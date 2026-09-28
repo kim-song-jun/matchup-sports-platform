@@ -3,7 +3,9 @@
 > **정본**: `docs/design/competition-canonical-flow.md` §3 "참가 명단이 경기 명단의 기본값이고, 팀이 경기마다 조정한다" · §6 "경기별 출전 명단".
 > **결정**: 2026-09-27 회의(성준·승민) 합의 → 2026-09-28 사용자 확정 — D1=조정 기록 테이블 · D2=참가 명단 전체가 기준 ·
 > D3=규정을 넣은 대회·리그만 출전정지 자동 제외 · 화면=경기 명단 화면(기본) + 빠른 선택 시트 · 대회·리그 한 모델.
-> D4(노출 수준)는 추천안(경기 상세의 팀장 전용 버튼만) 적용. D5(분담)는 2026-09-28 19시 미팅에서 정한다.
+> 추가 확정(2026-09-28): 팀 화면 T1 = A(다가오는 경기 카드) + B(선수 × 경기 일괄) + C(결장 기간) **전부 + 어드민에서도** ·
+> Q1 = 리그도 "경기 시작 전까지"로 통일(리그의 경기 중 명단 수정은 없어지고, 시작 후 변경은 어드민 결과 정정으로).
+> D4(노출 수준)는 추천안 적용. **미결**: D6(본인 결장 신고), D5(분담, 2026-09-28 19시 미팅).
 
 ## Context
 
@@ -28,12 +30,15 @@
 ## Original Conditions
 
 - [ ] 대회·리그 모두 팀 owner·manager 가 경기별로 선수를 빼고 되돌릴 수 있다(회의 "제외해주고 추가해주고").
-- [ ] 조정은 경기 시작 전(`SCHEDULED`)까지만(2026-09-28 사용자 선택 "경기 시작 전까지").
+- [ ] 조정은 경기 시작 전(`SCHEDULED`)까지만(2026-09-28 사용자 선택). 리그도 같다 — 지금의 리그 경기 중 명단 저장(LIVE·PAUSED)을 없앤다(Q1). 시작 후 변경은 어드민 결과 정정.
 - [ ] 조정은 새 테이블에 기록된다 — 누가·언제·왜. 지우지 않는다(회의 "DB 에 기록하려면 새 테이블").
 - [ ] 기준은 참가 명단 전체(D2). 검인은 기준을 바꾸지 않는다.
 - [ ] 참가 명단이 바뀌면 조정한 경기에도 반영된다(추가된 선수는 출전, 조정 기록은 유지).
 - [ ] 규정을 넣은 대회·리그는 출전정지 선수가 경기 명단에서 자동으로 빠진다(D3). 규정이 비면 영향 없음.
 - [ ] 옵셔널 — 진입점은 경기 상세와 팀 상세 "다가오는 경기"의 팀장 전용 버튼. 홈·알림·할 일에 띄우지 않는다(D4).
+- [ ] 팀 B: 팀 운영 메뉴 "경기 명단 관리" — 선수 × 다가오는 대회·리그 경기, 셀로 빼기/되돌리기, 일괄 저장.
+- [ ] 팀 C: 결장 기간 등록 — 기간 안에 시작하는 대회·리그 경기에서 자동 제외(나중에 잡히는 경기 포함). 새 테이블. 본인 등록은 D6.
+- [ ] 어드민: 참가 신청(명단 검토) 화면의 팀 행 "경기별 명단" 펼침, 운영 보드 경기 카드 요약·"명단" 버튼, 결장 기간 대리 등록. 기록에 운영자로 남는다.
 - [ ] 팀 ↔ 경기 양방향(2026-09-28 사용자 지시): 팀 상세의 경기 행에서 그 경기 명단으로(대회·리그 = 조정, 친선 = 참석명단), 경기 명단 화면에서 "우리 팀 다른 경기"로.
 - [ ] 화면: 경기 명단 화면(출전/빠짐/출전정지 + 변경 기록) + 경기 상세의 빠른 선택 시트. 시작 후 읽기 전용.
 - [ ] 운영 콘솔에는 편집 기능을 더하지 않는다(회의 "운영 방해 없이").
@@ -69,11 +74,29 @@ model V1GameRosterAdjustment {
   action          V1GameRosterAdjustmentAction
   reason          String?  // INJURY | PERSONAL | LATE_OR_EARLY | OTHER (DTO 에서 enum 검증)
   actorUserId     String
+  actorRole       String   // TEAM_MANAGER | ADMIN | STAFF — 변경 기록에 "팀장/운영자" 로 보인다
   createdAt       DateTime @default(now())
   revokedAt       DateTime?
   revokedByUserId String?
   @@index([gameId, sideId])
   // 같은 (gameId, sideId, userId) 에 revokedAt IS NULL 인 행은 하나만 — 부분 유니크 인덱스(raw SQL)
+}
+```
+
+```prisma
+model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
+  id              String   @id @default(uuid())
+  teamId          String
+  userId          String
+  startsAt        DateTime
+  endsAt          DateTime
+  reason          String?  // INJURY | PERSONAL | OTHER
+  actorUserId     String
+  actorRole       String   // SELF | TEAM_MANAGER | ADMIN | STAFF
+  createdAt       DateTime @default(now())
+  revokedAt       DateTime?
+  revokedByUserId String?
+  @@index([teamId, userId])
 }
 ```
 
@@ -86,7 +109,7 @@ model V1GameRosterAdjustment {
 ### 계산 — 경기 명단은 결과물
 
 ```
-경기 명단(side) = 기준 명단(side) − 활성 EXCLUDE(side) − 출전정지(side, 규정이 있을 때만)
+경기 명단(side) = 기준 명단(side) − 활성 EXCLUDE(side) − 결장 기간(경기 시작 시각이 기간 안) − 출전정지(side, 규정이 있을 때만)
 기준 명단 = 그 대회·리그의 confirmed 참가 명단(removedAt null) · 없으면 리그 한정 팀 활성 멤버(현행 폴백)
 ```
 
@@ -95,7 +118,8 @@ model V1GameRosterAdjustment {
   새 DRAFT 리비전을 추가만 한다(골·카드 이벤트 FK), `SCHEDULED` 인 경기만 건드린다, 감사 행을 남긴다.
 - 달라지는 점: 지금은 "팀장이 저장·제출한 라인업은 동기화하지 않는다"인데, 이제 팀장이 경기 명단 전체를 저장하는
   경로가 대회·리그에서 없어지므로 **모든 시작 전 경기가 동기화 대상**이 된다. 팀장의 뜻은 조정 기록으로 남아 계산에 들어간다.
-- 계산이 도는 때: 참가 명단 변경(추가·삭제·등번호), 조정 저장·되돌리기, 앞 경기 결과 확정(출전정지가 바뀔 수 있음).
+- 계산이 도는 때: 참가 명단 변경(추가·삭제·등번호), 조정 저장·되돌리기, 결장 기간 등록·취소(그 팀의 기간 안 시작 전 경기), 경기 시작 시각 변경, 앞 경기 결과 확정(출전정지가 바뀔 수 있음).
+- 친선 팀매치에는 결장 기간을 자동 적용하지 않는다(제출하는 참석명단이라). 참석명단 화면에 "결장 중" 배지만 보인다.
 - 출전정지: `tournaments/discipline/suspension-verdicts.ts` 의 `readSuspensionVerdicts` 를 계산에 넣는다.
   규정이 비면 조회 없이 빈 맵 — 현행 옵트인 그대로. 제출 경로의 `assertNoSuspendedParticipants` 는 남은 소비처를 확인한 뒤 정리한다.
 
@@ -107,6 +131,10 @@ model V1GameRosterAdjustment {
 | POST | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 owner·manager · 운영자 | `{ userId, reason? }` → EXCLUDE. 이미 활성이면 멱등 200 |
 | DELETE | `/games/:gameId/sides/:sideId/roster-adjustments/:userId` | 같음 | 활성 EXCLUDE 를 revoke. 없으면 멱등 200 |
 | GET | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 활성 멤버 · 운영자 | 변경 기록(revoke 포함, 시간순) |
+| GET | `/teams/:teamId/game-rosters` | 그 팀 owner·manager · 운영자 | 팀 B: 선수 × 다가오는 대회·리그 경기 매트릭스(출전/빠짐/결장/정지 + 사유·actor) |
+| POST | `/teams/:teamId/game-rosters/batch` | 같음 | 팀 B: `{ changes: [{ gameId, userId, op: 'EXCLUDE'\|'REVOKE', reason? }] }` 한 트랜잭션. 시작된 경기가 섞이면 전체 409 |
+| GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | owner·manager · 운영자 · 본인(D6) | 팀 C: 결장 기간 조회·등록·취소 |
+| GET | `/admin/tournaments/:id/registrations/:registrationId/game-rosters` | 어드민·그 대회 스태프 | 어드민: 참가 신청 화면의 팀별 경기 × 선수. 쓰기는 위 API 를 운영자 권한으로 |
 
 - 쓰기는 경기 `SCHEDULED` 일 때만 — 아니면 409 `LINEUP_DEADLINE_PASSED`(기존 코드 재사용).
 - 기준 명단 밖 `userId` 는 422 `ROSTER_ADJUSTMENT_NOT_IN_ROSTER`. 출전정지 선수 되돌리기는 조정 대상이 아니다(계산이 뺀다).
@@ -127,13 +155,21 @@ model V1GameRosterAdjustment {
 - 기존 자산: 팀 상세 `TeamUpcomingGamesCard`(`components/teams/team-upcoming-games-card.tsx`, 내 팀일 때만) ←
   `GET /teams/:teamId/upcoming-games` ← `LineupTodoService.listUpcomingForTeam`. 대회·리그·친선을 `V1TeamMatch` 한 테이블에서
   모으고 `competitionKind` 로 구분한다. 지금은 모든 행이 전술보드(`/teams/:id/tactics/:gameId`)로만 연결된다.
-- **팀 A안(추천, T1 미결)**: 이 카드의 행에 명단 요약과 버튼을 더한다.
+- **팀 A**: 이 카드의 행에 명단 요약과 버튼을 더한다.
   - 대회·리그: `rosterSummary { participating, excluded, suspended }` 를 응답에 추가 → "명단" 버튼 → 경기 명단 화면(2).
   - 친선: 기존 `lineupState` 로 "참석명단 제출/미제출" → "참석명단" 버튼 → `/team-matches/:id/lineup`.
   - "전술" 버튼은 그대로. 버튼은 owner·manager 에게만, 팀원은 요약만.
 - 경기 명단 화면(2) 상단에 "우리 팀 다른 경기 ›" → 팀 상세 다가오는 경기.
-- 팀 B안(선수별 일괄 관리 화면)·C안(선수 결장 기간 등록 — 새 테이블)은 인터뷰 결과를 보고 정한다. B는 같은 조정 기록을 일괄로
-  쓰므로 A 위에 얹을 수 있고, C는 `V1TeamMemberUnavailability`(팀 × 선수 × 기간) 테이블과 계산식 한 항이 추가된다.
+- **팀 B**: 팀 운영 메뉴(`buildTeamOperations`)에 "경기 명단 관리" — 선수 × 다가오는 대회·리그 경기, 같은 조정 기록을 일괄로 쓴다.
+- **팀 C**: 팀원 상세와 B 화면의 "결장 기간 등록" — `V1TeamMemberUnavailability`, 계산식에 한 항.
+
+### 어드민
+
+- **참가 신청(명단 검토)** `admin/tournaments/[id]/registrations`, `admin/league-matches/[leagueId]/registrations` — 팀 행에
+  "경기별 명단" 펼침(팀 B 와 같은 선수 × 경기 표), 결장 기간 대리 등록.
+- **운영 보드** `admin/live/[id]/operations` — 경기 카드에 "빠짐 N · 정지 N" 요약과 "명단" 버튼 → 경기 명단 화면(운영자 권한), 시작 전만 편집.
+- **결과 정정** `admin/live/[id]/records/corrections` — 바꾸지 않는다. 경기 시작 후 출전 변경은 여기로만.
+- 운영자가 한 조정은 `actorRole = ADMIN | STAFF` 로 남아 팀 화면 변경 기록에 "운영자"로 보인다.
 
 ### 리그 이관
 
@@ -161,6 +197,9 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 - **BE-2**: 계산 함수 + 대회·리그 동기화 통합 + 출전정지 반영. BE-1 과 같은 PR 이어도 된다.
 - **FE**(BE-1 계약 고정 후 병렬): 경기 상세 카드 · 경기 명단 화면 · 빠른 선택 시트 · 변경 기록 · 리그 진입점 교체 · 팀 상세 다가오는 경기 행 확장. changeset 필수.
 - **BE-4**: `upcoming-games` 응답에 `rosterSummary` 추가(대회·리그). 친선은 기존 `lineupState` 재사용.
+- **BE-5**: 결장 기간 테이블·API·계산식 반영(팀 C), 팀 B 매트릭스·일괄 API, 어드민 조회 API.
+- **BE-6**: 리그 경기 중 명단 저장 제거(Q1) — `team-match-lineup.service.ts` 의 `liveEditAllowed` 를 리그 경기에서 끈다(친선은 유지). 기존 통합 스펙 조정.
+- **FE-2**: 팀 B 화면(팀 운영 메뉴), 결장 기간 시트(팀원 상세·B), 어드민 참가 신청 펼침·운영 보드 카드.
 - **BE-3**: 리그 이관 스크립트(dry-run 기본).
 - **QA**: alpha 대회 1개·리그 1개 끝까지. ego-browser 390/768/1440 갤러리.
 
@@ -195,9 +234,9 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 
 ## Ambiguity Log
 
-1. **리그의 경기 중 명단 수정.** 지금 리그는 LIVE·PAUSED 에서도 팀장이 명단을 저장한다(친선과 공유 경로,
-   `team-match-lineup.service.ts:159`). "시작 전까지"로 통일하면 리그만 경기 중 수정이 사라진다. → **사용자 확인 필요.**
+1. **리그의 경기 중 명단 수정.** → **해결(2026-09-28): 시작 전까지로 통일.** 친선은 경기 중 저장 유지.
 2. **조정 알림.** 상대팀·운영진에게 알릴지. 현재 설계는 알리지 않는다(D4 "구석에").
 3. **검인과의 관계.** 검인에서 "안 옴"인 선수를 조정 화면에 표시만 할지. 현재 설계는 표시하지 않는다(D2 가 명단 기준).
-4. **팀 화면 범위(T1).** 팀 A안만 할지, B(일괄)·C(결장 기간)까지 할지. 추천은 A 먼저. → **사용자 확인 필요.**
+4. **팀 화면 범위(T1).** → **해결(2026-09-28): A + B + C 전부 + 어드민.**
+6. **본인 결장 신고(D6).** 선수 본인이 결장 기간을 등록할 수 있나 — 즉시 반영(추천) / 팀장 승인 / 불가. → **사용자 확인 필요.**
 5. **회의 화자.** 녹취에 화자 구분이 없어 일부 발언의 주체가 불명확하다(아티팩트 표시). 결정에는 영향 없음.

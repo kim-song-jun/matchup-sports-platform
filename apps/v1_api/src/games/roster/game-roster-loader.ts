@@ -81,6 +81,7 @@ export interface GameRosterSideContext extends CompetitionTeamScope {
 export interface LoadedGameRoster {
   readonly context: GameRosterSideContext;
   readonly baseSource: GameRosterBaseSource;
+  readonly base: readonly GameRosterBaseEntry[];
   readonly computation: GameRosterComputation;
 }
 
@@ -172,6 +173,7 @@ export async function loadGameRoster(
   return {
     context,
     baseSource: base.source,
+    base: base.entries,
     computation: computeGameRoster({
       base: base.entries,
       adjustments,

@@ -109,7 +109,7 @@ describe('computeGameRoster — 경기 명단 = 기준 − 조정 − 결장 −
       adjustments: [exclude('outsider-1')],
       unavailabilities: [away('outsider-2', '2026-10-01T00:00:00Z', '2026-10-20T00:00:00Z')],
       gameStartAt: KICKOFF,
-      suspensionVerdicts: new Map([['outsider-3', { suspended: true, reason: '퇴장' }]]),
+      suspensionVerdicts: new Map([['outsider-3', { suspended: true, reason: '퇴장', remainingMatches: 1 }]]),
     });
     expect(roster.participants).toEqual(BASE);
     expect([...roster.excluded, ...roster.unavailable, ...roster.suspended]).toEqual([]);
@@ -193,15 +193,15 @@ describe('computeGameRoster — 사유가 겹칠 때 우선순위: 출전정지 
     ],
     gameStartAt: KICKOFF,
     suspensionVerdicts: new Map([
-      ['u1', { suspended: true, reason: '레드카드 1장 · 1경기 정지' }],
-      ['u4', { suspended: false, reason: null }],
+      ['u1', { suspended: true, reason: '레드카드 1장 · 1경기 정지', remainingMatches: 2 }],
+      ['u4', { suspended: false, reason: null, remainingMatches: 0 }],
     ]),
   });
 
   it('세 사유가 모두 걸린 사람은 출전정지로만 나온다', () => {
     expect(ids(allThree.suspended)).toEqual(['u1']);
     expect(allThree.suspended[0]).toEqual(
-      expect.objectContaining({ reason: '레드카드 1장 · 1경기 정지' }),
+      expect.objectContaining({ reason: '레드카드 1장 · 1경기 정지', remainingMatches: 2 }),
     );
   });
 

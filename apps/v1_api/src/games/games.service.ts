@@ -101,6 +101,7 @@ import {
   hydrateFriendlyTeamMatchResultParticipants as mergeFriendlyTeamMatchResultParticipants,
 } from './core/friendly-team-match-result-participants';
 import type {
+  GameActorRole,
   GameActorScope,
   GameCommandContext,
   GameCreationResult,
@@ -6019,6 +6020,35 @@ export class GamesService {
       upcomingKey,
       lineupId,
     });
+  }
+
+  /**
+   * 경기 명단 조정(Task 176)용 운영자 판정. 플랫폼 운영자·그 대회 스태프면 역할과 쓰기 가능 여부를,
+   * 아니면 null 을 준다. 팀 액터(`team_*`)는 사이드를 보지 않고 통과하므로 운영자로 치지 않는다 —
+   * 팀 권한은 호출부가 사이드 팀 멤버십으로 따로 판정한다.
+   */
+  async resolveCompetitionOperator(
+    tx: Transaction | PrismaService,
+    gameId: string,
+    userId: string,
+  ): Promise<{ role: GameActorRole; canMutateLineup: boolean } | null> {
+    const operatorRoles: ReadonlySet<GameActorRole> = new Set([
+      'platform_ops',
+      'tournament_director',
+      'field_operator',
+      'support_readonly',
+    ]);
+    // ForbiddenException 은 "이 액션은 못 한다"는 판정값이다(3622 의 canMutateLineup 과 같은 규칙).
+    const probe = (action: GameAuthorizationAction) =>
+      this.resolveActor(tx, gameId, userId, action).catch((error: unknown) => {
+        if (!(error instanceof ForbiddenException)) throw error;
+        return null;
+      });
+    const mutate = await probe('lineup_mutate');
+    if (mutate !== null && operatorRoles.has(mutate.role)) return { role: mutate.role, canMutateLineup: true };
+    const read = await probe('read');
+    if (read !== null && operatorRoles.has(read.role)) return { role: read.role, canMutateLineup: false };
+    return null;
   }
 
   private async resolveActor(

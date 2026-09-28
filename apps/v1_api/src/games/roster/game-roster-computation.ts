@@ -35,7 +35,7 @@ export interface GameRosterUnavailabilityInput {
   readonly revokedAt: Date | null;
 }
 
-export type GameRosterSuspensionInput = Pick<SuspensionVerdict, 'suspended' | 'reason'>;
+export type GameRosterSuspensionInput = Pick<SuspensionVerdict, 'suspended' | 'reason' | 'remainingMatches'>;
 
 export interface GameRosterComputationInput {
   readonly base: readonly GameRosterBaseEntry[];
@@ -50,6 +50,8 @@ export interface GameRosterComputationInput {
 export interface GameRosterSuspendedEntry {
   readonly entry: GameRosterBaseEntry;
   readonly reason: string | null;
+  /** 이번 경기를 포함한 남은 정지 경기 수. */
+  readonly remainingMatches: number;
 }
 
 export interface GameRosterUnavailableEntry {
@@ -115,7 +117,7 @@ export function computeGameRoster(input: GameRosterComputationInput): GameRoster
   for (const entry of input.base) {
     const verdict = input.suspensionVerdicts.get(entry.userId);
     if (verdict?.suspended === true) {
-      result.suspended.push({ entry, reason: verdict.reason });
+      result.suspended.push({ entry, reason: verdict.reason, remainingMatches: verdict.remainingMatches });
       continue;
     }
     const period = unavailabilityByUser.get(entry.userId);

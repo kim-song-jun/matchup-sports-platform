@@ -14,6 +14,8 @@ import {
 import { GameBroadcastRegistry } from './game-broadcast.registry';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { GameRosterController } from './roster/game-roster.controller';
+import { GameRosterService } from './roster/game-roster.service';
 import { TeamMatchClaimableParticipantsController } from './team-match-claimable-participants.controller';
 
 // WebPushModule: 신원 연결 승인 요청 푸시(2026-08-26). NotificationsServiceModule 을 통째로
@@ -28,10 +30,12 @@ import { TeamMatchClaimableParticipantsController } from './team-match-claimable
     LeagueFixtureClaimAccessController,
     TeamMatchClaimableParticipantsController,
     LeagueClaimableFixturesController,
+    GameRosterController,
   ],
   providers: [
     GamesService,
     LeagueClaimableFixturesService,
+    GameRosterService,
     GameTakeoverService,
     GameBroadcastRegistry,
     OptionalV1AuthGuard,

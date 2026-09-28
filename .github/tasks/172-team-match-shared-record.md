@@ -8,7 +8,7 @@
 ## Phases
 - [x] 최신 origin/dev 독립 worktree 및 현재 계약 확인
 - [x] 공동 기록 API, 라인업 권한, 버전 충돌/재시도, 이력 및 확정 구현
-- [x] 진행 중 참석명단 수정 허용 및 기존 경기 기록 존재 시 손실 위험 재확인
+- [x] 진행 중 한쪽 명단 미완료 복구 허용, 양 팀 제출 또는 첫 기록부터 수정 잠금
 - [x] 참가자/일반 사용자 진입과 공동 기록 화면 구현
 - [x] 좁은 API/UI 검증 및 실제 브라우저 전 흐름 3폭 검증
 - [x] 문서/스크린샷/changeset/dev 대상 PR
@@ -47,3 +47,6 @@
 - 전용 headed 브라우저·API·Web 종료. 병합 후 다시 시작한 전용 PostgreSQL도 검증 완료 후 종료. 원래 공유 작업트리 WIP는 변경하지 않았다.
 
 - CI follow-up: schema bytes changed but the release/client attestation and game-schema fixture pins still referenced Task 149. Rebound current schema `58b05adaedc4e53461167c4efa1c101e1297297b122db6a173b06f899fb2e7d9`, preserving historical manifest pins and immutable M11. Binding gate 7/7 and the previously failing source-snapshot integration test pass. No runtime source changed after the 42-screen gallery.
+
+- 2026-09-28 follow-up: wall-clock/위험확인 기반 명단 재수정을 서버 상태 기반 복구 창으로 교체했다. `SCHEDULED`는 시각과 무관하게 열고, `LIVE`/`PAUSED`는 한쪽 최신 명단이 미완료인 동안만 연다. 양 팀 제출, 일반 이벤트, 공동 기록, 결과 revision부터 잠그며 명단·기록 mutation은 같은 Game 행 잠금을 사용한다. PR/alpha 검증은 이 follow-up 브랜치에서 수행한다.
+- 2026-09-28 validation: API 집중 단위 34/34, Web 명단 단위 41/41, 양쪽 `tsc --noEmit`, API surface/Web pattern lint를 통과했다. 로컬 통합 테스트는 격리 suite에 필요한 `DATABASE_URL`이 없고 Docker daemon도 사용할 수 없어 시작 전 차단됐으며, dev PR CI에서 DB 통합 검증을 이어간다.

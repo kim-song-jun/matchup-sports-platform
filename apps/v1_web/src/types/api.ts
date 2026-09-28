@@ -1569,6 +1569,11 @@ export type V1GameRevisionMutationResult = {
 // 엔드포인트는 없다(정정 요청은 내용을 보지 않고 사유만 남기는 blind 액션).
 export type V1TeamMatchLineupRole = 'team_owner' | 'team_manager';
 export type V1TeamMatchLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
+export type V1TeamMatchLineupLockReason =
+  | 'terminal'
+  | 'records_exist'
+  | 'active_lineups_complete'
+  | null;
 
 export type V1TeamMatchLineupStarter = {
   // `V1GameParticipant.id` — Task 17의 결과 입력 폼이 골·카드를 특정 로스터 행에
@@ -1641,7 +1646,12 @@ export type V1TeamMatchLineup = {
   // 새 행으로 supersede되므로 row 자체의 `version`과는 별개다 — team-match-lineup.service.ts 참조.
   revision: number;
   state: V1TeamMatchLineupState;
+  /** 서버가 실제 경기 상태, 양 팀 최신 revision, 기록 존재 여부를 함께 판정한 값. */
+  editable?: boolean;
+  /** optional은 API/Web 순차 배포 창의 구버전 응답 호환용이다. 누락 시 화면은 잠근다. */
+  lockReason?: V1TeamMatchLineupLockReason;
   gameState?: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+  /** @deprecated `editable`/`lockReason`을 사용한다. */
   hasRecordedEvents?: boolean;
   version: number;
   // 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치.
@@ -1677,6 +1687,7 @@ export type V1TeamMatchLineupParticipantInput = {
 // 추가돼 이제 저장·응답 모두 반영된다.
 export type V1TeamMatchLineupSavePayload = {
   expectedVersion: number;
+  /** @deprecated 구버전 API 호환용. 새 서버는 기록 시작 뒤 수정을 허용하지 않는다. */
   confirmRecordedDataRisk?: boolean;
   /**
    * 전술보드가 정한 배치. 라인업 화면은 **편집하지 않고 그대로 되돌려 보낸다**(정본 §3 —

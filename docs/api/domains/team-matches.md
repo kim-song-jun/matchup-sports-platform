@@ -39,10 +39,11 @@
 
 ### 진행 중 참석명단 수정
 
-- `GET /team-matches/:id/lineup`은 `gameState`와 `hasRecordedEvents`를 반환한다.
-- Game이 `LIVE` 또는 `PAUSED`이면 킥오프 이후나 기존 라인업이 `LOCKED`여도 팀 owner/manager가 참석명단을 새 리비전으로 저장하고 다시 제출할 수 있다. 종료·취소된 경기는 계속 차단한다.
-- 경기 이벤트가 하나라도 있으면 `PUT /team-matches/:id/lineup`은 `confirmRecordedDataRisk=true`를 요구한다. 없으면 `409 LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED`를 반환한다.
-- Web은 저장 전에 득점 등 선수 기록이 화면에서 사라질 수 있음을 알리고 사용자의 명시적 재확인을 받은 요청에만 확인값을 포함한다.
+- `GET /team-matches/:id/lineup`은 서버가 계산한 `editable`과 `lockReason`(`terminal`, `records_exist`, `active_lineups_complete`, `null`)을 반환한다. `gameState`와 `hasRecordedEvents`는 구버전 Web 호환 필드다.
+- 예정 시작 시각은 수정 마감이 아니다. Game이 `SCHEDULED`이면 `startAt`이 지나도 현장 지연 복구를 위해 저장·제출·정정 요청을 허용한다.
+- Game이 `LIVE`/`PAUSED`일 때는 양 팀 중 한쪽 최신 revision이 아직 미제출인 동안만 복구할 수 있다. 양 팀 최신 revision이 모두 `SUBMITTED`/`LOCKED`가 되면 즉시 잠긴다.
+- 일반 경기 이벤트, 공동 기록, 결과 revision 중 하나라도 생기면 참석명단 수정은 `409 LINEUP_LOCKED_FOR_DIRECT_EDIT`로 거절된다. 구버전의 `confirmRecordedDataRisk` 값으로 우회할 수 없다.
+- 명단 mutation과 공동 기록/Game command는 같은 Game 행을 잠근 뒤 상태를 다시 읽어 동시 요청에서 참가자 ID가 기록 뒤에 바뀌지 않게 한다.
 
 
 
@@ -281,7 +282,7 @@ Rules:
 - Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
 - Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement.
 - Opponent-side lineup access and change requests require an approved opponent team.
-- A submitted attendance roster remains editable until the game starts. Saving an edit creates a new draft revision, which can be submitted again without mutating the previous submitted revision.
+- Scheduled games remain editable regardless of wall-clock kickoff. LIVE/PAUSED games remain editable only while either side's latest lineup is incomplete and no event/shared-record/result revision exists. The GET response's `editable`/`lockReason` is the client source of truth.
 - Goalkeeper is an independent per-participant designation: multiple participants or no participant may be marked as goalkeeper.
 
 ## Frontend Mapping Notes

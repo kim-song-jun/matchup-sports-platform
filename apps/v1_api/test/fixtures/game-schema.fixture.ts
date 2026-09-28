@@ -537,7 +537,11 @@ export const gameSchemaSourceManifest = {
   // tournament_hosting/partnership, backed by 20260927100000_v1_inquiry_public_categories.
   // No game model changed.
   // 2026-09-27: guestInquiryRetentionDays Int + nullable V1Inquiry.guestRetentionDays/purgedAt/purgedByAdminUserId, in the same two migrations.
-  schema: 'a253cc251952aa69690f275ce2ef6bdf72d7c6cdede9b5ce631f181735599dab',
+  // 2026-09-28 Task 176: additive V1GameRosterAdjustment + V1TeamMemberUnavailability tables
+  // (20260928090000_v1_game_roster_adjustments) and back-relation fields on V1Game/V1GameSide/
+  // V1Team/V1User. No existing column, constraint or index changed; the bound game-operations
+  // migration is unchanged.
+  schema: '37e55f108dfd4ca3cd9d97549605ddd31a043295a3fd4bc298f5603db346236e',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

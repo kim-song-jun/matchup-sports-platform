@@ -17,6 +17,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
 import { GamesService } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
+import type { GameRosterActorRole } from './game-roster-computation';
 import { loadGameRoster } from './game-roster-loader';
 import { isUnmigratedTeamAuthoredLineup, syncGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
@@ -63,6 +64,17 @@ function rosterNotAvailable(message: string) {
   return new NotFoundException({ code: 'GAME_ROSTER_NOT_AVAILABLE', message });
 }
 
+/** 계정 id → 화면 표시 이름. 없는 계정은 맵에서 빠진다. */
+export async function loadDisplayNames(tx: Tx, userIds: readonly string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Map();
+  const users = await tx.v1User.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, profile: { select: { nickname: true, displayName: true } } },
+  });
+  return new Map(users.map((row) => [row.id, participantDisplayName({ user: { profile: row.profile } })]));
+}
+
 /** Task 176 — 대회·리그 경기 한 사이드의 명단 조회와 경기별 빼기·되돌리기. */
 @Injectable()
 export class GameRosterService {
@@ -74,19 +86,19 @@ export class GameRosterService {
   // 리그 기준 명단 로드가 명단 없는 확정 신청을 그 자리에서 채울 수 있어 조회도 트랜잭션 안에서 한다.
   getRoster(user: V1AuthUser, target: SideTarget): Promise<GameRosterView> {
     return this.prisma.$transaction(async (tx) => {
-      const access = await this.authorize(tx, user.id, target, 'read');
+      const access = await this.authorizeSide(tx, user.id, target, 'read');
       return this.readView(tx, target, access);
     });
   }
 
   listAdjustments(user: V1AuthUser, target: SideTarget) {
     return this.prisma.$transaction(async (tx) => {
-      await this.authorize(tx, user.id, target, 'read');
+      await this.authorizeSide(tx, user.id, target, 'read');
       const rows = await tx.v1GameRosterAdjustment.findMany({
         where: { gameId: target.gameId, sideId: target.sideId },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
-      const names = await this.displayNames(
+      const names = await loadDisplayNames(
         tx,
         rows.flatMap((row) => [row.userId, row.actorUserId, ...(row.revokedByUserId === null ? [] : [row.revokedByUserId])]),
       );
@@ -116,62 +128,79 @@ export class GameRosterService {
 
   exclude(user: V1AuthUser, target: SideTarget, dto: CreateGameRosterAdjustmentDto) {
     return this.prisma.$transaction(async (tx) => {
-      const access = await this.authorize(tx, user.id, target, 'write');
-      await this.lockScheduledGame(tx, target.gameId);
-      const loaded = await loadGameRoster(tx, target);
-      if (loaded === null) throw rosterNotAvailable('참가 명단이 확정되지 않은 팀이에요.');
-      if (!loaded.base.some((entry) => entry.userId === dto.userId)) {
-        throw new UnprocessableEntityException({
-          code: 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER',
-          message: '이 팀의 참가 명단에 없는 선수예요.',
-        });
-      }
-      const existing = await tx.v1GameRosterAdjustment.findFirst({
-        where: { gameId: target.gameId, sideId: target.sideId, userId: dto.userId, revokedAt: null },
-      });
-      if (existing !== null) {
-        return { alreadyApplied: true, adjustment: adjustmentView(existing), roster: await this.readView(tx, target, access) };
-      }
-      const created = await tx.v1GameRosterAdjustment.create({
-        data: {
-          gameId: target.gameId,
-          sideId: target.sideId,
-          userId: dto.userId,
-          action: V1GameRosterAdjustmentAction.EXCLUDE,
-          reason: dto.reason ?? null,
-          actorUserId: user.id,
-          actorRole: access.writeRole!,
-        },
-      });
-      await syncGameSideRoster(tx, target);
-      return { alreadyApplied: false, adjustment: adjustmentView(created), roster: await this.readView(tx, target, access) };
+      const access = await this.authorizeSide(tx, user.id, target, 'write');
+      await this.lockScheduledGames(tx, [target.gameId]);
+      const result = await this.applyExclude(tx, { userId: user.id, role: access.writeRole! }, target, dto);
+      if (!result.alreadyApplied) await syncGameSideRoster(tx, target);
+      return { ...result, roster: await this.readView(tx, target, access) };
     });
   }
 
   revoke(user: V1AuthUser, target: SideTarget, userId: string) {
     return this.prisma.$transaction(async (tx) => {
-      const access = await this.authorize(tx, user.id, target, 'write');
-      await this.lockScheduledGame(tx, target.gameId);
-      const existing = await tx.v1GameRosterAdjustment.findFirst({
-        where: { gameId: target.gameId, sideId: target.sideId, userId, revokedAt: null },
-      });
-      if (existing === null) {
-        return { alreadyApplied: true, roster: await this.readView(tx, target, access) };
-      }
-      await tx.v1GameRosterAdjustment.update({
-        where: { id: existing.id },
-        data: { revokedAt: new Date(), revokedByUserId: user.id },
-      });
-      await syncGameSideRoster(tx, target);
-      return { alreadyApplied: false, roster: await this.readView(tx, target, access) };
+      const access = await this.authorizeSide(tx, user.id, target, 'write');
+      await this.lockScheduledGames(tx, [target.gameId]);
+      const result = await this.applyRevoke(tx, user.id, target, userId);
+      if (!result.alreadyApplied) await syncGameSideRoster(tx, target);
+      return { ...result, roster: await this.readView(tx, target, access) };
     });
+  }
+
+  /**
+   * EXCLUDE 한 건. 명단 동기화는 하지 않는다 — 호출자가 바뀐 사이드마다 한 번 돌린다.
+   * 이미 활성이면 첫 행을 그대로 돌려준다(사유를 덮지 않는다).
+   */
+  async applyExclude(
+    tx: Tx,
+    actor: { userId: string; role: GameRosterActorRole },
+    target: SideTarget,
+    input: { userId: string; reason?: string | null },
+  ): Promise<{ alreadyApplied: boolean; adjustment: GameRosterAdjustmentView }> {
+    const loaded = await loadGameRoster(tx, target);
+    if (loaded === null) throw rosterNotAvailable('참가 명단이 확정되지 않은 팀이에요.');
+    if (!loaded.base.some((entry) => entry.userId === input.userId)) {
+      throw new UnprocessableEntityException({
+        code: 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER',
+        message: '이 팀의 참가 명단에 없는 선수예요.',
+        details: { gameId: target.gameId, userId: input.userId },
+      });
+    }
+    const existing = await tx.v1GameRosterAdjustment.findFirst({
+      where: { gameId: target.gameId, sideId: target.sideId, userId: input.userId, revokedAt: null },
+    });
+    if (existing !== null) return { alreadyApplied: true, adjustment: adjustmentView(existing) };
+    const created = await tx.v1GameRosterAdjustment.create({
+      data: {
+        gameId: target.gameId,
+        sideId: target.sideId,
+        userId: input.userId,
+        action: V1GameRosterAdjustmentAction.EXCLUDE,
+        reason: input.reason ?? null,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+      },
+    });
+    return { alreadyApplied: false, adjustment: adjustmentView(created) };
+  }
+
+  /** 활성 EXCLUDE 되돌리기 한 건. 동기화는 호출자 몫이다. */
+  async applyRevoke(tx: Tx, actorUserId: string, target: SideTarget, userId: string): Promise<{ alreadyApplied: boolean }> {
+    const existing = await tx.v1GameRosterAdjustment.findFirst({
+      where: { gameId: target.gameId, sideId: target.sideId, userId, revokedAt: null },
+    });
+    if (existing === null) return { alreadyApplied: true };
+    await tx.v1GameRosterAdjustment.update({
+      where: { id: existing.id },
+      data: { revokedAt: new Date(), revokedByUserId: actorUserId },
+    });
+    return { alreadyApplied: false };
   }
 
   /**
    * 사이드는 요청 값이 아니라 경기에서 다시 찾는다. 팀 권한은 **그 사이드 팀**의 멤버십으로만 준다 —
    * 경기 인가(`resolveActor`)의 팀 분기는 두 팀 중 어느 팀 매니저든 통과시키기 때문이다.
    */
-  private async authorize(
+  async authorizeSide(
     tx: Tx,
     userId: string,
     target: SideTarget,
@@ -214,14 +243,22 @@ export class GameRosterService {
     return access;
   }
 
-  /** 경기 시작 명령과 같은 행을 잠가, 조정이 시작 직후 경기에 끼어들지 않게 한다. */
-  private async lockScheduledGame(tx: Tx, gameId: string): Promise<void> {
-    await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
-    const game = await tx.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { state: true } });
-    if (game.state !== V1GameState.SCHEDULED) {
+  /**
+   * 경기 시작 명령과 같은 행을 잠가, 조정이 시작 직후 경기에 끼어들지 않게 한다.
+   * 여러 경기면 id 순으로 잠가 교착을 피하고, 하나라도 시작됐으면 전부 거부한다.
+   */
+  async lockScheduledGames(tx: Tx, gameIds: readonly string[]): Promise<void> {
+    const ids = [...new Set(gameIds)].sort();
+    for (const gameId of ids) {
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
+    }
+    const games = await tx.v1Game.findMany({ where: { id: { in: ids } }, select: { id: true, state: true } });
+    const started = games.filter((game) => game.state !== V1GameState.SCHEDULED).map((game) => game.id);
+    if (started.length > 0) {
       throw new ConflictException({
         code: 'LINEUP_DEADLINE_PASSED',
         message: '경기가 시작된 뒤에는 명단을 바꿀 수 없어요. 운영진에게 알려 주세요.',
+        details: { gameIds: started },
       });
     }
   }
@@ -251,7 +288,7 @@ export class GameRosterService {
         ? await isUnmigratedTeamAuthoredLineup(tx, target.gameId, target.sideId, latest)
         : false;
 
-    const displayNameByUserId = await this.displayNames(tx, [
+    const displayNameByUserId = await loadDisplayNames(tx, [
       ...computation.excluded.map((row) => row.actorUserId),
       ...computation.unavailable.map((row) => row.actorUserId),
     ]);
@@ -265,15 +302,5 @@ export class GameRosterService {
       legacyLineupPending,
       displayNameByUserId,
     });
-  }
-
-  private async displayNames(tx: Tx, userIds: readonly string[]): Promise<Map<string, string>> {
-    const ids = [...new Set(userIds)];
-    if (ids.length === 0) return new Map();
-    const users = await tx.v1User.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, profile: { select: { nickname: true, displayName: true } } },
-    });
-    return new Map(users.map((row) => [row.id, participantDisplayName({ user: { profile: row.profile } })]));
   }
 }

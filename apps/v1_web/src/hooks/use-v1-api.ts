@@ -2173,12 +2173,25 @@ export function useV1LineupTodos(options?: { enabled?: boolean }) {
 export type V1TeamUpcomingGame = {
   gameId: string;
   source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
+  teamMatchId: string | null;
+  /** 이 팀의 경기 사이드 — 경기 명단 화면(`/games/:gameId/sides/:sideId/roster` API)의 키. */
+  sideId: string | null;
   title: string;
   opponentName: string | null;
   scheduledAt: string | null;
   tournamentId: string | null;
   tournamentTitle: string | null;
   lineupState: 'MISSING' | 'DRAFT' | 'DONE';
+  /** 대회·리그 경기의 계산된 명단 요약. 친선과 확정 명단이 없는 팀은 null. */
+  rosterSummary: V1GameRosterSummary | null;
+};
+
+export type V1GameRosterSummary = {
+  participating: number;
+  excluded: number;
+  unavailable: number;
+  suspended: number;
 };
 
 export function useV1TeamUpcomingGames(teamId: string | null, options?: { enabled?: boolean }) {

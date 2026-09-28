@@ -188,15 +188,24 @@ export async function syncGameSideRoster(
   return true;
 }
 
-/** 대회·리그의 시작 전 경기. 대회 대진은 시각이 선택값이라 시각 없는 경기도 시작 전으로 본다. */
-function upcomingCompetitionGameWhere(competitionId: string, teamId: string, now: Date): Prisma.V1GameWhereInput {
+/**
+ * 한 팀의 대회·리그 시작 전 경기. 대회 대진은 시각이 선택값이라 시각 없는 경기도 시작 전으로 본다.
+ * `competitionId` 가 null 이면 그 팀의 모든 대회·리그 경기다.
+ */
+export function upcomingCompetitionGameWhere(
+  competitionId: string | null,
+  teamId: string,
+  now: Date,
+): Prisma.V1GameWhereInput {
   return {
     state: V1GameState.SCHEDULED,
     teamMatch: {
       deletedAt: null,
       status: { not: 'cancelled' },
       AND: [
-        { OR: [{ leagueId: competitionId }, { tournamentId: competitionId, leagueId: null }] },
+        competitionId === null
+          ? { OR: [{ leagueId: { not: null } }, { tournamentId: { not: null } }] }
+          : { OR: [{ leagueId: competitionId }, { tournamentId: competitionId, leagueId: null }] },
         { OR: [{ startAt: null }, { startAt: { gt: now } }] },
       ],
     },

@@ -14,9 +14,14 @@ import {
 import { GameBroadcastRegistry } from './game-broadcast.registry';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { AdminGameRosterController } from './roster/admin-game-roster.controller';
 import { GameRosterController } from './roster/game-roster.controller';
 import { GameRosterService } from './roster/game-roster.service';
+import { MemberUnavailabilityService } from './roster/member-unavailability.service';
+import { TeamGameRosterController } from './roster/team-game-roster.controller';
+import { TeamGameRosterService } from './roster/team-game-roster.service';
 import { TeamMatchClaimableParticipantsController } from './team-match-claimable-participants.controller';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 // WebPushModule: 신원 연결 승인 요청 푸시(2026-08-26). NotificationsServiceModule 을 통째로
 // import 하면 RealtimeModule → GamesModule 순환이 되므로, WebPushService 만 담은 최소 모듈을
@@ -31,11 +36,16 @@ import { TeamMatchClaimableParticipantsController } from './team-match-claimable
     TeamMatchClaimableParticipantsController,
     LeagueClaimableFixturesController,
     GameRosterController,
+    TeamGameRosterController,
+    AdminGameRosterController,
   ],
   providers: [
     GamesService,
     LeagueClaimableFixturesService,
     GameRosterService,
+    TeamGameRosterService,
+    MemberUnavailabilityService,
+    TournamentStaffAccessService,
     GameTakeoverService,
     GameBroadcastRegistry,
     OptionalV1AuthGuard,

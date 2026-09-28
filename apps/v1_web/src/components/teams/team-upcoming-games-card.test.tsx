@@ -24,12 +24,16 @@ function game(overrides: Record<string, unknown> = {}) {
   return {
     gameId: 'game-1',
     source: 'TEAM_MATCH' as const,
+    competitionKind: 'LEAGUE' as const,
+    teamMatchId: 'team-match-1',
+    sideId: 'side-1',
     title: '(테스트) 가을 리그 1주차',
     opponentName: '망원 FC',
     scheduledAt: '2026-09-02T13:00:00.000Z',
     tournamentId: null,
     tournamentTitle: null,
     lineupState: 'MISSING' as const,
+    rosterSummary: { participating: 11, excluded: 1, unavailable: 0, suspended: 0 },
     ...overrides,
   };
 }

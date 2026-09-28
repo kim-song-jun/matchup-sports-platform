@@ -60,7 +60,7 @@ import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/l
 import { randomUUID } from 'node:crypto';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
-import { syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
+import { findUpcomingTeamGameIds, lockGameScope, syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
 
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
@@ -1236,6 +1236,15 @@ export class LeagueMatchAdminService {
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const nextEndAt = nextStartAt !== undefined && durationMs !== null ? new Date(nextStartAt.getTime() + durationMs) : undefined;
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 시각이 바뀌면 양 팀의 시작 전 경기 명단을 다시 계산한다. 그 경기들(이 경기 포함)을 팀 매치보다
+      // 먼저 한 번에 잠근다 — 팀 매치를 쥔 채 경기를 잡으면 Game → TeamMatch 순서가 깨진다.
+      const teamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId].filter((id): id is string => id !== null);
+      const gameScope = dto.startsAt === undefined
+        ? undefined
+        : await lockGameScope(tx, [
+            ...(await tx.v1Game.findMany({ where: { teamMatchId }, select: { id: true } })).map((game) => game.id),
+            ...(await findUpcomingTeamGameIds(tx, teamIds.map((teamId) => ({ competitionId: leagueId, teamId })))),
+          ]);
       // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
       // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
       const trimmedPlaceName = dto.placeName === undefined ? undefined : dto.placeName.trim();
@@ -1259,10 +1268,7 @@ export class LeagueMatchAdminService {
         // (team-matches.service.ts:593의 동일 패턴). syncTeamMatchScheduleInTx는 teamMatchId
         // 기준으로 SCHEDULED 상태인 스케줄을 전부(호스트+원정 최대 2건) 갱신한다.
         await syncTeamMatchScheduleInTx(tx, teamMatchId, teamMatch.title, persistedStartAt, result.endAt);
-        await syncRostersForTeamMatchTeams(tx, {
-          competitionId: leagueId,
-          teamIds: [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
-        });
+        await syncRostersForTeamMatchTeams(tx, { competitionId: leagueId, teamIds }, gameScope);
       }
       await this.adminContext.logAdminAction(
         admin,

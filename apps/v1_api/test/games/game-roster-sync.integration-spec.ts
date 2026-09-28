@@ -18,6 +18,7 @@ import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-mat
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolve-team-match-competition-config';
+import { updateTournamentMatchInTx } from '../../src/tournaments/tournament-match-update';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -245,6 +246,25 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       // B 의 경기(g2)는 A 의 동기화가 건드리지 않는다.
       const g2 = side(f, 'g2', f.teamB.id);
       expect((await latestLineup(g2.gameId, g2.sideId)).revision).toBe(1);
+    });
+
+    // 수정마다 자기 경기를 먼저 잡고 팀 경기를 잡던 때는 g2 수정(g2 보유 → g3 대기)과 g3 수정(g3 보유 → g2 대기)이
+    // 서로를 기다렸다. 두 트랜잭션이 실제로 겹칠 때만 드러나므로 여러 번 돌린다.
+    it('같은 팀(C)이 걸린 두 대진을 동시에 고쳐도 교착(40P01) 없이 둘 다 끝난다', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      for (let round = 0; round < 5; round += 1) {
+        const results = await Promise.allSettled(
+          (['g2', 'g3'] as const).map((key, index) =>
+            prisma.$transaction((client) =>
+              updateTournamentMatchInTx(client, {
+                teamMatchId: f.games[key].teamMatchId,
+                scheduledAt: new Date(Date.now() + (4 + round * 2 + index) * DAY),
+              }),
+            ),
+          ),
+        );
+        expect(results.map((result) => (result.status === 'rejected' ? String(result.reason) : 'ok'))).toEqual(['ok', 'ok']);
+      }
     });
 
     it('대조군: 규정이 없는 대회는 같은 레드카드에도 다음 경기에 그대로 출전한다', async () => {

@@ -20,8 +20,8 @@ import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
-import { syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
-import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
+import { lockUpcomingTeamGameScope, syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
+import { findActiveRosterTeamIds, removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { formatLevelRange } from '../sports/level-range';
 import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
 import {
@@ -2804,12 +2804,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     reason: string | undefined,
     at: Date = new Date(),
   ) {
-    const removedRosterCount = await removeUserFromActiveRosters(tx, userId, { at });
-
     const memberships = await tx.v1TeamMembership.findMany({
       where: { userId, status: 'active' },
       select: { id: true, teamId: true, role: true },
     });
+    // 명단 정리와 폴백 리그 재계산이 잡을 경기를 한 번에 먼저 잠근다(교착 방지).
+    const gameScope = await lockUpcomingTeamGameScope(tx, [
+      ...(await findActiveRosterTeamIds(tx, userId)),
+      ...memberships.map((membership) => membership.teamId),
+    ]);
+    const removedRosterCount = await removeUserFromActiveRosters(tx, userId, { at, gameScope });
+
     for (const membership of memberships) {
       await tx.v1TeamMembership.update({
         where: { id: membership.id },
@@ -2837,6 +2842,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await syncTeamMemberFallbackRosters(
       tx,
       memberships.map((membership) => membership.teamId),
+      gameScope,
     );
 
     if (removedRosterCount > 0 || memberships.length > 0) {

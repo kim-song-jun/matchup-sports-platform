@@ -30,8 +30,8 @@ import {
 } from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { pickReviewHighlight, type ReviewHighlight } from '../reviews/review-highlight';
-import { syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
-import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
+import { lockUpcomingTeamGameScope, syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
+import { findActiveRosterTeamIds, removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import {
@@ -1172,11 +1172,14 @@ export class ProfileService {
       // 막으므로 본인은 더 이상 아무것도 할 수 없는데, 대회 로스터와 팀 명단에는 그대로
       // 남아 정원만 차지한다 — 2026-08-03 프로덕션에서 실제로 이렇게 됐다.
       // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
-      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
-      await syncTeamMemberFallbackRosters(
-        tx,
-        memberships.map((membership) => membership.teamId),
-      );
+      const membershipTeamIds = memberships.map((membership) => membership.teamId);
+      // 명단 정리와 폴백 리그 재계산이 잡을 경기를 한 번에 먼저 잠근다(교착 방지).
+      const gameScope = await lockUpcomingTeamGameScope(tx, [
+        ...(await findActiveRosterTeamIds(tx, user.id)),
+        ...membershipTeamIds,
+      ]);
+      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt, gameScope });
+      await syncTeamMemberFallbackRosters(tx, membershipTeamIds, gameScope);
 
       // 탈퇴 요청이 수락되는 순간 계정은 더 이상 로그인할 수 없다. 이때 브라우저
       // 구독과 네이티브 기기를 그대로 두면 운영자가 최종 삭제를 처리하기 전까지

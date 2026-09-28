@@ -10,8 +10,8 @@ import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { createTournamentMatchInTx } from './tournament-match-creation';
-import { syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
-import { updateTournamentMatchInTx } from './tournament-match-update';
+import { lockGameScope, syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
+import { planTournamentMatchUpdateGames, updateTournamentMatchInTx } from './tournament-match-update';
 
 /**
  * League generation operates on the canonical TeamMatch/Details/Game unit.
@@ -694,16 +694,19 @@ export class LeagueFixtureGeneratorService {
               message: '진행 중이거나 종료된 경기가 있어 대진을 바꿀 수 없어요.',
             });
           }
+          const updates = pairedRows.map(({ row }) => ({
+            teamMatchId: existingByCoordinate.get(`${row.round}:${row.fixtureNumber}:${row.legNumber}`)!.teamMatchId,
+            scheduledAt: row.startAt,
+            homeRegistrationId: row.homeRegistrationId,
+            awayRegistrationId: row.awayRegistrationId,
+          }));
+          // 대진마다 따로 잠그면 앞 대진의 경기를 쥔 채 뒤 대진의 경기를 잡아 순서가 깨진다 — 전부 한 번에 잠근다.
+          const plannedGameIds: string[] = [];
+          for (const update of updates) plannedGameIds.push(...(await planTournamentMatchUpdateGames(tx, update)));
+          const gameScope = await lockGameScope(tx, plannedGameIds);
           const reconciledRows: Array<Awaited<ReturnType<typeof updateTournamentMatchInTx>>> = [];
-          for (const { row } of pairedRows) {
-            const existing = existingByCoordinate.get(`${row.round}:${row.fixtureNumber}:${row.legNumber}`)!;
-            const updated = await updateTournamentMatchInTx(tx, {
-              teamMatchId: existing.teamMatchId,
-              scheduledAt: row.startAt,
-              homeRegistrationId: row.homeRegistrationId,
-              awayRegistrationId: row.awayRegistrationId,
-            });
-            reconciledRows.push(updated);
+          for (const update of updates) {
+            reconciledRows.push(await updateTournamentMatchInTx(tx, update, gameScope));
           }
           await this.adminContext.logAdminAction(
             admin,

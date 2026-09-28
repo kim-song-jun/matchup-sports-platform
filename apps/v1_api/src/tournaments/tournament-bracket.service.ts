@@ -58,7 +58,7 @@ import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
 import { createTournamentMatchInTx } from './tournament-match-creation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
-import { syncCompetitionTeamRosters } from '../games/roster/game-roster-sync';
+import { syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 
 type AdminBracketResult = {
@@ -600,13 +600,11 @@ export class TournamentBracketService {
       });
       // 위 참가자 복사는 이 순간의 스냅샷이라, 신청 확정 타이밍이 어긋나거나 그 뒤로
       // 명단이 바뀌면 복사가 낡아진다. 대진 생성 직후 같은 팀의 명단 동기화 함수를
-      // 한 번 더 태워 실제 신청 명단과 다시 맞춘다 — 이미 같으면 no-op이다.
-      if (home?.team.id) {
-        await syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId: home.team.id });
-      }
-      if (away?.team.id) {
-        await syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId: away.team.id });
-      }
+      // 한 번 더 태워 실제 신청 명단과 다시 맞춘다 — 이미 같으면 no-op이다. 양 팀 경기를 한 번에 잠근다.
+      await syncRostersForTeamMatchTeams(tx, {
+        competitionId: tournamentId,
+        teamIds: [home?.team.id ?? null, away?.team.id ?? null],
+      });
       const teamMatch = await tx.v1TeamMatch.findUniqueOrThrow({
         where: { id: creation.teamMatchId },
         select: {

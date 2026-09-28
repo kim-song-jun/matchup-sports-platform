@@ -294,6 +294,8 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     v1TournamentMatchDetails: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      // 교체(reconcile)가 잠글 경기를 미리 모으는 조회(planTournamentMatchUpdateGames).
+      findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
@@ -473,6 +475,9 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     });
     prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([]);
     prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockImplementation(({ where }: { where: { teamMatchId: string } }) =>
+      Promise.resolve(existingFixture(where.teamMatchId, { id: `game-${where.teamMatchId}` })),
+    );
+    prisma.v1TournamentMatchDetails.findUnique.mockImplementation(({ where }: { where: { teamMatchId: string } }) =>
       Promise.resolve(existingFixture(where.teamMatchId, { id: `game-${where.teamMatchId}` })),
     );
     prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'parent' });
@@ -691,6 +696,68 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     );
     expect(result.deleted).toBe(0);
     expect(result.created).toBe(0);
+  });
+
+  // 대진마다 따로 잠그면 앞 대진의 경기를 쥔 채 뒤 대진(더 작은 id)의 경기를 잡는다 — 같은 팀이 걸린
+  // 다른 대진 수정과 서로를 기다린다(40P01). 전부 한 번에 id 순으로 잡은 뒤에만 상세·팀 매치를 잡는다.
+  it('D1: 교체는 모든 대진의 경기를 한 번에 id 순으로 잠근 뒤에 대진별 상세·팀 매치를 잡는다', async () => {
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3']));
+    const rows = buildLeagueFixtureRows({
+      groupId: 'group-a',
+      registrationIds: ['r1', 'r2', 'r3'],
+      legs: 1,
+      balanceHome: true,
+      schedule: null,
+      fixtureNumberOffset: 0,
+    });
+    // 팀은 그대로 두고(팀 교체 경로는 이 스펙의 관심이 아니다) 시각만 달라 조정이 돌게 한다.
+    // 앞 대진일수록 경기 id 가 크다.
+    const fixtures = rows.map((row, index) => {
+      const id = `fx-${rows.length - 1 - index}`;
+      const startAt = new Date('2026-09-01T20:00:00.000Z');
+      const base = existingFixture(id, { id: `game-${id}` }, { round: row.round, fixtureNumber: row.fixtureNumber, startAt });
+      const home = `team-${row.homeRegistrationId}`;
+      const away = `team-${row.awayRegistrationId}`;
+      return {
+        ...base,
+        homeRegistrationId: row.homeRegistrationId,
+        awayRegistrationId: row.awayRegistrationId,
+        teamMatch: {
+          ...base.teamMatch,
+          hostTeamId: home,
+          approvedApplicantTeamId: away,
+          game: {
+            ...base.teamMatch.game!,
+            sides: [
+              { id: `game-${id}-home`, sideKey: 'HOME', teamId: home },
+              { id: `game-${id}-away`, sideKey: 'AWAY', teamId: away },
+            ],
+          },
+        },
+      };
+    });
+    const byId = new Map(fixtures.map((fixture) => [fixture.teamMatchId, fixture]));
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue(fixtures);
+    const findById = ({ where }: { where: { teamMatchId: string } }) => Promise.resolve(byId.get(where.teamMatchId));
+    prisma.v1TournamentMatchDetails.findUnique.mockImplementation(findById);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockImplementation(findById);
+
+    await service.generate(user, 't1', dto({ replaceExisting: true }));
+
+    const locks = prisma.$queryRaw.mock.calls
+      .map(([strings, ...values]: [TemplateStringsArray, ...unknown[]]) => {
+        const query = strings.join('?');
+        if (query.includes('FROM v1_games WHERE id') && query.includes('FOR UPDATE')) return `game:${String(values[0])}`;
+        if (query.includes('FOR UPDATE') && query.includes('v1_games')) return 'game:by-team-match';
+        if (query.includes('FOR UPDATE') && query.includes('v1_tournament_match_details')) return 'details';
+        if (query.includes('FOR UPDATE') && query.includes('v1_team_matches')) return 'team-match';
+        return null;
+      })
+      .filter((lock: string | null): lock is string => lock !== null);
+    const firstRowLock = locks.findIndex((lock: string) => !lock.startsWith('game:'));
+    expect(locks.slice(0, firstRowLock)).toEqual(['game:game-fx-0', 'game:game-fx-1', 'game:game-fx-2']);
+    expect(locks.slice(firstRowLock).filter((lock: string) => lock.startsWith('game:'))).toEqual([]);
+    expect(locks.filter((lock: string) => lock === 'details')).toHaveLength(rows.length);
   });
 
   // 취소 표식(tombstone)이 되살아나면 진행률·매직넘버·카드 정지가 다시 오염된다.

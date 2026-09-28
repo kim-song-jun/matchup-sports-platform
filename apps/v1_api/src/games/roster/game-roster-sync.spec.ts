@@ -1,6 +1,13 @@
 import type { Prisma } from '@prisma/client';
 import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
-import { syncGameSideRoster, syncRostersForTeamMatchTeams, syncTeamMemberFallbackRosters } from './game-roster-sync';
+import {
+  lockGameScope,
+  syncCompetitionTeamRosters,
+  syncGameSideRoster,
+  syncRostersForTeamMatchTeams,
+  syncTeamMemberFallbackRosters,
+  syncTeamRostersWithinPeriod,
+} from './game-roster-sync';
 
 jest.mock('../../league-matches/league-roster-autofill', () => ({
   fillLeagueTeamRoster: jest.fn(async (_tx: unknown, _leagueId: string, registration: { id: string; teamId: string }) => ({
@@ -29,6 +36,8 @@ interface Options {
   readonly leagueOfGame?: Record<string, string | null>;
   /** 활성 선수가 있는 확정 참가 명단을 가진 리그. */
   readonly leaguesWithRoster?: string[];
+  /** 결장 기간 안 팀 매치의 리그 id. */
+  readonly periodLeagueIds?: string[];
 }
 
 /**
@@ -76,6 +85,9 @@ function fakeTx(options: Options = {}) {
         calls.push('fill-query');
         return options.emptyRegistrations ?? [];
       }),
+    },
+    v1TeamMatch: {
+      findMany: jest.fn(async () => (options.periodLeagueIds ?? []).map((leagueId) => ({ leagueId, tournamentId: leagueId }))),
     },
     v1Tournament: { findFirst: jest.fn(async () => ({ title: '가을 리그' })) },
     v1Team: { findMany: jest.fn(async () => []) },
@@ -134,5 +146,48 @@ describe('syncTeamMemberFallbackRosters — 멤버십 변경 뒤 폴백 리그 �
     const { tx, calls } = fakeTx({ upcomingByTeam: {} });
     await expect(syncTeamMemberFallbackRosters(tx, ['team-A'])).resolves.toBe(0);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('경기 잠금 범위(GameLockScope) — 처음 한 번 id 순으로 잡은 행 밖은 잡지 않는다', () => {
+  const conflict = { response: { code: 'COMMAND_CONCURRENCY_CONFLICT' } };
+
+  it('호출자가 잠근 범위를 넘기면 다시 잠그지 않고, 범위 밖 경기가 필요하면 그 행을 잡지 않고 409', async () => {
+    const { tx, calls } = fakeTx({ upcomingByTeam: { 'team-A': ['g1', 'g2'] } });
+    const scope = await lockGameScope(tx, ['g1']);
+    calls.length = 0;
+    await expect(
+      syncRostersForTeamMatchTeams(tx, { competitionId: 'league-1', teamIds: ['team-A'] }, scope),
+    ).rejects.toMatchObject(conflict);
+    expect(calls.filter((call) => call.startsWith('lock:'))).toEqual([]);
+  });
+
+  it('잠그기 전 조회와 잠근 뒤 조회 사이에 끼어든 경기는 잠그지 않고 409 로 끝낸다(재시도 가능)', async () => {
+    const { tx, calls, raw } = fakeTx({ upcomingByTeam: { 'team-A': ['g2'] } });
+    // 잠근 뒤 다시 읽을 때 다른 트랜잭션이 커밋한 g1(더 작은 id)이 보인다.
+    raw.v1Game.findMany.mockImplementationOnce(async () => [{ id: 'g2', teamMatch: { leagueId: 'league-1' }, sides: [] }]);
+    raw.v1Game.findMany.mockImplementationOnce(async () => [
+      { id: 'g1', teamMatch: { leagueId: 'league-1' }, sides: [{ id: 'side-g1' }] },
+      { id: 'g2', teamMatch: { leagueId: 'league-1' }, sides: [{ id: 'side-g2' }] },
+    ]);
+    await expect(syncCompetitionTeamRosters(tx, { competitionId: 'league-1', teamId: 'team-A' })).rejects.toMatchObject({
+      response: { code: 'COMMAND_CONCURRENCY_CONFLICT', details: { gameIds: ['g1'] } },
+    });
+    expect(calls.filter((call) => call.startsWith('lock:'))).toEqual(['lock:g2']);
+  });
+
+  it('결장 기간이 여러 리그에 걸쳐도 전부 한 번에 id 순으로 잠그고, 그 뒤에는 새로 잡지 않는다', async () => {
+    const { tx, calls } = fakeTx({
+      upcomingByTeam: { 'team-A': ['g3', 'g1', 'g2'] },
+      leagueOfGame: { g1: 'league-2', g2: 'league-1', g3: 'league-1' },
+      periodLeagueIds: ['league-1', 'league-2'],
+    });
+    await syncTeamRostersWithinPeriod(tx, {
+      teamId: 'team-A',
+      startsAt: new Date('2099-01-01T00:00:00Z'),
+      endsAt: new Date('2099-02-01T00:00:00Z'),
+    });
+    expect(calls.filter((call) => call.startsWith('lock:'))).toEqual(['lock:g1', 'lock:g2', 'lock:g3']);
+    expect(calls.lastIndexOf('lock:g3')).toBeLessThan(calls.indexOf('fill-query'));
   });
 });

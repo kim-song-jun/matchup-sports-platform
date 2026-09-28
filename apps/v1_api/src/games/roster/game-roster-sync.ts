@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { Prisma, V1GameLineupState, V1GameState, type V1GameLineup } from '@prisma/client';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import { carryRevokedConsent, loadRevokedConsentByUserId } from '../../team-matches/lineup-consent-carry';
@@ -76,7 +77,7 @@ export async function isUnmigratedTeamAuthoredLineup(tx: Tx, gameId: string, sid
 
 /**
  * `v1_games` 행을 id 순으로 잠근다. 경기 시작 명령이 잠그는 행이라, 잠근 뒤 읽은 `SCHEDULED` 판정은
- * 명단을 쓰는 동안 바뀌지 않는다. 여러 경기를 잠글 때 순서를 고정해 교착을 피한다(이미 잡은 행은 다시 잡아도 된다).
+ * 명단을 쓰는 동안 바뀌지 않는다. 이미 쥔 행은 다시 잡아도 기다리지 않는다.
  */
 export async function lockGameRows(tx: Tx, gameIds: readonly string[]): Promise<void> {
   for (const gameId of [...new Set(gameIds)].sort()) {
@@ -84,28 +85,63 @@ export async function lockGameRows(tx: Tx, gameIds: readonly string[]): Promise<
   }
 }
 
-/** 팀들의 시작 전 대회·리그 경기를 한꺼번에 id 순으로 잠근다. 여러 팀·대회를 차례로 동기화하기 전에 부른다. */
-async function lockUpcomingTeamGames(
+/**
+ * 한 트랜잭션이 잡는 `v1_games` 행 전체. 트랜잭션의 **첫 경기 잠금**으로 한 번에 id 순으로 잡고
+ * (`lockGameScope`), 대진 상세·팀 매치는 그 뒤에 잡는다(Game → Details → TeamMatch,
+ * `game-operations/tournament-team-match-advancement.ts` lockMatches). 행을 쥔 채 다른 경기를 새로
+ * 잡으면 순서가 깨져 같은 팀이 걸린 두 대진 수정이 서로를 기다린다(40P01).
+ */
+export interface GameLockScope {
+  readonly gameIds: ReadonlySet<string>;
+}
+
+export async function lockGameScope(tx: Tx, gameIds: readonly string[]): Promise<GameLockScope> {
+  const ids = [...new Set(gameIds)].sort();
+  await lockGameRows(tx, ids);
+  return { gameIds: new Set(ids) };
+}
+
+/**
+ * 잠근 뒤 다시 읽은 대상이 잠금 집합 안에 있는지 본다. 잠그기 전 조회와 잠금 사이에 다른 트랜잭션이
+ * 경기를 끼워 넣었으면 그 행을 지금 잡을 수 없으므로(순서가 깨진다) 재시도 가능한 409 로 끝낸다.
+ */
+export function requireLockedGames(scope: GameLockScope, gameIds: readonly string[]): void {
+  const missing = [...new Set(gameIds)].filter((gameId) => !scope.gameIds.has(gameId)).sort();
+  if (missing.length === 0) return;
+  throw new ConflictException({
+    code: 'COMMAND_CONCURRENCY_CONFLICT',
+    message: '경기 일정이 동시에 바뀌어 명단을 다시 계산하지 못했어요. 다시 시도해 주세요.',
+    details: { gameIds: missing },
+  });
+}
+
+/** 잠그기 전 조회: 팀들의 시작 전 대회·리그 경기 id. `competitionId` 가 null 이면 그 팀의 모든 대회·리그. */
+export async function findUpcomingTeamGameIds(
   tx: Tx,
-  competitionId: string | null,
-  teamIds: readonly string[],
-  now: Date,
-): Promise<void> {
-  if (teamIds.length === 0) return;
+  targets: ReadonlyArray<{ competitionId: string | null; teamId: string }>,
+  now: Date = new Date(),
+): Promise<string[]> {
+  if (targets.length === 0) return [];
+  const wheres = targets.map((target) => upcomingCompetitionGameWhere(target.competitionId, target.teamId, now));
   const games = await tx.v1Game.findMany({
-    where: { OR: teamIds.map((teamId) => upcomingCompetitionGameWhere(competitionId, teamId, now)) },
+    where: wheres.length === 1 ? wheres[0] : { OR: wheres },
     select: { id: true },
   });
-  await lockGameRows(
-    tx,
-    games.map((game) => game.id),
-  );
+  return games.map((game) => game.id);
+}
+
+/** 팀들의 모든 대회·리그 시작 전 경기를 한 번에 잠근다. 한 트랜잭션에서 여러 대회에 걸쳐 동기화할 때 먼저 부른다. */
+export async function lockUpcomingTeamGameScope(tx: Tx, teamIds: readonly string[]): Promise<GameLockScope> {
+  const unique = [...new Set(teamIds)];
+  return lockGameScope(tx, await findUpcomingTeamGameIds(tx, unique.map((teamId) => ({ competitionId: null, teamId }))));
 }
 
 /**
  * 대회·리그 경기 한 사이드의 명단을 계산 결과(`loadGameRoster`)에 맞춘다. 바뀌었으면 true.
  *
  * - 경기 행을 잠근 뒤 `SCHEDULED` 인 경기만. 참가자 행은 지우지 않고 새 리비전을 추가한다(골·카드 이벤트 FK).
+ *   `scope` 가 있으면 그 안에 있어야 하고 다시 잡지 않는다. 없으면 이 경기 하나를 잡으므로, 호출자가 다른
+ *   경기를 쥐고 있다면 이 경기도 이미 쥐고 있어야 한다.
  * - 새 리비전은 **SUBMITTED** 다. 공식 결과·신원 후보 셀렉터가 제출본을 우선 읽으므로
  *   DRAFT 로 얹으면 옛 제출본이 계속 기록이 된다.
  * - 리그의 팀장 저장본은 이관 전까지 덮지 않는다.
@@ -114,8 +150,10 @@ export async function syncGameSideRoster(
   tx: Tx,
   target: { gameId: string; sideId: string },
   preloaded: GameRosterPreload = {},
+  scope?: GameLockScope,
 ): Promise<boolean> {
-  await lockGameRows(tx, [target.gameId]);
+  if (scope === undefined) await lockGameRows(tx, [target.gameId]);
+  else requireLockedGames(scope, [target.gameId]);
   const context = await loadGameRosterContext(tx, target);
   if (context === null || context.gameState !== V1GameState.SCHEDULED) return false;
   if (preloaded.base === undefined) await fillCompetitionRosterBase(tx, context);
@@ -241,11 +279,19 @@ export function upcomingCompetitionGameWhere(
 /**
  * 한 팀의 그 대회·리그 시작 전 경기 명단을 전부 다시 계산한다. 바뀐 사이드 수를 돌려준다.
  * 참가 명단 변경·시작 시각 변경·앞 경기 결과 변경처럼 팀의 여러 경기에 걸치는 트리거가 부른다.
+ * `scope` 가 없으면 이 호출이 트랜잭션의 첫 경기 잠금이어야 한다.
  */
 export async function syncCompetitionTeamRosters(
   tx: Tx,
   input: { competitionId: string; teamId: string },
+  scope?: GameLockScope,
 ): Promise<number> {
+  let lockScope = scope;
+  if (lockScope === undefined) {
+    const planned = await findUpcomingTeamGameIds(tx, [input]);
+    if (planned.length === 0) return 0;
+    lockScope = await lockGameScope(tx, planned);
+  }
   const games = await tx.v1Game.findMany({
     where: upcomingCompetitionGameWhere(input.competitionId, input.teamId, new Date()),
     orderBy: { id: 'asc' },
@@ -256,25 +302,27 @@ export async function syncCompetitionTeamRosters(
     },
   });
   if (games.length === 0) return 0;
-  await lockGameRows(
-    tx,
+  requireLockedGames(
+    lockScope,
     games.map((game) => game.id),
   );
-  const scope = {
+  const rosterScope = {
     competitionId: input.competitionId,
     isLeague: games[0].teamMatch?.leagueId != null,
     teamId: input.teamId,
   };
-  await fillCompetitionRosterBase(tx, scope);
-  const base = await loadCompetitionRosterBase(tx, scope);
+  await fillCompetitionRosterBase(tx, rosterScope);
+  const base = await loadCompetitionRosterBase(tx, rosterScope);
   // 확정 신청이 없는 대회 팀·비활성 리그 팀은 대진 생성과 같은 이유로 대상이 아니다.
   if (base === null) return 0;
-  const orderedGames = await loadTeamCompetitionGameOrder(tx, scope);
+  const orderedGames = await loadTeamCompetitionGameOrder(tx, rosterScope);
 
   let synced = 0;
   for (const game of games) {
     for (const side of game.sides) {
-      if (await syncGameSideRoster(tx, { gameId: game.id, sideId: side.id }, { base, orderedGames })) synced += 1;
+      if (await syncGameSideRoster(tx, { gameId: game.id, sideId: side.id }, { base, orderedGames }, lockScope)) {
+        synced += 1;
+      }
     }
   }
   return synced;
@@ -283,16 +331,27 @@ export async function syncCompetitionTeamRosters(
 /**
  * 경기의 순서가 바뀌었을 때(시작 시각 변경·대진 추가·팀 배정 변경) 관련 팀들의 시작 전 경기를 다시 계산한다.
  * 결장 기간은 시작 시각에, 출전정지는 팀 경기 순서에 걸리므로 규정 유무와 관계없이 돈다.
+ * 호출자가 이미 경기를 잠갔으면 그 `scope` 를 넘긴다. 없으면 이 호출이 트랜잭션의 첫 경기 잠금이어야 한다.
  */
 export async function syncRostersForTeamMatchTeams(
   tx: Tx,
   input: { competitionId: string; teamIds: readonly (string | null)[] },
+  scope?: GameLockScope,
 ): Promise<number> {
   const teamIds = [...new Set(input.teamIds)].filter((teamId): teamId is string => teamId !== null);
-  await lockUpcomingTeamGames(tx, input.competitionId, teamIds, new Date());
+  if (teamIds.length === 0) return 0;
+  const lockScope =
+    scope ??
+    (await lockGameScope(
+      tx,
+      await findUpcomingTeamGameIds(
+        tx,
+        teamIds.map((teamId) => ({ competitionId: input.competitionId, teamId })),
+      ),
+    ));
   let synced = 0;
   for (const teamId of teamIds) {
-    synced += await syncCompetitionTeamRosters(tx, { competitionId: input.competitionId, teamId });
+    synced += await syncCompetitionTeamRosters(tx, { competitionId: input.competitionId, teamId }, lockScope);
   }
   return synced;
 }
@@ -301,8 +360,13 @@ export async function syncRostersForTeamMatchTeams(
  * 팀 멤버십이 바뀐 뒤(가입·추방·탈퇴·계정 비활성) 참가 명단 없이 팀 활성 멤버를 기준 명단으로 쓰는
  * 리그(폴백)의 시작 전 경기를 다시 계산한다. 참가 명단이 있는 대회·리그는 명단 정리 경로
  * (`tournaments/roster-cleanup.ts`)가 맡는다. 멤버십을 바꾼 **뒤에** 불러야 새 멤버 목록을 읽는다.
+ * 같은 트랜잭션에서 명단 정리도 돌면 둘을 덮는 `lockUpcomingTeamGameScope` 를 먼저 잡아 넘긴다.
  */
-export async function syncTeamMemberFallbackRosters(tx: Tx, teamIds: readonly string[]): Promise<number> {
+export async function syncTeamMemberFallbackRosters(
+  tx: Tx,
+  teamIds: readonly string[],
+  scope?: GameLockScope,
+): Promise<number> {
   const now = new Date();
   const targets: Array<{ leagueId: string; teamId: string; gameIds: string[] }> = [];
   for (const teamId of new Set(teamIds)) {
@@ -330,13 +394,15 @@ export async function syncTeamMemberFallbackRosters(tx: Tx, teamIds: readonly st
       if (!registered.has(leagueId)) targets.push({ leagueId, teamId, gameIds });
     }
   }
-  await lockGameRows(
-    tx,
-    targets.flatMap((target) => target.gameIds),
-  );
+  const lockScope =
+    scope ??
+    (await lockGameScope(
+      tx,
+      targets.flatMap((target) => target.gameIds),
+    ));
   let synced = 0;
   for (const target of targets) {
-    synced += await syncCompetitionTeamRosters(tx, { competitionId: target.leagueId, teamId: target.teamId });
+    synced += await syncCompetitionTeamRosters(tx, { competitionId: target.leagueId, teamId: target.teamId }, lockScope);
   }
   return synced;
 }
@@ -385,10 +451,18 @@ export async function syncTeamRostersWithinPeriod(
   const competitionIds = new Set(
     matches.map((row) => row.leagueId ?? row.tournamentId).filter((id): id is string => id !== null),
   );
-  if (competitionIds.size > 1) await lockUpcomingTeamGames(tx, null, [input.teamId], now);
+  if (competitionIds.size === 0) return 0;
+  const scope = await lockGameScope(
+    tx,
+    await findUpcomingTeamGameIds(
+      tx,
+      [...competitionIds].map((competitionId) => ({ competitionId, teamId: input.teamId })),
+      now,
+    ),
+  );
   let synced = 0;
   for (const competitionId of competitionIds) {
-    synced += await syncCompetitionTeamRosters(tx, { competitionId, teamId: input.teamId });
+    synced += await syncCompetitionTeamRosters(tx, { competitionId, teamId: input.teamId }, scope);
   }
   return synced;
 }

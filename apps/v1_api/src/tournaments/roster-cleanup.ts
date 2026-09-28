@@ -1,5 +1,10 @@
 import { Prisma, V1CompetitionKind, V1StatusActorType, V1TournamentStatus } from '@prisma/client';
-import { syncCompetitionTeamRosters } from '../games/roster/game-roster-sync';
+import {
+  findUpcomingTeamGameIds,
+  lockGameScope,
+  syncCompetitionTeamRosters,
+  type GameLockScope,
+} from '../games/roster/game-roster-sync';
 
 // 팀을 벗어나는 모든 경로에서 대회 로스터를 함께 정리하기 위한 공용 헬퍼.
 //
@@ -51,7 +56,36 @@ export type RosterCleanupOptions = {
   teamId?: string;
   /** 같은 트랜잭션 안의 다른 기록과 시각을 맞추고 싶을 때 사용. */
   at?: Date;
+  /**
+   * 호출자가 이미 잡은 경기 잠금. 같은 트랜잭션에서 폴백 리그 재계산도 돌면 둘을 덮는 잠금
+   * (`lockUpcomingTeamGameScope`, 대상 팀은 `findActiveRosterTeamIds`)을 먼저 잡아 넘긴다.
+   */
+  gameScope?: GameLockScope;
 };
+
+function activeRosterWhere(userId: string, options: RosterCleanupOptions): Prisma.V1TournamentPlayerWhereInput {
+  return {
+    userId,
+    removedAt: null,
+    registration: {
+      ...(options.teamId ? { teamId: options.teamId } : {}),
+      tournament: { ...ROSTER_MUTABLE_TOURNAMENT_WHERE, deletedAt: null },
+    },
+  };
+}
+
+/** 정리 대상 명단의 팀. 호출자가 경기 잠금 범위를 정할 때 쓴다. */
+export async function findActiveRosterTeamIds(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  options: RosterCleanupOptions = {},
+): Promise<string[]> {
+  const rows = await tx.v1TournamentPlayer.findMany({
+    where: activeRosterWhere(userId, options),
+    select: { registration: { select: { teamId: true } } },
+  });
+  return [...new Set(rows.map((row) => row.registration.teamId))];
+}
 
 /**
  * 사용자를 진행 중·예정 대회의 로스터에서 제거한다(`removedAt` 설정).
@@ -76,14 +110,7 @@ export async function removeUserFromActiveRosters(
 ): Promise<number> {
   // updateMany 는 관계 필터를 받지 못한다. 대상을 먼저 골라 id 로 갱신한다.
   const targets = await tx.v1TournamentPlayer.findMany({
-    where: {
-      userId,
-      removedAt: null,
-      registration: {
-        ...(options.teamId ? { teamId: options.teamId } : {}),
-        tournament: { ...ROSTER_MUTABLE_TOURNAMENT_WHERE, deletedAt: null },
-      },
-    },
+    where: activeRosterWhere(userId, options),
     select: {
       id: true,
       registrationId: true,
@@ -129,8 +156,14 @@ export async function removeUserFromActiveRosters(
         target.registration ? [[`${target.registration.tournamentId}:${target.registration.teamId}`, target.registration] as const] : [],
       ),
     );
-    for (const registration of teams.values()) {
-      await syncCompetitionTeamRosters(tx, { competitionId: registration.tournamentId, teamId: registration.teamId });
+    const pairs = [...teams.values()].map((registration) => ({
+      competitionId: registration.tournamentId,
+      teamId: registration.teamId,
+    }));
+    // 대회마다 따로 잠그면 앞 대회 경기를 쥔 채 뒤 대회 경기를 잡는다 — 한 번에 잠근다.
+    const gameScope = options.gameScope ?? (await lockGameScope(tx, await findUpcomingTeamGameIds(tx, pairs)));
+    for (const pair of pairs) {
+      await syncCompetitionTeamRosters(tx, pair, gameScope);
     }
   }
 

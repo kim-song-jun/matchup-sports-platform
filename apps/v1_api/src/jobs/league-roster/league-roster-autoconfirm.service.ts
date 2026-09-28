@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
-import { syncCompetitionTeamRosters } from '../../games/roster/game-roster-sync';
+import { syncRostersForTeamMatchTeams } from '../../games/roster/game-roster-sync';
 import {
   fillLeagueTeamRoster,
   notifyLeagueRosterFillOutcomes,
@@ -132,13 +132,14 @@ export class LeagueRosterAutoConfirmService {
 
     // 대진이 이미 있는 리그도 채운다 — 채운 명단은 시작 전 경기 명단에 곧바로 맞춰진다(Task 170 D1′).
     const outcomes: LeagueRosterFillOutcome[] = [];
+    const filledTeamIds: string[] = [];
     for (const registration of await this.pendingRegistrations(tx, leagueId)) {
       const outcome = await fillLeagueTeamRoster(tx, leagueId, registration);
-      if (outcome.kind === 'filled') {
-        await syncCompetitionTeamRosters(tx, { competitionId: leagueId, teamId: registration.teamId });
-      }
+      if (outcome.kind === 'filled') filledTeamIds.push(registration.teamId);
       outcomes.push(outcome);
     }
+    // 팀마다 따로 동기화하면 앞 팀 경기를 쥔 채 뒤 팀 경기를 잡는다 — 채운 팀들의 경기를 한 번에 잠근다.
+    await syncRostersForTeamMatchTeams(tx, { competitionId: leagueId, teamIds: filledTeamIds });
     if (outcomes.length === 0) return;
     await notifyLeagueRosterFillOutcomes(tx, league, outcomes);
   };

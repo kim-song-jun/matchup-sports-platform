@@ -63,10 +63,22 @@ export type GameOperationHandler = (
 
 type OutboxRow = GameOperationClaim;
 
-function withCompetitionRosterResync(handler: GameOperationHandler): GameOperationHandler {
+/**
+ * 결과가 바뀐 경기의 양 팀 시작 전 경기 명단 재계산. 결과 핸들러의 트랜잭션에서 돌리지 않고 이 이벤트로
+ * 넘긴다 — 핸들러가 이미 경기·팀 매치를 쥔 뒤에 다른 경기를 잡으면 경기 잠금 순서
+ * (`game-roster-sync.ts` GameLockScope)가 깨져 대진 수정과 교착한다. 자기 트랜잭션에서는 첫 잠금이다.
+ */
+export const COMPETITION_ROSTER_RESYNC_TYPE = 'COMPETITION_ROSTER_RESYNC';
+
+export function withCompetitionRosterResync(handler: GameOperationHandler): GameOperationHandler {
   return async (claim, tx) => {
     await handler(claim, tx);
-    if (claim.aggregateType === 'GAME') await syncRostersAfterResultChange(tx, claim.aggregateId);
+    if (claim.aggregateType !== 'GAME') return;
+    await tx.$executeRaw`
+      INSERT INTO v1_outbox_events (id, business_key, aggregate_type, aggregate_id, type, payload, available_at, status, attempts, retry_generation, version, created_at, updated_at)
+      VALUES (${randomUUID()}, ${`${claim.businessKey}:roster-resync`}, 'GAME', ${claim.aggregateId}, ${COMPETITION_ROSTER_RESYNC_TYPE}, '{}'::jsonb, CURRENT_TIMESTAMP, 'PENDING'::"V1OutboxStatus", 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT (business_key) DO NOTHING
+    `;
   };
 }
 
@@ -108,14 +120,17 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
-    // 결과가 제출·확정·무효가 되면 출전정지가 바뀔 수 있어, 같은 트랜잭션에서 양 팀의 시작 전
-    // 대회·리그 경기 명단을 다시 계산한다(Task 176). 결과 쓰기 경로가 많아 이 세 이벤트에서 한 번에 건다.
+    // 결과가 제출·확정·무효가 되면 출전정지가 바뀔 수 있어, 양 팀의 시작 전 대회·리그 경기 명단을
+    // 다시 계산한다(Task 176). 결과 쓰기 경로가 많아 이 세 이벤트에서 한 번에 건다(재계산은 후속 이벤트).
     const officialProjection = new GameResultOfficialProjectionService(this.webPush);
     this.registerHandler('GAME_RESULT_OFFICIAL', withCompetitionRosterResync(officialProjection.handler));
     const voidProjection = new GameResultVoidProjectionService();
     this.registerHandler('GAME_RESULT_VOIDED', withCompetitionRosterResync(voidProjection.handler));
     const submittedEscalation = new GameResultSubmittedEscalationService();
     this.registerHandler('GAME_RESULT_SUBMITTED', withCompetitionRosterResync(submittedEscalation.handler));
+    this.registerHandler(COMPETITION_ROSTER_RESYNC_TYPE, async (claim, tx) => {
+      await syncRostersAfterResultChange(tx, claim.aggregateId);
+    });
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
     // 사용자 확정: 리그 대진의 경기 시작 +24시간에도 결과 미입력(not_entered)이면

@@ -1,7 +1,14 @@
 import { Prisma, V1GameSideKey } from '@prisma/client';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
-import { syncGameSideRoster, syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
+import {
+  findUpcomingTeamGameIds,
+  lockGameScope,
+  requireLockedGames,
+  syncGameSideRoster,
+  syncRostersForTeamMatchTeams,
+  type GameLockScope,
+} from '../games/roster/game-roster-sync';
 
 type Tx = Prisma.TransactionClient;
 
@@ -14,13 +21,56 @@ export type TournamentMatchUpdateInput = {
 };
 
 /**
+ * 이 수정이 잠가야 할 경기: 자기 경기와, 시각·팀이 바뀔 수 있으면 바뀌기 전·후 팀들의 시작 전 경기.
+ * 잠그기 전에 읽으므로 잠근 뒤의 동기화가 이 밖의 경기를 만나면 409 로 끝난다(`requireLockedGames`).
+ */
+export async function planTournamentMatchUpdateGames(tx: Tx, input: TournamentMatchUpdateInput): Promise<string[]> {
+  const detail = await tx.v1TournamentMatchDetails.findUnique({
+    where: { teamMatchId: input.teamMatchId },
+    select: {
+      tournamentId: true,
+      teamMatch: { select: { hostTeamId: true, approvedApplicantTeamId: true, game: { select: { id: true } } } },
+    },
+  });
+  if (detail === null || detail.teamMatch.game === null) return [];
+  const ownGameId = detail.teamMatch.game.id;
+  const reordersGames =
+    input.scheduledAt !== undefined || input.homeRegistrationId !== undefined || input.awayRegistrationId !== undefined;
+  if (!reordersGames) return [ownGameId];
+  const requestedRegistrationIds = [input.homeRegistrationId, input.awayRegistrationId].filter(
+    (id): id is string => id !== undefined && id !== null,
+  );
+  const requested = requestedRegistrationIds.length === 0
+    ? []
+    : await tx.v1TournamentRegistration.findMany({
+        where: { id: { in: requestedRegistrationIds }, tournamentId: detail.tournamentId },
+        select: { teamId: true },
+      });
+  const teamIds = [
+    detail.teamMatch.hostTeamId,
+    detail.teamMatch.approvedApplicantTeamId,
+    ...requested.map((row) => row.teamId),
+  ].filter((teamId): teamId is string => teamId !== null);
+  const teamGameIds = await findUpcomingTeamGameIds(
+    tx,
+    [...new Set(teamIds)].map((teamId) => ({ competitionId: detail.tournamentId, teamId })),
+  );
+  return [ownGameId, ...teamGameIds];
+}
+
+/**
  * Updates the operational TeamMatch and bracket-only Details together. The
  * caller must have performed the admin/auth and official-result checks; this
  * helper owns the row-level mutation and the side/schedule consequences.
+ *
+ * 경기 행은 `scope` 로 한 번에 잠근 뒤에만 상세·팀 매치를 잡는다(Game → Details → TeamMatch).
+ * 여러 대진을 한 트랜잭션에서 고치는 호출자는 전부의 `planTournamentMatchUpdateGames` 를 합쳐
+ * 먼저 잠그고 같은 `scope` 를 넘긴다. 없으면 이 호출이 트랜잭션의 첫 경기 잠금이어야 한다.
  */
 export async function updateTournamentMatchInTx(
   tx: Tx,
   input: TournamentMatchUpdateInput,
+  scope?: GameLockScope,
 ): Promise<{
   id: string;
   tournamentId: string;
@@ -37,14 +87,16 @@ export async function updateTournamentMatchInTx(
   createdAt: Date;
   updatedAt: Date;
 }> {
-  // Lock Game first. Result review and advancement use the same order.
+  const lockScope = scope ?? (await lockGameScope(tx, await planTournamentMatchUpdateGames(tx, input)));
+  // 경기 행은 위에서 잡았다. 여기서는 잠근 뒤의 값을 읽기만 한다.
   const gameRows = await tx.$queryRaw<Array<{ id: string; state: string; sourceType: string; currentOfficialRevisionId: string | null }>>`
     SELECT id, state::text AS state, source_type::text AS "sourceType",
            current_official_revision_id AS "currentOfficialRevisionId"
     FROM v1_games
     WHERE team_match_id = ${input.teamMatchId}
-    FOR UPDATE
   `;
+  if (gameRows.length === 1) requireLockedGames(lockScope, [gameRows[0].id]);
+  await tx.$queryRaw`SELECT team_match_id FROM v1_tournament_match_details WHERE team_match_id = ${input.teamMatchId} FOR UPDATE`;
   const teamMatchRows = await tx.$queryRaw<Array<{ id: string; deletedAt: Date | null }>>`
     SELECT id, deleted_at AS "deletedAt"
     FROM v1_team_matches
@@ -91,7 +143,6 @@ export async function updateTournamentMatchInTx(
   const officialRevision = gameRows[0].currentOfficialRevisionId === null
     ? null
     : await tx.v1GameResultRevision.findUnique({ where: { id: gameRows[0].currentOfficialRevisionId }, select: { state: true } });
-  await tx.$queryRaw`SELECT team_match_id FROM v1_tournament_match_details WHERE team_match_id = ${input.teamMatchId} FOR UPDATE`;
 
   const nextHome = input.homeRegistrationId !== undefined ? input.homeRegistrationId : detail.homeRegistrationId;
   const nextAway = input.awayRegistrationId !== undefined ? input.awayRegistrationId : detail.awayRegistrationId;
@@ -169,7 +220,7 @@ export async function updateTournamentMatchInTx(
       // 새 팀의 참가 명단(조정·결장·출전정지 반영)으로 방금 만든 리비전 위에 명단을 채운다.
       // 시각이 지난 경기도 SCHEDULED 면 채워야 하므로 팀 단위가 아니라 이 사이드를 직접 맞춘다.
       if (newLineupId !== null && sideChange.nextTeamId !== null) {
-        await syncGameSideRoster(tx, { gameId: game.id, sideId: side.id });
+        await syncGameSideRoster(tx, { gameId: game.id, sideId: side.id }, {}, lockScope);
       }
     }
     if (teamsChanged && sideChange.oldTeamId !== sideChange.nextTeamId) {
@@ -195,7 +246,7 @@ export async function updateTournamentMatchInTx(
     await syncRostersForTeamMatchTeams(tx, {
       competitionId: detail.tournamentId,
       teamIds: [detail.teamMatch.hostTeamId, detail.teamMatch.approvedApplicantTeamId, nextHomeTeamId, nextAwayTeamId],
-    });
+    }, lockScope);
   }
 
   return {

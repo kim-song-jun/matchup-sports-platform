@@ -1312,7 +1312,13 @@ describe('ProfileService withdrawal admin lockout', () => {
   it('탈퇴는 멤버십을 먼저 끄고 그다음 대회 명단을 정리한다', async () => {
     const prisma = createPrisma(null);
     prisma.v1TeamMembership.findMany.mockResolvedValue([{ id: 'membership-1', teamId: 'team-1' }]);
-    prisma.v1TournamentPlayer.findMany.mockResolvedValue([{ id: 'player-1' }]);
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      {
+        id: 'player-1',
+        registrationId: 'reg-1',
+        registration: { rosterLockedAt: null, tournamentId: 'tournament-1', teamId: 'team-1' },
+      },
+    ]);
     prisma.v1TournamentPlayer.updateMany.mockResolvedValue({ count: 1 });
 
     const order: string[] = [];

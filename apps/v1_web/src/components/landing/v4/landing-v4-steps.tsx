@@ -19,12 +19,16 @@ const STEPS_RANGE = 'cover 20% cover 60%';
 export function LandingV4Steps() {
   const motionOn = useLandingV4MotionOn();
   const listRef = useRef<HTMLOListElement>(null);
+  const lastProgress = useRef<number | null>(null);
 
   useScrollFrame(motionOn, () => {
     const list = listRef.current;
     if (!list) return;
     const rect = list.getBoundingClientRect();
     const progress = viewTimelineProgress(rect.top, rect.height, window.innerHeight, STEPS_RANGE);
+    // 화면 밖이라도 빨리 지나간 경우엔 끝값(0·1)까지는 한 번 써야 선이 덜 그려진 채 멈추지 않는다
+    if (progress === lastProgress.current) return;
+    lastProgress.current = progress;
     list.querySelectorAll<HTMLElement>(':scope > li').forEach((item, k) => {
       const { line, reached } = stepState(progress, k);
       item.style.setProperty('--tm-landing-v4-line', line.toFixed(4));
@@ -35,6 +39,7 @@ export function LandingV4Steps() {
   // 모션을 끄면 JS 가 넣은 진행값을 걷어 최종 상태(선 완성·단계 켜짐)로 돌린다.
   useEffect(() => {
     if (motionOn) return;
+    lastProgress.current = null;
     listRef.current?.querySelectorAll<HTMLElement>(':scope > li').forEach((item) => {
       item.style.removeProperty('--tm-landing-v4-line');
       delete item.dataset.reached;

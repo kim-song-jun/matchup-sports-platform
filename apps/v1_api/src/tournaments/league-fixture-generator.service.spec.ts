@@ -555,9 +555,11 @@ describe('LeagueFixtureGeneratorService.generate', () => {
 
     await service.generate(user, 't1', dto());
 
-    const synced = prisma.v1Game.findMany.mock.calls.map(
-      (call) => (call[0] as { where: { sides: { some: { teamId: string } } } }).where.sides.some.teamId,
-    );
+    // 여러 팀을 돌기 전 잠금 대상 조회(`OR` 묶음)는 빼고 팀별 재계산 조회만 센다.
+    const synced = prisma.v1Game.findMany.mock.calls.flatMap((call) => {
+      const where = (call[0] as { where: { sides?: { some: { teamId: string } } } }).where;
+      return where.sides === undefined ? [] : [where.sides.some.teamId];
+    });
     expect([...synced].sort()).toEqual(['team-r1', 'team-r2', 'team-r3', 'team-r4']);
   });
 

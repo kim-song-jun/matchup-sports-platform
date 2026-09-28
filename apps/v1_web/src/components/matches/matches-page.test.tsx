@@ -451,9 +451,10 @@ describe('MatchCreatePageView — confirm 단계 일시 표기 (종료 시간 �
   });
 });
 
-describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
-  it('생성 가능한 모든 매치 정보를 수정할 수 있게 노출한다', () => {
-    const model = getMatchCreateViewModel('edit');
+describe('MatchCreatePageView — 매치 수정 등록 화면 일치', () => {
+  function editModel(step: 'sport' | 'info' | 'place-time' | 'confirm') {
+    const model = getMatchCreateViewModel(step);
+    model.mode = 'edit';
     model.selectedSport = '풋살';
     model.sports = ['축구', '풋살'];
     model.form = {
@@ -467,20 +468,33 @@ describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
       onNext: vi.fn(),
       onSubmit: vi.fn(),
     };
+    return model;
+  }
 
-    render(<MatchCreatePageView model={model} />);
+  it('등록 화면과 동일하게 종목 선택부터 4단계 진행 표시를 보여준다', () => {
+    render(<MatchCreatePageView model={editModel('sport')} />);
 
-    for (const label of [
-      '종목', '제목', '설명', '최대 인원 선택', '최소 레벨', '최대 레벨',
-      '규칙', '지역', '장소', '상세 주소', '날짜', '시작 시간', '종료 시간',
-      '신청 마감일', '신청 마감시간',
-    ]) {
-      expect(screen.getByLabelText(label)).toBeInTheDocument();
-    }
-    expect(screen.getByText('성별 조건')).toBeInTheDocument();
-    expect(screen.getByText('대표 이미지')).toBeInTheDocument();
-    expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="1">1명</option>');
-    expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="100">100명</option>');
+    expect(screen.getByRole('progressbar', { name: '매치 수정 1단계/4단계' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '어떤 종목인가요?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /풋살/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByLabelText('종목')).toBeNull();
+    expect(screen.getByRole('button', { name: '다음' })).toBeInTheDocument();
+  });
+
+  it('매치 정보와 장소·시간을 등록 화면과 같은 별도 단계로 분리한다', () => {
+    const { unmount } = render(<MatchCreatePageView model={editModel('info')} />);
+
+    expect(screen.getByRole('progressbar', { name: '매치 수정 2단계/4단계' })).toBeInTheDocument();
+    expect(screen.getByLabelText('제목')).toBeInTheDocument();
+    expect(screen.queryByLabelText('지역')).toBeNull();
+
+    unmount();
+    render(<MatchCreatePageView model={editModel('place-time')} />);
+
+    expect(screen.getByRole('progressbar', { name: '매치 수정 3단계/4단계' })).toBeInTheDocument();
+    expect(screen.getByLabelText('지역')).toBeInTheDocument();
+    expect(screen.getByLabelText('장소')).toBeInTheDocument();
+    expect(screen.queryByLabelText('제목')).toBeNull();
   });
 
   it('최대 인원은 1명까지 선택할 수 있고 감소 버튼도 1명 아래로 내리지 않는다', () => {
@@ -511,8 +525,9 @@ describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
 // 시작 시각이 지난(터미널) 매치에서도 눌리는 죽은 버튼이었다 — 서버 cancel()이 결국 409로
 // 거부하는데도 화면은 아무 사전 신호를 주지 않았다.
 describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
-  function editModel(lockedReason: string | null) {
-    const model = getMatchCreateViewModel('edit');
+  function editModel(lockedReason: string | null, step: 'info' | 'confirm' = 'confirm') {
+    const model = getMatchCreateViewModel(step);
+    model.mode = 'edit';
     model.matchId = 'match-locked';
     model.form = {
       selectedSportId: 'sport-futsal',
@@ -542,17 +557,24 @@ describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
     expect(screen.getByRole('button', { name: '매치 취소' })).not.toBeDisabled();
   });
 
+  it('매치 관리 동작은 마지막 확인 단계 전에는 노출하지 않는다', () => {
+    render(<MatchCreatePageView model={editModel(null, 'info')} />);
+
+    expect(screen.queryByRole('button', { name: '매치 취소' })).toBeNull();
+    expect(screen.getByRole('button', { name: '다음' })).toBeInTheDocument();
+  });
+
   // 서버 update()는 잠긴 매치의 어떤 필드도 받지 않는다 — 입력이 열려 있으면 고친 뒤에야 409를 본다.
-  it('lockedReason이 있으면 입력·토글도 잠그고, 변경 취소로는 나갈 수 있다', () => {
-    render(<MatchCreatePageView model={editModel('완료·취소·종료된 매치는 수정할 수 없어요.')} />);
+  it('lockedReason이 있으면 입력·토글도 잠그고, 이전 단계로는 이동할 수 있다', () => {
+    render(<MatchCreatePageView model={editModel('완료·취소·종료된 매치는 수정할 수 없어요.', 'info')} />);
 
     expect(screen.getByRole('textbox', { name: '제목' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: '나도 참가해요' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '변경 취소' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: '이전' })).not.toBeDisabled();
   });
 
   it('lockedReason이 없으면 입력·토글은 열려 있다', () => {
-    render(<MatchCreatePageView model={editModel(null)} />);
+    render(<MatchCreatePageView model={editModel(null, 'info')} />);
 
     expect(screen.getByRole('textbox', { name: '제목' })).not.toBeDisabled();
     expect(screen.getByRole('switch', { name: '나도 참가해요' })).not.toBeDisabled();
@@ -576,7 +598,7 @@ describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
     expect(shell).toHaveClass('tm-create-shell-edit');
     expect(management).toContainElement(screen.getByRole('button', { name: '모집 마감' }));
     expect(management).toContainElement(screen.getByRole('button', { name: '매치 취소' }));
-    expect(fixedActions).toContainElement(screen.getByRole('button', { name: '변경 취소' }));
+    expect(fixedActions).toContainElement(screen.getByRole('button', { name: '이전' }));
     expect(fixedActions).toContainElement(screen.getByRole('button', { name: '변경사항 저장' }));
     expect(fixedActions).not.toContainElement(screen.getByRole('button', { name: '매치 취소' }));
   });

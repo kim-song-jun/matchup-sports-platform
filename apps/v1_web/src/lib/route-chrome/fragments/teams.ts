@@ -71,6 +71,16 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     },
   },
   {
+    // Task 176 팀 B — 선수 × 다가오는 대회·리그 경기. 저장 버튼이 하단 고정이라 탭바를 숨긴다.
+    pattern: '/teams/:id/game-rosters',
+    chrome: {
+      title: '경기 명단 관리',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+    },
+  },
+  {
     pattern: '/teams/:id/contact/settings',
     chrome: {
       title: '컨택 설정',

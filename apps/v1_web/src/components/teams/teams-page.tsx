@@ -655,7 +655,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               피드백) — 팀장이 다음 경기를 준비하는 mode==='mine' 에서만 아래쪽 원래
               자리(경기 정보 다음)에 남기고, 그 외에는 히어로 바로 다음으로 끌어올린다. */}
           {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
-          {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
+          {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
           <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
           <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
           <TeamRecordLinkCard
@@ -798,7 +798,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         {/* 비회원·가입 희망자는 매치·리그보다 팀 소개·가입 조건을 먼저 봐야 한다(QA
             피드백) — mode==='mine' 에서만 아래쪽 원래 자리(경기 정보 다음)에 남긴다. */}
         {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
-        {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
+        {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
         <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
         <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
 
@@ -1455,6 +1455,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
           {canManageMembers ? <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card> : null}
         </div>
+        {model.selfNotice ? <div style={{ marginTop: 16 }}>{model.selfNotice}</div> : null}
         {canManageMembers ? (
           <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
             <div className="tm-text-label">권한 규칙</div>

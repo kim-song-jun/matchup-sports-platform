@@ -46,6 +46,8 @@ import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
+import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
+import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
@@ -398,6 +400,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       detailMode === 'pending'
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
+    canManageGameRosters: authVerified && isTeamOperatorRole(query.data.viewer.role),
     operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, fromPath ? selfHref : null, selfHref) : undefined,
     onShare: () => shareTeam(query.data),
     openMatches,
@@ -437,6 +440,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   /** 등번호를 고칠 대상. null이면 다이얼로그가 닫혀 있다. */
   const [jerseyTarget, setJerseyTarget] = useState<{ membershipId: string; name: string; current: number | null } | null>(null);
   const [jerseyError, setJerseyError] = useState<string | null>(null);
+  const [unavailabilityTarget, setUnavailabilityTarget] = useState<{ userId: string; displayName: string } | null>(null);
+  const [unavailabilityOpen, setUnavailabilityOpen] = useState(false);
   const changeJersey = useV1ChangeMembershipJersey(teamId);
   const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
@@ -466,6 +471,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
   const invitationItems = invitationsQuery.data?.items ?? [];
+  const viewerUserId = memberItems.find((member) => member.membershipId === viewerMembershipId)?.userId ?? null;
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
 
   function handleLeaveTeam() {
@@ -547,6 +553,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       managers: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0,
       pending: requestItems.length,
     },
+    selfNotice:
+      !canManageMembers && viewerUserId !== null ? <MyUnavailabilityNotice teamId={teamId} userId={viewerUserId} /> : undefined,
     members: memberItems.length
       ? memberItems.map((member) =>
           toMemberModel(member, membersHref, {
@@ -556,6 +564,13 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
             delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+            openUnavailability:
+              canManageMembers && member.status === 'active' && member.membershipId !== viewerMembershipId
+                ? () => {
+                    setUnavailabilityTarget({ userId: member.userId, displayName: member.displayName });
+                    setUnavailabilityOpen(true);
+                  }
+                : undefined,
             editJersey: () => setJerseyTarget({
               membershipId: member.membershipId,
               name: member.displayName,
@@ -649,6 +664,15 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
       <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
+      {unavailabilityTarget !== null ? (
+        <MemberUnavailabilitySheet
+          open={unavailabilityOpen}
+          teamId={teamId}
+          userId={unavailabilityTarget.userId}
+          displayName={unavailabilityTarget.displayName}
+          onClose={() => setUnavailabilityOpen(false)}
+        />
+      ) : null}
       <JerseyNumberDialog
         open={jerseyTarget !== null}
         memberName={jerseyTarget?.name ?? ''}
@@ -973,6 +997,11 @@ function buildTeamOperations(
       href: withFromPath(`/teams/${team.teamId}/members`, subPageFrom),
     },
     {
+      label: '경기 명단 관리',
+      sub: '다가오는 대회·리그 경기에서 빠질 선수와 결장 기간을 한 번에 관리해요.',
+      href: `/teams/${team.teamId}/game-rosters`,
+    },
+    {
       // 컨택은 채팅방으로 흡수됐다 — 팀컨택 필터가 걸린 채팅 목록으로 보낸다.
       label: '받은 컨택',
       sub: '다른 팀이 보낸 컨택을 확인하고 답해요.',
@@ -1015,6 +1044,8 @@ function toMemberModel(
     demote: () => void;
     remove: () => void;
     editJersey: () => void;
+    /** 결장 기간 시트 — 팀장·매니저가 다른 멤버 행에서만(본인 등록 없음, D6). */
+    openUnavailability?: () => void;
     /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
     selfLeave?: { pending: boolean; error?: string | null; activeOwnerCount: number | undefined; onSelect: () => void };
   },
@@ -1038,6 +1069,7 @@ function toMemberModel(
       onSelect: actions.editJersey,
     });
   }
+  if (actions.openUnavailability) itemActions.push({ label: '결장 기간', onSelect: actions.openUnavailability });
   const ownerCanLeave = member.role !== 'owner' || (actions.selfLeave?.activeOwnerCount ?? 0) > 1;
 
   return {

@@ -22,7 +22,7 @@ import {
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorCode } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
-import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
 import { useGameRosterSide } from '@/components/game-roster/use-game-roster-side';
 
@@ -479,10 +479,8 @@ function RosterLoadError({ error, onRetry }: { error: unknown; onRetry: () => vo
   );
 }
 
-/** 끝 시각은 서버에서 "미포함"이라 하루 전으로 보여 준다(자정 종료가 다음 날로 읽히지 않게). */
 function unavailabilityRange(startsAt: string, endsAt: string): string {
-  const lastMoment = new Date(Date.parse(endsAt) - 1).toISOString();
-  const range = formatTournamentDateRangeShort(startsAt, lastMoment);
+  const range = formatExclusiveEndRangeShort(startsAt, endsAt);
   return range === null ? '결장 기간' : `${range} 결장`;
 }
 

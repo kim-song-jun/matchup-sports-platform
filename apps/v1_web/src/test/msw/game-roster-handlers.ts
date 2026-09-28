@@ -184,6 +184,8 @@ export function createV1GameRosterMswHandlers() {
         if (ex) return { ...empty, gameId: roster.gameId, status: 'EXCLUDED', reason: ex.reason, actorRole: ex.actor.role, adjustmentId: ex.adjustmentId };
         const un = roster.unavailable.find((u) => u.userId === p.userId);
         if (un) return { ...empty, gameId: roster.gameId, status: 'UNAVAILABLE', reason: un.reason, actorRole: un.actor.role, unavailabilityId: un.unavailabilityId };
+        const su = roster.suspended.find((row) => row.userId === p.userId);
+        if (su) return { ...empty, gameId: roster.gameId, status: 'SUSPENDED', reason: su.reason, remainingMatches: su.remainingMatches };
         return { ...empty, gameId: roster.gameId, status: 'PARTICIPATING' };
       }),
     }));
@@ -214,6 +216,7 @@ export function createV1GameRosterMswHandlers() {
     return false;
   }
 
+  const forbidden = (message: string) => fail(403, 'PERMISSION_DENIED', message);
   const inRoster = (userId: string) => GAME_ROSTER_MSW.players.some((p) => p.userId === userId);
   const deadlinePassed = (gameIds: string[]) =>
     fail(409, 'LINEUP_DEADLINE_PASSED', '경기가 시작돼 명단을 바꿀 수 없어요.', { gameIds });
@@ -271,6 +274,7 @@ export function createV1GameRosterMswHandlers() {
     }),
     http.get(`${api}/teams/:teamId/game-rosters`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
+      if (state.viewerRole === 'TEAM_MEMBER') return forbidden('팀장·매니저만 경기 명단을 관리할 수 있어요.');
       const result: V1TeamRosterMatrix = { teamId: String(params.teamId), viewerRole: 'TEAM_MANAGER', ...matrix() };
       return ok(result);
     }),
@@ -299,6 +303,8 @@ export function createV1GameRosterMswHandlers() {
     http.post(`${api}/teams/:teamId/members/:userId/unavailability`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
       const body = state.requests.at(-1)!.body as { startsAt: string; endsAt: string; reason?: string };
+      if (state.viewerRole === 'TEAM_MEMBER') return forbidden('팀장·매니저만 결장 기간을 등록할 수 있어요.');
+      if (params.userId === GAME_ROSTER_MSW.viewerUserId) return forbidden('내 결장 기간은 다른 팀장·매니저가 등록해요.');
       const created: Unavailability = {
         id: nextId('unavailability'),
         teamId: String(params.teamId),

@@ -47,7 +47,7 @@ export function LandingV4Cta() {
       delete button.dataset.pulling;
     };
     const onMove = (event: PointerEvent) => {
-      if (!fine.matches) return;
+      if (!fine.matches) return reset();
       const r = button.getBoundingClientRect();
       const dx = event.clientX - (r.left + r.width / 2);
       const dy = event.clientY - (r.top + r.height / 2);

@@ -839,7 +839,7 @@
 /* ── ① 고정 무대: 모션 켜짐(stage) ── */
 .tm-landing-v4-day[data-mode='stage'] {
   position: relative;
-  height: calc(100svh + 5 * 64svh);
+  height: calc(100svh + var(--tm-landing-v4-scenes, 5) * 64svh);
   padding: 0;
 }
 
@@ -904,7 +904,7 @@
 
 .tm-landing-v4-rail {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--tm-landing-v4-scenes, 5), minmax(0, 1fr));
   gap: 4px;
   margin: 16px 0;
 }
@@ -1090,7 +1090,7 @@
   .tm-landing-v4-scene-copy h3 { font-size: 32px; }
   .tm-landing-v4-scene-copy p { font-size: var(--font-size-body-lg); }
 
-  .tm-landing-v4-day[data-mode='stage'] { height: calc(100svh + 5 * 80svh); }
+  .tm-landing-v4-day[data-mode='stage'] { height: calc(100svh + var(--tm-landing-v4-scenes, 5) * 80svh); }
   .tm-landing-v4-day[data-mode='stage'] .tm-landing-v4-day-intro { display: none; }
   .tm-landing-v4-day[data-mode='stage'] .tm-landing-v4-day-head {
     position: static;

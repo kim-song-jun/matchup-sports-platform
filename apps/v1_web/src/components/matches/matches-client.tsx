@@ -16,6 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
+import { extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
@@ -262,6 +263,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   const [applyError, setApplyError] = useState<string | null>(null);
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
   const resolveChatRoom = useV1ResolveChatRoom();
+  const [chatError, setChatError] = useState<string | null>(null);
   const matchViewTrackedRef = useRef<string | null>(null);
   const fallback = getMatchDetailViewModel();
   const matchSportType = query.data ? query.data.sport?.name ?? query.data.sportName : undefined;
@@ -291,6 +293,8 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   // 이 상세 페이지 자신의 URL(자기 ?from= 포함)을 다음 from으로 싣는다. fromPath가 없으면
   // undefined — 기존 하위 링크(?from= 없음)를 그대로 유지한다.
   const selfHref = fromPath ? withFromPath(`/matches/${matchId}`, fromPath) : undefined;
+  const hostHasChatPeer = viewerState !== 'host'
+    || (query.data.participantCount ?? 0) > (query.data.hostParticipates === false ? 0 : 1);
 
   const model: MatchDetailViewModel = {
     ...fallback,
@@ -332,11 +336,22 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
     chatLabel: chatLabel(viewerState),
     chatPending: resolveChatRoom.isPending,
+    chatError,
     onChat: !seeding && canOpenMatchChat(viewerState)
-      ? () => resolveChatRoom.mutate(
-          { targetType: 'match', targetId: matchId },
-          { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
-        )
+      ? () => {
+          setChatError(null);
+          if (!hostHasChatPeer) {
+            setChatError('아직 참여자가 없어 채팅을 시작할 수 없어요. 신청자를 승인한 뒤 이용해 주세요.');
+            return;
+          }
+          resolveChatRoom.mutate(
+            { targetType: 'match', targetId: matchId },
+            {
+              onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)),
+              onError: (error) => setChatError(extractErrorMessage(error, '채팅을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+            },
+          );
+        }
       : undefined,
     onShare: () => shareMatch(query.data),
     onApply: seeding ? undefined : getApplyAction({

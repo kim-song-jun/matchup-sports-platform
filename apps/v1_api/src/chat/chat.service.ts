@@ -479,11 +479,31 @@ export class ChatService {
   }
 
   private async assertCanUseMatchChat(userId: string, matchId: string) {
-    const participant = await this.prisma.v1MatchParticipant.findFirst({
-      where: { matchId, userId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
-      select: { id: true },
+    const match = await this.prisma.v1Match.findFirst({
+      where: { id: matchId, deletedAt: null },
+      select: {
+        hostUserId: true,
+        participants: {
+          where: { status: { in: ['active', 'completed'] } },
+          select: { userId: true, role: true },
+        },
+      },
     });
-    if (!participant) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires confirmed participation' });
+    if (!match) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
+    }
+
+    const isHost = match.hostUserId === userId;
+    const hasConfirmedParticipant = match.participants.some((participant) => participant.role === 'participant');
+    if (isHost && !hasConfirmedParticipant) {
+      throw new ConflictException({
+        code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED',
+        message: '아직 참여자가 없어 채팅을 시작할 수 없어요. 신청자를 승인한 뒤 이용해 주세요.',
+      });
+    }
+    if (isHost || match.participants.some((participant) => participant.userId === userId)) return;
+
+    throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires confirmed participation' });
   }
 
   private async assertCanUseTeamChat(userId: string, teamId: string) {

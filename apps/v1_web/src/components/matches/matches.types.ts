@@ -124,6 +124,7 @@ export type MatchDetailViewModel = {
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
+  chatError?: string | null;
   /** 경기 종료 후 후기 작성 화면(/my/reviews/match/:id) 링크. 참가자·호스트일 때만 설정된다.
    * 이 링크가 없던 동안 매치 상세에는 후기로 가는 길이 아예 없었다(완료 알림도 이 화면으로
    * 보냈지만 여기서 더 갈 곳이 없어 막다른 길이었다). */

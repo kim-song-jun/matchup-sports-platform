@@ -10,6 +10,7 @@ const {
   applyMatchMutateAsync,
   applyMatchMutate,
   withdrawMatchMutateAsync,
+  resolveChatRoomMutate,
   routerPush,
   useV1MatchMock,
   useV1MatchApplicationEligibilityMock,
@@ -19,6 +20,7 @@ const {
   applyMatchMutateAsync: vi.fn(),
   applyMatchMutate: vi.fn(),
   withdrawMatchMutateAsync: vi.fn(),
+  resolveChatRoomMutate: vi.fn(),
   routerPush: vi.fn(),
   useV1MatchMock: vi.fn(),
   useV1MatchApplicationEligibilityMock: vi.fn(),
@@ -38,7 +40,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MatchApplicationEligibility: useV1MatchApplicationEligibilityMock,
   useV1ApplyMatch: () => ({ mutateAsync: applyMatchMutateAsync, mutate: applyMatchMutate, isPending: false }),
   useV1WithdrawMatchApplication: () => ({ mutateAsync: withdrawMatchMutateAsync, isPending: false }),
-  useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1ResolveChatRoom: () => ({ mutate: resolveChatRoomMutate, isPending: false }),
   useV1Matches: useV1MatchesMock,
   useV1MasterSports: () => ({ data: [] }),
   useV1MasterRegions: () => ({ data: [] }),
@@ -51,6 +53,8 @@ vi.mock('./matches-page', () => ({
   MatchDetailPageView: ({ model }: { model: MatchDetailViewModel }) => (
     <div>
       {model.onApply && <button onClick={model.onApply}>참가 신청</button>}
+      {model.onChat && <button onClick={model.onChat}>채팅</button>}
+      {model.chatError && <div role="alert">{model.chatError}</div>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
       <div data-testid="address">{model.match.address}</div>
       <div data-testid="description">{model.match.description}</div>
@@ -146,6 +150,53 @@ describe('MatchDetailPageClient — GA events', () => {
       expect(withdrawMatchMutateAsync).toHaveBeenCalledWith({ reason: 'applicant_withdrawn_from_v1_web' });
     });
     expect(trackEvent).toHaveBeenCalledWith('match_leave', { matchId: 'match-1' });
+  });
+});
+
+describe('MatchDetailPageClient — 주최자 채팅', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: false, applicationId: null } });
+  });
+
+  it('실제 참가자가 아직 없으면 API를 호출하지 않고 안내를 보여준다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: {
+        ...baseMatch,
+        viewerState: 'host',
+        participantCount: 1,
+        hostParticipates: true,
+      },
+      isError: false,
+      isPlaceholderData: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
+
+    expect(resolveChatRoomMutate).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('아직 참여자가 없어 채팅을 시작할 수 없어요.');
+  });
+
+  it('주최자가 직접 참가하지 않아도 승인 참가자가 있으면 채팅방을 연다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: {
+        ...baseMatch,
+        viewerState: 'host',
+        participantCount: 1,
+        hostParticipates: false,
+      },
+      isError: false,
+      isPlaceholderData: false,
+    });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
+
+    expect(resolveChatRoomMutate).toHaveBeenCalledWith(
+      { targetType: 'match', targetId: 'match-1' },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
   });
 });
 

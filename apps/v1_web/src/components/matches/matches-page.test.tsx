@@ -179,6 +179,25 @@ describe('MatchDetailPageView — host management actions', () => {
     expect(screen.queryByRole('link', { name: '매치 수정' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '신청자 관리' })).not.toBeInTheDocument();
   });
+
+  it('모바일 하단은 채팅과 신청자 관리만 한 줄에 두고 매치 수정은 상태 행으로 분리한다', () => {
+    const model = getMatchDetailViewModel('mine');
+    model.match.id = 'match-hosted';
+    model.match.editHref = '/matches/match-hosted/edit';
+    model.match.applicationsHref = '/matches/match-hosted/applications';
+    model.onChat = vi.fn();
+
+    const { container } = render(<MatchDetailPageView model={model} />);
+    const mobileCta = container.querySelector('.tm-match-detail-fixed-cta');
+    const mobileActions = mobileCta?.querySelector('.tm-match-detail-fixed-cta-actions');
+
+    expect(mobileActions).toHaveClass('tm-match-detail-fixed-cta-actions-split');
+    expect(mobileActions?.querySelectorAll('.tm-btn')).toHaveLength(2);
+    expect(mobileActions?.textContent).toContain('채팅');
+    expect(mobileActions?.textContent).toContain('신청자 관리');
+    expect(mobileActions?.textContent).not.toContain('매치 수정');
+    expect(mobileCta?.querySelector('.tm-match-detail-edit-link')).toHaveAttribute('href', '/matches/match-hosted/edit');
+  });
 });
 
 describe('MatchListPageView — 매치 카드 종목 배지', () => {

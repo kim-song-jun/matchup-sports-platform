@@ -114,6 +114,10 @@ export type TeamMatchDetailViewModel = {
     hostTeamHref?: string;
     hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
+    hostTeamSportName?: string | null;
+    hostTeamLevelLabel?: string | null;
+    hostTeamRatingScore?: number | null;
+    hostTeamWins?: number | null;
     hostTeamTrustState?: string | null;
     /** 값이 있으면 리그전 경기다(리그 홈으로 딥링크). null 이면 일반 팀 매치. */
     league?: { leagueId: string; title: string } | null;
@@ -125,6 +129,8 @@ export type TeamMatchDetailViewModel = {
       meta: string;
       status: string;
       logoUrl?: string | null;
+      sportName?: string | null;
+      levelLabel?: string | null;
       trustState?: string | null;
       href?: string;
       applicationId?: string;

@@ -171,7 +171,12 @@ Rules:
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.
   - `mannerScore` is the live aggregate of publicly revealed team-match reviews and is `null` when no score is publishable.
   - `wins` counts only the team's current official result facts whose result is `WON`; draft and superseded revisions are excluded.
-- Detail responses include the same public team-card fields for `approvedOpponentTeam`: `logoUrl`, `trustState`, `mannerScore`, and `wins`.
+- Detail team identity cards additionally use `hostTeam` / `approvedOpponentTeam` fields `sportName`, `levelLabel`, `ratingScore`, `ratingCount`, and `wins`.
+  - `sportName` and `levelLabel` come from the team's own sport/profile settings, not the team-match recruitment conditions.
+  - `ratingScore` is the general team review rating shown on the public team detail: every publicly revealed team-target review source is eligible, and ratings are folded by sport × reviewer team before averaging. With no publishable review it is `null`, not `0`.
+  - `ratingCount` is the number of folded sport × reviewer-team opinions, and `wins` keeps the official-current-result rule above.
+  - `platformManaged`, league membership, and match sport/level remain match-level fields and must not be presented as attributes of either team.
+- `GET /team-matches/:teamMatchId/applications` returns the same team-card fields (`sportName`, `levelLabel`, `ratingScore`, `ratingCount`, `wins`) for each applicant. Legacy `score`/`matchCount` remain response-compatible but are not the detail card's team-rating/win source.
 
 ## POST /team-matches
 

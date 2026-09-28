@@ -1181,7 +1181,10 @@ describe('TeamMatchesService', () => {
         const rows = teamIds.flatMap((teamId) =>
           (reviewsByTeam[teamId] ?? []).map((review) => ({
             targetTeamId: teamId,
+            sourceType: 'team_match',
             sourceId: review.sourceId,
+            sourceGroupId: null,
+            sportId: 'sport-1',
             reviewerTeamId: review.reviewerTeamId ?? `opponent-of-${teamId}`,
             rating: review.rating,
             submittedAt: OLD_SUBMITTED_AT,
@@ -1218,14 +1221,16 @@ describe('TeamMatchesService', () => {
         name: '홈팀',
         ownerUserId: manager.id,
         status: 'active',
-        profile: { logoUrl: '/uploads/home.png' },
+        sport: { id: 'sport-1', name: '풋살' },
+        profile: { logoUrl: '/uploads/home.png', skillNote: null, minSportLevel: { name: '중급' }, maxSportLevel: { name: '중급' } },
         trustScore: null,
         memberships: [],
       },
       approvedApplicantTeam: {
         id: 'team-away',
         name: '어웨이팀',
-        profile: { logoUrl: '/uploads/away.png' },
+        sport: { id: 'sport-1', name: '풋살' },
+        profile: { logoUrl: '/uploads/away.png', skillNote: null, minSportLevel: { name: '고급' }, maxSportLevel: { name: '고급' } },
         trustScore: { trustState: 'sample', mannerScore: 1 },
         memberships: [],
       },
@@ -1251,7 +1256,11 @@ describe('TeamMatchesService', () => {
       teamId: 'team-away',
       name: '어웨이팀',
       logoUrl: '/uploads/away.png',
+      sportName: '풋살',
+      levelLabel: '고급',
       trustState: 'verified',
+      ratingScore: 4.67,
+      ratingCount: 3,
       mannerScore: 4.67,
       wins: 7,
       applicationId: 'app-away',
@@ -1390,6 +1399,7 @@ describe('TeamMatchesService', () => {
         applicantTeam: {
           id: 'team-applicant-a',
           name: 'A팀',
+          sport: { id: 'sport-1', name: '풋살' },
           profile: null,
           trustScore: { trustState: 'sample', mannerScore: null, matchCount: 7 },
         },
@@ -1401,6 +1411,7 @@ describe('TeamMatchesService', () => {
         applicantTeam: {
           id: 'team-applicant-b',
           name: 'B팀',
+          sport: { id: 'sport-1', name: '풋살' },
           profile: null,
           trustScore: { trustState: 'sample', mannerScore: null, matchCount: 2 },
         },
@@ -1417,6 +1428,8 @@ describe('TeamMatchesService', () => {
     // A팀의 값이 B팀에 섞여 들어가면(크로스토크) 이 assertion이 깨진다.
     expect(teamA?.applicantTeam.trustState).toBe('verified');
     expect(teamA?.applicantTeam.score).toBe(5);
+    expect(teamA?.applicantTeam.ratingScore).toBe(5);
+    expect(teamA?.applicantTeam.sportName).toBe('풋살');
     expect(teamA?.applicantTeam.matchCount).toBe(7); // matchCount는 스코프 밖 — 기존 캐시값 유지
     expect(teamB?.applicantTeam.trustState).toBe('estimated');
     expect(teamB?.applicantTeam.score).toBe(2);

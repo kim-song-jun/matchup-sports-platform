@@ -216,8 +216,10 @@ describe('TeamMatchDetailPageClient — GA events', () => {
           teamId: 'team-away',
           name: 'AWAY 참가팀',
           logoUrl: '/uploads/away-logo.png',
+          sportName: '풋살',
+          levelLabel: '중급',
           trustState: 'verified',
-          mannerScore: 4.7,
+          ratingScore: 4.5,
           wins: 7,
         },
       },
@@ -232,7 +234,7 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
     expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
     expect(screen.getByTestId('team-match-away-logo')).toHaveTextContent('/uploads/away-logo.png');
-    expect(screen.getByTestId('team-match-away-meta')).toHaveTextContent('매너 4.7 · 승 7');
+    expect(screen.getByTestId('team-match-away-meta')).toHaveTextContent('팀 평점 4.5 · 7승');
     expect(screen.getByTestId('team-match-away-trust')).toHaveTextContent('verified');
     expect(screen.getByTestId('team-match-away-meta')).not.toHaveTextContent('승인된 상대팀');
     expect(screen.queryByText('매치 관리')).not.toBeInTheDocument();

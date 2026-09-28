@@ -335,6 +335,10 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
       hostTeamId: query.data.hostTeam?.teamId ?? null,
       hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
+      hostTeamSportName: query.data.hostTeam?.sportName ?? null,
+      hostTeamLevelLabel: query.data.hostTeam?.levelLabel ?? null,
+      hostTeamRatingScore: query.data.hostTeam?.ratingScore ?? null,
+      hostTeamWins: query.data.hostTeam?.wins ?? null,
       hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
       league: query.data.league ?? null,
       applicantActionError: actionError,
@@ -513,10 +517,10 @@ function toApplicantTeamsWithActions(
 ): TeamMatchDetailViewModel['match']['applicantTeams'] {
   if (match.approvedOpponentTeam) {
     const opponentStats = [
-      match.approvedOpponentTeam.mannerScore == null
+      match.approvedOpponentTeam.ratingScore == null
         ? null
-        : `매너 ${match.approvedOpponentTeam.mannerScore.toFixed(1)}`,
-      match.approvedOpponentTeam.wins == null ? null : `승 ${match.approvedOpponentTeam.wins}`,
+        : `팀 평점 ${match.approvedOpponentTeam.ratingScore.toFixed(1)}`,
+      match.approvedOpponentTeam.wins == null ? null : `${match.approvedOpponentTeam.wins}승`,
     ].filter((value): value is string => value !== null);
     return [{
       teamId: match.approvedOpponentTeam.teamId,
@@ -524,6 +528,8 @@ function toApplicantTeamsWithActions(
       meta: opponentStats.join(' · '),
       status: '승인 완료',
       logoUrl: match.approvedOpponentTeam.logoUrl ?? null,
+      sportName: match.approvedOpponentTeam.sportName ?? null,
+      levelLabel: match.approvedOpponentTeam.levelLabel ?? null,
       trustState: match.approvedOpponentTeam.trustState ?? null,
       href: `/teams/${match.approvedOpponentTeam.teamId}`,
       applicationId: match.approvedOpponentTeam.applicationId,
@@ -534,9 +540,14 @@ function toApplicantTeamsWithActions(
     return applications.items.map((app) => ({
       teamId: app.applicantTeam.teamId,
       name: app.applicantTeam.name,
-      meta: `매너 ${app.applicantTeam.score?.toFixed(1) ?? '-'} · ${app.applicantTeam.matchCount}전`,
+      meta: [
+        app.applicantTeam.ratingScore == null ? null : `팀 평점 ${app.applicantTeam.ratingScore.toFixed(1)}`,
+        `${app.applicantTeam.wins}승`,
+      ].filter((value): value is string => value !== null).join(' · '),
       status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인 완료' : app.status === 'rejected' ? '미승인' : app.status,
       logoUrl: app.applicantTeam.logoUrl,
+      sportName: app.applicantTeam.sportName,
+      levelLabel: app.applicantTeam.levelLabel,
       trustState: app.applicantTeam.trustState,
       href: `/teams/${app.applicantTeam.teamId}`,
       applicationId: app.applicationId,

@@ -45,7 +45,7 @@ Status: in_progress
   Then the API rejects the request without partial writes.
 - Given successful finalization
   When the public list or detail is opened
-  Then the platform-managed badge remains visible beside the assigned home and away teams.
+  Then platform provenance remains visible at the match level, while assigned home/away identity cards contain only attributes of those teams.
 - Given successful finalization
   When either team views its schedule/lineup flow
   Then the same team match and Game aggregate are available to both sides.
@@ -84,6 +84,8 @@ Status: in_progress
 - The administrator does not designate teams at creation. Teams apply first, and the administrator selects two requested applications later.
 
 ## Progress Snapshot
+
+- 2026-09-28: Corrected the public detail team-card boundary. `플랫폼 주관` and league/match conditions remain match-level provenance and are no longer rendered as attributes inside an assigned team card.
 
 - 2026-09-27: Fixed the first-approval projection gap reported on alpha. The approval transaction now persists the first approved applicant as `hostTeamId`, a data migration backfills existing single-approved platform recruitments, and public list/detail can render `HOME 팀명 vs 모집 중` immediately.
 

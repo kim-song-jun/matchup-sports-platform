@@ -36,7 +36,7 @@ import { OperationAuditWriterService } from '../common/audit/operation-audit-wri
 import { PrismaService } from '../prisma/prisma.service';
 import { persistCanonicalGameAggregate } from './game-source-aggregate';
 import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
-import { leagueFixtureListOrder, leagueFixtureListWhere } from '../league-matches/league-fixture-list-source';
+import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 import { completeTeamMatchAtResultBoundary } from './team-match-result-boundary';
 import {
   parseLineupCatalog,
@@ -5997,24 +5997,16 @@ export class GamesService {
     if (teamMatchCompetition !== null) {
       competitionId = teamMatchCompetition.competitionId;
       upcomingKey = teamMatchCompetition.teamMatchId;
-      const matches = teamMatchCompetition.isLeague
-        ? await tx.v1TeamMatch.findMany({
-            where: leagueFixtureListWhere(competitionId),
-            orderBy: leagueFixtureListOrder(),
-            select: { id: true, game: { select: { id: true } } },
-          })
-        : await tx.v1TeamMatch.findMany({
-            where: { tournamentId: competitionId, deletedAt: null },
-            orderBy: [
-              { startAt: { sort: 'asc', nulls: 'last' } },
-              { tournamentDetails: { round: 'asc' } },
-              { tournamentDetails: { fixtureNumber: 'asc' } },
-              { tournamentDetails: { legNumber: 'asc' } },
-              { id: 'asc' },
-            ],
-            select: { id: true, game: { select: { id: true } } },
-          });
-      orderedGames = matches.map((row) => ({ key: row.id, gameId: row.game?.id ?? null }));
+      const lineup = await tx.v1GameLineup.findUnique({ where: { id: lineupId }, select: { sideId: true } });
+      const side =
+        lineup === null
+          ? null
+          : await tx.v1GameSide.findUnique({ where: { id: lineup.sideId }, select: { teamId: true } });
+      orderedGames = await loadTeamCompetitionGameOrder(tx, {
+        competitionId,
+        isLeague: teamMatchCompetition.isLeague,
+        teamId: side?.teamId ?? null,
+      });
     } else if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
       return;
     } else {

@@ -3,6 +3,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { participantDisplayName } from '../tournaments/participant-display-name';
+import type { GameRosterBaseEntry } from '../games/roster/game-roster-computation';
 import { findTournamentOnSurfaceOrThrow } from '../tournaments/tournament-surface-lookup';
 import {
   fillLeagueTeamRoster,
@@ -52,7 +53,7 @@ type ParticipantProfile = { nickname: string | null; displayName: string | null 
 export interface LeagueFixtureTeam {
   id: string;
   name: string;
-  memberships: Array<{ id: string; user: { profile: ParticipantProfile | null } }>;
+  memberships: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
   /** 이 리그의 참가 명단(confirmed 신청에서 제외되지 않은 선수). 비어 있으면 명단 미제출이다. */
   registeredPlayers: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
 }
@@ -99,16 +100,34 @@ export interface LeagueRosterEntry {
  * 대진 생성과 명단 동기화(`league-roster-sync.ts`)가 같은 규칙을 쓴다.
  */
 export function leagueTeamRosterEntries(team: LeagueFixtureTeam): LeagueRosterEntry[] {
+  return leagueTeamRosterBase(team).map((entry) => ({
+    sourceParticipantId: entry.sourceParticipantId,
+    ...(entry.accountLinked ? { userId: entry.userId } : {}),
+    displayNameSnapshot: entry.displayNameSnapshot,
+  }));
+}
+
+/**
+ * 경기 명단 계산(`games/roster`)의 기준 명단. 폴백 팀원도 멤버십 userId 를 매칭 키로 갖는다 —
+ * 조정·결장·출전정지는 userId 로 걸리기 때문이다. 경기 참가자 행에는 `accountLinked` 가
+ * false 라 여전히 userId 가 실리지 않는다(위 주석의 이유 그대로).
+ */
+export function leagueTeamRosterBase(team: LeagueFixtureTeam): GameRosterBaseEntry[] {
   if (team.registeredPlayers.length > 0) {
     return team.registeredPlayers.map((player) => ({
-      sourceParticipantId: player.id,
       userId: player.userId,
+      accountLinked: true,
       displayNameSnapshot: participantDisplayName(player),
+      jerseyNumber: null,
+      sourceParticipantId: player.id,
     }));
   }
   return team.memberships.map((membership) => ({
-    sourceParticipantId: membership.id,
+    userId: membership.userId,
+    accountLinked: false,
     displayNameSnapshot: participantDisplayName(membership),
+    jerseyNumber: null,
+    sourceParticipantId: membership.id,
   }));
 }
 
@@ -151,8 +170,8 @@ export async function loadLeagueTeamRosters(
       memberships: {
         where: { status: 'active' },
         orderBy: { id: 'asc' },
-        // userId 를 읽지 않는다 — 명단 미제출 팀의 팀원은 계정 없이 들어간다.
-        select: { id: true, user: profile },
+        // userId 는 조정·결장 대조 키로만 쓴다 — 경기 참가자에는 계정 없이 들어간다.
+        select: { id: true, userId: true, user: profile },
       },
     },
   });

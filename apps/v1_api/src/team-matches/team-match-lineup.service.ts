@@ -13,11 +13,8 @@ import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } fro
 import { PrismaService } from '../prisma/prisma.service';
 import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
 import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
-import {
-  leagueFixtureListOrder,
-  leagueFixtureListWhere,
-} from '../league-matches/league-fixture-list-source';
 import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
+import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 import {
   carryRevokedConsent,
   latestConsentSnapshotByLinkId,
@@ -341,17 +338,13 @@ export class TeamMatchLineupService {
           // 규정(`yellowAccumulationLimit`·`redCardSuspensionMatches`)이 꺼져 있으면 공유
           // 함수가 조회 없이 통과시킨다 — **옵트인**이다.
           if (context.leagueId !== null) {
-            const fixtures = await tx.v1TeamMatch.findMany({
-              // 리그 대진 목록의 정본 조건·정렬을 그대로 쓴다. 정지 판정의 기준틀이
-              // "몇 번째 경기인가" 라서, 목록 화면과 다른 순서로 세면 사람이 보는 순서와
-              // 규정이 어긋난다.
-              where: leagueFixtureListWhere(context.leagueId),
-              orderBy: leagueFixtureListOrder(),
-              select: { id: true, game: { select: { id: true } } },
-            });
             await assertNoSuspendedParticipants(tx, {
               competitionId: context.leagueId,
-              orderedGames: fixtures.map((row) => ({ key: row.id, gameId: row.game?.id ?? null })),
+              orderedGames: await loadTeamCompetitionGameOrder(tx, {
+                competitionId: context.leagueId,
+                isLeague: true,
+                teamId: context.ownTeamId,
+              }),
               upcomingKey: context.teamMatchId,
               lineupId: lineup.id,
             });

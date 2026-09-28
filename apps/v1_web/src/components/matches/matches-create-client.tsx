@@ -35,7 +35,6 @@ import {
   getMatchMissingFields,
   getMatchStepErrors,
   normalizeGenderRule,
-  toFieldErrorMap,
 } from './matches.validation';
 import { getMatchCreateViewModel } from './matches.view-model';
 
@@ -249,8 +248,10 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const [regionId, setRegionId] = useState('');
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
-  // "변경사항 저장"을 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다(#1과 동일한 UX 원칙).
-  const [editAttempted, setEditAttempted] = useState(false);
+  // 각 단계의 "다음"을 누른 뒤에만 해당 단계의 인라인 에러를 보여준다(생성 흐름과 동일한 UX 원칙).
+  const [editStep, setEditStep] = useState<Exclude<MatchCreateStep, 'edit'>>('sport');
+  const [editAttemptedStep, setEditAttemptedStep] = useState<MatchCreateStep | null>(null);
+  const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
   const [editTouched, setEditTouched] = useState(false);
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(editTouched);
   const sportOptions = sports.data?.map((sport) => ({ id: sport.id, name: sport.name }))
@@ -271,11 +272,20 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     setVersion(editQuery.data.version);
   }, [editQuery.data]);
 
-  // #2: edit 화면은 스텝 구분이 없는 한 화면이라 getMatchMissingFields 를 그대로
-  // 평탄화(toFieldErrorMap)해서 각 CreateField 아래 인라인 에러로 붙인다.
+  // 생성과 동일한 단계 검증을 사용하고, 완료된 단계는 진행 표시에서 함께 안내한다.
   const editCtx = { sportId: selectedSportId, regionId, draft };
-  const editMissingFields = editAttempted ? getMatchMissingFields(editCtx) : [];
-  const editFieldErrors = toFieldErrorMap(editMissingFields);
+  const editFieldErrors = editAttemptedStep === editStep ? getMatchStepErrors(editCtx, editStep) : {};
+  const completeSteps = getCompleteMatchSteps(editCtx, CREATE_STEP_ORDER);
+
+  useEffect(() => {
+    if (!pendingFocusField) return;
+    const el = document.getElementById(`field-${pendingFocusField}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus({ preventScroll: true });
+    }
+    setPendingFocusField(null);
+  }, [pendingFocusField, editStep]);
 
   // 모집 마감 / 다시 열기 — 서버 close()/reopen() 이 받아주는 상태와 정확히 같은 조건으로
   // 버튼을 고른다. 마감은 두 갈래(호스트가 닫은 status='closed' · 마감 시각 경과)라
@@ -293,7 +303,8 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const togglePending = closeMatch.isPending || reopenMatch.isPending;
 
   const model = buildCreateModel({
-    step: 'edit',
+    step: editStep,
+    mode: 'edit',
     matchId,
     draft,
     selectedSportId,
@@ -304,6 +315,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     fieldErrors: editFieldErrors,
+    completeSteps,
     recruitingToggle: recruitingToggleKind
       ? {
           label: recruitingToggleKind === 'close' ? '모집 마감' : '모집 다시 열기',
@@ -357,11 +369,37 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       setRegionId(value);
     },
     onBack: () => {
+      const currentIndex = CREATE_STEP_ORDER.indexOf(editStep);
+      if (editStep === 'confirm') {
+        setEditAttemptedStep(null);
+        setEditStep('place-time');
+        return;
+      }
+      if (currentIndex > 0) {
+        setEditAttemptedStep(null);
+        setEditStep(CREATE_STEP_ORDER[currentIndex - 1] as Exclude<MatchCreateStep, 'edit'>);
+        return;
+      }
       void confirmLeave().then((leave) => {
         if (leave) router.push(detailHref);
       });
     },
-    onNext: () => undefined,
+    onNext: () => {
+      const errors = getMatchStepErrors(editCtx, editStep);
+      const firstInvalidField = Object.keys(errors)[0];
+      if (firstInvalidField) {
+        setEditAttemptedStep(editStep);
+        setPendingFocusField(firstInvalidField);
+        return;
+      }
+      const currentIndex = CREATE_STEP_ORDER.indexOf(editStep);
+      setEditAttemptedStep(null);
+      setEditStep(
+        currentIndex === CREATE_STEP_ORDER.length - 1
+          ? 'confirm'
+          : CREATE_STEP_ORDER[currentIndex + 1] as Exclude<MatchCreateStep, 'edit'>,
+      );
+    },
     uploadImage: async (file: File) => {
       const result = await uploadImages.mutateAsync([file]);
       const url = result.urls[0];
@@ -378,7 +416,11 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       if (payloadResult.missingFields || !version) {
         // #2: 실제 결측 필드만 지목 — 각 CreateField 아래 인라인 에러로 표시되고,
         // 상단 배너는 몇 개가 비어 있는지만 간단히 안내한다(중복 문구 방지).
-        setEditAttempted(true);
+        const firstMissingStep = payloadResult.missingFields?.[0]?.step;
+        if (firstMissingStep && firstMissingStep !== 'edit') {
+          setEditStep(firstMissingStep);
+          setEditAttemptedStep(firstMissingStep);
+        }
         setError(
           payloadResult.missingFields
             ? `${payloadResult.missingFields.length}개 항목을 확인해 주세요.`
@@ -456,6 +498,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
 
 function buildCreateModel({
   step,
+  mode,
   matchId,
   draft,
   selectedSportId,
@@ -481,6 +524,7 @@ function buildCreateModel({
   recentVenues,
 }: {
   step: MatchCreateStep;
+  mode?: 'create' | 'edit';
   matchId?: string;
   draft: MatchDraft;
   selectedSportId: string;
@@ -515,6 +559,7 @@ function buildCreateModel({
 
   return {
     ...fallback,
+    mode,
     matchId,
     selectedSport,
     sports: sportNames,

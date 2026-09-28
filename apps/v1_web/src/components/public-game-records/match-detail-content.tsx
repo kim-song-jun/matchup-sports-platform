@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
@@ -320,7 +321,16 @@ function HistorySection({ history, isStatusOnly }: { history: PublicMatchDetail[
   );
 }
 
-export function MatchDetailContent({ data, from }: { data: PublicMatchDetail; from?: string }) {
+export function MatchDetailContent({
+  data,
+  from,
+  afterHeader,
+}: {
+  data: PublicMatchDetail;
+  from?: string;
+  /** 헤더(스코어 카드) 바로 아래 자리 — 참가팀 전용 카드(우리 팀 출전)가 쓴다. */
+  afterHeader?: ReactNode;
+}) {
   const isStatusOnly = data.visibilityMode === 'status_only';
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -417,6 +427,7 @@ export function MatchDetailContent({ data, from }: { data: PublicMatchDetail; fr
           ) : null}
         </Card>
       </header>
+      {afterHeader ?? null}
 
       {data.mvp ? (
         <Card pad={16}>

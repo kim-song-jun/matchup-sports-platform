@@ -10,6 +10,8 @@ import { AttestRequestsSection } from '@/components/public-game-records/attest-r
 import { LeagueClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { MatchTeamRosterCard } from '@/components/game-roster/match-team-roster-card';
+import { useMyMatchRosterSide } from '@/components/game-roster/use-my-match-roster-side';
 import { extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
@@ -114,6 +116,14 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     () => series?.fixtures.find((item) => item.teamMatchId === fixtureId) ?? null,
     [series, fixtureId],
   );
+
+  // 참가팀 팀원에게만 "우리 팀 출전" 카드가 뜬다. 게임이 비공개(기록 404)여도 대진 id 로 찾는다.
+  const rosterSide = useMyMatchRosterSide({
+    teamIds: [fixture?.homeTeamId ?? null, fixture?.awayTeamId ?? null],
+    gameId: recordQuery.data?.gameId ?? null,
+    teamMatchId: fixtureId,
+  });
+  const rosterCard = <MatchTeamRosterCard side={rosterSide} />;
 
   const rowByTeam = useMemo(() => {
     const map = new Map<string, V1LeagueStandingRow>();
@@ -246,7 +256,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               MatchDetailContent 는 자체 좌우 패딩(20px)을 가진다 — 이 컨테이너의 px-4 와
               겹쳐 본문만 안으로 밀리지 않게 음수 마진으로 상쇄한다. */}
           <div className="-mx-4">
-            <MatchDetailContent data={recordQuery.data} from={selfHref} />
+            <MatchDetailContent data={recordQuery.data} from={selfHref} afterHeader={rosterCard} />
           </div>
           {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
               반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}
@@ -316,6 +326,8 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           </div>
         </Card>
       )}
+      {/* 기록 본문이 없을 때(게임 미공개) 우리 팀 출전 카드는 요약 카드 아래에 둔다. */}
+      {recordQuery.data || recordQuery.isPending ? null : rosterCard}
 
       {/* 맞대결 기록 — 이 리그에서 같은 두 팀이 이미 치른 경기. 없으면 섹션 자체를 숨긴다. */}
       {headToHead.length > 0 && (
@@ -356,9 +368,15 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               </button>
             ) : null}
             {chatError ? <p role="alert" className="text-sm text-red-700 dark:text-red-300">{chatError}</p> : null}
-            <Link href={withFromPath(`/team-matches/${fixtureId}/lineup`, selfHref)} className="tm-btn tm-btn-lg tm-btn-neutral">
-              라인업 관리
-            </Link>
+            {/* 리그 경기는 친선 참석명단이 아니라 경기 명단(참가 명단 기준 조정)으로 간다(Task 176). */}
+            {rosterSide.status === 'resolved' ? (
+              <Link
+                href={withFromPath(`/teams/${rosterSide.teamId}/games/${rosterSide.gameId}/roster`, selfHref)}
+                className="tm-btn tm-btn-lg tm-btn-neutral"
+              >
+                경기 명단
+              </Link>
+            ) : null}
             {(fixture.status === 'completed' || result.hasScore) && (
               <Link href={withFromPath(`/team-matches/${fixtureId}/result`, selfHref)} className="tm-btn tm-btn-lg tm-btn-neutral">
                 경기 결과 보기

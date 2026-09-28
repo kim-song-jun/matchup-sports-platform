@@ -10,6 +10,7 @@ import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-g
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { GameRosterPlayerRow } from '@/components/game-roster/game-roster-player-row';
 import { GameRosterHistoryList } from '@/components/game-roster/game-roster-history';
+import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reason-chips';
 import { TEAM_UPCOMING_GAMES_ANCHOR } from '@/components/teams/team-upcoming-games-card';
 import {
   useV1ApplyGameRosterBatch,
@@ -22,9 +23,8 @@ import { V1ApiError } from '@/lib/api-client';
 import { extractErrorCode } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { GAME_ROSTER_REASON_OPTIONS, type GameRosterAdjustmentReason } from '@/lib/v1-status-labels';
-import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from './game-roster-draft';
-import { useGameRosterSide } from './use-game-roster-side';
+import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
+import { useGameRosterSide } from '@/components/game-roster/use-game-roster-side';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -34,7 +34,7 @@ type Notice = { tone: 'info' | 'error'; message: string };
  * 변경은 모아 두었다가 한 번에 저장한다(팀 일괄 API — 한 트랜잭션이라 일부만 저장되지 않는다).
  */
 export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: string }) {
-  const side = useGameRosterSide(teamId, gameId);
+  const side = useGameRosterSide(teamId, { gameId });
 
   if (side.status === 'loading') return <PageSkeleton variant="detail" />;
   if (side.status === 'friendly') {
@@ -292,7 +292,7 @@ function GameRosterScreen({
                     }
                   />
                   {leaving ? (
-                    <ReasonChips
+                    <GameRosterReasonChips
                       playerName={row.displayName}
                       value={leaving.reason}
                       onChange={(reason) => setEntry(row.userId, { op: 'EXCLUDE', reason })}
@@ -454,40 +454,6 @@ function RosterSection({
       ) : null}
       <div style={{ marginTop: 8 }}>{children}</div>
     </Card>
-  );
-}
-
-/** 체크를 풀면 뜨는 사유 칩 — 고르지 않아도 저장된다. 다시 누르면 선택이 풀린다. */
-function ReasonChips({
-  playerName,
-  value,
-  onChange,
-}: {
-  playerName: string;
-  value: GameRosterAdjustmentReason | null;
-  onChange: (reason: GameRosterAdjustmentReason | null) => void;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={`${playerName} 빠지는 사유(선택)`}
-      style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '0 0 12px 40px' }}
-    >
-      {GAME_ROSTER_REASON_OPTIONS.map((option) => {
-        const selected = value === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            className={`tm-chip${selected ? ' tm-chip-active' : ''}`}
-            aria-pressed={selected}
-            onClick={() => onChange(selected ? null : option.value)}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

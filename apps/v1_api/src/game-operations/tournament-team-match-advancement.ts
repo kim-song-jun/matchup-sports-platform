@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { syncGameSideRoster } from '../games/roster/game-roster-sync';
 import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
 import type { OfficialRevisionRow, OfficialScore } from './game-result-official-projection.types';
 
@@ -455,6 +456,7 @@ async function assignTarget(
       const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
       if (sideId !== null) {
         await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: registration.teamId, displayNameSnapshot: registration.teamName } });
+        await syncGameSideRoster(tx, { gameId: target.gameId, sideId });
       }
       await tx.v1Game.update({ where: { id: target.gameId }, data: { version: { increment: 1 } } });
     }
@@ -494,6 +496,7 @@ async function replaceTargetAssignment(
     const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
     if (sideId !== null) {
       await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: registration.teamId, displayNameSnapshot: registration.teamName } });
+      await syncGameSideRoster(tx, { gameId: target.gameId, sideId });
     }
     await tx.v1Game.update({ where: { id: target.gameId }, data: { version: { increment: 1 } } });
   }

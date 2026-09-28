@@ -71,7 +71,7 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
    * 팀 하나(선수 후보 2명, 상대팀은 신청만 확정)와 이미 만들어진 시작 전 대진 하나를 세팅한다 —
    * 정확히 실사용자가 겪은 순서(신청 확정 → 명단 채우기 전에 대진 생성)를 재현한다.
    */
-  async function seedFixture() {
+  async function seedFixture(options: { playersBeforeFixture?: boolean } = {}) {
     const captainId = await makeUser();
     const team = await prisma.v1Team.create({
       data: { ownerUserId: captainId, sportId, regionId, name: `rs-team-${suiteId}-${seq}` },
@@ -99,6 +99,12 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
         data: { tournamentId: tournament.id, teamId: opponent.id, appliedByUserId: opponentCaptainId, status: 'confirmed' },
       }),
     ]);
+
+    if (options.playersBeforeFixture) {
+      for (const userId of members) {
+        await prisma.v1TournamentPlayer.create({ data: { registrationId: homeRegistration.id, userId, realName: '명단 선수' } });
+      }
+    }
 
     const bracket = app.get(TournamentBracketService);
     const admin: V1AuthUser = {
@@ -156,6 +162,20 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     expect(marker).not.toBeNull();
     // 상대 사이드는 건드리지 않는다.
     expect((await latestLineup(f.game.id, f.opponentSide.id)).revision).toBe(1);
+  });
+
+  it('명단을 먼저 채우고 대진을 만들면, 생성 스냅샷과 계산이 같아도 제출본이 선다 — 운영 보드·공식 결과가 읽는 것', async () => {
+    const f = await seedFixture({ playersBeforeFixture: true });
+
+    const latest = await latestLineup(f.game.id, f.side.id);
+    expect(latest.state).toBe('SUBMITTED');
+    expect((await participantsOf(latest.id)).map((row) => row.userId).sort()).toEqual([...f.members].sort());
+    const generated = await prisma.v1GameLineup.findFirstOrThrow({ where: { gameId: f.game.id, sideId: f.side.id, revision: 1 } });
+    expect([generated.state, latest.supersedesId]).toEqual(['DRAFT', generated.id]);
+    // 제출본이 선 뒤에는 같은 계산으로 리비전을 더 만들지 않는다.
+    expect(await sync(f.tournament.id, f.team.id)).toBe(0);
+    // 명단이 빈 상대 사이드는 제출할 것이 없어 초안 그대로다.
+    expect([(await latestLineup(f.game.id, f.opponentSide.id)).revision, (await latestLineup(f.game.id, f.opponentSide.id)).state]).toEqual([1, 'DRAFT']);
   });
 
   it('명단에서 선수를 빼면 그 선수가 빠진 리비전으로 다시 맞춘다 — 동기화 리비전 위에서도 이어진다', async () => {

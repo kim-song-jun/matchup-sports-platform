@@ -1721,6 +1721,11 @@ export class LeagueMatchAdminService {
         }),
       );
     }
+    // 생성 스냅샷은 기준 명단 원본이라 결장 기간·출전정지가 빠져 있다 — 단건 생성처럼 직후 맞춘다.
+    await syncRostersForTeamMatchTeams(tx, {
+      competitionId: input.leagueId,
+      teamIds: pairings.flatMap(({ home, away }) => [home.id, away.id]),
+    });
     return { ids, placeName };
   }
 

@@ -10,6 +10,7 @@ import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { createTournamentMatchInTx } from './tournament-match-creation';
+import { syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 
 /**
@@ -783,6 +784,11 @@ export class LeagueFixtureGeneratorService {
             payloadHash,
           });
         }
+        // 생성 스냅샷은 참가 명단 원본이라 결장 기간·출전정지·등번호가 빠져 있다 — 직후 계산 결과로 맞춘다.
+        await syncRostersForTeamMatchTeams(tx, {
+          competitionId: tournamentId,
+          teamIds: pairedRows.flatMap(({ home, away }) => [home.team.id, away.team.id]),
+        });
 
         return { createdCount: builtRows.length, deleted: deletedCount, rows: builtRows, teamCount: currentGroup.groupTeams.length, oddTeamCount: currentGroup.groupTeams.length % 2 !== 0 };
       },

@@ -411,6 +411,12 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     expect(state.calls.filter((call) => call.startsWith('v1ParticipantIdentityLink'))).toEqual([]);
   });
 
+  it('일괄 생성 직후 참가한 모든 팀의 시작 전 경기 명단을 다시 계산한다(결장 기간·출전정지)', async () => {
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    expect([...new Set(state.rosterSyncTeamIds)].sort()).toEqual(['team-a', 'team-b']);
+  });
+
   it('참가자는 자기 팀 사이드에, 자기 멤버십 이름으로 붙는다', async () => {
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
 

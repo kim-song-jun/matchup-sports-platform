@@ -108,18 +108,10 @@ export async function syncGameSideRoster(
     where: { lineupId: latest.id },
     select: { userId: true, displayNameSnapshot: true, jerseyNumber: true },
   });
-  if (rosterKey(current) === rosterKey(desired)) {
-    // 같은 명단이라도 최신이 DRAFT 이고 그 아래에 제출본이 있으면 셀렉터는 옛 제출본을 읽는다.
-    if (latest.state !== V1GameLineupState.DRAFT) return false;
-    const submittedBelow = await tx.v1GameLineup.findFirst({
-      where: {
-        gameId: context.gameId,
-        sideId: context.sideId,
-        state: { in: [V1GameLineupState.SUBMITTED, V1GameLineupState.LOCKED] },
-      },
-      select: { id: true },
-    });
-    if (submittedBelow === null) return false;
+  // 같은 명단이어도 최신이 DRAFT(대진 생성 스냅샷·진출 뒤 초안)면 제출본으로 올린다. 공식 결과·운영
+  // 보드는 제출본만 명단으로 치고, 대회·리그는 팀이 직접 제출할 경로가 없다(T-e). 빈 명단은 제출하지 않는다.
+  if (rosterKey(current) === rosterKey(desired) && (latest.state !== V1GameLineupState.DRAFT || desired.length === 0)) {
+    return false;
   }
 
   const top = await tx.v1GameLineup.findFirst({

@@ -11,6 +11,9 @@ import {
   syncRostersAfterResultChange,
   syncTeamRostersWithinPeriod,
 } from '../../src/games/roster/game-roster-sync';
+import { GameResultBracketProjectionService } from '../../src/game-operations/game-result-bracket-projection.service';
+import type { OfficialRevisionRow } from '../../src/game-operations/game-result-official-projection.types';
+import { V1GameOperationsWorkerService } from '../../src/jobs/v1-game-operations-worker.service';
 import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-matches/league-fixture-creation';
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -212,6 +215,7 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       data: { resultRevisionId: revision.id, participantId: participant.id, sideId, started: true, cards: { yellow: 0, red: 1 } },
     });
     await prisma.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: 'SUBMITTED', submittedAt: new Date() } });
+    return revision.id;
   }
 
   const side = (f: Awaited<ReturnType<typeof seedTournament>>, key: string, teamId: string) => ({
@@ -375,6 +379,76 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       const chosen = selectLineupParticipantsWithDraftFallback(participants, lineups).filter((row) => row.sideId === g4.sideId);
       expect(chosen.map((row) => row.userId)).toEqual([a1]);
     });
+
+    it('규정 없는 녹아웃에서도 승자가 진출한 사이드는 승자 참가 명단의 제출본으로 채워진다', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      const source = f.games.g1;
+      await prisma.v1TeamMatch.update({ where: { id: source.teamMatchId }, data: { status: 'completed' } });
+      await prisma.v1Game.update({ where: { id: source.gameId }, data: { state: 'ENDED' } });
+      const target = await prisma.v1TeamMatch.create({
+        data: {
+          tournamentId: f.tournament.id,
+          sportId,
+          regionId,
+          title: '명단 계산 4강',
+          status: 'matched',
+          startAt: new Date(Date.now() + 5 * DAY),
+          competitionConfigVersionId: configId,
+        },
+      });
+      await prisma.v1TournamentMatchDetails.create({
+        data: { teamMatchId: target.id, tournamentId: f.tournament.id, round: 'semi', fixtureNumber: 10 },
+      });
+      const creation: GameSourceCreationInput = {
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        sourceId: target.id,
+        competitionConfigVersionId: configId,
+        sides: [
+          { sideKey: V1GameSideKey.HOME, teamId: null, displayNameSnapshot: 'TBD' },
+          { sideKey: V1GameSideKey.AWAY, teamId: null, displayNameSnapshot: 'TBD' },
+        ],
+        participants: [],
+      };
+      await inTx((client) =>
+        app.get(GamesService).createFromSourceInTransaction(client, creation, {
+          actor: { actorType: 'USER', actorUserId: adminUserId, role: 'platform_ops' },
+          expectedVersion: 0,
+          durableCommandId: `grs-${suiteId}-${target.id}`,
+          payloadHash: canonicalGameCommandPayloadHash(creation),
+        }),
+      );
+      await prisma.v1TournamentMatchAdvancementEdge.create({
+        data: {
+          tournamentId: f.tournament.id,
+          sourceTeamMatchId: source.teamMatchId,
+          sourceOutcome: 'WINNER',
+          targetTeamMatchId: target.id,
+          targetSide: 'HOME',
+        },
+      });
+      const targetGame = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: target.id }, include: { sides: true } });
+      const home = targetGame.sides.find((row) => row.sideKey === V1GameSideKey.HOME)!;
+      const away = targetGame.sides.find((row) => row.sideKey === V1GameSideKey.AWAY)!;
+      const revision = {
+        revisionId: 'grs-advance',
+        gameId: source.gameId,
+        revision: 1,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: source.teamMatchId,
+        tournamentTeamMatchId: source.teamMatchId,
+        teamMatchTournamentId: f.tournament.id,
+        tournamentId: f.tournament.id,
+        leagueId: null,
+      } as OfficialRevisionRow;
+
+      await inTx((client) => new GameResultBracketProjectionService().project(client, revision, { home: 2, away: 1 }));
+
+      const latest = await latestLineup(targetGame.id, home.id);
+      expect(latest.state).toBe('SUBMITTED');
+      expect(await rosterOf(targetGame.id, home.id)).toEqual(sorted(f.teamA.members));
+      // 배정되지 않은 사이드는 계산할 팀이 없다.
+      expect((await latestLineup(targetGame.id, away.id)).revision).toBe(1);
+    });
   });
 
   // ── 리그: A·B 두 팀, 경기 L1(+7일) · L2(+14일) ─────────────────────────────────────
@@ -490,6 +564,70 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
 
       expect(await rosterOf(l2.gameId, l2.sideId)).toEqual(sorted([f.teamA.ownerId, m2]));
       expect(await rosterOf(l1.gameId, l1.sideId)).toEqual(sorted([f.teamA.ownerId, m1, m2]));
+    });
+
+    it('결과 제출 이벤트를 워커가 처리하면 리그 다음 경기의 저장된 명단에서 정지 선수가 빠진다', async () => {
+      const f = await seedLeague({ eligibleA: true });
+      const [m1, m2] = f.teamA.members;
+      await prisma.v1Tournament.update({ where: { id: f.league.id }, data: { redCardSuspensionMatches: 1 } });
+      await prisma.v1TeamMatch.update({ where: { id: f.fixtures.L1.teamMatchId }, data: { startAt: new Date(Date.now() - DAY) } });
+      const l2 = leagueSide(f, 'L2', f.teamA.id);
+      const l2B = leagueSide(f, 'L2', f.teamB.id);
+      expect(await rosterOf(l2.gameId, l2.sideId)).toEqual(sorted([f.teamA.ownerId, m1, m2]));
+
+      const revisionId = await seedRedCard(f.fixtures.L1.gameId, f.fixtures.L1.sideByTeam.get(f.teamA.id)!, m1);
+      const event = await prisma.v1OutboxEvent.create({
+        data: {
+          businessKey: `result-review:${revisionId}:GAME_RESULT_SUBMITTED`,
+          aggregateType: 'GAME',
+          aggregateId: f.fixtures.L1.gameId,
+          revisionId,
+          type: 'GAME_RESULT_SUBMITTED',
+          payload: { revisionId },
+        },
+      });
+      const worker = new V1GameOperationsWorkerService(prisma);
+      for (let guard = 0; guard < 100 && (await worker.processOne()); guard += 1);
+
+      expect((await prisma.v1OutboxEvent.findUniqueOrThrow({ where: { id: event.id } })).status).toBe('COMPLETED');
+      expect(await rosterOf(l2.gameId, l2.sideId)).toEqual(sorted([f.teamA.ownerId, m2]));
+      expect((await latestLineup(l2.gameId, l2.sideId)).state).toBe('SUBMITTED');
+      // 카드가 없는 상대 팀은 전원 그대로다.
+      expect(await rosterOf(l2B.gameId, l2B.sideId)).toEqual(sorted([f.teamB.ownerId, ...f.teamB.members]));
+    });
+
+    it('대진 일괄 생성 전에 등록한 결장 기간이 새 경기의 저장된 명단에 걸린다', async () => {
+      const teamA = await makeTeam('GA', ['g1', 'g2']);
+      const teamB = await makeTeam('GB', ['h1']);
+      const league = await seedLeagueOnTournamentAxis(prisma, {
+        title: `명단 계산 일괄 ${suiteId}-${seq}`,
+        sportId,
+        regionId,
+        state: 'active',
+        startsOn: new Date(Date.now() + 3 * DAY),
+        teamIds: [teamA.id, teamB.id],
+        appliedByUserId: teamA.ownerId,
+      });
+      const [g1, g2] = teamA.members;
+      await prisma.v1TeamMemberUnavailability.create({
+        data: {
+          teamId: teamA.id,
+          userId: g1,
+          startsAt: new Date(),
+          endsAt: new Date(Date.now() + 60 * DAY),
+          actorUserId: teamA.ownerId,
+          actorRole: 'TEAM_MANAGER',
+        },
+      });
+
+      await app.get(LeagueMatchAdminService).generateFixtures(authUser(adminUserId), league.id, { weeksCount: 1 } as never);
+
+      const game = await prisma.v1Game.findFirstOrThrow({ where: { teamMatch: { leagueId: league.id } }, include: { sides: true } });
+      const sideA = game.sides.find((row) => row.teamId === teamA.id)!;
+      const sideB = game.sides.find((row) => row.teamId === teamB.id)!;
+      expect(await rosterOf(game.id, sideA.id)).toEqual(sorted([teamA.ownerId, g2]));
+      expect((await latestLineup(game.id, sideA.id)).state).toBe('SUBMITTED');
+      expect(await rosterOf(game.id, sideB.id)).toEqual(sorted([teamB.ownerId, ...teamB.members]));
     });
   });
 });

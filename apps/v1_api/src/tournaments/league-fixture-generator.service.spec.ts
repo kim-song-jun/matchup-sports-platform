@@ -308,6 +308,8 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     },
     v1TeamSchedule: { create: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1GameSide: { update: jest.fn() },
+    // 명단 동기화(syncCompetitionTeamRosters)가 팀의 시작 전 경기를 찾는 조회. 실제 재계산은 통합 스펙이 본다.
+    v1Game: { findMany: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
@@ -505,6 +507,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     prisma.v1TeamSchedule.updateMany.mockResolvedValue({ count: 0 });
     prisma.v1TeamSchedule.count = jest.fn().mockResolvedValue(0);
     prisma.v1GameSide.update.mockResolvedValue({});
+    prisma.v1Game.findMany.mockResolvedValue([]);
     prisma.v1TournamentRegistration.findMany.mockImplementation(confirmedRegistrations);
     prisma.v1TournamentPlayer.findMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) =>
       Promise.resolve(where.id.in.map((id) => ({
@@ -545,6 +548,17 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     expect(creations.map((creation) => creation.input.sourceId)).toEqual(fixtureIds);
     expect(creations.map((creation) => creation.input.sourceType)).toEqual(Array(6).fill('TEAM_MATCH'));
     expect(creations.map((creation) => creation.input.competitionConfigVersionId)).toEqual(Array(6).fill('ccv-1'));
+  });
+
+  it('만든 대진의 모든 팀 명단을 생성 직후 다시 계산한다 — 결장 기간·출전정지가 새 경기에도 걸린다', async () => {
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
+
+    await service.generate(user, 't1', dto());
+
+    const synced = prisma.v1Game.findMany.mock.calls.map(
+      (call) => (call[0] as { where: { sides: { some: { teamId: string } } } }).where.sides.some.teamId,
+    );
+    expect([...synced].sort()).toEqual(['team-r1', 'team-r2', 'team-r3', 'team-r4']);
   });
 
   // C1: fixture 행의 competitionConfigVersionId 가 비어 있으면 나중에 fixture-game-backfill

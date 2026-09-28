@@ -157,6 +157,62 @@ describe('platform-managed team match provenance', () => {
     expect(hostCard).toHaveTextContent('플랫폼 주관');
     expect(hostCard).toHaveTextContent('팀 보기');
   });
+
+  it('플랫폼 주관 매치에 배정된 팀이 없으면 우측 팀 보기 영역을 비워 둔다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = {
+      ...model.match,
+      platformManaged: true,
+      hostTeam: 'Teameet 운영',
+      hostTeamId: undefined,
+      hostTeamHref: undefined,
+      applicantTeams: [],
+    };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const rightColumn = container.querySelector('.tm-team-match-detail-right');
+
+    expect(rightColumn).not.toBeNull();
+    expect(rightColumn!.querySelector('.tm-team-match-team-cards')).not.toBeInTheDocument();
+    expect(rightColumn!.querySelector('.tm-team-match-cta-card')).toBeInTheDocument();
+  });
+
+  it('우측 팀 보기 영역에 홈팀과 들어온 신청팀을 모두 보여준다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match = {
+      ...model.match,
+      platformManaged: true,
+      hostTeam: '마포 레인저스',
+      hostTeamId: 'team-home',
+      hostTeamHref: '/teams/team-home',
+      applicantTeams: [
+        {
+          name: '한강 로버스',
+          meta: '승인된 상대팀',
+          status: '승인 완료',
+          href: '/teams/team-away',
+          applicationId: 'application-away',
+        },
+        {
+          name: '브라보FC',
+          meta: '매너 4.8 · 12전',
+          status: '승인 대기',
+          href: '/teams/team-bravo',
+          applicationId: 'application-bravo',
+        },
+      ],
+    };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const rightColumn = container.querySelector('.tm-team-match-detail-right');
+    const teamCards = within(rightColumn as HTMLElement);
+
+    expect(teamCards.getByRole('link', { name: '마포 레인저스 팀 보기' })).toHaveAttribute('href', '/teams/team-home');
+    expect(teamCards.getByRole('link', { name: '한강 로버스 팀 보기' })).toHaveAttribute('href', '/teams/team-away');
+    expect(teamCards.getByRole('link', { name: '브라보FC 팀 보기' })).toHaveAttribute('href', '/teams/team-bravo');
+    expect(teamCards.getByText('어웨이팀 정보')).toBeInTheDocument();
+    expect(teamCards.getByText('신청팀 정보')).toBeInTheDocument();
+  });
 });
 
 // 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — matches-page.test.tsx의
@@ -1044,7 +1100,9 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    expect(screen.getByRole('link', { name: '브라보FC 팀 보기' })).toHaveAttribute('href', '/teams/team-bravo');
+    const links = screen.getAllByRole('link', { name: '브라보FC 팀 보기' });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute('href', '/teams/team-bravo');
   });
 
   it('신청팀이 없으면 빈 카드 대신 현재 상태를 설명한다', () => {

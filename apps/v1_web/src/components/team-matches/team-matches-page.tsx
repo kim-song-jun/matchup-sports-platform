@@ -234,6 +234,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
   const { match, mode } = model;
   const league = match.league;
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
+  const shouldShowHostTeamCard = !match.platformManaged || hasAssignedHostTeam;
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
    * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다. */
@@ -337,8 +338,8 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
     </div>
   );
 
-  /* Host-team card — rendered in left column (mobile) and right column (desktop).
-   * Desktop 우측 컬럼에 이동해 40% 보이드를 채움(T1). 모바일은 기존 위치 유지. */
+  /* 참가 팀 카드 — 모바일 본문과 데스크톱 우측 컬럼에서 같은 목록을 사용한다.
+   * 플랫폼 생성 매치는 팀이 배정되기 전까지 운영 주체를 팀처럼 보여주지 않는다. */
   const hostTeamCardContent = (
     <>
       {/* 팀 로고 아바타 — 원본은 48px였으나 TeamAvatar 표준 사이즈 중 가장 근접한 md(40px)로 통일 */}
@@ -368,15 +369,50 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       {hasAssignedHostTeam ? <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span> : null}
     </>
   );
-  const hostTeamCard = !hasAssignedHostTeam ? (
+  const hostTeamCard = !shouldShowHostTeamCard ? null : hasAssignedHostTeam ? (
+    <Link
+      className="tm-card tm-pressable tm-host-team-card"
+      href={match.hostTeamHref ?? `/teams/${match.hostTeamId}`}
+      aria-label={`${match.hostTeam} 팀 보기`}
+      style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}
+    >
+      {hostTeamCardContent}
+    </Link>
+  ) : (
     <div className="tm-card tm-host-team-card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
       {hostTeamCardContent}
     </div>
-  ) : (
-    <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
-      {hostTeamCardContent}
-    </Link>
   );
+  const applicantTeamViewCards = match.applicantTeams.filter((team, index, teams) => (
+    Boolean(team.href)
+    && team.href !== match.hostTeamHref
+    && teams.findIndex((candidate) => candidate.href === team.href) === index
+  ));
+  const hasTeamViewCards = Boolean(hostTeamCard) || applicantTeamViewCards.length > 0;
+  const teamViewCards = hasTeamViewCards ? (
+    <div className="tm-team-match-team-cards" style={{ display: 'grid', gap: 12 }} aria-label="팀 보기">
+      {hostTeamCard}
+      {applicantTeamViewCards.map((team) => (
+        <Link
+          key={team.href}
+          className="tm-card tm-pressable tm-host-team-card"
+          href={team.href!}
+          aria-label={`${team.name} 팀 보기`}
+          style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}
+        >
+          <TeamAvatar seed={team.applicationId ?? team.name} name={team.name} size="md" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+              {team.status === '승인 완료' ? '어웨이팀 정보' : '신청팀 정보'}
+            </div>
+            <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{team.name}</div>
+            <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{team.meta}</div>
+          </div>
+          <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
+        </Link>
+      ))}
+    </div>
+  ) : null;
 
   /* Shared CTA buttons — rendered in both mobile fixed bar and desktop sticky card */
   const ctaButtons = (
@@ -637,8 +673,8 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                   </div>
                 </Card>
               ) : null}
-              {/* 홈팀 카드: 모바일은 왼쪽 컬럼 하단, 데스크톱은 우측 컬럼(tm-hide-desktop)으로 이동 */}
-              <div className="tm-hide-desktop" style={{ marginTop: 16 }}>{hostTeamCard}</div>
+              {/* 참가 팀 카드: 모바일은 본문 하단, 데스크톱은 우측 컬럼에 모두 표시 */}
+              {teamViewCards ? <div className="tm-hide-desktop" style={{ marginTop: 16 }}>{teamViewCards}</div> : null}
               {mode === 'mine' ? (
                 <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">신청팀</div>
@@ -736,10 +772,10 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
           </article>
         </div>
 
-        {/* RIGHT: desktop sticky column — host-team compact + CTA card */}
+        {/* RIGHT: desktop sticky column — all participating/applicant teams + CTA card */}
         <div className="tm-team-match-detail-right tm-show-desktop">
-          {/* 홈팀 카드: 데스크톱 우측 컬럼 상단 — 40% 보이드 채움(T1) */}
-          <div className="tm-team-match-right-host">{hostTeamCard}</div>
+          {/* 플랫폼 매치는 미배정 상태에서 비워두고, 팀이 생기면 홈/어웨이를 모두 노출한다. */}
+          {teamViewCards ? <div className="tm-team-match-right-host">{teamViewCards}</div> : null}
           <div className="tm-team-match-cta-card">
             {isClosedGuestStatusDuplicate ? null : (
               <div className="tm-team-match-cta-meta">

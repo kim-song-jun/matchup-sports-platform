@@ -68,6 +68,7 @@ import {
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
+import { v1GameRosterMswHandlers } from './game-roster-handlers';
 
 const api = '*/api/v1';
 
@@ -417,6 +418,7 @@ const v1TournamentFields = [
 ];
 
 export const v1MswHandlers = [
+  ...v1GameRosterMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {

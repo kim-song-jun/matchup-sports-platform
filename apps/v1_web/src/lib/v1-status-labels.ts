@@ -124,3 +124,69 @@ const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득�
 
 export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
 export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }
+
+// ── Task 176 경기별 출전 명단 ────────────────────────────────────────────────
+// 서버는 사유·역할을 문자열 컬럼으로 보낸다(DTO 가 enum 으로 검증) — 모르는 값은 null 로 돌려
+// 호출부가 빈칸으로 두게 한다(영문 코드 노출 방지).
+
+export const GAME_ROSTER_ADJUSTMENT_REASONS = ['INJURY', 'PERSONAL', 'LATE_OR_EARLY', 'OTHER'] as const;
+export type GameRosterAdjustmentReason = (typeof GAME_ROSTER_ADJUSTMENT_REASONS)[number];
+
+/** 결장 기간 사유 — 경기별 사유에서 지각·조퇴만 빠진다(서버 DTO 와 같은 집합). */
+export const MEMBER_UNAVAILABILITY_REASONS = ['INJURY', 'PERSONAL', 'OTHER'] as const;
+export type MemberUnavailabilityReason = (typeof MEMBER_UNAVAILABILITY_REASONS)[number];
+
+const GAME_ROSTER_REASON: Record<GameRosterAdjustmentReason, string> = {
+  INJURY: '부상',
+  PERSONAL: '개인 사정',
+  LATE_OR_EARLY: '지각·조퇴',
+  OTHER: '기타',
+};
+
+export const GAME_ROSTER_REASON_OPTIONS = GAME_ROSTER_ADJUSTMENT_REASONS.map((value) => ({
+  value,
+  label: GAME_ROSTER_REASON[value],
+}));
+
+export const MEMBER_UNAVAILABILITY_REASON_OPTIONS = MEMBER_UNAVAILABILITY_REASONS.map((value) => ({
+  value,
+  label: GAME_ROSTER_REASON[value],
+}));
+
+export function gameRosterReasonLabel(reason: string | null | undefined): string | null {
+  if (reason === null || reason === undefined) return null;
+  return (GAME_ROSTER_REASON as Record<string, string>)[reason] ?? null;
+}
+
+/** 출전정지처럼 사람이 아니라 계산이 만든 상태의 주체 라벨. */
+export const GAME_ROSTER_AUTO_ACTOR_LABEL = '자동';
+
+/**
+ * 조정·결장 기록의 주체. 되돌리기 기록은 서버가 역할을 남기지 않아(role null) 라벨이 없다 —
+ * 그때는 이름만 보인다. 자동 계산 결과에는 `GAME_ROSTER_AUTO_ACTOR_LABEL` 을 쓴다.
+ */
+export function gameRosterActorRoleLabel(role: string | null | undefined): string | null {
+  if (role === 'TEAM_MANAGER') return '팀장';
+  if (role === 'ADMIN' || role === 'STAFF') return '운영자';
+  return null;
+}
+
+/** 선수 한 명의 이 경기 상태. 출전정지는 이번 경기를 포함한 남은 경기 수를 붙인다. */
+export function gameRosterStatusLabel(status: string, remainingMatches?: number | null): string {
+  switch (status) {
+    case 'PARTICIPATING':
+      return '출전';
+    case 'EXCLUDED':
+      return '빠짐';
+    case 'UNAVAILABLE':
+      return '결장';
+    case 'SUSPENDED':
+      return remainingMatches !== null && remainingMatches !== undefined && remainingMatches > 0
+        ? `출전정지 ${remainingMatches}경기`
+        : '출전정지';
+    case 'NOT_IN_ROSTER':
+      return '명단 밖';
+    default:
+      return '확인 필요';
+  }
+}

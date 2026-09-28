@@ -358,6 +358,8 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   lineupId: 'lineup-1',
   revision: 1,
   state: 'DRAFT',
+  editable: true,
+  lockReason: null,
   version: 1,
   formation: '2-2',
   publicLineupAt: null,

@@ -492,11 +492,9 @@ describe('Task 14 team-match lineup builder', () => {
     expectHttpCode(nothingToChallenge, 404, 'LINEUP_SUBMISSION_NOT_FOUND');
   });
 
-  it('denies change-request once the match deadline has locked the lineup, and denies a non-participant caller entirely', async () => {
-    // `saveLineup`/`submitLineup` both reject once the match has already
-    // started (see the separate LINEUP_DEADLINE_PASSED assertion below), so
-    // a SUBMITTED-before-deadline lineup for this already-started match is
-    // seeded directly rather than through the service.
+  it('keeps a SCHEDULED match editable after startAt while denying a non-participant caller', async () => {
+    // startAt은 지났지만 실제 Game 상태는 SCHEDULED다. 현장 지연 복구를 위해 저장·제출·
+    // 상대 명단 정정 요청을 시간만으로 막지 않는다.
     const pastGame = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: ids.pastMatch } });
     const pastOpponentSide = await prisma.v1GameSide.findFirstOrThrow({
       where: { gameId: pastGame.id, sideKey: 'AWAY' },
@@ -519,40 +517,34 @@ describe('Task 14 team-match lineup builder', () => {
       data: { state: 'SUBMITTED', submittedAt: new Date() },
     });
 
-    const lockedChangeRequest = await captureFailure(() =>
-      service.requestChange(authUser(ids.hostOwner), ids.pastMatch, 'idem-change-past', {
+    const reopened = await service.requestChange(
+      authUser(ids.hostOwner),
+      ids.pastMatch,
+      'idem-change-past',
+      {
         expectedVersion: pastLineup.revision,
-        reason: '너무 늦었어요',
-      }),
+        reason: '현장에서 명단을 다시 확인해 주세요',
+      },
     );
-    expectHttpCode(lockedChangeRequest, 409, 'LINEUP_LOCKED');
-
-    // **거부 경로의 부수효과는 남지 않는다.** `requestChange` 는 `lazyLock` 으로 LOCKED
-    // UPDATE 를 한 뒤 409 를 던지는데, 그 전체가 하나의 `serializable` 트랜잭션이다 —
-    // 던지는 순간 방금 한 UPDATE 도 함께 롤백돼 행은 SUBMITTED 로 남는다. 코드가 옳고,
-    // 이 자리를 LOCKED 로 단언하던 옛 테스트가 틀렸다(같은 함정을 이 저장소가 이미
-    // 문서화해 뒀다 — `withResultCommand` 가 거부 감사 로그를 트랜잭션 **밖**에서 쓰는
-    // 이유가 정확히 그것이다).
-    const afterRejectedChange = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: pastLineup.id } });
-    expect(afterRejectedChange.state).toBe('SUBMITTED');
-
-    // 락이 **영속되는 자리는 정상 반환하는 읽기 경로**다. 원정팀 팀장이 자기 라인업을
-    // 읽으면 그 트랜잭션이 커밋되면서 lazyLock 의 UPDATE 도 함께 남는다.
-    await service.getLineup(authUser(ids.opponentOwner), ids.pastMatch);
-    const lockedRow = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: pastLineup.id } });
-    expect(lockedRow.state).toBe('LOCKED');
+    expect(reopened).toEqual(expect.objectContaining({ state: 'change_requested' }));
 
     const nonParticipant = await captureFailure(() =>
       service.getLineup(authUser(ids.strangerUser), ids.pastMatch),
     );
     expectHttpCode(nonParticipant, 403, 'PERMISSION_DENIED');
 
-    const submitPastDeadline = await captureFailure(() =>
-      service.submitLineup(authUser(ids.hostOwner), ids.pastMatch, 'idem-host-past-submit', {
-        expectedVersion: 1,
-      }),
+    const hostVersion = await currentVersion(ids.hostOwner, ids.pastMatch);
+    const saved = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.pastMatch,
+      'idem-host-past-save',
+      { expectedVersion: hostVersion, starters: validHostStarters, bench: [] },
     );
-    expectHttpCode(submitPastDeadline, 409, 'LINEUP_DEADLINE_PASSED');
+    await expect(
+      service.submitLineup(authUser(ids.hostOwner), ids.pastMatch, 'idem-host-past-submit', {
+        expectedVersion: saved.version,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ state: 'SUBMITTED' }));
   });
 
   /** 재생 계약을 다른 테스트의 라인업 revision과 격리하기 위해 전용 팀매치를 쓴다. */

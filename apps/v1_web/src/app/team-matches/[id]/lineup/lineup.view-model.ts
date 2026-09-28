@@ -5,6 +5,7 @@ import type {
   V1TeamMatchLineup,
   V1TeamMatchLineupParticipantInput,
   V1TeamMatchLineupState,
+  V1TeamMatchLineupLockReason,
 } from '@/types/api';
 
 /**
@@ -425,41 +426,41 @@ export function extractConflictCurrentVersion(details: unknown): number | null {
   return typeof value === 'number' ? value : null;
 }
 
-/** 내 팀이 자기 사이드를 이제 직접 편집할 수 있는지 결정하는 유일한 지점.
- *
- * - DRAFT: 킥오프 전이면 편집 가능. 킥오프가 지났는데도 DRAFT라면(한 번도 제출하지 않은 채
- *   시간이 지난 경우) 서버가 saveLineup에서 LINEUP_DEADLINE_PASSED로 막으므로 프론트도 미리
- *   막아 헛된 라운드트립을 없앤다.
- * - SUBMITTED: 킥오프 전이면 다시 편집·저장해 새 DRAFT 리비전을 만든 뒤 재제출할 수 있다.
- * - LOCKED: 킥오프 이후 자동 잠김. 어느 쪽도 더 이상 바꿀 수 없다.
- */
+/** 서버의 실제 경기 상태 기반 판정을 사용자에게 설명하는 단일 지점. */
 export function describeLineupPhase(
   state: V1TeamMatchLineupState,
-  deadlinePassed: boolean,
-  liveEditAllowed = false,
+  editable: boolean,
+  lockReason: V1TeamMatchLineupLockReason,
 ): { label: string; editable: boolean; helperText: string } {
-  if (liveEditAllowed) {
-    return {
-      label: '경기 중 · 수정 가능',
-      editable: true,
-      helperText: '경기 진행 중에도 참석명단을 수정할 수 있어요.',
-    };
+  if (!editable) {
+    if (lockReason === 'records_exist') {
+      return {
+        label: '기록 시작 · 잠김',
+        editable: false,
+        helperText: '득점·공동 기록 등 경기 기록이 시작되어 참석명단을 수정할 수 없어요.',
+      };
+    }
+    if (lockReason === 'active_lineups_complete') {
+      return {
+        label: '명단 확정',
+        editable: false,
+        helperText: '진행 중인 경기의 양 팀 참석명단이 모두 제출되어 수정할 수 없어요.',
+      };
+    }
+    if (lockReason === 'terminal') {
+      return {
+        label: '경기 종료 · 잠김',
+        editable: false,
+        helperText: '종료되거나 취소된 경기의 참석명단은 수정할 수 없어요.',
+      };
+    }
+    return { label: '잠김', editable: false, helperText: '서버에서 편집 가능 상태를 확인할 수 없어요.' };
   }
-  if (state === 'LOCKED') {
-    return { label: '잠김', editable: false, helperText: '경기가 시작되어 참석명단이 잠겼어요.' };
-  }
-  if (deadlinePassed) {
-    return {
-      label: '수정 마감',
-      editable: false,
-      helperText: '경기 시작 이후에는 참석명단을 직접 수정할 수 없어요.',
-    };
-  }
-  if (state === 'SUBMITTED') {
+  if (state === 'SUBMITTED' || state === 'LOCKED') {
     return {
       label: '제출됨 · 수정 가능',
       editable: true,
-      helperText: '제출 후에도 경기 시작 전까지 참석명단을 수정하고 다시 제출할 수 있어요.',
+      helperText: '경기 기록이 시작되기 전까지 참석명단을 수정하고 다시 제출할 수 있어요.',
     };
   }
   return { label: '초안', editable: true, helperText: '' };

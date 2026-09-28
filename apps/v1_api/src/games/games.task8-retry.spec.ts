@@ -117,7 +117,7 @@ async function retryEvent(
   return Reflect.apply(retry, service, [reader, gameId, input]);
 }
 
-async function createTask8RetryService() {
+async function createTask8RetryService(lineupReady = true) {
   const state = {
     events: [] as Array<{
       id: string;
@@ -240,6 +240,26 @@ async function createTask8RetryService() {
       async findFirst() {
         return { id: 'task8-side' };
       },
+      async findMany() {
+        return [{ id: 'task8-side' }, { id: 'task8-away-side' }];
+      },
+    },
+    v1GameLineup: {
+      async findMany() {
+        return lineupReady
+          ? [
+              { id: 'task8-home-lineup', sideId: 'task8-side' },
+              { id: 'task8-away-lineup', sideId: 'task8-away-side' },
+            ]
+          : [{ id: 'task8-home-lineup', sideId: 'task8-side' }];
+      },
+    },
+    v1GameParticipant: {
+      async findMany() {
+        return lineupReady
+          ? [{ sideId: 'task8-side' }, { sideId: 'task8-away-side' }]
+          : [{ sideId: 'task8-side' }];
+      },
     },
     v1IdempotencyRecord: {
       async findUnique({
@@ -302,6 +322,57 @@ async function createTask8RetryService() {
 }
 
 describe('Task 8 offline event retry service contract', () => {
+  it('rejects a live roster-dependent event while either lineup is incomplete', async () => {
+    const fixture = await createTask8RetryService(false);
+    const event: ImmutableEvent = {
+      ...immutableEvent({ anonymous: true }),
+      type: V1GameEventType.GOAL,
+    };
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+
+    try {
+      await expect(
+        fixture.service.appendEvent(
+          reader,
+          'task8-retry-game',
+          'task8-incomplete-roster-live-goal',
+          appendInput('task8-incomplete-roster-live-goal', event, 0, takeoverToken),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'ROSTER_INCOMPLETE' },
+      });
+      expect(fixture.state.events).toHaveLength(0);
+    } finally {
+      await fixture.close();
+    }
+  });
+
+  it('rejects an unseen roster-dependent offline event while either lineup is incomplete', async () => {
+    const fixture = await createTask8RetryService(false);
+    const event: ImmutableEvent = {
+      ...offlineImmutableEvent({ anonymous: true }),
+      type: V1GameEventType.GOAL,
+    };
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+
+    try {
+      await expect(
+        retryEvent(
+          fixture.service,
+          'task8-retry-game',
+          retryInput('task8-incomplete-roster-goal', event, 0, takeoverToken),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'ROSTER_INCOMPLETE' },
+      });
+      expect(fixture.state.events).toHaveLength(0);
+    } finally {
+      await fixture.close();
+    }
+  });
+
   it('Task 8 PIN replays an identical ordinary append once and conflicts on a changed payload', async () => {
     const fixture = await createTask8RetryService();
     const event = immutableEvent({ source: 'offline' });

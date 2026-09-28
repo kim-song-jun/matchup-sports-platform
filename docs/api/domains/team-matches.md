@@ -122,8 +122,8 @@ Rules:
 
 - 대상은 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
 - 선택 신청은 `requested` 상태여야 하고 신청 팀은 활성 상태이며 모집 종목과 같아야 한다.
-- 첫 번째 승인에서는 해당 신청을 `approved`로 바꾸고 그 팀을 HOME(`hostTeamId`)으로 예약하되 팀매치는 `recruiting`을 유지한다. 공개 목록/상세는 즉시 `승인된 HOME 팀 vs 모집 중`으로 표시하며 Game과 team schedule은 아직 만들지 않는다.
-- 두 번째 승인에서는 먼저 승인한 팀을 HOME(`hostTeamId`), 새 승인 팀을 AWAY(`approvedApplicantTeamId`)로 연결하고 팀매치를 `matched`로 바꾼다.
+- 첫 번째 승인에서는 해당 신청을 `approved`로 바꾸고 그 팀을 HOME(`hostTeamId`)으로 예약하되 팀매치는 `recruiting`을 유지한다. 동시에 일반 팀매치 모집과 같은 HOME + teamId 없는 AWAY placeholder Game과 HOME 팀 schedule을 만든다. 공개 목록/상세는 즉시 `승인된 HOME 팀 vs 모집 중`으로 표시하며, 승인된 팀 owner/manager는 두 번째 팀을 기다리지 않고 참석명단을 저장·제출할 수 있다.
+- 두 번째 승인에서는 기존 Game의 AWAY placeholder와 revision-1 명단 스냅샷을 새 승인 팀으로 채우고 `approvedApplicantTeamId`를 연결한 뒤 팀매치를 `matched`로 바꾼다. Game을 새로 만들거나 HOME schedule을 중복 생성하지 않는다.
 
 ## POST /admin/team-matches/:id/applications/:applicationId/reject
 
@@ -139,7 +139,7 @@ Rules:
 - 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
 - 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다. 따라서 공개 목록/상세의 `viewerState`/`viewer.state`도 플랫폼 HOME 팀에 `host_team`을 부여하지 않고 `viewer.manageRoute`는 `null`이다. `viewer.manageableHostTeam`은 HOME 사이드의 참가 기능 판정일 뿐 모집 관리 권한이 아니다.
 - 두 번째 승인 때 나머지 `requested` 신청을 `rejected`로 전환한다.
-- 두 번째 승인과 Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
+- 첫 승인과 HOME Game side/placeholder AWAY side/HOME schedule, 두 번째 승인과 AWAY side hydration/AWAY schedule/application·team-match 상태 로그/admin action log는 각각의 승인 트랜잭션 안에서 원자적으로 기록한다.
 - 성공 응답은 `applicationId`, `applicantTeamId`, `applicationStatus`, `teamMatchId`, `teamMatchStatus`, `approvedCount`, nullable `gameId`/`homeTeamId`/`awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
 ## GET /team-matches (TeamMatchesQueryDto)

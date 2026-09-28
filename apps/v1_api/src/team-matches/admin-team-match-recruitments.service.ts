@@ -21,6 +21,7 @@ import {
   UpdateAdminTeamMatchRecruitmentDto,
 } from './dto/admin-team-match-recruitment.dto';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
+import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 
 const CREATE_ACTION = 'admin_team_match_recruitment_create';
 const IDEMPOTENCY_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -259,12 +260,20 @@ export class AdminTeamMatchRecruitmentsService {
             data: { hostTeamId: targetApplication.applicantTeam.id },
           });
         }
+        const game = await this.ensurePlatformRecruitmentGame(
+          tx,
+          teamMatch,
+          targetApplication.applicantTeam,
+          admin.userId,
+          dto.clientCommandId,
+          payloadHash,
+        );
         return {
           applicationId,
           applicantTeamId: targetApplication.applicantTeam.id,
           applicationStatus: 'approved' as const,
           teamMatchId,
-          gameId: null,
+          gameId: game.gameId,
           teamMatchStatus: 'recruiting' as const,
           approvedCount: 1 as const,
           homeTeamId: targetApplication.applicantTeam.id,
@@ -304,6 +313,14 @@ export class AdminTeamMatchRecruitmentsService {
           where: { id: teamMatch.id },
           data: { hostTeamId: targetTeam.id },
         });
+        const game = await this.ensurePlatformRecruitmentGame(
+          tx,
+          teamMatch,
+          targetTeam,
+          admin.userId,
+          dto.clientCommandId,
+          payloadHash,
+        );
         await this.adminContext.logAdminAction(
           admin,
           {
@@ -322,7 +339,7 @@ export class AdminTeamMatchRecruitmentsService {
           applicantTeamId: targetTeam.id,
           applicationStatus: 'approved' as const,
           teamMatchId,
-          gameId: null,
+          gameId: game.gameId,
           teamMatchStatus: 'recruiting' as const,
           approvedCount: 1 as const,
           homeTeamId: targetTeam.id,
@@ -343,28 +360,15 @@ export class AdminTeamMatchRecruitmentsService {
       ) {
         throw new UnprocessableEntityException({ code: 'TEAM_MATCH_TEAMS_INVALID', message: '먼저 승인한 팀의 상태를 확인해 주세요.' });
       }
-      const game = await this.games.createFromSourceInTransaction(
+      const game = await this.ensurePlatformRecruitmentGame(
         tx,
-        {
-          sourceType: V1GameSourceType.TEAM_MATCH,
-          sourceId: teamMatch.id,
-          competitionConfigVersionId: teamMatch.competitionConfigVersionId,
-          sides: [
-            { sideKey: V1GameSideKey.HOME, teamId: home.id, displayNameSnapshot: home.name },
-            { sideKey: V1GameSideKey.AWAY, teamId: away.id, displayNameSnapshot: away.name },
-          ],
-          participants: [
-            ...this.toParticipants(home, V1GameSideKey.HOME),
-            ...this.toParticipants(away, V1GameSideKey.AWAY),
-          ],
-        },
-        {
-          actor: { actorType: 'USER', actorUserId: admin.userId, role: 'platform_ops' },
-          expectedVersion: 0,
-          durableCommandId: dto.clientCommandId,
-          payloadHash,
-        },
+        teamMatch,
+        home,
+        admin.userId,
+        dto.clientCommandId,
+        payloadHash,
       );
+      await hydrateApprovedTeamMatchAwaySnapshot(tx, teamMatch.id, away.id);
       await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: { hostTeamId: home.id, approvedApplicantTeamId: away.id, status: 'matched' },
@@ -387,7 +391,6 @@ export class AdminTeamMatchRecruitmentsService {
         where: { id: { in: rejected.map((application) => application.id) } },
         data: { status: 'rejected', reviewedByUserId: admin.userId, reviewedAt: new Date() },
       });
-      await createTeamMatchScheduleInTx(tx, home.id, teamMatch.id, teamMatch.title, teamMatch.startAt, teamMatch.endAt);
       await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, teamMatch.title, teamMatch.startAt, teamMatch.endAt);
       await tx.v1StatusChangeLog.createMany({
         data: [
@@ -668,6 +671,65 @@ export class AdminTeamMatchRecruitmentsService {
       sideKey,
       displayNameSnapshot: membership.user.profile?.nickname ?? membership.user.profile?.displayName ?? '팀원',
     }));
+  }
+
+  /**
+   * 첫 승인 직후 HOME 팀이 명단을 작성할 수 있도록 일반 팀매치와 같은 HOME + 미정 AWAY
+   * Game을 만든다. 두 번째 승인과 과거 단일 승인 재시도도 이 관문을 거쳐 기존 Game을
+   * 재사용하고, Game을 실제로 새로 만든 경우에만 HOME 팀 일정을 함께 생성한다.
+   */
+  private async ensurePlatformRecruitmentGame(
+    tx: Prisma.TransactionClient,
+    teamMatch: {
+      id: string;
+      title: string;
+      competitionConfigVersionId: string | null;
+      startAt: Date | null;
+      endAt: Date | null;
+      game: { id: string } | null;
+    },
+    home: AssignableTeam,
+    actorUserId: string,
+    durableCommandId: string,
+    payloadHash: string,
+  ) {
+    if (teamMatch.game !== null) {
+      return { gameId: teamMatch.game.id };
+    }
+    if (teamMatch.competitionConfigVersionId === null || teamMatch.startAt === null) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+        message: '경기 설정 또는 시작 시간이 없어 참가팀 명단을 준비할 수 없어요.',
+      });
+    }
+    const game = await this.games.createFromSourceInTransaction(
+      tx,
+      {
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        sourceId: teamMatch.id,
+        competitionConfigVersionId: teamMatch.competitionConfigVersionId,
+        sides: [
+          { sideKey: V1GameSideKey.HOME, teamId: home.id, displayNameSnapshot: home.name },
+          { sideKey: V1GameSideKey.AWAY, teamId: null, displayNameSnapshot: '상대 팀 미정' },
+        ],
+        participants: this.toParticipants(home, V1GameSideKey.HOME),
+      },
+      {
+        actor: { actorType: 'USER', actorUserId, role: 'platform_ops' },
+        expectedVersion: 0,
+        durableCommandId,
+        payloadHash,
+      },
+    );
+    await createTeamMatchScheduleInTx(
+      tx,
+      home.id,
+      teamMatch.id,
+      teamMatch.title,
+      teamMatch.startAt,
+      teamMatch.endAt,
+    );
+    return game;
   }
 
   private emitTeamNotifications(teamIds: string[], type: 'team_match_application_approved' | 'team_match_application_rejected', teamMatchId: string, body: string) {

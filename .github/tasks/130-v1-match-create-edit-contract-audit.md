@@ -214,7 +214,7 @@ DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
 - [x] `hostParticipates=false` 주최자가 승인 참가자와 채팅할 수 있도록 현재/수신자 권한 보강
 - [x] 모바일 하단 주요 액션을 `채팅`·`신청자 관리` 2개로 고정하고 `매치 수정`은 상태 행 링크로 분리
 - [x] 작은 화면 전역 grid stacking과 충돌하지 않는 전용 class 및 safe-area 포함 본문 여백 적용
-- [x] API 집중 테스트 30/30, Web 집중 테스트 74/74, 양쪽 `tsc --noEmit` 통과
+- [x] API 집중 테스트 33/33, Web 집중 테스트 74/74, 양쪽 `tsc --noEmit` 통과
 - [ ] PR CI, dev 병합, alpha 배포 및 실제 모바일 viewport 확인
 
 기존 중단된 cherry-pick이 있는 공유 작업 트리는 수정·stage하지 않고, 최신 `origin/dev` 기반

@@ -136,6 +136,17 @@ Error: ENOENT: no such file or directory, open '.../apps/v1_api/CHANGELOG.md'
 
 3번은 릴리스 확정이므로 사용자 승인 후에 진행한다.
 
+> **후속 (2026-09-28): `release-main.yml` → `promote-main.yml` 로 대체됨.** 위 ②의 우회는
+> "PR을 dev 를 base 로 만든다"였을 뿐, `changesets/action`이 PR 자체를 만들려는 시도는
+> 남아 있었다 — 저장소 설정이 Actions 의 PR 생성·승인을 허용하지 않아 매 dispatch 가
+> "GitHub Actions is not permitted to create or approve pull requests" 로 실패했다(즉 이
+> 문서가 기록한 "복구된 경로"는 실행 이력이 여전히 0건이었다). `promote-main.yml`("Promote
+> to main")은 PR 을 직접 만들지 않고 alpha 검증 + 필요 시 dev 버전 커밋 push + 승격 게이트
+> 사전 검증까지만 하고, dev→main PR 은 사람이 누를 링크(job summary)로 남긴다. 위 2번 명령은
+> `gh workflow run promote-main.yml --ref dev -f confirmation=PROMOTE` 로 대체됐다(alpha
+> 검증은 워크플로 내부에서 자동으로 함 — `alpha_release`/`alpha_sha` 입력 불필요). 로직은
+> `scripts/release/promote-main.sh`, 테스트는 `scripts/qa/test-promote-main.sh`.
+
 ### M5. prod는 장기 SSH 사설키, alpha는 OIDC — **2026-08-02 해소**
 
 prod 배포는 `EC2_SSH_KEY`(장기 사설키)를 GitHub secret으로 들고 있고, alpha는 `id-token: write` + `configure-aws-credentials`로 OIDC 역할을 assume한다. 보안 모델이 프로덕션 쪽이 더 약하다. 전환에는 AWS IAM 역할·신뢰정책 생성이 필요하다.

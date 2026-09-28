@@ -237,7 +237,7 @@ graph TD
 | `deploy-alpha.yml` | `dev` push, 수동 | alpha 빌드 + 배포 |
 | `rollback-alpha.yml` | 수동 | alpha를 직전 릴리스로 되돌리기 |
 | `rollback-prod.yml` | 수동 | 프로덕션을 직전 릴리스로 되돌리기 |
-| `release-main.yml` | 수동 | 검증된 alpha 버전을 기준으로 승격 PR 생성(base는 `dev`) |
+| `promote-main.yml` | 수동 | alpha 검증 + 필요 시 dev에 버전 커밋 push, dev→main PR 링크를 job summary에 남김(PR 생성·머지는 사람이 함) |
 | `android-alpha.yml` · `ios-alpha.yml` | `dev` push·PR(각 앱 경로 변경 시), 수동 | 네이티브 셸 alpha 빌드 |
 | `android-production-bundle.yml` | 수동 | Android 프로덕션 번들 |
 

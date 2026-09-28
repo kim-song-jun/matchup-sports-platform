@@ -416,9 +416,10 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   2. **배포 창을 피하라**(2026-08-13 실사고). 배포 중 502를 결함으로 오진한다. 측정 전에
      `curl -fsSI .../landing | grep -iE 'x-teameet-(release|commit)'` 로 서빙 SHA를 확인하고 내 머지를 포함하는지
      `git merge-base --is-ancestor` 로 검증한다. 앞 배포 run이 `cancelled` 로 남을 수 있으니 마지막 **성공** 배포 SHA를 본다.
-  3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 계약 4개: takeover 토큰은 Socket.IO
-     `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId` / 라인업 참가자
-     `started: boolean` 필수 / 라인업 수정은 `state === 'SCHEDULED'` 동안만.
+  3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 순서: start → end-period → start-period
+     → end-period → end. 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 176 — 라인업
+     저장·제출 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
+     계약 2개: takeover 토큰은 Socket.IO `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId`.
   4. **판정은 비인증 공개 API**(`GET /tournaments/:id/matches/:fixtureId`)를 ground truth로. 육안 스크린샷 대조로
      "차이 없음"을 결론내지 말고 computed 값을 직접 읽는다.
   5. 라이브 페이지는 10초 폴링이라 Playwright `networkidle`이 끝나지 않는다 → `domcontentloaded` + 명시적 대기.
@@ -446,3 +447,5 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 
 `docs/design/competition-canonical-flow.md` 가 대회·정규 리그·팀 매치·명단·결과 확정·전적의 정본이다(2026-09-02 사용자 확정).
 충돌하는 태스크 문서보다 이 문서를 따르고, 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.
+요지: 경기 명단 = 출전자(선후발 없음, 참가 명단이 기본값이고 팀이 경기 시작 전까지 경기별로 조정, 롤링 종목은 교체 기록 없음) ·
+결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음).

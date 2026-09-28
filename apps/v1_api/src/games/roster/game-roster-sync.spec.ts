@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
-import { syncGameSideRoster, syncRostersForTeamMatchTeams } from './game-roster-sync';
+import { syncGameSideRoster, syncRostersForTeamMatchTeams, syncTeamMemberFallbackRosters } from './game-roster-sync';
 
 jest.mock('../../league-matches/league-roster-autofill', () => ({
   fillLeagueTeamRoster: jest.fn(async (_tx: unknown, _leagueId: string, registration: { id: string; teamId: string }) => ({
@@ -13,6 +13,11 @@ jest.mock('../../league-matches/league-roster-autofill', () => ({
   notifyLeagueRosterFillOutcomes: jest.fn(),
 }));
 
+interface UpcomingWhere {
+  sides: { some: { teamId: string } };
+  teamMatch: { AND: [{ OR: Array<{ leagueId?: unknown }> }] };
+}
+
 const LEAGUE_MATCH = { id: 'lm-1', tournamentId: 'league-1', leagueId: 'league-1', startAt: new Date('2099-01-01T00:00:00Z') };
 
 interface Options {
@@ -20,6 +25,10 @@ interface Options {
   readonly stateAfterLock?: string;
   readonly emptyRegistrations?: Array<{ id: string; teamId: string }>;
   readonly upcomingByTeam?: Record<string, string[]>;
+  /** 경기 → 리그 id(대회 경기는 null). 없으면 전부 league-1. */
+  readonly leagueOfGame?: Record<string, string | null>;
+  /** 활성 선수가 있는 확정 참가 명단을 가진 리그. */
+  readonly leaguesWithRoster?: string[];
 }
 
 /**
@@ -45,15 +54,24 @@ function fakeTx(options: Options = {}) {
           sides: [{ id: 'side-1', teamId: 'team-A' }],
         };
       }),
-      findMany: jest.fn(async ({ where }: { where: { OR?: Array<{ sides: { some: { teamId: string } } }>; sides?: { some: { teamId: string } } } }) => {
+      findMany: jest.fn(async ({ where }: { where: UpcomingWhere & { OR?: UpcomingWhere[] } }) => {
         const byTeam = options.upcomingByTeam ?? {};
-        const teamIds = where.OR ? where.OR.map((row) => row.sides.some.teamId) : [where.sides!.some.teamId];
-        const ids = [...new Set(teamIds.flatMap((teamId) => byTeam[teamId] ?? []))];
-        return ids.map((id) => ({ id, teamMatch: { leagueId: 'league-1' }, sides: [{ id: `side-${id}` }] }));
+        const leagueOf = (id: string) => (options.leagueOfGame ? (options.leagueOfGame[id] ?? null) : 'league-1');
+        const ids = (where.OR ?? [where]).flatMap((row) => {
+          const competitionId = row.teamMatch.AND[0].OR[0].leagueId;
+          return (byTeam[row.sides.some.teamId] ?? []).filter(
+            (id) => typeof competitionId !== 'string' || leagueOf(id) === competitionId,
+          );
+        });
+        return [...new Set(ids)].map((id) => ({ id, teamMatch: { leagueId: leagueOf(id) }, sides: [{ id: `side-${id}` }] }));
       }),
     },
     v1TournamentRegistration: {
-      findMany: jest.fn(async ({ where }: { where: { players?: { none: object } } }) => {
+      findMany: jest.fn(async ({ where }: { where: { tournamentId: unknown; players?: { none?: object; some?: object } } }) => {
+        if (where.players?.some !== undefined) {
+          const asked = (where.tournamentId as { in: string[] }).in;
+          return (options.leaguesWithRoster ?? []).filter((id) => asked.includes(id)).map((id) => ({ tournamentId: id }));
+        }
         if (where.players?.none === undefined) return [];
         calls.push('fill-query');
         return options.emptyRegistrations ?? [];
@@ -96,5 +114,25 @@ describe('syncRostersForTeamMatchTeams — 여러 팀의 잠금 순서', () => {
     // 팀별 동기화가 다시 잡는 행은 이미 쥔 행뿐이다.
     expect(new Set(locks)).toEqual(new Set(['lock:g1', 'lock:g2', 'lock:g3']));
     expect(calls.indexOf('lock:g3')).toBeLessThan(calls.indexOf('fill-query'));
+  });
+});
+
+describe('syncTeamMemberFallbackRosters — 멤버십 변경 뒤 폴백 리그 재계산', () => {
+  it('참가 명단 없이 팀원 기준으로 뛰는 리그 경기만 잠그고 다시 계산한다', async () => {
+    const { tx, calls } = fakeTx({
+      upcomingByTeam: { 'team-A': ['g1', 'g2', 'g3'] },
+      leagueOfGame: { g1: 'league-registered', g2: 'league-fallback', g3: null },
+      leaguesWithRoster: ['league-registered'],
+    });
+    await syncTeamMemberFallbackRosters(tx, ['team-A']);
+    // 참가 명단이 있는 리그(g1)와 대회 경기(g3)는 명단 정리 경로 몫이다.
+    expect(new Set(calls.filter((call) => call.startsWith('lock:')))).toEqual(new Set(['lock:g2']));
+    expect(calls).toContain('fill-query');
+  });
+
+  it('시작 전 리그 경기가 없으면 아무것도 잠그지 않는다', async () => {
+    const { tx, calls } = fakeTx({ upcomingByTeam: {} });
+    await expect(syncTeamMemberFallbackRosters(tx, ['team-A'])).resolves.toBe(0);
+    expect(calls).toEqual([]);
   });
 });

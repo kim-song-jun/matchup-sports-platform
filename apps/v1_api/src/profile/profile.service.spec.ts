@@ -41,6 +41,7 @@ describe('ProfileService identity binding', () => {
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -230,6 +231,7 @@ describe('ProfileService phone change proof gate', () => {
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -1296,6 +1298,7 @@ describe('ProfileService withdrawal admin lockout', () => {
       v1PushDevice: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));

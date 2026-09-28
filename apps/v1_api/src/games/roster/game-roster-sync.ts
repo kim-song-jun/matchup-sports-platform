@@ -298,6 +298,50 @@ export async function syncRostersForTeamMatchTeams(
 }
 
 /**
+ * 팀 멤버십이 바뀐 뒤(가입·추방·탈퇴·계정 비활성) 참가 명단 없이 팀 활성 멤버를 기준 명단으로 쓰는
+ * 리그(폴백)의 시작 전 경기를 다시 계산한다. 참가 명단이 있는 대회·리그는 명단 정리 경로
+ * (`tournaments/roster-cleanup.ts`)가 맡는다. 멤버십을 바꾼 **뒤에** 불러야 새 멤버 목록을 읽는다.
+ */
+export async function syncTeamMemberFallbackRosters(tx: Tx, teamIds: readonly string[]): Promise<number> {
+  const now = new Date();
+  const targets: Array<{ leagueId: string; teamId: string; gameIds: string[] }> = [];
+  for (const teamId of new Set(teamIds)) {
+    const games = await tx.v1Game.findMany({
+      where: upcomingCompetitionGameWhere(null, teamId, now),
+      select: { id: true, teamMatch: { select: { leagueId: true } } },
+    });
+    const gameIdsByLeague = new Map<string, string[]>();
+    for (const game of games) {
+      const leagueId = game.teamMatch?.leagueId ?? null;
+      if (leagueId !== null) gameIdsByLeague.set(leagueId, [...(gameIdsByLeague.get(leagueId) ?? []), game.id]);
+    }
+    if (gameIdsByLeague.size === 0) continue;
+    const withRoster = await tx.v1TournamentRegistration.findMany({
+      where: {
+        tournamentId: { in: [...gameIdsByLeague.keys()] },
+        teamId,
+        status: 'confirmed',
+        players: { some: { removedAt: null } },
+      },
+      select: { tournamentId: true },
+    });
+    const registered = new Set(withRoster.map((row) => row.tournamentId));
+    for (const [leagueId, gameIds] of gameIdsByLeague) {
+      if (!registered.has(leagueId)) targets.push({ leagueId, teamId, gameIds });
+    }
+  }
+  await lockGameRows(
+    tx,
+    targets.flatMap((target) => target.gameIds),
+  );
+  let synced = 0;
+  for (const target of targets) {
+    synced += await syncCompetitionTeamRosters(tx, { competitionId: target.leagueId, teamId: target.teamId });
+  }
+  return synced;
+}
+
+/**
  * 결과 리비전이 제출·확정·무효가 된 경기의 양 팀 시작 전 경기를 다시 계산한다(출전정지 변동).
  * 출전정지 규정이 없는 대회·리그는 결과가 명단을 바꿀 수 없으므로 조회 두 번으로 끝난다.
  */

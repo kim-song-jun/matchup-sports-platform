@@ -30,6 +30,7 @@ import {
 } from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { pickReviewHighlight, type ReviewHighlight } from '../reviews/review-highlight';
+import { syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -1172,6 +1173,10 @@ export class ProfileService {
       // 남아 정원만 차지한다 — 2026-08-03 프로덕션에서 실제로 이렇게 됐다.
       // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
       const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
+      await syncTeamMemberFallbackRosters(
+        tx,
+        memberships.map((membership) => membership.teamId),
+      );
 
       // 탈퇴 요청이 수락되는 순간 계정은 더 이상 로그인할 수 없다. 이때 브라우저
       // 구독과 네이티브 기기를 그대로 두면 운영자가 최종 삭제를 처리하기 전까지

@@ -122,7 +122,8 @@ export async function removeUserFromActiveRosters(
         })),
       });
     }
-    // 팀을 떠난 사람을 그 대회·리그의 시작 전 경기 명단에서도 뺀다.
+    // 팀을 떠난 사람을 그 대회·리그의 시작 전 경기 명단에서도 뺀다. 참가 명단 없이 팀원 기준으로 뛰는
+    // 리그는 여기 대상이 없으니 멤버십을 바꾼 호출부가 `syncTeamMemberFallbackRosters` 로 따로 맞춘다.
     const teams = new Map(
       targets.flatMap((target) =>
         target.registration ? [[`${target.registration.tournamentId}:${target.registration.teamId}`, target.registration] as const] : [],

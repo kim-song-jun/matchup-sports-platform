@@ -20,6 +20,7 @@ import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
+import { syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { formatLevelRange } from '../sports/level-range';
 import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
@@ -2833,6 +2834,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
       });
     }
+    await syncTeamMemberFallbackRosters(
+      tx,
+      memberships.map((membership) => membership.teamId),
+    );
 
     if (removedRosterCount > 0 || memberships.length > 0) {
       this.logger?.info(

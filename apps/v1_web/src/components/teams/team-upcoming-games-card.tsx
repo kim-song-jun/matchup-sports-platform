@@ -15,6 +15,9 @@ import { formatTournamentDateTimeShort } from '@/lib/date-utils';
  *
  * 알려진 한계: 서버가 **앞으로의 경기만** 모은다 — 끝난 경기의 전술보드는 여기서 열 수 없다.
  */
+/** 경기 명단 화면의 "우리 팀 다른 경기" 링크가 여기로 온다(`/teams/:id#…`). */
+export const TEAM_UPCOMING_GAMES_ANCHOR = 'team-upcoming-games';
+
 export function TeamUpcomingGamesCard({ teamId }: { teamId: string }) {
   const query = useV1TeamUpcomingGames(teamId);
   const items = query.data?.items ?? [];
@@ -26,7 +29,7 @@ export function TeamUpcomingGamesCard({ teamId }: { teamId: string }) {
 
   return (
     <>
-      <SectionTitle title="다가오는 경기" sub="경기마다 우리 팀 전술을 짜 둘 수 있어요." />
+      <SectionTitle id={TEAM_UPCOMING_GAMES_ANCHOR} title="다가오는 경기" sub="경기마다 우리 팀 전술을 짜 둘 수 있어요." />
       <Card pad={16}>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {items.map((game, index) => (

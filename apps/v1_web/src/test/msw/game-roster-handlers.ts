@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type {
   V1AdminRegistrationRosterMatrix,
+  V1GameRosterViewerRole,
   V1GameRosterHistoryEvent,
   V1GameRosterView,
   V1MemberUnavailability,
@@ -71,6 +72,11 @@ export function createV1GameRosterMswHandlers() {
     unavailabilities: [] as Unavailability[],
     requests: [] as GameRosterMswRequest[],
     seq: 0,
+    viewerRole: 'TEAM_MANAGER' as V1GameRosterViewerRole,
+    /** 출전정지(규정 있는 대회) — userId → 사유·남은 경기. 모든 경기에 같이 건다. */
+    suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
+    /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
+    joinedAfter: new Set<string>(),
   };
 
   const nextId = (prefix: string) => `${prefix}-${++state.seq}`;
@@ -94,7 +100,9 @@ export function createV1GameRosterMswHandlers() {
   function view(game: (typeof GAME_ROSTER_MSW.games)[number]): V1GameRosterView {
     const gameState = state.gameStates.get(game.gameId)!;
     const base = GAME_ROSTER_MSW.players.map((p) => {
-      const status = coveringUnavailability(p.userId, game.startAt)
+      const status = state.suspensions.has(p.userId)
+        ? ('SUSPENDED' as const)
+        : coveringUnavailability(p.userId, game.startAt)
         ? ('UNAVAILABLE' as const)
         : activeAdjustment(game.gameId, p.userId)
           ? ('EXCLUDED' as const)
@@ -103,17 +111,21 @@ export function createV1GameRosterMswHandlers() {
     });
     const excluded = GAME_ROSTER_MSW.players.flatMap((p) => {
       const adj = activeAdjustment(game.gameId, p.userId);
-      if (!adj || coveringUnavailability(p.userId, game.startAt)) return [];
+      if (!adj || state.suspensions.has(p.userId) || coveringUnavailability(p.userId, game.startAt)) return [];
       return [{ ...person(p), adjustmentId: adj.id, reason: adj.reason, excludedAt: adj.createdAt, actor: actor(adj.actorUserId, adj.actorRole) }];
     });
     const unavailable = GAME_ROSTER_MSW.players.flatMap((p) => {
       const u = coveringUnavailability(p.userId, game.startAt);
-      if (!u) return [];
+      if (!u || state.suspensions.has(p.userId)) return [];
       return [{ ...person(p), unavailabilityId: u.id, reason: u.reason, startsAt: u.startsAt, endsAt: u.endsAt, actor: actor(u.actorUserId, u.actorRole) }];
     });
     const participants = base
       .filter((p) => p.status === 'PARTICIPATING')
-      .map(({ status: _status, ...p }) => ({ ...p, joinedAfterFixtureCreated: false }));
+      .map(({ status: _status, ...p }) => ({ ...p, joinedAfterFixtureCreated: state.joinedAfter.has(p.userId) }));
+    const suspended = GAME_ROSTER_MSW.players.flatMap((p) => {
+      const s = state.suspensions.get(p.userId);
+      return s ? [{ ...person(p), reason: s.reason, remainingMatches: s.remainingMatches }] : [];
+    });
     return {
       gameId: game.gameId,
       sideId: game.sideId,
@@ -123,20 +135,20 @@ export function createV1GameRosterMswHandlers() {
       competitionKind: 'TOURNAMENT',
       gameState,
       deadline: game.startAt,
-      editable: gameState === 'SCHEDULED',
-      viewerRole: 'TEAM_MANAGER',
+      editable: gameState === 'SCHEDULED' && state.viewerRole !== 'TEAM_MEMBER',
+      viewerRole: state.viewerRole,
       baseSource: 'REGISTRATION',
       base,
       participants,
       excluded,
-      suspended: [],
+      suspended,
       unavailable,
       counts: {
         base: base.length,
         participating: participants.length,
         excluded: excluded.length,
         unavailable: unavailable.length,
-        suspended: 0,
+        suspended: suspended.length,
       },
       legacyLineupPending: false,
     };
@@ -332,6 +344,33 @@ export function createV1GameRosterMswHandlers() {
     requests: state.requests,
     setGameState(gameId: string, gameState: V1GameState) {
       state.gameStates.set(gameId, gameState);
+    },
+    setViewerRole(role: V1GameRosterViewerRole) {
+      state.viewerRole = role;
+    },
+    suspend(userId: string, reason: string, remainingMatches: number) {
+      state.suspensions.set(userId, { reason, remainingMatches });
+    },
+    markJoinedAfterFixture(userId: string) {
+      state.joinedAfter.add(userId);
+    },
+    markUnavailable(userId: string, startsAt: string, endsAt: string, reason: string | null) {
+      state.unavailabilities.push({
+        id: nextId('unavailability'),
+        teamId: GAME_ROSTER_MSW.teamId,
+        userId,
+        startsAt,
+        endsAt,
+        reason,
+        actorUserId: GAME_ROSTER_MSW.viewerUserId,
+        actorRole: 'TEAM_MANAGER',
+        createdAt: at(),
+        revokedAt: null,
+      });
+    },
+    /** 다른 운영진이 먼저 뺀 것처럼 서버 상태만 바꾼다. */
+    excludeAsTeamManager(gameId: string, userId: string, reason: string | null) {
+      exclude(gameId, userId, reason);
     },
   };
 }

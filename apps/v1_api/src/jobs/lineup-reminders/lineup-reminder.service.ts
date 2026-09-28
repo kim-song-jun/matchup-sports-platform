@@ -1,10 +1,10 @@
 import { Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { LineupTodo, LineupTodoService } from '../../team-lineups/lineup-todo.service';
+import type { CompetitionRosterCheck, LineupTodo, LineupTodoService } from '../../team-lineups/lineup-todo.service';
 import type { WebPushService } from '../../notifications/web-push.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
-import { isQuietHour, kstParts } from './quiet-hours';
+import { isQuietHour, kstMidnight, kstParts } from './quiet-hours';
 
 /** 스캔 주기. 슬롯 경계로 정규화해 재예약 키를 만들기 때문에, 재시도가 겹쳐도 같은
  * 슬롯에는 outbox 행이 하나만 생긴다. */
@@ -25,7 +25,9 @@ type ReminderMessage = {
 };
 
 /**
- * 라인업을 아직 넣지 않은 팀에게 알린다.
+ * 친선 팀매치 참석명단을 아직 넣지 않은 팀에게 알리고, 대회·리그 경기는 전날 양 팀
+ * owner·manager 에게 "명단 확인"을 한 번 보낸다(Task 176 R1 — 대회·리그 명단은 계산되므로
+ * 제출 재촉이 없다).
  *
  * **왜 예약이 아니라 주기 스캔인가.** 대회 일정은 운영 중에 바뀐다(경기 시간 조정, 대진
  * 확정 지연). 미리 T-24h 같은 시점에 발송을 예약해두면 일정이 바뀔 때마다 예약을
@@ -34,12 +36,9 @@ type ReminderMessage = {
  * 필요 없다.
  *
  * **하루 한 번을 어떻게 보장하는가.** 발송 이력 테이블을 따로 두지 않는다. 알림의
- * `businessKey`에 한국 날짜를 박고(`V1Notification.businessKey`는 unique), 대회 단위로
- * 묶는다 — 같은 날 같은 대회로 두 번째 행을 만드는 일이 DB 수준에서 불가능하다.
+ * `businessKey`에 한국 날짜(명단 확인은 경기·팀)를 박는다(`V1Notification.businessKey`는
+ * unique) — 같은 키로 두 번째 행을 만드는 일이 DB 수준에서 불가능하다.
  * 스캔이 15분마다 돌아도, 워커가 여러 대여도, 재시도가 겹쳐도 결과는 같다.
- *
- * **왜 경기 단위가 아니라 대회 단위인가.** 대회는 하루에 여러 경기를 치른다. 경기마다
- * 보내면 알림이 소나기처럼 쏟아지고, 그러면 정작 중요한 날에 무시당한다.
  */
 export class LineupReminderService {
   private readonly logger = new Logger(LineupReminderService.name);
@@ -79,12 +78,13 @@ export class LineupReminderService {
     if (isQuietHour(now)) return;
 
     const todos = await this.todoService.listAllPending(now);
-    if (todos.length === 0) return;
+    const rosterChecks = await this.todoService.listCompetitionRosterChecks(kstMidnight(now, 1), kstMidnight(now, 2));
 
     const { dateKey } = kstParts(now);
     const messages = [
       ...buildDailyMessages(todos, dateKey),
       ...buildFinalMessages(todos, now),
+      ...buildRosterCheckMessages(rosterChecks),
     ];
 
     for (const message of messages) {
@@ -161,68 +161,31 @@ export class LineupReminderService {
 }
 
 /**
- * 매일 한 번 가는 "아직 라인업이 비어 있어요" 알림.
- *
- * 대회는 대회 단위로 묶고, 팀 매치는 매치가 곧 한 경기이므로 그대로 한 건이다.
+ * 매일 한 번 가는 "아직 참석명단이 비어 있어요" 알림. 할 일은 친선 팀매치뿐이라 매치가 곧
+ * 한 경기이므로 경기마다 한 건이다.
  */
 export function buildDailyMessages(
   todos: LineupTodo[],
   dateKey: string,
 ): Array<ReminderMessage & { teamId: string }> {
-  const groups = new Map<string, LineupTodo[]>();
-  for (const todo of todos) {
-    const scope =
-      todo.competitionKind === 'TOURNAMENT' && todo.tournamentId !== null
-        ? `tournament:${todo.tournamentId}`
-        : `game:${todo.gameId}`;
-    const key = `${scope}|${todo.teamId}`;
-    const bucket = groups.get(key);
-    if (bucket === undefined) groups.set(key, [todo]);
-    else bucket.push(todo);
-  }
-
-  const messages: Array<ReminderMessage & { teamId: string }> = [];
-  for (const [key, group] of groups) {
-    const [scope] = key.split('|');
-    const first = group[0];
-    const isTournament = first.competitionKind === 'TOURNAMENT';
-    // 가장 이른 경기를 대표로 삼는다 — 링크는 지금 당장 손볼 경기로 꽂혀야 한다.
-    const soonest = group.reduce((earliest, candidate) =>
-      (candidate.scheduledAt?.getTime() ?? Infinity) < (earliest.scheduledAt?.getTime() ?? Infinity)
-        ? candidate
-        : earliest,
-    );
-
-    messages.push({
-      teamId: first.teamId,
-      targetId: first.teamId,
-      title: isTournament
-        ? `${first.tournamentTitle ?? '대회'} 라인업을 확인해 주세요`
-        : '팀 매치 참석명단을 확인해 주세요',
-      body: describeDailyBody(group, soonest, isTournament),
-      deepLink: soonest.deepLink,
-      keyPrefix: `lineup-daily:${scope}:${first.teamId}:${dateKey}`,
-    });
-  }
-  return messages;
+  return todos.map((todo) => ({
+    teamId: todo.teamId,
+    targetId: todo.teamId,
+    title: '팀 매치 참석명단을 확인해 주세요',
+    body: describeDailyBody(todo),
+    deepLink: todo.deepLink,
+    keyPrefix: `lineup-daily:game:${todo.gameId}:${todo.teamId}:${dateKey}`,
+  }));
 }
 
-function describeDailyBody(group: LineupTodo[], soonest: LineupTodo, isTournament: boolean): string {
-  // 대회 경기는 '라인업', 팀 매치는 '참석명단' — 용어는 competitionKind로 갈린다(MD-QA #14).
-  const term = isTournament ? '라인업' : '참석명단';
-  const missing = group.filter((todo) => todo.state === 'MISSING').length;
-  const draft = group.length - missing;
-  const parts: string[] = [];
-  if (missing > 0) parts.push(`${missing}경기는 ${term}이 비어 있고`);
-  if (draft > 0) parts.push(`${draft}경기는 아직 제출 전이에요`);
-  const status = parts.length > 0 ? parts.join(' ') : `아직 ${term}이 준비되지 않았어요`;
-  const opponent = soonest.opponentName !== null ? ` vs ${soonest.opponentName}` : '';
-  return `${soonest.teamName} · ${status}. 가장 가까운 경기는 ${soonest.title}${opponent}예요.`;
+function describeDailyBody(todo: LineupTodo): string {
+  const status = todo.state === 'MISSING' ? '1경기는 참석명단이 비어 있고' : '1경기는 아직 제출 전이에요';
+  const opponent = todo.opponentName !== null ? ` vs ${todo.opponentName}` : '';
+  return `${todo.teamName} · ${status}. 가장 가까운 경기는 ${todo.title}${opponent}예요.`;
 }
 
 /**
- * 킥오프 2시간 전 최종 확인. 하루치 알림과 달리 경기 하나하나에 붙는다 — 이 시점에는
- * "어느 경기"가 곧 "지금 당장"이라 묶을 이유가 없다.
+ * 킥오프 2시간 전 최종 확인. 하루치 알림과 달리 이 시점에는 "어느 경기"가 곧 "지금 당장"이다.
  */
 export function buildFinalMessages(
   todos: LineupTodo[],
@@ -234,22 +197,38 @@ export function buildFinalMessages(
       const remaining = todo.scheduledAt.getTime() - now.getTime();
       return remaining > 0 && remaining <= FINAL_REMINDER_WINDOW_MS;
     })
-    .map((todo) => {
-      // 대회 경기는 '라인업', 팀 매치는 '참석명단' — 용어는 competitionKind로 갈린다(MD-QA #14).
-      const term = todo.competitionKind === 'TOURNAMENT' ? '라인업' : '참석명단';
-      return {
-        teamId: todo.teamId,
-        targetId: todo.teamId,
-        title: `곧 경기가 시작돼요 — ${term}을 확인해 주세요`,
-        body:
-          todo.state === 'MISSING'
-            ? `${todo.title} ${term}이 아직 비어 있어요.`
-            : `${todo.title} ${term}이 아직 제출 전이에요.`,
-        deepLink: todo.deepLink,
-        // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
-        keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
-      };
-    });
+    .map((todo) => ({
+      teamId: todo.teamId,
+      targetId: todo.teamId,
+      title: '곧 경기가 시작돼요 — 참석명단을 확인해 주세요',
+      body:
+        todo.state === 'MISSING'
+          ? `${todo.title} 참석명단이 아직 비어 있어요.`
+          : `${todo.title} 참석명단이 아직 제출 전이에요.`,
+      deepLink: todo.deepLink,
+      // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
+      keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
+    }));
+}
+
+/**
+ * 대회·리그 경기 전날 "명단 확인". 날짜를 키에 넣지 않는다 — 경기·팀당 한 번만 가야 하고,
+ * 경기가 다른 날로 옮겨져도 다시 보내지 않는다.
+ */
+export function buildRosterCheckMessages(
+  checks: CompetitionRosterCheck[],
+): Array<ReminderMessage & { teamId: string }> {
+  return checks.map((check) => {
+    const opponent = check.opponentName !== null ? ` vs ${check.opponentName}` : '';
+    return {
+      teamId: check.teamId,
+      targetId: check.teamId,
+      title: `${check.title}${opponent} 명단을 확인해 주세요`,
+      body: `내일 경기 출전 ${check.rosterSummary.participating}명 · 빠지는 사람이 있으면 조정해 주세요`,
+      deepLink: check.deepLink,
+      keyPrefix: `roster-check:${check.gameId}:${check.teamId}`,
+    };
+  });
 }
 
 /**

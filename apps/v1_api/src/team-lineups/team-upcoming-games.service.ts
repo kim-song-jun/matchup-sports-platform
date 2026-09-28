@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
-import type { Prisma } from '@prisma/client';
-import { loadCompetitionRosterBase, loadGameRoster } from '../games/roster/game-roster-loader';
-import { summarizeGameRoster, type GameRosterSummary } from '../games/roster/game-roster-matrix';
 import { PrismaService } from '../prisma/prisma.service';
-import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
-import { LineupTodoService, type TeamUpcomingGame } from './lineup-todo.service';
+import { LineupTodoService, loadRosterSummaries } from './lineup-todo.service';
 import { assertTeamLineupMember } from './team-lineup-access';
 
 /**
@@ -49,41 +45,4 @@ export class TeamUpcomingGamesService {
       })),
     };
   }
-}
-
-async function loadRosterSummaries(
-  tx: Prisma.TransactionClient,
-  teamId: string,
-  games: readonly TeamUpcomingGame[],
-): Promise<Map<string, { teamMatchId: string | null; sideId: string; summary: GameRosterSummary | null }>> {
-  const sides = await tx.v1GameSide.findMany({
-    where: { gameId: { in: games.map((game) => game.gameId) }, teamId },
-    select: { id: true, gameId: true, game: { select: { teamMatchId: true } } },
-  });
-  const sideByGame = new Map(sides.map((side) => [side.gameId, side]));
-  const preloaded = new Map<string, Awaited<ReturnType<typeof preload>>>();
-  async function preload(competitionId: string, isLeague: boolean) {
-    const scope = { competitionId, isLeague, teamId };
-    const base = await loadCompetitionRosterBase(tx, scope);
-    return { base, orderedGames: base === null ? [] : await loadTeamCompetitionGameOrder(tx, scope) };
-  }
-
-  const result = new Map<string, { teamMatchId: string | null; sideId: string; summary: GameRosterSummary | null }>();
-  for (const game of games) {
-    const side = sideByGame.get(game.gameId);
-    if (side === undefined) continue;
-    let summary: GameRosterSummary | null = null;
-    if (game.competitionKind !== 'FRIENDLY' && game.tournamentId !== null) {
-      let cached = preloaded.get(game.tournamentId);
-      if (cached === undefined) {
-        cached = await preload(game.tournamentId, game.competitionKind === 'LEAGUE');
-        preloaded.set(game.tournamentId, cached);
-      }
-      const loaded =
-        cached.base === null ? null : await loadGameRoster(tx, { gameId: game.gameId, sideId: side.id }, cached);
-      summary = loaded === null ? null : summarizeGameRoster(loaded.computation);
-    }
-    result.set(game.gameId, { teamMatchId: side.game.teamMatchId, sideId: side.id, summary });
-  }
-  return result;
 }

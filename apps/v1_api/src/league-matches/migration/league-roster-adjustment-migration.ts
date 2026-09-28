@@ -1,9 +1,14 @@
 import { Prisma, V1GameRosterAdjustmentAction, V1GameState, V1TeamMatchStatus } from '@prisma/client';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
-import { loadGameRoster } from '../../games/roster/game-roster-loader';
+import {
+  fillCompetitionRosterBase,
+  loadGameRosterContext,
+  loadGameRosterForContext,
+} from '../../games/roster/game-roster-loader';
 import {
   isUnmigratedTeamAuthoredLineup,
   LEAGUE_ROSTER_MIGRATED_ACTION,
+  lockGameRows,
   leagueRosterMigrationRequestId,
   syncGameSideRoster,
 } from '../../games/roster/game-roster-sync';
@@ -111,6 +116,10 @@ async function migrateSide(
   outcome: 'MIGRATED' | 'WOULD_MIGRATE',
 ): Promise<LeagueSideMigrationReport | null> {
   const target = { gameId: side.gameId, sideId: side.sideId };
+  // 대상은 트랜잭션 밖에서 골랐다 — 잠근 뒤 다시 보고 그 사이 시작된 경기는 건너뛴다.
+  await lockGameRows(tx, [side.gameId]);
+  const context = await loadGameRosterContext(tx, target);
+  if (context !== null && context.gameState !== V1GameState.SCHEDULED) return null;
   const latest = await tx.v1GameLineup.findFirst({
     where: { ...target, invalidatedAt: null },
     orderBy: { revision: 'desc' },
@@ -124,7 +133,8 @@ async function migrateSide(
     unrepresentableRows: plan?.unrepresentableRows ?? 0,
     rosterChanged,
   });
-  const loaded = await loadGameRoster(tx, target);
+  if (context !== null) await fillCompetitionRosterBase(tx, context);
+  const loaded = context === null ? null : await loadGameRosterForContext(tx, context);
   if (loaded === null) return report('ROSTER_NOT_AVAILABLE', null);
 
   const saved = await tx.v1GameParticipant.findMany({ where: { lineupId: latest.id }, select: { userId: true } });
@@ -160,7 +170,6 @@ async function migrateSide(
       })),
     });
   }
-  const { context } = loaded;
   await new OperationAuditWriterService().create(tx, {
     actor: { type: 'SYSTEM', id: MIGRATION_SYSTEM_ACTOR },
     requestId: leagueRosterMigrationRequestId(side.gameId, side.sideId),
@@ -168,8 +177,8 @@ async function migrateSide(
     targetType: 'GAME',
     targetId: side.gameId,
     // 동기화 감사와 같은 규칙 — tournamentId 없는 옛 리그 경기에 리그 id 를 짝지으면 복합 FK 위반이다.
-    tournamentId: context.tournamentId ?? context.leagueId,
-    teamMatchId: context.tournamentId === null ? null : side.teamMatchId,
+    tournamentId: loaded.context.tournamentId ?? loaded.context.leagueId,
+    teamMatchId: loaded.context.tournamentId === null ? null : side.teamMatchId,
     occurredAt: new Date(),
     before: { lineupId: latest.id },
     after: { sideId: side.sideId, excludeCount: plan.excludeUserIds.length, unrepresentableRows: plan.unrepresentableRows },

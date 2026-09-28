@@ -19,7 +19,7 @@ import { GamesService } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
 import { loadGameRoster } from './game-roster-loader';
-import { isUnmigratedTeamAuthoredLineup, syncGameSideRoster } from './game-roster-sync';
+import { isUnmigratedTeamAuthoredLineup, lockGameRows, syncGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
 
 type Tx = Prisma.TransactionClient;
@@ -83,7 +83,7 @@ export class GameRosterService {
     private readonly games: GamesService,
   ) {}
 
-  // 리그 기준 명단 로드가 명단 없는 확정 신청을 그 자리에서 채울 수 있어 조회도 트랜잭션 안에서 한다.
+  // 조회는 DB 를 바꾸지 않는다(리그 명단 자동 채움은 동기화 쓰기 경로에서만). 인가와 계산을 한 트랜잭션에서 읽는다.
   getRoster(user: V1AuthUser, target: SideTarget): Promise<GameRosterView> {
     return this.prisma.$transaction(async (tx) => {
       const access = await this.authorizeSide(tx, user.id, target, 'read');
@@ -248,10 +248,8 @@ export class GameRosterService {
    * 여러 경기면 id 순으로 잠가 교착을 피하고, 하나라도 시작됐으면 전부 거부한다.
    */
   async lockScheduledGames(tx: Tx, gameIds: readonly string[]): Promise<void> {
-    const ids = [...new Set(gameIds)].sort();
-    for (const gameId of ids) {
-      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
-    }
+    const ids = [...new Set(gameIds)];
+    await lockGameRows(tx, ids);
     const games = await tx.v1Game.findMany({ where: { id: { in: ids } }, select: { id: true, state: true } });
     const started = games.filter((game) => game.state !== V1GameState.SCHEDULED).map((game) => game.id);
     if (started.length > 0) {

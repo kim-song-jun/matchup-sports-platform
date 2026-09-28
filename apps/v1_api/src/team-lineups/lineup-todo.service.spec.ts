@@ -520,7 +520,6 @@ describe('LineupTodoService.listCompetitionRosterChecks — 전날 명단 확인
       },
       v1GameLineup: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    prisma.$transaction = jest.fn((callback: (tx: unknown) => unknown) => Promise.resolve(callback(prisma)));
     return prisma;
   }
 

@@ -23,8 +23,8 @@ export class TeamUpcomingGamesService {
     // 전술보드 읽기와 같은 선 — 활성 팀원이면 본다. 팀이 없으면 404, 팀원이 아니면 403.
     await assertTeamLineupMember(this.prisma, teamId, user.id);
     const games = await this.lineupTodos.listUpcomingForTeam(teamId, new Date());
-    // 리그 기준 명단 로드가 명단 없는 확정 신청을 채울 수 있어(경기 명단 조회와 같은 이유) 트랜잭션이다.
-    const rosters = await this.prisma.$transaction((tx) => loadRosterSummaries(tx, teamId, games));
+    // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
+    const rosters = await loadRosterSummaries(this.prisma, teamId, games);
     return {
       items: games.map((game) => ({
         gameId: game.gameId,

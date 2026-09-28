@@ -205,7 +205,7 @@ function createFake() {
       ),
       findMany: track(
         'v1TournamentRegistration.findMany',
-        async (args: { where: { teamId?: { in: string[] }; id?: { in: string[] } } }) => {
+        async (args: { where: { teamId?: { in: string[] }; id?: { in: string[] }; players?: { none: object } } }) => {
           const regRow = (teamId: string) => ({
             id: `reg-${teamId}`,
             teamId,
@@ -214,12 +214,14 @@ function createFake() {
               userId: player.userId,
               user: { profile: { nickname: player.nickname, displayName: null } },
             })),
-            // 이 fake 는 소프트 삭제를 모델링하지 않는다 — "활성 선수 수" 와 "전체 행 수"
-            // 가 항상 같다. 실제 쿼리는 `_count.players` 로 "행이 아예 없다" 를 판정한다.
-            _count: { players: (state.rosterPlayers.get(teamId) ?? []).length },
           });
           if (args.where.teamId?.in) {
-            return args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map(regRow);
+            // 이 fake 는 소프트 삭제를 모델링하지 않는다 — "활성 선수 수" 와 "전체 행 수" 가 같다.
+            const withoutRows = args.where.players?.none !== undefined;
+            return args.where.teamId.in
+              .filter((id) => state.registeredTeamIds.has(id))
+              .filter((id) => !withoutRows || (state.rosterPlayers.get(id) ?? []).length === 0)
+              .map(regRow);
           }
           if (args.where.id?.in) {
             return args.where.id.in.map((id) => regRow(id.replace(/^reg-/, '')));
@@ -269,8 +271,9 @@ function createFake() {
       findFirst: track('v1Game.findFirst', async () => null),
       // 명단 재계산(syncCompetitionTeamRosters)이 팀의 시작 전 경기를 찾는 조회. 이 스위트는 그 경기를
       // 흉내 내지 않으므로 "대상 없음"이다 — 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
-      findMany: track('v1Game.findMany', async (args: { where: { sides: { some: { teamId: string } } } }) => {
-        state.rosterSyncTeamIds.push(args.where.sides.some.teamId);
+      findMany: track('v1Game.findMany', async (args: { where: { sides?: { some: { teamId: string } } } }) => {
+        // 여러 팀 동기화 전 잠금 대상 조회(`OR` 묶음)는 팀별 재계산이 아니다.
+        if (args.where.sides !== undefined) state.rosterSyncTeamIds.push(args.where.sides.some.teamId);
         return [];
       }),
       findUnique: track('v1Game.findUnique', async () =>

@@ -1,5 +1,9 @@
 import type { Prisma, V1GameState } from '@prisma/client';
-import { leagueTeamRosterBase, loadLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
+import {
+  fillEmptyLeagueRosters,
+  leagueTeamRosterBase,
+  readLeagueTeamRosters,
+} from '../../league-matches/league-fixture-creation';
 import { readSuspensionVerdicts, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
@@ -23,15 +27,24 @@ export interface CompetitionTeamScope {
 }
 
 /**
+ * 쓰기 경로(명단 동기화)가 기준 명단을 읽기 전에 부른다 — 리그의 명단 행 없는 확정 신청을 채운다
+ * (`fillEmptyLeagueRosters`: DB 쓰기 + 팀장 알림). 대회는 할 일이 없다.
+ */
+export async function fillCompetitionRosterBase(tx: Tx, scope: CompetitionTeamScope): Promise<void> {
+  if (scope.isLeague) await fillEmptyLeagueRosters(tx, scope.competitionId, [scope.teamId]);
+}
+
+/**
  * 기준 명단 = confirmed 참가 신청의 활성 선수. 리그는 명단이 없는 팀에 한해 팀 활성 멤버로 폴백한다.
  * 대회에 confirmed 신청이 없거나 리그 팀이 비활성이면 `null` — 계산 대상이 아니다.
+ * DB 를 바꾸지 않는다 — 조회 API 가 그대로 부른다.
  */
 export async function loadCompetitionRosterBase(
   tx: Tx,
   scope: CompetitionTeamScope,
 ): Promise<CompetitionRosterBase | null> {
   if (scope.isLeague) {
-    const team = (await loadLeagueTeamRosters(tx, scope.competitionId, [scope.teamId])).get(scope.teamId);
+    const team = (await readLeagueTeamRosters(tx, scope.competitionId, [scope.teamId])).get(scope.teamId);
     if (team === undefined) return null;
     return {
       source: team.registeredPlayers.length > 0 ? 'REGISTRATION' : 'TEAM_MEMBERS',
@@ -85,8 +98,13 @@ export interface LoadedGameRoster {
   readonly computation: GameRosterComputation;
 }
 
+export interface GameRosterPreload {
+  readonly base?: CompetitionRosterBase | null;
+  readonly orderedGames?: readonly OrderedCompetitionGame[];
+}
+
 /**
- * 대회·리그 경기 한 사이드의 명단 계산 입력을 읽어 `computeGameRoster` 에 넘긴다.
+ * 대회·리그 경기 한 사이드의 명단 계산 입력을 읽어 `computeGameRoster` 에 넘긴다. DB 를 바꾸지 않는다.
  * 친선 경기·팀 미정 사이드·기준 명단이 없는 팀은 `null`.
  *
  * 한 팀의 여러 경기를 돌 때는 `preloaded` 로 기준 명단과 팀 경기 순서를 한 번만 읽어 넘긴다.
@@ -94,8 +112,17 @@ export interface LoadedGameRoster {
 export async function loadGameRoster(
   tx: Tx,
   target: { gameId: string; sideId: string },
-  preloaded: { base?: CompetitionRosterBase | null; orderedGames?: readonly OrderedCompetitionGame[] } = {},
+  preloaded: GameRosterPreload = {},
 ): Promise<LoadedGameRoster | null> {
+  const context = await loadGameRosterContext(tx, target);
+  return context === null ? null : loadGameRosterForContext(tx, context, preloaded);
+}
+
+/** 경기·사이드에서 대회·리그와 팀을 푼다. 친선 경기·팀 미정 사이드는 `null`. */
+export async function loadGameRosterContext(
+  tx: Tx,
+  target: { gameId: string; sideId: string },
+): Promise<GameRosterSideContext | null> {
   const game = await tx.v1Game.findUnique({
     where: { id: target.gameId },
     select: {
@@ -125,7 +152,14 @@ export async function loadGameRoster(
     leagueId: teamMatch.leagueId,
     startAt: teamMatch.startAt,
   };
+  return context;
+}
 
+export async function loadGameRosterForContext(
+  tx: Tx,
+  context: GameRosterSideContext,
+  preloaded: GameRosterPreload = {},
+): Promise<LoadedGameRoster | null> {
   const base = preloaded.base !== undefined ? preloaded.base : await loadCompetitionRosterBase(tx, context);
   if (base === null) return null;
 

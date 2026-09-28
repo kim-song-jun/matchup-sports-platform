@@ -26,7 +26,7 @@ export class TeamGameRosterService {
     private readonly staffAccess: TournamentStaffAccessService,
   ) {}
 
-  // 리그 기준 명단 로드가 명단 없는 확정 신청을 채울 수 있어(기존 동작) 조회도 트랜잭션이다.
+  // 조회는 DB 를 바꾸지 않는다(리그 명단 자동 채움은 동기화 쓰기 경로에서만).
   getTeamMatrix(user: V1AuthUser, teamId: string) {
     return this.prisma.$transaction(async (tx) => {
       const access = await resolveTeamRosterAccess(tx, teamId, user.id);

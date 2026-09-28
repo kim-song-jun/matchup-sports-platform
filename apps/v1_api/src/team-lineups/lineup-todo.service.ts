@@ -136,8 +136,7 @@ export class LineupTodoService {
 
     const checks: CompetitionRosterCheck[] = [];
     for (const [teamId, teamGames] of byTeam) {
-      // 리그 기준 명단 로드가 명단 없는 확정 신청을 채울 수 있어 트랜잭션이다(팀 다가오는 경기와 같다).
-      const rosters = await this.prisma.$transaction((tx) => loadRosterSummaries(tx, teamId, teamGames));
+      const rosters = await loadRosterSummaries(this.prisma, teamId, teamGames);
       for (const game of teamGames) {
         const summary = rosters.get(game.gameId)?.summary;
         if (summary) checks.push({ ...game, rosterSummary: summary });

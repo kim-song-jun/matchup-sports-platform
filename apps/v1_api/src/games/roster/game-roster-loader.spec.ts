@@ -1,5 +1,12 @@
 import type { Prisma } from '@prisma/client';
+import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
 import { loadGameRoster } from './game-roster-loader';
+
+// 조회가 자동 채움(쓰기·알림)을 부르는지 본다. 동기화 쓰기 경로의 호출은 game-roster-sync.spec 이 본다.
+jest.mock('../../league-matches/league-roster-autofill', () => ({
+  fillLeagueTeamRoster: jest.fn(),
+  notifyLeagueRosterFillOutcomes: jest.fn(),
+}));
 
 const PROFILE = (nickname: string) => ({ profile: { nickname, displayName: null } });
 const KICKOFF = new Date('2026-10-10T10:00:00Z');
@@ -201,5 +208,20 @@ describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
     expect(loaded?.computation.participants).toEqual([
       { userId: 'u7', accountLinked: true, displayNameSnapshot: '칠', jerseyNumber: null, sourceParticipantId: 'lp-1' },
     ]);
+  });
+});
+
+describe('loadGameRoster — 조회는 DB 를 바꾸지 않는다', () => {
+  it('명단 행이 없는 리그 확정 신청을 채우지 않고 팀원 폴백으로 읽는다', async () => {
+    const tx = fakeTx({
+      teamMatch: { id: 'lm-1', tournamentId: 'league-1', leagueId: 'league-1', startAt: KICKOFF },
+      sideTeamId: 'team-A',
+      leagueTeam: { memberships: [{ id: 'ms-1', userId: 'u1', user: PROFILE('하나') }] },
+      leagueRegistrations: [{ id: 'lreg-empty', teamId: 'team-A', players: [], _count: { players: 0 } }],
+    });
+    const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+    expect(loaded?.baseSource).toBe('TEAM_MEMBERS');
+    expect(fillLeagueTeamRoster).not.toHaveBeenCalled();
+    expect(notifyLeagueRosterFillOutcomes).not.toHaveBeenCalled();
   });
 });

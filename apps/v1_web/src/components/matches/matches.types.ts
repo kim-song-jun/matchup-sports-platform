@@ -21,6 +21,8 @@ export type MatchCardModel = {
   costNote: string | null;
   deadline: string;
   deadlineDetail?: string;
+  /** 서버가 현재 시각과 종료 시각을 조합해 계산한 공개 목록 생명주기 상태. */
+  lifecycleStatus?: V1MatchApiStatus;
   status: 'open' | 'pending' | 'approved' | 'full' | 'mine';
 };
 
@@ -101,7 +103,6 @@ export type MatchDetailViewModel = {
    */
   backHref?: string;
   match: MatchCardModel & {
-    lifecycleStatus?: V1MatchApiStatus;
     description: string;
     address: string;
     rules: string[];

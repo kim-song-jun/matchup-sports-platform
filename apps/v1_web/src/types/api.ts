@@ -53,7 +53,7 @@ export type AdminCursorPage<T> = CursorPage<T> & {
 };
 
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
-export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full';
+export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full' | 'in_progress' | 'completion_pending';
 export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
 export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn';
 export type V1TeamMatchViewerState = 'none' | 'guest' | 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';

@@ -19,6 +19,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  navigation.search = '';
   mocks.applications.mockReturnValue({ data: { pages: [{ items: [] }] } });
 });
 describe('개인 매치 신청 관리', () => {
@@ -127,5 +128,15 @@ describe('개인 매치 신청 관리', () => {
     expect(mocks.applications).toHaveBeenLastCalledWith('m1', { status: 'approved', limit: 50 }, { enabled: true });
     fireEvent.click(screen.getByRole('button', { name: '전체 이력' }));
     expect(mocks.applications).toHaveBeenLastCalledWith('m1', { limit: 50 }, { enabled: true });
+  });
+
+  it('종료 확인 CTA에서 들어오면 확정 명단을 바로 연다', () => {
+    navigation.search = 'tab=approved';
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, canComplete: true } });
+
+    render(<MatchApplicationsPageClient matchId="m1" />);
+
+    expect(screen.getByRole('button', { name: '확정 명단' })).toHaveAttribute('aria-pressed', 'true');
+    expect(mocks.applications).toHaveBeenLastCalledWith('m1', { status: 'approved', limit: 50 }, { enabled: true });
   });
 });

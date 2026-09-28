@@ -315,7 +315,9 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
       rules: query.data.rulesText ? [query.data.rulesText] : [],
       editHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/edit`, selfHref) : undefined,
-      applicationsHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/applications`, selfHref) : undefined,
+      applicationsHref: viewerState === 'host'
+        ? withFromPath(`/matches/${matchId}/applications${query.data.canComplete ? '?tab=approved' : ''}`, selfHref)
+        : undefined,
       lifecycleStatus: getStatus(query.data),
       participants: toParticipants(
         query.data,
@@ -567,6 +569,8 @@ function statusLabel(
   status: V1MatchApiStatus,
   participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
 ) {
+  if (status === 'in_progress') return '진행중';
+  if (status === 'completion_pending') return viewerState === 'host' ? '종료 확인 필요' : '종료 확인 중';
   if (status === 'completed' && participantStatus === 'no_show') return '불참 기록';
   if (status === 'completed' && (viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant')) return '참여 완료';
   if (viewerState === 'host') return '내가 만든 매치';

@@ -24,14 +24,18 @@ type Attendance = Record<string, 'completed' | 'no_show'>;
 
 export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const matchDetailPath = `/matches/${matchId}`;
   // 상세로 돌아가는 버튼은 받은 출처를 잇는다(상세가 넘긴 출처면 그대로 접힌다).
-  const matchDetailHref = withFromPath(matchDetailPath, sanitizeRedirectPath(useSearchParams().get('from')));
+  const matchDetailHref = withFromPath(matchDetailPath, sanitizeRedirectPath(searchParams.get('from')));
   const matchQuery = useV1Match(matchId);
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(matchQuery.data) });
   const viewerState = matchQuery.data?.viewer?.state ?? matchQuery.data?.viewerState ?? 'none';
   const isHost = !matchQuery.isPlaceholderData && viewerState === 'host';
-  const [tab, setTab] = useState<'requested' | 'approved' | 'all'>('requested');
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState<'requested' | 'approved' | 'all'>(
+    requestedTab === 'approved' || requestedTab === 'all' ? requestedTab : 'requested',
+  );
   // Fetch once we know user is host — avoids 403 for non-hosts.
   // Cursor-paginated: a match can hold up to 100 participants while the API caps each
   // page at 50, so the host loads further pages via "더 보기" to manage every applicant.

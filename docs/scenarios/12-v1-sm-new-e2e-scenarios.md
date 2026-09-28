@@ -481,6 +481,9 @@ Reviewable completed personal matches and team matches, review target eligibilit
 star rating `1-5`, one or more predefined review tags, idempotent review submit,
 written review list, received review grouping.
 
+- `V1-14-008`: 개인매치 방장이 `hostParticipates=false`여도 완료 후 실제 참가자를 리뷰할 수 있고,
+  방장도 참가자도 아닌 사용자는 동일 source 조회에서 `403 NOT_SOURCE_PARTICIPANT`로 차단된다.
+
 DB evidence:
 `v1_matches`, `v1_match_participants`, `v1_team_matches`,
 `v1_team_match_applications`, `v1_team_memberships`,

@@ -111,6 +111,14 @@ describe('buildMatchPayloadResult — payload | missingFields 분기', () => {
     expect(result.payload).toMatchObject({ hostParticipates: false });
   });
 
+  it('최대 인원 1명을 그대로 payload에 보존한다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, capacity: 1 } });
+
+    const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
+
+    expect(result.payload).toMatchObject({ capacity: 1 });
+  });
+
   it('date가 빈 문자열은 아니지만 파싱 불가능한 값(손상된 draft)이면 크래시 대신 missingFields를 반환한다', () => {
     // RULES의 presence 검사(Boolean(draft.date))는 통과하지만 new Date(...)가 NaN이 되는 값 —
     // localStorage에서 복원된 draft가 깨진 경우를 흉내낸다. 예전엔 `parseStartsAt(draft) as Date`

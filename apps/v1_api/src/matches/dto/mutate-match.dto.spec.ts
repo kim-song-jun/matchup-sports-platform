@@ -3,7 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MutateMatchDto } from './mutate-match.dto';
 
-describe('MutateMatchDto costNote', () => {
+describe('MutateMatchDto', () => {
   const valid = {
     sportId: '0e65978c-3a58-42e5-a371-cf6d6239699a',
     regionId: 'c9e88345-c8c1-4179-9f11-1c9698517008',
@@ -16,6 +16,16 @@ describe('MutateMatchDto costNote', () => {
   it('accepts a payload without costNote (optional field)', async () => {
     const errors = await validate(plainToInstance(MutateMatchDto, valid));
     expect(errors.some((error) => error.property === 'costNote')).toBe(false);
+  });
+
+  it('accepts a one-person match capacity', async () => {
+    const errors = await validate(plainToInstance(MutateMatchDto, { ...valid, capacity: 1 }));
+    expect(errors.some((error) => error.property === 'capacity')).toBe(false);
+  });
+
+  it('rejects a capacity below one person', async () => {
+    const errors = await validate(plainToInstance(MutateMatchDto, { ...valid, capacity: 0 }));
+    expect(errors.some((error) => error.property === 'capacity')).toBe(true);
   });
 
   it('accepts costNote at the 200-character limit', async () => {

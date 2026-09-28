@@ -3370,6 +3370,12 @@ label.tm-btn:focus-within {
   padding-top: 12px;
 }
 
+.tm-create-fixed-cta-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+}
+
 .tm-home-chat-fab {
   font-size: 0;
 }
@@ -3759,6 +3765,19 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-create-shell-edit {
   padding-bottom: calc(168px + var(--v1-shell-safe-bottom));
+}
+
+.tm-match-edit-management {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--grey100);
+}
+
+.tm-match-edit-management-action {
+  display: grid;
+  gap: 4px;
 }
 
 .tm-create-progress {

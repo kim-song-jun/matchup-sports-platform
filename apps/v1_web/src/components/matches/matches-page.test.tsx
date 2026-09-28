@@ -479,7 +479,31 @@ describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
     }
     expect(screen.getByText('성별 조건')).toBeInTheDocument();
     expect(screen.getByText('대표 이미지')).toBeInTheDocument();
+    expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="1">1명</option>');
     expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="100">100명</option>');
+  });
+
+  it('최대 인원은 1명까지 선택할 수 있고 감소 버튼도 1명 아래로 내리지 않는다', () => {
+    const model = getMatchCreateViewModel('info');
+    const onFieldChange = vi.fn();
+    model.draft = { ...model.draft, capacity: 1 };
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectSport: vi.fn(),
+      onFieldChange,
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+    };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByLabelText('최대 인원 선택')).toHaveValue('1');
+    fireEvent.click(screen.getByRole('button', { name: '인원 줄이기' }));
+    expect(onFieldChange).toHaveBeenCalledWith('capacity', 1);
   });
 });
 
@@ -532,6 +556,29 @@ describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
 
     expect(screen.getByRole('textbox', { name: '제목' })).not.toBeDisabled();
     expect(screen.getByRole('switch', { name: '나도 참가해요' })).not.toBeDisabled();
+  });
+
+  it('수정 관리 동작은 스크롤 본문에 두고 고정 footer는 변경 취소와 저장만 유지한다', () => {
+    const model = editModel(null);
+    model.form!.recruitingToggle = {
+      label: '모집 마감',
+      hint: '새 신청을 받지 않아요.',
+      pending: false,
+      onClick: vi.fn(),
+    };
+
+    const { container } = render(<MatchCreatePageView model={model} />);
+
+    const shell = container.querySelector('.tm-match-create-shell');
+    const management = container.querySelector('.tm-match-edit-management');
+    const fixedActions = container.querySelector('.tm-create-fixed-cta-actions');
+
+    expect(shell).toHaveClass('tm-create-shell-edit');
+    expect(management).toContainElement(screen.getByRole('button', { name: '모집 마감' }));
+    expect(management).toContainElement(screen.getByRole('button', { name: '매치 취소' }));
+    expect(fixedActions).toContainElement(screen.getByRole('button', { name: '변경 취소' }));
+    expect(fixedActions).toContainElement(screen.getByRole('button', { name: '변경사항 저장' }));
+    expect(fixedActions).not.toContainElement(screen.getByRole('button', { name: '매치 취소' }));
   });
 });
 

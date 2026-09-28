@@ -540,8 +540,8 @@ export const gameSchemaSourceManifest = {
   // 2026-09-28 Task 176: additive V1GameRosterAdjustment + V1TeamMemberUnavailability tables
   // (20260928090000_v1_game_roster_adjustments) and back-relation fields on V1Game/V1GameSide/
   // V1Team/V1User. No existing column, constraint or index changed; the bound game-operations
-  // migration is unchanged.
-  schema: '37e55f108dfd4ca3cd9d97549605ddd31a043295a3fd4bc298f5603db346236e',
+  // migration is unchanged. Same day: the unavailability actorRole doc comment dropped STAFF (comment only).
+  schema: '02be0c876bfdf683554a38efcf5391d6fc6935fabeeefbdf9a3473916795725f',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

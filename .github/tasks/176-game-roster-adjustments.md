@@ -39,7 +39,7 @@
 - [ ] 규정을 넣은 대회·리그는 출전정지 선수가 경기 명단에서 자동으로 빠진다(D3). 규정이 비면 영향 없음.
 - [ ] 옵셔널 — 진입점은 경기 상세와 팀 상세 "다가오는 경기"의 팀장 전용 버튼. 홈·알림·할 일에 띄우지 않는다(D4).
 - [ ] 팀 B: 팀 운영 메뉴 "경기 명단 관리" — 선수 × 다가오는 대회·리그 경기, 셀로 빼기/되돌리기, 일괄 저장.
-- [ ] 팀 C: 결장 기간 등록 — 기간 안에 시작하는 대회·리그 경기에서 자동 제외(나중에 잡히는 경기 포함). 새 테이블. 팀장·매니저·운영자만 등록(D6).
+- [ ] 팀 C: 결장 기간 등록 — 기간 안에 시작하는 대회·리그 경기에서 자동 제외(나중에 잡히는 경기 포함). 새 테이블. 팀장·매니저·운영자(플랫폼 어드민)만 등록(D6). 대회 스태프는 경기별 조정만(아래 권한 표).
 - [ ] 어드민: 참가 신청(명단 검토) 화면의 팀 행 "경기별 명단" 펼침, 운영 보드 경기 카드 요약·"명단" 버튼, 결장 기간 대리 등록. 기록에 운영자로 남는다.
 - [ ] 팀 ↔ 경기 양방향(2026-09-28 사용자 지시): 팀 상세의 경기 행에서 그 경기 명단으로(대회·리그 = 조정, 친선 = 참석명단), 경기 명단 화면에서 "우리 팀 다른 경기"로.
 - [ ] 화면: 경기 명단 화면(출전/빠짐/출전정지 + 변경 기록) + 경기 상세의 빠른 선택 시트. 시작 후 읽기 전용.
@@ -96,7 +96,7 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
   endsAt          DateTime
   reason          String?  // INJURY | PERSONAL | OTHER
   actorUserId     String
-  actorRole       String   // TEAM_MANAGER | ADMIN | STAFF (본인 등록 없음, D6)
+  actorRole       String   // TEAM_MANAGER | ADMIN (본인 등록 없음, D6 · 대회 스태프 불가 — 권한 표 참고)
   createdAt       DateTime @default(now())
   revokedAt       DateTime?
   revokedByUserId String?
@@ -137,13 +137,16 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 | GET | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 활성 멤버 · 운영자 | 변경 기록(revoke 포함, 시간순) |
 | GET | `/teams/:teamId/game-rosters` | 그 팀 owner·manager · 운영자 | 팀 B: 선수 × 다가오는 대회·리그 경기 매트릭스(출전/빠짐/결장/정지 + 사유·actor) |
 | POST | `/teams/:teamId/game-rosters/batch` | 같음 | 팀 B: `{ changes: [{ gameId, userId, op: 'EXCLUDE'\|'REVOKE', reason? }] }` 한 트랜잭션. 시작된 경기가 섞이면 전체 409 |
-| GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | 조회: 그 팀 활성 멤버 · 쓰기: owner·manager · 운영자(D6) | 팀 C: 결장 기간 조회·등록·취소 |
+| GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | 조회: 그 팀 활성 멤버 · 플랫폼 어드민 · 쓰기: owner·manager · 플랫폼 어드민(support 제외, D6). 대회 스태프 불가 | 팀 C: 결장 기간 조회·등록·취소 |
 | GET | `/admin/tournaments/:id/registrations/:registrationId/game-rosters` | 어드민·그 대회 스태프 | 어드민: 참가 신청 화면의 팀별 경기 × 선수. 쓰기는 위 API 를 운영자 권한으로 |
 
 - 쓰기는 경기 `SCHEDULED` 일 때만 — 아니면 409 `LINEUP_DEADLINE_PASSED`(기존 코드 재사용).
 - 기준 명단 밖 `userId` 는 422 `ROSTER_ADJUSTMENT_NOT_IN_ROSTER`. 출전정지 선수 되돌리기는 조정 대상이 아니다(계산이 뺀다).
 - 공개 경기 기록은 계산된 경기 명단만 보여 주고 조정 사유는 노출하지 않는다.
 - 인가는 대회 `GamesService.resolveActor`(lineup_mutate), 리그 팀매치 라인업 인가를 그대로 재사용한다.
+- **결장 기간 쓰기에 대회 스태프를 넣지 않는다(2026-09-28 구현 판단).** 결장 기간은 팀 단위라 특정 대회에 묶이지 않고,
+  등록하면 그 팀이 뛰는 **다른** 대회·리그 경기에서도 빠진다 — 한 대회 스태프가 남의 대회 명단을 바꾸게 된다.
+  스태프는 자기 대회 경기의 경기별 조정(`actorRole STAFF`)으로 같은 일을 한다. 운영자 결장 등록은 플랫폼 어드민(`ADMIN`)만.
 
 ### 화면 (목업: 아티팩트 "경기별 출전 명단 기획" §전)
 
@@ -170,7 +173,7 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 ### 어드민
 
 - **참가 신청(명단 검토)** `admin/tournaments/[id]/registrations`, `admin/league-matches/[leagueId]/registrations` — 팀 행에
-  "경기별 명단" 펼침(팀 B 와 같은 선수 × 경기 표), 결장 기간 대리 등록.
+  "경기별 명단" 펼침(팀 B 와 같은 선수 × 경기 표), 결장 기간 대리 등록(플랫폼 어드민만 — 스태프는 그 대회 경기별 조정).
 - **운영 보드** `admin/live/[id]/operations` — 경기 카드에 "빠짐 N · 정지 N" 요약과 "명단" 버튼 → 경기 명단 화면(운영자 권한), 시작 전만 편집.
 - **결과 정정** `admin/live/[id]/records/corrections` — 바꾸지 않는다. 경기 시작 후 출전 변경은 여기로만.
 - 운영자가 한 조정은 `actorRole = ADMIN | STAFF` 로 남아 팀 화면 변경 기록에 "운영자"로 보인다.

@@ -11,7 +11,8 @@ export interface TeamRosterAccess {
 
 /**
  * 팀 단위 명단 화면(선수 × 경기 표, 결장 기간)의 권한. 대회 스태프는 대회에 묶인 권한이라
- * 팀 단위로는 열지 않는다 — 스태프는 어드민 참가 신청 경로와 경기 단위 API 를 쓴다.
+ * 팀 단위로는 열지 않는다 — 결장 기간은 그 팀의 모든 대회·리그 경기에 걸려 스태프가 남의 대회 명단을
+ * 바꾸게 되기 때문이다. 스태프는 어드민 참가 신청 경로와 경기 단위 API 를 쓴다.
  */
 export function decideTeamRosterAccess(input: {
   membershipRole: 'owner' | 'manager' | 'member' | null;

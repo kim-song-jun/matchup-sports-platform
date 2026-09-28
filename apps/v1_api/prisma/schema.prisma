@@ -3915,7 +3915,7 @@ model V1TeamMemberUnavailability {
   /// INJURY | PERSONAL | OTHER — DTO 에서 검증한다.
   reason          String?
   actorUserId     String    @map("actor_user_id")
-  /// TEAM_MANAGER | ADMIN | STAFF
+  /// TEAM_MANAGER | ADMIN — 대회 스태프는 쓰지 않는다(팀 단위라 다른 대회·리그 경기까지 빠진다)
   actorRole       String    @map("actor_role")
   createdAt       DateTime  @default(now()) @map("created_at")
   revokedAt       DateTime? @map("revoked_at")

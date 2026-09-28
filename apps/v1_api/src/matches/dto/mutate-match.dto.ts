@@ -44,7 +44,7 @@ export class MutateMatchDto {
 
   @Type(() => Number)
   @IsInt()
-  @Min(2)
+  @Min(1)
   @Max(100)
   capacity!: number;
 

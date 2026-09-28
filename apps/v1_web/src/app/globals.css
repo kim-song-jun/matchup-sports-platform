@@ -3370,6 +3370,12 @@ label.tm-btn:focus-within {
   padding-top: 12px;
 }
 
+.tm-create-fixed-cta-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+}
+
 .tm-home-chat-fab {
   font-size: 0;
 }
@@ -3398,7 +3404,7 @@ label.tm-btn:focus-within {
 
 .tm-match-detail {
   min-height: 100%;
-  padding-bottom: 124px;
+  padding-bottom: calc(176px + var(--v1-shell-safe-bottom));
 }
 
 /* Tournament detail owns a mobile/tablet fixed CTA. Its terminal content must clear the
@@ -3476,6 +3482,39 @@ label.tm-btn:focus-within {
   padding: 16px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
+}
+
+.tm-match-detail-fixed-cta-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tm-match-detail-edit-link {
+  color: var(--blue500);
+  text-decoration: none;
+}
+
+.tm-match-detail-fixed-cta-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.tm-match-detail-fixed-cta-actions-split {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tm-match-detail-fixed-cta-actions > * {
+  min-width: 0;
+}
+
+.tm-match-detail-chat-error {
+  margin: 8px 0 0;
+  color: var(--orange700);
+  line-height: 1.45;
 }
 
 .tm-filter-scrim {
@@ -3726,6 +3765,19 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-create-shell-edit {
   padding-bottom: calc(168px + var(--v1-shell-safe-bottom));
+}
+
+.tm-match-edit-management {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--grey100);
+}
+
+.tm-match-edit-management-action {
+  display: grid;
+  gap: 4px;
 }
 
 .tm-create-progress {

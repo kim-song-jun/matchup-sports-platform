@@ -39,9 +39,11 @@
 - **모든 작업은 `dev`에서 시작한다.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev → main` 승격은 사용자만 한다.** 에이전트는 `gh pr merge`·`git push origin dev:main` 등
   **어떤 방식으로도 직접 실행하지 않는다.** 승격이 필요해 보이면 사용자에게 알리고 멈춘다.
-  사용자가 GitHub에서 직접 PR을 머지하는 것이 유일한 승격 경로이며, **자동으로 승격하는
-  워크플로는 존재하지 않는다**(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이고,
-  `release-main.yml`이 만드는 PR의 base도 `dev`다).
+  사용자가 GitHub에서 직접 PR을 머지하는 것이 유일한 승격 경로이며, **자동으로 승격(머지)하는
+  워크플로는 존재하지 않는다**(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
+  `promote-main.yml`("Promote to main", 수동 실행)은 alpha 검증 + 필요하면 dev에 버전 커밋
+  push까지만 하고, dev→main PR은 사람이 누를 링크만 job summary에 남긴다(저장소 설정이
+  Actions의 PR 생성을 허용하지 않는다) — 그 PR을 실제로 열고 머지하는 것은 여전히 사용자만 한다.
 - **dev 머지 = 즉시 alpha 실배포.** 승인 게이트가 없으므로 dev 머지 전 검증(테스트·tsc·lint)을
   실배포 게이트로 취급한다.
 - **`main`에 dev에 없는 커밋이 생겼다면 `origin/main → dev` 방향으로 흡수한다.** 반대 방향으로

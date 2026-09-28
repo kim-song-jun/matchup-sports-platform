@@ -32,7 +32,7 @@ import {
 } from '../team-schedules/team-schedules.service';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
-import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
+import { computePublicTeamRatingBatch, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   CancelTeamMatchDto,
@@ -60,7 +60,13 @@ type TeamMatchWithRelations = V1TeamMatch & {
     name: string;
     ownerUserId: string;
     status: string;
-    profile: { logoUrl: string | null } | null;
+    sport: { id: string; name: string };
+    profile: {
+      logoUrl: string | null;
+      skillNote: string | null;
+      minSportLevel: { name: string } | null;
+      maxSportLevel: { name: string } | null;
+    } | null;
     trustScore: {
       trustState: 'verified' | 'estimated' | 'sample' | 'none';
       mannerScore: Prisma.Decimal | number | null;
@@ -70,6 +76,17 @@ type TeamMatchWithRelations = V1TeamMatch & {
   approvedApplicantTeam: {
     id: string;
     name: string;
+    sport: { id: string; name: string };
+    profile: {
+      logoUrl: string | null;
+      skillNote: string | null;
+      minSportLevel: { name: string } | null;
+      maxSportLevel: { name: string } | null;
+    } | null;
+    trustScore: {
+      trustState: 'verified' | 'estimated' | 'sample' | 'none';
+      mannerScore: Prisma.Decimal | number | null;
+    } | null;
     memberships: Array<{ userId: string; role: 'owner' | 'manager' | 'member'; status: string }>;
   } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
@@ -194,7 +211,12 @@ export class TeamMatchesService {
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
-    const winsByHostTeam = await this.loadOfficialWinCounts(teamMatch.hostTeamId ? [teamMatch.hostTeamId] : []);
+    const participantTeamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId]
+      .filter((teamId): teamId is string => teamId !== null);
+    const [winsByTeam, ratingsByTeam] = await Promise.all([
+      this.loadOfficialWinCounts(participantTeamIds),
+      computePublicTeamRatingBatch(this.prisma, participantTeamIds),
+    ]);
     const viewer = await this.getViewer(teamMatch, user);
     const approvedApplication = teamMatch.applications.find(
       (item) => item.status === 'approved' && item.applicantTeamId === teamMatch.approvedApplicantTeamId,
@@ -243,12 +265,20 @@ export class TeamMatchesService {
             teamId: teamMatch.hostTeam.id,
             name: teamMatch.hostTeam.name,
             logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
+            sportName: teamMatch.hostTeam.sport?.name ?? null,
+            levelLabel: formatLevelRange(
+              teamMatch.hostTeam.profile?.minSportLevel,
+              teamMatch.hostTeam.profile?.maxSportLevel,
+              teamMatch.hostTeam.profile?.skillNote,
+            ),
             trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
+            ratingScore: ratingsByTeam.get(teamMatch.hostTeam.id)?.ratingScore ?? null,
+            ratingCount: ratingsByTeam.get(teamMatch.hostTeam.id)?.ratingCount ?? 0,
             mannerScore:
               teamMatch.hostTeam.trustScore?.mannerScore == null
                 ? null
                 : Number(teamMatch.hostTeam.trustScore.mannerScore),
-            wins: winsByHostTeam.get(teamMatch.hostTeamId) ?? 0,
+            wins: winsByTeam.get(teamMatch.hostTeamId) ?? 0,
             ownerUserId: teamMatch.hostTeam.ownerUserId,
           }
         : null,
@@ -257,6 +287,21 @@ export class TeamMatchesService {
           ? {
               teamId: teamMatch.approvedApplicantTeam.id,
               name: teamMatch.approvedApplicantTeam.name,
+              logoUrl: teamMatch.approvedApplicantTeam.profile?.logoUrl ?? null,
+              sportName: teamMatch.approvedApplicantTeam.sport?.name ?? null,
+              levelLabel: formatLevelRange(
+                teamMatch.approvedApplicantTeam.profile?.minSportLevel,
+                teamMatch.approvedApplicantTeam.profile?.maxSportLevel,
+                teamMatch.approvedApplicantTeam.profile?.skillNote,
+              ),
+              trustState: teamMatch.approvedApplicantTeam.trustScore?.trustState ?? 'none',
+              ratingScore: ratingsByTeam.get(teamMatch.approvedApplicantTeam.id)?.ratingScore ?? null,
+              ratingCount: ratingsByTeam.get(teamMatch.approvedApplicantTeam.id)?.ratingCount ?? 0,
+              mannerScore:
+                teamMatch.approvedApplicantTeam.trustScore?.mannerScore == null
+                  ? null
+                  : Number(teamMatch.approvedApplicantTeam.trustScore.mannerScore),
+              wins: winsByTeam.get(teamMatch.approvedApplicantTeam.id) ?? 0,
               applicationId: approvedApplication.id,
             }
           : null,
@@ -1006,7 +1051,15 @@ export class TeamMatchesService {
           select: {
             id: true,
             name: true,
-            profile: { select: { logoUrl: true } },
+            sport: { select: { id: true, name: true } },
+            profile: {
+              select: {
+                logoUrl: true,
+                skillNote: true,
+                minSportLevel: { select: { name: true } },
+                maxSportLevel: { select: { name: true } },
+              },
+            },
             trustScore: { select: { matchCount: true } },
           },
         },
@@ -1029,12 +1082,17 @@ export class TeamMatchesService {
     // 신뢰점수를 배치 1회 호출로 live 재계산한다. matchCount는 이번 스코프 밖(리뷰 reveal과 무관한 별개
     // 집계)이라 기존 캐시값을 그대로 쓴다.
     const applicantTeamIds = [...new Set(pageItems.map((application) => application.applicantTeamId))];
-    const trustByApplicantTeam = await computeRevealedTeamTrustBatch(this.prisma, applicantTeamIds);
+    const [trustByApplicantTeam, ratingsByApplicantTeam, winsByApplicantTeam] = await Promise.all([
+      computeRevealedTeamTrustBatch(this.prisma, applicantTeamIds),
+      computePublicTeamRatingBatch(this.prisma, applicantTeamIds),
+      this.loadOfficialWinCounts(applicantTeamIds),
+    ]);
 
     return {
       teamMatchId: teamMatch.id,
       items: pageItems.map((application) => {
         const trust = trustByApplicantTeam.get(application.applicantTeamId);
+        const rating = ratingsByApplicantTeam.get(application.applicantTeamId);
         return {
           applicationId: application.id,
           status: application.status,
@@ -1045,7 +1103,16 @@ export class TeamMatchesService {
             teamId: application.applicantTeam.id,
             name: application.applicantTeam.name,
             logoUrl: application.applicantTeam.profile?.logoUrl ?? null,
+            sportName: application.applicantTeam.sport.name,
+            levelLabel: formatLevelRange(
+              application.applicantTeam.profile?.minSportLevel,
+              application.applicantTeam.profile?.maxSportLevel,
+              application.applicantTeam.profile?.skillNote,
+            ),
             trustState: trust?.trustState ?? 'none',
+            ratingScore: rating?.ratingScore ?? null,
+            ratingCount: rating?.ratingCount ?? 0,
+            wins: winsByApplicantTeam.get(application.applicantTeamId) ?? 0,
             score: trust?.mannerScore ?? null,
             matchCount: application.applicantTeam.trustScore?.matchCount ?? 0,
           },
@@ -1404,7 +1471,15 @@ export class TeamMatchesService {
           name: true,
           ownerUserId: true,
           status: true,
-          profile: { select: { logoUrl: true } },
+          sport: { select: { id: true, name: true } },
+          profile: {
+            select: {
+              logoUrl: true,
+              skillNote: true,
+              minSportLevel: { select: { name: true } },
+              maxSportLevel: { select: { name: true } },
+            },
+          },
           trustScore: { select: { trustState: true, mannerScore: true } },
           memberships: user
             ? { where: { userId: user.id, status: 'active' }, select: { id: true, userId: true, role: true, status: true } }
@@ -1415,6 +1490,16 @@ export class TeamMatchesService {
         select: {
           id: true,
           name: true,
+          sport: { select: { id: true, name: true } },
+          profile: {
+            select: {
+              logoUrl: true,
+              skillNote: true,
+              minSportLevel: { select: { name: true } },
+              maxSportLevel: { select: { name: true } },
+            },
+          },
+          trustScore: { select: { trustState: true, mannerScore: true } },
           // 후기 자격은 "참가팀의 active 멤버"다(reviews.service.ts resolveReviewerTeams) —
           // 역할을 안 가린다. hostTeam 과 똑같이 현재 유저의 멤버십만 실어서, 화면이 그
           // 자격을 서버와 같은 기준으로 판정할 수 있게 한다.
@@ -1515,19 +1600,33 @@ export class TeamMatchesService {
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
     assertTeamMatchPublicInvariant(teamMatch);
 
-    // hostTeam 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
-    // hostTeam.trustScore를 전혀 참조하지 않으므로 불필요한 live 재계산(추가 쿼리)을 건너뛴다.
-    if (options.includeTrust && teamMatch.hostTeam && teamMatch.hostTeamId) {
-      const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
-      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
-      teamMatch.hostTeam.trustScore = trust
-        ? {
-            trustState: trust.trustState,
-            mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
-          }
-        : null;
-    } else if (teamMatch.hostTeam) {
-      teamMatch.hostTeam.trustScore = null;
+    // 양 팀 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
+    // 이를 참조하지 않으므로 불필요한 live 재계산(추가 쿼리)을 건너뛴다.
+    if (options.includeTrust) {
+      const participantTeamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId]
+        .filter((teamId): teamId is string => teamId !== null);
+      const trustByTeam = await computeRevealedTeamTrustBatch(this.prisma, participantTeamIds);
+      if (teamMatch.hostTeam && teamMatch.hostTeamId) {
+        const trust = trustByTeam.get(teamMatch.hostTeamId);
+        teamMatch.hostTeam.trustScore = trust
+          ? {
+              trustState: trust.trustState,
+              mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
+            }
+          : null;
+      }
+      if (teamMatch.approvedApplicantTeam && teamMatch.approvedApplicantTeamId) {
+        const trust = trustByTeam.get(teamMatch.approvedApplicantTeamId);
+        teamMatch.approvedApplicantTeam.trustScore = trust
+          ? {
+              trustState: trust.trustState,
+              mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
+            }
+          : null;
+      }
+    } else {
+      if (teamMatch.hostTeam) teamMatch.hostTeam.trustScore = null;
+      if (teamMatch.approvedApplicantTeam) teamMatch.approvedApplicantTeam.trustScore = null;
     }
 
     return teamMatch;

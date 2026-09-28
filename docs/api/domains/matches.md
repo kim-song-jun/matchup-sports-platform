@@ -65,7 +65,7 @@
 | `startsAt` | ISO datetime | Yes | - |
 | `endsAt` | ISO datetime | No | - |
 | `deadlineAt` | ISO datetime | No | - |
-| `capacity` | int(2~100) | Yes | - |
+| `capacity` | int(1~100) | Yes | - |
 | `hostParticipates` | boolean | No | `true` |
 | `manualPlaceName` | string | Yes | - |
 | `addressText` | string | No | - |

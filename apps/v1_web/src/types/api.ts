@@ -1148,7 +1148,11 @@ export type V1TeamMatch = V1Match & {
     teamId: string;
     name: string;
     logoUrl?: string | null;
+    sportName?: string | null;
+    levelLabel?: string | null;
     trustState?: string;
+    ratingScore?: number | null;
+    ratingCount?: number;
     mannerScore?: number | null;
     wins?: number;
     ownerUserId?: string;
@@ -1164,6 +1168,14 @@ export type V1TeamMatch = V1Match & {
   approvedOpponentTeam?: {
     teamId: string;
     name: string;
+    logoUrl?: string | null;
+    sportName?: string | null;
+    levelLabel?: string | null;
+    trustState?: string | null;
+    ratingScore?: number | null;
+    ratingCount?: number;
+    mannerScore?: number | null;
+    wins?: number | null;
     applicationId?: string;
   } | null;
   viewerState?: V1TeamMatchViewerState;
@@ -1292,7 +1304,12 @@ export type V1TeamMatchApplication = {
     teamId: string;
     name: string;
     logoUrl: string | null;
+    sportName: string | null;
+    levelLabel: string | null;
     trustState: string;
+    ratingScore: number | null;
+    ratingCount: number;
+    wins: number;
     score: number | null;
     matchCount: number;
   };

@@ -468,6 +468,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Button>
               )}
             </div>
+            {model.chatError ? <p className="tm-match-detail-chat-error tm-text-caption" role="alert">{model.chatError}</p> : null}
           </div>
         </div>
 
@@ -521,24 +522,25 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       </article>
 
       {/* Mobile-only fixed CTA — hidden on desktop (CSS: .tm-match-detail + .tm-fixed-cta) */}
-      <div className="tm-fixed-cta tm-hide-desktop">
+      <div className="tm-fixed-cta tm-match-detail-fixed-cta tm-hide-desktop">
         {isDeadlinePassedClosed ? null : (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div className="tm-match-detail-fixed-cta-state">
             <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-            <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+            {mode === 'mine' && !model.completed && !model.canComplete ? (
+              <Link className="tm-match-detail-edit-link tm-text-label" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+            ) : (
+              <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+            )}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: showChat || mode === 'mine' ? '1fr 1fr' : '1fr', gap: 8 }}>
+        <div className={showChat || mode === 'mine' ? 'tm-match-detail-fixed-cta-actions tm-match-detail-fixed-cta-actions-split' : 'tm-match-detail-fixed-cta-actions'}>
           {showChat ? (
             <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
               {model.chatLabel ?? '채팅'}
             </Button>
           ) : null}
           {mode === 'mine' ? (
-            <>
-              <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
-              {!model.completed && !model.canComplete ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
-            </>
+            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
           ) : (
             <Button
               disabled={!canRunAction}
@@ -552,15 +554,19 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </Button>
           )}
         </div>
+        {model.chatError ? <p className="tm-match-detail-chat-error tm-text-caption" role="alert">{model.chatError}</p> : null}
       </div>
     </>
   );
 }
 export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) {
-  const edit = model.step === 'edit';
-  const stepNo = edit ? 2 : stepToNumber(model.step);
-  const primaryLabel = model.form?.submitLabel ?? (edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음');
-  const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
+  const edit = model.mode === 'edit' || model.step === 'edit';
+  const wizardStep = model.step === 'edit' ? 'info' : model.step;
+  const stepNo = stepToNumber(wizardStep);
+  const primaryLabel = wizardStep === 'confirm'
+    ? model.form?.submitLabel ?? (edit ? '변경사항 저장' : '매치 만들기')
+    : '다음';
+  const primaryAction = wizardStep === 'confirm' ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   const missingFields = model.form?.missingFields ?? [];
   return (
@@ -572,33 +578,60 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
       </div>
-      <div className="tm-create-shell tm-match-create-shell tm-content-enter">
+      <div className={`tm-create-shell tm-match-create-shell ${edit ? 'tm-create-shell-edit' : ''} tm-content-enter`}>
         {/* 단계 전환 시 스크린리더에 현재 단계 공지 */}
-        {!edit ? (
-          <div className="sr-only" aria-live="polite" aria-atomic="true">
-            {['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][stepNo - 1]} — {stepNo}단계 / 4단계
-          </div>
-        ) : null}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][stepNo - 1]} — {stepNo}단계 / 4단계
+        </div>
         <CreateProgress step={stepNo} edit={edit} completeSteps={model.form?.completeSteps?.map(stepToNumber) ?? []} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {missingFields.length > 0 ? <MissingFieldsBanner missingFields={missingFields} stepHref={matchStepHref} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치예요" body={model.form.lockedReason} /> : null}
-        {model.step === 'sport' ? <SportStep model={model} /> : null}
-        {model.step === 'info' || model.step === 'edit' ? (
-          // The server rejects every field of a locked match, so every control is locked with it.
-          <fieldset className="tm-create-fieldset" disabled={Boolean(model.form?.lockedReason)}>
-            <InfoStep model={model} edit={edit} />
-          </fieldset>
+        {/* The server rejects every field of a locked match, so every control is locked with it. */}
+        <fieldset className="tm-create-fieldset" disabled={Boolean(model.form?.lockedReason)}>
+          {wizardStep === 'sport' ? <SportStep model={model} /> : null}
+          {wizardStep === 'info' ? <InfoStep model={model} /> : null}
+          {wizardStep === 'place-time' ? <PlaceTimeStep model={model} /> : null}
+          {wizardStep === 'confirm' ? <ConfirmStep model={model} /> : null}
+        </fieldset>
+        {edit && wizardStep === 'confirm' && (model.form?.recruitingToggle || model.form?.onCancel) ? (
+          <section className="tm-match-edit-management" aria-labelledby="match-edit-management-title">
+            <div>
+              <h2 id="match-edit-management-title" className="tm-text-body-lg" style={{ margin: 0 }}>매치 관리</h2>
+              <p className="tm-text-caption" style={{ marginTop: 4 }}>모집 상태를 바꾸거나 매치를 취소할 수 있어요.</p>
+            </div>
+            {model.form.recruitingToggle ? (
+              <div className="tm-match-edit-management-action">
+                <button
+                  className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                  type="button"
+                  disabled={model.form.submitting || model.form.recruitingToggle.pending || Boolean(model.form.lockedReason)}
+                  onClick={model.form.recruitingToggle.onClick}
+                >
+                  {model.form.recruitingToggle.label}
+                </button>
+                <p className="tm-text-caption" style={{ marginTop: 4 }}>{model.form.recruitingToggle.hint}</p>
+              </div>
+            ) : null}
+            {model.form.onCancel ? (
+              <button
+                className="tm-btn tm-btn-md tm-btn-danger tm-btn-block"
+                type="button"
+                disabled={model.form.submitting || Boolean(model.form.lockedReason)}
+                onClick={model.form.onCancel}
+              >
+                매치 취소
+              </button>
+            ) : null}
+          </section>
         ) : null}
-        {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
-        {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
       <div className="tm-fixed-cta tm-create-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+        <div className="tm-create-fixed-cta-actions">
           {secondaryAction ? (
-            <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</button>
+            <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{wizardStep === 'sport' ? (edit ? '변경 취소' : '취소') : '이전'}</button>
           ) : (
-            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'sport' ? '/matches' : '/matches/new'}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</Link>
+            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={wizardStep === 'sport' ? '/matches' : '/matches/new'}>{wizardStep === 'sport' ? (edit ? '변경 취소' : '취소') : '이전'}</Link>
           )}
           {primaryAction ? (
             <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.form?.submitting || Boolean(model.form?.lockedReason)} onClick={primaryAction}>
@@ -608,26 +641,6 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{primaryLabel}</Link>
           )}
         </div>
-        {/* lockedReason이 있으면(완료·취소·만료 등 터미널 상태) 서버 cancel()도 같은 조건으로
-            409를 던진다 — '변경사항 저장' 버튼과 같은 게이트를 걸어 죽은 버튼을 사전에 막는다
-            (2026-08-27 감사 M-A-personal-match-state). */}
-        {/* 모집 마감 / 다시 열기 — 되돌릴 수 있는 동작이라 취소보다 위에 둔다.
-            lockedReason(터미널 상태)에서는 서버도 409 를 던지므로 같이 잠근다. */}
-        {edit && model.form?.recruitingToggle ? (
-          <>
-            <button
-              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-              type="button"
-              style={{ marginTop: 8 }}
-              disabled={model.form.submitting || model.form.recruitingToggle.pending || Boolean(model.form?.lockedReason)}
-              onClick={model.form.recruitingToggle.onClick}
-            >
-              {model.form.recruitingToggle.label}
-            </button>
-            <p className="tm-text-caption" style={{ marginTop: 6, textAlign: 'center' }}>{model.form.recruitingToggle.hint}</p>
-          </>
-        ) : null}
-        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-danger tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting || Boolean(model.form?.lockedReason)} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
     </>
   );
@@ -972,21 +985,19 @@ function CreateProgress({ step, edit, completeSteps = [] }: { step: number; edit
     <div className="tm-create-progress">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
         <span
-          className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}
-          {...(!edit && {
-            role: 'progressbar',
-            'aria-valuenow': step,
-            'aria-valuemin': 1,
-            'aria-valuemax': 4,
-            'aria-label': `매치 만들기 ${step}단계/4단계`,
-          })}
+          className="tm-badge tm-badge-blue"
+          role="progressbar"
+          aria-valuenow={step}
+          aria-valuemin={1}
+          aria-valuemax={4}
+          aria-label={`${edit ? '매치 수정' : '매치 만들기'} ${step}단계/4단계`}
         >
-          {edit ? '수정' : `${step}/4단계`}
+          {step}/4단계
         </span>
-        <span className="tm-text-caption">{edit ? '기존 값 유지 · 변경사항만 저장' : ['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][step - 1]}</span>
+        <span className="tm-text-caption">{['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][step - 1]}</span>
       </div>
       {/* data-complete: 이미 지나온 스텝 중 필수 필드를 전부 채운 스텝 — CSS가 green으로 표시(#1). */}
-      {!edit ? <div className="tm-create-bars" aria-hidden="true">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} data-complete={completeSteps.includes(item)} />)}</div> : null}
+      <div className="tm-create-bars" aria-hidden="true">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} data-complete={completeSteps.includes(item)} />)}</div>
     </div>
   );
 }
@@ -1016,14 +1027,13 @@ function SportStep({ model }: { model: MatchCreateViewModel }) {
   );
 }
 
-function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean }) {
+function InfoStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   return (
     <div>
       {/* [P3] 캡션(우상단 "매치 정보")과 h1 이 같은 문구였다 — 1·4단계처럼 h1 은 질문형,
           캡션은 단계 이름으로 역할을 가른다. */}
       <h1 className="tm-text-heading">어떤 매치인가요?</h1>
-      {edit ? <CreateSelect label="종목" value={model.selectedSport} options={model.sports} onChange={model.form?.onSelectSport} /> : null}
       <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
@@ -1050,13 +1060,6 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
       <GenderRuleSelector value={draft.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} />
       <CreateField label="참가비" value={draft.costNote} placeholder="예: 10,000원/1인, 무료" onChange={(value) => model.form?.onFieldChange('costNote', value)} />
       <CreateField label="규칙" value={draft.rules} placeholder="예: 풋살화 착용, 지각 시 미리 연락" multiline onChange={(value) => model.form?.onFieldChange('rules', value)} />
-      {edit ? (
-        <>
-          <h2 className="tm-text-subhead" style={{ marginTop: 28 }}>장소와 시간</h2>
-          <PlaceTimeFields model={model} />
-        </>
-      ) : null}
-      {edit ? <StateCard tone="orange" title="변경사항 저장" body="저장에 실패하면 입력한 내용을 유지한 채 다시 시도할 수 있어요." /> : null}
     </div>
   );
 }
@@ -1112,14 +1115,14 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
 }
 
 function CapacityField({ value, onChange }: { value: number; onChange?: (value: number) => void }) {
-  const options = Array.from({ length: 99 }, (_, index) => index + 2);
-  const normalized = Math.min(100, Math.max(2, Number(value) || 2));
+  const options = Array.from({ length: 100 }, (_, index) => index + 1);
+  const normalized = Math.min(100, Math.max(1, Number(value) || 1));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">최대 인원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(2, normalized - 1))}>-</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(1, normalized - 1))}>-</button>
         <select className="tm-create-input tm-create-select-control" value={normalized} aria-label="최대 인원 선택" onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>

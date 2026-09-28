@@ -80,6 +80,9 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-manner">{model.match.manner}</span>
       <span data-testid="team-match-wins">{model.match.wins}</span>
       <span data-testid="team-match-applicant-count">{model.match.applicantTeams.length}</span>
+      <span data-testid="team-match-away-logo">{model.match.applicantTeams[0]?.logoUrl}</span>
+      <span data-testid="team-match-away-meta">{model.match.applicantTeams[0]?.meta}</span>
+      <span data-testid="team-match-away-trust">{model.match.applicantTeams[0]?.trustState}</span>
       <span data-testid="team-match-host-actions">{model.hostActions?.map((action) => action.label).join(',')}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
@@ -209,7 +212,16 @@ describe('TeamMatchDetailPageClient — GA events', () => {
           manageRoute: null,
         },
         hostTeam: { teamId: 'team-home', name: 'HOME 참가팀' },
-        approvedOpponentTeam: { teamId: 'team-away', name: 'AWAY 참가팀' },
+        approvedOpponentTeam: {
+          teamId: 'team-away',
+          name: 'AWAY 참가팀',
+          logoUrl: '/uploads/away-logo.png',
+          sportName: '풋살',
+          levelLabel: '중급',
+          trustState: 'verified',
+          ratingScore: 4.5,
+          wins: 7,
+        },
       },
       isError: false,
       isPlaceholderData: false,
@@ -221,6 +233,10 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('상대팀 확정');
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
     expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('team-match-away-logo')).toHaveTextContent('/uploads/away-logo.png');
+    expect(screen.getByTestId('team-match-away-meta')).toHaveTextContent('팀 평점 4.5 · 7승');
+    expect(screen.getByTestId('team-match-away-trust')).toHaveTextContent('verified');
+    expect(screen.getByTestId('team-match-away-meta')).not.toHaveTextContent('승인된 상대팀');
     expect(screen.queryByText('매치 관리')).not.toBeInTheDocument();
     expect(screen.queryByText('내가 만든 팀매치')).not.toBeInTheDocument();
   });

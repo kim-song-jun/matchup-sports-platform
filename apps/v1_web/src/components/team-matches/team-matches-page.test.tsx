@@ -154,8 +154,9 @@ describe('platform-managed team match provenance', () => {
     expect(hostCard?.tagName).toBe('A');
     expect(hostCard).toHaveAttribute('href', '/teams/team-home');
     expect(hostCard).toHaveTextContent('홈팀 정보');
-    expect(hostCard).toHaveTextContent('플랫폼 주관');
+    expect(hostCard).not.toHaveTextContent('플랫폼 주관');
     expect(hostCard).toHaveTextContent('팀 보기');
+    expect(screen.getByText('플랫폼 주관')).toBeInTheDocument();
   });
 
   it('플랫폼 주관 매치에 배정된 팀이 없으면 우측 팀 보기 영역을 비워 둔다', () => {
@@ -187,9 +188,12 @@ describe('platform-managed team match provenance', () => {
       hostTeamHref: '/teams/team-home',
       applicantTeams: [
         {
+          teamId: 'team-away',
           name: '한강 로버스',
-          meta: '승인된 상대팀',
+          meta: '매너 4.7 · 승 9',
           status: '승인 완료',
+          logoUrl: '/uploads/hangang-rovers.png',
+          trustState: 'verified',
           href: '/teams/team-away',
           applicationId: 'application-away',
         },
@@ -212,6 +216,12 @@ describe('platform-managed team match provenance', () => {
     expect(teamCards.getByRole('link', { name: '브라보FC 팀 보기' })).toHaveAttribute('href', '/teams/team-bravo');
     expect(teamCards.getByText('어웨이팀 정보')).toBeInTheDocument();
     expect(teamCards.getByText('신청팀 정보')).toBeInTheDocument();
+    expect(teamCards.getByText('매너 4.7 · 승 9')).toBeInTheDocument();
+    expect(teamCards.queryByText('승인된 상대팀')).not.toBeInTheDocument();
+    expect(teamCards.getByRole('link', { name: '한강 로버스 팀 보기' }).querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('hangang-rovers.png'),
+    );
   });
 });
 
@@ -811,23 +821,13 @@ describe('리그전 배지', () => {
     expect(screen.getByText('비용 미정')).toBeInTheDocument();
   });
 
-  it('상세의 호스트 팀 카드는 리그명이 든 정적 배지를 배지 줄 안에 형제와 같은 크기로 둔다', () => {
+  it('상세의 호스트 팀 카드는 매치 소속 리그를 팀 속성처럼 표시하지 않는다', () => {
     const model = getTeamMatchDetailViewModel();
     model.match = { ...model.match, league: { leagueId: 'lg-1', title: '가을 리그' } };
 
     const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
 
-    // hostTeamCard가 모바일·데스크톱 레이아웃 두 곳에 동시 마운트되므로 배지도 2개.
-    const texts = screen.getAllByText('정규 리그 · 가을 리그');
-    expect(texts).toHaveLength(2);
-    texts.forEach((text) => {
-      const badge = text.closest('.tm-badge') as HTMLElement | null;
-      expect(badge).not.toBeNull();
-      expect(badge!.tagName).toBe('SPAN');
-      // 종목 배지와 같은 부모(배지 줄)에 있어야 26px 균질 줄이 된다.
-      const sportBadge = within(badge!.parentElement as HTMLElement).getByText(model.match.sport);
-      expect(sportBadge.parentElement).toBe(badge!.parentElement);
-    });
+    expect(screen.queryByText('정규 리그 · 가을 리그')).not.toBeInTheDocument();
     expect(container.querySelector('a[href^="/league-matches/"]')).toBeNull();
     expect(container.querySelectorAll('.tm-host-team-card button')).toHaveLength(0);
   });
@@ -1029,6 +1029,32 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
 
     expect(screen.queryByText('sample')).not.toBeInTheDocument();
     expect(screen.queryByText('샘플')).not.toBeInTheDocument();
+  });
+
+  it('팀 카드에는 매치 출처·조건이 아니라 실제 팀 설정과 팀 평점을 표시한다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.platformManaged = true;
+    model.match.hostTeamId = 'team-home';
+    model.match.hostTeamHref = '/teams/team-home';
+    model.match.sport = '매치 종목';
+    model.match.grade = '매치 등급';
+    model.match.hostTeamSportName = '풋살';
+    model.match.hostTeamLevelLabel = '중급';
+    model.match.hostTeamRatingScore = 4.5;
+    model.match.hostTeamWins = 4;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const teamCards = screen.getAllByLabelText(`${model.match.hostTeam} 팀 보기`);
+    expect(teamCards.length).toBeGreaterThan(0);
+    for (const card of teamCards) {
+      expect(within(card).getByText('팀 평점 4.5 · 4승')).toBeInTheDocument();
+      expect(within(card).getByText('풋살')).toBeInTheDocument();
+      expect(within(card).getByText('중급')).toBeInTheDocument();
+      expect(within(card).queryByText('플랫폼 주관')).not.toBeInTheDocument();
+      expect(within(card).queryByText('매치 종목')).not.toBeInTheDocument();
+      expect(within(card).queryByText('매치 등급등급')).not.toBeInTheDocument();
+    }
   });
 
   it('등급이 비어 있으면 값 없는 "등급" 배지를 만들지 않고 정보 행은 미정으로 채운다', () => {

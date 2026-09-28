@@ -14,6 +14,19 @@ describe('currentChatEntitlementWhere — 팀매치 채팅 엔타이틀먼트는
   });
 });
 
+describe('currentChatEntitlementWhere — 개인매치 주최자 채팅', () => {
+  it('활성 일반 참가자가 있을 때 주최자도 현재 채팅 권한을 유지한다', () => {
+    const where = currentChatEntitlementWhere('host-1');
+    const matchBranch = where.OR?.find((clause: any) => 'match' in clause) as any;
+    const hostBranch = matchBranch.match.is.OR.find((clause: any) => clause.hostUserId === 'host-1');
+
+    expect(hostBranch.participants.some).toEqual({
+      role: 'participant',
+      status: { in: ['active', 'completed'] },
+    });
+  });
+});
+
 // "팀 컨택의 채팅 흡수" §3.6: 컨택 방은 요청 시점부터 양 팀 운영진에게 보여야 한다.
 // status: 'accepted' 필터가 남아 있으면 requested/declined/withdrawn/expired 컨택 방이
 // 방 목록에서 조용히 사라진다.
@@ -36,7 +49,15 @@ describe('currentChatRecipientEntitlementWhere', () => {
       teamContactId: null,
       teamContact: null,
     });
-    expect(where.user?.matchParticipants?.some?.matchId).toBe('m1');
+    const participantBranch = (where.user as any)?.OR?.find((clause: any) => clause.matchParticipants);
+    const hostBranch = (where.user as any)?.OR?.find((clause: any) => clause.hostedMatches);
+    expect(participantBranch.matchParticipants.some.matchId).toBe('m1');
+    expect(hostBranch.hostedMatches.some).toMatchObject({
+      id: 'm1',
+      participants: {
+        some: { role: 'participant', status: { in: ['active', 'completed'] } },
+      },
+    });
   });
 
   it('team 방이면 팀 멤버십으로 좁힌다', () => {

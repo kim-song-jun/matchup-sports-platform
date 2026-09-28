@@ -24,7 +24,13 @@ export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWh
         match: {
           is: {
             deletedAt: null,
-            participants: { some: { userId, status: { in: ['active', 'completed'] } } },
+            OR: [
+              { participants: { some: { userId, status: { in: ['active', 'completed'] } } } },
+              {
+                hostUserId: userId,
+                participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
+              },
+            ],
           },
         },
       },
@@ -93,9 +99,22 @@ export function currentChatRecipientEntitlementWhere(
   if (room.matchId) {
     return {
       user: {
-        matchParticipants: {
-          some: { matchId: room.matchId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
-        },
+        OR: [
+          {
+            matchParticipants: {
+              some: { matchId: room.matchId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
+            },
+          },
+          {
+            hostedMatches: {
+              some: {
+                id: room.matchId,
+                deletedAt: null,
+                participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
+              },
+            },
+          },
+        ],
       },
     };
   }

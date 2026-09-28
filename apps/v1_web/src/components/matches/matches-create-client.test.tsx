@@ -93,6 +93,7 @@ vi.mock('./matches-page', () => ({
     if (!form) return null;
     return (
       <div>
+        <span data-testid="match-step">{model.step}</span>
         <label htmlFor="title">제목</label>
         <input id="title" value={model.draft.title} onChange={(event) => form.onFieldChange('title', event.target.value)} />
         <label htmlFor="venue">장소</label>
@@ -116,6 +117,12 @@ vi.mock('./matches-page', () => ({
         />
         <button type="button" onClick={form.onSubmit}>
           매치 만들기
+        </button>
+        <button type="button" onClick={form.onNext}>
+          다음
+        </button>
+        <button type="button" onClick={form.onBack}>
+          이전
         </button>
         {form.onCancel ? (
           <button type="button" onClick={form.onCancel}>
@@ -312,6 +319,30 @@ describe('match edit hydration', () => {
 
     expect(draft.date).toBe(expectedDate);
     expect(draft.startTime).toBe(expectedTime);
+  });
+});
+
+describe('MatchEditPageClient — 등록 화면과 동일한 단계 이동', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('기존 값을 유지하며 종목부터 확인까지 4단계로 이동한다', async () => {
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('제목')).toHaveValue('수정 중인 매치'));
+    expect(screen.getByTestId('match-step')).toHaveTextContent('sport');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByTestId('match-step')).toHaveTextContent('info');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByTestId('match-step')).toHaveTextContent('place-time');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByTestId('match-step')).toHaveTextContent('confirm');
   });
 });
 

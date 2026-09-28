@@ -207,8 +207,64 @@ DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
 실제 참가자만 포함된다. 사용자가 이번 follow-up의 배포를 명시적으로 요청했으므로 기존 리뷰 대기
 메모와 별개로 CI 통과 후 `dev`에 병합해 alpha에 반영한다.
 
+## Follow-up — 주최자 채팅과 모바일 하단 액션 (2026-09-28)
+
+- [x] 참가자가 없는 주최자의 채팅 클릭을 클라이언트에서 차단하고 실제 안내 표시
+- [x] API에서도 빈 개인매치 채팅방 생성을 `409 MATCH_CHAT_PARTICIPANTS_REQUIRED`로 차단
+- [x] `hostParticipates=false` 주최자가 승인 참가자와 채팅할 수 있도록 현재/수신자 권한 보강
+- [x] 모바일 하단 주요 액션을 `채팅`·`신청자 관리` 2개로 고정하고 `매치 수정`은 상태 행 링크로 분리
+- [x] 작은 화면 전역 grid stacking과 충돌하지 않는 전용 class 및 safe-area 포함 본문 여백 적용
+- [x] API 집중 테스트 33/33, Web 집중 테스트 74/74, 양쪽 `tsc --noEmit` 통과
+- [ ] PR CI, dev 병합, alpha 배포 및 실제 모바일 viewport 확인
+
+기존 중단된 cherry-pick이 있는 공유 작업 트리는 수정·stage하지 않고, 최신 `origin/dev` 기반
+격리 worktree/브랜치 `fix/personal-match-host-chat-footer`에서 배포 범위를 분리한다.
+
 ![모바일 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-390.png)
 ![모바일 불참 확인](../../docs/screenshots/personal-match-participation/host-actions-no_show-confirm-390.png)
 ![태블릿 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-768.png)
 ![데스크톱 불참 메뉴](../../docs/screenshots/personal-match-participation/host-actions-no_show-menu-1440.png)
 ![불참 저장 이력](../../docs/screenshots/personal-match-participation/host-actions-no_show-persisted-390.png)
+
+## Follow-up — 개인매치 수정 하단 스크롤 겹침 (2026-09-28)
+
+- [x] 개인매치 수정 shell에 고정 CTA 높이와 safe-area를 포함한 하단 여백 적용
+- [x] 고정 CTA를 `변경 취소`·`변경사항 저장` 두 동작으로 제한
+- [x] 모집 마감/재오픈과 매치 취소를 스크롤 가능한 `매치 관리` 영역으로 이동
+- [x] 작은 화면에서도 저장 CTA가 불필요하게 2행으로 늘어나지 않는 전용 grid class 적용
+- [x] Web 집중 테스트 47/47 통과
+- [ ] 실제 모바일 viewport 시각 확인
+
+Alpha URL에서 보고된 문제는 개인매치 수정 화면만 `tm-create-shell-edit`가 누락된 상태에서
+가변 높이의 운영 버튼까지 fixed footer에 포함되어 발생했다. 저장 CTA와 운영 동작의 레이아웃
+책임을 분리해 마지막 폼 필드와 관리 동작이 footer 아래로 가려지지 않도록 고정한다.
+
+## Follow-up — 개인매치 1명 정원 (2026-09-28)
+
+- [x] 개인매치 생성·수정 DTO의 정원 범위를 `1~100명`으로 확장
+- [x] 생성·수정 폼의 선택 목록과 감소 버튼 최솟값을 1명으로 변경
+- [x] 프론트 payload 변환이 1명을 2명으로 올리지 않고 그대로 보존
+- [x] API 계약 문서와 프론트·백엔드 회귀 테스트 동기화
+
+팀매치 정원 계약은 변경하지 않는다. 개인매치 수정 시에는 기존 활성 참가자 수보다 낮은 정원으로
+줄일 수 없다는 서비스 계층의 동시성·정원 보호 규칙을 그대로 유지한다.
+
+## Follow-up — 개인매치 생성·수정 폼 일치 (2026-09-28)
+
+- [x] 개인매치 수정도 생성과 동일한 `종목 → 매치 정보 → 장소·시간 → 확인` 4단계로 구성
+- [x] 수정 종목 선택을 별도 드롭다운 대신 생성 화면과 같은 종목 카드로 통일
+- [x] 기존 매치 값을 각 단계에 유지하고 단계별 필수값 검증·첫 오류 포커스 적용
+- [x] 마지막 확인 단계에서만 `변경사항 저장`과 모집 상태·매치 취소 관리 노출
+- [x] Web 집중 테스트 65/65 및 `tsc --noEmit` 통과
+- [ ] 실제 모바일·데스크톱 viewport 시각 확인
+
+수정 화면만 모든 필드를 한 페이지에 합친 별도 폼을 사용하던 차이를 제거했다. 생성과 수정은
+동일한 입력 순서, 진행 표시, 카드/필드 컴포넌트를 공유하고 저장 API와 운영 동작만 수정 모드에서
+유지한다.
+
+로컬 Next.js 서버는 기동했지만 Windows 브라우저 자동화 helper가
+`helper_unknown_error: setup refresh had errors`로 종료되어 이번 실행에서는 headed viewport 캡처를
+완료하지 못했다. 해당 검증은 코드·테스트 실패가 아닌 로컬 CUA 런타임 blocker로 남긴다.
+로컬 production build도 Windows worktree의 pnpm junction 대상이 생성되지 않아 기존
+`react-query-persist-client`·TipTap 패키지를 resolve하지 못했다. 변경 범위의 테스트·타입·패턴
+검사는 통과했으며 Linux CI build 결과를 배포 게이트로 사용한다.

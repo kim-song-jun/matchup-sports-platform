@@ -232,7 +232,6 @@ export function TeamMatchDetailPageSkeleton() {
 export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode }) {
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
-  const league = match.league;
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
   const shouldShowHostTeamCard = !match.platformManaged || hasAssignedHostTeam;
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
@@ -348,21 +347,19 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{hasAssignedHostTeam ? '홈팀 정보' : '운영 주관'}</div>
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
+        {match.hostTeamRatingScore != null || match.hostTeamWins != null ? (
+          <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+            {[
+              match.hostTeamRatingScore == null ? null : `팀 평점 ${match.hostTeamRatingScore.toFixed(1)}`,
+              match.hostTeamWins == null ? null : `${match.hostTeamWins}승`,
+            ].filter(Boolean).join(' · ')}
+          </div>
+        ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-          <span className="tm-badge tm-badge-blue">{match.sport}</span>
-          {match.platformManaged ? <span className="tm-badge tm-badge-grey">플랫폼 주관</span> : null}
-          {/* 등급 미입력(리그 대진 등 levelLabel 없음)이면 값 없는 "등급" 배지가 뜬다 — 숨긴다. */}
-          {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
+          {match.hostTeamSportName ? <span className="tm-badge tm-badge-blue">{match.hostTeamSportName}</span> : null}
+          {match.hostTeamLevelLabel ? <span className="tm-badge tm-badge-grey">{match.hostTeamLevelLabel}</span> : null}
           {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
-          ) : null}
-          {/* 리그 배지는 정보만 말한다(링크 아님) — 카드 전체가 팀 상세 Link 라 안에 누를 것을
-              두면 인터랙티브 중첩이 된다. 리그 순위표는 리그 경기 상세가 안내한다.
-              리그명은 nowrap 배지가 카드 밖으로 밀리지 않게 .tm-league-badge-text 에서 말줄임한다. */}
-          {league ? (
-            <span className="tm-badge tm-badge-grey tm-league-badge">
-              <span className="tm-league-badge-text">정규 리그 · {league.title}</span>
-            </span>
           ) : null}
         </div>
       </div>
@@ -400,13 +397,20 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
           aria-label={`${team.name} 팀 보기`}
           style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}
         >
-          <TeamAvatar seed={team.applicationId ?? team.name} name={team.name} size="md" />
+          <TeamAvatar seed={team.teamId ?? team.applicationId ?? team.name} name={team.name} logoUrl={team.logoUrl} size="md" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
               {team.status === '승인 완료' ? '어웨이팀 정보' : '신청팀 정보'}
             </div>
             <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{team.name}</div>
-            <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{team.meta}</div>
+            {team.meta ? <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{team.meta}</div> : null}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+              {team.sportName ? <span className="tm-badge tm-badge-blue">{team.sportName}</span> : null}
+              {team.levelLabel ? <span className="tm-badge tm-badge-grey">{team.levelLabel}</span> : null}
+              {team.trustState && trustStateLabel(team.trustState) ? (
+                <span className="tm-badge tm-badge-blue">{trustStateLabel(team.trustState)}</span>
+              ) : null}
+            </div>
           </div>
           <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
         </Link>
@@ -494,24 +498,30 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                   </div>
                 </div>
               ) : (
-                <div className="tm-team-vs-row">
-                  <div>
-                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
-                    <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
-                    {/* 매너·승수는 API 가 내려주지만(hostTeam.mannerScore / hostTeam.wins), 공개된
-                        팀 후기가 0건이면 매너 점수를 낼 수 없어 null 이 온다 — 모르면 이 줄을 통째로
-                        감춘다. 0 으로 채워 "매너 0 · 승 0"을 보여주면 실제로 잘하는 팀이 최악으로
-                        보이고, 목업으로 채우면 모든 매치가 같은 숫자를 보여준다(2026-08-23 실사고). */}
-                    {match.manner !== null && match.wins !== null ? (
-                      <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>매너 {match.manner} · 승 {match.wins}</div>
-                    ) : null}
+                <div>
+                  <div className="tm-team-vs-row">
+                    <div>
+                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
+                      {match.hostTeamRatingScore != null || match.hostTeamWins != null ? (
+                        <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>
+                          {[
+                            match.hostTeamRatingScore == null ? null : `팀 평점 ${match.hostTeamRatingScore.toFixed(1)}`,
+                            match.hostTeamWins == null ? null : `${match.hostTeamWins}승`,
+                          ].filter(Boolean).join(' · ')}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
+                      <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
+                    </div>
                   </div>
-                  <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
-                    <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
-                    <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
-                  </div>
+                  {match.platformManaged ? (
+                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-86)', textAlign: 'center', marginTop: 20 }}>플랫폼 주관</div>
+                  ) : null}
                 </div>
               )}
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}

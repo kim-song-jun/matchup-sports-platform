@@ -468,6 +468,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Button>
               )}
             </div>
+            {model.chatError ? <p className="tm-match-detail-chat-error tm-text-caption" role="alert">{model.chatError}</p> : null}
           </div>
         </div>
 
@@ -521,24 +522,25 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       </article>
 
       {/* Mobile-only fixed CTA — hidden on desktop (CSS: .tm-match-detail + .tm-fixed-cta) */}
-      <div className="tm-fixed-cta tm-hide-desktop">
+      <div className="tm-fixed-cta tm-match-detail-fixed-cta tm-hide-desktop">
         {isDeadlinePassedClosed ? null : (
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div className="tm-match-detail-fixed-cta-state">
             <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-            <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+            {mode === 'mine' && !model.completed && !model.canComplete ? (
+              <Link className="tm-match-detail-edit-link tm-text-label" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+            ) : (
+              <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+            )}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: showChat || mode === 'mine' ? '1fr 1fr' : '1fr', gap: 8 }}>
+        <div className={showChat || mode === 'mine' ? 'tm-match-detail-fixed-cta-actions tm-match-detail-fixed-cta-actions-split' : 'tm-match-detail-fixed-cta-actions'}>
           {showChat ? (
             <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
               {model.chatLabel ?? '채팅'}
             </Button>
           ) : null}
           {mode === 'mine' ? (
-            <>
-              <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
-              {!model.completed && !model.canComplete ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
-            </>
+            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
           ) : (
             <Button
               disabled={!canRunAction}
@@ -552,6 +554,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </Button>
           )}
         </div>
+        {model.chatError ? <p className="tm-match-detail-chat-error tm-text-caption" role="alert">{model.chatError}</p> : null}
       </div>
     </>
   );

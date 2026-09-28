@@ -3398,7 +3398,7 @@ label.tm-btn:focus-within {
 
 .tm-match-detail {
   min-height: 100%;
-  padding-bottom: 124px;
+  padding-bottom: calc(176px + var(--v1-shell-safe-bottom));
 }
 
 /* Tournament detail owns a mobile/tablet fixed CTA. Its terminal content must clear the
@@ -3476,6 +3476,39 @@ label.tm-btn:focus-within {
   padding: 16px var(--v1-shell-page-x) calc(var(--v1-shell-cta-bottom-pad) + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
+}
+
+.tm-match-detail-fixed-cta-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tm-match-detail-edit-link {
+  color: var(--blue500);
+  text-decoration: none;
+}
+
+.tm-match-detail-fixed-cta-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.tm-match-detail-fixed-cta-actions-split {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tm-match-detail-fixed-cta-actions > * {
+  min-width: 0;
+}
+
+.tm-match-detail-chat-error {
+  margin: 8px 0 0;
+  color: var(--orange700);
+  line-height: 1.45;
 }
 
 .tm-filter-scrim {

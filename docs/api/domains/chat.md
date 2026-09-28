@@ -36,6 +36,12 @@ rows from `active` to `completed` but preserves that room entitlement, while wit
 kickoff moves them to `cancelled` and drops current match-chat entitlement. The web chat list does
 not expose leaving a linked room; users can only mute/unmute per-room app chat notifications.
 
+For a personal match host, `POST /chat/rooms/resolve` requires at least one active or completed
+ordinary participant. A host with no confirmed participant receives `409
+MATCH_CHAT_PARTICIPANTS_REQUIRED`; no empty room is created. Once an ordinary participant is
+confirmed, the host retains room/list/notification entitlement even when `hostParticipates=false`
+and therefore has no host participant row.
+
 ## Room entry and read state
 
 - `v1_chat_room_participants.visible_from_at` is the participant visibility boundary; `GET

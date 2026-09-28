@@ -207,6 +207,19 @@ DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
 실제 참가자만 포함된다. 사용자가 이번 follow-up의 배포를 명시적으로 요청했으므로 기존 리뷰 대기
 메모와 별개로 CI 통과 후 `dev`에 병합해 alpha에 반영한다.
 
+## Follow-up — 주최자 채팅과 모바일 하단 액션 (2026-09-28)
+
+- [x] 참가자가 없는 주최자의 채팅 클릭을 클라이언트에서 차단하고 실제 안내 표시
+- [x] API에서도 빈 개인매치 채팅방 생성을 `409 MATCH_CHAT_PARTICIPANTS_REQUIRED`로 차단
+- [x] `hostParticipates=false` 주최자가 승인 참가자와 채팅할 수 있도록 현재/수신자 권한 보강
+- [x] 모바일 하단 주요 액션을 `채팅`·`신청자 관리` 2개로 고정하고 `매치 수정`은 상태 행 링크로 분리
+- [x] 작은 화면 전역 grid stacking과 충돌하지 않는 전용 class 및 safe-area 포함 본문 여백 적용
+- [x] API 집중 테스트 33/33, Web 집중 테스트 74/74, 양쪽 `tsc --noEmit` 통과
+- [ ] PR CI, dev 병합, alpha 배포 및 실제 모바일 viewport 확인
+
+기존 중단된 cherry-pick이 있는 공유 작업 트리는 수정·stage하지 않고, 최신 `origin/dev` 기반
+격리 worktree/브랜치 `fix/personal-match-host-chat-footer`에서 배포 범위를 분리한다.
+
 ![모바일 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-390.png)
 ![모바일 불참 확인](../../docs/screenshots/personal-match-participation/host-actions-no_show-confirm-390.png)
 ![태블릿 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-768.png)

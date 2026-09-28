@@ -113,3 +113,4 @@
 - 2026-04-11: backend `PATCH /matches/:id`, `POST /matches/:id/cancel`, `POST /matches/:id/close`는 현재 코드에 존재하며, `e2e/tests/match-join-flow.spec.ts`에도 `MATCH-003` 케이스가 추가돼 있다. (레거시·삭제됨 — legacy-v0-final)
 - 2026-04-11: Task 40 문서 정합성 기준으로 `MATCH-003 blocked` 주장은 제거한다. 현재 truth는 lifecycle scenario verified이며, 최신 런타임 재검증은 follow-up이다.
 - 2026-04-11: Task 38에서 `/matches/new`, `/matches/[id]/edit`는 mock-only affordance가 아니라 real upload UI + submit guard로 연결됐다. edit route smoke는 통과했지만 create-route upload completion smoke는 current dev runtime instability와 분리해 재검증이 필요하다.
+- 2026-09-28: 개인매치 주최자는 승인된 일반 참가자가 없으면 채팅방을 만들지 않고 안내를 본다. 승인 참가자가 생기면 주최자 본인의 참가 여부와 무관하게 채팅할 수 있다. 모바일 하단은 채팅·신청자 관리 2개 주요 액션과 별도 매치 수정 링크를 사용한다.

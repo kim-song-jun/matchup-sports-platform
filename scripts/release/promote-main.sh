@@ -309,7 +309,7 @@ main() {
   if [[ -z "${pr_url}" ]]; then
     is_existing=false
     local title body
-    title="chore(release): promote Teameet ${new_web_version} to main"
+    title="release: Teameet ${new_web_version} — dev → main 승격"
     body="$(build_pr_body "${base_web_version}" "${new_web_version}" "${commit_count}")"
     pr_url="$(build_compare_url "${title}" "${body}")"
   fi

@@ -45,11 +45,14 @@ describe('buildSportSummary', () => {
 });
 
 describe('sortMatchesByAvailability', () => {
-  it('신청 가능한 매치를 먼저 두고 각 상태 그룹의 서버 순서는 유지한다', () => {
+  it('모집중 → 진행중 → 종료 확인 필요 → 최근 종료 순으로 두고 각 그룹의 서버 순서는 유지한다', () => {
     const items = [
       { id: 'closed-new', status: 'closed' },
+      { id: 'completed', status: 'completed', displayState: 'completed' },
       { id: 'open-new', status: 'recruiting' },
+      { id: 'pending-completion', status: 'expired', displayState: 'completion_pending' },
       { id: 'full', status: 'recruiting', displayState: 'full' },
+      { id: 'in-progress', status: 'expired', displayState: 'in_progress' },
       { id: 'open-old', status: 'recruiting' },
     ] as unknown as V1Match[];
 
@@ -58,8 +61,26 @@ describe('sortMatchesByAvailability', () => {
       'open-old',
       'closed-new',
       'full',
+      'in-progress',
+      'pending-completion',
+      'completed',
     ]);
-    expect(items.map((item) => item.id)).toEqual(['closed-new', 'open-new', 'full', 'open-old']);
+    expect(items.map((item) => item.id)).toEqual(['closed-new', 'completed', 'open-new', 'pending-completion', 'full', 'in-progress', 'open-old']);
+  });
+
+  it('종료 확인이 필요한 호스트 카드에는 다음 행동을 안내한다', () => {
+    const card = toMatchCard({
+      id: 'pending-completion',
+      matchId: 'pending-completion',
+      title: '경기 종료 매치',
+      startsAt: '2026-09-27T10:00:00.000Z',
+      status: 'expired',
+      displayState: 'completion_pending',
+      viewer: { state: 'host' },
+    } as unknown as V1Match, base.matches[0]);
+
+    expect(card.lifecycleStatus).toBe('completion_pending');
+    expect(card.actionLabel).toBe('참여 여부 확인');
   });
 });
 

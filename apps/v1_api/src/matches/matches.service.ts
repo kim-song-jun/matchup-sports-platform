@@ -53,6 +53,7 @@ export class MatchesService {
     const isDefaultDiscovery = query.status === undefined;
     const status = query.status ?? 'recruiting';
     const now = new Date();
+    const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1MatchWhereInput[] = [
       // 일반 탐색은 마감 글도 경기 전까지 남기지만, 추천순은 즉시 신청할 수 있는
       // 모집 글만 보여줘야 하므로 추천에서만 신청 마감 조건을 적용한다.
@@ -81,10 +82,32 @@ export class MatchesService {
         ? { startAt: { lt: now } }
         : isDefaultDiscovery
           ? {
-              // 상태를 닫은 글도 경기 전까지 일반 목록에 남겨 신청마감으로 보여준다.
-              // 취소·완료·보관 글과 시작 시각이 지난 글은 탐색 목록에 포함하지 않는다.
-              status: { in: query.sort === 'recommended' ? ['recruiting'] : ['recruiting', 'closed'] },
-              startAt: { gte: now },
+              // 일반 목록은 모집 전후의 흐름을 잇되, 추천순은 지금 신청 가능한 글만 유지한다.
+              // 경기 중·종료 확인 중·최근 완료 글은 종료 기준 최대 7일 동안 공개한다.
+              ...(query.sort === 'recommended'
+                ? {
+                    status: { in: ['recruiting'] },
+                    startAt: { gte: now },
+                  }
+                : {
+                    OR: [
+                      {
+                        status: { in: ['recruiting', 'closed'] },
+                        OR: [
+                          { startAt: { gte: now } },
+                          { endAt: { gte: publicHistoryFrom } },
+                          { endAt: null, startAt: { gte: publicHistoryFrom } },
+                        ],
+                      },
+                      {
+                        status: 'completed',
+                        OR: [
+                          { completedAt: { gte: publicHistoryFrom } },
+                          { completedAt: null, startAt: { gte: publicHistoryFrom } },
+                        ],
+                      },
+                    ],
+                  }),
             }
           : status === 'recruiting'
           ? { status, startAt: { gte: now } }
@@ -1477,9 +1500,13 @@ export class MatchesService {
   }
 
   private getDisplayState(match: MatchWithRelations) {
-    if (match.status === 'recruiting' && match.startAt < new Date()) return 'expired';
+    const now = new Date();
+    if ((match.status === 'recruiting' || match.status === 'closed') && match.startAt <= now) {
+      if (match.endAt && match.endAt > now) return 'in_progress';
+      return 'completion_pending';
+    }
     if (match.status === 'recruiting' && this.getParticipantCount(match) >= match.maxParticipants) return 'full';
-    if (match.status === 'recruiting' && match.deadlineAt && match.deadlineAt < new Date()) return 'closed';
+    if (match.status === 'recruiting' && match.deadlineAt && match.deadlineAt < now) return 'closed';
     return match.status;
   }
 

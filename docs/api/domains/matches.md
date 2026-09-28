@@ -43,7 +43,8 @@
 
 - Response: `{ items, pageInfo }`
 - 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. `deadline`/`starts_at`은 경기 시작 임박순이며 `recommended`는 현재 시작 임박순으로 처리한다.
-- `status`를 생략한 일반 목록은 경기 시작 전인 raw `recruiting`과 `closed`를 포함한다. 신청 마감이 지났거나 raw `closed`인 항목도 경기 시작 전까지 `displayState=closed`(신청마감)로 노출하고, 경기 시작 시각 이후에는 목록에서 제외한다.
+- `status`를 생략한 일반 목록은 시작 전 raw `recruiting`/`closed`와 최근 7일 안에 시작·완료된 매치를 포함한다. raw 상태는 mutation guard를 위해 그대로 두고, 화면 상태는 `displayState`로 구분한다: 시작 전 `recruiting|closed|full`, `startAt <= now < endAt`은 `in_progress`, `endAt <= now`(종료 시각이 없으면 시작 시각부터)는 `completion_pending`, 완료 확정 뒤에는 `completed`다.
+- `completion_pending` 매치는 호스트가 확정 명단에서 참가자별 `completed|no_show`를 지정하고 완료할 수 있다. 완료·미완료 모두 공개 목록에는 최대 7일만 유지되며, `/me/matches` 이력은 이 공개 보존 기간의 영향을 받지 않는다.
 - `sort=recommended` 목록과 `GET /home/recommendations`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
   `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.

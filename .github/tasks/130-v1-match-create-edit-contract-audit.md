@@ -268,3 +268,17 @@ Alpha URL에서 보고된 문제는 개인매치 수정 화면만 `tm-create-she
 로컬 production build도 Windows worktree의 pnpm junction 대상이 생성되지 않아 기존
 `react-query-persist-client`·TipTap 패키지를 resolve하지 못했다. 변경 범위의 테스트·타입·패턴
 검사는 통과했으며 Linux CI build 결과를 배포 게이트로 사용한다.
+
+## Follow-up — 개인매치 경기 시작 후 공개 수명주기 (2026-09-28)
+
+- [x] 기본 공개 목록에서 경기 시작 즉시 사라지던 `startAt >= now` 제한을 최근 7일 보존 계약으로 변경
+- [x] `진행중`·`종료 확인 필요`·`종료` display state와 목록 정렬·상태 배지 추가
+- [x] 종료 확인이 필요한 주최자에게 상세의 `참여 여부 확인` CTA 제공
+- [x] 완료 CTA 진입 시 신청자 관리의 `확정 명단` 탭을 바로 열도록 연결
+- [x] 7일 뒤 공개 목록에서만 제외하고 `/me/matches` 이력은 계속 유지
+- [x] API 49개·Web 74개 집중 테스트 및 양쪽 `tsc --noEmit` 통과
+- [ ] alpha 390/768/1440 시각 확인 (배포 전이므로 미실행)
+
+raw `recruiting|closed` 상태는 기존 수정·신청·취소 권한 가드에 사용하므로 바꾸지 않는다. 현재
+시각과 `startAt/endAt`을 조합한 `displayState`만 공개 화면 생명주기로 확장한다. 종료 시각이 없는
+매치는 기존 완료 가능 계약과 동일하게 시작 시각부터 `completion_pending`으로 본다.

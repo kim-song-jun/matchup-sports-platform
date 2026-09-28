@@ -23,6 +23,7 @@ import type {
   MatchStateViewModel,
 } from './matches.types';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import type { V1MatchApiStatus } from '@/types/api';
 
 /**
  * 종목 한국어 레이블 → 인디케이터 dot CSS 색상.
@@ -213,7 +214,10 @@ function MatchCreateFloatingButton() {
   );
 }
 
-function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: MatchDetailViewModel['match']['status']) {
+function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: MatchDetailViewModel['match']['status'], lifecycleStatus?: V1MatchApiStatus) {
+  if (lifecycleStatus === 'in_progress') return 'tm-badge-green';
+  if (lifecycleStatus === 'completion_pending') return 'tm-badge-orange';
+  if (lifecycleStatus === 'completed') return 'tm-badge-grey';
   if (mode === 'pending') return 'tm-badge-orange';
   if (mode === 'approved') return 'tm-badge-green';
   if (mode === 'mine') return 'tm-badge-blue';
@@ -225,8 +229,11 @@ function matchStatusBadgeLabel(
   mode: MatchDetailViewModel['mode'],
   status: MatchDetailViewModel['match']['status'],
   completed = false,
+  lifecycleStatus?: V1MatchApiStatus,
 ) {
-  if (completed) return '참여 완료';
+  if (lifecycleStatus === 'in_progress') return '진행중';
+  if (lifecycleStatus === 'completion_pending') return mode === 'mine' ? '종료 확인 필요' : '종료 확인 중';
+  if (completed || lifecycleStatus === 'completed') return '종료';
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') return '승인 완료';
   if (mode === 'mine') return '내 매치';
@@ -286,6 +293,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       </div>
     </Card>
   ) : null;
+  const lifecycleCard = match.lifecycleStatus === 'in_progress'
+    ? <StateCard tone="green" title="경기가 진행 중이에요" body="경기가 끝나면 호스트가 참여 여부를 확인하고 매치를 완료해요." />
+    : match.lifecycleStatus === 'completion_pending'
+      ? <StateCard tone="orange" title={mode === 'mine' ? '종료 확인이 필요해요' : '경기 종료를 확인하고 있어요'} body={mode === 'mine' ? '참여 여부를 확인한 뒤 매치를 완료해 주세요.' : '호스트가 참여 여부를 확인하면 완료 상태로 바뀌어요.'} />
+      : null;
+  const isPostStartLifecycle = match.lifecycleStatus === 'in_progress' || match.lifecycleStatus === 'completion_pending';
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
     // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
@@ -365,7 +378,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 {/* 마감 시각이 지난 경우 상태는 본문 상태 카드가 유일한 자리다 — 여기서 또
                     말하면 "모집 완료" 배지 · 상태 카드 · 하단 바가 같은 뜻을 세 번 반복한다. */}
                 {isDeadlinePassedClosed ? null : (
-                  <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed)}</span>
+                  <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status, match.lifecycleStatus)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed, match.lifecycleStatus)}</span>
                 )}
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
@@ -395,7 +408,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             {/* 참가비는 자유 입력(costNote) — 호스트가 안 적었으면 행 자체를 감춘다(비용을
                 0원으로 단정하지 않는다, team-matches의 '비용 미정' 관례와 같은 이유). */}
             {match.costNote ? <InfoRow label="참가비" value={match.costNote} /> : null}
-            {mode === 'pending' ? (
+            {lifecycleCard}
+            {mode === 'pending' && !isPostStartLifecycle ? (
               <>
                 <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
                 {/* 신청 후 현황 확인 CTA — '내 신청 현황 보기' (#13) */}
@@ -404,10 +418,10 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
+            {mode === 'approved' && !isPostStartLifecycle ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
             {/* [P2] 마감 사유를 아는 만큼만 정확히 말한다 — 시각이 지났으면 그 이유를,
                 아니면(정원 마감·취소·완료·만료) 기존 중립 문구를 유지한다. */}
-            {mode === 'closed' ? (
+            {mode === 'closed' && !isPostStartLifecycle ? (
               isDeadlinePassedClosed
                 ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
                 : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
@@ -452,7 +466,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               ) : null}
               {mode === 'mine' ? (
                 <>
-                  <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
+                  <Link className={`tm-btn tm-btn-lg ${model.canComplete ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href={match.applicationsHref ?? `/matches/${match.id}/applications`}>{model.canComplete ? '참여 여부 확인' : '신청자 관리'}</Link>
                   {!model.completed && !model.canComplete ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
                 </>
               ) : (
@@ -484,7 +498,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {/* 위 상세와 같은 이유 — 공유 InfoRow 는 빈 값을 그대로 그린다. */}
           <InfoRow label="성별 조건" value={match.gender} />
           {match.costNote ? <InfoRow label="참가비" value={match.costNote} /> : null}
-          {mode === 'pending' ? (
+          {lifecycleCard}
+          {mode === 'pending' && !isPostStartLifecycle ? (
             <>
               <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
               {/* 신청 후 현황 확인 CTA — '내 신청 현황 보기' (#13) */}
@@ -493,8 +508,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
-          {mode === 'closed' ? (
+          {mode === 'approved' && !isPostStartLifecycle ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
+          {mode === 'closed' && !isPostStartLifecycle ? (
             isDeadlinePassedClosed
               ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
               : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
@@ -540,7 +555,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </Button>
           ) : null}
           {mode === 'mine' ? (
-            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
+            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>{model.canComplete ? '참여 여부 확인' : '신청자 관리'}</Link>
           ) : (
             <Button
               disabled={!canRunAction}
@@ -786,9 +801,17 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
  * 마감된 매치도 모집 중처럼 보인다(2026-09-07 제보). 정원이 찬 것과 기한이 지난 것은
  * 사용자가 할 수 있는 일이 다르므로(전자는 자리가 날 수 있고 후자는 끝났다) 문구도 가른다.
  */
-function closedBadgeLabel(match: MatchCardModel): string | null {
+function matchStateBadge(match: MatchCardModel): { label: string; className: string; subdued: boolean; useDeadline: boolean } | null {
+  if (match.lifecycleStatus === 'in_progress') return { label: '진행중', className: 'tm-badge-green', subdued: false, useDeadline: false };
+  if (match.lifecycleStatus === 'completion_pending') return { label: match.status === 'mine' ? '종료 확인 필요' : '종료 확인 중', className: 'tm-badge-orange', subdued: true, useDeadline: false };
+  if (match.lifecycleStatus === 'completed') return { label: '종료', className: 'tm-badge-grey', subdued: true, useDeadline: false };
   if (match.status !== 'full') return null;
-  return match.current >= match.capacity ? '모집 완료' : '신청 마감';
+  return {
+    label: match.current >= match.capacity ? '모집 완료' : '신청 마감',
+    className: 'tm-badge-grey',
+    subdued: true,
+    useDeadline: true,
+  };
 }
 
 /**
@@ -797,9 +820,9 @@ function closedBadgeLabel(match: MatchCardModel): string | null {
  * 목록은 이해시키는 화면이 아니라 비교시키는 화면이라 개수가 먼저다(browse-density 스킬).
  */
 function MatchRowItem({ match }: { match: MatchCardModel }) {
-  const closedLabel = closedBadgeLabel(match);
+  const stateBadge = matchStateBadge(match);
   return (
-    <Link className={`tm-match-row tm-card-interactive tm-pressable${closedLabel ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
+    <Link className={`tm-match-row tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
       <div className={`tm-match-row-thumb${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
         {match.image ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
@@ -807,7 +830,7 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
         {/* 빈 값을 그대로 이으면 "풋살 · 3-5 · " 처럼 구분점만 남는다 — 있는 것만 잇는다. */}
         <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline">
-          {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
+          {stateBadge ? <span className={`tm-badge ${stateBadge.className} tm-card-closed-badge`}>{stateBadge.label}</span> : null}
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
         </div>
         <div className="tm-text-caption tm-match-row-when">
@@ -838,7 +861,7 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
               단, deadlineAt 자체가 없는 매치(match.deadline==='')는 deadlineDetail이
               '경기 시작 전까지'로 떨어져 "닫힘"과 모순되는 문구가 되므로 그때는
               actionLabel을 그대로 둔다(Copilot 리뷰 지적). */}
-          <span className="tm-text-label tm-match-row-act">{closedLabel && match.deadline ? match.deadlineDetail : match.actionLabel}</span>
+          <span className="tm-text-label tm-match-row-act">{stateBadge?.useDeadline && match.deadline ? match.deadlineDetail : match.actionLabel}</span>
         </div>
       </div>
     </Link>
@@ -888,9 +911,9 @@ function MatchNearbyRail({ matches }: { matches: MatchCardModel[] }) {
 }
 
 function MatchCardItem({ match }: { match: MatchCardModel }) {
-  const closedLabel = closedBadgeLabel(match);
+  const stateBadge = matchStateBadge(match);
   return (
-    <Link className={`tm-match-list-card tm-card-interactive tm-pressable${closedLabel ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
+    <Link className={`tm-match-list-card tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
       <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
         {match.image ? null : <SportIllustration sport={match.sport} sizes="132px" />}
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
@@ -906,7 +929,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline" style={{ marginTop: 8 }}>
-          {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
+          {stateBadge ? <span className={`tm-badge ${stateBadge.className} tm-card-closed-badge`}>{stateBadge.label}</span> : null}
           <div className="tm-text-body-lg">{match.title}</div>
         </div>
         {/* [격상3] 시간만 weight 600으로 강조 — 행동 결정 핵심 정보 분리. 날짜·장소는 caption 유지. */}
@@ -917,7 +940,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         <div className="tm-match-list-footer">
           <span className="tm-text-caption">{match.region} · {match.host}</span>
           {/* [P2] MatchRowItem과 동일 원칙(deadlineAt 없는 매치는 actionLabel 유지, Copilot 리뷰 지적). */}
-          <span className="tm-text-label">{closedLabel && match.deadline ? match.deadlineDetail : match.actionLabel}</span>
+          <span className="tm-text-label">{stateBadge?.useDeadline && match.deadline ? match.deadlineDetail : match.actionLabel}</span>
         </div>
       </div>
     </Link>

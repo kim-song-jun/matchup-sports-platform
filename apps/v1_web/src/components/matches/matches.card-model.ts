@@ -15,7 +15,9 @@ const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as cons
 
 export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
   const capacity = getCapacity(match, fallback);
-  const status = statusToCardStatus(getStatus(match), getViewerState(match));
+  const lifecycleStatus = getStatus(match);
+  const viewerState = getViewerState(match);
+  const status = statusToCardStatus(lifecycleStatus, viewerState);
 
   return {
     ...fallback,
@@ -46,9 +48,10 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     image: match.imageUrl ?? null,
     costNote: match.costNote ?? null,
     status,
+    lifecycleStatus,
     deadline: formatDeadline(match.deadlineAt),
     deadlineDetail: formatDeadlineDetail(match.deadlineAt),
-    actionLabel: actionLabel(status),
+    actionLabel: actionLabel(status, lifecycleStatus, viewerState),
   };
 }
 
@@ -135,7 +138,7 @@ export function getStatus(match: V1Match): V1MatchApiStatus {
  */
 export function sortMatchesByAvailability(items: V1Match[]): V1Match[] {
   return items
-    .map((item, index) => ({ item, index, rank: statusToCardStatus(getStatus(item)) === 'open' ? 0 : 1 }))
+    .map((item, index) => ({ item, index, rank: lifecycleRank(getStatus(item)) }))
     .sort((left, right) => left.rank - right.rank || left.index - right.index)
     .map(({ item }) => item);
 }
@@ -148,11 +151,23 @@ export function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1View
   if (viewerState === 'host') return 'mine';
   if (viewerState === 'requested') return 'pending';
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'full';
+  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full' || status === 'in_progress' || status === 'completion_pending') return 'full';
   return 'open';
 }
 
-export function actionLabel(status: MatchCardModel['status']) {
+function lifecycleRank(status: V1MatchApiStatus) {
+  if (status === 'closed' || status === 'full') return 1;
+  if (status === 'in_progress') return 2;
+  if (status === 'completion_pending') return 3;
+  if (status === 'completed') return 4;
+  if (status === 'cancelled' || status === 'expired') return 5;
+  return 0;
+}
+
+export function actionLabel(status: MatchCardModel['status'], lifecycleStatus?: V1MatchApiStatus, viewerState: V1ViewerState = 'none') {
+  if (lifecycleStatus === 'in_progress') return '진행중';
+  if (lifecycleStatus === 'completion_pending') return viewerState === 'host' ? '참여 여부 확인' : '종료 확인 중';
+  if (lifecycleStatus === 'completed') return '종료';
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'full') return '신청 마감';

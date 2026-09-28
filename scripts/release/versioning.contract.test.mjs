@@ -406,15 +406,24 @@ test('Changesets keeps a changelog generator so the release action can build its
   assert.ok(config.changelog, 'a changelog generator must be configured');
 });
 
-test('release PR workflow refuses to run when there is nothing to release', () => {
-  // 리졸버가 0개를 허용하게 됐으므로, 빈 릴리스 PR 이 열리지 않도록 워크플로가 직접 막아야 한다.
-  const releaseWorkflow = readFileSync(join(repoRoot, '.github/workflows/release-main.yml'), 'utf8');
+test('promote-to-main workflow only dispatches from dev and skips (not fails) an empty release', () => {
+  // release-main.yml 을 대체한 promote-main.yml/promote-main.sh 는 리졸버가 0개를 허용하는
+  // 것과 자기모순을 일으키지 않는다 — 소비할 changeset 이 없으면 버전 단계를 건너뛰고
+  // (실패시키지 않고) 승격 게이트 사전 검증과 PR 링크 생성으로 그대로 진행한다.
+  const promoteWorkflow = readFileSync(join(repoRoot, '.github/workflows/promote-main.yml'), 'utf8');
+  const promoteScript = readFileSync(join(repoRoot, 'scripts/release/promote-main.sh'), 'utf8');
 
-  assert.match(releaseWorkflow, /\.changesets \| length > 0/);
-  assert.match(releaseWorkflow, /nothing to release/i);
-  // 통합·배포 브랜치가 dev 하나이므로 릴리스 PR 도 dev 를 base 로 만든다.
-  assert.match(releaseWorkflow, /github\.ref == 'refs\/heads\/dev'/);
-  assert.doesNotMatch(releaseWorkflow, /github\.ref == 'refs\/heads\/main'/);
+  // 통합·배포 브랜치가 dev 하나이므로 승격 워크플로도 dev 에서만 돈다.
+  assert.match(promoteWorkflow, /github\.ref == 'refs\/heads\/dev'/);
+  assert.doesNotMatch(promoteWorkflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.ok(
+    promoteScript.includes('changesets_count") -gt 0') || promoteScript.includes('"${changesets_count}" -gt 0'),
+    'promote-main.sh must branch on the pending changeset count',
+  );
+  assert.ok(
+    promoteScript.includes('버전 단계를 건너뛴다'),
+    'promote-main.sh must skip (not fail) the version-bump step when there is nothing to release',
+  );
 });
 
 test('resolver rejects a release when the fixed app versions have drifted', () => {

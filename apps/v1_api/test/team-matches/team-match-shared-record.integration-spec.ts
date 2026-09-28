@@ -77,7 +77,7 @@ describe('friendly match shared score sheet (real DB)', () => {
     const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
     const manager = user(f.userIds[0]);
     const before = await lineups.getLineup(manager, f.match.id);
-    expect(before).toMatchObject({ editable: false, lockReason: 'active_lineups_complete' });
+    expect(before).toMatchObject({ editable: true, lockReason: null });
 
     await records.mutate(
       user(f.userIds[1]),

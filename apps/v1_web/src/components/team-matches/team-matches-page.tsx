@@ -146,19 +146,18 @@ function TeamMatchCreateFloatingButton() {
 function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']) {
   if (mode === 'pending') return '검토 중';
   if (mode === 'approved') {
-    // 승인된 시점부터 상대는 확정이다 — 팀 이름 자리에 신청 상태("승인 완료")를 넣으면
-    // 정작 누구와 붙는지가 화면에서 사라진다(2026-08-25 사용자 보고). applicantTeams에는
-    // 승인된 팀(=이 뷰어의 팀) 하나가 '승인 완료' 상태로 담겨 온다 — 아래 closed 분기와
-    // 같은 소스다. 이름을 못 찾는 예외 상황에서만 기존 상태 문구로 물러난다.
+    // 일반 팀매치는 신청 승인 시 applicantTeams에 실제 상대팀이 담기지만, 관리자 생성
+    // 매치에서 먼저 승인된 팀이 홈팀이 되는 경우에는 아직 상대팀이 없다. 이때 뷰어의
+    // 개인 상태("승인 완료")를 상대팀 이름처럼 표시하면 모집 중인 슬롯이 사라진다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    return approvedOpponent?.name ?? '승인 완료';
+    return approvedOpponent?.name ?? '모집 중';
   }
   if (mode === 'mine') {
     // 생성팀 뷰도 승인 완료 후에는 'approved'/'closed' 분기와 같은 근거(applicantTeams의
     // '승인 완료' 항목)로 실제 상대팀 이름을 보여줘야 한다 — 그 전까지는 '신청팀'
-    // placeholder다(MD-QA #16: 승인 완료 후에도 상단이 계속 '신청팀'으로 고정돼 있었다).
+    // placeholder로 바꾸지 않는다. 승인 전 상대팀 슬롯은 다른 뷰어와 동일한 모집 상태다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    return approvedOpponent?.name ?? '신청팀';
+    return approvedOpponent?.name ?? '모집 중';
   }
   if (match.status === 'closed') {
     // approvedOpponentTeam이 있으면 applicantTeams에 그 팀 하나만 '승인 완료' 상태로 담겨
@@ -172,10 +171,13 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
 
 function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], statusLabel?: string) {
   if (mode === 'pending') return '홈팀 검토 중';
-  if (mode === 'approved') return '참가 확정';
+  if (mode === 'approved') {
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent ? '참가 확정' : '신청 후 승인';
+  }
   if (mode === 'mine') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    return approvedOpponent ? '참가 확정' : '승인 후 확정';
+    return approvedOpponent ? '참가 확정' : '신청 후 승인';
   }
   // statusLabel(모델에서 이미 계산돼 온 문구)이 matched/completed/cancelled를
   // 구분해 정확한 상태를 준다 — team-matches-client.tsx statusLabel() 참고.

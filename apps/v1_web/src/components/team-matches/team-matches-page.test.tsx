@@ -994,6 +994,17 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
 
     expect(screen.getByText('브라보FC')).toBeInTheDocument();
   });
+
+  it('관리자 생성 매치의 홈팀으로 승인됐지만 상대팀이 없으면 모집 상태를 유지한다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.match.applicantTeams = [];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('모집 중')).toBeInTheDocument();
+    expect(screen.getByText('신청 후 승인')).toBeInTheDocument();
+    expect(screen.queryByText('참가 확정')).not.toBeInTheDocument();
+  });
 });
 
 describe('TeamMatchDetailPageView — 히어로 액션', () => {
@@ -1007,6 +1018,20 @@ describe('TeamMatchDetailPageView — 히어로 액션', () => {
 });
 
 describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
+  it('생성팀이 보고 있어도 승인된 상대팀이 없으면 모집 상태를 유지한다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.applicantTeams = [];
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const hero = container.querySelector<HTMLElement>('.tm-team-vs-row');
+
+    expect(hero).not.toBeNull();
+    expect(within(hero!).getByText('모집 중')).toBeInTheDocument();
+    expect(within(hero!).getByText('신청 후 승인')).toBeInTheDocument();
+    expect(within(hero!).queryByText('신청팀')).not.toBeInTheDocument();
+    expect(within(hero!).queryByText('승인 후 확정')).not.toBeInTheDocument();
+  });
+
   it('신청팀 카드에서 실제 상대팀 상세로 이동할 수 있다', () => {
     const model = getTeamMatchDetailViewModel('mine');
     model.match.applicantTeams = [{

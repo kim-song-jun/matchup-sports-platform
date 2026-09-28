@@ -5,7 +5,7 @@
 > D3=규정을 넣은 대회·리그만 출전정지 자동 제외 · 화면=경기 명단 화면(기본) + 빠른 선택 시트 · 대회·리그 한 모델.
 > 추가 확정(2026-09-28): 팀 화면 T1 = A(다가오는 경기 카드) + B(선수 × 경기 일괄) + C(결장 기간) **전부 + 어드민에서도** ·
 > Q1 = 리그도 "경기 시작 전까지"로 통일(리그의 경기 중 명단 수정은 없어지고, 시작 후 변경은 어드민 결과 정정으로).
-> D4(노출 수준)는 추천안 적용. **미결**: D6(본인 결장 신고), D5(분담, 2026-09-28 19시 미팅).
+> D4(노출 수준)는 추천안 적용 · D6 = 결장 기간은 **팀장·운영자만** 등록(본인 등록 없음). **미결**: D5(분담, 2026-09-28 19시 미팅).
 
 ## Context
 
@@ -37,7 +37,7 @@
 - [ ] 규정을 넣은 대회·리그는 출전정지 선수가 경기 명단에서 자동으로 빠진다(D3). 규정이 비면 영향 없음.
 - [ ] 옵셔널 — 진입점은 경기 상세와 팀 상세 "다가오는 경기"의 팀장 전용 버튼. 홈·알림·할 일에 띄우지 않는다(D4).
 - [ ] 팀 B: 팀 운영 메뉴 "경기 명단 관리" — 선수 × 다가오는 대회·리그 경기, 셀로 빼기/되돌리기, 일괄 저장.
-- [ ] 팀 C: 결장 기간 등록 — 기간 안에 시작하는 대회·리그 경기에서 자동 제외(나중에 잡히는 경기 포함). 새 테이블. 본인 등록은 D6.
+- [ ] 팀 C: 결장 기간 등록 — 기간 안에 시작하는 대회·리그 경기에서 자동 제외(나중에 잡히는 경기 포함). 새 테이블. 팀장·매니저·운영자만 등록(D6).
 - [ ] 어드민: 참가 신청(명단 검토) 화면의 팀 행 "경기별 명단" 펼침, 운영 보드 경기 카드 요약·"명단" 버튼, 결장 기간 대리 등록. 기록에 운영자로 남는다.
 - [ ] 팀 ↔ 경기 양방향(2026-09-28 사용자 지시): 팀 상세의 경기 행에서 그 경기 명단으로(대회·리그 = 조정, 친선 = 참석명단), 경기 명단 화면에서 "우리 팀 다른 경기"로.
 - [ ] 화면: 경기 명단 화면(출전/빠짐/출전정지 + 변경 기록) + 경기 상세의 빠른 선택 시트. 시작 후 읽기 전용.
@@ -92,7 +92,7 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
   endsAt          DateTime
   reason          String?  // INJURY | PERSONAL | OTHER
   actorUserId     String
-  actorRole       String   // SELF | TEAM_MANAGER | ADMIN | STAFF
+  actorRole       String   // TEAM_MANAGER | ADMIN | STAFF (본인 등록 없음, D6)
   createdAt       DateTime @default(now())
   revokedAt       DateTime?
   revokedByUserId String?
@@ -133,7 +133,7 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 | GET | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 활성 멤버 · 운영자 | 변경 기록(revoke 포함, 시간순) |
 | GET | `/teams/:teamId/game-rosters` | 그 팀 owner·manager · 운영자 | 팀 B: 선수 × 다가오는 대회·리그 경기 매트릭스(출전/빠짐/결장/정지 + 사유·actor) |
 | POST | `/teams/:teamId/game-rosters/batch` | 같음 | 팀 B: `{ changes: [{ gameId, userId, op: 'EXCLUDE'\|'REVOKE', reason? }] }` 한 트랜잭션. 시작된 경기가 섞이면 전체 409 |
-| GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | owner·manager · 운영자 · 본인(D6) | 팀 C: 결장 기간 조회·등록·취소 |
+| GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | 조회: 그 팀 활성 멤버 · 쓰기: owner·manager · 운영자(D6) | 팀 C: 결장 기간 조회·등록·취소 |
 | GET | `/admin/tournaments/:id/registrations/:registrationId/game-rosters` | 어드민·그 대회 스태프 | 어드민: 참가 신청 화면의 팀별 경기 × 선수. 쓰기는 위 API 를 운영자 권한으로 |
 
 - 쓰기는 경기 `SCHEDULED` 일 때만 — 아니면 409 `LINEUP_DEADLINE_PASSED`(기존 코드 재사용).
@@ -238,5 +238,5 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 2. **조정 알림.** 상대팀·운영진에게 알릴지. 현재 설계는 알리지 않는다(D4 "구석에").
 3. **검인과의 관계.** 검인에서 "안 옴"인 선수를 조정 화면에 표시만 할지. 현재 설계는 표시하지 않는다(D2 가 명단 기준).
 4. **팀 화면 범위(T1).** → **해결(2026-09-28): A + B + C 전부 + 어드민.**
-6. **본인 결장 신고(D6).** 선수 본인이 결장 기간을 등록할 수 있나 — 즉시 반영(추천) / 팀장 승인 / 불가. → **사용자 확인 필요.**
+6. **본인 결장 신고(D6).** → **해결(2026-09-28): 팀장·운영자만.** 선수는 자기 결장 상태를 볼 수만 있다.
 5. **회의 화자.** 녹취에 화자 구분이 없어 일부 발언의 주체가 불명확하다(아티팩트 표시). 결정에는 영향 없음.

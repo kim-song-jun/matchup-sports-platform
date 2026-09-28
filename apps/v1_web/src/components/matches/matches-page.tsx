@@ -575,7 +575,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
       </div>
-      <div className="tm-create-shell tm-match-create-shell tm-content-enter">
+      <div className={`tm-create-shell tm-match-create-shell ${edit ? 'tm-create-shell-edit' : ''} tm-content-enter`}>
         {/* 단계 전환 시 스크린리더에 현재 단계 공지 */}
         {!edit ? (
           <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -595,9 +595,40 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         ) : null}
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
+        {edit && (model.form?.recruitingToggle || model.form?.onCancel) ? (
+          <section className="tm-match-edit-management" aria-labelledby="match-edit-management-title">
+            <div>
+              <h2 id="match-edit-management-title" className="tm-text-body-lg" style={{ margin: 0 }}>매치 관리</h2>
+              <p className="tm-text-caption" style={{ marginTop: 4 }}>모집 상태를 바꾸거나 매치를 취소할 수 있어요.</p>
+            </div>
+            {model.form.recruitingToggle ? (
+              <div className="tm-match-edit-management-action">
+                <button
+                  className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                  type="button"
+                  disabled={model.form.submitting || model.form.recruitingToggle.pending || Boolean(model.form.lockedReason)}
+                  onClick={model.form.recruitingToggle.onClick}
+                >
+                  {model.form.recruitingToggle.label}
+                </button>
+                <p className="tm-text-caption" style={{ marginTop: 4 }}>{model.form.recruitingToggle.hint}</p>
+              </div>
+            ) : null}
+            {model.form.onCancel ? (
+              <button
+                className="tm-btn tm-btn-md tm-btn-danger tm-btn-block"
+                type="button"
+                disabled={model.form.submitting || Boolean(model.form.lockedReason)}
+                onClick={model.form.onCancel}
+              >
+                매치 취소
+              </button>
+            ) : null}
+          </section>
+        ) : null}
       </div>
       <div className="tm-fixed-cta tm-create-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+        <div className="tm-create-fixed-cta-actions">
           {secondaryAction ? (
             <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</button>
           ) : (
@@ -611,26 +642,6 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{primaryLabel}</Link>
           )}
         </div>
-        {/* lockedReason이 있으면(완료·취소·만료 등 터미널 상태) 서버 cancel()도 같은 조건으로
-            409를 던진다 — '변경사항 저장' 버튼과 같은 게이트를 걸어 죽은 버튼을 사전에 막는다
-            (2026-08-27 감사 M-A-personal-match-state). */}
-        {/* 모집 마감 / 다시 열기 — 되돌릴 수 있는 동작이라 취소보다 위에 둔다.
-            lockedReason(터미널 상태)에서는 서버도 409 를 던지므로 같이 잠근다. */}
-        {edit && model.form?.recruitingToggle ? (
-          <>
-            <button
-              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-              type="button"
-              style={{ marginTop: 8 }}
-              disabled={model.form.submitting || model.form.recruitingToggle.pending || Boolean(model.form?.lockedReason)}
-              onClick={model.form.recruitingToggle.onClick}
-            >
-              {model.form.recruitingToggle.label}
-            </button>
-            <p className="tm-text-caption" style={{ marginTop: 6, textAlign: 'center' }}>{model.form.recruitingToggle.hint}</p>
-          </>
-        ) : null}
-        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-danger tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting || Boolean(model.form?.lockedReason)} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
     </>
   );
@@ -1115,14 +1126,14 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
 }
 
 function CapacityField({ value, onChange }: { value: number; onChange?: (value: number) => void }) {
-  const options = Array.from({ length: 99 }, (_, index) => index + 2);
-  const normalized = Math.min(100, Math.max(2, Number(value) || 2));
+  const options = Array.from({ length: 100 }, (_, index) => index + 1);
+  const normalized = Math.min(100, Math.max(1, Number(value) || 1));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">최대 인원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(2, normalized - 1))}>-</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(1, normalized - 1))}>-</button>
         <select className="tm-create-input tm-create-select-control" value={normalized} aria-label="최대 인원 선택" onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>

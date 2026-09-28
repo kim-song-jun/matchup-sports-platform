@@ -225,3 +225,26 @@ DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
 ![태블릿 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-768.png)
 ![데스크톱 불참 메뉴](../../docs/screenshots/personal-match-participation/host-actions-no_show-menu-1440.png)
 ![불참 저장 이력](../../docs/screenshots/personal-match-participation/host-actions-no_show-persisted-390.png)
+
+## Follow-up — 개인매치 수정 하단 스크롤 겹침 (2026-09-28)
+
+- [x] 개인매치 수정 shell에 고정 CTA 높이와 safe-area를 포함한 하단 여백 적용
+- [x] 고정 CTA를 `변경 취소`·`변경사항 저장` 두 동작으로 제한
+- [x] 모집 마감/재오픈과 매치 취소를 스크롤 가능한 `매치 관리` 영역으로 이동
+- [x] 작은 화면에서도 저장 CTA가 불필요하게 2행으로 늘어나지 않는 전용 grid class 적용
+- [x] Web 집중 테스트 47/47 통과
+- [ ] 실제 모바일 viewport 시각 확인
+
+Alpha URL에서 보고된 문제는 개인매치 수정 화면만 `tm-create-shell-edit`가 누락된 상태에서
+가변 높이의 운영 버튼까지 fixed footer에 포함되어 발생했다. 저장 CTA와 운영 동작의 레이아웃
+책임을 분리해 마지막 폼 필드와 관리 동작이 footer 아래로 가려지지 않도록 고정한다.
+
+## Follow-up — 개인매치 1명 정원 (2026-09-28)
+
+- [x] 개인매치 생성·수정 DTO의 정원 범위를 `1~100명`으로 확장
+- [x] 생성·수정 폼의 선택 목록과 감소 버튼 최솟값을 1명으로 변경
+- [x] 프론트 payload 변환이 1명을 2명으로 올리지 않고 그대로 보존
+- [x] API 계약 문서와 프론트·백엔드 회귀 테스트 동기화
+
+팀매치 정원 계약은 변경하지 않는다. 개인매치 수정 시에는 기존 활성 참가자 수보다 낮은 정원으로
+줄일 수 없다는 서비스 계층의 동시성·정원 보호 규칙을 그대로 유지한다.

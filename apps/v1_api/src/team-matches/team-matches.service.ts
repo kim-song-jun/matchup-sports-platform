@@ -16,7 +16,6 @@ import {
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
-  createSourceRosterIdentityLinks,
   GamesService,
 } from '../games/games.service';
 import type {
@@ -31,6 +30,7 @@ import {
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
+import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computePublicTeamRatingBatch, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
@@ -1247,7 +1247,7 @@ export class TeamMatchesService {
           approvedApplicantTeamId: application.applicantTeamId,
         },
       });
-      await this.hydrateApprovedAwaySnapshot(
+      await hydrateApprovedTeamMatchAwaySnapshot(
         tx,
         application.teamMatchId,
         application.applicantTeamId,
@@ -1975,90 +1975,6 @@ export class TeamMatchesService {
       })),
       participants,
     };
-  }
-
-  private async hydrateApprovedAwaySnapshot(
-    tx: Prisma.TransactionClient,
-    teamMatchId: string,
-    awayTeamId: string,
-  ) {
-    const [game, awayTeam] = await Promise.all([
-      tx.v1Game.findUnique({
-        where: { teamMatchId },
-        include: {
-          sides: true,
-          lineups: { where: { revision: 1 } },
-        },
-      }),
-      tx.v1Team.findFirst({
-        where: { id: awayTeamId, status: 'active', deletedAt: null },
-        select: {
-          id: true,
-          name: true,
-          memberships: {
-            where: { status: 'active' },
-            orderBy: { id: 'asc' },
-            select: {
-              userId: true,
-              user: {
-                select: {
-                  profile: { select: { nickname: true, displayName: true } },
-                },
-              },
-            },
-          },
-        },
-      }),
-    ]);
-    if (game === null || awayTeam === null) {
-      throw new ConflictException({
-        code: 'TEAM_MATCH_GAME_REQUIRED',
-        message: 'Approved TeamMatch requires its atomically created Game',
-      });
-    }
-    const awaySide = game.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
-    const awayLineup = game.lineups.find((lineup) => lineup.sideId === awaySide?.id);
-    if (awaySide === undefined || awayLineup === undefined) {
-      throw new ConflictException({
-        code: 'TEAM_MATCH_GAME_REQUIRED',
-        message: 'Approved TeamMatch requires an AWAY side and lineup',
-      });
-    }
-    if (awaySide.teamId !== null && awaySide.teamId !== awayTeam.id) {
-      throw new ConflictException({
-        code: 'TEAM_MATCH_GAME_REQUIRED',
-        message: 'The AWAY side is already pinned to another team',
-      });
-    }
-    await tx.v1GameSide.update({
-      where: { id: awaySide.id },
-      data: { teamId: awayTeam.id, displayNameSnapshot: awayTeam.name },
-    });
-    // createMany 대신 createManyAndReturn — 신원 연결의 키가 생성된 participantId라
-    // id를 돌려받아야 한다(saveLineup과 같은 이유). 이 스냅샷은 팀장이 라인업을 따로
-    // 저장하지 않으면 그대로 최신 리비전으로 남으므로, 여기서 연결을 안 만들면 그 팀
-    // 전원의 개인 기록이 이 경기에서 영원히 공개될 수 없다.
-    const createdParticipants = await tx.v1GameParticipant.createManyAndReturn({
-      data: awayTeam.memberships.map((membership) => ({
-        gameId: game.id,
-        sideId: awaySide.id,
-        lineupId: awayLineup.id,
-        userId: membership.userId,
-        displayNameSnapshot:
-          membership.user.profile?.nickname ??
-          membership.user.profile?.displayName ??
-          '팀원',
-      })),
-      select: { id: true, userId: true },
-    });
-    await createSourceRosterIdentityLinks(
-      tx,
-      createdParticipants
-        .filter((participant): participant is { id: string; userId: string } => participant.userId !== null)
-        .map((participant) => ({ participantId: participant.id, userId: participant.userId })),
-      { actorType: 'SYSTEM', systemActor: 'TEAM_MATCH_AWAY_ROSTER_SYNC' },
-      'team_match_away_approval_snapshot',
-    );
   }
 
   private assertActiveAccount(user: V1AuthUser) {

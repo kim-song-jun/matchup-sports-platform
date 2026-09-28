@@ -153,7 +153,7 @@ describe('LandingV4Page', () => {
   it('무대 ①② 는 실데이터 팀 매치와 수치를, 예시 장면은 "체험용 예시"를 보여 준다', async () => {
     const { container } = await renderPage(LandingV4Page);
     const stage = container.querySelector('#stage') as HTMLElement;
-    expect(stage.textContent).toContain('지금 올라온 팀 매치 41개를');
+    expect(stage.textContent).toContain('지금 올라온 팀 매치(41개)를');
     expect(stage.textContent).toContain('마포 레인저스 vs 한강 로버스');
     expect(stage.textContent).toContain('송파 유나이티드 vs 이게팀이야');
     expect(stage.textContent).toContain('4:4 입문');

@@ -36,7 +36,7 @@ function buildScenes(countText: string | null, sportsText: string | null): Scene
   return [
     {
       key: 'find', label: '찾기', title: ['근처 팀 매치를', '한눈에 골라요'],
-      body: countText ? `지금 올라온 팀 매치 ${countText}를 종목·지역·수준으로 좁혀 봐요.` : '올라온 팀 매치를 종목·지역·수준으로 좁혀 봐요.',
+      body: countText ? `지금 올라온 팀 매치(${countText})를 종목·지역·수준으로 좁혀 봐요.` : '올라온 팀 매치를 종목·지역·수준으로 좁혀 봐요.',
       points: ['일시·장소·방식이 카드 한 장에', '입문부터 리그까지 수준별로'],
       badge: { icon: <List size={18} />, title: countText ? `팀 매치 ${countText}` : '팀 매치 모집 중', sub: sportsText ?? '종목별로 골라 봐요' },
     },

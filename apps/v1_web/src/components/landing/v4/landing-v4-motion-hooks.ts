@@ -7,9 +7,17 @@ const REDUCE_QUERY = '(prefers-reduced-motion: reduce)';
 
 function subscribeReduce(onChange: () => void): () => void {
   if (typeof window.matchMedia !== 'function') return () => {};
-  const query = window.matchMedia(REDUCE_QUERY);
-  query.addEventListener?.('change', onChange);
-  return () => query.removeEventListener?.('change', onChange);
+  // Safari < 14 MediaQueryList has only the legacy addListener/removeListener.
+  const query = window.matchMedia(REDUCE_QUERY) as MediaQueryList & {
+    addListener?: (listener: () => void) => void;
+    removeListener?: (listener: () => void) => void;
+  };
+  if (typeof query.addEventListener === 'function') {
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }
+  query.addListener?.(onChange);
+  return () => query.removeListener?.(onChange);
 }
 
 /* matchMedia 가 없으면 LandingRoot 도 모션을 켜지 않는다 — 같은 판정을 따른다. */

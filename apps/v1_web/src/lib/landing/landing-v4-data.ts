@@ -1,11 +1,12 @@
 /**
- * 랜딩 v4(/landing/v4)가 "지금 열려 있어요"·"문 3개"·"종목" 섹션에 쓰는 실데이터 요약.
+ * 랜딩 v4(/landing/v4)의 고정 무대·"지금 팀밋에서" 섹션이 쓰는 실데이터 요약.
  * 서버 전용 — fetchSeoSeed 는 실패해도 던지지 않고 null 을 돌려주므로, 이 파일도 null 을
  * 그대로 전파한다(빈 배열로 메우면 "0건"과 "못 받음"이 섞인다).
  */
 import { fetchSeoSeed } from '@/lib/seo-list';
 import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { formatCardDate, formatCardTime, formatTournamentDateMedium } from '@/lib/date-utils';
+import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import type { CursorPage, PageInfo, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 const LIST_LIMIT = 50;
@@ -27,6 +28,10 @@ export type LandingLiveTournament = {
   readonly location: string | null;
   readonly teamsText: string | null;
   readonly prizeText: string | null;
+  readonly imageUrl: string | null;
+  readonly formatLabel: string;
+  /** 정원이 있는 모집 중 대회만 — 리그는 정원 개념이 없다(teamCount 부재). */
+  readonly slots: { readonly confirmed: number; readonly total: number } | null;
   readonly href: string;
 };
 
@@ -35,8 +40,13 @@ export type LandingLiveTeamMatch = {
   readonly id: string;
   readonly hostName: string;
   readonly opponentName: string;
+  readonly hostLogoUrl: string | null;
+  readonly opponentLogoUrl: string | null;
   readonly region: string | null;
+  readonly place: string | null;
   readonly dateTimeText: string;
+  readonly formatText: string | null;
+  readonly levelLabel: string | null;
   readonly isLeague: boolean;
   readonly href: string;
 };
@@ -51,8 +61,14 @@ export type LandingV4Data = {
   readonly bySport: LandingBySport;
   /** 세 목록 중 하나라도 받았으면 true. false 면 종목 칸은 "0"이 아니라 이름만 보여준다. */
   readonly hasAnyData: boolean;
-  readonly live: readonly (LandingLiveTournament | LandingLiveTeamMatch)[];
+  /** 진행 중 > 모집 중 > 모집 마감 순, 최대 TOURNAMENT_LIMIT 개. 첫 장이 큰 카드다. */
+  readonly tournaments: readonly LandingLiveTournament[];
+  /** 상대가 확정된 다가오는 팀 매치, 시작 시각 순 최대 TEAM_MATCH_LIMIT 개. */
+  readonly teamMatches: readonly LandingLiveTeamMatch[];
 };
+
+const TOURNAMENT_LIMIT = 3;
+const TEAM_MATCH_LIMIT = 6;
 
 export async function fetchLandingV4Data(): Promise<LandingV4Data> {
   const [teamMatches, tournaments, teams] = await Promise.all([
@@ -136,7 +152,8 @@ export function summarizeLandingData(
     },
     bySport,
     hasAnyData: teamMatchesPage !== null || tournamentsPage !== null || teamsPage !== null,
-    live: [...liveTournaments(tournaments), ...liveTeamMatches(teamMatches, now)],
+    tournaments: liveTournaments(tournaments),
+    teamMatches: liveTeamMatches(teamMatches, now),
   };
 }
 
@@ -151,7 +168,7 @@ function liveTournaments(items: readonly V1TournamentListItem[]): LandingLiveTou
     .sort((a, b) =>
       TOURNAMENT_STATUS_PRIORITY[a.status] - TOURNAMENT_STATUS_PRIORITY[b.status] || a.item.promoHomePriority - b.item.promoHomePriority,
     )
-    .slice(0, 2)
+    .slice(0, TOURNAMENT_LIMIT)
     .map(({ item, status }) => ({
       kind: 'tournament' as const,
       id: item.id,
@@ -162,31 +179,61 @@ function liveTournaments(items: readonly V1TournamentListItem[]): LandingLiveTou
       location: item.promoHomeLocationText,
       teamsText: item.promoHomeTeamsText,
       prizeText: item.promoHomePrizeText,
+      imageUrl: item.promoHomeImageUrl ?? item.coverImageUrl ?? null,
+      formatLabel: competitionFormatLabel(item),
+      slots:
+        status === 'open' && !isLeagueCompetition(item) && typeof item.teamCount === 'number' && item.teamCount > 0
+          ? { confirmed: Math.min(item.confirmedCount, item.teamCount), total: item.teamCount }
+          : null,
       href: `/tournaments/${item.id}`,
     }));
 }
 
 function liveTeamMatches(items: readonly V1TeamMatch[], now: Date): LandingLiveTeamMatch[] {
-  const eligible: { item: V1TeamMatch; host: string; opponent: string }[] = [];
+  const eligible: { item: V1TeamMatch; host: NonNullable<V1TeamMatch['hostTeam']>; opponent: NonNullable<V1TeamMatch['approvedOpponentTeam']> }[] = [];
   for (const item of items) {
     if (getStatus(item) !== 'matched') continue;
-    const host = item.hostTeam?.name;
-    const opponent = item.approvedOpponentTeam?.name;
-    if (!host || !opponent) continue;
+    const host = item.hostTeam;
+    const opponent = item.approvedOpponentTeam;
+    if (!host?.name || !opponent?.name) continue;
     if (new Date(item.startsAt).getTime() <= now.getTime()) continue;
     eligible.push({ item, host, opponent });
   }
   return eligible
     .sort((a, b) => new Date(a.item.startsAt).getTime() - new Date(b.item.startsAt).getTime())
-    .slice(0, 2)
+    .slice(0, TEAM_MATCH_LIMIT)
     .map(({ item, host, opponent }) => ({
       kind: 'team_match' as const,
       id: item.teamMatchId ?? item.id,
-      hostName: host,
-      opponentName: opponent,
+      hostName: host.name,
+      opponentName: opponent.name,
+      hostLogoUrl: host.logoUrl ?? null,
+      opponentLogoUrl: opponent.logoUrl ?? null,
       region: item.region?.name ?? item.regionName ?? null,
+      place: item.place?.name ?? (item.placeName || null),
       dateTimeText: `${formatCardDate(item.startsAt)} ${formatCardTime(item.startsAt)}`,
+      formatText: item.matchFormat || null,
+      levelLabel: item.levelLabel || null,
       isLeague: Boolean(item.league),
       href: `/team-matches/${item.teamMatchId ?? item.id}`,
     }));
+}
+
+/** 운영 종목 — 수치가 0 인 종목도 "준비 중"으로 이름을 남기려고 고정 목록을 둔다. */
+export const LANDING_SPORTS = ['풋살', '축구', '러닝', '수영'] as const;
+
+export type LandingSportChips = {
+  readonly chips: readonly { readonly name: string; readonly count: number }[];
+  /** 이 지표가 0 인 운영 종목을 한 줄로("러닝·수영 준비 중"). 없으면 null. */
+  readonly soon: string | null;
+};
+
+export function sportChips(bySport: LandingBySport, key: keyof LandingBySport[string]): LandingSportChips {
+  const names = new Set<string>([...LANDING_SPORTS, ...Object.keys(bySport)]);
+  const chips = [...names]
+    .map((name) => ({ name, count: bySport[name]?.[key] ?? 0 }))
+    .filter((chip) => chip.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const idle = LANDING_SPORTS.filter((name) => !(bySport[name]?.[key] ?? 0));
+  return { chips, soon: idle.length > 0 ? `${idle.join('·')} 준비 중` : null };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CursorPage, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
-import { formatLandingCount, summarizeLandingData } from './landing-v4-data';
+import { formatLandingCount, sportChips, summarizeLandingData } from './landing-v4-data';
 
 const NOW = new Date('2026-09-28T00:00:00.000Z');
 const FUTURE = '2026-10-01T09:00:00.000Z';
@@ -49,15 +49,16 @@ describe('summarizeLandingData', () => {
     const on = tournament({ id: 'on', promoHomeEnabled: true });
     const off = tournament({ id: 'off', promoHomeEnabled: false });
     const data = summarizeLandingData(null, tournamentPage([off, on]), null, NOW);
-    expect(data.live.map((c) => c.id)).toEqual(['on']);
+    expect(data.tournaments.map((c) => c.id)).toEqual(['on']);
   });
 
-  it('상태 우선순위(in_progress > open > closed)로 정렬하고 최대 2개만 남긴다', () => {
+  it('상태 우선순위(in_progress > open > closed)로 정렬하고 최대 3개만 남긴다', () => {
     const closed = tournament({ id: 'closed', status: 'closed', promoHomeEnabled: true });
     const open = tournament({ id: 'open', status: 'open', promoHomeEnabled: true });
+    const open2 = tournament({ id: 'open2', status: 'open', promoHomeEnabled: true, promoHomePriority: 1 });
     const inProgress = tournament({ id: 'live', status: 'in_progress', promoHomeEnabled: true });
-    const data = summarizeLandingData(null, tournamentPage([closed, open, inProgress]), null, NOW);
-    expect(data.live.map((c) => c.id)).toEqual(['live', 'open']);
+    const data = summarizeLandingData(null, tournamentPage([closed, open2, open, inProgress]), null, NOW);
+    expect(data.tournaments.map((c) => c.id)).toEqual(['live', 'open', 'open2']);
   });
 
   it('지난 팀매치·상대 미확정 팀매치는 제외하고, 조건을 만족하는 것만 남긴다', () => {
@@ -65,14 +66,14 @@ describe('summarizeLandingData', () => {
     const past = teamMatch({ id: 'past', startsAt: PAST });
     const noOpponent = teamMatch({ id: 'no-opponent', startsAt: FUTURE, approvedOpponentTeam: null });
     const data = summarizeLandingData(cursorPage([past, noOpponent, upcoming]), null, null, NOW);
-    expect(data.live.map((c) => c.id)).toEqual(['upcoming']);
+    expect(data.teamMatches.map((c) => c.id)).toEqual(['upcoming']);
   });
 
   it('팀매치는 startsAt 오름차순으로 정렬한다', () => {
     const later = teamMatch({ id: 'later', startsAt: '2026-10-05T09:00:00.000Z' });
     const sooner = teamMatch({ id: 'sooner', startsAt: '2026-10-02T09:00:00.000Z' });
     const data = summarizeLandingData(cursorPage([later, sooner]), null, null, NOW);
-    expect(data.live.map((c) => c.id)).toEqual(['sooner', 'later']);
+    expect(data.teamMatches.map((c) => c.id)).toEqual(['sooner', 'later']);
   });
 
   it('다음 페이지가 있어도 이번 페이지에 모집 중이 0개면 "0개 이상"이 아니라 "0개"다', () => {
@@ -111,7 +112,8 @@ describe('summarizeLandingData', () => {
     expect(data.counts).toEqual({ teamMatches: null, tournaments: null, tournamentsOpen: null, teams: null });
     expect(data.bySport).toEqual({});
     expect(data.hasAnyData).toBe(false);
-    expect(data.live).toEqual([]);
+    expect(data.tournaments).toEqual([]);
+    expect(data.teamMatches).toEqual([]);
   });
 
   it('일부만 실패해도 hasAnyData 는 true 이고, 실패한 목록만 null 로 남는다', () => {
@@ -129,5 +131,69 @@ describe('summarizeLandingData', () => {
       NOW,
     );
     expect(data.counts.tournamentsOpen).toEqual({ value: 2, more: false });
+  });
+
+  it('팀매치는 최대 6개까지 남기고, 로고·장소·형식·수준을 싣는다(없는 값은 null)', () => {
+    const items = Array.from({ length: 7 }, (_, i) =>
+      teamMatch({ id: `m${i}`, startsAt: `2026-10-0${i + 1}T09:00:00.000Z` }),
+    );
+    items[0] = teamMatch({
+      id: 'm0',
+      startsAt: '2026-10-01T09:00:00.000Z',
+      hostTeam: { teamId: 'h', name: '마포 레인저스', logoUrl: '/logo/h.png' },
+      approvedOpponentTeam: { teamId: 'o', name: '한강 로버스', logoUrl: null },
+      place: { name: '케이풋살파크' },
+      matchFormat: '4:4',
+      levelLabel: '입문',
+    });
+    const data = summarizeLandingData(cursorPage(items), null, null, NOW);
+    expect(data.teamMatches).toHaveLength(6);
+    expect(data.teamMatches[0]).toMatchObject({
+      hostName: '마포 레인저스',
+      hostLogoUrl: '/logo/h.png',
+      opponentLogoUrl: null,
+      place: '케이풋살파크',
+      formatText: '4:4',
+      levelLabel: '입문',
+    });
+    expect(data.teamMatches[1]).toMatchObject({ hostLogoUrl: null, place: null, formatText: null, levelLabel: null });
+  });
+
+  it('대회 이미지는 홈 홍보 이미지 > 커버 > null 순이고, 형식 라벨은 리그를 먼저 가른다', () => {
+    const promo = tournament({ id: 'a', promoHomeEnabled: true, promoHomeImageUrl: '/p.png', coverImageUrl: '/c.png', format: 'knockout', kind: 'regular_tournament' });
+    const cover = tournament({ id: 'b', promoHomeEnabled: true, promoHomeImageUrl: null, coverImageUrl: '/c.png', format: 'group_knockout', kind: 'regular_league' });
+    const none = tournament({ id: 'c', promoHomeEnabled: true, promoHomeImageUrl: null, coverImageUrl: null, format: 'group_knockout', kind: null });
+    const byId = Object.fromEntries(summarizeLandingData(null, tournamentPage([promo, cover, none]), null, NOW).tournaments.map((t) => [t.id, t]));
+    expect([byId.a.imageUrl, byId.b.imageUrl, byId.c.imageUrl]).toEqual(['/p.png', '/c.png', null]);
+    expect([byId.a.formatLabel, byId.b.formatLabel, byId.c.formatLabel]).toEqual(['토너먼트', '리그 방식', '조별리그 + 토너먼트']);
+  });
+
+  it('정원 칸은 정원이 있는 모집 중 대회에만 있다(리그·진행 중은 null)', () => {
+    const open = tournament({ id: 'open', status: 'open', promoHomeEnabled: true, teamCount: 4, confirmedCount: 1, format: 'knockout', kind: null });
+    const league = tournament({ id: 'league', status: 'open', promoHomeEnabled: true, teamCount: 8, confirmedCount: 2, format: 'league', kind: null });
+    const live = tournament({ id: 'live', status: 'in_progress', promoHomeEnabled: true, teamCount: 4, confirmedCount: 4, format: 'knockout', kind: null });
+    const byId = Object.fromEntries(summarizeLandingData(null, tournamentPage([open, league, live]), null, NOW).tournaments.map((t) => [t.id, t]));
+    expect(byId.open.slots).toEqual({ confirmed: 1, total: 4 });
+    expect(byId.league.slots).toBeNull();
+    expect(byId.live.slots).toBeNull();
+  });
+});
+
+describe('sportChips', () => {
+  it('지표가 있는 종목만 많은 순으로 칩을 만들고, 0건 운영 종목은 한 줄로 묶는다', () => {
+    const bySport = {
+      축구: { teamMatches: 11, tournaments: 0, teams: 3 },
+      풋살: { teamMatches: 74, tournaments: 2, teams: 0 },
+    };
+    expect(sportChips(bySport, 'teamMatches')).toEqual({
+      chips: [{ name: '풋살', count: 74 }, { name: '축구', count: 11 }],
+      soon: '러닝·수영 준비 중',
+    });
+    expect(sportChips(bySport, 'teams')).toEqual({ chips: [{ name: '축구', count: 3 }], soon: '풋살·러닝·수영 준비 중' });
+  });
+
+  it('운영 종목이 전부 있으면 준비 중 줄이 없다', () => {
+    const one = { teamMatches: 1, tournaments: 0, teams: 0 };
+    expect(sportChips({ 풋살: one, 축구: one, 러닝: one, 수영: one }, 'teamMatches').soon).toBeNull();
   });
 });

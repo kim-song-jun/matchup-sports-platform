@@ -512,10 +512,19 @@ function toApplicantTeamsWithActions(
   actionPending: boolean,
 ): TeamMatchDetailViewModel['match']['applicantTeams'] {
   if (match.approvedOpponentTeam) {
+    const opponentStats = [
+      match.approvedOpponentTeam.mannerScore == null
+        ? null
+        : `매너 ${match.approvedOpponentTeam.mannerScore.toFixed(1)}`,
+      match.approvedOpponentTeam.wins == null ? null : `승 ${match.approvedOpponentTeam.wins}`,
+    ].filter((value): value is string => value !== null);
     return [{
+      teamId: match.approvedOpponentTeam.teamId,
       name: match.approvedOpponentTeam.name,
-      meta: '승인된 상대팀',
+      meta: opponentStats.join(' · '),
       status: '승인 완료',
+      logoUrl: match.approvedOpponentTeam.logoUrl ?? null,
+      trustState: match.approvedOpponentTeam.trustState ?? null,
       href: `/teams/${match.approvedOpponentTeam.teamId}`,
       applicationId: match.approvedOpponentTeam.applicationId,
     }];
@@ -523,9 +532,12 @@ function toApplicantTeamsWithActions(
 
   if (applications?.items.length) {
     return applications.items.map((app) => ({
+      teamId: app.applicantTeam.teamId,
       name: app.applicantTeam.name,
       meta: `매너 ${app.applicantTeam.score?.toFixed(1) ?? '-'} · ${app.applicantTeam.matchCount}전`,
       status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인 완료' : app.status === 'rejected' ? '미승인' : app.status,
+      logoUrl: app.applicantTeam.logoUrl,
+      trustState: app.applicantTeam.trustState,
       href: `/teams/${app.applicantTeam.teamId}`,
       applicationId: app.applicationId,
       actionPending,

@@ -187,9 +187,12 @@ describe('platform-managed team match provenance', () => {
       hostTeamHref: '/teams/team-home',
       applicantTeams: [
         {
+          teamId: 'team-away',
           name: '한강 로버스',
-          meta: '승인된 상대팀',
+          meta: '매너 4.7 · 승 9',
           status: '승인 완료',
+          logoUrl: '/uploads/hangang-rovers.png',
+          trustState: 'verified',
           href: '/teams/team-away',
           applicationId: 'application-away',
         },
@@ -212,6 +215,12 @@ describe('platform-managed team match provenance', () => {
     expect(teamCards.getByRole('link', { name: '브라보FC 팀 보기' })).toHaveAttribute('href', '/teams/team-bravo');
     expect(teamCards.getByText('어웨이팀 정보')).toBeInTheDocument();
     expect(teamCards.getByText('신청팀 정보')).toBeInTheDocument();
+    expect(teamCards.getByText('매너 4.7 · 승 9')).toBeInTheDocument();
+    expect(teamCards.queryByText('승인된 상대팀')).not.toBeInTheDocument();
+    expect(teamCards.getByRole('link', { name: '한강 로버스 팀 보기' }).querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('hangang-rovers.png'),
+    );
   });
 });
 

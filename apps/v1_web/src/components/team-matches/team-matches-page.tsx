@@ -348,6 +348,14 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{hasAssignedHostTeam ? '홈팀 정보' : '운영 주관'}</div>
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
+        {match.manner !== null || match.wins !== null ? (
+          <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+            {[
+              match.manner === null ? null : `매너 ${match.manner.toFixed(1)}`,
+              match.wins === null ? null : `승 ${match.wins}`,
+            ].filter(Boolean).join(' · ')}
+          </div>
+        ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
           {match.platformManaged ? <span className="tm-badge tm-badge-grey">플랫폼 주관</span> : null}
@@ -400,13 +408,20 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
           aria-label={`${team.name} 팀 보기`}
           style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}
         >
-          <TeamAvatar seed={team.applicationId ?? team.name} name={team.name} size="md" />
+          <TeamAvatar seed={team.teamId ?? team.applicationId ?? team.name} name={team.name} logoUrl={team.logoUrl} size="md" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
               {team.status === '승인 완료' ? '어웨이팀 정보' : '신청팀 정보'}
             </div>
             <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{team.name}</div>
-            <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{team.meta}</div>
+            {team.meta ? <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{team.meta}</div> : null}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+              <span className="tm-badge tm-badge-blue">{match.sport}</span>
+              {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
+              {team.trustState && trustStateLabel(team.trustState) ? (
+                <span className="tm-badge tm-badge-blue">{trustStateLabel(team.trustState)}</span>
+              ) : null}
+            </div>
           </div>
           <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
         </Link>

@@ -120,9 +120,12 @@ export type TeamMatchDetailViewModel = {
     applicantActionError?: string | null;
     manageHref?: string;
     applicantTeams: Array<{
+      teamId?: string;
       name: string;
       meta: string;
       status: string;
+      logoUrl?: string | null;
+      trustState?: string | null;
       href?: string;
       applicationId?: string;
       onApprove?: () => void;

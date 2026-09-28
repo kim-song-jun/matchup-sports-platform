@@ -1164,6 +1164,10 @@ export type V1TeamMatch = V1Match & {
   approvedOpponentTeam?: {
     teamId: string;
     name: string;
+    logoUrl?: string | null;
+    trustState?: string | null;
+    mannerScore?: number | null;
+    wins?: number | null;
     applicationId?: string;
   } | null;
   viewerState?: V1TeamMatchViewerState;

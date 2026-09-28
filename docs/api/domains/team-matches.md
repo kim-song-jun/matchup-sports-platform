@@ -171,6 +171,7 @@ Rules:
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.
   - `mannerScore` is the live aggregate of publicly revealed team-match reviews and is `null` when no score is publishable.
   - `wins` counts only the team's current official result facts whose result is `WON`; draft and superseded revisions are excluded.
+- Detail responses include the same public team-card fields for `approvedOpponentTeam`: `logoUrl`, `trustState`, `mannerScore`, and `wins`.
 
 ## POST /team-matches
 

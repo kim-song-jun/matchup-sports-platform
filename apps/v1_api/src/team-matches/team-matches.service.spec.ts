@@ -1196,6 +1196,68 @@ describe('TeamMatchesService', () => {
     });
   }
 
+  it('detail: 확정 어웨이팀도 홈팀과 같은 로고·매너·승수 정보를 반환한다', async () => {
+    mockPostEventReviewsByTeam({
+      'team-away': [
+        { sourceId: 'tm-away-a', rating: 5, reviewerTeamId: 'rival-1' },
+        { sourceId: 'tm-away-b', rating: 4, reviewerTeamId: 'rival-2' },
+        { sourceId: 'tm-away-c', rating: 5, reviewerTeamId: 'rival-3' },
+      ],
+    });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...teamMatchRow({
+        status: 'matched',
+        approvedApplicantTeamId: 'team-away',
+      }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '홈팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: { logoUrl: '/uploads/home.png' },
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: {
+        id: 'team-away',
+        name: '어웨이팀',
+        profile: { logoUrl: '/uploads/away.png' },
+        trustScore: { trustState: 'sample', mannerScore: 1 },
+        memberships: [],
+      },
+      applications: [{
+        ...applicationRow({
+          id: 'app-away',
+          applicantTeamId: 'team-away',
+          status: 'approved',
+        }),
+        applicantTeam: { id: 'team-away', name: '어웨이팀' },
+      }],
+      game: { id: 'game-1' },
+      league: null,
+    });
+    prisma.$queryRaw.mockResolvedValue([
+      { teamId: 'team-host', wins: 4n },
+      { teamId: 'team-away', wins: 7n },
+    ]);
+
+    const result = await service.detail(null, 'tm-1');
+
+    expect(result.approvedOpponentTeam).toMatchObject({
+      teamId: 'team-away',
+      name: '어웨이팀',
+      logoUrl: '/uploads/away.png',
+      trustState: 'verified',
+      mannerScore: 4.67,
+      wins: 7,
+      applicationId: 'app-away',
+    });
+  });
+
   it('list: 캐시된 trustState(sample)와 다른 live 재계산 값(verified)을 반환한다', async () => {
     // 서로 다른 3개 팀이 평가 → 3표 → verified. (같은 팀이 3경기에서 준 것이면 팀 평균 1표로 접혀
     // estimated가 되므로, 등급을 검증하려면 평가팀을 나눠야 한다.)

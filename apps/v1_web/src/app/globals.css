@@ -3506,7 +3506,7 @@ label.tm-btn:focus-within {
 }
 
 .tm-match-detail-chat-error {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--orange700);
   line-height: 1.45;
 }

@@ -1,9 +1,7 @@
 import { Prisma, V1GameSideKey } from '@prisma/client';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
-import { createSourceRosterIdentityLinks } from '../games/games.service';
-import { participantDisplayName } from './participant-display-name';
-import { readJerseyNumbers } from './tournament-player-jersey';
+import { syncGameSideRoster, syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
 
 type Tx = Prisma.TransactionClient;
 
@@ -107,27 +105,12 @@ export async function updateTournamentMatchInTx(
       id: true,
       teamId: true,
       team: { select: { name: true } },
-      players: {
-        where: { removedAt: null },
-        select: {
-          id: true,
-          userId: true,
-          realName: true,
-          registrationId: true,
-          user: { select: { profile: { select: { nickname: true, displayName: true } } } },
-        },
-        orderBy: { id: 'asc' },
-      },
     },
   });
   if (registrations.length !== registrationIds.length) throw new BadRequestException({ code: 'REGISTRATION_INVALID', message: '대진 등록이 해당 대회에 없거나 확정되지 않았어요.' });
   const registrationById = new Map(registrations.map((row) => [row.id, row]));
   const home = nextHome === null ? null : registrationById.get(nextHome)!;
   const away = nextAway === null ? null : registrationById.get(nextAway)!;
-  const [homeJerseys, awayJerseys] = await Promise.all([
-    home ? readJerseyNumbers(tx, home.id) : Promise.resolve(new Map<string, number>()),
-    away ? readJerseyNumbers(tx, away.id) : Promise.resolve(new Map<string, number>()),
-  ]);
   const nextHomeTeamId = home?.teamId ?? null;
   const nextAwayTeamId = away?.teamId ?? null;
   const homeChanged = detail.teamMatch.hostTeamId !== nextHomeTeamId;
@@ -174,8 +157,8 @@ export async function updateTournamentMatchInTx(
   });
 
   const sideChanges = [
-    { key: V1GameSideKey.HOME, oldTeamId: detail.teamMatch.hostTeamId, nextTeamId: nextHomeTeamId, name: home?.team.name ?? '홈 팀 미정', changed: homeChanged, registration: home, jerseys: homeJerseys },
-    { key: V1GameSideKey.AWAY, oldTeamId: detail.teamMatch.approvedApplicantTeamId, nextTeamId: nextAwayTeamId, name: away?.team.name ?? '어웨이 팀 미정', changed: awayChanged, registration: away, jerseys: awayJerseys },
+    { key: V1GameSideKey.HOME, oldTeamId: detail.teamMatch.hostTeamId, nextTeamId: nextHomeTeamId, name: home?.team.name ?? '홈 팀 미정', changed: homeChanged },
+    { key: V1GameSideKey.AWAY, oldTeamId: detail.teamMatch.approvedApplicantTeamId, nextTeamId: nextAwayTeamId, name: away?.team.name ?? '어웨이 팀 미정', changed: awayChanged },
   ];
   for (const sideChange of sideChanges) {
     const side = game.sides.find((candidate) => candidate.sideKey === sideChange.key);
@@ -183,30 +166,10 @@ export async function updateTournamentMatchInTx(
     if (sideChange.changed) {
       const newLineupId = await invalidateLineupAndTactics(tx, game.id, side.id);
       await tx.v1GameSide.update({ where: { id: side.id }, data: { teamId: sideChange.nextTeamId, displayNameSnapshot: sideChange.name } });
-      // TBD 슬롯이 실제 팀을 배정받는 시점 — createFixture 의 최초 참가자 복사와 같은 일을
-      // 여기서도 해준다. 안 해주면 이 사이드는 영원히 빈 라인업으로 남는다(실사용자 발견 결함,
-      // 2026-09-16) — syncTournamentRosterLineups 는 "이미 있던 자동 명단만 다시 맞추는" 함수라
-      // 이 시점엔 도와줄 수 없다(방금 만든 리비전이 revision 1도, 동기화 마커도 없어 안전장치가
-      // 오히려 이 새 리비전을 "누가 손댄 것"으로 보고 덮어쓰길 거부한다).
-      if (newLineupId !== null && sideChange.nextTeamId !== null && sideChange.registration !== null) {
-        const created = await tx.v1GameParticipant.createManyAndReturn({
-          data: sideChange.registration.players.map((player) => ({
-            gameId: game.id,
-            sideId: side.id,
-            lineupId: newLineupId,
-            userId: player.userId,
-            displayNameSnapshot: participantDisplayName(player),
-            jerseyNumber: sideChange.jerseys.get(player.id),
-            started: true,
-          })),
-          select: { id: true, userId: true },
-        });
-        await createSourceRosterIdentityLinks(
-          tx,
-          created.flatMap((row) => (row.userId === null ? [] : [{ participantId: row.id, userId: row.userId }])),
-          { actorType: 'SYSTEM', systemActor: 'TOURNAMENT_ROSTER_SYNC' },
-          'tournament_bracket_team_assigned',
-        );
+      // 새 팀의 참가 명단(조정·결장·출전정지 반영)으로 방금 만든 리비전 위에 명단을 채운다.
+      // 시각이 지난 경기도 SCHEDULED 면 채워야 하므로 팀 단위가 아니라 이 사이드를 직접 맞춘다.
+      if (newLineupId !== null && sideChange.nextTeamId !== null) {
+        await syncGameSideRoster(tx, { gameId: game.id, sideId: side.id });
       }
     }
     if (teamsChanged && sideChange.oldTeamId !== sideChange.nextTeamId) {
@@ -227,6 +190,13 @@ export async function updateTournamentMatchInTx(
     }
   }
   if (teamsChanged) await tx.v1Game.update({ where: { id: game.id }, data: { version: { increment: 1 } } });
+  // 팀 경기 순서(출전정지)와 경기 시각(결장 기간)이 바뀌었으니 관련 팀의 시작 전 경기를 다시 계산한다.
+  if (teamsChanged || timeChanged) {
+    await syncRostersForTeamMatchTeams(tx, {
+      competitionId: detail.tournamentId,
+      teamIds: [detail.teamMatch.hostTeamId, detail.teamMatch.approvedApplicantTeamId, nextHomeTeamId, nextAwayTeamId],
+    });
+  }
 
   return {
     id: updated.id,

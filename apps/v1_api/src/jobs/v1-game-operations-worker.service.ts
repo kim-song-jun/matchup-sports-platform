@@ -20,6 +20,7 @@ import {
   IdentityLinkExpiryService,
 } from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { syncRostersAfterResultChange } from '../games/roster/game-roster-sync';
 import { WebPushService } from '../notifications/web-push.service';
 import { VideoUploadCleanupService } from './video-upload-cleanup.service';
 import { VIDEO_UPLOAD_CLEANUP_TYPE } from '../games/video-url-lock';
@@ -62,6 +63,13 @@ export type GameOperationHandler = (
 
 type OutboxRow = GameOperationClaim;
 
+function withCompetitionRosterResync(handler: GameOperationHandler): GameOperationHandler {
+  return async (claim, tx) => {
+    await handler(claim, tx);
+    if (claim.aggregateType === 'GAME') await syncRostersAfterResultChange(tx, claim.aggregateId);
+  };
+}
+
 type QueueCounts = {
   pending: number;
   retry: number;
@@ -100,12 +108,14 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
+    // 결과가 제출·확정·무효가 되면 출전정지가 바뀔 수 있어, 같은 트랜잭션에서 양 팀의 시작 전
+    // 대회·리그 경기 명단을 다시 계산한다(Task 176). 결과 쓰기 경로가 많아 이 세 이벤트에서 한 번에 건다.
     const officialProjection = new GameResultOfficialProjectionService(this.webPush);
-    this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
+    this.registerHandler('GAME_RESULT_OFFICIAL', withCompetitionRosterResync(officialProjection.handler));
     const voidProjection = new GameResultVoidProjectionService();
-    this.registerHandler('GAME_RESULT_VOIDED', voidProjection.handler);
+    this.registerHandler('GAME_RESULT_VOIDED', withCompetitionRosterResync(voidProjection.handler));
     const submittedEscalation = new GameResultSubmittedEscalationService();
-    this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
+    this.registerHandler('GAME_RESULT_SUBMITTED', withCompetitionRosterResync(submittedEscalation.handler));
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
     // 사용자 확정: 리그 대진의 경기 시작 +24시간에도 결과 미입력(not_entered)이면

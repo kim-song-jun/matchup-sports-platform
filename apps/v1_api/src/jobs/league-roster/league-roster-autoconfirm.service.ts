@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
-import { syncLeagueRosterLineups } from '../../league-matches/league-roster-sync';
+import { syncCompetitionTeamRosters } from '../../games/roster/game-roster-sync';
 import {
   fillLeagueTeamRoster,
   notifyLeagueRosterFillOutcomes,
@@ -135,7 +135,7 @@ export class LeagueRosterAutoConfirmService {
     for (const registration of await this.pendingRegistrations(tx, leagueId)) {
       const outcome = await fillLeagueTeamRoster(tx, leagueId, registration);
       if (outcome.kind === 'filled') {
-        await syncLeagueRosterLineups(tx, { leagueId, teamId: registration.teamId });
+        await syncCompetitionTeamRosters(tx, { competitionId: leagueId, teamId: registration.teamId });
       }
       outcomes.push(outcome);
     }

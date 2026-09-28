@@ -97,7 +97,7 @@ export interface LeagueRosterEntry {
  * 연결하면 뛰지 않은 사람이 상호평가 대상(reviews.service.ts)과 선수 카드 기록에 오르고,
  * "이 선수가 저예요" 신청 목록(연결 없는 참가자만)에서도 빠진다.
  *
- * 대진 생성과 명단 동기화(`league-roster-sync.ts`)가 같은 규칙을 쓴다.
+ * 대진 생성과 명단 동기화(`games/roster/game-roster-sync.ts`)가 같은 규칙을 쓴다.
  */
 export function leagueTeamRosterEntries(team: LeagueFixtureTeam): LeagueRosterEntry[] {
   return leagueTeamRosterBase(team).map((entry) => ({
@@ -149,7 +149,7 @@ function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
  * 올렸다가 팀장이 전원 뺀 팀" 까지 다시 채워 버리는데, 그건 정책상 자동 채움 대상이
  * 아니다(`league-roster-autofill.ts` 참고) — 게다가 방금 뺀 그 유저를 그 자리에서 다시
  * 채우려다 유니크 제약에 걸려 **선수 삭제 트랜잭션 자체가 롤백된 적**이 있다
- * (`removePlayer` → `syncLeagueRosterLineups` → 이 함수, 같은 트랜잭션).
+ * (`removePlayer` → `syncCompetitionTeamRosters` → 이 함수, 같은 트랜잭션).
  */
 export async function loadLeagueTeamRosters(
   tx: Prisma.TransactionClient,

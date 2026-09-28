@@ -29,7 +29,7 @@ export interface LeagueRosterFillOutcome {
  * (시즌 시작 전에 전체 일정을 미리 짜 두는 것은 흔한, 정상적인 운영 순서다)
  * `league-fixture-creation.ts`의 `leagueTeamRosterEntries()`가 명단이 비어 있다고 보고
  * `team.memberships`(계정 없는 스냅샷)로 폴백한다. 되돌리는 동기화
- * (`league-roster-sync.ts`의 `syncLeagueRosterLineups`)는 "아직 시작 안 한 경기"에만
+ * (`games/roster/game-roster-sync.ts`의 `syncCompetitionTeamRosters`)는 "아직 시작 안 한 경기"에만
  * 적용되므로, 그 경기가 크론이 돌기 전에 이미 진행·종료되면 영영 못 고친다(실사용자
  * 발견 버그, 2026-09-19 QA #9).
  *

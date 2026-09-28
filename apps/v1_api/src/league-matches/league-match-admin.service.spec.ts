@@ -64,6 +64,8 @@ interface FakeState {
   registeredTeamIds: Set<string>;
   /** 팀별 리그 참가 명단. 기본은 비어 있다(명단 미제출). */
   rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string }>>;
+  /** 명단 재계산이 시작 전 경기를 찾은 팀. */
+  rosterSyncTeamIds: string[];
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -74,7 +76,7 @@ const KNOWN_TEAMS = new Map([
 
 function createFake() {
   const state: FakeState = {
-    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [],
+    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [], rosterSyncTeamIds: [],
     // 기본: 서로 다른 두 경기일이 이미 있다(KST 9/5, 9/12).
     siblingStartAts: [new Date('2026-09-05T01:00:00.000Z'), new Date('2026-09-12T01:00:00.000Z')],
     teamMatchCreates: [],
@@ -265,6 +267,12 @@ function createFake() {
     },
     v1Game: {
       findFirst: track('v1Game.findFirst', async () => null),
+      // 명단 재계산(syncCompetitionTeamRosters)이 팀의 시작 전 경기를 찾는 조회. 이 스위트는 그 경기를
+      // 흉내 내지 않으므로 "대상 없음"이다 — 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
+      findMany: track('v1Game.findMany', async (args: { where: { sides: { some: { teamId: string } } } }) => {
+        state.rosterSyncTeamIds.push(args.where.sides.some.teamId);
+        return [];
+      }),
       findUnique: track('v1Game.findUnique', async () =>
         createdGameId === null
           ? null
@@ -558,6 +566,12 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
      * 자동·수동이 같은 함수를 쓰므로 경로를 단정하면 수동으로 넣은 경기가 "자동 생성" 이라고
      * 표시된다 — 운영자가 자기가 손으로 넣은 경기를 시스템이 만든 것으로 읽는다.
      */
+    it('끼어든 경기로 팀 경기 순서가 바뀌므로 양 팀의 시작 전 경기 명단을 다시 계산한다', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+
+      expect([...state.rosterSyncTeamIds].sort()).toEqual(['team-a', 'team-b']);
+    });
+
     it('자동 승인 신청서 문구가 경로를 단정하지 않는다', async () => {
       await service.createManualFixture(adminUser, 'league-1', { ...manual });
 

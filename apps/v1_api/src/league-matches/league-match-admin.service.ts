@@ -60,6 +60,7 @@ import { LEAGUE_STATE_BY_STATUS, isCompleteLeagueMirror } from '../tournaments/l
 import { randomUUID } from 'node:crypto';
 import { LeagueStateValue } from './league-state';
 import { isLeagueRegistrationOpen } from './league-registration-open';
+import { syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
 
 // 그룹 B 감사 결함 1: 팀 제외로 인한 대진 취소는 운영자 개별 사유가 아니라 시스템이
 // 판단한 부수효과다 — cancelFixture(운영자 사유 필수)와 구분되는 고정 사유 문자열.
@@ -1160,7 +1161,7 @@ export class LeagueMatchAdminService {
           message: '비활성화되었거나 삭제된 팀이 포함돼 있어요.',
         });
       }
-      return createLeagueFixture(tx, this.games, {
+      const created = await createLeagueFixture(tx, this.games, {
         leagueId: league.id,
         adminUserId: admin.userId,
         sportId: league.sportId,
@@ -1176,6 +1177,9 @@ export class LeagueMatchAdminService {
         home,
         away,
       });
+      // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 양 팀을 다시 계산한다.
+      await syncRostersForTeamMatchTeams(tx, { competitionId: league.id, teamIds: [dto.homeTeamId, dto.awayTeamId] });
+      return created;
     });
 
     return { leagueId, teamMatchId };
@@ -1255,6 +1259,10 @@ export class LeagueMatchAdminService {
         // (team-matches.service.ts:593의 동일 패턴). syncTeamMatchScheduleInTx는 teamMatchId
         // 기준으로 SCHEDULED 상태인 스케줄을 전부(호스트+원정 최대 2건) 갱신한다.
         await syncTeamMatchScheduleInTx(tx, teamMatchId, teamMatch.title, persistedStartAt, result.endAt);
+        await syncRostersForTeamMatchTeams(tx, {
+          competitionId: leagueId,
+          teamIds: [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
+        });
       }
       await this.adminContext.logAdminAction(
         admin,

@@ -833,9 +833,9 @@ async function appendIdentityEvent(
           // `system_actor` 는 TEXT 컬럼이고 트리거가 값을 검사하는 것은 EXPIRED 뿐이라
           // (20260729000100 migration 의 v1_guard_identity_event) 스키마 변경이 필요 없다.
           | 'LINEUP_REVISION_COPY'
-          // 리그 참가 명단이 바뀌어 시작 전 경기 명단을 다시 맞출 때(league-roster-sync.ts).
+          // 시작 전 리그 경기 명단을 다시 계산할 때(games/roster/game-roster-sync.ts).
           | 'LEAGUE_ROSTER_SYNC'
-          // 대회 참가 명단이 바뀌어 시작 전 대진 경기 명단을 다시 맞출 때(tournament-roster-sync.ts).
+          // 시작 전 대회 경기 명단을 다시 계산할 때(games/roster/game-roster-sync.ts).
           | 'TOURNAMENT_ROSTER_SYNC'
           // 친선 팀 매치의 상대팀 신청이 승인되어 그 팀의 초기 라인업 스냅샷이
           // 자동 생성될 때(team-matches.service.ts hydrateApprovedAwaySnapshot).

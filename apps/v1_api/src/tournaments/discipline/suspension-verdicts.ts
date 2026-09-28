@@ -58,6 +58,24 @@ function readResultCards(value: unknown): { yellow: number; red: number } {
   return { yellow: 0, red: 0 };
 }
 
+/** 대회·리그의 출전정지 규정. 결과가 명단을 바꿀 수 있는지(`suspensionRulesEnabled`) 판정에도 쓴다. */
+export async function readSuspensionRules(
+  tx: Tx,
+  competitionId: string,
+): Promise<{ yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null }> {
+  // **행이 없으면 규정이 조용히 꺼진다**(아래 `?? null` → `suspensionRulesEnabled` false).
+  // 그래서 대회/리그를 가리지 않고 찾는다 — 좁혀 두면 리그 경기가 여기로 오는 순간
+  // 리그 징계 규정이 에러 없이 사라진다(경고 누적·퇴장 정지가 통째로 안 돈다).
+  const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
+    where: { id: competitionId },
+    select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
+  });
+  return {
+    yellowAccumulationLimit: competition?.yellowAccumulationLimit ?? null,
+    redCardSuspensionMatches: competition?.redCardSuspensionMatches ?? null,
+  };
+}
+
 /**
  * 이 대회에서 카드가 누적된 선수들의 "다음 경기(`upcomingKey`) 출전정지" 여부.
  *
@@ -88,17 +106,7 @@ export async function readSuspensionVerdicts(
   tx: Tx,
   input: SuspensionVerdictInput,
 ): Promise<Map<string, SuspensionVerdict>> {
-  // **행이 없으면 규정이 조용히 꺼진다**(아래 `?? null` → `suspensionRulesEnabled` false).
-  // 그래서 대회/리그를 가리지 않고 찾는다 — 좁혀 두면 리그 경기가 여기로 오는 순간
-  // 리그 징계 규정이 에러 없이 사라진다(경고 누적·퇴장 정지가 통째로 안 돈다).
-  const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
-    where: { id: input.competitionId },
-    select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
-  });
-  const rules = {
-    yellowAccumulationLimit: competition?.yellowAccumulationLimit ?? null,
-    redCardSuspensionMatches: competition?.redCardSuspensionMatches ?? null,
-  };
+  const rules = await readSuspensionRules(tx, input.competitionId);
   // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회·리그가 그렇다(옵트인).
   if (!suspensionRulesEnabled(rules)) return emptyVerdicts();
 

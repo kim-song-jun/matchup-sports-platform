@@ -126,6 +126,12 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
 
 // ─── 테스트 스위트 ───────────────────────────────────────────────────────────────
 
+
+/** 동기화가 경기를 찾는 대회·리그 범위 — 리그 경기는 leagueId, 대회 경기는 tournamentId(리그 아님). */
+const competitionScope = (competitionId: string) => ({
+  OR: [{ leagueId: competitionId }, { tournamentId: competitionId, leagueId: null }],
+});
+
 describe('TournamentPlayersService', () => {
   let service: TournamentPlayersService;
   let prisma: {
@@ -178,7 +184,7 @@ describe('TournamentPlayersService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
-      // 리그 경기 명단 동기화(league-roster-sync)가 시작 전 경기를 찾는 조회. 기본은 "대상 경기 없음".
+      // 리그 경기 명단 동기화(syncCompetitionTeamRosters)가 시작 전 경기를 찾는 조회. 기본은 "대상 경기 없음".
       v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
@@ -658,11 +664,11 @@ describe('TournamentPlayersService', () => {
         }),
       }),
     );
-    // 리그면 시작 전 경기 명단을 새 참가 명단에 맞춘다 — 같은 리그·같은 팀으로 찾는다.
+    // 그 대회·리그(같은 id)의 시작 전 경기를 같은 팀으로 찾는다.
     expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          teamMatch: expect.objectContaining({ leagueId: 'tournament-1' }),
+          teamMatch: expect.objectContaining({ AND: expect.arrayContaining([competitionScope('tournament-1')]) }),
           sides: { some: { teamId: registrationRow().teamId } },
         }),
       }),
@@ -821,7 +827,7 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          teamMatch: expect.objectContaining({ leagueId: 'tournament-1' }),
+          teamMatch: expect.objectContaining({ AND: expect.arrayContaining([competitionScope('tournament-1')]) }),
           sides: { some: { teamId: registrationRow().teamId } },
         }),
       }),
@@ -1658,7 +1664,7 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          teamMatch: expect.objectContaining({ leagueId: 'tournament-1' }),
+          teamMatch: expect.objectContaining({ AND: expect.arrayContaining([competitionScope('tournament-1')]) }),
           sides: { some: { teamId: 'team-removed-from' } },
         }),
       }),

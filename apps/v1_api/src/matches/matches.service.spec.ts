@@ -603,14 +603,30 @@ describe('MatchesService', () => {
     expect(result.lockedReason).toBeNull();
   });
 
-  it('list: status 생략 기본 탐색은 시작 시각이 지난 매치를 where에서 제외한다', async () => {
+  it('list: status 생략 기본 탐색은 진행중·종료 확인 중·최근 완료 매치를 7일 범위로 포함한다', async () => {
     prisma.v1Match.findMany.mockResolvedValue([]);
 
     await service.list(null, {});
 
     const where = prisma.v1Match.findMany.mock.calls[0][0].where;
-    expect(where.status).toEqual({ in: ['recruiting', 'closed'] });
-    expect(where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(where.status).toBeUndefined();
+    expect(where.OR).toEqual([
+      {
+        status: { in: ['recruiting', 'closed'] },
+        OR: [
+          { startAt: { gte: expect.any(Date) } },
+          { endAt: { gte: expect.any(Date) } },
+          { endAt: null, startAt: { gte: expect.any(Date) } },
+        ],
+      },
+      {
+        status: 'completed',
+        OR: [
+          { completedAt: { gte: expect.any(Date) } },
+          { completedAt: null, startAt: { gte: expect.any(Date) } },
+        ],
+      },
+    ]);
   });
 
   it('list: 기본 조회는 최신 생성순이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
@@ -620,8 +636,7 @@ describe('MatchesService', () => {
 
     const args = prisma.v1Match.findMany.mock.calls[0][0];
     expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
-    expect(args.where.status).toEqual({ in: ['recruiting', 'closed'] });
-    expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(args.where.OR).toHaveLength(2);
     expect(args.where.AND).toBeUndefined();
   });
 
@@ -635,6 +650,24 @@ describe('MatchesService', () => {
     expect(args.where.AND).toEqual(expect.arrayContaining([
       { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
     ]));
+  });
+
+  it('list: 시작 후 종료 전에는 진행중, 종료 뒤 완료 전에는 종료 확인 필요 상태를 내려준다', async () => {
+    const now = Date.now();
+    const common = {
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      hostUser: { id: host.id, profile: null, reputationSummary: null },
+    };
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({ ...common, id: 'in-progress', startAt: new Date(now - 30 * 60 * 1000), endAt: new Date(now + 30 * 60 * 1000) }),
+      matchRow({ ...common, id: 'pending-completion', startAt: new Date(now - 2 * 60 * 60 * 1000), endAt: new Date(now - 60 * 60 * 1000) }),
+    ]);
+
+    const result = await service.list(null, {});
+
+    expect(result.items.map((item: { displayState: string }) => item.displayState)).toEqual(['in_progress', 'completion_pending']);
   });
 
   // 감사 결함 회귀 방지(2026-08-27): toListItem()이 host를 아예 내려주지 않아 프론트가

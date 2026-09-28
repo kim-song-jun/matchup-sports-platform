@@ -9,6 +9,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { createSharedRecordFixture } from '../fixtures/team-match-shared-record.fixture';
 import type { MutateTeamMatchRecordDto } from '../../src/team-matches/dto/team-match-record.dto';
+import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 
 const prisma = new PrismaService();
 const records = new TeamMatchRecordService(prisma);
@@ -70,6 +71,34 @@ describe('friendly match shared score sheet (real DB)', () => {
       expect((await records.mutate(actor, f.match.id, input)).goals).toHaveLength(1);
       await expect(records.mutate(actor, f.match.id, { ...input, sideId: f.sides[1].id })).rejects.toMatchObject({ status: 409 });
     }
+  });
+  it('reports the shared record as the immutable lineup lock once recording starts', async () => {
+    const f = await createSharedRecordFixture(prisma);
+    const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
+    const manager = user(f.userIds[0]);
+    const before = await lineups.getLineup(manager, f.match.id);
+    expect(before).toMatchObject({ editable: true, lockReason: null });
+
+    await records.mutate(
+      user(f.userIds[1]),
+      f.match.id,
+      cmd('add', 0, { sideId: f.sides[0].id, participantId: f.participants[0].id }),
+    );
+
+    await expect(lineups.getLineup(manager, f.match.id)).resolves.toMatchObject({
+      editable: false,
+      lockReason: 'records_exist',
+    });
+
+    await expect(
+      lineups.saveLineup(manager, f.match.id, randomUUID(), {
+        expectedVersion: before.version,
+        participants: [],
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' },
+    });
   });
   it('counts own goals for the opposing team and leaves unknown scorers unassigned', async () => {
     const f = await createSharedRecordFixture(prisma);

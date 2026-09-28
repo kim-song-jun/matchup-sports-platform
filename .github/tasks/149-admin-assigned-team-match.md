@@ -16,7 +16,7 @@ Status: in_progress
 - [x] Managed active teams in the same sport can apply through the existing public application flow.
 - [x] Creation writes only a recruiting team match; it does not create a Game or either team schedule.
 - [x] An owner/ops admin can later select two distinct requested applications as home and away.
-- [x] Finalization atomically creates the Game and both schedules, approves the selected applications, rejects the remaining applications, and writes audit/status logs.
+- [x] The first approval atomically creates a HOME + placeholder AWAY Game and HOME schedule; finalization hydrates AWAY, creates its schedule, approves the selected application, rejects the remaining applications, and writes audit/status logs.
 - [x] Support admins and non-admin users cannot create or finalize platform recruitment.
 - [x] Existing team-owner recruitment/application flow remains unchanged.
 - [x] The admin recruitment uses the ordinary team-match condition contract: representative image, level, format, styles, uniform, gender, total/opponent cost, place, schedule, and optional deadline.
@@ -24,6 +24,7 @@ Status: in_progress
 - [x] Platform-managed provenance is persisted independently of `hostTeamId` and remains visible after home/away assignment.
 - [x] Admins approve applicant teams one at a time; the first approval stays recruiting and the second approval finalizes the match.
 - [x] The first approved team is persisted as HOME immediately, so the public hero changes from `모집 중 vs 모집 중` to `HOME 팀명 vs 모집 중` before the second approval.
+- [x] The first approved HOME team can immediately save and submit its attendance lineup without waiting for the second team.
 - [x] The admin list exposes a visible application-management action as soon as one requested application exists.
 - [x] HOME/AWAY assignment never promotes either participant team into the platform recruitment operator; platform HOME viewers receive no `host_team` state or recruitment-management CTA.
 - [x] Owner/ops admins can reject an individual requested application with a required reason, audit log, and applicant-team notification.
@@ -39,7 +40,7 @@ Status: in_progress
   Then the application is stored as `requested` without requiring a host team.
 - Given at least two valid requested applications
   When the admin approves the first application and later approves the second
-  Then the first response remains `recruiting` while the approved HOME team is publicly visible, the second makes the team match `matched`, remaining applications are rejected, and the detail route is returned.
+  Then the first response remains `recruiting` while the approved HOME team is publicly visible and can manage its lineup, the second hydrates the existing AWAY side, makes the team match `matched`, rejects remaining applications, and returns the detail route.
 - Given the same application twice, a cross-sport/inactive team, or a support admin
   When finalization is attempted
   Then the API rejects the request without partial writes.
@@ -77,6 +78,7 @@ Status: in_progress
 - [x] 2026-09-24 rejection/edit focused frontend detail/edit tests: 15/15
 - [x] 2026-09-24 API/Web `tsc --noEmit` and `git diff --check`
 - [ ] 2026-09-24 rejection/edit headed visual QA: local API/Web runtime was unavailable on ports 8121/3013; verify detail rejection form and edit page on alpha after deployment.
+- [x] 2026-09-28 first-approval lineup recovery: focused API unit suites 100/100 and API `tsc --noEmit`
 
 ## Ambiguity Log
 
@@ -85,13 +87,15 @@ Status: in_progress
 
 ## Progress Snapshot
 
+- 2026-09-28: First platform approval now creates the canonical HOME + placeholder AWAY Game and HOME schedule, enabling the approved team to register its attendance lineup immediately. Second approval hydrates that existing AWAY side instead of creating a replacement Game.
+
 - 2026-09-28: Corrected the public detail team-card boundary. `플랫폼 주관` and league/match conditions remain match-level provenance and are no longer rendered as attributes inside an assigned team card.
 
 - 2026-09-27: Fixed the first-approval projection gap reported on alpha. The approval transaction now persists the first approved applicant as `hostTeamId`, a data migration backfills existing single-approved platform recruitments, and public list/detail can render `HOME 팀명 vs 모집 중` immediately.
 
 - 2026-09-24: Added the missing explicit rejection action and a platform-recruitment edit route. Rejection requires a reason and preserves the recruiting aggregate; editing is limited to admin-managed standalone matches in `recruiting` state and uses optimistic concurrency.
 
-- 2026-09-22: Replaced the two-application batch selector with per-application approval. The first approved team reserves HOME without creating a Game or schedule; the second approved team becomes AWAY and atomically finalizes the match.
+- 2026-09-22: Replaced the two-application batch selector with per-application approval. The original first-approval contract reserved HOME without a Game or schedule; the 2026-09-28 follow-up supersedes that part by creating the placeholder Game and HOME schedule immediately.
 - 2026-09-22: Added `pendingApplicationCount` and a visible `신청 1건 관리` list action so operators do not need to discover the row-click detail route before approving the first team.
 - 2026-09-19: Existing v1 flow and admin permissions verified. Implementation started.
 - 2026-09-19: Initial direct-assignment interpretation was corrected after user clarification.

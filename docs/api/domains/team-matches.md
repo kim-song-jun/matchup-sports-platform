@@ -40,10 +40,11 @@
 ### 진행 중 참석명단 수정
 
 - **Task 176**: 대회·리그 경기(`leagueId` 또는 `tournamentId` 가 있는 팀매치)는 `PUT .../lineup`·`POST .../lineup/submit`·`POST .../lineup/change-request` 가 모두 `409 ROSTER_MANAGED_BY_ADJUSTMENTS` 다(진행 중 포함). 경기 명단은 참가 명단에서 계산되고 빠지는 선수는 경기 명단 조정 API 로 뺀다. 아래 규칙은 친선에만 적용된다.
-- `GET /team-matches/:id/lineup`은 `gameState`와 `hasRecordedEvents`를 반환한다.
-- Game이 `LIVE` 또는 `PAUSED`이면 킥오프 이후나 기존 라인업이 `LOCKED`여도 팀 owner/manager가 참석명단을 새 리비전으로 저장하고 다시 제출할 수 있다. 종료·취소된 경기는 계속 차단한다.
-- 경기 이벤트가 하나라도 있으면 `PUT /team-matches/:id/lineup`은 `confirmRecordedDataRisk=true`를 요구한다. 없으면 `409 LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED`를 반환한다.
-- Web은 저장 전에 득점 등 선수 기록이 화면에서 사라질 수 있음을 알리고 사용자의 명시적 재확인을 받은 요청에만 확인값을 포함한다.
+- `GET /team-matches/:id/lineup`은 서버가 계산한 `editable`과 `lockReason`(`terminal`, `records_exist`, `active_lineups_complete`, `null`)을 반환한다. `gameState`와 `hasRecordedEvents`는 구버전 Web 호환 필드다.
+- 예정 시작 시각은 수정 마감이 아니다. Game이 `SCHEDULED`이면 `startAt`이 지나도 현장 지연 복구를 위해 저장·제출·정정 요청을 허용한다.
+- Game이 `LIVE`/`PAUSED`일 때는 양 팀 중 한쪽 최신 revision이 아직 미제출인 동안만 복구할 수 있다. 양 팀 최신 revision이 모두 `SUBMITTED`/`LOCKED`가 되면 즉시 잠긴다.
+- 일반 경기 이벤트, 공동 기록, 결과 revision 중 하나라도 생기면 참석명단 수정은 `409 LINEUP_LOCKED_FOR_DIRECT_EDIT`로 거절된다. 구버전의 `confirmRecordedDataRisk` 값으로 우회할 수 없다.
+- 명단 mutation과 공동 기록/Game command는 같은 Game 행을 잠근 뒤 상태를 다시 읽어 동시 요청에서 참가자 ID가 기록 뒤에 바뀌지 않게 한다.
 
 
 
@@ -122,8 +123,8 @@ Rules:
 
 - 대상은 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
 - 선택 신청은 `requested` 상태여야 하고 신청 팀은 활성 상태이며 모집 종목과 같아야 한다.
-- 첫 번째 승인에서는 해당 신청을 `approved`로 바꾸고 그 팀을 HOME(`hostTeamId`)으로 예약하되 팀매치는 `recruiting`을 유지한다. 공개 목록/상세는 즉시 `승인된 HOME 팀 vs 모집 중`으로 표시하며 Game과 team schedule은 아직 만들지 않는다.
-- 두 번째 승인에서는 먼저 승인한 팀을 HOME(`hostTeamId`), 새 승인 팀을 AWAY(`approvedApplicantTeamId`)로 연결하고 팀매치를 `matched`로 바꾼다.
+- 첫 번째 승인에서는 해당 신청을 `approved`로 바꾸고 그 팀을 HOME(`hostTeamId`)으로 예약하되 팀매치는 `recruiting`을 유지한다. 동시에 일반 팀매치 모집과 같은 HOME + teamId 없는 AWAY placeholder Game과 HOME 팀 schedule을 만든다. 공개 목록/상세는 즉시 `승인된 HOME 팀 vs 모집 중`으로 표시하며, 승인된 팀 owner/manager는 두 번째 팀을 기다리지 않고 참석명단을 저장·제출할 수 있다.
+- 두 번째 승인에서는 기존 Game의 AWAY placeholder와 revision-1 명단 스냅샷을 새 승인 팀으로 채우고 `approvedApplicantTeamId`를 연결한 뒤 팀매치를 `matched`로 바꾼다. Game을 새로 만들거나 HOME schedule을 중복 생성하지 않는다.
 
 ## POST /admin/team-matches/:id/applications/:applicationId/reject
 
@@ -139,7 +140,7 @@ Rules:
 - 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
 - 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다. 따라서 공개 목록/상세의 `viewerState`/`viewer.state`도 플랫폼 HOME 팀에 `host_team`을 부여하지 않고 `viewer.manageRoute`는 `null`이다. `viewer.manageableHostTeam`은 HOME 사이드의 참가 기능 판정일 뿐 모집 관리 권한이 아니다.
 - 두 번째 승인 때 나머지 `requested` 신청을 `rejected`로 전환한다.
-- 두 번째 승인과 Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
+- 첫 승인과 HOME Game side/placeholder AWAY side/HOME schedule, 두 번째 승인과 AWAY side hydration/AWAY schedule/application·team-match 상태 로그/admin action log는 각각의 승인 트랜잭션 안에서 원자적으로 기록한다.
 - 성공 응답은 `applicationId`, `applicantTeamId`, `applicationStatus`, `teamMatchId`, `teamMatchStatus`, `approvedCount`, nullable `gameId`/`homeTeamId`/`awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
 ## GET /team-matches (TeamMatchesQueryDto)
@@ -282,7 +283,7 @@ Rules:
 - Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
 - Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement.
 - Opponent-side lineup access and change requests require an approved opponent team.
-- A submitted attendance roster remains editable until the game starts. Saving an edit creates a new draft revision, which can be submitted again without mutating the previous submitted revision.
+- Scheduled games remain editable regardless of wall-clock kickoff. LIVE/PAUSED games remain editable only while either side's latest lineup is incomplete and no event/shared-record/result revision exists. The GET response's `editable`/`lockReason` is the client source of truth.
 - Goalkeeper is an independent per-participant designation: multiple participants or no participant may be marked as goalkeeper.
 
 ## Frontend Mapping Notes

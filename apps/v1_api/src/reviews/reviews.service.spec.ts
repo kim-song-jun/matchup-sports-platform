@@ -57,6 +57,70 @@ describe('ReviewsService', () => {
     expect(tournamentFixtureReviews.pending).toHaveBeenCalledWith(user, 20, tournamentId);
   });
 
+  it('match source: 직접 참가하지 않은 방장도 실제 참가자를 리뷰할 수 있다', async () => {
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          hostUserId: user.id,
+          title: '방장이 직접 참가하지 않는 개인 매치',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    await expect(service.source(user, { sourceType: 'match', sourceId })).resolves.toMatchObject({
+      targets: [
+        expect.objectContaining({ targetUserId, name: '민준', locked: false }),
+      ],
+    });
+  });
+
+  it('match source: 방장도 참가자도 아닌 사용자는 계속 차단한다', async () => {
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          hostUserId: 'host-user',
+          title: '개인 매치',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
+
+    await expect(service.source(user, { sourceType: 'match', sourceId })).rejects.toMatchObject({
+      response: { code: 'NOT_SOURCE_PARTICIPANT' },
+    });
+  });
+
   it('returns an idempotent duplicate response when personal review create hits the unique constraint', async () => {
     const existingReview = {
       id: 'review-1',

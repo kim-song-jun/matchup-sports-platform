@@ -432,9 +432,16 @@ export class ReviewsService {
       where: {
         deletedAt: null,
         OR: [{ status: 'completed' }, { completedAt: { not: null } }],
-        participants: {
-          some: { userId: user.id, status: { in: ELIGIBLE_PARTICIPANT_STATUSES } },
-        },
+        AND: [{
+          OR: [
+            { hostUserId: user.id },
+            {
+              participants: {
+                some: { userId: user.id, status: { in: ELIGIBLE_PARTICIPANT_STATUSES } },
+              },
+            },
+          ],
+        }],
       },
       orderBy: [{ completedAt: 'desc' }, { startAt: 'desc' }],
       take: limit,
@@ -576,6 +583,7 @@ export class ReviewsService {
       select: {
         id: true,
         title: true,
+        hostUserId: true,
         status: true,
         completedAt: true,
         startAt: true,
@@ -593,7 +601,9 @@ export class ReviewsService {
     });
     if (!match) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (!isCompleted(match)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
-    if (!match.participants.some((participant) => participant.userId === user.id)) {
+    const isHost = match.hostUserId === user.id;
+    const isParticipant = match.participants.some((participant) => participant.userId === user.id);
+    if (!isHost && !isParticipant) {
       throw forbidden('NOT_SOURCE_PARTICIPANT', 'Only participants can review this match');
     }
 

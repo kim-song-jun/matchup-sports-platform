@@ -42,6 +42,11 @@ import {
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
+import {
+  areLatestTeamMatchLineupsSubmitted,
+  isTeamMatchRosterDependentEventType,
+  latestTeamMatchLineupBySide,
+} from './core/team-match-lineup-window';
 import { isCommandConcurrencyConflict } from './command-concurrency-error';
 import {
   assertBracketResolvable,
@@ -1939,6 +1944,13 @@ export class GamesService {
             message: 'Terminal games reject event mutation',
           });
         }
+        if (
+          game.sourceType === V1GameSourceType.TEAM_MATCH &&
+          isTeamMatchRosterDependentEventType(dto.type) &&
+          (await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)) === null
+        ) {
+          await this.assertFriendlyTeamMatchLineupsReady(tx, game.id);
+        }
         const references = await this.assertEventReferences(tx, game, dto);
         const sequence = game.lastSequence + 1;
         const createdEvent = await tx.v1GameEvent.create({
@@ -2101,6 +2113,13 @@ export class GamesService {
             clientEventId: input.clientEventId,
             takeoverToken: input.takeoverToken,
           };
+          if (
+            game.sourceType === V1GameSourceType.TEAM_MATCH &&
+            isTeamMatchRosterDependentEventType(dto.type) &&
+            (await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)) === null
+          ) {
+            await this.assertFriendlyTeamMatchLineupsReady(tx, game.id);
+          }
           const references = await this.assertEventReferences(tx, game, dto);
           const sequence = game.lastSequence + 1;
           const createdEvent = await tx.v1GameEvent.create({
@@ -6155,16 +6174,27 @@ export class GamesService {
     const [sides, lineups] = await Promise.all([
       tx.v1GameSide.findMany({ where: { gameId, teamId: { not: null } }, select: { id: true } }),
       tx.v1GameLineup.findMany({
-        where: { gameId, invalidatedAt: null, state: { in: [V1GameLineupState.SUBMITTED, V1GameLineupState.LOCKED] } },
-        orderBy: { revision: 'desc' },
-        select: { id: true, sideId: true },
+        where: { gameId, invalidatedAt: null },
+        select: { id: true, sideId: true, revision: true, state: true },
       }),
     ]);
-    const latestBySide = new Map<string, string>();
-    for (const lineup of lineups) if (!latestBySide.has(lineup.sideId)) latestBySide.set(lineup.sideId, lineup.id);
+    const sideIds = sides.map((side) => side.id);
+    const latestBySide = latestTeamMatchLineupBySide(lineups);
+    if (!areLatestTeamMatchLineupsSubmitted(sideIds, lineups)) {
+      throw new ConflictException({
+        code: 'ROSTER_INCOMPLETE',
+        message: '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.',
+      });
+    }
     const participantSides = new Set(
       (await tx.v1GameParticipant.findMany({
-        where: { gameId, lineupId: { in: [...latestBySide.values()] } },
+        where: {
+          gameId,
+          lineupId: { in: sideIds.flatMap((sideId) => {
+            const lineup = latestBySide.get(sideId);
+            return lineup === undefined ? [] : [lineup.id];
+          }) },
+        },
         select: { sideId: true },
       })).map((participant) => participant.sideId),
     );

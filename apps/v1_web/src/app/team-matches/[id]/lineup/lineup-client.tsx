@@ -9,7 +9,6 @@ import {
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
-import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1MyTeams,
   useV1SaveTeamMatchLineup,
@@ -118,9 +117,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [lastSubmittedRevision, setLastSubmittedRevision] = useState<number | null>(null);
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
-  const deadlinePassed = Boolean(kickoffAt) && now >= new Date(kickoffAt as string).getTime();
-  const liveEditAllowed = lineupQuery.data?.gameState === 'LIVE' || lineupQuery.data?.gameState === 'PAUSED';
-  const phase = lineupQuery.data ? describeLineupPhase(lineupQuery.data.state, deadlinePassed, liveEditAllowed) : null;
+  const phase = lineupQuery.data
+    ? describeLineupPhase(
+        lineupQuery.data.state,
+        lineupQuery.data.editable === true,
+        lineupQuery.data.lockReason ?? null,
+      )
+    : null;
   const editable = Boolean(phase?.editable) && isOnline;
 
   // ── 자동저장: 서버 ack 전에는 절대 "저장됨"이라 말하지 않는다 ──
@@ -149,20 +152,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   // submitFlowPending(state)은 버튼 disabled/라벨을 렌더링하는 용도 — 항상 같이 갱신한다.
   const pendingSubmitRef = useRef(false);
   const [submitFlowPending, setSubmitFlowPending] = useState(false);
-  const [recordRiskConfirmOpen, setRecordRiskConfirmOpen] = useState(false);
-  const { dialogRef: recordRiskDialogRef, onBackdropClick: onRecordRiskBackdropClick } =
-    useModalA11y<HTMLElement, HTMLElement>({
-      open: recordRiskConfirmOpen,
-      onClose: () => setRecordRiskConfirmOpen(false),
-    });
-
-  function runQueuedSave(confirmRecordedDataRisk = false) {
+  function runQueuedSave() {
     const current = latestStateRef.current;
     if (!current || !current.dirty || !latestEditableRef.current) return;
-    if (lineupQuery.data?.hasRecordedEvents && !confirmRecordedDataRisk) {
-      setRecordRiskConfirmOpen(true);
-      return;
-    }
     if (saveInFlightRef.current) {
       saveQueuedRef.current = true;
       return;
@@ -173,7 +165,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     saveMutation.mutate(
       {
         idempotencyKey: randomUuid(),
-        payload: { ...buildSavePayload(current), ...(confirmRecordedDataRisk ? { confirmRecordedDataRisk: true } : {}) },
+        payload: buildSavePayload(current),
       },
       {
         onSuccess: (result) => {
@@ -461,7 +453,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
   const submittedWithoutChanges =
     !state.dirty &&
-    (lineupQuery.data.state === 'SUBMITTED' || lastSubmittedRevision === state.baseRevision);
+    (lineupQuery.data.state === 'SUBMITTED' ||
+      lineupQuery.data.state === 'LOCKED' ||
+      lastSubmittedRevision === state.baseRevision);
 
   // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
   // 보내야 한다. 자동저장은 900ms 디바운스 뒤에야 실행되므로, 방금 입력을 마치자마자 제출을
@@ -866,41 +860,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                     : '참석명단 제출하기'}
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {recordRiskConfirmOpen ? (
-        <div
-          role="presentation"
-          onClick={onRecordRiskBackdropClick}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--scrim-dark-32)', padding: 20 }}
-        >
-          <section
-            ref={recordRiskDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="lineup-record-risk-title"
-            style={{ width: 'min(100%, 420px)', borderRadius: 'var(--radius-container)', background: 'var(--bg)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
-          >
-            <h2 id="lineup-record-risk-title" className="tm-text-subhead" style={{ margin: 0 }}>참석명단을 수정할까요?</h2>
-            <p className="tm-text-body" style={{ margin: '12px 0 0', color: 'var(--text-muted)' }}>
-              이미 득점 등 경기 기록이 입력되어 있어요. 명단에서 선수를 빼거나 교체하면 해당 선수의 기록이 화면에서 사라질 수 있어요.
-            </p>
-            <p className="tm-text-label" style={{ margin: '8px 0 0', color: 'var(--text-strong)' }}>기록을 확인한 뒤 수정해 주세요.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8, marginTop: 16 }}>
-              <button type="button" className="tm-btn tm-btn-md tm-btn-neutral" onClick={() => setRecordRiskConfirmOpen(false)}>취소</button>
-              <button
-                type="button"
-                className="tm-btn tm-btn-md tm-btn-danger"
-                onClick={() => {
-                  setRecordRiskConfirmOpen(false);
-                  runQueuedSave(true);
-                }}
-              >
-                확인하고 수정
-              </button>
-            </div>
-          </section>
         </div>
       ) : null}
 

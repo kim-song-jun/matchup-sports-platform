@@ -299,12 +299,25 @@ describe('lineup.view-model', () => {
     expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('참석명단이 공개됐어요.');
   });
 
-  it('gates editability by lineup state and kickoff deadline', () => {
-    expect(describeLineupPhase('DRAFT', false).editable).toBe(true);
-    expect(describeLineupPhase('DRAFT', true).editable).toBe(false);
-    expect(describeLineupPhase('SUBMITTED', false).editable).toBe(true);
-    expect(describeLineupPhase('LOCKED', false).editable).toBe(false);
-    expect(describeLineupPhase('LOCKED', true, true)).toMatchObject({ editable: true, label: '경기 중 · 수정 가능' });
+  it('describes the server-computed editability and lock reason', () => {
+    expect(describeLineupPhase('DRAFT', true, null).editable).toBe(true);
+    expect(describeLineupPhase('SUBMITTED', true, null)).toMatchObject({
+      editable: true,
+      label: '제출됨 · 수정 가능',
+    });
+    expect(describeLineupPhase('DRAFT', false, 'records_exist')).toMatchObject({
+      editable: false,
+      label: '기록 시작 · 잠김',
+    });
+    expect(describeLineupPhase('SUBMITTED', false, 'active_lineups_complete')).toMatchObject({
+      editable: false,
+      label: '명단 확정',
+    });
+    expect(describeLineupPhase('LOCKED', false, 'terminal')).toMatchObject({
+      editable: false,
+      label: '경기 종료 · 잠김',
+    });
+    expect(describeLineupPhase('DRAFT', false, null).editable).toBe(false);
   });
 
   it('resolves which team is "mine" for this match from host/opponent + my memberships', () => {
@@ -431,6 +444,8 @@ function baseLineup(overrides: Partial<V1TeamMatchLineup> = {}): V1TeamMatchLine
     lineupId: null,
     revision: 0,
     state: 'DRAFT',
+    editable: true,
+    lockReason: null,
     version: 0,
     publicLineupAt: null,
       formation: null,
@@ -466,11 +481,13 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.queryByRole('button', { name: '정정 요청 보내기' })).not.toBeInTheDocument();
   });
 
-  it('경기 기록이 있는 진행 중 참석명단은 재확인 후 저장한다', async () => {
+  it('경기 기록이 시작된 참석명단은 확인 모달로 우회하지 않고 잠근다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         gameState: 'LIVE',
         hasRecordedEvents: true,
+        editable: false,
+        lockReason: 'records_exist',
         state: 'LOCKED',
         starters: [{ id: 'p-live', userId: 'user-1', displayName: '홍길동', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null }],
       }),
@@ -480,16 +497,11 @@ describe('TeamMatchLineupPageClient', () => {
     });
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: /골키퍼로 지정/ }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    expect(screen.getByRole('dialog', { name: '참석명단을 수정할까요?' })).toBeInTheDocument();
+    expect(screen.getByText('기록 시작 · 잠김')).toBeInTheDocument();
+    expect(screen.getByText(/경기 기록이 시작되어 참석명단을 수정할 수 없어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '참석명단을 수정할까요?' })).not.toBeInTheDocument();
     expect(hoisted.saveMutate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '확인하고 수정' }));
-    expect(hoisted.saveMutate).toHaveBeenCalledWith(
-      expect.objectContaining({ payload: expect.objectContaining({ confirmRecordedDataRisk: true }) }),
-      expect.any(Object),
-    );
   });
 
   /**

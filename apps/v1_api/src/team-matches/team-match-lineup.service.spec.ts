@@ -48,7 +48,17 @@ interface FakeState {
   userConsents: Array<{ userId: string; state: V1ConsentState }>;
 }
 
-function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?: string | null; gameState?: V1GameState; recordedEventCount?: number; startAt?: Date; leagueId?: string | null; tournamentId?: string | null } = {}) {
+function createFake(options: {
+  managerTeamId?: string;
+  approvedApplicantTeamId?: string | null;
+  gameState?: V1GameState;
+  hasRosterRecord?: boolean;
+  hasResultRevision?: boolean;
+  hasSharedRecord?: boolean;
+  startAt?: Date;
+  leagueId?: string | null;
+  tournamentId?: string | null;
+} = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
    *  다시 저장한다"는 실제 흐름은 서로 다른 팀의 권한을 차례로 태워야 재현된다. */
@@ -66,6 +76,7 @@ function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?:
   let lineupSeq = 0;
 
   const tx = {
+    $queryRaw: async () => [{ id: 'game-1' }],
     v1TeamMatch: {
       findUnique: async () => ({
         id: 'team-match-1',
@@ -83,7 +94,13 @@ function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?:
       findUnique: async () => ({ id: 'game-1', state: options.gameState ?? V1GameState.SCHEDULED, competitionConfigVersionId: 'config-1' }),
     },
     v1GameEvent: {
-      count: async () => options.recordedEventCount ?? 0,
+      findFirst: async () => options.hasRosterRecord ? { id: 'event-1' } : null,
+    },
+    v1GameResultRevision: {
+      findFirst: async () => options.hasResultRevision ? { id: 'result-1' } : null,
+    },
+    v1TeamMatchRecord: {
+      findUnique: async () => options.hasSharedRecord ? { gameId: 'game-1' } : null,
     },
     v1GameSide: {
       findMany: async () => [
@@ -137,6 +154,7 @@ function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?:
       },
     },
     v1GameLineup: {
+      findMany: async () => state.lineups,
       findFirst: async (args: { where: { gameId: string; sideId: string } }) => {
         const matches = state.lineups
           .filter((row) => row.gameId === args.where.gameId && row.sideId === args.where.sideId)
@@ -295,7 +313,7 @@ function lineupDto(expectedVersion: number) {
 }
 
 describe('TeamMatchLineupService.saveLineup — 신원 연결', () => {
-  it('진행 중인 팀매치는 킥오프 이후에도 참석명단을 저장한다', async () => {
+  it('진행 중이어도 상대 최신 명단이 없고 기록이 없으면 참석명단을 복구한다', async () => {
     const { prisma } = createFake({
       gameState: V1GameState.LIVE,
       startAt: new Date(Date.now() - 60 * 60 * 1000),
@@ -305,17 +323,43 @@ describe('TeamMatchLineupService.saveLineup — 신원 연결', () => {
     await expect(service.saveLineup(manager, 'team-match-1', 'live-save', lineupDto(0))).resolves.toMatchObject({ revision: 1 });
   });
 
-  it('경기 기록이 있으면 위험 확인 없이 참석명단을 저장하지 않는다', async () => {
-    const { prisma } = createFake({ gameState: V1GameState.LIVE, recordedEventCount: 1 });
+  it.each([
+    ['일반 이벤트', { hasRosterRecord: true }],
+    ['결과 revision', { hasResultRevision: true }],
+    ['공동 기록', { hasSharedRecord: true }],
+  ] as const)('%s이 생긴 뒤에는 확인값으로 우회하지 못한다', async (_label, recordOptions) => {
+    const { prisma } = createFake({ gameState: V1GameState.LIVE, ...recordOptions });
     const service = new TeamMatchLineupService(prisma, audit);
 
-    await expect(service.saveLineup(manager, 'team-match-1', 'risk-blocked', lineupDto(0))).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED' }),
-    });
-    await expect(service.saveLineup(manager, 'team-match-1', 'risk-confirmed', {
+    await expect(service.saveLineup(manager, 'team-match-1', `record-blocked-${_label}`, {
       ...lineupDto(0),
       confirmRecordedDataRisk: true,
-    })).resolves.toMatchObject({ revision: 1 });
+    })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' }),
+    });
+  });
+
+  it('LIVE에서 양 팀 최신 명단이 모두 제출되면 저장을 거절한다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE });
+    for (const sideId of ['side-home', 'side-away']) {
+      state.lineups.push({
+        id: `${sideId}-submitted`,
+        gameId: 'game-1',
+        sideId,
+        revision: 1,
+        state: V1GameLineupState.SUBMITTED,
+        version: 0,
+        formation: null,
+        supersedesId: null,
+      });
+    }
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(
+      service.saveLineup(manager, 'team-match-1', 'both-submitted', lineupDto(1)),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' }),
+    });
   });
 
   it('userId 가 실린 참가자마다 연결을 만들고, 게스트에는 만들지 않는다', async () => {
@@ -388,7 +432,7 @@ describe('TeamMatchLineupService.saveLineup — 신원 연결', () => {
  * 이 복사본은 그 사이드의 최신 리비전이 되고, 결과 입력은 최신 리비전의 참가자만
  * 모집단으로 삼는다(latest-lineup-participants.ts + league-result-participants.ts 의
  * teamAuthored). 연결을 옮기지 않으면 그 팀 전원의 개인 기록이 그 경기에서 공개 불가가
- * 되는데, 경기 시작(startAt) 이후에는 saveLineup 이 LINEUP_DEADLINE_PASSED 로 막히므로
+ * 되는데, 기록이 생기거나 양 팀 최신 명단이 모두 제출되면 이후 수정은 서버 상태 게이트로 막히므로
  * "다시 저장하면 붙는다"는 자가 치유가 성립하지 않는다 — 킥오프 직전 정정에서 영구화된다.
  */
 describe('TeamMatchLineupService.requestChange — 복사 리비전의 신원 연결', () => {

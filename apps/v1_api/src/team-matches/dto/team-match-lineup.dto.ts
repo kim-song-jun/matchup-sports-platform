@@ -73,6 +73,7 @@ export class SaveTeamMatchLineupDto {
 
   @IsOptional()
   @IsBoolean()
+  /** @deprecated 순차 배포 중인 구버전 Web 호환용. 서버는 이 값을 무시한다. */
   confirmRecordedDataRisk?: boolean;
 
   // Task 15 blocker-2가 막았던 `formation` — V1GameLineup.formation 마이그레이션이

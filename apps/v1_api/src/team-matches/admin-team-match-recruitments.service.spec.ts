@@ -106,6 +106,39 @@ describe('AdminTeamMatchRecruitmentsService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      v1Game: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'game-1',
+          sides: [
+            { id: 'side-home', sideKey: 'HOME', teamId: 'team-home' },
+            { id: 'side-away', sideKey: 'AWAY', teamId: null },
+          ],
+          lineups: [
+            { id: 'lineup-home', sideId: 'side-home', revision: 1 },
+            { id: 'lineup-away', sideId: 'side-away', revision: 1 },
+          ],
+        }),
+      },
+      v1Team: {
+        findFirst: jest.fn().mockResolvedValue(application(awayApplicationId, 'team-away', '원정 FC').applicantTeam),
+      },
+      v1GameSide: { update: jest.fn().mockResolvedValue({}) },
+      v1GameParticipant: {
+        createManyAndReturn: jest.fn().mockResolvedValue([
+          { id: 'participant-away-owner', userId: 'user-team-away' },
+        ]),
+      },
+      v1ParticipantIdentityLinkEvent: {
+        createManyAndReturn: jest.fn().mockResolvedValue([
+          {
+            participantId: 'participant-away-owner',
+            linkId: 'link-away-owner',
+            userId: 'user-team-away',
+            effectiveAt: new Date('2026-08-01T00:00:00.000Z'),
+          },
+        ]),
+      },
+      v1ParticipantIdentityLinkCurrent: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1TeamSchedule: { create: jest.fn().mockResolvedValue({}) },
       v1StatusChangeLog: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
@@ -156,23 +189,35 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       data: expect.objectContaining({ deadlineAt: null }),
     });
   });
-  it('reserves the first approved application as HOME without creating a game or schedules', async () => {
+  it('reserves the first approved application as HOME and creates its lineup-ready game and schedule', async () => {
     await expect(service.approveApplication(adminUser, 'team-match-1', homeApplicationId, approveDto)).resolves.toEqual(expect.objectContaining({
       teamMatchId: 'team-match-1',
       applicationId: homeApplicationId,
       applicantTeamId: 'team-home',
-      gameId: null,
+      gameId: 'game-1',
       teamMatchStatus: 'recruiting',
       approvedCount: 1,
       homeTeamId: 'team-home',
       replayed: false,
     }));
-    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+    expect(games.createFromSourceInTransaction).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        sides: [
+          expect.objectContaining({ sideKey: 'HOME', teamId: 'team-home' }),
+          expect.objectContaining({ sideKey: 'AWAY', teamId: null }),
+        ],
+      }),
+      expect.objectContaining({ actor: expect.objectContaining({ role: 'platform_ops' }) }),
+    );
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({
       where: { id: 'team-match-1' },
       data: { hostTeamId: 'team-home' },
     });
-    expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();
+    expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(1);
+    expect(prisma.v1TeamSchedule.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ teamId: 'team-home', teamMatchId: 'team-match-1' }),
+    });
     expect(adminContext.logAdminAction).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: 'team_match.application.approve', targetId: homeApplicationId }),
@@ -180,7 +225,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
     );
   });
 
-  it('repairs a legacy first approval that did not persist the HOME team', async () => {
+  it('repairs a legacy first approval that did not persist the HOME team or game', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
       ...await prisma.v1TeamMatch.findFirst(),
       applications: [application(homeApplicationId, 'team-home', '홈 FC', 'approved')],
@@ -195,11 +240,15 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       where: { id: 'team-match-1' },
       data: { hostTeamId: 'team-home' },
     });
+    expect(games.createFromSourceInTransaction).toHaveBeenCalledTimes(1);
+    expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(1);
   });
 
-  it('approves the second application and then creates the game and both schedules', async () => {
+  it('approves the second application by hydrating the existing AWAY side and creating only its schedule', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
       ...await prisma.v1TeamMatch.findFirst(),
+      hostTeamId: 'team-home',
+      game: { id: 'game-1' },
       applications: [
         application(homeApplicationId, 'team-home', '홈 FC', 'approved'),
         application(awayApplicationId, 'team-away', '원정 FC'),
@@ -216,16 +265,19 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       awayTeamId: 'team-away',
       replayed: false,
     }));
-    expect(games.createFromSourceInTransaction).toHaveBeenCalledWith(
-      prisma,
-      expect.objectContaining({ sides: [expect.objectContaining({ teamId: 'team-home' }), expect.objectContaining({ teamId: 'team-away' })] }),
-      expect.objectContaining({ actor: expect.objectContaining({ role: 'platform_ops' }) }),
-    );
+    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+    expect(prisma.v1GameSide.update).toHaveBeenCalledWith({
+      where: { id: 'side-away' },
+      data: { teamId: 'team-away', displayNameSnapshot: '원정 FC' },
+    });
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({
       where: { id: 'team-match-1' },
       data: { hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', status: 'matched' },
     });
-    expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(2);
+    expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(1);
+    expect(prisma.v1TeamSchedule.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ teamId: 'team-away', teamMatchId: 'team-match-1' }),
+    });
   });
 
   it('rejects approving an application for a match outside the platform flow', async () => {

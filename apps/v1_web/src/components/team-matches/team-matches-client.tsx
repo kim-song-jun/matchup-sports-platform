@@ -421,7 +421,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     }),
   };
 
-  return <TeamMatchDetailPageView model={model} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} /> : undefined} />;
+  return <TeamMatchDetailPageView model={model} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={chainFrom} /> : undefined} />;
 }
 
 

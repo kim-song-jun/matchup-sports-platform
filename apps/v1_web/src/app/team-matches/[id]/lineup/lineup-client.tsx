@@ -673,7 +673,15 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         "전원이 GK" 로 보고했다. 라벨을 지우면 못 찾고, 항상 띄우면 값으로
                         읽힌다 — 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 열 헤더('GK')가
                         이 열이 무엇인지 말하고, 각 버튼의 aria-label 이 스크린리더에 같은
-                        문맥을 준다. 피치 배치 화면도 지정된 선수에게만 GK 를 붙인다. */}
+                        문맥을 준다. 피치 배치 화면도 지정된 선수에게만 GK 를 붙인다.
+
+                        **미지정 행에만 "+" 아이콘을 더한다**(2026-09-29 사용자 확정, A/B/C
+                        3안 중 C). 빈 점선 원이 "눌러야 하나?" 라는 지적을 받았다 — "GK" 글자를
+                        다시 항상 띄우면(B안) 위 QA 재발 위험이 있어, 값이 아닌 **일반적인
+                        "추가 가능" 기호**(+)만 얹는다. 지정된 행은 그대로 두므로(오렌지 채움
+                        + "GK") 이 결정이 위 계약을 뒤집지 않는다 — editable 이 아니면(열람
+                        전용) 누를 수 없는데 "+" 가 남아 있으면 거짓 신호라 그때는 이전처럼
+                        빈 원으로 되돌린다. */}
                     <button
                       type="button"
                       aria-pressed={entry.goalkeeper}
@@ -692,6 +700,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         flexShrink: 0,
                         minWidth: 44,
                         minHeight: 44,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         borderRadius: 'var(--radius-pill)',
                         border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
                         background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
@@ -701,7 +712,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         cursor: editable ? 'pointer' : 'default',
                       }}
                     >
-                      {entry.goalkeeper ? 'GK' : ''}
+                      {entry.goalkeeper ? 'GK' : editable ? <PlusIcon size={16} /> : null}
                     </button>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>
                       {entry.displayName}

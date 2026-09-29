@@ -191,8 +191,20 @@ describe('MyMatchesPageView — 빈 상태 CTA 출처', () => {
   function matchesModel(overrides: Partial<MyMatchesViewModel> = {}): MyMatchesViewModel {
     return {
       mode: 'created',
+      typeFilter: 'all',
+      filters: [
+        { key: 'all', label: '전체', href: '/my/matches/created' },
+        { key: 'personal', label: '개인 매치', href: '/my/matches/created?type=personal' },
+        { key: 'team', label: '팀 매치', href: '/my/matches/created?type=team' },
+      ],
       summary: [],
       matches: [],
+      emptyState: {
+        title: '만든 매치가 없어요',
+        sub: '개인 또는 팀 매치를 만들면 여기에 표시돼요.',
+        cta: '개인 매치 만들기',
+        ctaHref: '/matches/new/sport?from=%2Fmy%2Fmatches%2Fcreated',
+      },
       loading: false,
       error: false,
       onRetry: vi.fn(),
@@ -203,14 +215,22 @@ describe('MyMatchesPageView — 빈 상태 CTA 출처', () => {
   it('생성한 매치가 없으면 "매치 만들기" CTA에 from=/my/matches/created 를 담는다', () => {
     render(<MyMatchesPageView model={matchesModel({ mode: 'created' })} />);
 
-    expect(screen.getByRole('link', { name: '매치 만들기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '개인 매치 만들기' })).toHaveAttribute(
       'href',
       '/matches/new/sport?from=%2Fmy%2Fmatches%2Fcreated',
     );
   });
 
   it('회귀 방지: 참여 매치 빈 상태의 "매치 둘러보기" CTA는 from 없이 /matches 그대로다', () => {
-    render(<MyMatchesPageView model={matchesModel({ mode: 'joined' })} />);
+    render(<MyMatchesPageView model={matchesModel({
+      mode: 'joined',
+      emptyState: {
+        title: '신청·참여한 매치가 없어요',
+        sub: '개인 매치나 소속 팀의 팀매치에 참여하면 여기에 표시돼요.',
+        cta: '매치 둘러보기',
+        ctaHref: '/matches',
+      },
+    })} />);
 
     expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
   });

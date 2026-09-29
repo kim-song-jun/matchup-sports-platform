@@ -168,9 +168,10 @@ describe('CorrectionsPageClient — 공개 화면 링크', () => {
 
     // 긍정 앵커 — 패널이 실제로 그려졌다는 증거를 먼저 둔다.
     expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-1');
+    // 공개 화면에서 뒤로가기를 누르면 이 정정 화면(자기 딥링크 포함)으로 돌아온다.
     expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
       'href',
-      '/tournaments/t-1/matches/fx-1',
+      '/tournaments/t-1/matches/fx-1?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Frecords%2Fcorrections%3FfixtureId%3Dfx-1',
     );
   });
 
@@ -180,7 +181,27 @@ describe('CorrectionsPageClient — 공개 화면 링크', () => {
 
     expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
       'href',
-      '/league-matches/t-1/fixtures/fx-1',
+      '/league-matches/t-1/fixtures/fx-1?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Frecords%2Fcorrections%3FfixtureId%3Dfx-1',
+    );
+  });
+
+  it('딥링크 A에서 B를 선택하면 공개 화면의 복귀 주소도 B로 바꾼다', async () => {
+    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 대회', kind: 'regular_tournament', fixtures: [] } });
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+      data: { items: [ITEM('fx-1', 'game-1', 1, 'rev-1'), ITEM('fx-2', 'game-2', 2, 'rev-2')] },
+      refetch: vi.fn(),
+    });
+    render(<CorrectionsPageClient tournamentId="t-1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: /2번 경기/ }));
+
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-2');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/fx-2?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Frecords%2Fcorrections%3FfixtureId%3Dfx-2',
     );
   });
 

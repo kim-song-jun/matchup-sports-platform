@@ -171,6 +171,7 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 ## Notes
 
 - 팀 매치는 권한, 실시간, 알림이 함께 얽혀 있어 핵심 회귀 세트로 다룬다.
+- 2026-09-29: 마이페이지의 `신청·참여 매치`와 `생성한 매치`가 개인·팀 매치를 통합한다. 팀매치 참여 목록은 `scope=applied`로 `우리 팀 신청/확정` 관계를 표시하고, 생성 목록은 `scope=created`로 실제 `createdByUserId`만 조회한다. 호스트팀 일반 멤버에게 관리 CTA를 노출하지 않는다.
 - 2026-06-04: 팀매치 생성은 현재 사용자의 owner/manager 팀만 선택지로 표시하도록 고정했고, 팀매치 상세의 신청팀 섹션은 호스트에게만 노출하며 승인 완료 이후에만 채팅 진입점을 보여주도록 정리했다.
 - 2026-04-07: `/teams/new`, `/my/teams`, `/team-matches`, `/team-matches/new` step 0 Desktop Chrome 스모크는 통과했다. 실제 신청/승인/거절/알림/경기 후 평가 흐름은 다음 자동화 묶음으로 남아 있다.
 - 2026-04-07: `e2e/tests/team-owner-flow.spec.ts` Desktop Chrome smoke는 통과했다. 현재 자동화 범위는 팀 생성/my teams/team-matches step-0 진입까지이며, 신청/승인/알림/평가 시나리오는 후속 범위다. (레거시·삭제됨 — legacy-v0-final)

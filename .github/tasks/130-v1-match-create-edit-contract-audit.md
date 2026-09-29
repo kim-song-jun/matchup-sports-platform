@@ -282,3 +282,16 @@ Alpha URL에서 보고된 문제는 개인매치 수정 화면만 `tm-create-she
 raw `recruiting|closed` 상태는 기존 수정·신청·취소 권한 가드에 사용하므로 바꾸지 않는다. 현재
 시각과 `startAt/endAt`을 조합한 `displayState`만 공개 화면 생명주기로 확장한다. 종료 시각이 없는
 매치는 기존 완료 가능 계약과 동일하게 시작 시각부터 `completion_pending`으로 본다.
+
+## Follow-up — PR #1338 리뷰 보완 (2026-09-29)
+
+- [x] 수정 API에도 `hostParticipates=true`이면 정원 2명 이상이라는 생성 API 불변조건 적용
+- [x] `/me/matches?mode=joined`가 본인의 `no_show` 참가 이력을 조회하고 `viewer.participantStatus`로 반환
+- [x] 신청자 프로필에서 현재 신청 관리 탭과 그 이전 진입점까지 순서대로 돌아가는 `from` 체인 보존
+- [x] 공개 목록·상세의 참가자 집계에는 `no_show`를 포함하지 않도록 조회 범위 분리
+- [x] 참여·주최 이력의 커서를 함께 잇는 `더 보기`로 mode당 50건 잘림 제거
+- [x] API 집중 테스트 53건·Web 집중 테스트 25건, 양쪽 `tsc --noEmit`, surface/pattern 검사 통과
+- [ ] PR CI 통과
+
+이 보완은 새 UI를 추가하지 않는다. PR #1338의 기존 화면이 실제 API 계약을 사용하도록 만들고,
+생성·수정의 서버 검증을 일치시키며, 프로필 이동 뒤 신청 관리 문맥을 잃지 않게 하는 회귀 수정이다.

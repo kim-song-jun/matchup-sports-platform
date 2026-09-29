@@ -111,12 +111,20 @@ describe('buildMatchPayloadResult — payload | missingFields 분기', () => {
     expect(result.payload).toMatchObject({ hostParticipates: false });
   });
 
-  it('최대 인원 1명을 그대로 payload에 보존한다', () => {
-    const ctx = baseCtx({ draft: { ...baseCtx().draft, capacity: 1 } });
+  it('주최자가 참가하지 않으면 최대 인원 1명을 그대로 payload에 보존한다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, capacity: 1, hostParticipates: false } });
 
     const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
 
     expect(result.payload).toMatchObject({ capacity: 1 });
+  });
+
+  it('주최자가 참가하면 최대 인원 1명은 2명으로 올려서 payload를 만든다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, capacity: 1, hostParticipates: true } });
+
+    const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
+
+    expect(result.payload).toMatchObject({ capacity: 2 });
   });
 
   it('date가 빈 문자열은 아니지만 파싱 불가능한 값(손상된 draft)이면 크래시 대신 missingFields를 반환한다', () => {

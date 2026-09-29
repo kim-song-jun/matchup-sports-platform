@@ -1,12 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TeamMatchSharedRecord } from './team-match-shared-record';
+import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 
-const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn() }));
+const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn() }));
 const navigation = vi.hoisted(() => ({ search: '' }));
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: state.replace }),
   useSearchParams: () => new URLSearchParams(navigation.search),
 }));
 vi.mock('@/hooks/use-team-match-record', () => ({
@@ -16,6 +16,7 @@ vi.mock('@/hooks/use-team-match-record', () => ({
 beforeEach(() => {
   navigation.search = '';
   state.mutate.mockReset().mockResolvedValue({});
+  state.replace.mockReset();
   state.data = {
     teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
     serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, ownSideId: 'home',
@@ -42,6 +43,26 @@ describe('shared record participant flow', () => {
   it('출처가 없으면 매치 상세 링크는 view=detail 만 싣는다', () => {
     render(<TeamMatchSharedRecord teamMatchId="match" />);
     expect(screen.getByRole('link', { name: '← 매치 상세' })).toHaveAttribute('href', '/team-matches/match?view=detail');
+  });
+
+  // 매치 상세에서 "공동 경기 기록 열기"로 들어갈 때도 출처를 실어야, 공동 기록 화면의 셸
+  // 뒤로가기가 route-chrome 고정 backHref 대신 이 출처로 돌아간다.
+  it('매치 상세 카드의 열기 링크가 받은 출처를 ?from= 으로 함께 싣는다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/team-matches/match" />);
+    expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute(
+      'href',
+      `/team-matches/match/record?from=${encodeURIComponent('/team-matches/match')}`,
+    );
+  });
+
+  it('출처가 없으면 열기 링크는 ?from= 없이 그대로 간다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
+    expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute('href', '/team-matches/match/record');
+  });
+
+  it('라이브 참가자는 출처를 실은 경로로 자동 리다이렉트된다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" fromHref="/team-matches/match" />);
+    expect(state.replace).toHaveBeenCalledWith(`/team-matches/match/record?from=${encodeURIComponent('/team-matches/match')}`);
   });
 
   it('selects scorer from the credited team and sends the opened version with the goal', async () => {

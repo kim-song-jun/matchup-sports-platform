@@ -1203,6 +1203,25 @@ export type V1TeamMatch = V1Match & {
   applicantTeamState?: string;
 };
 
+/** GET /me/team-matches의 축약된 워크리스트 항목. 공개 목록/상세와 응답 모양이 다르다. */
+export type V1MyTeamMatch = {
+  teamMatchId: string;
+  title: string;
+  sportName: string;
+  startsAt: string;
+  deadlineAt?: string | null;
+  status: V1TeamMatchApiStatus;
+  displayState?: V1TeamMatchApiStatus;
+  isLive?: boolean;
+  relation: 'host_team' | 'created_by_me' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
+  teamId?: string | null;
+  teamName?: string | null;
+  applicationId?: string | null;
+  league?: { leagueId: string; title: string } | null;
+  manageRoute?: string | null;
+  detailRoute: string;
+};
+
 
 export type V1TeamMatchMutationPayload = {
   hostTeamId: string;

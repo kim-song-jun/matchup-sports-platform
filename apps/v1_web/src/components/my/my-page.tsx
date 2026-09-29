@@ -197,8 +197,20 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
         </div>
         {/* 선택 상태를 primary 로 칠하면 "이 화면의 주요 행동"으로 읽힌다(§14) — 칩으로 표현한다. */}
         <div className="tm-segment-row">
-          <Link className={`tm-chip ${joined ? 'tm-chip-active' : ''}`} href="/my/matches/joined" aria-current={joined ? 'page' : undefined}>신청·참여 매치</Link>
-          <Link className={`tm-chip ${!joined ? 'tm-chip-active' : ''}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
+          <Link className={`tm-chip ${joined ? 'tm-chip-active' : ''}`} href={`/my/matches/joined${model.typeFilter === 'all' ? '' : `?type=${model.typeFilter}`}`} aria-current={joined ? 'page' : undefined}>신청·참여 매치</Link>
+          <Link className={`tm-chip ${!joined ? 'tm-chip-active' : ''}`} href={`/my/matches/created${model.typeFilter === 'all' ? '' : `?type=${model.typeFilter}`}`} aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
+        </div>
+        <div className="tm-team-form-chip-row" role="group" aria-label="매치 유형" style={{ marginTop: 12 }}>
+          {model.filters.map((filter) => (
+            <Link
+              key={filter.key}
+              className={`tm-chip ${model.typeFilter === filter.key ? 'tm-chip-active' : ''}`}
+              href={filter.href}
+              aria-current={model.typeFilter === filter.key ? 'page' : undefined}
+            >
+              {filter.label}
+            </Link>
+          ))}
         </div>
         {model.loading ? <PageSkeleton variant="list" /> : null}
         {model.error ? (
@@ -209,19 +221,25 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
             retryLabel="다시 불러오기"
           />
         ) : null}
+        {model.partialError ? (
+          <Card pad={16} className="tm-auth-soft-card-warning">
+            <div className="tm-text-body">{model.partialError.message}</div>
+            <button className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 10 }} type="button" onClick={model.partialError.onRetry}>다시 불러오기</button>
+          </Card>
+        ) : null}
         <div className="tm-my-list-stack">
           {/* 로딩·오류 중에는 '매치 없어요' 빈 상태를 띄우지 않는다 — 스켈레톤·오류 화면과 모순 방지. */}
           {!model.loading && !model.error && model.matches.length === 0 ? (
             <EmptyState
               fill
               illustration={{ name: 'matches-empty' }}
-              title="표시할 매치가 없어요"
-              sub={model.mode === 'joined' ? '신청하거나 참여한 개인 매치가 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
-              cta={model.mode === 'joined' ? '매치 둘러보기' : '매치 만들기'}
-              ctaHref={model.mode === 'joined' ? '/matches' : withFromPath('/matches/new/sport', '/my/matches/created')}
+              title={model.emptyState.title}
+              sub={model.emptyState.sub}
+              cta={model.emptyState.cta}
+              ctaHref={model.emptyState.ctaHref}
             />
           ) : (
-            model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)
+            model.matches.map((match) => <MyMatchCard key={`${match.kind}:${match.id}`} match={match} manage={model.mode === 'created'} />)
           )}
         </div>
         {model.loadMoreError ? <p role="alert" className="tm-text-caption">이전 참여 이력을 불러오지 못했어요. 다시 시도해 주세요.</p> : null}
@@ -543,6 +561,10 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
   const canReview = Boolean(match.reviewHref);
   return (
     <Card pad={16}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        <span className="tm-badge tm-badge-grey">{match.kindLabel}</span>
+        {match.contextLabel ? <span className="tm-text-caption">{match.contextLabel}</span> : null}
+      </div>
       <div className="tm-my-card-head">
         <div>
           <div className="tm-text-body-lg">{match.title}</div>
@@ -553,7 +575,7 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
       <p className="tm-text-caption" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
-        {manage ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.manageHref}>참가 관리</Link> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
+        {manage && match.manageHref ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.manageHref}>{match.manageLabel ?? '참가 관리'}</Link> : !manage && canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : !manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button> : null}
       </div>
     </Card>
   );

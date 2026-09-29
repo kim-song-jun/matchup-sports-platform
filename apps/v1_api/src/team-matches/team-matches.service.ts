@@ -398,7 +398,16 @@ export class TeamMatchesService {
       select: { teamId: true, role: true },
     });
     const teamIds = memberships.map((membership) => membership.teamId);
-    if (teamIds.length === 0) return { items: [], pageInfo: { nextCursor: null, hasNext: false } };
+    const manageableTeamIds = new Set(
+      memberships
+        .filter((membership) => membership.role === 'owner' || membership.role === 'manager')
+        .map((membership) => membership.teamId),
+    );
+    // 직접 만든 이력은 이후 팀에서 탈퇴했더라도 남아야 한다. hosted/applied/all 은 현재
+    // 소속 팀이 없으면 관계 자체가 없지만, created 는 V1TeamMatch.createdByUserId 로 조회한다.
+    if (teamIds.length === 0 && query.scope !== 'created') {
+      return { items: [], pageInfo: { nextCursor: null, hasNext: false } };
+    }
 
     // status 는 두 계열이 섞여 있다: 매치 상태(recruiting~expired)는 teamMatch.status 로,
     // 신청 상태(requested~withdrawn)는 "내 신청"의 상태로 필터한다.
@@ -410,11 +419,15 @@ export class TeamMatchesService {
       (['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired'] as const).find(
         (status) => status === query.status,
       ) ?? null;
+    if (query.scope === 'created' && applicationStatusFilter) {
+      return { items: [], pageInfo: { nextCursor: null, hasNext: false } };
+    }
 
     // 신청 상태는 호스트로 참여한 매치에는 성립하지 않으므로 hosted 분기를 제외한다
     // (scope=hosted + 신청 상태 조합은 OR: [] → 빈 결과).
     const includeHosted = (!query.scope || query.scope === 'all' || query.scope === 'hosted') && !applicationStatusFilter;
     const includeApplied = !query.scope || query.scope === 'all' || query.scope === 'applied';
+    const includeCreated = query.scope === 'created' && !applicationStatusFilter;
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
@@ -427,6 +440,9 @@ export class TeamMatchesService {
             : { status: matchStatusFilter }
           : {}),
         OR: [
+          ...(includeCreated
+            ? [{ createdByUserId: user.id, ...(query.teamId ? { hostTeamId: query.teamId } : {}) }]
+            : []),
           ...(includeHosted ? [{ hostTeamId: { in: teamIds } }] : []),
           ...(includeApplied
             ? [
@@ -476,12 +492,16 @@ export class TeamMatchesService {
     return {
       items: pageItems.map((teamMatch) => {
         const application = teamMatch.applications[0] ?? null;
-        const relation = teamIds.includes(teamMatch.hostTeamId)
-          ? 'host_team'
+        const createdByMe = query.scope === 'created' && teamMatch.createdByUserId === user.id;
+        const hostTeamRelation = teamIds.includes(teamMatch.hostTeamId);
+        const relation = createdByMe
+          ? 'created_by_me'
+          : hostTeamRelation
+            ? 'host_team'
           : application?.status === 'approved'
             ? 'approved'
             : application?.status ?? 'requested';
-        const teamId = teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeamId : application?.applicantTeamId;
+        const teamId = createdByMe || hostTeamRelation ? teamMatch.hostTeamId : application?.applicantTeamId;
         return {
           teamMatchId: teamMatch.id,
           title: teamMatch.title,
@@ -497,10 +517,15 @@ export class TeamMatchesService {
           isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
           relation,
           teamId,
-          teamName: teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeam.name : application?.applicantTeam.name,
+          teamName: createdByMe || hostTeamRelation ? teamMatch.hostTeam.name : application?.applicantTeam.name,
           applicationId: application?.id ?? null,
           league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
-          manageRoute: relation === 'host_team' ? `/team-matches/${teamMatch.id}/manage` : null,
+          // 호스트팀의 일반 멤버에게 관리 경로를 내려주면 눌렀을 때 서버 가드에서 막히는
+          // dead-end CTA가 된다. 생성자여도 현재 owner/manager 권한이 없으면 이력 상세만 본다.
+          manageRoute:
+            (relation === 'host_team' || relation === 'created_by_me') && manageableTeamIds.has(teamMatch.hostTeamId)
+              ? `/team-matches/${teamMatch.id}`
+              : null,
           detailRoute: `/team-matches/${teamMatch.id}`,
         };
       }),

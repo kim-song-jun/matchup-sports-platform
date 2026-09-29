@@ -313,6 +313,7 @@ function ScheduleRow({
   isMine,
   showGroupLabel = true,
   isRegularLeague,
+  fromHref,
 }: {
   tournamentId: string;
   entry: PublicScheduleEntry;
@@ -322,6 +323,8 @@ function ScheduleRow({
   showGroupLabel?: boolean;
   /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
   isRegularLeague: boolean;
+  /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
+  fromHref?: string | null;
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
@@ -330,7 +333,7 @@ function ScheduleRow({
       // **리그는 라우트가 다르다.** 이 화면은 대회와 리그가 같은 일정 응답을 쓰는데,
       // 리그 행의 `fixtureId` 에는 팀 매치 id 가 들어 있어 대회 패턴으로 링크하면
       // 경기 카드 전부가 404 로 떨어진다(근거는 `fixtureDetailHref`).
-      href={fixtureDetailHref({ isRegularLeague, competitionId: tournamentId, fixtureId: entry.fixtureId })}
+      href={fixtureDetailHref({ isRegularLeague, competitionId: tournamentId, fixtureId: entry.fixtureId, fromHref })}
       // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
       // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
       // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
@@ -575,12 +578,15 @@ function ScheduleGroupBlock({
   showGroupHeading,
   myFixtureIds,
   isRegularLeague,
+  fromHref,
 }: {
   tournamentId: string;
   group: { key: string; label: string; entries: PublicScheduleEntry[] };
   showGroupHeading: boolean;
   myFixtureIds: ReadonlySet<string>;
   isRegularLeague: boolean;
+  /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
+  fromHref?: string | null;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -600,6 +606,7 @@ function ScheduleGroupBlock({
             isMine={myFixtureIds.has(entry.fixtureId)}
             showGroupLabel={!showGroupHeading}
             isRegularLeague={isRegularLeague}
+            fromHref={fromHref}
           />
         ))}
       </div>
@@ -628,6 +635,7 @@ function ScheduleSections({
   onSelectFilter,
   phaseLabels,
   isRegularLeague,
+  fromHref,
 }: {
   tournamentId: string;
   entries: readonly PublicScheduleEntry[];
@@ -638,6 +646,8 @@ function ScheduleSections({
   phaseLabels: SchedulePhaseLabels;
   /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
   isRegularLeague: boolean;
+  /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
+  fromHref?: string | null;
 }) {
   const phases = groupScheduleEntries(entries, phaseLabels);
 
@@ -694,6 +704,7 @@ function ScheduleSections({
                 showGroupHeading={group.label !== phase.label || phase.groups.length > 1}
                 myFixtureIds={myFixtureIds}
                 isRegularLeague={isRegularLeague}
+                fromHref={fromHref}
               />
             ))}
           </section>
@@ -719,6 +730,7 @@ export function ScheduleContent({
   showStandings = true,
   myFixtures,
   isRegularLeague = false,
+  fromHref,
 }: {
   tournamentId: string;
   data: PublicTournamentScheduleResponse;
@@ -740,6 +752,8 @@ export function ScheduleContent({
    * 짚어준다. 비로그인 방문자·참가하지 않은 사용자에게는 undefined라 화면이 종전 그대로다.
    */
   myFixtures?: V1MyTournamentFixtures;
+  /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
+  fromHref?: string | null;
 }) {
   // F4 fix: 필터는 "경기 일정"과 "시간 미정 경기" 두 섹션이 공유해야 한다 — 컴포넌트
   // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
@@ -880,6 +894,7 @@ export function ScheduleContent({
             onSelectFilter={setFilter}
             phaseLabels={phaseLabels}
             isRegularLeague={isRegularLeague}
+            fromHref={fromHref}
           />
         )}
         {hasNextPage ? (
@@ -919,6 +934,7 @@ export function ScheduleContent({
                   showGroupHeading
                   myFixtureIds={myFixtureIds}
                   isRegularLeague={isRegularLeague}
+                  fromHref={fromHref}
                 />
               ))}
             </div>

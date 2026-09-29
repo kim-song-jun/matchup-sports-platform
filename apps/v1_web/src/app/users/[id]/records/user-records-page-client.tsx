@@ -8,8 +8,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { usePublicUserRecords } from '@/components/public-game-records/use-public-game-records';
-import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
-import type { RecordTypeFilter } from '@/components/public-game-records/record-category-tabs';
+import { UserRecordsContent, type UserRecordTabFilter } from '@/components/public-game-records/user-records-content';
 
 function RecordsSkeleton() {
   return (
@@ -21,10 +20,12 @@ function RecordsSkeleton() {
 }
 
 export function UserRecordsPageClient({ userId }: { userId: string }) {
-  // Task 166 BE-4: 팀 전적과 같은 4탭. '전체'는 로컬 값이라 서버로 보내지 않는다.
-  const [activeType, setActiveType] = useState<RecordTypeFilter>('all');
+  // Task 166 BE-4: 팀 전적과 같은 4탭 + '개인'(본인 전용, 서버 API와 무관 — user-records-content.tsx 참고).
+  // '전체'와 '개인'은 로컬 값이라 서버로 보내지 않는다('개인'은 애초에 이 API가 모르는 값이다).
+  const [activeType, setActiveType] = useState<UserRecordTabFilter>('all');
+  const serverType = activeType === 'all' || activeType === 'personal' ? undefined : activeType;
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    usePublicUserRecords(userId, undefined, activeType === 'all' ? undefined : activeType);
+    usePublicUserRecords(userId, undefined, serverType);
 
   const firstPage = data?.pages[0];
 

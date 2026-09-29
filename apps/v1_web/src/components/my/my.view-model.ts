@@ -55,8 +55,8 @@ export const myHomeModel: MyHomeViewModel = {
     {
       title: '내 활동',
       items: [
-        { label: '참여한 매치', sub: '승인 대기와 완료 내역을 확인해요', href: '/my/matches/joined', icon: 'ClipboardList' },
-        { label: '내가 만든 매치', sub: '모집 현황과 참가자를 관리해요', href: '/my/matches/created', icon: 'Plus' },
+        { label: '참여한 매치', sub: '개인·팀 매치 신청과 참가 내역을 확인해요', href: '/my/matches/joined', icon: 'ClipboardList' },
+        { label: '내가 만든 매치', sub: '개인·팀 매치 모집 현황을 관리해요', href: '/my/matches/created', icon: 'Plus' },
         // '내 활동 기록'은 내 userId 가 필요해 my-api-clients 가 동적으로 붙인다.
       ],
     },

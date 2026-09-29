@@ -161,7 +161,7 @@ export async function loadLeagueTeamRosters(
  * 올렸다가 팀장이 전원 뺀 팀" 까지 다시 채워 버리는데, 그건 정책상 자동 채움 대상이
  * 아니다 — 게다가 방금 뺀 그 유저를 그 자리에서 다시 채우려다 유니크 제약에 걸려
  * **선수 삭제 트랜잭션 자체가 롤백된 적**이 있다
- * (`removePlayer` → `syncCompetitionTeamRosters` → 이 함수, 같은 트랜잭션).
+ * (당시 `removePlayer` → 명단 동기화 → 이 함수가 같은 트랜잭션이었다. 지금은 워커의 재계산 이벤트).
  */
 export async function fillEmptyLeagueRosters(
   tx: Prisma.TransactionClient,

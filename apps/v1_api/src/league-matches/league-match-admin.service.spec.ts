@@ -64,7 +64,7 @@ interface FakeState {
   registeredTeamIds: Set<string>;
   /** 팀별 리그 참가 명단. 기본은 비어 있다(명단 미제출). */
   rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string }>>;
-  /** 명단 재계산이 시작 전 경기를 찾은 팀. */
+  /** 명단 재계산 이벤트(outbox)를 남긴 팀. */
   rosterSyncTeamIds: string[];
 }
 
@@ -269,13 +269,6 @@ function createFake() {
     },
     v1Game: {
       findFirst: track('v1Game.findFirst', async () => null),
-      // 명단 재계산(syncCompetitionTeamRosters)이 팀의 시작 전 경기를 찾는 조회. 이 스위트는 그 경기를
-      // 흉내 내지 않으므로 "대상 없음"이다 — 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
-      findMany: track('v1Game.findMany', async (args: { where: { sides?: { some: { teamId: string } } } }) => {
-        // 여러 팀 동기화 전 잠금 대상 조회(`OR` 묶음)는 팀별 재계산이 아니다.
-        if (args.where.sides !== undefined) state.rosterSyncTeamIds.push(args.where.sides.some.teamId);
-        return [];
-      }),
       findUnique: track('v1Game.findUnique', async () =>
         createdGameId === null
           ? null
@@ -358,7 +351,16 @@ function createFake() {
       ),
     },
     $queryRaw: track('$queryRaw', async () => [{ id: 'league-1' }]),
-    $executeRaw: track('$executeRaw', async () => 1),
+    // 명단 재계산 이벤트(값 순서: id, business_key, aggregate_type, aggregate_id, type, payload)는 따로 모은다.
+    // 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
+    $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      if (values[4] === 'COMPETITION_ROSTER_RESYNC') {
+        state.rosterSyncTeamIds.push((JSON.parse(String(values[5])) as { teamId: string }).teamId);
+        return 1;
+      }
+      state.calls.push('$executeRaw');
+      return 1;
+    },
     $transaction: async <T>(fn: (client: unknown) => Promise<T>) => fn(tx),
   };
 
@@ -414,7 +416,7 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     expect(state.calls.filter((call) => call.startsWith('v1ParticipantIdentityLink'))).toEqual([]);
   });
 
-  it('일괄 생성 직후 참가한 모든 팀의 시작 전 경기 명단을 다시 계산한다(결장 기간·출전정지)', async () => {
+  it('일괄 생성 직후 참가한 모든 팀의 명단 재계산 이벤트를 남긴다(결장 기간·출전정지)', async () => {
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
 
     expect([...new Set(state.rosterSyncTeamIds)].sort()).toEqual(['team-a', 'team-b']);
@@ -575,7 +577,7 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
      * 자동·수동이 같은 함수를 쓰므로 경로를 단정하면 수동으로 넣은 경기가 "자동 생성" 이라고
      * 표시된다 — 운영자가 자기가 손으로 넣은 경기를 시스템이 만든 것으로 읽는다.
      */
-    it('끼어든 경기로 팀 경기 순서가 바뀌므로 양 팀의 시작 전 경기 명단을 다시 계산한다', async () => {
+    it('끼어든 경기로 팀 경기 순서가 바뀌므로 양 팀의 명단 재계산 이벤트를 남긴다', async () => {
       await service.createManualFixture(adminUser, 'league-1', { ...manual });
 
       expect([...state.rosterSyncTeamIds].sort()).toEqual(['team-a', 'team-b']);

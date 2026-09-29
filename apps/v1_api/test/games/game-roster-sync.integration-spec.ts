@@ -13,6 +13,7 @@ import {
 } from '../../src/games/roster/game-roster-sync';
 import { GameResultBracketProjectionService } from '../../src/game-operations/game-result-bracket-projection.service';
 import type { OfficialRevisionRow } from '../../src/game-operations/game-result-official-projection.types';
+import { enqueueRosterResync } from '../../src/games/roster/roster-resync-events';
 import { V1GameOperationsWorkerService } from '../../src/jobs/v1-game-operations-worker.service';
 import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-matches/league-fixture-creation';
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
@@ -21,6 +22,7 @@ import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolv
 import { updateTournamentMatchInTx } from '../../src/tournaments/tournament-match-update';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
@@ -225,6 +227,8 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
   });
   const syncTeam = (competitionId: string, teamId: string) =>
     inTx((client) => syncCompetitionTeamRosters(client, { competitionId, teamId }));
+  /** 조정 API 밖의 트리거는 재계산 이벤트만 남긴다 — 워커가 처리한 뒤에 명단이 바뀐다. */
+  const drainWorker = () => drainOutboxWorker(prisma);
   async function exclude(target: { gameId: string; sideId: string }, userId: string, actorUserId: string) {
     return prisma.v1GameRosterAdjustment.create({
       data: { ...target, userId, action: 'EXCLUDE', reason: 'injury', actorUserId, actorRole: 'TEAM_MANAGER' },
@@ -265,6 +269,44 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
         );
         expect(results.map((result) => (result.status === 'rejected' ? String(result.reason) : 'ok'))).toEqual(['ok', 'ok']);
       }
+    });
+
+    it('같은 팀 재계산 이벤트가 쌓여도 워커가 한 번에 닫고 명단은 한 번만 새로 쓴다', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      const [a1, a2] = f.teamA.members;
+      await syncTeam(f.tournament.id, f.teamA.id);
+      const g4 = side(f, 'g4', f.teamA.id);
+      const before = await latestLineup(g4.gameId, g4.sideId);
+      await exclude(g4, a2, f.teamA.ownerId);
+      const target = { scope: 'competitionTeam', competitionId: f.tournament.id, teamId: f.teamA.id } as const;
+      for (let index = 0; index < 3; index += 1) await inTx((client) => enqueueRosterResync(client, [target]));
+
+      await drainWorker();
+
+      const events = await prisma.v1OutboxEvent.findMany({ where: { type: 'COMPETITION_ROSTER_RESYNC', aggregateId: f.teamA.id } });
+      expect(events.map((event) => event.status)).toEqual(['COMPLETED', 'COMPLETED', 'COMPLETED']);
+      expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1]));
+      expect((await latestLineup(g4.gameId, g4.sideId)).revision).toBe(before.revision + 1);
+    });
+
+    it('이벤트를 남긴 뒤 처리 전에 시작한 경기는 워커가 건너뛴다', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      const [a1, a2] = f.teamA.members;
+      await syncTeam(f.tournament.id, f.teamA.id);
+      const g3 = side(f, 'g3', f.teamA.id);
+      const g4 = side(f, 'g4', f.teamA.id);
+      const liveBefore = await latestLineup(g3.gameId, g3.sideId);
+      await exclude(g3, a2, f.teamA.ownerId);
+      await exclude(g4, a2, f.teamA.ownerId);
+      await inTx((client) =>
+        enqueueRosterResync(client, [{ scope: 'competitionTeam', competitionId: f.tournament.id, teamId: f.teamA.id }]),
+      );
+      await prisma.v1Game.update({ where: { id: g3.gameId }, data: { state: 'LIVE' } });
+
+      await drainWorker();
+
+      expect((await latestLineup(g3.gameId, g3.sideId)).id).toBe(liveBefore.id);
+      expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1]));
     });
 
     it('대조군: 규정이 없는 대회는 같은 레드카드에도 다음 경기에 그대로 출전한다', async () => {
@@ -339,6 +381,9 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
         f.registrations.get(f.teamA.id)!,
         { userId: a3 } as never,
       );
+      // 참가 명단 쓰기 트랜잭션은 경기를 잠그지 않는다 — 워커가 처리하기 전에는 그대로다.
+      expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1]));
+      await drainWorker();
 
       expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1, a3]));
       expect(await rosterOf(g3.gameId, g3.sideId)).toEqual(sorted([a1, a2, a3]));
@@ -462,6 +507,7 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       } as OfficialRevisionRow;
 
       await inTx((client) => new GameResultBracketProjectionService().project(client, revision, { home: 2, away: 1 }));
+      await drainWorker();
 
       const latest = await latestLineup(targetGame.id, home.id);
       expect(latest.state).toBe('SUBMITTED');
@@ -537,6 +583,7 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       await app.get(TournamentPlayersService).addPlayer(authUser(f.teamA.ownerId), f.league.id, f.registration.id, {
         userId: m3,
       } as never);
+      await drainWorker();
 
       expect(await rosterOf(l2.gameId, l2.sideId)).toEqual(sorted([f.teamA.ownerId, m2, m3]));
       expect(await rosterOf(l1.gameId, l1.sideId)).toEqual(sorted([f.teamA.ownerId, m1, m2, m3]));
@@ -581,6 +628,7 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       await app.get(LeagueMatchAdminService).updateFixture(authUser(adminUserId), f.league.id, f.fixtures.L2.teamMatchId, {
         startsAt: target.toISOString(),
       } as never);
+      await drainWorker();
 
       expect(await rosterOf(l2.gameId, l2.sideId)).toEqual(sorted([f.teamA.ownerId, m2]));
       expect(await rosterOf(l1.gameId, l1.sideId)).toEqual(sorted([f.teamA.ownerId, m1, m2]));
@@ -641,6 +689,7 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       });
 
       await app.get(LeagueMatchAdminService).generateFixtures(authUser(adminUserId), league.id, { weeksCount: 1 } as never);
+      await drainWorker();
 
       const game = await prisma.v1Game.findFirstOrThrow({ where: { teamMatch: { leagueId: league.id } }, include: { sides: true } });
       const sideA = game.sides.find((row) => row.teamId === teamA.id)!;

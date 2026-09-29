@@ -1,10 +1,9 @@
 import type { Prisma } from '@prisma/client';
 import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
 import {
-  lockGameScope,
+  handleCompetitionRosterResync,
   syncCompetitionTeamRosters,
   syncGameSideRoster,
-  syncRostersForTeamMatchTeams,
   syncTeamMemberFallbackRosters,
   syncTeamRostersWithinPeriod,
 } from './game-roster-sync';
@@ -48,6 +47,11 @@ function fakeTx(options: Options = {}) {
   const calls: string[] = [];
   const locked = new Set<string>();
   const tx = {
+    // 같은 대상의 대기 이벤트 닫기(completeQueuedDuplicates).
+    $executeRaw: jest.fn(async () => {
+      calls.push('complete-duplicates');
+      return 0;
+    }),
     $queryRaw: jest.fn(async (_strings: TemplateStringsArray, gameId: string) => {
       calls.push(`lock:${gameId}`);
       locked.add(gameId);
@@ -91,6 +95,7 @@ function fakeTx(options: Options = {}) {
     },
     v1Tournament: { findFirst: jest.fn(async () => ({ title: '가을 리그' })) },
     v1Team: { findMany: jest.fn(async () => []) },
+    v1GameSide: { findMany: jest.fn(async () => [{ id: 'side-1' }]) },
     v1GameLineup: { findFirst: jest.fn(), create: jest.fn() },
   };
   return { tx: tx as unknown as Prisma.TransactionClient, calls, raw: tx };
@@ -117,18 +122,6 @@ describe('syncGameSideRoster — 경기 행 잠금', () => {
   });
 });
 
-describe('syncRostersForTeamMatchTeams — 여러 팀의 잠금 순서', () => {
-  it('두 팀의 시작 전 경기를 먼저 id 순으로 전부 잠근다(교착 방지)', async () => {
-    const { tx, calls } = fakeTx({ upcomingByTeam: { 'team-A': ['g3', 'g1'], 'team-B': ['g2', 'g3'] } });
-    await syncRostersForTeamMatchTeams(tx, { competitionId: 'league-1', teamIds: ['team-A', 'team-B', null] });
-    const locks = calls.filter((call) => call.startsWith('lock:'));
-    expect(locks.slice(0, 3)).toEqual(['lock:g1', 'lock:g2', 'lock:g3']);
-    // 팀별 동기화가 다시 잡는 행은 이미 쥔 행뿐이다.
-    expect(new Set(locks)).toEqual(new Set(['lock:g1', 'lock:g2', 'lock:g3']));
-    expect(calls.indexOf('lock:g3')).toBeLessThan(calls.indexOf('fill-query'));
-  });
-});
-
 describe('syncTeamMemberFallbackRosters — 멤버십 변경 뒤 폴백 리그 재계산', () => {
   it('참가 명단 없이 팀원 기준으로 뛰는 리그 경기만 잠그고 다시 계산한다', async () => {
     const { tx, calls } = fakeTx({
@@ -149,19 +142,7 @@ describe('syncTeamMemberFallbackRosters — 멤버십 변경 뒤 폴백 리그 �
   });
 });
 
-describe('경기 잠금 범위(GameLockScope) — 처음 한 번 id 순으로 잡은 행 밖은 잡지 않는다', () => {
-  const conflict = { response: { code: 'COMMAND_CONCURRENCY_CONFLICT' } };
-
-  it('호출자가 잠근 범위를 넘기면 다시 잠그지 않고, 범위 밖 경기가 필요하면 그 행을 잡지 않고 409', async () => {
-    const { tx, calls } = fakeTx({ upcomingByTeam: { 'team-A': ['g1', 'g2'] } });
-    const scope = await lockGameScope(tx, ['g1']);
-    calls.length = 0;
-    await expect(
-      syncRostersForTeamMatchTeams(tx, { competitionId: 'league-1', teamIds: ['team-A'] }, scope),
-    ).rejects.toMatchObject(conflict);
-    expect(calls.filter((call) => call.startsWith('lock:'))).toEqual([]);
-  });
-
+describe('여러 경기 재계산 — 대상 경기를 처음 한 번 id 순으로 잡고 그 밖은 잡지 않는다', () => {
   it('잠그기 전 조회와 잠근 뒤 조회 사이에 끼어든 경기는 잠그지 않고 409 로 끝낸다(재시도 가능)', async () => {
     const { tx, calls, raw } = fakeTx({ upcomingByTeam: { 'team-A': ['g2'] } });
     // 잠근 뒤 다시 읽을 때 다른 트랜잭션이 커밋한 g1(더 작은 id)이 보인다.
@@ -189,5 +170,35 @@ describe('경기 잠금 범위(GameLockScope) — 처음 한 번 id 순으로 �
     });
     expect(calls.filter((call) => call.startsWith('lock:'))).toEqual(['lock:g1', 'lock:g2', 'lock:g3']);
     expect(calls.lastIndexOf('lock:g3')).toBeLessThan(calls.indexOf('fill-query'));
+  });
+});
+
+describe('handleCompetitionRosterResync — 후속 이벤트 워커 핸들러', () => {
+  it('같은 대상의 대기 이벤트를 먼저 닫고, 팀의 시작 전 경기를 id 순으로 잠근 뒤 다시 계산한다', async () => {
+    const { tx, calls } = fakeTx({ upcomingByTeam: { 'team-A': ['g3', 'g1'] } });
+    await handleCompetitionRosterResync(tx, {
+      id: 'event-1',
+      payload: { scope: 'competitionTeam', competitionId: 'league-1', teamId: 'team-A' },
+    });
+    expect(calls[0]).toBe('complete-duplicates');
+    const locks = calls.filter((call) => call.startsWith('lock:'));
+    expect(locks.slice(0, 2)).toEqual(['lock:g1', 'lock:g3']);
+    expect(new Set(locks)).toEqual(new Set(['lock:g1', 'lock:g3']));
+    expect(calls.indexOf('lock:g3')).toBeLessThan(calls.indexOf('fill-query'));
+  });
+
+  it('경기 대상: 그 경기를 잠근 뒤 판정해 그 사이 시작된 경기에는 쓰지 않는다', async () => {
+    const { tx, calls, raw } = fakeTx({ stateAfterLock: 'LIVE' });
+    await expect(handleCompetitionRosterResync(tx, { id: 'event-1', payload: { scope: 'game', gameId: 'g1' } })).resolves.toBe(0);
+    expect(calls.indexOf('lock:g1')).toBeLessThan(calls.indexOf('read-state:g1'));
+    expect(raw.v1GameLineup.create).not.toHaveBeenCalled();
+  });
+
+  it('모양이 다른 payload 는 던진다 — 재시도 끝에 POISONED 로 드러난다', async () => {
+    const { tx, calls } = fakeTx();
+    await expect(handleCompetitionRosterResync(tx, { id: 'event-1', payload: { scope: 'competitionTeam' } })).rejects.toThrow(
+      'Invalid COMPETITION_ROSTER_RESYNC payload',
+    );
+    expect(calls).toEqual([]);
   });
 });

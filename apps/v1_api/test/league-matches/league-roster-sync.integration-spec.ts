@@ -14,6 +14,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolve-team-match-competition-config';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
@@ -126,6 +127,8 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     prisma.v1GameParticipant.findMany({ where: { lineupId }, orderBy: { displayNameSnapshot: 'asc' } });
   const sync = (leagueId: string, teamId: string) =>
     prisma.$transaction((tx) => syncCompetitionTeamRosters(tx, { competitionId: leagueId, teamId }));
+  /** 참가 명단 쓰기는 재계산 이벤트만 남긴다 — 경기 명단은 워커가 처리한 뒤에 본다. */
+  const drain = () => drainOutboxWorker(prisma);
 
   /**
    * #9 (2026-09-19 QA) 이후: `seedFixture()`의 팀장·팀원 전부(활성 멤버십엔 역할 구분이 없다 —
@@ -140,6 +143,7 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     const newMember = await makeMember(f.team.id);
 
     await app.get(TournamentPlayersService).addPlayer(f.captain, f.league.id, f.registration.id, { userId: newMember } as never);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect([latest.revision, latest.state]).toEqual([2, 'SUBMITTED']);
@@ -167,6 +171,7 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     });
 
     await players.removePlayer(f.captain, f.league.id, f.registration.id, first.id);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect(latest.revision).toBe(2);
@@ -203,8 +208,9 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
       where: { registrationId: f.registration.id, removedAt: null },
     });
     expect(active).toBe(0);
-    // "올렸다가 전원 뺀 팀" 은 자동 채움 대상이 아니다 — 소프트 삭제된 3건 그대로이고
-    // 새로 생기지 않는다.
+    // "올렸다가 전원 뺀 팀" 은 자동 채움 대상이 아니다 — 워커가 재계산해도 소프트 삭제된 3건
+    // 그대로이고 새로 생기지 않는다.
+    await drain();
     const everRegistered = await prisma.v1TournamentPlayer.count({
       where: { registrationId: f.registration.id },
     });

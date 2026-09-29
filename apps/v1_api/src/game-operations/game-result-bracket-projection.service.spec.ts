@@ -47,8 +47,9 @@ function makeTx() {
     },
     v1TeamTacticsBoard: { deleteMany: jest.fn() },
     v1GameSide: { update: jest.fn() },
-    // 진출 뒤 명단 동기화가 대상 경기를 읽는다. null 이면 동기화는 할 일이 없다(실제 계산은 통합 스펙).
-    v1Game: { update: jest.fn(), findUnique: jest.fn().mockResolvedValue(null) },
+    v1Game: { update: jest.fn() },
+    // 진출한 사이드의 명단 재계산 이벤트(outbox). 실제 계산은 통합 스펙.
+    $executeRaw: jest.fn().mockResolvedValue(1),
   } as never;
 }
 
@@ -60,10 +61,10 @@ describe('GameResultBracketProjectionService canonical TeamMatch projection', ()
     await service.project(tx, revisionRow(), { home: 2, away: 1 });
     expect((tx as any).v1TournamentMatchDetails.update).toHaveBeenCalledWith(expect.objectContaining({ where: { teamMatchId: TARGET }, data: { homeRegistrationId: HOME_REG } }));
     expect((tx as any).v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: TARGET }, data: { hostTeamId: 'team-home' } }));
-    // 진출한 사이드의 명단을 곧바로 계산한다 — 운영 콘솔 저장이 막혀 있어 이것이 유일한 채움 경로다.
-    expect((tx as any).v1Game.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'game-target' }, select: expect.objectContaining({ sides: { where: { id: 'target-home-side' }, select: expect.anything() } }) }),
-    );
+    // 진출한 경기의 명단 재계산 이벤트를 남긴다 — 운영 콘솔 저장이 막혀 있어 이것이 유일한 채움 경로다.
+    // 이 트랜잭션은 원천 경기를 먼저 쥐고 있어 대상 경기 명단을 여기서 계산하지 않는다(교착 방지).
+    const events = (tx as any).$executeRaw.mock.calls.map((call: unknown[]) => JSON.parse(String(call[6])));
+    expect(events).toEqual([{ scope: 'game', gameId: 'game-target' }]);
   });
 
   it.each<OfficialScore>([

@@ -20,7 +20,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
-import { lockUpcomingTeamGameScope, syncTeamMemberFallbackRosters } from '../games/roster/game-roster-sync';
+import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-resync-events';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import {
   ChangeTeamMembershipJerseyDto,
@@ -874,14 +874,11 @@ export class TeamsService {
       // 팀에서 빠진 사람은 그 팀의 대회 명단에도 남아 있으면 안 된다. 남겨 두면 정원만
       // 차지하고, 대회 당일 출전 자격 문제가 된다 — 2026-08-03 프로덕션에서 이 경로로
       // 실제 사고가 났다(추방된 멤버가 12명 정원 중 한 자리를 계속 점유).
-      // 명단 정리와 폴백 리그 재계산이 잡을 경기를 한 번에 먼저 잠근다(교착 방지).
-      const gameScope = await lockUpcomingTeamGameScope(tx, [target.teamId]);
       const removedRosterCount = await removeUserFromActiveRosters(tx, target.userId, {
         teamId: target.teamId,
         at: removedAt,
-        gameScope,
       });
-      await syncTeamMemberFallbackRosters(tx, [target.teamId], gameScope);
+      await enqueueRosterResync(tx, teamMembersTargets([target.teamId]));
 
       return { updated, team, removedRosterCount };
     });
@@ -966,13 +963,11 @@ export class TeamsService {
       await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
 
       // 추방(removeMembership)과 같은 이유로 자진 이탈에서도 대회 명단을 비운다.
-      const gameScope = await lockUpcomingTeamGameScope(tx, [teamId]);
       const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, {
         teamId,
         at: leftAt,
-        gameScope,
       });
-      await syncTeamMemberFallbackRosters(tx, [teamId], gameScope);
+      await enqueueRosterResync(tx, teamMembersTargets([teamId]));
 
       return { updated, team: updatedTeam, removedRosterCount };
     });
@@ -1270,7 +1265,7 @@ export class TeamsService {
         !wasActive,
         'team_join_application_approved',
       );
-      if (!wasActive) await syncTeamMemberFallbackRosters(tx, [application.teamId]);
+      if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([application.teamId]));
 
       return { updatedApplication, membership, team };
     });
@@ -1730,7 +1725,7 @@ export class TeamsService {
         !wasActive,
         'team_invitation_accepted',
       );
-      if (!wasActive) await syncTeamMemberFallbackRosters(tx, [invitation.teamId]);
+      if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([invitation.teamId]));
 
       return { updatedInvitation, membership, team };
     });

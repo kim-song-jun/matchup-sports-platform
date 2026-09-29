@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { syncGameSideRoster } from '../games/roster/game-roster-sync';
+import { enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
 import type { OfficialRevisionRow, OfficialScore } from './game-result-official-projection.types';
 
@@ -456,7 +456,8 @@ async function assignTarget(
       const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
       if (sideId !== null) {
         await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: registration.teamId, displayNameSnapshot: registration.teamName } });
-        await syncGameSideRoster(tx, { gameId: target.gameId, sideId });
+        // 새 팀 명단은 후속 이벤트가 채운다 — 이 트랜잭션은 원천 경기를 먼저 쥐고 있다.
+        await enqueueRosterResync(tx, [{ scope: 'game', gameId: target.gameId }]);
       }
       await tx.v1Game.update({ where: { id: target.gameId }, data: { version: { increment: 1 } } });
     }
@@ -496,7 +497,7 @@ async function replaceTargetAssignment(
     const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
     if (sideId !== null) {
       await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: registration.teamId, displayNameSnapshot: registration.teamName } });
-      await syncGameSideRoster(tx, { gameId: target.gameId, sideId });
+      await enqueueRosterResync(tx, [{ scope: 'game', gameId: target.gameId }]);
     }
     await tx.v1Game.update({ where: { id: target.gameId }, data: { version: { increment: 1 } } });
   }

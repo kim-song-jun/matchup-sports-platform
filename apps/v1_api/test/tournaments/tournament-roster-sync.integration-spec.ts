@@ -7,6 +7,7 @@ import { AdminRegistrationsService } from '../../src/tournaments/admin-registrat
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
@@ -18,6 +19,7 @@ import { createV1IntegrationApp } from '../integration/integration-app';
  *
  * Task 176 부터 대회 경기는 팀장이 경기 명단 전체를 저장하는 경로가 없고, 동기화 리비전은
  * 공식 결과가 읽는 SUBMITTED 로 쌓인다. 그래서 대회는 누가 저장한 리비전이든 다시 맞춘다.
+ * 참가 명단·대진 쓰기는 재계산 이벤트만 남기므로 경기 명단은 워커가 처리한 뒤(`drain`)에 본다.
  */
 describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', () => {
   const suiteId = randomUUID().slice(0, 8);
@@ -121,6 +123,7 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
       awayRegistrationId: awayRegistration.id,
       venue: '테스트 구장',
     });
+    await drain();
 
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: teamMatch.id } });
     const side = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId: game.id, teamId: team.id } });
@@ -140,6 +143,7 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     prisma.v1GameParticipant.findMany({ where: { lineupId }, orderBy: { displayNameSnapshot: 'asc' } });
   const sync = (tournamentId: string, teamId: string) =>
     prisma.$transaction((tx) => syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId }));
+  const drain = () => drainOutboxWorker(prisma);
 
   it('대진 생성 시점에 로스터가 비어 있었어도, 이후 선수를 추가하면 시작 전 경기 참가자가 채워진다', async () => {
     const f = await seedFixture();
@@ -147,6 +151,7 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     expect(await participantsOf((await latestLineup(f.game.id, f.side.id)).id)).toHaveLength(0);
 
     await app.get(TournamentPlayersService).addPlayer(f.captain, f.tournament.id, f.registration.id, { userId: f.members[0] } as never);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect([latest.revision, latest.state]).toEqual([2, 'SUBMITTED']);
@@ -182,9 +187,12 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     const f = await seedFixture();
     const players = app.get(TournamentPlayersService);
     const first = (await players.addPlayer(f.captain, f.tournament.id, f.registration.id, { userId: f.members[0] } as never)) as { id: string };
+    await drain();
     await players.addPlayer(f.captain, f.tournament.id, f.registration.id, { userId: f.members[1] } as never);
+    await drain();
 
     await players.removePlayer(f.captain, f.tournament.id, f.registration.id, first.id);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect(latest.revision).toBe(4);
@@ -199,6 +207,7 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
       f.registration.id,
       { userId: f.members[0], jerseyNumber: 7 } as never,
     );
+    await drain();
 
     const rows = await participantsOf((await latestLineup(f.game.id, f.side.id)).id);
     expect(rows.map((row) => row.jerseyNumber)).toEqual([7]);
@@ -212,12 +221,14 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
       f.registration.id,
       { userId: f.members[0], jerseyNumber: 7 } as never,
     );
+    await drain();
     expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(2);
 
     const player = await prisma.v1TournamentPlayer.findFirstOrThrow({
       where: { registrationId: f.registration.id, userId: f.members[0], removedAt: null },
     });
     await app.get(TournamentPlayersService).updatePlayerJersey(f.captain, f.tournament.id, f.registration.id, player.id, 9);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect(latest.revision).toBe(3);
@@ -297,6 +308,7 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
       onboardingStatus: 'completed',
     };
     await app.get(AdminRegistrationsService).rosterLock(admin, f.registration.id, {});
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect(latest.revision).toBe(2);

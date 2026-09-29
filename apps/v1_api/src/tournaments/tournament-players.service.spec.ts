@@ -127,10 +127,11 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
 // ─── 테스트 스위트 ───────────────────────────────────────────────────────────────
 
 
-/** 동기화가 경기를 찾는 대회·리그 범위 — 리그 경기는 leagueId, 대회 경기는 tournamentId(리그 아님). */
-const competitionScope = (competitionId: string) => ({
-  OR: [{ leagueId: competitionId }, { tournamentId: competitionId, leagueId: null }],
-});
+/** 트랜잭션이 남긴 경기 명단 재계산 이벤트(outbox payload). */
+const rosterResyncEvents = (executeRaw: jest.Mock) =>
+  executeRaw.mock.calls
+    .filter((call: unknown[]) => call[5] === 'COMPETITION_ROSTER_RESYNC')
+    .map((call: unknown[]) => JSON.parse(String(call[6])));
 
 describe('TournamentPlayersService', () => {
   let service: TournamentPlayersService;
@@ -152,7 +153,6 @@ describe('TournamentPlayersService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
-    v1Game: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
     $executeRaw: jest.Mock;
@@ -184,8 +184,6 @@ describe('TournamentPlayersService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
-      // 리그 경기 명단 동기화(syncCompetitionTeamRosters)가 시작 전 경기를 찾는 조회. 기본은 "대상 경기 없음".
-      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
       // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
@@ -664,15 +662,10 @@ describe('TournamentPlayersService', () => {
         }),
       }),
     );
-    // 그 대회·리그(같은 id)의 시작 전 경기를 같은 팀으로 찾는다.
-    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          teamMatch: expect.objectContaining({ AND: expect.arrayContaining([competitionScope('tournament-1')]) }),
-          sides: { some: { teamId: registrationRow().teamId } },
-        }),
-      }),
-    );
+    // 그 대회·리그(같은 id)·같은 팀의 경기 명단 재계산 이벤트를 남긴다.
+    expect(rosterResyncEvents(prisma.$executeRaw)).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: registrationRow().teamId },
+    ]);
   });
 
   it('addPlayer: team member missing required profile → 400 PLAYER_REQUIRED_PROFILE_MISSING', async () => {
@@ -824,14 +817,9 @@ describe('TournamentPlayersService', () => {
         data: expect.objectContaining({ removedAt: expect.any(Date) }),
       }),
     );
-    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          teamMatch: expect.objectContaining({ AND: expect.arrayContaining([competitionScope('tournament-1')]) }),
-          sides: { some: { teamId: registrationRow().teamId } },
-        }),
-      }),
-    );
+    expect(rosterResyncEvents(prisma.$executeRaw)).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: registrationRow().teamId },
+    ]);
   });
 
   it('removePlayer: player not found → 404 PLAYER_NOT_FOUND', async () => {
@@ -1660,15 +1648,10 @@ describe('TournamentPlayersService', () => {
       where: { id: 'reg-1' },
       data: { rosterLockedAt: null },
     });
-    // 어드민 제거도 선수의 신청 팀 기준으로 시작 전 경기 명단을 맞춘다.
-    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          teamMatch: expect.objectContaining({ AND: expect.arrayContaining([competitionScope('tournament-1')]) }),
-          sides: { some: { teamId: 'team-removed-from' } },
-        }),
-      }),
-    );
+    // 어드민 제거도 선수의 신청 팀 기준으로 경기 명단 재계산 이벤트를 남긴다.
+    expect(rosterResyncEvents(prisma.$executeRaw)).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-removed-from' },
+    ]);
   });
 
   it('listEligiblePlayersForAdmin: 없는 신청이면 404', async () => {

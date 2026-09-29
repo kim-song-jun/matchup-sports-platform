@@ -7,6 +7,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
@@ -389,12 +390,14 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 176)', () => {
         reason: 'INJURY',
         actor: expect.objectContaining({ userId: f.teamA.managerId, role: 'TEAM_MANAGER' }),
       });
-      expect(created.body.data.syncedSides).toBe(1);
+      // 화면(조회)은 요청 때 계산하므로 곧바로 빠져 보이고, 저장된 경기 명단은 워커가 처리한 뒤에 바뀐다.
+      const roster = await getAs(`${f.sidePath('g1', f.teamA.id)}/roster`, f.teamA.ownerId);
+      expect(roster.body.data.unavailable.map((row: { userId: string }) => row.userId)).toEqual([a1]);
+      expect(await lineupUserIds(g1A.gameId, g1A.sideId)).toEqual(sorted([a1, a2]));
+      await drainOutboxWorker(prisma);
       expect(await lineupUserIds(g1A.gameId, g1A.sideId)).toEqual([a2]);
       expect(await lineupUserIds(g2A.gameId, g2A.sideId)).toEqual(sorted([a1, a2]));
       expect(await lineupUserIds(g1B.gameId, g1B.sideId)).toEqual(g1BBefore);
-      const roster = await getAs(`${f.sidePath('g1', f.teamA.id)}/roster`, f.teamA.ownerId);
-      expect(roster.body.data.unavailable.map((row: { userId: string }) => row.userId)).toEqual([a1]);
 
       // 조회는 팀원이면 된다(본인 포함). 팀 밖은 403.
       for (const id of [a1, a2, f.adminId]) {
@@ -408,6 +411,7 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 176)', () => {
       const unavailabilityId = created.body.data.unavailability.id as string;
       const revoked = await deleteAs(`${path}/${unavailabilityId}`, f.adminId);
       expect([revoked.status, revoked.body.data.alreadyApplied]).toEqual([200, false]);
+      await drainOutboxWorker(prisma);
       expect(await lineupUserIds(g1A.gameId, g1A.sideId)).toEqual(sorted([a1, a2]));
       const again = await deleteAs(`${path}/${unavailabilityId}`, f.teamA.ownerId);
       expect([again.status, again.body.data.alreadyApplied]).toEqual([200, true]);

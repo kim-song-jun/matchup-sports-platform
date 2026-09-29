@@ -3,7 +3,7 @@ import { Prisma, type V1TeamMemberUnavailability } from '@prisma/client';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateMemberUnavailabilityDto } from './dto/team-game-roster.dto';
-import { syncTeamRostersWithinPeriod } from './game-roster-sync';
+import { enqueueRosterResync } from './roster-resync-events';
 import { loadDisplayNames } from './game-roster.service';
 import { resolveTeamRosterAccess, type TeamRosterAccess } from './team-roster-access';
 
@@ -84,9 +84,9 @@ export class MemberUnavailabilityService {
           actorRole: access.writeRole!,
         },
       });
-      const syncedSides = await syncTeamRostersWithinPeriod(tx, { teamId, startsAt, endsAt });
+      await enqueuePeriodResync(tx, created);
       const names = await loadDisplayNames(tx, [created.actorUserId]);
-      return { unavailability: toView(created, names), syncedSides };
+      return { unavailability: toView(created, names) };
     });
   }
 
@@ -99,19 +99,15 @@ export class MemberUnavailabilityService {
       }
       if (row.revokedAt !== null) {
         const names = await loadDisplayNames(tx, [row.actorUserId]);
-        return { alreadyApplied: true, unavailability: toView(row, names), syncedSides: 0 };
+        return { alreadyApplied: true, unavailability: toView(row, names) };
       }
       const updated = await tx.v1TeamMemberUnavailability.update({
         where: { id: row.id },
         data: { revokedAt: new Date(), revokedByUserId: user.id },
       });
-      const syncedSides = await syncTeamRostersWithinPeriod(tx, {
-        teamId,
-        startsAt: updated.startsAt,
-        endsAt: updated.endsAt,
-      });
+      await enqueuePeriodResync(tx, updated);
       const names = await loadDisplayNames(tx, [updated.actorUserId]);
-      return { alreadyApplied: false, unavailability: toView(updated, names), syncedSides };
+      return { alreadyApplied: false, unavailability: toView(updated, names) };
     });
   }
 
@@ -137,4 +133,11 @@ export class MemberUnavailabilityService {
     }
     return access;
   }
+}
+
+/** 기간 안 경기 명단 재계산은 후속 이벤트로 — 이 트랜잭션은 결장 기간 행을 쥐고 있다. */
+function enqueuePeriodResync(tx: Tx, row: { teamId: string; startsAt: Date; endsAt: Date }): Promise<void> {
+  return enqueueRosterResync(tx, [
+    { scope: 'teamPeriod', teamId: row.teamId, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString() },
+  ]);
 }

@@ -124,8 +124,8 @@ describe('TeamsService', () => {
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     // 팀 이탈 시 대회 명단도 함께 정리한다(roster-cleanup).
     v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
-    // 멤버십이 바뀌면 팀원 기준(폴백) 리그의 시작 전 경기를 찾는다.
-    v1Game: { findMany: jest.Mock };
+    // 멤버십이 바뀌면 팀원 기준(폴백) 리그 명단 재계산 이벤트를 남긴다.
+    $executeRaw: jest.Mock;
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
@@ -170,7 +170,7 @@ describe('TeamsService', () => {
       v1User: { findUnique: jest.fn() },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
@@ -1131,13 +1131,10 @@ describe('TeamsService', () => {
       select: { id: true },
     });
     expect(result).toMatchObject({ membershipId: 'mem-member', status: 'left', memberCount: 4 });
-    // 참가 명단 없이 팀원 기준으로 뛰는 리그 경기도 멤버십을 끈 뒤 다시 계산한다(대회 명단 정리 0건이어도).
-    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ sides: { some: { teamId: 'team-1' } } }) }),
-    );
-    expect(prisma.v1TeamMembership.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
-      prisma.v1Game.findMany.mock.invocationCallOrder[0],
-    );
+    // 참가 명단 없이 팀원 기준으로 뛰는 리그 경기도 다시 계산한다(대회 명단 정리 0건이어도) — 이 트랜잭션은
+    // 팀·멤버십 행을 쥐고 있어 경기를 잠그지 않고 후속 이벤트만 남긴다.
+    const resync = prisma.$executeRaw.mock.calls.filter((call: unknown[]) => call[5] === 'COMPETITION_ROSTER_RESYNC');
+    expect(resync.map((call: unknown[]) => JSON.parse(String(call[6])))).toEqual([{ scope: 'teamMembers', teamId: 'team-1' }]);
   });
 
   it('leaveTeam: manager가 나가면 tx 내부에서 재조회한 role로 managerCount를 decrement한다(바깥에서 읽은 stale role 무시)', async () => {
@@ -1448,6 +1445,11 @@ describe('TeamsService', () => {
       application.teamId,
       '"테스트팀" 팀 가입이 승인됐어요.',
     );
+    // 새 팀원은 팀원 기준(폴백) 리그 경기 명단에 후속 이벤트로 들어간다.
+    const resync = prisma.$executeRaw.mock.calls.filter((call: unknown[]) => call[5] === 'COMPETITION_ROSTER_RESYNC');
+    expect(resync.map((call: unknown[]) => JSON.parse(String(call[6])))).toEqual([
+      { scope: 'teamMembers', teamId: application.teamId },
+    ]);
   });
 
   // ─── withdrawJoinApplication: 본인이 아닌 사용자가 철회 불가 → 403 ───────────

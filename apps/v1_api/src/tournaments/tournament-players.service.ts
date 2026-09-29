@@ -24,7 +24,7 @@ import {
   writeJerseyNumber,
 } from './tournament-player-jersey';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
-import { syncCompetitionTeamRosters } from '../games/roster/game-roster-sync';
+import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -417,7 +417,7 @@ export class TournamentPlayersService {
       if (dto.jerseyNumber !== undefined) {
         await writeJerseyNumber(tx, saved.id, dto.jerseyNumber);
       }
-      await syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId: current.registration.teamId });
+      await enqueueRosterResync(tx, competitionTeamTargets(tournamentId, [current.registration.teamId]));
       return saved;
     });
   }
@@ -459,7 +459,7 @@ export class TournamentPlayersService {
         where: { id: playerId },
         data: { removedAt: new Date() },
       });
-      await syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId: registration.teamId });
+      await enqueueRosterResync(tx, competitionTeamTargets(tournamentId, [registration.teamId]));
       return removedPlayer;
     });
 
@@ -521,8 +521,8 @@ export class TournamentPlayersService {
       }
       await writeJerseyNumber(tx, playerId, jerseyNumber);
       // 등번호도 참가자 스냅샷의 일부라 시작 전 대진 경기 명단에 다시 찍는다(멤버십은
-      // 안 바뀌었어도 번호만 바뀌면 새 참가자 행을 만들어야 한다).
-      await syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId: registration.teamId });
+      // 안 바뀌었어도 번호만 바뀌면 새 참가자 행을 만들어야 한다 — 후속 이벤트).
+      await enqueueRosterResync(tx, competitionTeamTargets(tournamentId, [registration.teamId]));
       return player;
     });
 
@@ -887,10 +887,10 @@ export class TournamentPlayersService {
       // 제거로 성별 비율이 바뀌어 쿼터를 벗어날 수도 있다(예: 여성 최소 인원 미달) —
       // reconcileGenderQuotaAfterRosterChange 주석 참조.
       await this.reconcileGenderQuotaAfterRosterChange(tx, player.registrationId, tournament);
-      await syncCompetitionTeamRosters(tx, {
-        competitionId: player.registration.tournamentId,
-        teamId: player.registration.teamId,
-      });
+      await enqueueRosterResync(
+        tx,
+        competitionTeamTargets(player.registration.tournamentId, [player.registration.teamId]),
+      );
 
       return updated;
     });

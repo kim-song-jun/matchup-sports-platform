@@ -134,13 +134,9 @@ function fixtureRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/**
- * updateTournamentMatchInTx 의 raw 조회 순서: 경기 잠금(대상 경기 전부, 여기서는 game-1 하나) →
- * 경기 읽기 → 대진 상세 잠금 → 팀 매치 잠금.
- */
+/** updateTournamentMatchInTx 의 raw 조회 순서: 자기 경기 잠금 → 대진 상세 잠금 → 팀 매치 잠금. */
 function queueFixtureUpdateRaw(queryRaw: jest.Mock, gameRow: Record<string, unknown>, teamMatchRow: Record<string, unknown>) {
   queryRaw
-    .mockResolvedValueOnce([])
     .mockResolvedValueOnce([gameRow])
     .mockResolvedValueOnce([])
     .mockResolvedValueOnce([teamMatchRow]);
@@ -341,10 +337,6 @@ describe('TournamentBracketService', () => {
       },
       v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
-      // createFixture 가 대진 생성 직후 대진 재동기화(syncCompetitionTeamRosters)를 태운다 —
-      // 이 스위트는 그 자체 로직이 아니라 최초 참가자 스냅샷 복사를 검증하므로 "이 팀의 시작
-      // 전 대진 없음"으로 즉시 no-op 처리되게 둔다. 실제 동기화 동작은
-      // tournament-roster-sync.integration-spec.ts.
       v1Game: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
       v1GameLineup: {
         findFirst: jest.fn().mockResolvedValue(null),

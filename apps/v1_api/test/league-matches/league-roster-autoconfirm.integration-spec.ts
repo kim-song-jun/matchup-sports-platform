@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 import {
   LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
@@ -305,6 +306,8 @@ describe('D10 리그 명단 자동 확정', () => {
     }
 
     await run(league.id, startsOn);
+    // 자동 확정은 경기 명단 재계산 이벤트만 남긴다 — 워커가 처리한 뒤에 본다.
+    await drainOutboxWorker(prisma);
 
     const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id, removedAt: null } });
     expect(players).toHaveLength(2);

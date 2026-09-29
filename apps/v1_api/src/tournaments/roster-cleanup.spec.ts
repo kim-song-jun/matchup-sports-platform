@@ -47,11 +47,11 @@ describe('removeUserFromActiveRosters', () => {
     ]);
     const updateMany = jest.fn().mockResolvedValue({ count: 2 });
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
-    const gameFindMany = jest.fn().mockResolvedValue([]);
+    const executeRaw = jest.fn().mockResolvedValue(1);
     const tx = {
       v1TournamentPlayer: { findMany, updateMany },
       v1StatusChangeLog: { createMany },
-      v1Game: { findMany: gameFindMany },
+      $executeRaw: executeRaw,
     } as unknown as Prisma.TransactionClient;
     const removedAt = new Date('2026-08-07T00:00:00.000Z');
 
@@ -72,17 +72,12 @@ describe('removeUserFromActiveRosters', () => {
         }),
       ],
     });
-    // 팀을 떠난 사람이 시작 전 경기 명단에 남지 않도록, 명단이 줄어든 팀마다 그 대회·리그의
-    // 시작 전 경기(리그 경기 leagueId, 대회 경기 tournamentId)를 맞춘다. 두 팀의 경기는 먼저 한
-    // 조회로 모아 한 번에 잠그고(교착 방지), 그 뒤 팀마다 잠근 뒤 다시 읽는다.
-    type UpcomingWhere = { teamMatch: { AND: unknown[] }; sides: { some: { teamId: string } } };
-    const covered = (args: { where: UpcomingWhere & { OR?: UpcomingWhere[] } }) =>
-      (args.where.OR ?? [args.where]).map((where) => `${JSON.stringify(where.teamMatch.AND[0])}:${where.sides.some.teamId}`).sort();
-    const expected = ['team-1', 'team-2'].map(
-      (teamId) => `${JSON.stringify({ OR: [{ leagueId: 'tournament-1' }, { tournamentId: 'tournament-1', leagueId: null }] })}:${teamId}`,
-    );
-    expect(covered(gameFindMany.mock.calls[0][0])).toEqual(expected);
-    expect(gameFindMany.mock.calls.slice(1).flatMap(([args]) => covered(args)).sort()).toEqual(expected);
+    // 팀을 떠난 사람이 시작 전 경기 명단에 남지 않도록, 명단이 줄어든 팀마다 그 대회·리그의 재계산
+    // 이벤트를 남긴다. 이 트랜잭션은 명단·멤버십 행을 쥐고 있어 경기를 잠그지 않는다(교착 방지).
+    expect(executeRaw.mock.calls.map((call: unknown[]) => JSON.parse(String(call[6])))).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-1' },
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-2' },
+    ]);
   });
 
   it('잠긴 신청건이 없으면 감사 로그를 남기지 않는다', async () => {
@@ -98,7 +93,7 @@ describe('removeUserFromActiveRosters', () => {
     const tx = {
       v1TournamentPlayer: { findMany, updateMany },
       v1StatusChangeLog: { createMany },
-      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
     } as unknown as Prisma.TransactionClient;
 
     await removeUserFromActiveRosters(tx, 'user-1', { at: new Date('2026-08-07T00:00:00.000Z') });

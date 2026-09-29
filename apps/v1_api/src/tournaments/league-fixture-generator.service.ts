@@ -10,8 +10,9 @@ import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { createTournamentMatchInTx } from './tournament-match-creation';
-import { lockGameScope, syncRostersForTeamMatchTeams } from '../games/roster/game-roster-sync';
-import { planTournamentMatchUpdateGames, updateTournamentMatchInTx } from './tournament-match-update';
+import { lockGameRows } from '../games/roster/game-roster-sync';
+import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
+import { updateTournamentMatchInTx } from './tournament-match-update';
 
 /**
  * League generation operates on the canonical TeamMatch/Details/Game unit.
@@ -694,19 +695,18 @@ export class LeagueFixtureGeneratorService {
               message: '진행 중이거나 종료된 경기가 있어 대진을 바꿀 수 없어요.',
             });
           }
-          const updates = pairedRows.map(({ row }) => ({
-            teamMatchId: existingByCoordinate.get(`${row.round}:${row.fixtureNumber}:${row.legNumber}`)!.teamMatchId,
-            scheduledAt: row.startAt,
-            homeRegistrationId: row.homeRegistrationId,
-            awayRegistrationId: row.awayRegistrationId,
-          }));
-          // 대진마다 따로 잠그면 앞 대진의 경기를 쥔 채 뒤 대진의 경기를 잡아 순서가 깨진다 — 전부 한 번에 잠근다.
-          const plannedGameIds: string[] = [];
-          for (const update of updates) plannedGameIds.push(...(await planTournamentMatchUpdateGames(tx, update)));
-          const gameScope = await lockGameScope(tx, plannedGameIds);
+          // 대진마다 자기 경기를 잡으면 목록 순서로 여러 경기를 쥔다 — 재계산 워커(id 순)와 엇갈리지 않게 먼저 id 순으로.
+          await lockGameRows(tx, currentFixtures.map((fixture) => fixture.teamMatch.game!.id));
           const reconciledRows: Array<Awaited<ReturnType<typeof updateTournamentMatchInTx>>> = [];
-          for (const update of updates) {
-            reconciledRows.push(await updateTournamentMatchInTx(tx, update, gameScope));
+          for (const { row } of pairedRows) {
+            const existing = existingByCoordinate.get(`${row.round}:${row.fixtureNumber}:${row.legNumber}`)!;
+            const updated = await updateTournamentMatchInTx(tx, {
+              teamMatchId: existing.teamMatchId,
+              scheduledAt: row.startAt,
+              homeRegistrationId: row.homeRegistrationId,
+              awayRegistrationId: row.awayRegistrationId,
+            });
+            reconciledRows.push(updated);
           }
           await this.adminContext.logAdminAction(
             admin,
@@ -787,11 +787,14 @@ export class LeagueFixtureGeneratorService {
             payloadHash,
           });
         }
-        // 생성 스냅샷은 참가 명단 원본이라 결장 기간·출전정지·등번호가 빠져 있다 — 직후 계산 결과로 맞춘다.
-        await syncRostersForTeamMatchTeams(tx, {
-          competitionId: tournamentId,
-          teamIds: pairedRows.flatMap(({ home, away }) => [home.team.id, away.team.id]),
-        });
+        // 생성 스냅샷은 참가 명단 원본이라 결장 기간·출전정지·등번호가 빠져 있다 — 후속 이벤트가 맞춘다.
+        await enqueueRosterResync(
+          tx,
+          competitionTeamTargets(
+            tournamentId,
+            pairedRows.flatMap(({ home, away }) => [home.team.id, away.team.id]),
+          ),
+        );
 
         return { createdCount: builtRows.length, deleted: deletedCount, rows: builtRows, teamCount: currentGroup.groupTeams.length, oddTeamCount: currentGroup.groupTeams.length % 2 !== 0 };
       },

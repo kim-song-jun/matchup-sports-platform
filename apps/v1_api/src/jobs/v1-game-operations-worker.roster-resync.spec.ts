@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
+import { COMPETITION_ROSTER_RESYNC_TYPE } from '../games/roster/roster-resync-events';
 import {
-  COMPETITION_ROSTER_RESYNC_TYPE,
   V1GameOperationsWorkerService,
   withCompetitionRosterResync,
   type GameOperationClaim,
@@ -51,6 +51,7 @@ describe('결과 이벤트 뒤 명단 재계산 — 결과 트랜잭션 밖의 �
     expect(values).toEqual(
       expect.arrayContaining(['game:game-1:revision:2:official:roster-resync', 'game-1', COMPETITION_ROSTER_RESYNC_TYPE]),
     );
+    expect(JSON.parse(String(values[5]))).toEqual({ scope: 'result', gameId: 'game-1' });
   });
 
   it('경기가 아닌 집계의 이벤트에는 후속 이벤트를 남기지 않는다', async () => {

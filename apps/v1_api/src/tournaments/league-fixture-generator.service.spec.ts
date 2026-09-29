@@ -2,6 +2,7 @@ import { ConflictException, UnprocessableEntityException } from '@nestjs/common'
 import { Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import type { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
+import { COMPETITION_ROSTER_RESYNC_TYPE } from '../games/roster/roster-resync-events';
 import {
   assertLeagueGenerationAllowed,
   buildLeagueFixtureRows,
@@ -294,8 +295,6 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     v1TournamentMatchDetails: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
-      // 교체(reconcile)가 잠글 경기를 미리 모으는 조회(planTournamentMatchUpdateGames).
-      findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
@@ -310,8 +309,6 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     },
     v1TeamSchedule: { create: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1GameSide: { update: jest.fn() },
-    // 명단 동기화(syncCompetitionTeamRosters)가 팀의 시작 전 경기를 찾는 조회. 실제 재계산은 통합 스펙이 본다.
-    v1Game: { findMany: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
@@ -320,6 +317,14 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   const games = { createFromSourceInTransaction: jest.fn() };
 
   let service: LeagueFixtureGeneratorService;
+
+  /** 이 트랜잭션이 남긴 명단 재계산 이벤트(outbox payload). 팀마다 한 번만 남는다. */
+  function rosterResyncEvents(): Array<{ scope: string; competitionId: string; teamId: string }> {
+    // enqueueRosterResync 의 값 순서: id, business_key, aggregate_type, aggregate_id, type, payload.
+    return prisma.$executeRaw.mock.calls
+      .filter((call: unknown[]) => call[5] === COMPETITION_ROSTER_RESYNC_TYPE)
+      .map((call: unknown[]) => JSON.parse(String(call[6])));
+  }
 
   /**
    * 조에 배정된 registrationId 들을 전부 confirmed 로 돌려주는 기본 응답.
@@ -477,9 +482,6 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockImplementation(({ where }: { where: { teamMatchId: string } }) =>
       Promise.resolve(existingFixture(where.teamMatchId, { id: `game-${where.teamMatchId}` })),
     );
-    prisma.v1TournamentMatchDetails.findUnique.mockImplementation(({ where }: { where: { teamMatchId: string } }) =>
-      Promise.resolve(existingFixture(where.teamMatchId, { id: `game-${where.teamMatchId}` })),
-    );
     prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'parent' });
     prisma.v1IdempotencyRecord.findFirst.mockResolvedValue(null);
     prisma.v1GameResultRevision.findUnique.mockResolvedValue(null);
@@ -512,7 +514,6 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     prisma.v1TeamSchedule.updateMany.mockResolvedValue({ count: 0 });
     prisma.v1TeamSchedule.count = jest.fn().mockResolvedValue(0);
     prisma.v1GameSide.update.mockResolvedValue({});
-    prisma.v1Game.findMany.mockResolvedValue([]);
     prisma.v1TournamentRegistration.findMany.mockImplementation(confirmedRegistrations);
     prisma.v1TournamentPlayer.findMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) =>
       Promise.resolve(where.id.in.map((id) => ({
@@ -555,17 +556,13 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     expect(creations.map((creation) => creation.input.competitionConfigVersionId)).toEqual(Array(6).fill('ccv-1'));
   });
 
-  it('만든 대진의 모든 팀 명단을 생성 직후 다시 계산한다 — 결장 기간·출전정지가 새 경기에도 걸린다', async () => {
+  it('만든 대진의 모든 팀에 명단 재계산 이벤트를 남긴다 — 결장 기간·출전정지가 새 경기에도 걸린다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
 
     await service.generate(user, 't1', dto());
 
-    // 여러 팀을 돌기 전 잠금 대상 조회(`OR` 묶음)는 빼고 팀별 재계산 조회만 센다.
-    const synced = prisma.v1Game.findMany.mock.calls.flatMap((call) => {
-      const where = (call[0] as { where: { sides?: { some: { teamId: string } } } }).where;
-      return where.sides === undefined ? [] : [where.sides.some.teamId];
-    });
-    expect([...synced].sort()).toEqual(['team-r1', 'team-r2', 'team-r3', 'team-r4']);
+    expect(rosterResyncEvents().map((event) => event.teamId).sort()).toEqual(['team-r1', 'team-r2', 'team-r3', 'team-r4']);
+    expect(rosterResyncEvents().every((event) => event.scope === 'competitionTeam' && event.competitionId === 't1')).toBe(true);
   });
 
   // C1: fixture 행의 competitionConfigVersionId 가 비어 있으면 나중에 fixture-game-backfill
@@ -698,9 +695,9 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     expect(result.created).toBe(0);
   });
 
-  // 대진마다 따로 잠그면 앞 대진의 경기를 쥔 채 뒤 대진(더 작은 id)의 경기를 잡는다 — 같은 팀이 걸린
-  // 다른 대진 수정과 서로를 기다린다(40P01). 전부 한 번에 id 순으로 잡은 뒤에만 상세·팀 매치를 잡는다.
-  it('D1: 교체는 모든 대진의 경기를 한 번에 id 순으로 잠근 뒤에 대진별 상세·팀 매치를 잡는다', async () => {
+  // 교체는 여러 대진의 경기를 쥔다. 목록 순서로 잡으면 같은 경기들을 id 순으로 잡는 재계산 워커와
+  // 서로를 기다린다(40P01) — 자기 경기들을 먼저 id 순으로 잡고, 팀의 다른 경기 재계산은 이벤트로 남긴다.
+  it('D1: 교체는 자기 대진 경기들만 먼저 id 순으로 잠그고 팀 명단 재계산은 이벤트로 남긴다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3']));
     const rows = buildLeagueFixtureRows({
       groupId: 'group-a',
@@ -739,7 +736,6 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     const byId = new Map(fixtures.map((fixture) => [fixture.teamMatchId, fixture]));
     prisma.v1TournamentMatchDetails.findMany.mockResolvedValue(fixtures);
     const findById = ({ where }: { where: { teamMatchId: string } }) => Promise.resolve(byId.get(where.teamMatchId));
-    prisma.v1TournamentMatchDetails.findUnique.mockImplementation(findById);
     prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockImplementation(findById);
 
     await service.generate(user, 't1', dto({ replaceExisting: true }));
@@ -747,17 +743,20 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     const locks = prisma.$queryRaw.mock.calls
       .map(([strings, ...values]: [TemplateStringsArray, ...unknown[]]) => {
         const query = strings.join('?');
-        if (query.includes('FROM v1_games WHERE id') && query.includes('FOR UPDATE')) return `game:${String(values[0])}`;
-        if (query.includes('FOR UPDATE') && query.includes('v1_games')) return 'game:by-team-match';
-        if (query.includes('FOR UPDATE') && query.includes('v1_tournament_match_details')) return 'details';
-        if (query.includes('FOR UPDATE') && query.includes('v1_team_matches')) return 'team-match';
+        if (!query.includes('FOR UPDATE')) return null;
+        if (query.includes('FROM v1_games WHERE id')) return `game:${String(values[0])}`;
+        if (query.includes('v1_games')) return 'game:by-team-match';
+        if (query.includes('v1_tournament_match_details')) return 'details';
         return null;
       })
       .filter((lock: string | null): lock is string => lock !== null);
-    const firstRowLock = locks.findIndex((lock: string) => !lock.startsWith('game:'));
-    expect(locks.slice(0, firstRowLock)).toEqual(['game:game-fx-0', 'game:game-fx-1', 'game:game-fx-2']);
-    expect(locks.slice(firstRowLock).filter((lock: string) => lock.startsWith('game:'))).toEqual([]);
-    expect(locks.filter((lock: string) => lock === 'details')).toHaveLength(rows.length);
+    const firstOtherLock = locks.findIndex((lock: string) => !/^game:game-/.test(lock));
+    expect(locks.slice(0, firstOtherLock)).toEqual(['game:game-fx-0', 'game:game-fx-1', 'game:game-fx-2']);
+    // 대진별 수정은 이미 쥔 자기 경기만 다시 잡는다 — 팀의 다른 경기는 잡지 않는다.
+    expect(locks.slice(firstOtherLock).filter((lock: string) => lock.startsWith('game:game-'))).toEqual([]);
+    expect(locks.filter((lock: string) => lock === 'game:by-team-match')).toHaveLength(rows.length);
+    // 대진마다 따로 남긴 같은 팀 이벤트는 워커가 한 번에 처리한다(completeQueuedDuplicates).
+    expect([...new Set(rosterResyncEvents().map((event) => event.teamId))].sort()).toEqual(['team-r1', 'team-r2', 'team-r3']);
   });
 
   // 취소 표식(tombstone)이 되살아나면 진행률·매직넘버·카드 정지가 다시 오염된다.

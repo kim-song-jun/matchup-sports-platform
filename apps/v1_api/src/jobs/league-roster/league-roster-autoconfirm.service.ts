@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
-import { syncRostersForTeamMatchTeams } from '../../games/roster/game-roster-sync';
+import { competitionTeamTargets, enqueueRosterResync } from '../../games/roster/roster-resync-events';
 import {
   fillLeagueTeamRoster,
   notifyLeagueRosterFillOutcomes,
@@ -130,7 +130,7 @@ export class LeagueRosterAutoConfirmService {
     // 더 새 세대(시작일 변경)로 다시 예약됐으면 이 발화는 무시한다.
     if (league.scheduledAt.toISOString() !== expectedStartsOn) return;
 
-    // 대진이 이미 있는 리그도 채운다 — 채운 명단은 시작 전 경기 명단에 곧바로 맞춰진다(Task 170 D1′).
+    // 대진이 이미 있는 리그도 채운다 — 채운 명단은 시작 전 경기 명단에 맞춰진다(Task 170 D1′).
     const outcomes: LeagueRosterFillOutcome[] = [];
     const filledTeamIds: string[] = [];
     for (const registration of await this.pendingRegistrations(tx, leagueId)) {
@@ -138,8 +138,8 @@ export class LeagueRosterAutoConfirmService {
       if (outcome.kind === 'filled') filledTeamIds.push(registration.teamId);
       outcomes.push(outcome);
     }
-    // 팀마다 따로 동기화하면 앞 팀 경기를 쥔 채 뒤 팀 경기를 잡는다 — 채운 팀들의 경기를 한 번에 잠근다.
-    await syncRostersForTeamMatchTeams(tx, { competitionId: leagueId, teamIds: filledTeamIds });
+    // 채운 명단은 시작 전 경기 명단 재계산 이벤트로 맞춘다(이 트랜잭션은 신청·명단 행을 쥐고 있다).
+    await enqueueRosterResync(tx, competitionTeamTargets(leagueId, filledTeamIds));
     if (outcomes.length === 0) return;
     await notifyLeagueRosterFillOutcomes(tx, league, outcomes);
   };

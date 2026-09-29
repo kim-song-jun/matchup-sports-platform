@@ -26,6 +26,7 @@ import type {
   V1GrantTournamentStaffPayload,
   V1Inquiry,
   V1SetScheduleAttendanceDto,
+  V1MyTeamMatch,
   V1TeamMatchLineup,
   V1TeamMatchLineupSavePayload,
   V1TeamScheduleDetail,
@@ -559,6 +560,33 @@ export const v1MswHandlers = [
     pageInfo: { nextCursor: null, hasNext: false },
   })),
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
+  http.get(`${api}/me/team-matches`, ({ request }) => {
+    const scope = new URL(request.url).searchParams.get('scope');
+    const items = v1TeamMatchesFixture.map((item) => {
+      const teamMatchId = item.id;
+      const createdByMe = scope === 'created';
+
+      return {
+        teamMatchId,
+        title: item.title,
+        sportName: item.sport?.name ?? item.sportName ?? '종목 미정',
+        startsAt: item.startsAt,
+        deadlineAt: null,
+        status: 'recruiting',
+        displayState: 'recruiting',
+        isLive: false,
+        relation: createdByMe ? 'created_by_me' : 'approved',
+        teamId: item.hostTeamId ?? null,
+        teamName: item.hostTeam?.name ?? item.hostTeamName ?? null,
+        applicationId: createdByMe ? null : 'team-match-application-1',
+        league: item.league ?? null,
+        manageRoute: createdByMe ? `/team-matches/${teamMatchId}` : null,
+        detailRoute: `/team-matches/${teamMatchId}`,
+      } satisfies V1MyTeamMatch;
+    });
+
+    return ok(page(items));
+  }),
   http.get(`${api}/team-matches`, ({ request }) => {
     const sportId = new URL(request.url).searchParams.get('sportId');
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];

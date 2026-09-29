@@ -66,8 +66,8 @@ export class TeamMatchEligibilityQueryDto {
 
 export class MyTeamMatchesQueryDto {
   @IsOptional()
-  @IsIn(['hosted', 'applied', 'all'])
-  scope?: 'hosted' | 'applied' | 'all';
+  @IsIn(['hosted', 'applied', 'created', 'all'])
+  scope?: 'hosted' | 'applied' | 'created' | 'all';
 
   @IsOptional()
   @IsUUID()

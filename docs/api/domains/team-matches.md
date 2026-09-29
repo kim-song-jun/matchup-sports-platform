@@ -75,7 +75,7 @@
 | POST | `/team-match-applications/:applicationId/withdraw` | Yes(신청 팀 owner/manager) | 신청 철회 |
 | POST | `/team-match-applications/:applicationId/approve` | Yes(host team owner/manager) | 신청 승인(경기 확정) |
 | POST | `/team-match-applications/:applicationId/reject` | Yes(host team owner/manager) | 신청 거절 |
-| GET | `/me/team-matches` | Yes | 내 팀매치 워크리스트(`scope?`, `teamId?`, `status?`) |
+| GET | `/me/team-matches` | Yes | 내 팀매치 워크리스트(`scope=hosted|applied|created|all`, `teamId?`, `status?`) |
 | GET | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 조회 |
 | PUT | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 draft 저장 |
 | POST | `/team-matches/:teamMatchId/lineup/submit` | Yes | 참석명단 제출 |
@@ -85,6 +85,17 @@
 | POST | `/admin/team-matches/:id/applications/:applicationId/approve` | Admin owner/ops | 신청 팀을 한 팀씩 승인하고 두 번째 승인에서 경기 확정 |
 | POST | `/admin/team-matches/:id/applications/:applicationId/reject` | Admin owner/ops | 대기 신청을 사유와 함께 거절 |
 | PATCH | `/admin/team-matches/:id` | Admin owner/ops | 모집 중인 플랫폼 단발 팀매치 수정 |
+
+## GET /me/team-matches
+
+마이페이지에서 사용하는 로그인 사용자 기준 팀매치 목록이다.
+
+- `scope=applied`: 사용자의 현재 active 소속 팀이 신청한 팀매치. 개인 출전 확정이 아니라 `우리 팀 신청/확정` 관계다.
+- `scope=hosted`: 사용자의 현재 active 소속 팀이 호스트인 팀매치.
+- `scope=created`: 현재 팀 소속 여부와 관계없이 `V1TeamMatch.createdByUserId`가 로그인 사용자와 같은 팀매치. 마이페이지 `생성한 매치`의 팀매치 소스다.
+- `scope=all` 또는 생략: 현재 소속 팀 기준 hosted + applied 워크리스트. `created` 이력까지 합치는 의미는 아니다.
+
+응답의 `relation`은 `host_team`, `created_by_me`, `requested`, `approved`, `rejected`, `withdrawn` 중 하나다. `manageRoute`는 현재 호스트팀의 active owner/manager에게만 내려가며 실제 v1 팀매치 상세(`/team-matches/:id`)로 연결된다. 과거 생성자이지만 현재 관리 권한이 없으면 생성 이력은 보이되 `manageRoute=null`이다.
 
 ## POST /admin/team-matches
 

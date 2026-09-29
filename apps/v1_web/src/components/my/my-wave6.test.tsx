@@ -61,7 +61,26 @@ describe('받은 초대', () => {
 });
 
 describe('내 매치', () => {
-  const base = { mode: 'joined' as const, matches: [], summary: [], loading: false, error: false, onRetry: vi.fn() };
+  const base = {
+    mode: 'joined' as const,
+    typeFilter: 'all' as const,
+    filters: [
+      { key: 'all' as const, label: '전체', href: '/my/matches/joined' },
+      { key: 'personal' as const, label: '개인 매치', href: '/my/matches/joined?type=personal' },
+      { key: 'team' as const, label: '팀 매치', href: '/my/matches/joined?type=team' },
+    ],
+    matches: [],
+    summary: [],
+    emptyState: {
+      title: '참여한 매치가 없어요',
+      sub: '새로운 매치를 찾아보세요.',
+      cta: '개인 매치 찾기',
+      ctaHref: '/matches',
+    },
+    loading: false,
+    error: false,
+    onRetry: vi.fn(),
+  };
 
   it('세그먼트 선택 상태는 primary 가 아니라 칩으로 표현한다', () => {
     const { container } = render(<MyMatchesPageView model={base} />);

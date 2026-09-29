@@ -185,6 +185,26 @@ describe('CorrectionsPageClient — 공개 화면 링크', () => {
     );
   });
 
+  it('딥링크 A에서 B를 선택하면 공개 화면의 복귀 주소도 B로 바꾼다', async () => {
+    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 대회', kind: 'regular_tournament', fixtures: [] } });
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+      data: { items: [ITEM('fx-1', 'game-1', 1, 'rev-1'), ITEM('fx-2', 'game-2', 2, 'rev-2')] },
+      refetch: vi.fn(),
+    });
+    render(<CorrectionsPageClient tournamentId="t-1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: /2번 경기/ }));
+
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-2');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/fx-2?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Frecords%2Fcorrections%3FfixtureId%3Dfx-2',
+    );
+  });
+
   /**
    * 목록은 보드 쿼리로 뜨고 `kind` 는 다른 쿼리에서 온다 — 보드가 먼저 성공하면
    * `tournament.data` 가 undefined 라 정규 리그가 대회 라우트로 링크돼 404 다.

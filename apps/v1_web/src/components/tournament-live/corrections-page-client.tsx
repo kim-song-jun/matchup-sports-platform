@@ -17,6 +17,20 @@ import { GameResultCorrectionPanel } from '@/components/tournament-result-review
 import { describeResultReviewError } from '@/components/tournament-result-review/result-review-copy';
 import { ResultReviewGridStyles } from '@/components/tournament-result-review/result-review-grid-styles';
 
+const INTERNAL_URL_BASE = 'https://teameet.invalid';
+
+/**
+ * 정정 목록에서 선택한 경기와 복귀 딥링크를 맞춘다. 선택은 로컬 상태라 현재 주소의
+ * `fixtureId`가 이전 경기를 가리킬 수 있으므로, 공개 화면에 넘길 때 현재 선택으로 교체한다.
+ * 받은 `from` 체인과 hash는 그대로 보존한다.
+ */
+function withSelectedFixtureId(href: string | null, fixtureId: string) {
+  if (!href) return null;
+  const parsed = new URL(href, INTERNAL_URL_BASE);
+  parsed.searchParams.set('fixtureId', fixtureId);
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
 /**
  * Screen A-04 -- `/tournament-ops/tournaments/:tournamentId/records/
  * corrections`. Same worktree gap as `result-review-page-client.tsx`: Task
@@ -66,6 +80,9 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   );
 
   const selectedItem = hasOfficialResult.find((item) => item.fixtureId === selectedFixtureId) ?? null;
+  const selectedSelfHref = selectedItem
+    ? withSelectedFixtureId(selfHref, selectedItem.fixtureId)
+    : selfHref;
 
   /**
    * **확정된 결과를 관전자 화면에서 확인하는 자리.** 원래 결과 검토 화면에 뒀는데 거기서는
@@ -83,7 +100,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
           isRegularLeague: tournament.data.kind === 'regular_league',
           competitionId: tournamentId,
           fixtureId: selectedItem.fixtureId,
-          fromHref: selfHref,
+          fromHref: selectedSelfHref,
         })
       : undefined;
   const selectedFixtureTitle = selectedItem

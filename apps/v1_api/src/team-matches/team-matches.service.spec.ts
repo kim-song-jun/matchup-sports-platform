@@ -557,6 +557,68 @@ describe('TeamMatchesService', () => {
     expect(args.include.applications.where.status).toBe('requested');
   });
 
+  it('myTeamMatches: created는 현재 팀 소속이 없어도 실제 생성자 기준으로 이력을 반환한다', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      {
+        ...teamMatchRow(),
+        sport: { name: '풋살' },
+        hostTeam: { id: 'team-host', name: '성수 FC' },
+        league: null,
+        applications: [],
+      },
+    ]);
+
+    const result = await service.myTeamMatches(manager, { scope: 'created' });
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    expect(args.where.OR).toEqual([{ createdByUserId: manager.id }]);
+    expect(result.items[0]).toMatchObject({
+      teamMatchId: 'tm-1',
+      relation: 'created_by_me',
+      teamId: 'team-host',
+      teamName: '성수 FC',
+      manageRoute: null,
+    });
+  });
+
+  it('myTeamMatches: 호스트팀 일반 멤버에게 관리 dead-end 경로를 내리지 않는다', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'member' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      {
+        ...teamMatchRow(),
+        sport: { name: '풋살' },
+        hostTeam: { id: 'team-host', name: '성수 FC' },
+        league: null,
+        applications: [],
+      },
+    ]);
+
+    const result = await service.myTeamMatches(manager, { scope: 'hosted' });
+
+    expect(result.items[0]).toMatchObject({ relation: 'host_team', manageRoute: null });
+  });
+
+  it('myTeamMatches: 현재 owner인 생성자의 관리 경로는 실제 상세 라우트로 연결한다', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      {
+        ...teamMatchRow(),
+        sport: { name: '풋살' },
+        hostTeam: { id: 'team-host', name: '성수 FC' },
+        league: null,
+        applications: [],
+      },
+    ]);
+
+    const result = await service.myTeamMatches(manager, { scope: 'created' });
+
+    expect(result.items[0]).toMatchObject({
+      relation: 'created_by_me',
+      manageRoute: '/team-matches/tm-1',
+    });
+  });
+
   it('list/myTeamMatches: cursor 페이지네이션 orderBy가 유일 tie-breaker(id)로 끝난다', async () => {
     // 리그 일괄 생성 행은 startAt·createdAt이 동일할 수 있어 tie-breaker 없이는
     // 페이지 경계에서 행이 누락/중복된다.
@@ -1421,8 +1483,12 @@ describe('TeamMatchesService', () => {
 
     const result = await service.applications(manager, 'tm-1', {});
 
-    const teamA = result.items.find((item) => item.applicantTeam.teamId === 'team-applicant-a');
-    const teamB = result.items.find((item) => item.applicantTeam.teamId === 'team-applicant-b');
+    const teamA = result.items.find(
+      (item: (typeof result.items)[number]) => item.applicantTeam.teamId === 'team-applicant-a',
+    );
+    const teamB = result.items.find(
+      (item: (typeof result.items)[number]) => item.applicantTeam.teamId === 'team-applicant-b',
+    );
 
     // A팀은 3건 만점 리뷰 → verified/5점. B팀은 1건 낮은 점수 리뷰 → estimated/2점.
     // A팀의 값이 B팀에 섞여 들어가면(크로스토크) 이 assertion이 깨진다.

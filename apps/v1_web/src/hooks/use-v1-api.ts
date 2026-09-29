@@ -149,6 +149,7 @@ import type {
   V1TeamMembersPage,
   V1TeamMembershipMutationResult,
   V1TeamMatch,
+  V1MyTeamMatch,
   V1TeamMatchApplicationResult,
   V1TeamMatchApplicationsPage,
   V1TeamMatchEdit,
@@ -663,12 +664,32 @@ export function useV1MyMatches(filters?: ListFilters) {
   });
 }
 
-export function useV1MyMatchesInfinite(mode: 'joined' | 'created') {
+export function useV1MyMatchesInfinite(mode: 'joined' | 'created', options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: [...v1Keys.all, 'me', 'matches', 'infinite', mode] as const,
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => v1Get<CursorPage<V1Match>>('/me/matches', { mode, limit: 50, ...(pageParam ? { cursor: pageParam } : {}) }),
     getNextPageParam: (last) => last.pageInfo?.hasNext ? last.pageInfo.nextCursor ?? undefined : undefined,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1MyTeamMatchesInfinite(
+  scope: 'applied' | 'created',
+  options?: { enabled?: boolean },
+) {
+  return useInfiniteQuery({
+    queryKey: [...v1Keys.all, 'me', 'team-matches', 'infinite', scope] as const,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', {
+        scope,
+        limit: 50,
+        ...(pageParam ? { cursor: pageParam } : {}),
+      }),
+    getNextPageParam: (last) =>
+      last.pageInfo?.hasNext ? last.pageInfo.nextCursor ?? undefined : undefined,
+    enabled: options?.enabled ?? true,
   });
 }
 

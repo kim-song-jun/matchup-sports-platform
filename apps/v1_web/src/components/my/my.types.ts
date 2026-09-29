@@ -63,13 +63,19 @@ export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended';
 
 export type MyMatch = {
   id: string;
+  kind: 'personal' | 'team';
+  kindLabel: string;
+  contextLabel?: string;
+  /** 개인·팀 소스를 한 목록에서 안정적으로 정렬하기 위한 원본 ISO 시각. */
+  startsAt: string;
   title: string;
   meta: string;
   status: MyMatchStatus;
   statusLabel: string;
   note: string;
   href: string;
-  manageHref: string;
+  manageHref?: string;
+  manageLabel?: string;
   reviewHref?: string;
 };
 
@@ -79,8 +85,24 @@ export type MyMatchesViewModel = {
   loadMoreError?: boolean;
   onLoadMore?: () => void;
   mode: 'joined' | 'created';
+  typeFilter: 'all' | 'personal' | 'team';
+  filters: Array<{
+    key: 'all' | 'personal' | 'team';
+    label: string;
+    href: string;
+  }>;
   summary: Array<{ label: string; value: number; unit: string }>;
   matches: MyMatch[];
+  emptyState: {
+    title: string;
+    sub: string;
+    cta: string;
+    ctaHref: string;
+  };
+  partialError?: {
+    message: string;
+    onRetry: () => void;
+  };
   /** 조회 중. 스켈레톤을 그리고 빈 상태는 띄우지 않는다. */
   loading: boolean;
   /** 조회 실패. ErrorState + 재시도를 그린다(예전엔 알림 카드뿐이라 다시 부를 길이 없었다). */

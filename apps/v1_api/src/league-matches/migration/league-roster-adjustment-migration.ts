@@ -1,16 +1,12 @@
 import { Prisma, V1GameRosterAdjustmentAction, V1GameState, V1TeamMatchStatus } from '@prisma/client';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
-import {
-  fillCompetitionRosterBase,
-  loadGameRosterContext,
-  loadGameRosterForContext,
-} from '../../games/roster/game-roster-loader';
+import { loadGameRosterContext, loadGameRosterForContext } from '../../games/roster/game-roster-loader';
 import {
   isUnmigratedTeamAuthoredLineup,
   LEAGUE_ROSTER_MIGRATED_ACTION,
-  lockGameRows,
   leagueRosterMigrationRequestId,
-  syncGameSideRoster,
+  lockRosterWriteScope,
+  syncPreparedGameSideRoster,
 } from '../../games/roster/game-roster-sync';
 
 type Tx = Prisma.TransactionClient;
@@ -110,21 +106,29 @@ class DryRunRollback extends Error {
   }
 }
 
+/** 그 사이드의 최신 리비전이 이관 전 팀장 저장본이면 그 리비전. */
+async function unmigratedTeamLineup(tx: Tx, target: { gameId: string; sideId: string }) {
+  const latest = await tx.v1GameLineup.findFirst({
+    where: { ...target, invalidatedAt: null },
+    orderBy: { revision: 'desc' },
+  });
+  if (latest === null || !(await isUnmigratedTeamAuthoredLineup(tx, target.gameId, target.sideId, latest))) return null;
+  return latest;
+}
+
 async function migrateSide(
   tx: Tx,
   side: { gameId: string; sideId: string; teamMatchId: string },
   outcome: 'MIGRATED' | 'WOULD_MIGRATE',
 ): Promise<LeagueSideMigrationReport | null> {
   const target = { gameId: side.gameId, sideId: side.sideId };
-  // 대상은 트랜잭션 밖에서 골랐다 — 잠근 뒤 다시 보고 그 사이 시작된 경기는 건너뛴다.
-  await lockGameRows(tx, [side.gameId]);
+  // 잠금(빈 리그 명단 채우기 포함)은 옮길 사이드에만 건다. 잠근 뒤 다시 보고 그 사이 시작된 경기는 건너뛴다.
+  if ((await unmigratedTeamLineup(tx, target)) === null) return null;
+  await lockRosterWriteScope(tx, [side.gameId], [side.sideId]);
   const context = await loadGameRosterContext(tx, target);
   if (context !== null && context.gameState !== V1GameState.SCHEDULED) return null;
-  const latest = await tx.v1GameLineup.findFirst({
-    where: { ...target, invalidatedAt: null },
-    orderBy: { revision: 'desc' },
-  });
-  if (latest === null || !(await isUnmigratedTeamAuthoredLineup(tx, side.gameId, side.sideId, latest))) return null;
+  const latest = await unmigratedTeamLineup(tx, target);
+  if (latest === null) return null;
 
   const report = (status: LeagueSideMigrationStatus, plan: LeagueSideMigrationPlan | null, rosterChanged = false) => ({
     ...side,
@@ -133,7 +137,6 @@ async function migrateSide(
     unrepresentableRows: plan?.unrepresentableRows ?? 0,
     rosterChanged,
   });
-  if (context !== null) await fillCompetitionRosterBase(tx, context);
   const loaded = context === null ? null : await loadGameRosterForContext(tx, context);
   if (loaded === null) return report('ROSTER_NOT_AVAILABLE', null);
 
@@ -183,7 +186,7 @@ async function migrateSide(
     before: { lineupId: latest.id },
     after: { sideId: side.sideId, excludeCount: plan.excludeUserIds.length, unrepresentableRows: plan.unrepresentableRows },
   });
-  const rosterChanged = await syncGameSideRoster(tx, target);
+  const rosterChanged = await syncPreparedGameSideRoster(tx, target);
   return report(outcome, plan, rosterChanged);
 }
 

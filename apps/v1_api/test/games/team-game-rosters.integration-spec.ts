@@ -448,7 +448,9 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 176)', () => {
       const byAdmin = await postAs(unavailabilityPath(f.teamA.id, a1), f.adminId, period);
       expect(byAdmin.status).toBe(201);
       expect(byAdmin.body.data.unavailability.actor.role).toBe('ADMIN');
-      // 기간이 두 경기를 모두 덮는다.
+      // 기간이 두 경기를 모두 덮는다. 등록은 재계산 이벤트만 남기므로 워커가 처리한 뒤에 바뀐다.
+      expect(await lineupUserIds(f.games.g1.gameId, f.games.g1.sideByTeam.get(f.teamA.id)!)).toEqual(sorted([a1, a2]));
+      await drainOutboxWorker(prisma);
       expect(await lineupUserIds(f.games.g1.gameId, f.games.g1.sideByTeam.get(f.teamA.id)!)).toEqual([a2]);
       expect(await lineupUserIds(f.games.g2.gameId, f.games.g2.sideByTeam.get(f.teamA.id)!)).toEqual([a2]);
     });

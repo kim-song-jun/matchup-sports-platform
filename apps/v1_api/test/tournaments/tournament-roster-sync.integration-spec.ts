@@ -265,13 +265,22 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     expect((await participantsOf(latest.id)).map((row) => row.userId)).toEqual([f.members[0]]);
   });
 
-  it('시작 시각이 지난 경기는 맞추지 않는다', async () => {
+  // 대회 경기는 시작 명령으로만 SCHEDULED 를 벗어나므로 시각이 지난 SCHEDULED 경기는 지연된 시작 전 경기다.
+  it('시작 시각이 지났어도 시작 전(SCHEDULED)이면 맞추고, 시작한 경기·끝난 대회의 경기는 맞추지 않는다', async () => {
     const f = await seedFixture();
     await prisma.v1TeamMatch.update({ where: { id: f.teamMatchId }, data: { startAt: new Date(Date.now() - 60_000) } });
     await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' } });
+    expect(await sync(f.tournament.id, f.team.id)).toBe(1);
+    expect((await participantsOf((await latestLineup(f.game.id, f.side.id)).id)).map((row) => row.userId)).toEqual([f.members[0]]);
 
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[1], realName: '명단 선수' } });
+    await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
     expect(await sync(f.tournament.id, f.team.id)).toBe(0);
-    expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(1);
+
+    await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'in_progress' } });
+    await prisma.v1Game.update({ where: { id: f.game.id }, data: { state: 'LIVE' } });
+    expect(await sync(f.tournament.id, f.team.id)).toBe(0);
+    expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(2);
   });
 
   it('명단이 이미 같으면 새 리비전을 만들지 않는다 — 두 번째 호출은 0을 돌려준다', async () => {

@@ -1,9 +1,5 @@
 import type { Prisma, V1GameState } from '@prisma/client';
-import {
-  fillEmptyLeagueRosters,
-  leagueTeamRosterBase,
-  readLeagueTeamRosters,
-} from '../../league-matches/league-fixture-creation';
+import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
 import { readSuspensionVerdicts, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
@@ -24,14 +20,6 @@ export interface CompetitionTeamScope {
   readonly competitionId: string;
   readonly isLeague: boolean;
   readonly teamId: string;
-}
-
-/**
- * 쓰기 경로(명단 동기화)가 기준 명단을 읽기 전에 부른다 — 리그의 명단 행 없는 확정 신청을 채운다
- * (`fillEmptyLeagueRosters`: DB 쓰기 + 팀장 알림). 대회는 할 일이 없다.
- */
-export async function fillCompetitionRosterBase(tx: Tx, scope: CompetitionTeamScope): Promise<void> {
-  if (scope.isLeague) await fillEmptyLeagueRosters(tx, scope.competitionId, [scope.teamId]);
 }
 
 /**

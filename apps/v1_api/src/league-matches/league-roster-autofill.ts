@@ -12,12 +12,27 @@ export interface LeagueRosterFillOutcome {
    * "대회가 끝나서 아무것도 안 했다" 를 `skipped: [{ userId: '-' }]` 센티널로 담았는데,
    * 알림이 그걸 **"팀원 1명이 제외됐다"** 로 집계해 팀장에게 거짓 문구를 보냈다.
    * 사람이 제외된 것과 팀 전체가 대상이 아닌 것은 다른 사건이라 종류로 가른다.
+   * `skipped_not_empty` 는 신청을 잠근 뒤 보니 더는 "행 없는 확정 신청" 이 아니었다는 뜻이다(다른 경로가 먼저 채움).
    */
-  readonly kind: 'filled' | 'skipped_terminal' | 'no_eligible';
+  readonly kind: 'filled' | 'skipped_terminal' | 'skipped_not_empty' | 'no_eligible';
   readonly registrationId: string;
   readonly teamId: string;
   readonly added: number;
   readonly skipped: ReadonlyArray<{ readonly userId: string; readonly reason: string }>;
+}
+
+/** 팀의 활성 멤버십을 계정(KEY SHARE) → 멤버십(FOR SHARE) 순으로 잠그고 잠근 멤버십 id 를 돌려준다. */
+async function lockActiveMemberships(tx: Prisma.TransactionClient, teamId: string): Promise<string[]> {
+  const rows = await tx.v1TeamMembership.findMany({
+    where: { teamId, status: 'active' },
+    select: { id: true, userId: true },
+  });
+  if (rows.length === 0) return [];
+  const userIds = [...new Set(rows.map((row) => row.userId))];
+  await tx.$queryRaw`SELECT id FROM v1_users WHERE id IN (${Prisma.join(userIds)}) ORDER BY id FOR KEY SHARE`;
+  const ids = rows.map((row) => row.id);
+  await tx.$queryRaw`SELECT id FROM v1_team_memberships WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR SHARE`;
+  return ids;
 }
 
 /**
@@ -45,7 +60,13 @@ export interface LeagueRosterFillOutcome {
  * 제외). 그래서 호출부가 "이 등록에 `V1TournamentPlayer` 행이 하나라도 있었던 적이
  * 있는가"(크론의 `players: { none: {} }`, `loadLeagueTeamRosters` 의
  * `_count.players === 0`) 를 직접 판정하고, **행이 정말 하나도 없을 때만** 이 함수를
- * 불러야 한다. 이 함수 자신은 그 판정을 다시 하지 않는다.
+ * 불러야 한다. 호출부 판정은 잠그기 전 값이라, 이 함수가 신청 행을 잠근 뒤 같은 조건을 한 번 더 본다
+ * (그 사이 팀장이 첫 선수를 올렸으면 `skipped_not_empty`).
+ *
+ * ## 잠금 순서 — 신청 → 계정(KEY SHARE) → 멤버십(FOR SHARE)
+ * 선수 추가(신청 → 멤버십)·회원 탈퇴(계정 → 멤버십)와 같은 방향이다. 멤버십을 잠그지 않으면 추방·탈퇴가
+ * 아직 커밋 안 된 이 채움을 못 보고 명단 정리를 끝내, 떠난 사람이 명단에 남는다(2026-08-03 유령 명단).
+ * 호출부는 경기 행보다 먼저 이 함수를 불러야 한다(`game-roster-sync.ts` `lockRosterWriteScope`).
  *
  * ## "멤버 전원" 이 아니라 "자격 통과 멤버 전원" 이다
  * 명단 추가에는 실명·생년월일·휴대폰(+성별부·전화인증·정원) 가드가 걸려 있다. 통과자가
@@ -66,6 +87,14 @@ export async function fillLeagueTeamRoster(
   leagueId: string,
   registration: { id: string; teamId: string },
 ): Promise<LeagueRosterFillOutcome> {
+  await tx.$queryRaw`SELECT id FROM v1_tournament_registrations WHERE id = ${registration.id} FOR UPDATE`;
+  const stillEmpty = await tx.v1TournamentRegistration.findFirst({
+    where: { id: registration.id, status: 'confirmed', players: { none: {} } },
+    select: { id: true },
+  });
+  if (stillEmpty === null) {
+    return { kind: 'skipped_not_empty', registrationId: registration.id, teamId: registration.teamId, added: 0, skipped: [] };
+  }
   // 원시 `v1Tournament` 조회 금지(v1-surface-check) — 이 함수는 **정규 리그만** 다루므로
   // 표면 헬퍼가 그 종류 조건까지 함께 걸어 준다. 리그가 아닌 id 가 들어오면 여기서
   // TOURNAMENT_NOT_FOUND 로 끊긴다.
@@ -73,8 +102,10 @@ export async function fillLeagueTeamRoster(
     where: { id: leagueId },
     select: { maxPlayers: true, genderCategory: true, status: true },
   });
+  const lockedMembershipIds = await lockActiveMemberships(tx, registration.teamId);
   const members = await tx.v1TeamMembership.findMany({
-    where: { teamId: registration.teamId, status: 'active' },
+    // 잠근 행만 후보다 — 잠근 뒤 들어온 팀원은 이 채움에 없던 사람으로 본다.
+    where: { teamId: registration.teamId, status: 'active', id: { in: lockedMembershipIds } },
     // 정원을 넘으면 **가입 순 상위 N명** — 임의로 자르지 않는다.
     orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
     select: {
@@ -222,7 +253,9 @@ export async function notifyLeagueRosterFillOutcomes(
 ): Promise<void> {
   // 대회가 끝나 아무것도 하지 않은 팀에는 알리지 않는다 — 팀장이 잘못한 것도, 할 수 있는
   // 일도 없다. (예전엔 이 케이스가 센티널로 섞여 들어와 "1명 제외" 로 잘못 통보됐다.)
-  const notifiable = outcomes.filter((outcome) => outcome.kind !== 'skipped_terminal');
+  const notifiable = outcomes.filter(
+    (outcome) => outcome.kind !== 'skipped_terminal' && outcome.kind !== 'skipped_not_empty',
+  );
   if (notifiable.length === 0) return;
 
   const owners = await tx.v1TeamMembership.findMany({

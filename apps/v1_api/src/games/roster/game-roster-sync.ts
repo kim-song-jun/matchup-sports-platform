@@ -1,13 +1,14 @@
 import { ConflictException } from '@nestjs/common';
-import { Prisma, V1GameLineupState, V1GameState, type V1GameLineup } from '@prisma/client';
+import { Prisma, V1GameLineupState, V1GameState, V1TournamentStatus, type V1GameLineup } from '@prisma/client';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
+import { fillEmptyLeagueRosters } from '../../league-matches/league-fixture-creation';
 import { carryRevokedConsent, loadRevokedConsentByUserId } from '../../team-matches/lineup-consent-carry';
 import { suspensionRulesEnabled } from '../../tournaments/discipline/card-suspension';
 import { readSuspensionRules } from '../../tournaments/discipline/suspension-verdicts';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
+import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import { createSourceRosterIdentityLinks } from '../games.service';
 import {
-  fillCompetitionRosterBase,
   loadCompetitionRosterBase,
   loadGameRosterContext,
   loadGameRosterForContext,
@@ -55,6 +56,39 @@ function rosterKey(rows: readonly ParticipantRow[]): string {
     .join('␞');
 }
 
+export interface ShownArrival {
+  readonly userId: string | null;
+  readonly displayNameSnapshot: string;
+  readonly arrivedAt: Date | null;
+}
+
+/**
+ * 새 리비전 행마다 지금 화면에 보이는 명단에서 같은 사람의 검인 시각을 찾는다. 검인은 킥오프 직전이라
+ * 재계산보다 먼저 온다 — 이월하지 않으면 명단이 한 번 바뀔 때마다 받아 둔 검인이 사라진다.
+ * 계정 없는 행은 이름으로 대조하고, 같은 이름은 `shown` 순서대로 1:1 소진한다.
+ */
+export function carryArrivals(shown: readonly ShownArrival[], desired: readonly ParticipantRow[]): Array<Date | null> {
+  const keyOf = (row: { userId: string | null; displayNameSnapshot: string }) =>
+    row.userId !== null ? `u:${row.userId}` : `g:${row.displayNameSnapshot}`;
+  const buckets = new Map<string, Array<Date | null>>();
+  for (const row of shown) buckets.set(keyOf(row), [...(buckets.get(keyOf(row)) ?? []), row.arrivedAt]);
+  return desired.map((row) => buckets.get(keyOf(row))?.shift() ?? null);
+}
+
+/** 그 사이드에서 화면(검인 패널)이 보여 주는 리비전의 참가자 — 제출본이 있으면 제출본, 없으면 최신. */
+async function loadShownArrivals(tx: Tx, gameId: string, sideId: string): Promise<ShownArrival[]> {
+  const lineups = await tx.v1GameLineup.findMany({
+    where: { gameId, sideId, invalidatedAt: null },
+    select: { id: true, sideId: true, revision: true, state: true },
+  });
+  const rows = await tx.v1GameParticipant.findMany({
+    where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, arrivedAt: true },
+  });
+  return selectLineupParticipantsWithDraftFallback(rows, lineups);
+}
+
 /**
  * 리그 사이드의 최신 리비전이 팀장이 저장·제출한 것이고 아직 이관되지 않았으면 true.
  * 시스템 리비전 = 대진 생성 스냅샷(리비전 1 DRAFT) 또는 동기화 감사 행이 붙은 리비전.
@@ -79,12 +113,57 @@ export async function isUnmigratedTeamAuthoredLineup(tx: Tx, gameId: string, sid
 /**
  * `v1_games` 행을 id 순으로 잠근다. 경기 시작 명령이 잠그는 행이라, 잠근 뒤 읽은 `SCHEDULED` 판정은
  * 명단을 쓰는 동안 바뀌지 않는다. 이미 쥔 행은 다시 잡아도 기다리지 않는다.
- * 트랜잭션의 첫 잠금이어야 한다 — 다른 행을 쥔 채 경기를 잡으면 순서가 엇갈려 교착한다.
+ * 명단을 쓰는 경로는 이것 대신 `lockRosterWriteScope` 를 트랜잭션 첫 잠금으로 부른다.
  */
 export async function lockGameRows(tx: Tx, gameIds: readonly string[]): Promise<void> {
   for (const gameId of [...new Set(gameIds)].sort()) {
     await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
   }
+}
+
+/**
+ * 명단을 쓰는 트랜잭션의 첫 잠금. 순서는 대회·리그 행(KEY SHARE) → 리그의 빈 참가 명단 채우기
+ * (신청 → 계정 → 멤버십) → 경기(id 순)다. 감사 행의 대회 FK 검사가 대회 행을 KEY SHARE 하는데 대회 설정
+ * 변경·순위 재계산은 대회 → 경기 순으로 잡으므로, 경기를 먼저 쥐면 둘이 서로를 기다린다.
+ * `sideIds` 가 null 이면 그 경기들의 팀 배정된 사이드 전부가 채우기 대상이다.
+ */
+export async function lockRosterWriteScope(
+  tx: Tx,
+  gameIds: readonly string[],
+  sideIds: readonly string[] | null,
+): Promise<void> {
+  const ids = [...new Set(gameIds)].sort();
+  if (ids.length === 0) return;
+  const games = await tx.v1Game.findMany({
+    where: { id: { in: ids } },
+    select: {
+      teamMatch: { select: { tournamentId: true, leagueId: true } },
+      sides: {
+        where: { teamId: { not: null }, ...(sideIds === null ? {} : { id: { in: [...sideIds] } }) },
+        select: { teamId: true },
+      },
+    },
+  });
+  const competitionIds = new Set<string>();
+  const leagueTeams = new Map<string, Set<string>>();
+  for (const game of games) {
+    const tournamentId = game.teamMatch?.tournamentId ?? null;
+    const leagueId = game.teamMatch?.leagueId ?? null;
+    if (tournamentId !== null) competitionIds.add(tournamentId);
+    if (leagueId === null) continue;
+    competitionIds.add(leagueId);
+    const teams = leagueTeams.get(leagueId) ?? new Set<string>();
+    for (const side of game.sides) if (side.teamId !== null) teams.add(side.teamId);
+    leagueTeams.set(leagueId, teams);
+  }
+  for (const competitionId of [...competitionIds].sort()) {
+    await tx.$queryRaw`SELECT id FROM v1_tournaments WHERE id = ${competitionId} FOR KEY SHARE`;
+  }
+  for (const leagueId of [...leagueTeams.keys()].sort()) {
+    const teamIds = [...leagueTeams.get(leagueId)!].sort();
+    if (teamIds.length > 0) await fillEmptyLeagueRosters(tx, leagueId, teamIds);
+  }
+  await lockGameRows(tx, ids);
 }
 
 /**
@@ -101,24 +180,27 @@ function requireLockedGames(locked: ReadonlySet<string>, gameIds: readonly strin
   });
 }
 
-/** 잠그기 전 조회: 대회·리그별 팀들의 시작 전 경기 id. */
-async function findUpcomingTeamGameIds(
+/** 잠그기 전 조회: 대회·리그별 팀들의 시작 전 경기와 그 팀 사이드. */
+async function findUpcomingTeamSides(
   tx: Tx,
   targets: ReadonlyArray<{ competitionId: string; teamId: string }>,
   now: Date,
-): Promise<string[]> {
-  if (targets.length === 0) return [];
-  const wheres = targets.map((target) => upcomingCompetitionGameWhere(target.competitionId, target.teamId, now));
-  const games = await tx.v1Game.findMany({
-    where: wheres.length === 1 ? wheres[0] : { OR: wheres },
-    select: { id: true },
-  });
-  return games.map((game) => game.id);
+): Promise<Array<{ gameId: string; sideId: string }>> {
+  const found: Array<{ gameId: string; sideId: string }> = [];
+  for (const target of targets) {
+    const games = await tx.v1Game.findMany({
+      where: upcomingCompetitionGameWhere(target.competitionId, target.teamId, now),
+      select: { id: true, sides: { where: { teamId: target.teamId }, select: { id: true } } },
+    });
+    for (const game of games) found.push(...game.sides.map((side) => ({ gameId: game.id, sideId: side.id })));
+  }
+  return found;
 }
 
 /**
  * 대회·리그 경기 한 사이드의 명단을 계산 결과(`loadGameRoster`)에 맞춘다. 바뀌었으면 true.
- * 이 경기를 잠그므로 호출자는 아무 행도 쥐지 않았거나 이 경기를 이미 쥐고 있어야 한다.
+ * `lockRosterWriteScope` 로 잠그므로 호출자는 아무 행도 쥐지 않았어야 한다 — 이미 잠갔으면
+ * `syncPreparedGameSideRoster`.
  *
  * - 경기 행을 잠근 뒤 `SCHEDULED` 인 경기만. 참가자 행은 지우지 않고 새 리비전을 추가한다(골·카드 이벤트 FK).
  * - 새 리비전은 **SUBMITTED** 다. 공식 결과·신원 후보 셀렉터가 제출본을 우선 읽으므로
@@ -128,13 +210,17 @@ async function findUpcomingTeamGameIds(
 export async function syncGameSideRoster(
   tx: Tx,
   target: { gameId: string; sideId: string },
-  preloaded: GameRosterPreload = {},
 ): Promise<boolean> {
-  await lockGameRows(tx, [target.gameId]);
-  return syncLockedGameSide(tx, target, preloaded);
+  await lockRosterWriteScope(tx, [target.gameId], [target.sideId]);
+  return syncLockedGameSide(tx, target, {});
 }
 
-/** `syncGameSideRoster` 의 본체. 호출자가 이 경기를 이미 잠갔다. */
+/** 호출자가 이 사이드를 `lockRosterWriteScope` 로 이미 잠갔다(조정 API·이관 CLI). */
+export function syncPreparedGameSideRoster(tx: Tx, target: { gameId: string; sideId: string }): Promise<boolean> {
+  return syncLockedGameSide(tx, target, {});
+}
+
+/** `syncGameSideRoster` 의 본체. 호출자가 `lockRosterWriteScope` 로 이 경기를 이미 잠갔다. */
 async function syncLockedGameSide(
   tx: Tx,
   target: { gameId: string; sideId: string },
@@ -142,7 +228,6 @@ async function syncLockedGameSide(
 ): Promise<boolean> {
   const context = await loadGameRosterContext(tx, target);
   if (context === null || context.gameState !== V1GameState.SCHEDULED) return false;
-  if (preloaded.base === undefined) await fillCompetitionRosterBase(tx, context);
   const loaded = await loadGameRosterForContext(tx, context, preloaded);
   if (loaded === null) return false;
   const { computation } = loaded;
@@ -178,6 +263,7 @@ async function syncLockedGameSide(
   });
   const kind = context.isLeague ? KIND.league : KIND.tournament;
   const carried = await loadRevokedConsentByUserId(tx, latest.id);
+  const arrivals = carryArrivals(await loadShownArrivals(tx, context.gameId, context.sideId), desired);
   const now = new Date();
   const lineup = await tx.v1GameLineup.create({
     data: {
@@ -191,7 +277,7 @@ async function syncLockedGameSide(
     },
   });
   const created = await tx.v1GameParticipant.createManyAndReturn({
-    data: desired.map((row) => ({
+    data: desired.map((row, index) => ({
       gameId: context.gameId,
       sideId: context.sideId,
       lineupId: lineup.id,
@@ -200,6 +286,7 @@ async function syncLockedGameSide(
       jerseyNumber: row.jerseyNumber,
       // 명단 = 출전자(정본 §3). 출전 판정은 이 값을 읽는다.
       started: true,
+      arrivedAt: arrivals[index],
     })),
     select: { id: true, userId: true },
   });
@@ -239,6 +326,8 @@ async function syncLockedGameSide(
 
 /**
  * 한 팀의 대회·리그 시작 전 경기. 대회 대진은 시각이 선택값이라 시각 없는 경기도 시작 전으로 본다.
+ * 대회 경기는 콘솔의 시작 명령으로만 SCHEDULED 를 벗어나므로 시각이 지나도 시작 전이다(지연 경기, 끝난
+ * 대회 제외). 리그는 결과 입력이 SCHEDULED 에서 바로 끝내 시각이 지난 경기는 이미 치렀을 수 있어 시각으로 끊는다.
  * `competitionId` 가 null 이면 그 팀의 모든 대회·리그 경기다.
  */
 export function upcomingCompetitionGameWhere(
@@ -255,7 +344,13 @@ export function upcomingCompetitionGameWhere(
         competitionId === null
           ? { OR: [{ leagueId: { not: null } }, { tournamentId: { not: null } }] }
           : { OR: [{ leagueId: competitionId }, { tournamentId: competitionId, leagueId: null }] },
-        { OR: [{ startAt: null }, { startAt: { gt: now } }] },
+        {
+          OR: [
+            { startAt: null },
+            { startAt: { gt: now } },
+            { leagueId: null, tournament: { status: { notIn: [V1TournamentStatus.completed, V1TournamentStatus.cancelled] } } },
+          ],
+        },
       ],
     },
     sides: { some: { teamId } },
@@ -290,7 +385,6 @@ async function syncLockedCompetitionTeam(
     isLeague: games[0].teamMatch?.leagueId != null,
     teamId: input.teamId,
   };
-  await fillCompetitionRosterBase(tx, rosterScope);
   const base = await loadCompetitionRosterBase(tx, rosterScope);
   // 확정 신청이 없는 대회 팀·비활성 리그 팀은 대진 생성과 같은 이유로 대상이 아니다.
   if (base === null) return 0;
@@ -306,7 +400,7 @@ async function syncLockedCompetitionTeam(
 }
 
 /**
- * 대회·리그별 팀들의 시작 전 경기를 한 번에 id 순으로 잠근 뒤(트랜잭션의 첫 잠금) 각각 다시 계산한다.
+ * 대회·리그별 팀들의 시작 전 경기를 `lockRosterWriteScope` 로 한 번에 잠근 뒤(트랜잭션의 첫 잠금) 각각 다시 계산한다.
  * 결장 기간은 시작 시각에, 출전정지는 팀 경기 순서에 걸리므로 경기 순서가 바뀌는 트리거도 이것을 탄다.
  */
 async function syncCompetitionTeams(
@@ -314,10 +408,15 @@ async function syncCompetitionTeams(
   targets: ReadonlyArray<{ competitionId: string; teamId: string }>,
 ): Promise<number> {
   const unique = [...new Map(targets.map((target) => [`${target.competitionId}:${target.teamId}`, target])).values()];
-  const planned = await findUpcomingTeamGameIds(tx, unique, new Date());
+  const planned = await findUpcomingTeamSides(tx, unique, new Date());
   if (planned.length === 0) return 0;
-  await lockGameRows(tx, planned);
-  const locked = new Set(planned);
+  const plannedGameIds = planned.map((row) => row.gameId);
+  await lockRosterWriteScope(
+    tx,
+    plannedGameIds,
+    planned.map((row) => row.sideId),
+  );
+  const locked = new Set(plannedGameIds);
   let synced = 0;
   for (const target of unique) synced += await syncLockedCompetitionTeam(tx, target, locked);
   return synced;
@@ -395,19 +494,19 @@ export async function syncTeamRostersWithinPeriod(
   tx: Tx,
   input: { teamId: string; startsAt: Date; endsAt: Date },
 ): Promise<number> {
-  const matches = await tx.v1TeamMatch.findMany({
+  const games = await tx.v1Game.findMany({
     where: {
-      deletedAt: null,
-      status: { not: 'cancelled' },
-      startAt: { gte: input.startsAt, lt: input.endsAt, gt: new Date() },
-      OR: [{ leagueId: { not: null } }, { tournamentId: { not: null } }],
-      AND: [{ OR: [{ hostTeamId: input.teamId }, { approvedApplicantTeamId: input.teamId }] }],
-      game: { state: V1GameState.SCHEDULED },
+      AND: [
+        upcomingCompetitionGameWhere(null, input.teamId, new Date()),
+        { teamMatch: { startAt: { gte: input.startsAt, lt: input.endsAt } } },
+      ],
     },
-    select: { leagueId: true, tournamentId: true },
+    select: { teamMatch: { select: { leagueId: true, tournamentId: true } } },
   });
   const competitionIds = new Set(
-    matches.map((row) => row.leagueId ?? row.tournamentId).filter((id): id is string => id !== null),
+    games
+      .map((game) => game.teamMatch?.leagueId ?? game.teamMatch?.tournamentId ?? null)
+      .filter((id): id is string => id !== null),
   );
   return syncCompetitionTeams(
     tx,
@@ -417,7 +516,7 @@ export async function syncTeamRostersWithinPeriod(
 
 /** 한 경기의 팀 배정된 사이드 전부(시각 필터 없음). 진출·대진 팀 변경 뒤의 새 팀 명단. */
 async function syncGameRosters(tx: Tx, gameId: string): Promise<number> {
-  await lockGameRows(tx, [gameId]);
+  await lockRosterWriteScope(tx, [gameId], null);
   const sides = await tx.v1GameSide.findMany({
     where: { gameId, teamId: { not: null } },
     orderBy: { id: 'asc' },
@@ -432,7 +531,7 @@ async function syncGameRosters(tx: Tx, gameId: string): Promise<number> {
 
 /**
  * `COMPETITION_ROSTER_RESYNC` 워커 핸들러. 같은 대상의 대기 이벤트를 닫고(한 번에 처리), 대상 경기를
- * 첫 잠금으로 id 순 잠근 뒤 다시 계산한다. 그 사이 시작된 경기는 잠근 뒤 판정으로 건너뛴다.
+ * `lockRosterWriteScope` 로 잠근 뒤 다시 계산한다. 그 사이 시작된 경기는 잠근 뒤 판정으로 건너뛴다.
  */
 export async function handleCompetitionRosterResync(
   tx: Tx,

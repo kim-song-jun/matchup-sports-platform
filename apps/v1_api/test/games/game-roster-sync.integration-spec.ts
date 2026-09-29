@@ -11,6 +11,7 @@ import {
   syncRostersAfterResultChange,
   syncTeamRostersWithinPeriod,
 } from '../../src/games/roster/game-roster-sync';
+import { GameRosterService } from '../../src/games/roster/game-roster.service';
 import { GameResultBracketProjectionService } from '../../src/game-operations/game-result-bracket-projection.service';
 import type { OfficialRevisionRow } from '../../src/game-operations/game-result-official-projection.types';
 import { enqueueRosterResync } from '../../src/games/roster/roster-resync-events';
@@ -193,6 +194,8 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
     }
     const f = { tournament, teamA, teamB, teamC, registrations, games };
     if (input.redCardOnA1) await seedRedCard(f.games.g1.gameId, f.games.g1.sideByTeam.get(teamA.id)!, teamA.members[0]);
+    // 지난 경기는 끝난 경기다 — 대회 경기는 시작 명령 전까지 SCHEDULED 라, 그대로 두면 시각이 지나도 재계산 대상이다.
+    await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'ENDED' } });
     return f;
   }
 
@@ -514,6 +517,64 @@ describe('경기 명단 계산 동기화 (Task 176)', () => {
       expect(await rosterOf(targetGame.id, home.id)).toEqual(sorted(f.teamA.members));
       // 배정되지 않은 사이드는 계산할 팀이 없다.
       expect((await latestLineup(targetGame.id, away.id)).revision).toBe(1);
+    });
+
+    // 대회 경기는 시작 명령으로만 SCHEDULED 를 벗어난다 — 킥오프 시각이 지나도 시작 전인 지연 경기다.
+    it('앞 경기 결과로 바뀐 정지가 킥오프 시각이 지난 시작 전 경기(지연)에도 걸리고, 그 뒤 경기에는 복귀한다', async () => {
+      const f = await seedTournament({ redCardRule: true, redCardOnA1: false });
+      const [a1, a2] = f.teamA.members;
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g3.teamMatchId }, data: { startAt: new Date(Date.now() - 60_000) } });
+      expect(await syncTeam(f.tournament.id, f.teamA.id)).toBe(2);
+      const g3 = side(f, 'g3', f.teamA.id);
+      const g4 = side(f, 'g4', f.teamA.id);
+      expect(await rosterOf(g3.gameId, g3.sideId)).toEqual(sorted([a1, a2]));
+
+      await seedRedCard(f.games.g1.gameId, f.games.g1.sideByTeam.get(f.teamA.id)!, a1);
+      await inTx((client) => syncRostersAfterResultChange(client, f.games.g1.gameId));
+
+      expect(await rosterOf(g3.gameId, g3.sideId)).toEqual(sorted([a2]));
+      expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1, a2]));
+    });
+
+    it('끝난 대회의 킥오프 시각 지난 경기는 맞추지 않는다 — 시각 전 경기는 그대로 맞춘다', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      const [a1, a2] = f.teamA.members;
+      await syncTeam(f.tournament.id, f.teamA.id);
+      const g3 = side(f, 'g3', f.teamA.id);
+      const g4 = side(f, 'g4', f.teamA.id);
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g3.teamMatchId }, data: { startAt: new Date(Date.now() - 60_000) } });
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
+      const g3Before = await latestLineup(g3.gameId, g3.sideId);
+      await exclude(g3, a2, f.teamA.ownerId);
+      await exclude(g4, a2, f.teamA.ownerId);
+
+      expect(await syncTeam(f.tournament.id, f.teamA.id)).toBe(1);
+
+      expect((await latestLineup(g3.gameId, g3.sideId)).id).toBe(g3Before.id);
+      expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1]));
+    });
+
+    it('명단이 다시 맞춰져도 받아 둔 검인은 새 제출본에 이어지고, 대체된 리비전 행에 검인하면 409 다', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      const [a1, a2] = f.teamA.members;
+      await syncTeam(f.tournament.id, f.teamA.id);
+      const g4 = side(f, 'g4', f.teamA.id);
+      const games = app.get(GamesService);
+      const admin = authUser(adminUserId);
+      const before = await prisma.v1GameParticipant.findMany({ where: { lineupId: (await latestLineup(g4.gameId, g4.sideId)).id } });
+      const oldA1 = before.find((row) => row.userId === a1)!;
+      const checkedIn = await games.setParticipantArrival(admin, g4.gameId, oldA1.id, true);
+      await games.setParticipantArrival(admin, g4.gameId, before.find((row) => row.userId === a2)!.id, true);
+
+      await app.get(GameRosterService).exclude(admin, g4, { userId: a2 } as never);
+
+      const after = await prisma.v1GameParticipant.findMany({ where: { lineupId: (await latestLineup(g4.gameId, g4.sideId)).id } });
+      expect(after.map((row) => [row.userId, row.arrivedAt])).toEqual([[a1, checkedIn.arrivedAt]]);
+      await expect(games.setParticipantArrival(admin, g4.gameId, oldA1.id, false)).rejects.toMatchObject({
+        response: { code: 'GAME_PARTICIPANT_SUPERSEDED' },
+      });
+      expect((await prisma.v1GameParticipant.findUniqueOrThrow({ where: { id: oldA1.id } })).arrivedAt).toEqual(checkedIn.arrivedAt);
+      await expect(games.setParticipantArrival(admin, g4.gameId, after[0].id, false)).resolves.toMatchObject({ arrivedAt: null });
     });
   });
 

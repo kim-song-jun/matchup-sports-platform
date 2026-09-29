@@ -19,7 +19,7 @@ import { GamesService } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
 import { loadGameRoster } from './game-roster-loader';
-import { isUnmigratedTeamAuthoredLineup, lockGameRows, syncGameSideRoster } from './game-roster-sync';
+import { isUnmigratedTeamAuthoredLineup, lockRosterWriteScope, syncPreparedGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
 
 type Tx = Prisma.TransactionClient;
@@ -129,9 +129,9 @@ export class GameRosterService {
   exclude(user: V1AuthUser, target: SideTarget, dto: CreateGameRosterAdjustmentDto) {
     return this.prisma.$transaction(async (tx) => {
       const access = await this.authorizeSide(tx, user.id, target, 'write');
-      await this.lockScheduledGames(tx, [target.gameId]);
+      await this.lockScheduledGames(tx, [target]);
       const result = await this.applyExclude(tx, { userId: user.id, role: access.writeRole! }, target, dto);
-      if (!result.alreadyApplied) await syncGameSideRoster(tx, target);
+      if (!result.alreadyApplied) await syncPreparedGameSideRoster(tx, target);
       return { ...result, roster: await this.readView(tx, target, access) };
     });
   }
@@ -139,9 +139,9 @@ export class GameRosterService {
   revoke(user: V1AuthUser, target: SideTarget, userId: string) {
     return this.prisma.$transaction(async (tx) => {
       const access = await this.authorizeSide(tx, user.id, target, 'write');
-      await this.lockScheduledGames(tx, [target.gameId]);
+      await this.lockScheduledGames(tx, [target]);
       const result = await this.applyRevoke(tx, user.id, target, userId);
-      if (!result.alreadyApplied) await syncGameSideRoster(tx, target);
+      if (!result.alreadyApplied) await syncPreparedGameSideRoster(tx, target);
       return { ...result, roster: await this.readView(tx, target, access) };
     });
   }
@@ -244,12 +244,16 @@ export class GameRosterService {
   }
 
   /**
-   * 경기 시작 명령과 같은 행을 잠가, 조정이 시작 직후 경기에 끼어들지 않게 한다.
-   * 여러 경기면 id 순으로 잠가 교착을 피하고, 하나라도 시작됐으면 전부 거부한다.
+   * 경기 시작 명령과 같은 행을 잠가, 조정이 시작 직후 경기에 끼어들지 않게 한다. 트랜잭션의 첫 잠금이다
+   * (`lockRosterWriteScope` — 대회 행·빈 리그 명단 채우기가 경기보다 앞선다). 하나라도 시작됐으면 전부 거부한다.
    */
-  async lockScheduledGames(tx: Tx, gameIds: readonly string[]): Promise<void> {
-    const ids = [...new Set(gameIds)];
-    await lockGameRows(tx, ids);
+  async lockScheduledGames(tx: Tx, sides: readonly SideTarget[]): Promise<void> {
+    const ids = [...new Set(sides.map((side) => side.gameId))];
+    await lockRosterWriteScope(
+      tx,
+      ids,
+      sides.map((side) => side.sideId),
+    );
     const games = await tx.v1Game.findMany({ where: { id: { in: ids } }, select: { id: true, state: true } });
     const started = games.filter((game) => game.state !== V1GameState.SCHEDULED).map((game) => game.id);
     if (started.length > 0) {

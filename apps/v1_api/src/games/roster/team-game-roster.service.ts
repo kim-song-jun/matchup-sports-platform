@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import type { GameRosterBatchDto, GameRosterBatchOp } from './dto/team-game-roster.dto';
 import { buildTeamRosterMatrix } from './game-roster-matrix';
-import { syncGameSideRoster } from './game-roster-sync';
+import { syncPreparedGameSideRoster } from './game-roster-sync';
 import { GameRosterService } from './game-roster.service';
 import { resolveTeamRosterAccess } from './team-roster-access';
 import { loadTeamRosterColumns } from './team-roster-columns';
@@ -108,7 +108,10 @@ export class TeamGameRosterService {
         const target = { gameId, sideId: sideIdByGame.get(gameId)! };
         accessByGame.set(gameId, await this.gameRoster.authorizeSide(tx, user.id, target, 'write'));
       }
-      await this.gameRoster.lockScheduledGames(tx, gameIds);
+      await this.gameRoster.lockScheduledGames(
+        tx,
+        gameIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })),
+      );
 
       const results: GameRosterBatchResult[] = [];
       const touched = new Set<string>();
@@ -127,7 +130,7 @@ export class TeamGameRosterService {
         results.push({ ...target, userId: change.userId, op: change.op, alreadyApplied });
       }
       for (const gameId of touched) {
-        await syncGameSideRoster(tx, { gameId, sideId: sideIdByGame.get(gameId)! });
+        await syncPreparedGameSideRoster(tx, { gameId, sideId: sideIdByGame.get(gameId)! });
       }
       return { teamId, results };
     });

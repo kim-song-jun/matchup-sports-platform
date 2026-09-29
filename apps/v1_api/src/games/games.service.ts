@@ -2576,31 +2576,47 @@ export class GamesService {
     // lineup_mutate 는 platform_ops · 라인업 권한을 가진 대회 스태프 · 이 fixture 참가팀의
     // 매니저/오너를 통과시킨다 — 명단 검인을 할 수 있어야 하는 사람과 정확히 같은 집합이다.
     const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
-    const participant = await this.prisma.v1GameParticipant.findFirst({
-      where: { id: participantId, gameId },
-      select: { id: true, sideId: true, arrivedAt: true },
-    });
-    if (participant === null) {
-      throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
-    }
-    // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
-    // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
-    if (actor.role === 'team_manager' || actor.role === 'team_owner') {
-      const side = await this.prisma.v1GameSide.findFirst({
-        where: { id: participant.sideId, gameId },
-        select: { teamId: true },
+    return this.prisma.$transaction(async (tx) => {
+      // 명단 재계산이 경기 행을 FOR UPDATE 로 잡고 새 리비전을 쓴다 — 같은 행을 잡아 그 앞이나 뒤에만 판정한다.
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR SHARE`;
+      const participant = await tx.v1GameParticipant.findFirst({
+        where: { id: participantId, gameId },
+        select: { id: true, sideId: true, lineupId: true, arrivedAt: true },
       });
-      if (side === null || actor.teamId !== side.teamId) {
-        throw this.forbidden();
+      if (participant === null) {
+        throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
       }
-    }
-    const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
-    // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
-    // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
-    return this.prisma.v1GameParticipant.update({
-      where: { id: participant.id },
-      data: { arrivedAt },
-      select: { id: true, sideId: true, arrivedAt: true },
+      // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
+      // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
+      if (actor.role === 'team_manager' || actor.role === 'team_owner') {
+        const side = await tx.v1GameSide.findFirst({
+          where: { id: participant.sideId, gameId },
+          select: { teamId: true },
+        });
+        if (side === null || actor.teamId !== side.teamId) {
+          throw this.forbidden();
+        }
+      }
+      const lineups = await tx.v1GameLineup.findMany({
+        where: { gameId, sideId: participant.sideId, invalidatedAt: null },
+        select: { id: true, sideId: true, revision: true, state: true },
+      });
+      // 검인 패널은 이 셀렉터가 고른 리비전만 보여 준다. 대체된 리비전 행에 쓰면 200 인데 검인이 안 보인다.
+      if (selectLineupParticipantsWithDraftFallback([participant], lineups).length === 0) {
+        throw new ConflictException({
+          code: 'GAME_PARTICIPANT_SUPERSEDED',
+          message: '명단이 방금 바뀌었어요. 새로 불러온 명단에서 다시 검인해 주세요.',
+          details: { participantId },
+        });
+      }
+      const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
+      // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
+      // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
+      return tx.v1GameParticipant.update({
+        where: { id: participant.id },
+        data: { arrivedAt },
+        select: { id: true, sideId: true, arrivedAt: true },
+      });
     });
   }
 

@@ -170,6 +170,8 @@ export async function fillEmptyLeagueRosters(
 ): Promise<void> {
   const emptyRegistrations = await tx.v1TournamentRegistration.findMany({
     where: { tournamentId: leagueId, teamId: { in: [...teamIds] }, status: 'confirmed', players: { none: {} } },
+    // 채우기가 신청 행을 하나씩 잠그므로 id 순으로 돈다.
+    orderBy: { id: 'asc' },
     select: { id: true, teamId: true },
   });
   if (emptyRegistrations.length === 0) return;

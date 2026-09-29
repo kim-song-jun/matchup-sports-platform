@@ -276,9 +276,9 @@ function RosterCell({
       aria-pressed={playing}
       aria-label={`${player.displayName} ${gameColumnLabel(game)} ${label}, ${playing ? '누르면 빠져요' : '누르면 출전으로 돌아가요'}`}
       onClick={onToggle}
-      className="inline-flex min-h-[44px] items-center rounded-lg px-2 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-      // 저장 전 칸은 점선 테두리 — 색이 아니라 패턴과 "저장 전" 글자로도 구분한다.
-      style={changed ? { outline: '2px dashed var(--blue500)', outlineOffset: -2 } : undefined}
+      className="inline-flex min-h-[44px] items-center rounded-lg border-2 border-transparent px-2 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      // 저장 전 칸은 점선 테두리("저장 전" 글자와 함께) — outline 은 포커스 링 자리라 쓰지 않는다.
+      style={changed ? { borderStyle: 'dashed', borderColor: 'var(--blue500)' } : undefined}
     >
       {content}
     </button>
@@ -287,13 +287,11 @@ function RosterCell({
 
 /** 목업 표기: "빠짐 · 부상 · 팀장", "빠짐 · 결장", "출전정지". 저장 전이면 " · 저장 전". */
 function cellLabel(cell: V1TeamRosterCell, status: string, changed: boolean): string {
-  const suffix = changed ? ' · 저장 전' : '';
-  if (status === 'PARTICIPATING') return `출전${suffix}`;
-  if (status === 'NOT_IN_ROSTER') return '명단 밖';
-  if (status === 'SUSPENDED') return gameRosterStatusLabel('SUSPENDED', cell.remainingMatches);
-  if (status === 'UNAVAILABLE') return '빠짐 · 결장';
-  if (changed) return `빠짐${suffix}`;
-  return ['빠짐', gameRosterReasonLabel(cell.reason), gameRosterActorRoleLabel(cell.actorRole)]
+  const statusLabel = gameRosterStatusLabel(status, cell.remainingMatches);
+  if (changed) return `${statusLabel} · 저장 전`;
+  if (status === 'UNAVAILABLE') return `${gameRosterStatusLabel('EXCLUDED')} · ${statusLabel}`;
+  if (status !== 'EXCLUDED') return statusLabel;
+  return [statusLabel, gameRosterReasonLabel(cell.reason), gameRosterActorRoleLabel(cell.actorRole)]
     .filter((part) => part !== null)
     .join(' · ');
 }
@@ -308,7 +306,7 @@ function gameColumnLabel(game: V1TeamRosterMatrixGame): string {
 function unavailabilitySummary(player: V1TeamRosterMatrixPlayer): string {
   const cell = player.cells.find((row) => row.status === 'UNAVAILABLE');
   if (cell === undefined) return '—';
-  return ['결장', gameRosterReasonLabel(cell.reason), gameRosterActorRoleLabel(cell.actorRole)]
+  return [gameRosterStatusLabel('UNAVAILABLE'), gameRosterReasonLabel(cell.reason), gameRosterActorRoleLabel(cell.actorRole)]
     .filter((part) => part !== null)
     .join(' · ');
 }

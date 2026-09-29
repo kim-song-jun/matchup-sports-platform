@@ -96,6 +96,22 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 178 팀 A)', ()
     expect(friendly.queryByRole('link', { name: 'vs 성수FS 명단' })).toBeNull();
   });
 
+  it('명단 버튼은 행마다 보조(outline) 스타일 — 미제출 친선이 여럿이어도 주 CTA 를 늘리지 않는다', () => {
+    show([
+      ...items,
+      game({ gameId: 'g-f2', competitionKind: 'FRIENDLY', opponentName: '합정FC', teamMatchId: 'tm-f2', sideId: null, rosterSummary: null, lineupState: 'MISSING' }),
+    ]);
+    const { container } = render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters />);
+
+    expect(container.querySelector('.tm-btn-primary')).toBeNull();
+    for (const opponent of ['성수FS', '합정FC']) {
+      const link = within(row(opponent)).getByRole('link', { name: `vs ${opponent} 참석명단` });
+      expect(link).toHaveClass('tm-btn-outline');
+      // 미제출은 버튼 색이 아니라 상태 글자로 알린다.
+      expect(within(row(opponent)).getByText('참석명단 미제출')).toBeInTheDocument();
+    }
+  });
+
   it('팀원은 요약만 보고 명단 버튼은 없다 — 전술보드(읽기)는 그대로 들어간다', () => {
     show(items);
     render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters={false} />);

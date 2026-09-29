@@ -171,6 +171,21 @@ export function gameRosterActorRoleLabel(role: string | null | undefined): strin
   return null;
 }
 
+/** 경기 명단 화면 머리의 편집 가능 여부 — 시작 전인데 못 바꾸면 권한이 없는 것이다. */
+export function gameRosterEditStateLabel(view: { editable: boolean; gameState: string }): string {
+  if (view.editable) return '수정 가능';
+  switch (view.gameState) {
+    case 'SCHEDULED':
+      return '보기 전용';
+    case 'ENDED':
+      return '경기 끝남';
+    case 'CANCELLED':
+      return '취소된 경기';
+    default:
+      return '경기 시작됨';
+  }
+}
+
 /** 선수 한 명의 이 경기 상태. 출전정지는 이번 경기를 포함한 남은 경기 수를 붙인다. */
 export function gameRosterStatusLabel(status: string, remainingMatches?: number | null): string {
   switch (status) {

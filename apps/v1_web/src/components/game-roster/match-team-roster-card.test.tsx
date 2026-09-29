@@ -157,7 +157,11 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
     const save = within(dialog).getByRole('button', { name: '빠지는 선수를 골라 주세요' });
     expect(save).toBeDisabled();
 
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 빠짐' }));
+    // 경기 명단 화면과 같은 뜻 — 체크 = 출전, 풀면 빠진다.
+    expect(within(dialog).getByText('체크를 풀면 이번 경기에서 빠져요.')).toBeInTheDocument();
+    for (const box of within(dialog).getAllByRole('checkbox')) expect(box).toBeChecked();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 출전' }));
+    expect(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 출전' })).not.toBeChecked();
     const reasons = within(dialog).getByRole('group', { name: '박서준 빠지는 사유(선택)' });
     fireEvent.click(within(reasons).getByRole('button', { name: '부상' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '1명 빼고 저장' }));
@@ -174,7 +178,7 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
 
   it('사유를 고르지 않으면 사유 없이 보낸다', async () => {
     const dialog = await openSheet();
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '김민재 이번 경기 빠짐' }));
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '김민재 이번 경기 출전' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '1명 빼고 저장' }));
     await waitFor(() => expect(mock.requests.some((r) => r.path === BATCH)).toBe(true));
     expect(mock.requests.find((r) => r.path === BATCH)!.body).toEqual({
@@ -182,9 +186,9 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
     });
   });
 
-  it('체크를 다시 풀면 그 선수는 저장 대상에서 빠진다', async () => {
+  it('다시 체크하면 그 선수는 저장 대상에서 빠진다', async () => {
     const dialog = await openSheet();
-    const box = within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 빠짐' });
+    const box = within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 출전' });
     fireEvent.click(box);
     fireEvent.click(box);
     expect(within(dialog).getByRole('button', { name: '빠지는 선수를 골라 주세요' })).toBeDisabled();
@@ -192,7 +196,7 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
 
   it('ESC 로 닫히고 아무것도 저장하지 않는다', async () => {
     const dialog = await openSheet();
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 빠짐' }));
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 출전' }));
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(mock.requests.some((r) => r.path === BATCH)).toBe(false);
@@ -209,7 +213,7 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
 
   it('그 사이 경기가 시작됐으면 마감 안내를 띄우고 최신 명단을 다시 받는다', async () => {
     const dialog = await openSheet();
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 빠짐' }));
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '박서준 이번 경기 출전' }));
     mock.setGameState(G1.gameId, 'LIVE');
     const before = rosterRequests().length;
     fireEvent.click(within(dialog).getByRole('button', { name: '1명 빼고 저장' }));

@@ -13,7 +13,7 @@ import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { withFromPath } from '@/lib/session-storage';
 import type { GameRosterAdjustmentReason } from '@/lib/v1-status-labels';
 import { draftToChanges, type GameRosterDraft } from './game-roster-draft';
-import { GameRosterPlayerRow } from './game-roster-player-row';
+import { GAME_ROSTER_PLAYING_HINT, GameRosterPlayerRow, GameRosterPlayingCheckbox } from './game-roster-player-row';
 import { GameRosterReasonChips } from './game-roster-reason-chips';
 
 /** 빠질 선수 → 고른 사유(없으면 null). */
@@ -127,41 +127,42 @@ export function GameRosterQuickSheet({
               출전하는 선수가 없어요.
             </p>
           ) : (
-            <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0 }}>
-              {roster.participants.map((row) => {
-                const isLeaving = row.userId in leaving;
-                const reason = leaving[row.userId] ?? null;
-                return (
-                  <li key={row.userId} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <GameRosterPlayerRow
-                      jerseyNumber={row.jerseyNumber}
-                      displayName={row.displayName}
-                      accountLinked={row.accountLinked}
-                      status={isLeaving ? 'EXCLUDED' : 'PARTICIPATING'}
-                      reason={reason}
-                      trailing={
-                        <label style={checkboxLabelStyle}>
-                          <input
-                            type="checkbox"
-                            checked={isLeaving}
-                            onChange={(event) => toggle(row.userId, event.target.checked)}
-                            aria-label={`${row.displayName} 이번 경기 빠짐`}
-                            style={checkboxStyle}
+            <>
+              <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
+                {GAME_ROSTER_PLAYING_HINT}
+              </p>
+              <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0 }}>
+                {roster.participants.map((row) => {
+                  const isLeaving = row.userId in leaving;
+                  const reason = leaving[row.userId] ?? null;
+                  return (
+                    <li key={row.userId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <GameRosterPlayerRow
+                        jerseyNumber={row.jerseyNumber}
+                        displayName={row.displayName}
+                        accountLinked={row.accountLinked}
+                        status={isLeaving ? 'EXCLUDED' : 'PARTICIPATING'}
+                        reason={reason}
+                        trailing={
+                          <GameRosterPlayingCheckbox
+                            displayName={row.displayName}
+                            playing={!isLeaving}
+                            onChange={(playing) => toggle(row.userId, !playing)}
                           />
-                        </label>
-                      }
-                    />
-                    {isLeaving ? (
-                      <GameRosterReasonChips
-                        playerName={row.displayName}
-                        value={reason}
-                        onChange={(next) => setLeaving((current) => ({ ...current, [row.userId]: next }))}
+                        }
                       />
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+                      {isLeaving ? (
+                        <GameRosterReasonChips
+                          playerName={row.displayName}
+                          value={reason}
+                          onChange={(next) => setLeaving((current) => ({ ...current, [row.userId]: next }))}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
           <p className="tm-text-caption" style={{ margin: '12px 0 0' }}>
             전체 명단은{' '}
@@ -195,13 +196,3 @@ export function GameRosterQuickSheet({
     </>
   );
 }
-
-const checkboxLabelStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minWidth: 44,
-  minHeight: 44,
-  cursor: 'pointer',
-};
-const checkboxStyle: React.CSSProperties = { width: 22, height: 22, margin: 0, accentColor: 'var(--blue500)' };

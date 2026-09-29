@@ -8,7 +8,11 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
-import { GameRosterPlayerRow } from '@/components/game-roster/game-roster-player-row';
+import {
+  GAME_ROSTER_PLAYING_HINT,
+  GameRosterPlayerRow,
+  GameRosterPlayingCheckbox,
+} from '@/components/game-roster/game-roster-player-row';
 import { GameRosterHistoryList } from '@/components/game-roster/game-roster-history';
 import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reason-chips';
 import { TEAM_UPCOMING_GAMES_ANCHOR } from '@/components/teams/team-upcoming-games-card';
@@ -22,6 +26,7 @@ import {
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorCode } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
+import { gameRosterEditStateLabel } from '@/lib/v1-status-labels';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
 import { useGameRosterSide } from '@/components/game-roster/use-game-roster-side';
@@ -251,6 +256,7 @@ function GameRosterScreen({
 
       <RosterSection
         title={`출전 ${data.participants.length - pendingExcludes + pendingRevokes}명`}
+        sub={canEdit && data.participants.length > 0 ? GAME_ROSTER_PLAYING_HINT : undefined}
         action={
           canEdit && data.excluded.length > 0 ? (
             <Button variant="ghost" size="sm" disabled={batch.isPending} onClick={() => void resetToRegistration(data)}>
@@ -278,17 +284,11 @@ function GameRosterScreen({
                     reason={leaving?.reason ?? null}
                     note={leaving ? '저장하면 이번 경기에서 빠져요' : row.joinedAfterFixtureCreated ? '새로 추가' : null}
                     trailing={
-                      <label style={checkboxLabelStyle}>
-                        <input
-                          type="checkbox"
-                          checked={leaving === null}
-                          onChange={(event) =>
-                            setEntry(row.userId, event.target.checked ? null : { op: 'EXCLUDE', reason: null })
-                          }
-                          aria-label={`${row.displayName} 이번 경기 출전`}
-                          style={checkboxStyle}
-                        />
-                      </label>
+                      <GameRosterPlayingCheckbox
+                        displayName={row.displayName}
+                        playing={leaving === null}
+                        onChange={(playing) => setEntry(row.userId, playing ? null : { op: 'EXCLUDE', reason: null })}
+                      />
                     }
                   />
                   {leaving ? (
@@ -416,16 +416,11 @@ function GameRosterScreen({
 }
 
 function StateBadge({ view }: { view: V1GameRosterView }) {
-  if (view.editable) return <span className="tm-badge tm-badge-sm tm-badge-blue">수정 가능</span>;
-  const label =
-    view.gameState === 'SCHEDULED'
-      ? '보기 전용'
-      : view.gameState === 'ENDED'
-        ? '경기 끝남'
-        : view.gameState === 'CANCELLED'
-          ? '취소된 경기'
-          : '경기 시작됨';
-  return <span className="tm-badge tm-badge-sm tm-badge-grey">{label}</span>;
+  return (
+    <span className={`tm-badge tm-badge-sm ${view.editable ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
+      {gameRosterEditStateLabel(view)}
+    </span>
+  );
 }
 
 function RosterSection({
@@ -487,12 +482,3 @@ function unavailabilityRange(startsAt: string, endsAt: string): string {
 const listStyle: React.CSSProperties = { listStyle: 'none', margin: 0, padding: 0 };
 const rowItemStyle: React.CSSProperties = { borderBottom: '1px solid var(--border)' };
 const linkButtonStyle: React.CSSProperties = { display: 'inline-flex', gap: 2, paddingLeft: 0 };
-const checkboxLabelStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minWidth: 44,
-  minHeight: 44,
-  cursor: 'pointer',
-};
-const checkboxStyle: React.CSSProperties = { width: 22, height: 22, margin: 0, accentColor: 'var(--blue500)' };

@@ -90,9 +90,10 @@ function UpcomingGameRow({
           {status.text}
         </span>
         <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+          {/* 행마다 보조 버튼 — 미제출은 주황 상태 글자로 알린다(화면의 주 CTA 는 하나). */}
           {rosterLink !== null ? (
             <Link
-              className={`tm-btn tm-btn-sm ${status.tone === 'warn' ? 'tm-btn-primary' : 'tm-btn-outline'}`}
+              className="tm-btn tm-btn-sm tm-btn-outline"
               href={rosterLink.href}
               aria-label={`${title} ${rosterLink.label}`}
             >

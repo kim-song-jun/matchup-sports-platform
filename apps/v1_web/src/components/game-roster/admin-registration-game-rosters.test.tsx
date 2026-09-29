@@ -106,6 +106,17 @@ describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
     expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 
+  it('저장 전 칸은 점선 테두리로 표시하고, outline 은 키보드 포커스 링에 남겨 둔다', async () => {
+    renderPanel();
+    fireEvent.click(await cell('김민재', G1.opponentName, '출전'));
+    const changed = await cell('김민재', G1.opponentName, '빠짐 · 저장 전');
+    expect(changed.style.borderStyle).toBe('dashed');
+    expect(changed.style.outline).toBe('');
+    expect(changed.style.outlineStyle).toBe('');
+    expect(changed.className).toContain('focus-visible:outline-2');
+    expect((await cell('김민재', G2.opponentName, '출전')).style.borderStyle).toBe('');
+  });
+
   it('빠진 칸을 다시 누르면 되돌리기(REVOKE)로 저장한다', async () => {
     mock.excludeAsTeamManager(G2.gameId, 'player-2', 'INJURY');
     renderPanel();

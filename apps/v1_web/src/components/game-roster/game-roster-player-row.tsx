@@ -95,3 +95,42 @@ export function GameRosterPlayerRow({
     </div>
   );
 }
+
+/** 출전 체크의 뜻 — 체크를 쓰는 화면마다 같은 문구로 보인다. */
+export const GAME_ROSTER_PLAYING_HINT = '체크를 풀면 이번 경기에서 빠져요.';
+
+/**
+ * 이번 경기 출전 체크 — 경기 명단 화면과 빠른 선택 시트가 같이 쓴다. 두 화면 모두 체크 = 출전,
+ * 풀면 빠짐이다(같은 모양의 행에서 뜻이 갈리지 않게). 44px 라벨이 터치 영역이다.
+ */
+export function GameRosterPlayingCheckbox({
+  displayName,
+  playing,
+  onChange,
+}: {
+  displayName: string;
+  playing: boolean;
+  onChange: (playing: boolean) => void;
+}) {
+  return (
+    <label style={checkboxLabelStyle}>
+      <input
+        type="checkbox"
+        checked={playing}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={`${displayName} 이번 경기 출전`}
+        style={checkboxStyle}
+      />
+    </label>
+  );
+}
+
+const checkboxLabelStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 44,
+  minHeight: 44,
+  cursor: 'pointer',
+};
+const checkboxStyle: React.CSSProperties = { width: 22, height: 22, margin: 0, accentColor: 'var(--blue500)' };

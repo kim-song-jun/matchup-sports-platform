@@ -52,6 +52,7 @@ export function MemberUnavailabilitySheet({
   const titleId = useId();
   const startId = useId();
   const endId = useId();
+  const reasonLabelId = useId();
   const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLButtonElement, HTMLElement>({
     open,
     onClose,
@@ -157,7 +158,10 @@ export function MemberUnavailabilitySheet({
             </p>
           ) : null}
 
-          <div role="group" aria-label="결장 사유(선택)" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+          <div id={reasonLabelId} className="tm-text-label" style={{ marginTop: 16, marginBottom: 6 }}>
+            사유 <span className="tm-text-caption">(선택)</span>
+          </div>
+          <div role="group" aria-labelledby={reasonLabelId} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {MEMBER_UNAVAILABILITY_REASON_OPTIONS.map((option) => {
               const selected = reason === option.value;
               return (

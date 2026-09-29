@@ -194,7 +194,7 @@ function PlayerCard({
               }}
             >
               {label}
-              {playing ? null : <span aria-hidden="true"> · {chipStatusWord(status)}</span>}
+              {playing ? null : <span aria-hidden="true"> · {gameRosterStatusLabel(status)}</span>}
             </button>
           );
         })}
@@ -227,11 +227,6 @@ function gameChipLabel(game: V1TeamRosterMatrixGame): string {
   return `${day} ${game.opponentName ?? game.competitionTitle ?? '상대 미정'}`;
 }
 
-function chipStatusWord(status: string): string {
-  if (status === 'SUSPENDED') return '정지';
-  return gameRosterStatusLabel(status);
-}
-
 function chipAriaLabel(label: string, status: string, remaining: number | null, toggleable: boolean, changed: boolean): string {
   const now = gameRosterStatusLabel(status, remaining);
   const hint = !toggleable ? '' : status === 'PARTICIPATING' ? ', 누르면 빠져요' : ', 누르면 출전으로 돌아가요';
@@ -259,11 +254,17 @@ const playerGridStyle: React.CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
   gap: 12,
 };
-// 빠진 칩은 색만이 아니라 "· 빠짐" 글자와 취소선으로도 구분한다.
+// 빠진 칩은 색만이 아니라 "· 빠짐" 글자와 취소선으로도 구분한다. 글자는 grey100 위 AA 를 넘는 grey700.
 const offChipStyle: React.CSSProperties = {
   background: 'var(--grey100)',
-  color: 'var(--text-caption)',
+  color: 'var(--grey700)',
   textDecoration: 'line-through',
 };
-// 저장 전 칩은 점선 테두리 — 색 외의 패턴으로 "아직 저장 안 됨"을 보인다.
-const changedChipStyle: React.CSSProperties = { outline: '2px dashed var(--blue500)', outlineOffset: 1 };
+// 저장 전 칩은 점선 테두리 — outline 은 .tm-chip:focus-visible 포커스 링 자리라 쓰지 않는다.
+// 테두리가 1px 두꺼워진 만큼 좌우 여백을 줄여 칩 폭을 그대로 둔다.
+const changedChipStyle: React.CSSProperties = {
+  borderWidth: 2,
+  borderStyle: 'dashed',
+  borderColor: 'var(--blue500)',
+  paddingInline: 11,
+};

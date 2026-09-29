@@ -52,7 +52,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function renderPanel() {
+function renderPanel(onDirtyChange?: (dirty: boolean) => void) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -61,6 +61,7 @@ function renderPanel() {
         registrationId={registrationId}
         teamName="성수 FC"
         correctionHref={`/admin/live/${tournamentId}/records/corrections`}
+        onDirtyChange={onDirtyChange}
       />
     </QueryClientProvider>,
   );
@@ -87,6 +88,22 @@ describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
     expect(await cell('김민재', G2.opponentName, '출전')).toBeInTheDocument();
     expect(await cell('박서준', G1.opponentName, '출전')).toBeInTheDocument();
     expect(screen.getByText('조정 1')).toBeInTheDocument();
+  });
+
+  it('저장 전 변경이 생기면 부모에 알리고, 저장하거나 펼침이 닫히면 없다고 알린다', async () => {
+    const onDirtyChange = vi.fn();
+    const view = renderPanel(onDirtyChange);
+    fireEvent.click(await cell('김민재', G1.opponentName, '출전'));
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+
+    fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+    await screen.findByText('변경 1건을 저장했어요.');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    fireEvent.click(await cell('박서준', G1.opponentName, '출전'));
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+    view.unmount();
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 
   it('빠진 칸을 다시 누르면 되돌리기(REVOKE)로 저장한다', async () => {

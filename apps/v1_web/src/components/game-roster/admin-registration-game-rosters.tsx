@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
@@ -40,11 +40,14 @@ export function AdminRegistrationGameRosters({
   registrationId,
   teamName,
   correctionHref,
+  onDirtyChange,
 }: {
   tournamentId: string;
   registrationId: string;
   teamName: string;
   correctionHref: string;
+  /** 저장 전 변경 유무 — 펼침을 닫으면 초안이 사라지므로 부모가 닫기 전에 묻는다. 언마운트 때 false. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const matrix = useV1AdminRegistrationGameRosters(tournamentId, registrationId);
   const adminMe = useV1AdminMe();
@@ -57,6 +60,11 @@ export function AdminRegistrationGameRosters({
   const pickerId = useId();
 
   const changes = useMemo(() => (data === undefined ? [] : draftToBatchChanges(draft, data)), [draft, data]);
+  const dirty = changes.length > 0;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   if (matrix.isError) {
     return (

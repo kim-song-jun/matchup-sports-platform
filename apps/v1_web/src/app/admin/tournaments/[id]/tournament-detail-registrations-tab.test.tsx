@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import {
@@ -41,9 +41,17 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 // 펼침 안의 표는 자기 테스트가 있다(admin-registration-game-rosters.test.tsx) — 여기선 어느 신청에 무엇을 넘기는지만 본다.
 vi.mock('@/components/game-roster/admin-registration-game-rosters', () => ({
-  AdminRegistrationGameRosters: (props: { registrationId: string; teamName: string; correctionHref: string }) => (
+  AdminRegistrationGameRosters: (props: {
+    registrationId: string;
+    teamName: string;
+    correctionHref: string;
+    onDirtyChange?: (dirty: boolean) => void;
+  }) => (
     <div data-testid="game-rosters-panel" data-registration-id={props.registrationId} data-correction-href={props.correctionHref}>
       {props.teamName}
+      <button type="button" onClick={() => props.onDirtyChange?.(true)}>
+        칸 바꾸기
+      </button>
     </div>
   ),
 }));
@@ -514,5 +522,66 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 178)', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
     expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: '경기별 명단' })).toHaveLength(2);
+  });
+
+  describe('저장 전 칸 변경이 있으면 펼침을 닫기 전에 묻는다', () => {
+    function arrangeDirty() {
+      arrange([
+        baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
+        baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
+      ]);
+      render(
+        <>
+          <RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />
+          <a href="/admin/tournaments/tournament-1/bracket">대진 탭</a>
+        </>,
+      );
+      fireEvent.click(screen.getAllByRole('button', { name: '경기별 명단' })[0]);
+      fireEvent.click(screen.getByRole('button', { name: '칸 바꾸기' }));
+    }
+
+    const panelId = () => screen.getByTestId('game-rosters-panel').getAttribute('data-registration-id');
+
+    it('다른 팀을 펼치려 하면 확인창 — "계속 편집"이면 그대로, "버리기"면 넘어간다', async () => {
+      arrangeDirty();
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      const dialog = await screen.findByRole('dialog', { name: '저장하지 않은 명단 변경이 있어요' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '계속 편집' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(panelId()).toBe('reg-1');
+
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '버리기' }));
+      await waitFor(() => expect(panelId()).toBe('reg-2'));
+    });
+
+    it('접기와 펼친 팀을 가리는 상태 필터도 먼저 묻는다', async () => {
+      arrangeDirty();
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '계속 편집' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(panelId()).toBe('reg-1');
+
+      fireEvent.click(screen.getByRole('button', { name: /입금 대기/ }));
+      expect(await screen.findByRole('dialog', { name: '저장하지 않은 명단 변경이 있어요' })).toBeInTheDocument();
+    });
+
+    it('다른 화면으로 가는 링크는 미저장 변경 보호가 막는다', async () => {
+      arrangeDirty();
+      fireEvent.click(screen.getByRole('link', { name: '대진 탭' }));
+      expect(await screen.findByRole('dialog', { name: '작성 중인 내용이 사라져요. 나갈까요?' })).toBeInTheDocument();
+    });
+
+    it('변경이 없으면 묻지 않고 바로 바꾼다', () => {
+      arrange([
+        baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
+        baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
+      ]);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+      fireEvent.click(screen.getAllByRole('button', { name: '경기별 명단' })[0]);
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(panelId()).toBe('reg-2');
+    });
   });
 });

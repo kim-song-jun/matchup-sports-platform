@@ -271,26 +271,6 @@ export function createV1GameRosterMswHandlers() {
         .sort((x, y) => x.at.localeCompare(y.at));
       return ok({ gameId: game.gameId, sideId: game.sideId, teamId: GAME_ROSTER_MSW.teamId, events });
     }),
-    http.post(`${sidePath}/roster-adjustments`, async ({ request, params }) => {
-      await record(request, new URL(request.url).pathname);
-      const game = findGame(String(params.gameId), String(params.sideId));
-      if (!game) return fail(404, 'GAME_ROSTER_NOT_AVAILABLE', '이 경기는 명단을 조정할 수 없어요.');
-      const body = state.requests.at(-1)!.body as { userId: string; reason?: string };
-      if (state.gameStates.get(game.gameId) !== 'SCHEDULED') return deadlinePassed([game.gameId]);
-      if (!inRoster(body.userId)) return fail(422, 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER', '기준 명단에 없는 선수예요.');
-      const alreadyApplied = exclude(game.gameId, body.userId, body.reason ?? null);
-      const adj = activeAdjustment(game.gameId, body.userId)!;
-      const { gameId: _gameId, actorUserId: _actor, revokedByUserId: _revoker, revokedByRole: _revokerRole, ...adjustment } = adj;
-      return ok({ alreadyApplied, adjustment, roster: view(game) });
-    }),
-    http.delete(`${sidePath}/roster-adjustments/:userId`, async ({ request, params }) => {
-      await record(request, new URL(request.url).pathname);
-      const game = findGame(String(params.gameId), String(params.sideId));
-      if (!game) return fail(404, 'GAME_ROSTER_NOT_AVAILABLE', '이 경기는 명단을 조정할 수 없어요.');
-      if (state.gameStates.get(game.gameId) !== 'SCHEDULED') return deadlinePassed([game.gameId]);
-      const alreadyApplied = revoke(game.gameId, String(params.userId));
-      return ok({ alreadyApplied, roster: view(game) });
-    }),
     http.get(`${api}/teams/:teamId/game-rosters`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
       if (state.viewerRole === 'TEAM_MEMBER') return forbidden('팀장·매니저만 경기 명단을 관리할 수 있어요.');
@@ -307,6 +287,7 @@ export function createV1GameRosterMswHandlers() {
       if (detached.length > 0) return fail(404, 'GAME_SIDE_NOT_FOUND', '이 팀이 뛰는 경기가 아니에요.', { gameIds: detached });
       const started = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.gameStates.get(id) !== 'SCHEDULED');
       if (started.length > 0) return deadlinePassed(started);
+      if (changes.some((c) => !inRoster(c.userId))) return fail(422, 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER', '기준 명단에 없는 선수예요.');
       const results = changes.map((c) => {
         const game = findGame(c.gameId)!;
         const alreadyApplied = c.op === 'EXCLUDE' ? exclude(c.gameId, c.userId, c.reason ?? null) : revoke(c.gameId, c.userId);

@@ -86,23 +86,6 @@ export type V1GameRosterHistoryEvent = {
 /** `teamId` = 지금 사이드 팀 — 기록은 이 팀의 조정만 온다(대진이 바뀌면 이전 팀 기록은 빠진다). */
 export type V1GameRosterHistory = { gameId: string; sideId: string; teamId: string; events: V1GameRosterHistoryEvent[] };
 
-export type V1GameRosterAdjustment = {
-  id: string;
-  userId: string;
-  reason: string | null;
-  actorRole: string;
-  createdAt: string;
-  revokedAt: string | null;
-};
-
-export type V1GameRosterExcludeResult = {
-  alreadyApplied: boolean;
-  adjustment: V1GameRosterAdjustment;
-  roster: V1GameRosterView;
-};
-
-export type V1GameRosterRevokeResult = { alreadyApplied: boolean; roster: V1GameRosterView };
-
 export type V1TeamRosterCellStatus = V1GameRosterPlayerStatus | 'NOT_IN_ROSTER';
 
 export type V1TeamRosterCell = {
@@ -250,16 +233,6 @@ function invalidateLineupReaders(queryClient: QueryClient, gameIds: readonly str
   });
 }
 
-function afterSideWrite(queryClient: QueryClient, roster: V1GameRosterView) {
-  // 응답이 새 명단을 싣고 오므로 명단은 바로 넣고(상대 팀 이름은 쓰기 응답에 없어 이어받는다), 기록·라인업만 다시 받는다.
-  queryClient.setQueryData<V1TeamGameRosterView>(v1Keys.teamGameRoster(roster.teamId, roster.gameId), (current) =>
-    current === undefined ? current : { ...roster, opponentName: current.opponentName },
-  );
-  void queryClient.invalidateQueries({ queryKey: v1Keys.gameRosterAdjustments(roster.gameId, roster.sideId) });
-  invalidateLineupReaders(queryClient, [roster.gameId]);
-  invalidateTeamRosterViews(queryClient, roster.teamId);
-}
-
 // ── 경기 한 사이드 ───────────────────────────────────────────────────────────
 
 /**
@@ -291,26 +264,6 @@ export function useV1GameRosterAdjustments(
     },
     enabled: (options?.enabled ?? true) && Boolean(gameId) && Boolean(sideId),
     retry: false,
-  });
-}
-
-/** 이번 경기에서 선수 빼기. 이미 빠져 있으면 서버가 `alreadyApplied: true` 로 첫 기록을 그대로 둔다. */
-export function useV1ExcludeGameRosterPlayer(gameId: string, sideId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { userId: string; reason?: GameRosterAdjustmentReason }) =>
-      v1Post<V1GameRosterExcludeResult>(`/games/${gameId}/sides/${sideId}/roster-adjustments`, input),
-    onSuccess: (result) => afterSideWrite(queryClient, result.roster),
-  });
-}
-
-/** 뺀 선수 되돌리기. 빠져 있지 않으면 `alreadyApplied: true`. */
-export function useV1RevokeGameRosterAdjustment(gameId: string, sideId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (userId: string) =>
-      v1Delete<V1GameRosterRevokeResult>(`/games/${gameId}/sides/${sideId}/roster-adjustments/${userId}`),
-    onSuccess: (result) => afterSideWrite(queryClient, result.roster),
   });
 }
 

@@ -11,7 +11,6 @@ import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createV1GameRosterMswHandlers, GAME_ROSTER_MSW } from '@/test/msw/game-roster-handlers';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
-import { useV1TeamUpcomingGames } from './use-v1-api';
 import { useV1FixtureLineup, useV1GameOperationsLineup, useV1SetParticipantArrival } from './use-v1-game-operations';
 import { usePublicLeagueFixtureRecord, usePublicMatch } from '@/components/public-game-records/use-public-game-records';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
@@ -20,10 +19,7 @@ import {
   useV1AdminRegistrationGameRosters,
   useV1ApplyGameRosterBatch,
   useV1CreateMemberUnavailability,
-  useV1ExcludeGameRosterPlayer,
-  useV1GameRosterAdjustments,
   useV1MemberUnavailability,
-  useV1RevokeGameRosterAdjustment,
   useV1RevokeMemberUnavailability,
   useV1TeamGameRoster,
   useV1TeamGameRosters,
@@ -105,79 +101,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function useSideScreen() {
-  return {
-    roster: useV1TeamGameRoster(teamId, G1.gameId),
-    history: useV1GameRosterAdjustments(G1.gameId, G1.sideId),
-    matrix: useV1TeamGameRosters(teamId),
-    upcoming: useV1TeamUpcomingGames(teamId),
-    exclude: useV1ExcludeGameRosterPlayer(G1.gameId, G1.sideId),
-    revoke: useV1RevokeGameRosterAdjustment(G1.gameId, G1.sideId),
-  };
-}
-
-describe('경기 한 사이드 조정', () => {
-  it('빼기는 사유를 실어 보내고, 명단은 응답으로 바로 바뀌며 기록·팀 표·다가오는 경기를 다시 받는다', async () => {
-    const { result } = renderHook(useSideScreen, { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.roster.data?.counts.participating).toBe(3));
-    await waitFor(() => expect(result.current.matrix.isSuccess && result.current.history.isSuccess).toBe(true));
-    await waitFor(() => expect(upcomingFetches).toBe(1));
-
-    await act(() => result.current.exclude.mutateAsync({ userId: 'player-2', reason: 'INJURY' }));
-
-    expect(mock.requests.find((r) => r.method === 'POST')).toEqual({
-      method: 'POST',
-      path: HISTORY_1,
-      body: { userId: 'player-2', reason: 'INJURY' },
-    });
-    await waitFor(() => expect(result.current.roster.data?.counts).toMatchObject({ participating: 2, excluded: 1 }));
-    expect(result.current.roster.data?.excluded[0]).toMatchObject({ userId: 'player-2', reason: 'INJURY' });
-    // 쓰기 응답엔 상대 팀 이름이 없다 — 화면 머리("vs …")가 비지 않게 이어받는다.
-    expect(result.current.roster.data?.opponentName).toBe(G1.opponentName);
-    await waitFor(() => expect(gets(HISTORY_1)).toBe(2));
-    await waitFor(() => expect(gets(MATRIX)).toBe(2));
-    await waitFor(() => expect(upcomingFetches).toBe(2));
-    await waitFor(() => expect(result.current.history.data?.events.map((e) => e.type)).toEqual(['EXCLUDE']));
-    // 응답이 새 명단을 실어 오므로 명단 GET 은 다시 나가지 않는다.
-    expect(gets(ROSTER_1)).toBe(1);
-  });
-
-  it('되돌리기는 사용자 경로로 DELETE 하고 선수가 출전으로 돌아온다', async () => {
-    const { result } = renderHook(useSideScreen, { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.roster.isSuccess).toBe(true));
-    await act(() => result.current.exclude.mutateAsync({ userId: 'player-1' }));
-    expect(mock.requests.find((r) => r.method === 'POST')?.body).toEqual({ userId: 'player-1' });
-
-    await act(() => result.current.revoke.mutateAsync('player-1'));
-
-    expect(mock.requests.filter((r) => r.method === 'DELETE').map((r) => r.path)).toEqual([`${HISTORY_1}/player-1`]);
-    await waitFor(() => expect(result.current.roster.data?.counts).toMatchObject({ participating: 3, excluded: 0 }));
-    await waitFor(() => expect(result.current.history.data?.events.map((e) => e.type)).toEqual(['EXCLUDE', 'REVOKE']));
-  });
-
-  it('경기가 시작되면 409 를 해요체 안내로 바꿔 보여 준다', async () => {
-    mock.setGameState(G1.gameId, 'LIVE');
-    const { result } = renderHook(useSideScreen, { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.roster.data?.editable).toBe(false));
-
-    const error = await result.current.exclude.mutateAsync({ userId: 'player-1' }).catch((e: unknown) => e);
-
-    expect(gameRosterErrorMessage(error, '명단을 바꾸지 못했어요.')).toBe(
-      '경기가 시작돼서 명단을 바꿀 수 없어요. 바꿀 게 있으면 운영진에게 알려 주세요.',
-    );
-    expect(gets(MATRIX)).toBe(1);
-  });
-
-  it('명단 밖 선수는 422 코드 문구로 안내한다', async () => {
-    const { result } = renderHook(useSideScreen, { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.roster.isSuccess).toBe(true));
-    const error = await result.current.exclude.mutateAsync({ userId: 'stranger' }).catch((e: unknown) => e);
-    expect(gameRosterErrorMessage(error, '명단을 바꾸지 못했어요.')).toBe(
-      '참가 명단에 없는 선수예요. 명단을 새로 불러와 주세요.',
-    );
-  });
-});
-
 describe('팀 B 일괄 저장', () => {
   it('변경 목록을 한 번에 보내고, 바뀐 두 경기 명단과 팀 표를 다시 받는다', async () => {
     const { result } = renderHook(
@@ -211,6 +134,14 @@ describe('팀 B 일괄 저장', () => {
         'EXCLUDED',
       ]),
     );
+  });
+
+  it('참가 명단 밖 선수가 섞이면 422 코드 문구로 안내한다', async () => {
+    const { result } = renderHook(() => useV1ApplyGameRosterBatch(teamId), { wrapper: wrapper() });
+    const error = await result.current
+      .mutateAsync([{ gameId: G1.gameId, userId: 'stranger', op: 'EXCLUDE' }])
+      .catch((e: unknown) => e);
+    expect(gameRosterErrorMessage(error, '저장하지 못했어요.')).toBe('참가 명단에 없는 선수예요. 명단을 새로 불러와 주세요.');
   });
 
   it('시작된 경기가 섞이면 409 로 아무것도 쓰지 않는다', async () => {
@@ -259,19 +190,6 @@ describe('명단이 바뀌면 그 명단을 읽는 다른 화면도 다시 받�
       await waitFor(() => expect(fetched(path), path).toBe(2));
     }
     // 대조군: 명단이 바뀌지 않은 경기의 팀매치 콘솔 라인업은 그대로 둔다.
-    expect(fetched(READERS.opsLineup2)).toBe(1);
-  });
-
-  it('경기 한 사이드 빼기도 같은 화면을 다시 받는다', async () => {
-    const { result } = renderHook(
-      () => ({ ...useReaders(), exclude: useV1ExcludeGameRosterPlayer(G1.gameId, G1.sideId) }),
-      { wrapper: wrapper() },
-    );
-    await readersLoaded(result);
-    await act(() => result.current.exclude.mutateAsync({ userId: 'player-1' }));
-    for (const path of [READERS.fixtureLineup, READERS.opsLineup1, READERS.publicMatch, READERS.leagueRecord]) {
-      await waitFor(() => expect(fetched(path), path).toBe(2));
-    }
     expect(fetched(READERS.opsLineup2)).toBe(1);
   });
 

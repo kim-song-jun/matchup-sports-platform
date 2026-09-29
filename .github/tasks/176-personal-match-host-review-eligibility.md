@@ -17,7 +17,7 @@ to review.
 
 - [x] A personal-match host can load and submit reviews for eligible actual participants even when the
   host did not participate.
-- [x] A non-participating host is not added to the review target list.
+- [x] A non-participating host is added to eligible participants' review target list, while self-review and duplicate host targets remain excluded.
 - [x] A user who is neither host nor eligible participant remains forbidden.
 - [x] Pending review lookup uses the same host-or-participant eligibility rule.
 - [x] Targeted API tests pass.
@@ -30,3 +30,5 @@ to review.
 - 2026-09-28: Implemented host reviewer eligibility while keeping targets restricted to actual eligible
   participants.
 - 2026-09-28: Review-focused unit run passed (3 suites, 128 tests). `v1_api` TypeScript check passed.
+- 2026-09-29: Product follow-up made the organizer relationship bidirectional: eligible participants can
+  now review a non-playing host, and pending target counts include the host exactly once.

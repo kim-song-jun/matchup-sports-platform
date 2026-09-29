@@ -40,9 +40,10 @@
 ### 계약 포인트
 
 - `sourceType`: `match | team_match | tournament_fixture`
-  - `match`: 완료된 개인 매치의 실제 참가자 또는 방장이 실제 참가자(`targetType=user`)를 평가한다. 방장이
-    `hostParticipates=false`로 직접 참가하지 않았더라도 운영자로서 참가자를 평가할 수 있지만, 그 방장은
-    다른 참가자의 리뷰 대상에는 포함되지 않는다. 방장도 참가자도 아닌 사용자는 `403 NOT_SOURCE_PARTICIPANT`다.
+  - `match`: 완료된 개인 매치의 실제 참가자 또는 방장이 다른 실제 참가자와 방장(`targetType=user`)을 평가한다.
+    방장이 `hostParticipates=false`로 직접 참가하지 않았더라도 방장은 참가자를 평가할 수 있고, 실제 참가자도
+    방장을 평가할 수 있다. 본인과 참가자 목록에 이미 포함된 방장은 중복 대상에서 제외한다. 방장도 참가자도
+    아닌 사용자는 `403 NOT_SOURCE_PARTICIPANT`다.
   - `team_match`: 완료된 팀매치의 참가팀 active 멤버가 상대 팀(`targetType=team`)을 평가한다.
   - `tournament_fixture`: 완료되고 공식 결과가 기록된 대회 경기에서 참가팀 active `owner | manager`는 상대 팀(`targetType=team`)과 상대 등록 선수(`targetType=user`)를, active `member`는 상대 등록 선수만 평가한다.
     - `sourceId`는 작성 화면으로 진입한 fixture ID다.

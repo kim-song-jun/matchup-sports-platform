@@ -1,3 +1,5 @@
+import type { V1TeamMatchApiStatus } from '@/types/api';
+
 export type TeamMatchModel = {
   id: string;
   title: string;
@@ -48,6 +50,8 @@ export type TeamMatchModel = {
    * 마감·취소·종료여도 항상 'mine' 이다. 그래서 매치 상태는 별도 필드로 둔다.
    */
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
+  /** Raw/derived API state retained so a completed game is not mislabeled as application-closed. */
+  apiStatus?: V1TeamMatchApiStatus;
   /** API status 만으로 판정한 "더는 신청받지 않는다" — 관계와 무관하다. */
   closed: boolean;
   live?: boolean;

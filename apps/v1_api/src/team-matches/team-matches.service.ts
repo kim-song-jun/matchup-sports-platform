@@ -109,6 +109,7 @@ export class TeamMatchesService {
     const isDefaultDiscovery = query.status === undefined;
     const status = query.status ?? 'recruiting';
     const now = new Date();
+    const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1TeamMatchWhereInput[] = [
       // 추천순의 모집 글에는 신청 마감을 적용한다. 확정 경기는 진행 중에도 찾을 수 있게 남긴다.
       ...(status === 'recruiting' && query.sort === 'recommended'
@@ -132,7 +133,23 @@ export class TeamMatchesService {
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         AND: [
           ...constraints,
-          ...(isDefaultDiscovery ? [{ OR: [{ startAt: { gte: now } }, { status: 'matched' as const }] }] : []),
+          ...(isDefaultDiscovery
+            ? [query.sort === 'recommended'
+                ? { OR: [{ startAt: { gte: now } }, { status: 'matched' as const }] }
+                : {
+                    OR: [
+                      { status: { in: ['recruiting' as const, 'closed' as const] }, startAt: { gte: now } },
+                      { status: 'matched' as const },
+                      {
+                        status: 'completed' as const,
+                        OR: [
+                          { completedAt: { gte: publicHistoryFrom } },
+                          { completedAt: null, startAt: { gte: publicHistoryFrom } },
+                        ],
+                      },
+                    ],
+                  }]
+            : []),
           {
             OR: [
               { hostTeam: { status: 'active', deletedAt: null } },
@@ -143,14 +160,14 @@ export class TeamMatchesService {
         ...(status === 'expired'
           ? { startAt: { lt: now } }
           : isDefaultDiscovery
-            ? {
+            ? query.sort === 'recommended'
+              ? {
                 // Matched games remain discoverable during play until the teams finalize them.
                 status: {
-                  in: query.sort === 'recommended'
-                    ? ['recruiting', 'matched']
-                    : ['recruiting', 'closed', 'matched'],
+                  in: ['recruiting', 'matched'],
                 },
               }
+              : {}
             : status === 'recruiting'
             ? { status, startAt: { gte: now } }
             : { status }),

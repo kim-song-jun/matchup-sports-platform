@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -91,7 +92,10 @@ export function isParticipantOwnerVisible(row: ParticipantConsentEligibility): b
  * 취급해야 한다.
  */
 export async function loadParticipantConsentEligibility(
-  prisma: PrismaService,
+  prisma: Pick<
+    Prisma.TransactionClient,
+    'v1ParticipantIdentityLinkCurrent' | 'v1UserRecordConsent' | 'v1ParticipantConsentSnapshot'
+  >,
   participantIds: readonly string[],
 ): Promise<Map<string, ParticipantConsentEligibility>> {
   const result = new Map<string, ParticipantConsentEligibility>();

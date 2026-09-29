@@ -159,6 +159,8 @@ function toPersonalMatch(match: V1Match, listHref: string): MyMatch {
   const status = toPersonalStatus(match);
   const id = match.matchId ?? match.id;
   const canReview = isReviewablePersonalMatch(match);
+  // 목록 응답에는 canComplete 가 없다 — 호스트의 종료 확인 대기 상태로 같은 조건을 판단한다.
+  const needsCompletion = getViewerState(match) === 'host' && (match.displayState ?? match.status) === 'completion_pending';
 
   return {
     id,
@@ -172,8 +174,8 @@ function toPersonalMatch(match: V1Match, listHref: string): MyMatch {
     note: buildPersonalNote(match, status),
     href: withFromPath(`/matches/${id}`, listHref),
     // 종료 확인이 필요한 호스트는 참여 여부를 체크하는 확정 명단 탭으로 바로 보낸다(매치 상세 CTA 와 같은 경로).
-    manageHref: match.canComplete ? `/matches/${id}/applications?tab=approved` : `/matches/${id}/applications`,
-    manageLabel: match.canComplete ? '참여 확인' : '참가 관리',
+    manageHref: needsCompletion ? `/matches/${id}/applications?tab=approved` : `/matches/${id}/applications`,
+    manageLabel: needsCompletion ? '참여 확인' : '참가 관리',
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,
   };
 }
@@ -255,7 +257,7 @@ function personalStatusLabel(status: MyMatchStatus, match: V1Match) {
     return match.viewer?.participantStatus === 'no_show' ? '불참' : '참여 완료';
   }
   const lifecycle = personalMatchLifecycleLabel(match.displayState ?? match.status, getViewerState(match) === 'host');
-  if (lifecycle) return lifecycle;
+  if (lifecycle && status !== 'pending') return lifecycle;
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'ended') return '종료';
@@ -287,8 +289,8 @@ function teamRelationLabel(relation: V1MyTeamMatch['relation']) {
 function buildPersonalNote(match: V1Match, status: MyMatchStatus) {
   if ((match.displayState ?? match.status) === 'completed' && match.viewer?.participantStatus === 'no_show') return '불참으로 확인된 경기예요. 개인 경기 점수는 기록되지 않아요.';
   const display = match.displayState ?? match.status;
-  if (display === 'in_progress') return '경기가 진행 중이에요.';
-  if (display === 'completion_pending') {
+  if (status !== 'pending' && display === 'in_progress') return '경기가 진행 중이에요.';
+  if (status !== 'pending' && display === 'completion_pending') {
     return getViewerState(match) === 'host' ? '경기가 끝났어요. 참가자가 실제로 참여했는지 확인해 주세요.' : '호스트가 참여 여부를 확인하고 있어요.';
   }
   if (status === 'pending') return '호스트가 신청을 검토 중이에요.';

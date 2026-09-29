@@ -47,11 +47,11 @@ describe('removeUserFromActiveRosters', () => {
     ]);
     const updateMany = jest.fn().mockResolvedValue({ count: 2 });
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
-    const gameFindMany = jest.fn().mockResolvedValue([]);
+    const executeRaw = jest.fn().mockResolvedValue(1);
     const tx = {
       v1TournamentPlayer: { findMany, updateMany },
       v1StatusChangeLog: { createMany },
-      v1Game: { findMany: gameFindMany },
+      $executeRaw: executeRaw,
     } as unknown as Prisma.TransactionClient;
     const removedAt = new Date('2026-08-07T00:00:00.000Z');
 
@@ -72,11 +72,12 @@ describe('removeUserFromActiveRosters', () => {
         }),
       ],
     });
-    // 팀을 떠난 사람이 리그·대회 양쪽의 시작 전 경기 명단에 남지 않도록, 명단이 줄어든
-    // 팀마다 리그판(leagueId=tournamentId)과 대회판(leagueId=null) 양쪽을 한 번씩 맞춘다.
-    expect(
-      gameFindMany.mock.calls.map(([args]) => `${args.where.teamMatch.leagueId}:${args.where.sides.some.teamId}`).sort(),
-    ).toEqual(['null:team-1', 'null:team-2', 'tournament-1:team-1', 'tournament-1:team-2']);
+    // 팀을 떠난 사람이 시작 전 경기 명단에 남지 않도록, 명단이 줄어든 팀마다 그 대회·리그의 재계산
+    // 이벤트를 남긴다. 이 트랜잭션은 명단·멤버십 행을 쥐고 있어 경기를 잠그지 않는다(교착 방지).
+    expect(executeRaw.mock.calls.map((call: unknown[]) => JSON.parse(String(call[6])))).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-1' },
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-2' },
+    ]);
   });
 
   it('잠긴 신청건이 없으면 감사 로그를 남기지 않는다', async () => {
@@ -92,7 +93,7 @@ describe('removeUserFromActiveRosters', () => {
     const tx = {
       v1TournamentPlayer: { findMany, updateMany },
       v1StatusChangeLog: { createMany },
-      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
     } as unknown as Prisma.TransactionClient;
 
     await removeUserFromActiveRosters(tx, 'user-1', { at: new Date('2026-08-07T00:00:00.000Z') });

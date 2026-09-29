@@ -3,6 +3,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { participantDisplayName } from '../tournaments/participant-display-name';
+import type { GameRosterBaseEntry } from '../games/roster/game-roster-computation';
 import { findTournamentOnSurfaceOrThrow } from '../tournaments/tournament-surface-lookup';
 import {
   fillLeagueTeamRoster,
@@ -52,7 +53,7 @@ type ParticipantProfile = { nickname: string | null; displayName: string | null 
 export interface LeagueFixtureTeam {
   id: string;
   name: string;
-  memberships: Array<{ id: string; user: { profile: ParticipantProfile | null } }>;
+  memberships: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
   /** 이 리그의 참가 명단(confirmed 신청에서 제외되지 않은 선수). 비어 있으면 명단 미제출이다. */
   registeredPlayers: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
 }
@@ -96,19 +97,37 @@ export interface LeagueRosterEntry {
  * 연결하면 뛰지 않은 사람이 상호평가 대상(reviews.service.ts)과 선수 카드 기록에 오르고,
  * "이 선수가 저예요" 신청 목록(연결 없는 참가자만)에서도 빠진다.
  *
- * 대진 생성과 명단 동기화(`league-roster-sync.ts`)가 같은 규칙을 쓴다.
+ * 대진 생성과 명단 동기화(`games/roster/game-roster-sync.ts`)가 같은 규칙을 쓴다.
  */
 export function leagueTeamRosterEntries(team: LeagueFixtureTeam): LeagueRosterEntry[] {
+  return leagueTeamRosterBase(team).map((entry) => ({
+    sourceParticipantId: entry.sourceParticipantId,
+    ...(entry.accountLinked ? { userId: entry.userId } : {}),
+    displayNameSnapshot: entry.displayNameSnapshot,
+  }));
+}
+
+/**
+ * 경기 명단 계산(`games/roster`)의 기준 명단. 폴백 팀원도 멤버십 userId 를 매칭 키로 갖는다 —
+ * 조정·결장·출전정지는 userId 로 걸리기 때문이다. 경기 참가자 행에는 `accountLinked` 가
+ * false 라 여전히 userId 가 실리지 않는다(위 주석의 이유 그대로).
+ */
+export function leagueTeamRosterBase(team: LeagueFixtureTeam): GameRosterBaseEntry[] {
   if (team.registeredPlayers.length > 0) {
     return team.registeredPlayers.map((player) => ({
-      sourceParticipantId: player.id,
       userId: player.userId,
+      accountLinked: true,
       displayNameSnapshot: participantDisplayName(player),
+      jerseyNumber: null,
+      sourceParticipantId: player.id,
     }));
   }
   return team.memberships.map((membership) => ({
-    sourceParticipantId: membership.id,
+    userId: membership.userId,
+    accountLinked: false,
     displayNameSnapshot: participantDisplayName(membership),
+    jerseyNumber: null,
+    sourceParticipantId: membership.id,
   }));
 }
 
@@ -118,75 +137,84 @@ function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
 
 /**
  * 대진 생성·명단 동기화가 읽는 팀 정보 — 활성 멤버십과 이 리그의 참가 명단.
- *
- * **`V1TournamentPlayer` 행이 아예 없는 confirmed 등록은 여기서 즉시 채운다** (#9,
- * 2026-09-19 QA). 원래는 D10 크론(`league-roster-autoconfirm.service.ts`)만 채웠는데,
- * 대진 생성이 그보다 먼저 일어나면(흔한 운영 순서) 명단 없는 팀이
- * `leagueTeamRosterEntries()`의 계정 없는 폴백을 타고, 그 경기가 크론 전에 시작·종료되면
- * 영영 못 고친다 — `league-roster-autofill.ts` 상단 주석 참고.
- *
- * "비어 있다" 를 **활성 선수(`removedAt: null`) 수** 로 재지 않는다 — 크론과 똑같이
- * `_count.players`(전체 행 수, `removedAt` 무관)로 판정한다. 활성 수로 재면 "한 번
- * 올렸다가 팀장이 전원 뺀 팀" 까지 다시 채워 버리는데, 그건 정책상 자동 채움 대상이
- * 아니다(`league-roster-autofill.ts` 참고) — 게다가 방금 뺀 그 유저를 그 자리에서 다시
- * 채우려다 유니크 제약에 걸려 **선수 삭제 트랜잭션 자체가 롤백된 적**이 있다
- * (`removePlayer` → `syncLeagueRosterLineups` → 이 함수, 같은 트랜잭션).
+ * 명단 없는 확정 신청을 먼저 채운다(`fillEmptyLeagueRosters`). **쓰기 경로 전용이다** — 조회는
+ * 부작용 없는 `readLeagueTeamRosters` 를 쓴다.
  */
 export async function loadLeagueTeamRosters(
   tx: Prisma.TransactionClient,
   leagueId: string,
   teamIds: string[],
 ): Promise<Map<string, LeagueFixtureTeam>> {
-  const profile = { select: { profile: { select: { nickname: true, displayName: true } } } } as const;
-  const playerSelect = {
-    where: { removedAt: null },
+  await fillEmptyLeagueRosters(tx, leagueId, teamIds);
+  return readLeagueTeamRosters(tx, leagueId, teamIds);
+}
+
+/**
+ * **`V1TournamentPlayer` 행이 아예 없는 confirmed 등록을 즉시 채우고 팀장에게 알린다** (#9,
+ * 2026-09-19 QA). 원래는 D10 크론(`league-roster-autoconfirm.service.ts`)만 채웠는데,
+ * 대진 생성이 그보다 먼저 일어나면(흔한 운영 순서) 명단 없는 팀이
+ * `leagueTeamRosterEntries()`의 계정 없는 폴백을 타고, 그 경기가 크론 전에 시작·종료되면
+ * 영영 못 고친다 — `league-roster-autofill.ts` 상단 주석 참고.
+ *
+ * "비어 있다" 를 **활성 선수(`removedAt: null`) 수** 로 재지 않는다 — 크론과 똑같이 행이 하나도
+ * 없는지(`players: { none: {} }`, `removedAt` 무관)로 판정한다. 활성 수로 재면 "한 번
+ * 올렸다가 팀장이 전원 뺀 팀" 까지 다시 채워 버리는데, 그건 정책상 자동 채움 대상이
+ * 아니다 — 게다가 방금 뺀 그 유저를 그 자리에서 다시 채우려다 유니크 제약에 걸려
+ * **선수 삭제 트랜잭션 자체가 롤백된 적**이 있다
+ * (당시 `removePlayer` → 명단 동기화 → 이 함수가 같은 트랜잭션이었다. 지금은 워커의 재계산 이벤트).
+ */
+export async function fillEmptyLeagueRosters(
+  tx: Prisma.TransactionClient,
+  leagueId: string,
+  teamIds: readonly string[],
+): Promise<void> {
+  const emptyRegistrations = await tx.v1TournamentRegistration.findMany({
+    where: { tournamentId: leagueId, teamId: { in: [...teamIds] }, status: 'confirmed', players: { none: {} } },
+    // 채우기가 신청 행을 하나씩 잠그므로 id 순으로 돈다.
     orderBy: { id: 'asc' },
-    select: { id: true, userId: true, user: profile },
-  } as const;
+    select: { id: true, teamId: true },
+  });
+  if (emptyRegistrations.length === 0) return;
+  const fillOutcomes: LeagueRosterFillOutcome[] = [];
+  for (const registration of emptyRegistrations) {
+    fillOutcomes.push(await fillLeagueTeamRoster(tx, leagueId, registration));
+  }
+  // 크론이 자동 채움을 알리는 것과 같은 이유 — 여기서 먼저 채우면 그 등록은 크론의
+  // `players: { none: {} }` 대상에서도 빠지니, 여기서 안 알리면 팀장은 영영 통보를 못 받는다.
+  const league = await findTournamentOnSurfaceOrThrow(tx, ['regular_league'], {
+    where: { id: leagueId },
+    select: { title: true },
+  });
+  await notifyLeagueRosterFillOutcomes(tx, { id: leagueId, title: league.title }, fillOutcomes);
+}
+
+/** `loadLeagueTeamRosters` 의 읽기 부분 — DB 를 바꾸지 않는다. 명단 행이 없는 확정 신청 팀은 멤버 폴백이 된다. */
+export async function readLeagueTeamRosters(
+  tx: Prisma.TransactionClient,
+  leagueId: string,
+  teamIds: readonly string[],
+): Promise<Map<string, LeagueFixtureTeam>> {
+  const profile = { select: { profile: { select: { nickname: true, displayName: true } } } } as const;
   const teams = await tx.v1Team.findMany({
-    where: { id: { in: teamIds }, status: 'active', deletedAt: null },
+    where: { id: { in: [...teamIds] }, status: 'active', deletedAt: null },
     select: {
       id: true,
       name: true,
       memberships: {
         where: { status: 'active' },
         orderBy: { id: 'asc' },
-        // userId 를 읽지 않는다 — 명단 미제출 팀의 팀원은 계정 없이 들어간다.
-        select: { id: true, user: profile },
+        // userId 는 조정·결장 대조 키로만 쓴다 — 경기 참가자에는 계정 없이 들어간다.
+        select: { id: true, userId: true, user: profile },
       },
     },
   });
   const registrations = await tx.v1TournamentRegistration.findMany({
-    where: { tournamentId: leagueId, teamId: { in: teamIds }, status: 'confirmed' },
-    select: { id: true, teamId: true, players: playerSelect, _count: { select: { players: true } } },
+    where: { tournamentId: leagueId, teamId: { in: [...teamIds] }, status: 'confirmed' },
+    select: {
+      teamId: true,
+      players: { where: { removedAt: null }, orderBy: { id: 'asc' }, select: { id: true, userId: true, user: profile } },
+    },
   });
-
-  const emptyRegistrations = registrations.filter((row) => row._count.players === 0);
-  const fillOutcomes: LeagueRosterFillOutcome[] = [];
-  for (const registration of emptyRegistrations) {
-    fillOutcomes.push(await fillLeagueTeamRoster(tx, leagueId, registration));
-  }
-  if (emptyRegistrations.length > 0) {
-    const refilled = await tx.v1TournamentRegistration.findMany({
-      where: { id: { in: emptyRegistrations.map((row) => row.id) } },
-      select: { id: true, players: playerSelect },
-    });
-    const refilledById = new Map(refilled.map((row) => [row.id, row.players]));
-    for (const registration of emptyRegistrations) {
-      registration.players = refilledById.get(registration.id) ?? registration.players;
-    }
-  }
-  if (fillOutcomes.length > 0) {
-    // 크론이 자동 채움을 알리는 것과 같은 이유 — 대진 생성이 먼저 채우면 그 등록은
-    // 크론의 `players: { none: {} }` 대상에서도 빠지니, 여기서 안 알리면 팀장은 영영
-    // 통보를 못 받는다(`league-roster-autofill.ts` 참고).
-    const league = await findTournamentOnSurfaceOrThrow(tx, ['regular_league'], {
-      where: { id: leagueId },
-      select: { title: true },
-    });
-    await notifyLeagueRosterFillOutcomes(tx, { id: leagueId, title: league.title }, fillOutcomes);
-  }
-
   const playersByTeam = new Map(registrations.map((row) => [row.teamId, row.players]));
   return new Map(
     teams.map((team) => [team.id, { ...team, registeredPlayers: playersByTeam.get(team.id) ?? [] }]),

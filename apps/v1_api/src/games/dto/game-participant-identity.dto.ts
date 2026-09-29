@@ -5,7 +5,7 @@ import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from 'clas
  * Task 14: every mutation on the identity-link/consent surface is a game-scoped
  * command, mirroring the `clientCommandId` == `Idempotency-Key` header contract
  * that every other `/games/:gameId/...` mutation in this module already enforces
- * (see SaveGameLineupDto/AppendGameEventDto). The frozen REST ledger's literal
+ * (see AppendGameEventDto). The frozen REST ledger's literal
  * request-body column omits `clientCommandId` for these five endpoints, but the
  * shipped Task 6 implementation applies the header/body match universally via
  * `assertGameCommandContext`, so this DTO family follows that established,

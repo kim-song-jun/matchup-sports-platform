@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import {
@@ -37,6 +37,23 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminAddPlayer: vi.fn(),
   useV1AdminRemovePlayer: vi.fn(),
   useV1AdminRosterEligibleMembers: vi.fn(),
+}));
+
+// 펼침 안의 표는 자기 테스트가 있다(admin-registration-game-rosters.test.tsx) — 여기선 어느 신청에 무엇을 넘기는지만 본다.
+vi.mock('@/components/game-roster/admin-registration-game-rosters', () => ({
+  AdminRegistrationGameRosters: (props: {
+    registrationId: string;
+    teamName: string;
+    correctionHref: string;
+    onDirtyChange?: (dirty: boolean) => void;
+  }) => (
+    <div data-testid="game-rosters-panel" data-registration-id={props.registrationId} data-correction-href={props.correctionHref}>
+      {props.teamName}
+      <button type="button" onClick={() => props.onDirtyChange?.(true)}>
+        칸 바꾸기
+      </button>
+    </div>
+  ),
 }));
 
 const useV1AdminTournamentRegistrationsMock = vi.mocked(useV1AdminTournamentRegistrations);
@@ -441,5 +458,130 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     arrange({ rosterAutoConfirmedAt: null });
     render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
     expect(screen.queryByText(/자동 확정/)).not.toBeInTheDocument();
+  });
+});
+
+describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
+  const showToast = vi.fn();
+
+  afterEach(() => vi.clearAllMocks());
+
+  function arrange(items: V1AdminTournamentRegistration[]) {
+    for (const hook of [
+      useV1ConfirmPaymentMock,
+      useV1ConfirmRegistrationMock,
+      useV1CancelRegistrationAdminMock,
+      useV1RejectCancelRequestMock,
+      useV1RosterLockMock,
+      useV1RosterUnlockMock,
+      useV1ExportRosterCsvMock,
+      useV1RosterDeadlineOverrideGrantMock,
+      useV1RosterDeadlineOverrideRevokeMock,
+      useV1UpdatePlayerEligibilityMock,
+      useV1AdminAddPlayerMock,
+      useV1AdminRemovePlayerMock,
+    ] as const) {
+      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue(noopMutationHook());
+    }
+    useV1AdminTournamentPlayersMock.mockReturnValue({
+      data: { players: [], belowMinimum: false },
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: { items },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+  }
+
+  it('확정 신청에만 버튼이 있고, 한 번에 한 팀만 펼치며 리그도 같은 결과 정정 경로를 넘긴다', () => {
+    arrange([
+      baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
+      baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
+      baseRegistration({ id: 'reg-3', teamId: 'team-3', teamName: '대기 FC', status: 'awaiting_payment', confirmedAt: null }),
+    ]);
+    render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
+
+    const toggles = screen.getAllByRole('button', { name: '경기별 명단' });
+    expect(toggles).toHaveLength(2);
+    expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(toggles[0]);
+    const panel = screen.getByTestId('game-rosters-panel');
+    expect(panel).toHaveAttribute('data-registration-id', 'reg-1');
+    expect(panel).toHaveAttribute('data-correction-href', '/admin/live/league-1/records/corrections');
+    expect(screen.getByRole('button', { name: '경기별 명단 접기' })).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+    expect(screen.getAllByTestId('game-rosters-panel')).toHaveLength(1);
+    expect(screen.getByTestId('game-rosters-panel')).toHaveAttribute('data-registration-id', 'reg-2');
+
+    fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
+    expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '경기별 명단' })).toHaveLength(2);
+  });
+
+  describe('저장 전 칸 변경이 있으면 펼침을 닫기 전에 묻는다', () => {
+    function arrangeDirty() {
+      arrange([
+        baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
+        baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
+      ]);
+      render(
+        <>
+          <RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />
+          <a href="/admin/tournaments/tournament-1/bracket">대진 탭</a>
+        </>,
+      );
+      fireEvent.click(screen.getAllByRole('button', { name: '경기별 명단' })[0]);
+      fireEvent.click(screen.getByRole('button', { name: '칸 바꾸기' }));
+    }
+
+    const panelId = () => screen.getByTestId('game-rosters-panel').getAttribute('data-registration-id');
+
+    it('다른 팀을 펼치려 하면 확인창 — "계속 편집"이면 그대로, "버리기"면 넘어간다', async () => {
+      arrangeDirty();
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      const dialog = await screen.findByRole('dialog', { name: '저장하지 않은 명단 변경이 있어요' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '계속 편집' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(panelId()).toBe('reg-1');
+
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '버리기' }));
+      await waitFor(() => expect(panelId()).toBe('reg-2'));
+    });
+
+    it('접기와 펼친 팀을 가리는 상태 필터도 먼저 묻는다', async () => {
+      arrangeDirty();
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '계속 편집' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(panelId()).toBe('reg-1');
+
+      fireEvent.click(screen.getByRole('button', { name: /입금 대기/ }));
+      expect(await screen.findByRole('dialog', { name: '저장하지 않은 명단 변경이 있어요' })).toBeInTheDocument();
+    });
+
+    it('다른 화면으로 가는 링크는 미저장 변경 보호가 막는다', async () => {
+      arrangeDirty();
+      fireEvent.click(screen.getByRole('link', { name: '대진 탭' }));
+      expect(await screen.findByRole('dialog', { name: '작성 중인 내용이 사라져요. 나갈까요?' })).toBeInTheDocument();
+    });
+
+    it('변경이 없으면 묻지 않고 바로 바꾼다', () => {
+      arrange([
+        baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
+        baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
+      ]);
+      render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+      fireEvent.click(screen.getAllByRole('button', { name: '경기별 명단' })[0]);
+      fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(panelId()).toBe('reg-2');
+    });
   });
 });

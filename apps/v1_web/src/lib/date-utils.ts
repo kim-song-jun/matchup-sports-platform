@@ -108,6 +108,24 @@ export function formatTournamentDateRangeShort(
   return `${start}~${end}`;
 }
 
+/** 칩처럼 아주 좁은 슬롯용: 'M/D'. KST 벽시계 고정. 없거나 invalid 이면 null. */
+export function formatKstMonthDaySlash(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return null;
+  return `${parts.month}/${parts.day}`;
+}
+
+/**
+ * 끝이 "미포함"인 기간(결장 기간 등)을 'M/D (요일)~M/D (요일)' 로. 끝 시각 1ms 전 날짜를
+ * 마지막 날로 보여 준다 — 자정 종료가 다음 날까지로 읽히지 않게.
+ */
+export function formatExclusiveEndRangeShort(startsAt: string, endsAt: string): string | null {
+  const end = Date.parse(endsAt);
+  if (Number.isNaN(end)) return null;
+  return formatTournamentDateRangeShort(startsAt, new Date(end - 1).toISOString());
+}
+
 /**
  * 목록/브래킷 슬롯용 짧은 날짜+시각: 'M/D (요일) HH:MM'
  * 경기 일정 목록 · 결선 대진표 카드처럼 한 줄에 날짜와 시각을 함께 보여줘야 하는

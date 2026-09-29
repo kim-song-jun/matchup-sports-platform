@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff } from 'lucide-react';
+import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
+import { AdminRegistrationGameRosters } from '@/components/game-roster/admin-registration-game-rosters';
 import { formatDate } from './tournament-admin-shared';
 import {
   ADMIN_CANCELLABLE,
@@ -379,7 +381,12 @@ export function RegistrationsTab({
   const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
+  // 경기별 명단 펼침(Task 179) — 한 번에 한 팀만 연다.
+  const [gameRostersRegistrationId, setGameRostersRegistrationId] = useState<string | null>(null);
+  // 펼친 표의 저장 전 칸 변경 — 펼침을 닫거나(다른 팀·접기·필터) 화면을 떠나면 사라진다.
+  const [gameRostersDirty, setGameRostersDirty] = useState(false);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
+  const { UnsavedChangesModal } = useUnsavedChangesGuard(gameRostersDirty);
   // 거부 사유 모달 — 대상이 있으면 열려 있다.
   const [cancelTarget, setCancelTarget] = useState<V1AdminTournamentRegistration | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -400,6 +407,33 @@ export function RegistrationsTab({
   }
   // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
   const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
+
+  /** 펼친 경기별 명단을 닫게 되는 조작 — 저장 전 변경이 있으면 버릴지 물은 뒤에만 한다. */
+  const closingGameRosters = (apply: () => void) => {
+    if (!gameRostersDirty) {
+      apply();
+      return;
+    }
+    void confirmDialog({
+      title: '저장하지 않은 명단 변경이 있어요',
+      message: '펼친 팀의 경기별 명단에서 바꾼 칸이 저장되지 않고 사라져요.',
+      confirmLabel: '버리기',
+      cancelLabel: '계속 편집',
+      tone: 'danger',
+    }).then((discard) => {
+      if (discard) apply();
+    });
+  };
+
+  const toggleGameRosters = (registrationId: string) =>
+    closingGameRosters(() => setGameRostersRegistrationId((current) => (current === registrationId ? null : registrationId)));
+
+  const changeStatusFilter = (next: string) => {
+    const expanded = registrations.find((r) => r.id === gameRostersRegistrationId);
+    const hidesExpanded = expanded !== undefined && next !== 'all' && expanded.status !== next;
+    if (hidesExpanded) closingGameRosters(() => setStatusFilter(next));
+    else setStatusFilter(next);
+  };
 
   const handleConfirmPayment = (reg: V1AdminTournamentRegistration) => {
     confirmPayment.mutate(
@@ -627,7 +661,7 @@ export function RegistrationsTab({
             <button
               key={opt.value}
               type="button"
-              onClick={() => setStatusFilter(opt.value)}
+              onClick={() => changeStatusFilter(opt.value)}
               aria-pressed={active}
               className={[
                 'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
@@ -760,6 +794,17 @@ export function RegistrationsTab({
         empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
         skeletonCards={8}
         minCardWidth="360px"
+        renderExpanded={(reg) =>
+          reg.status === 'confirmed' && gameRostersRegistrationId === reg.id ? (
+            <AdminRegistrationGameRosters
+              tournamentId={tournamentId}
+              registrationId={reg.id}
+              teamName={reg.teamName ?? reg.teamId}
+              correctionHref={`/admin/live/${encodeURIComponent(tournamentId)}/records/corrections`}
+              onDirtyChange={setGameRostersDirty}
+            />
+          ) : null
+        }
         renderActions={(reg) => {
           const isLocked = !!reg.rosterLockedAt;
           return (
@@ -867,6 +912,16 @@ export function RegistrationsTab({
                 label="명단 검토"
                 tone="gray"
               />
+              {/* 경기별 출전 명단 — 참가 명단이 경기 명단의 기준이 되는 확정 신청만. */}
+              {reg.status === 'confirmed' && (
+                <ActionButton
+                  onClick={() => toggleGameRosters(reg.id)}
+                  icon={<ListChecks size={13} />}
+                  label={gameRostersRegistrationId === reg.id ? '경기별 명단 접기' : '경기별 명단'}
+                  tone="gray"
+                  expanded={gameRostersRegistrationId === reg.id}
+                />
+              )}
               <ExportCsvButton registrationId={reg.id} showToast={showToast} />
               {canWrite && ADMIN_CANCELLABLE.has(reg.status) && (
                 <ActionButton
@@ -959,6 +1014,7 @@ export function RegistrationsTab({
 
       {/* 신청 관리 confirm modal (취소·취소거부·참가확정·일괄처리 공용) */}
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }

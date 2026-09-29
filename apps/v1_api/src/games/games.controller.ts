@@ -22,7 +22,7 @@ import {
   ListGameEventsQueryDto,
   ReverseGameEventDto,
 } from './dto/game-event.dto';
-import { SaveGameLineupDto, SetParticipantArrivalDto, SubmitGameLineupDto } from './dto/game-lineup.dto';
+import { SetParticipantArrivalDto } from './dto/game-lineup.dto';
 import {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
@@ -179,28 +179,17 @@ export class GamesController {
     return this.gamesService.listOperationsLineups(user, gameId);
   }
 
+  /** 더 이상 쓰지 않는 라인업 쓰기 경로 — 409 로 조정 API 를 안내한다(`GamesService.rejectLineupWrite`). */
   @Put(':gameId/lineups/:sideId')
   @UseGuards(V1AuthGuard)
-  saveLineup(
-    @CurrentUser() user: V1AuthUser,
-    @Param('gameId') gameId: string,
-    @Param('sideId') sideId: string,
-    @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() dto: SaveGameLineupDto,
-  ) {
-    return this.gamesService.saveLineup(user, gameId, sideId, idempotencyKey, dto);
+  saveLineup(@CurrentUser() user: V1AuthUser, @Param('gameId') gameId: string) {
+    return this.gamesService.rejectLineupWrite(user, gameId);
   }
 
   @Post(':gameId/lineups/:lineupId/submit')
   @UseGuards(V1AuthGuard)
-  submitLineup(
-    @CurrentUser() user: V1AuthUser,
-    @Param('gameId') gameId: string,
-    @Param('lineupId') lineupId: string,
-    @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() dto: SubmitGameLineupDto,
-  ) {
-    return this.gamesService.submitLineup(user, gameId, lineupId, idempotencyKey, dto);
+  submitLineup(@CurrentUser() user: V1AuthUser, @Param('gameId') gameId: string) {
+    return this.gamesService.rejectLineupWrite(user, gameId);
   }
 
   /**

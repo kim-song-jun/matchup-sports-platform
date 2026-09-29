@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -35,8 +34,6 @@ import type {
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { persistCanonicalGameAggregate } from './game-source-aggregate';
-import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
-import { leagueFixtureListOrder, leagueFixtureListWhere } from '../league-matches/league-fixture-list-source';
 import { completeTeamMatchAtResultBoundary } from './team-match-result-boundary';
 import {
   parseLineupCatalog,
@@ -44,7 +41,6 @@ import {
   parsePeriodDurations,
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
-import { findRejectedLineupPosition, rejectedLineupPositionMessage } from './core/lineup-position';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import {
   areLatestTeamMatchLineupsSubmitted,
@@ -106,6 +102,7 @@ import {
   hydrateFriendlyTeamMatchResultParticipants as mergeFriendlyTeamMatchResultParticipants,
 } from './core/friendly-team-match-result-participants';
 import type {
+  GameActorRole,
   GameActorScope,
   GameCommandContext,
   GameCreationResult,
@@ -124,10 +121,6 @@ import type {
   AssignGoalAssistDto,
   ReverseGameEventDto,
 } from './dto/game-event.dto';
-import type {
-  SaveGameLineupDto,
-  SubmitGameLineupDto,
-} from './dto/game-lineup.dto';
 import type {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
@@ -347,9 +340,6 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     // everywhere it's checked (resolveActor, decideTournamentStaffAccess).
     case 'event_assist_assign':
       return 'event_reverse';
-    case 'lineup_save':
-    case 'lineup_submit':
-      return 'lineup_mutate';
     case 'result_revision_create':
     case 'result_revision_submit':
       return 'team_result_submit';
@@ -508,39 +498,6 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
  * by `lineupId` without re-sorting -- the caller (`listLineups`) already
  * requested rows in the order this function must preserve per bucket.
  */
-/**
- * 라인업 편집용 등록 명단을 어느 등록(registration)에서 읽을지 정한다 — 그리고 애초에
- * 읽어도 되는지도 함께 정한다.
- *
- * 참가팀 매니저·오너는 **자기 팀 사이드만** 볼 수 있다. 이걸 놓치면 상대팀 선수 실명을
- * 그대로 넘겨주는 PII 유출이 된다(라인업을 짜려면 이름이 필요해 응답에 실명이 들어간다).
- * 대회 스태프는 양 팀을 대신 짤 수 있어야 해서 이 제한을 받지 않는다 — saveLineup의
- * sideId 가드(이 파일)와 정확히 같은 판단 기준이다.
- *
- * DB를 건드리지 않는 순수 판정이라 단독으로 테스트한다(games.service.spec.ts).
- */
-export function resolveLineupRosterRegistration(params: {
-  actorRole: string;
-  actorTeamId: string | null;
-  sideTeamId: string | null;
-  homeRegistration: { id: string; teamId: string } | null;
-  awayRegistration: { id: string; teamId: string } | null;
-}): { registrationId: string } | { denied: 'forbidden' | 'registration_not_found' } {
-  const isTeamActor = isTeamScopedActorRole(params.actorRole);
-  if (isTeamActor && params.actorTeamId !== params.sideTeamId) {
-    return { denied: 'forbidden' };
-  }
-  const registration =
-    params.homeRegistration?.teamId === params.sideTeamId
-      ? params.homeRegistration
-      : params.awayRegistration?.teamId === params.sideTeamId
-        ? params.awayRegistration
-        : null;
-  // 사이드는 있는데 대회 등록이 없다 — 등록이 취소돼 fixture에서 떨어져 나간 경우다.
-  // 빈 명단으로 돌려주면 "선수가 아직 없네"로 오해되므로 명시적으로 구분한다.
-  return registration === null ? { denied: 'registration_not_found' } : { registrationId: registration.id };
-}
-
 /**
  * 사이드별 **최신** 라인업 상태만 남긴다. 라인업은 저장할 때마다 revision이 올라가며
  * 행이 쌓이므로, 정렬을 믿지 않고 revision을 직접 비교해 고른다 — 옛 리비전이 남으면
@@ -746,25 +703,6 @@ function parseKickCount(raw: unknown, key: 'takenHome' | 'takenAway'): number | 
 }
 
 /**
- * 2026-08-11 알파 실측: 대회 스태프(감독/현장 담당/조회 전용)가 라인업을
- * `저장`(saveLineup, takeoverToken 불요구)까지는 통과시키고 `제출`
- * (submitLineup)에서만 인계 토큰을 요구해, 라인업 화면(lineup-client.tsx)이
- * 토큰을 얻지도 보내지도 않는 탓에 구조적으로 제출이 불가능했다
- * (TAKEOVER_TOKEN_EXPIRED). 오너 결정: "경기가 아직 시작되지 않았으면
- * (SCHEDULED) 스태프도 토큰 없이 제출할 수 있다 — 라이브 중(피리어드가 시작된
- * 이후)에는 두 운영자가 라인업을 놓고 충돌하는 걸 막기 위해 기존대로 토큰을
- * 요구한다." `game.state`를 그 판정 기준으로 재사용한다: executeCommand의
- * 'start' 커맨드가 SCHEDULED→LIVE로 전이시키는 바로 그 트랜잭션에서
- * V1GamePeriod도 함께 LIVE로 전환하므로(advancePeriod, 이 파일의
- * executeCommand 본문 참고) game.state는 이미 "피리어드가 시작됐는가"의 단일
- * 진실 소스다 — 새 판정을 만들지 않는다. 팀 매니저/오너는 이 함수가 관여하지
- * 않는 상위 조건(actorIsStaff)에서 이미 항상 면제이므로 그대로 둔다.
- */
-export function staffLineupSubmitRequiresTakeover(gameState: V1GameState): boolean {
-  return gameState !== V1GameState.SCHEDULED;
-}
-
-/**
  * 이슈 #375 — `executeCommand`의 command 문자열을 idempotency/audit
  * (`writeAudit`, `withCommand`)이 쓰는 `action` 문자열로 매핑한다. 구
  * `next-period`가 이미 하이픈이 아니라 언더스코어(`game_next_period`)로
@@ -793,8 +731,8 @@ export function gameCommandAuditAction(
 
 /**
  * 신원 연결(identity link) 3종 헬퍼는 `GamesService`의 private 메서드였다가 모듈 레벨
- * 함수로 올라왔다 — 팀매치 전용 라인업 서비스(`team-match-lineup.service.ts`)가
- * `GamesService.saveLineup`을 지나지 않고 자기 참가자 행을 직접 쓰는데, 그쪽에서도
+ * 함수로 올라왔다 — 팀매치 라인업 서비스(`team-match-lineup.service.ts`)와 경기 명단 동기화
+ * (`roster/game-roster-sync.ts`)가 자기 참가자 행을 직접 쓰는데, 그쪽에서도
  * **똑같은** ROSTER_ASSERTED 연결을 만들어야 하기 때문이다. 계약(중복 연결 조기 반환,
  * eventVersion 채번, 트리거 오류 매핑)을 복제하면 반드시 갈라지므로 구현은 하나로 둔다.
  * `this`를 쓰지 않는 순수 tx 함수라 클래스 밖으로 옮기는 데 다른 제약은 없다.
@@ -838,9 +776,9 @@ async function appendIdentityEvent(
           // `system_actor` 는 TEXT 컬럼이고 트리거가 값을 검사하는 것은 EXPIRED 뿐이라
           // (20260729000100 migration 의 v1_guard_identity_event) 스키마 변경이 필요 없다.
           | 'LINEUP_REVISION_COPY'
-          // 리그 참가 명단이 바뀌어 시작 전 경기 명단을 다시 맞출 때(league-roster-sync.ts).
+          // 시작 전 리그 경기 명단을 다시 계산할 때(games/roster/game-roster-sync.ts).
           | 'LEAGUE_ROSTER_SYNC'
-          // 대회 참가 명단이 바뀌어 시작 전 대진 경기 명단을 다시 맞출 때(tournament-roster-sync.ts).
+          // 시작 전 대회 경기 명단을 다시 계산할 때(games/roster/game-roster-sync.ts).
           | 'TOURNAMENT_ROSTER_SYNC'
           // 친선 팀 매치의 상대팀 신청이 승인되어 그 팀의 초기 라인업 스냅샷이
           // 자동 생성될 때(team-matches.service.ts hydrateApprovedAwaySnapshot).
@@ -1047,29 +985,6 @@ export class GamesService {
 
   /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
   private readonly pushLogger = new Logger(`${GamesService.name}:push`);
-  /**
-   * **`started` 삭제 조건을 측정하는 로거(#33).**
-   *
-   * 그 필드는 저장 경로에서 **무시되지만** DTO 에서 지우면 안 된다 — `ValidationPipe` 가
-   * `forbidNonWhitelisted: true` 라 모르는 속성을 조용히 떼는 게 아니라 **400 을 던진다.**
-   * 즉 지우는 순간 아직 그 값을 보내는 옛 클라이언트(번들 web 자산을 든 설치본 포함)의
-   * 라인업/결과 저장이 통째로 막힌다.
-   *
-   * DTO 주석이 삭제 조건을 "프론트 갱신 + alpha 미전송 확인" 으로 적어 뒀는데 **두 번째는
-   * 코드로 못 닫는다.** 그래서 실제로 실려 오면 여기서 남긴다 — 이 로그가 일정 기간
-   * 0건이면 그때가 지울 때다. **동작은 하나도 바뀌지 않는다(값은 여전히 무시된다).**
-   */
-  private readonly legacyFieldLogger = new Logger(`${GamesService.name}:legacy-field`);
-
-  /** 무시되는 `started` 가 실제로 실려 왔는지만 센다. 값 자체는 쓰지 않는다. */
-  private countLegacyStarted(where: string, participants: ReadonlyArray<{ started?: boolean }>): void {
-    const sent = participants.filter((participant) => participant.started !== undefined).length;
-    if (sent === 0) return;
-    this.legacyFieldLogger.warn(
-      `${where}: 'started' 가 ${sent}건 실려 왔다 — 이 값은 무시된다. #33 삭제 조건 측정용.`,
-    );
-  }
-
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
     input: GameSourceCreationInput,
@@ -2661,579 +2576,70 @@ export class GamesService {
     // lineup_mutate 는 platform_ops · 라인업 권한을 가진 대회 스태프 · 이 fixture 참가팀의
     // 매니저/오너를 통과시킨다 — 명단 검인을 할 수 있어야 하는 사람과 정확히 같은 집합이다.
     const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
-    const participant = await this.prisma.v1GameParticipant.findFirst({
-      where: { id: participantId, gameId },
-      select: { id: true, sideId: true, arrivedAt: true },
-    });
-    if (participant === null) {
-      throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
-    }
-    // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
-    // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
-    if (actor.role === 'team_manager' || actor.role === 'team_owner') {
-      const side = await this.prisma.v1GameSide.findFirst({
-        where: { id: participant.sideId, gameId },
-        select: { teamId: true },
+    return this.prisma.$transaction(async (tx) => {
+      // 명단 재계산이 경기 행을 FOR UPDATE 로 잡고 새 리비전을 쓴다 — 같은 행을 잡아 그 앞이나 뒤에만 판정한다.
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR SHARE`;
+      const participant = await tx.v1GameParticipant.findFirst({
+        where: { id: participantId, gameId },
+        select: { id: true, sideId: true, lineupId: true, arrivedAt: true },
       });
-      if (side === null || actor.teamId !== side.teamId) {
-        throw this.forbidden();
+      if (participant === null) {
+        throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
       }
-    }
-    const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
-    // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
-    // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
-    return this.prisma.v1GameParticipant.update({
-      where: { id: participant.id },
-      data: { arrivedAt },
-      select: { id: true, sideId: true, arrivedAt: true },
-    });
-  }
-
-  async saveLineup(
-    user: V1AuthUser,
-    gameId: string,
-    sideId: string,
-    headerIdempotencyKey: string | undefined,
-    dto: SaveGameLineupDto,
-  ) {
-    this.countLegacyStarted('saveLineup', dto.participants ?? []);
-    return this.withCommand(
-      {
-        gameId,
-        action: 'lineup_save',
-        actor: await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate'),
-        expectedVersion: dto.expectedVersion,
-        versionScope: 'lineup',
-        headerIdempotencyKey,
-        bodyCommandId: dto.clientCommandId,
-        payload: { sideId, ...dto },
-      },
-      async (tx, game, context) => {
-        const teamMatchCompetition =
-          game.sourceType === V1GameSourceType.TEAM_MATCH
-            ? await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)
-            : null;
-        if (game.sourceType === V1GameSourceType.TEAM_MATCH && teamMatchCompetition === null) {
-          throw new ConflictException({
-            code: 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN',
-            message: 'Friendly team matches manage lineups through their team-match route.',
-          });
-        }
-        if (
-          teamMatchCompetition !== null &&
-          (teamMatchCompetition.status === V1TeamMatchStatus.completed ||
-            teamMatchCompetition.status === V1TeamMatchStatus.cancelled ||
-            teamMatchCompetition.status === V1TeamMatchStatus.archived)
-        ) {
-          throw new ConflictException({
-            code: 'LINEUP_DEADLINE_PASSED',
-            message: '종료되거나 취소된 경기에는 라인업을 수정할 수 없어요.',
-          });
-        }
-        // Issue #378: this route had NO deadline gate at all — a director/manager
-        // could overwrite a tournament-fixture lineup (DRAFT or SUBMITTED) after
-        // kickoff by calling the API directly, even though the frontend hid the
-        // save UI once SUBMITTED. `game.state` is already this codebase's single
-        // source of truth for "has the game started" — see
-        // `staffLineupSubmitRequiresTakeover` above, which reuses the exact same
-        // SCHEDULED→LIVE transition (advancePeriod in executeCommand's 'start'
-        // command) for the same question. Reject anything past SCHEDULED:
-        // LIVE/PAUSED/ENDED obviously must not accept new rosters, and CANCELLED
-        // is included too — a cancelled fixture has no upcoming kickoff to staff
-        // a lineup for, so there is nothing left to save. Mirrors the sibling
-        // team-match path's `LINEUP_DEADLINE_PASSED` gate
-        // (team-match-lineup.service.ts saveLineup) — same code, same shape,
-        // reworded because the fixture path has no wall-clock startAt deadline
-        // and no opponent-correction-request reopen flow to point the caller at.
-        if (game.state !== V1GameState.SCHEDULED) {
-          throw new ConflictException({
-            code: 'LINEUP_DEADLINE_PASSED',
-            message: '경기 시작 이후에는 라인업을 직접 수정할 수 없어요.',
-          });
-        }
-        const side = await tx.v1GameSide.findFirst({ where: { id: sideId, gameId } });
-        if (side === null) {
-          throw this.notFound('GAME_SIDE_NOT_FOUND');
-        }
-        // 참가팀 액터(team_manager/team_owner)는 자기 팀 사이드만 쓸 수 있다 — 스태프/
-        // platform_ops는 sideId 제한 없이 어느 팀 라인업이든 대신 입력할 수 있어야 하므로
-        // 팀 액터일 때만 검사한다.
-        if (
-          context.actor.actorType === 'USER' &&
-          (context.actor.role === 'team_manager' || context.actor.role === 'team_owner') &&
-          context.actor.teamId !== side.teamId
-        ) {
+      // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
+      // 스태프/platform_ops 는 어느 쪽이든 검인해야 하므로 팀 액터일 때만 검사한다.
+      if (actor.role === 'team_manager' || actor.role === 'team_owner') {
+        const side = await tx.v1GameSide.findFirst({
+          where: { id: participant.sideId, gameId },
+          select: { teamId: true },
+        });
+        if (side === null || actor.teamId !== side.teamId) {
           throw this.forbidden();
         }
-        const previous = await tx.v1GameLineup.findFirst({
-          where: { gameId, sideId },
-          orderBy: { revision: 'desc' },
+      }
+      const lineups = await tx.v1GameLineup.findMany({
+        where: { gameId, sideId: participant.sideId, invalidatedAt: null },
+        select: { id: true, sideId: true, revision: true, state: true },
+      });
+      // 검인 패널은 이 셀렉터가 고른 리비전만 보여 준다. 대체된 리비전 행에 쓰면 200 인데 검인이 안 보인다.
+      if (selectLineupParticipantsWithDraftFallback([participant], lineups).length === 0) {
+        throw new ConflictException({
+          code: 'GAME_PARTICIPANT_SUPERSEDED',
+          message: '명단이 방금 바뀌었어요. 새로 불러온 명단에서 다시 검인해 주세요.',
+          details: { participantId },
         });
-        const currentLineupRevision = previous?.revision ?? 0;
-        if (dto.expectedVersion !== currentLineupRevision) {
-          throw new ConflictException({
-            code: 'VERSION_CONFLICT',
-            message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-            details: { expectedVersion: dto.expectedVersion, currentVersion: currentLineupRevision },
-          });
-        }
-        // Task 163 — 여기서 **선발 인원·골키퍼를 검증하지 않는다.**
-        //
-        // 이 게이트는 명단 제출이 곧 선발 결정이던 시절의 것이다. 정본 §3 이 선발/후보
-        // 구분 자체를 없앴으므로 제출 시점에 셀 "선발" 이라는 개념이 없다 — 명단에
-        // 있으면 뛴 것이고, `dto.participants[].started` 는 무시된다.
-        //
-        // 인원이 규칙에 안 맞아도 경기는 시작되고 **운영 콘솔에서 조정한다**(사용자 확정).
-        // 인원 규칙을 강제하던 자리가 통째로 사라지는 것이므로, 되살리려면 그 결정부터
-        // 뒤집어야 한다.
-        // **빈 명단은 막는다.** 인원 min~max 게이트를 없앤 것과 다른 문제다 — 이건
-        // 선발 규칙이 아니라 **데이터 손실 가드**다: 아래 재사용 경로는 이번 저장에서
-        // 짝을 못 찾은 기존 행을 "명단에서 빠진 사람" 으로 보고 지우므로, 빈 배열로
-        // 저장하면 그 사이드의 참가자 행이 검인 기록까지 통째로 사라진다.
-        if (dto.participants.length === 0) {
-          throw new BadRequestException({
-            code: 'LINEUP_EMPTY',
-            message: '명단에 최소 한 명은 있어야 해요.',
-          });
-        }
-
-        // 지운 센티널이 **입력으로 되돌아오는 것**을 막는다. `position` 은 클라이언트가
-        // 보내는 자유 문자열이라, 마이그레이션이 정리한 'BENCH' 가 다음 저장 요청으로
-        // 그대로 다시 들어올 수 있다. 'BENCH' 만 막으면 '벤치'·'sub'·오타는 그대로
-        // 들어오므로 **카탈로그에 있는 값만** 통과시킨다(근거는 core/lineup-position.ts).
-        const lineupConfig = await tx.v1CompetitionConfigVersion.findUnique({
-          where: { id: game.competitionConfigVersionId },
-          select: { lineup: true },
-        });
-        const rejectedPosition = findRejectedLineupPosition(
-          dto.participants.map((participant) => participant.position),
-          parseLineupCatalog(lineupConfig?.lineup ?? null).positions.map((position) => position.code),
-        );
-        if (rejectedPosition !== null) {
-          throw new BadRequestException({
-            code: 'LINEUP_POSITION_INVALID',
-            message: rejectedLineupPositionMessage(rejectedPosition),
-          });
-        }
-
-        // 라인업에 실려 온 계정(userId) 검증. 이 값이 저장되면 아래에서 신원 연결이
-        // 자동으로 생기므로, 아무 계정이나 남의 경기 기록에 붙지 않게 여기서 막는다.
-        //
-        // 인정 근거는 두 가지이고 **둘 중 하나면 통과**한다:
-        //  ① 이 사이드 팀의 active 멤버
-        //  ② 이 경기의 참가 등록 명단(V1TournamentPlayer)에 살아 있는 선수
-        // ②가 필요한 이유: 대회 라인업 화면은 팀 멤버십이 아니라 **등록 명단**을
-        // 출처로 삼는다(resolveFixtureLineupRoster). 등록 이후 팀을 떠났거나 애초에
-        // 멤버십 없이 명단에만 오른 선수가 있을 수 있어서, 멤버십만 요구하면 정상적인
-        // 라인업 저장이 422로 막힌다. 반대로 명단에도 팀에도 없는 계정은 여전히 거부된다.
-        // 같은 요청 안에서 같은 계정이 두 번 오면(선발+후보 중복 지정 등) 별도 코드로 거부.
-        const seenLineupUserIds = new Set<string>();
-        const rosterUserIds = new Set<string>();
-        if (dto.participants.some((participant) => participant.userId !== undefined)) {
-          // resolveFixtureLineupRoster 와 같은 경로로 이 사이드의 등록을 찾는다 --
-          // 라인업 화면이 명단을 읽어 오는 출처와 검증의 출처가 갈리면, 화면에 뜬
-          // 선수를 저장할 수 없는 상황이 생긴다.
-          const registrationId = [
-            teamMatchCompetition?.homeRegistration,
-            teamMatchCompetition?.awayRegistration,
-          ].find(
-            (registration) => registration != null && registration.teamId === side.teamId,
-          )?.id;
-          if (registrationId !== undefined) {
-            const rosterPlayers = await tx.v1TournamentPlayer.findMany({
-              where: { registrationId, removedAt: null },
-              select: { userId: true },
-            });
-            for (const player of rosterPlayers) rosterUserIds.add(player.userId);
-          }
-        }
-        for (const participant of dto.participants) {
-          if (participant.userId === undefined) continue;
-          if (seenLineupUserIds.has(participant.userId)) {
-            throw new UnprocessableEntityException({
-              code: 'LINEUP_DUPLICATE_USER',
-              message: '같은 선수를 라인업에 두 번 넣을 수 없어요.',
-            });
-          }
-          seenLineupUserIds.add(participant.userId);
-          if (rosterUserIds.has(participant.userId)) continue;
-          const membership =
-            side.teamId === null
-              ? null
-              : await tx.v1TeamMembership.findFirst({
-                  where: { teamId: side.teamId, userId: participant.userId, status: 'active' },
-                });
-          if (membership === null) {
-            throw new UnprocessableEntityException({
-              code: 'LINEUP_USER_NOT_TEAM_MEMBER',
-              message: '참가 명단에 있거나 이 팀에서 활동 중인 선수만 라인업에 연결할 수 있어요.',
-            });
-          }
-        }
-        // [P1-b] 대회 경기는 참가자 행을 **재사용**한다 -- 저장할 때마다 새로 만들지 않는다.
-        //
-        // 예전에는 저장 한 번에 새 라인업 리비전 + 새 참가자 행 한 벌이 통째로 생겼다.
-        // 그런데 participant 행에는 그 행에만 붙는 것들이 매달려 있다:
-        //  ① `arrivedAt` -- 현장 명단 검인(1차 대회 회고의 "안 온 사람 확인이 어려움").
-        //  ② `V1GameResultParticipant.participantId` -- 공식 기록의 개인 귀속.
-        //  ③ `V1ParticipantIdentityLink*.participantId` -- 개인 기록 공개의 출발점.
-        // 즉 명단을 한 번 더 저장하는 것만으로 검인이 사라지고 신원 연결이 고아가 됐다.
-        //
-        // **왜 "새 리비전을 안 만든다"가 아니라 "새 행을 안 만든다"인가**: 리비전 번호는
-        // 이 경로의 유일한 낙관적 잠금이다(`dto.expectedVersion !== currentLineupRevision`
-        // 위 2574, 그리고 제출 경로 2788). 클라이언트도 그 전제로 짜여 있다
-        // (fixture-lineup.view-model.ts:146/336). 번호를 고정하면 그 가드 둘이 **살아는
-        // 있고 아무것도 못 잡는** 상태가 된다 -- 있는 줄 알고 안심하게 되므로 더 나쁘다.
-        // 그래서 DRAFT 라인업 **행 하나를 재사용하면서 revision 은 그대로 올린다**:
-        // 참가자는 같은 행에 고정되고, 잠금은 실효를 유지하고, 클라이언트는 안 바뀐다.
-        //
-        // 제출본(SUBMITTED/LOCKED) 위에는 그대로 **새 행**을 만든다 -- 엄격 셀렉터
-        // (selectLineupParticipantsWithDraftFallback)가 제출본을 계속 집어내야 공식 결과와 신원 연결
-        // 후보가 비지 않는다. 그 경로에서는 대신 `arrivedAt` 을 이월한다(아래).
-        //
-        // 범위는 canonical tournament TeamMatch 한정이다. 친선 및 아직 승격되지
-        // 않은 source enum은 source 생성/권한 경계에서 거부되므로 태우지 않는다.
-        const reusesDraftRow =
-          teamMatchCompetition !== null &&
-          previous !== null &&
-          previous.state === V1GameLineupState.DRAFT;
-        // 재사용 경로든 이월 경로든 직전 행의 참가자를 신원으로 대조해야 한다.
-        const priorParticipants =
-          teamMatchCompetition !== null && previous !== null
-            ? await tx.v1GameParticipant.findMany({
-                where: { gameId, sideId, lineupId: previous.id },
-                // **정렬은 필수다.** 아래에서 같은 키의 행을 `shift()` 로 1:1 소진하는데,
-                // 동명 게스트 둘(둘 다 userId=null, 둘 다 "김철수")은 **같은 버킷**에 들어간다.
-                // `ORDER BY` 없는 SELECT 의 순서는 Postgres 가 보장하지 않으므로, 정렬이
-                // 없으면 어느 쪽이 먼저 소진되는지가 DB 반환 순서에 좌우된다 -- 저장할 때마다
-                // `arrivedAt` 이월 대상과 재사용되는 행이 뒤바뀔 수 있다(검인이 옆 사람에게
-                // 옮겨 붙는데 재현은 불규칙하다).
-                //
-                // `id` 를 tie-breaker 로 붙이는 이유: 같은 트랜잭션에서 만들어진 행들은
-                // `createdAt` 이 동일할 수 있어 그것만으로는 다시 비결정적이 된다.
-                orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-              })
-            : [];
-        // 매칭 키: 계정이 있으면 계정, 게스트는 이름이 유일한 신원이다(V1TeamTacticsBoardEntry
-        // 와 같은 규칙). 이름 대조를 게스트로 한정하는 이유는 전술보드에서와 같다 -- 연동
-        // 팀원까지 이름으로 묶으면 동명이인이 조용히 한 사람으로 합쳐진다.
-        const priorByKey = new Map<string, (typeof priorParticipants)[number][]>();
-        for (const row of priorParticipants) {
-          const key = row.userId !== null ? `u:${row.userId}` : `g:${row.displayNameSnapshot}`;
-          const bucket = priorByKey.get(key);
-          if (bucket === undefined) priorByKey.set(key, [row]);
-          else bucket.push(row);
-        }
-        // 같은 키가 여러 행이면(동명 게스트) 먼저 온 것부터 1:1 로 소진한다.
-        const takePrior = (participant: SaveGameLineupDto['participants'][number]) => {
-          const key =
-            participant.userId !== undefined
-              ? `u:${participant.userId}`
-              : `g:${participant.displayNameSnapshot}`;
-          return priorByKey.get(key)?.shift();
-        };
-
-        let lineup: { id: string; revision: number };
-        if (reusesDraftRow && previous !== null) {
-          // 낙관적 잠금 2단: revision 은 **stale 클라이언트**(먼저 열고 나중에 저장)를,
-          // 이 CAS 는 **같은 순간 겹치는 트랜잭션**을 잡는다. 리비전만으로는 후자가 안
-          // 잡힌다 -- 둘 다 같은 previous 를 읽고 둘 다 통과해 한쪽이 조용히 덮인다.
-          // (`V1GameLineup.version` 은 컬럼만 있고 여태 아무도 안 쓰던 값이다.)
-          const swapped = await tx.v1GameLineup.updateMany({
-            where: { id: previous.id, version: previous.version },
-            data: {
-              revision: previous.revision + 1,
-              version: { increment: 1 },
-              formation: dto.formation,
-            },
-          });
-          if (swapped.count === 0) {
-            // `currentVersion` 에 `previous.revision` 을 넣으면 **항상 expectedVersion 과
-            // 같은 값**이 나간다 -- 위 2574 가드를 통과했다는 것이 곧 둘이 같다는 뜻이라
-            // 여기까지 온 시점에 그 둘은 정의상 일치한다. 그러면 두 값을 비교해 재조회
-            // 여부를 정하는 클라이언트는 409 를 받고도 "충돌 없음"으로 읽어, 무엇을 해야
-            // 할지 모르는 상태가 된다. 그래서 **실패 시점의 실제 최신 revision** 을 다시
-            // 읽어 내려준다.
-            //
-            // 같은 트랜잭션 안에서 다시 읽는 것이 stale 을 볼 것 같지만, 이 경로에서는
-            // 안전하다 -- 근거는 격리 수준이다:
-            //  · Postgres 기본값 **READ COMMITTED** 에서 트랜잭션 안의 *새 문장*은 다른
-            //    트랜잭션이 **커밋한** 변경을 본다.
-            //  · `updateMany` 가 `count === 0` 을 돌려줬다는 것은 상대가 **이미 커밋했다**는
-            //    뜻이다(커밋 전이었다면 행 잠금에 걸려 블록됐을 것이다).
-            //  · 따라서 이 재조회는 반드시 새 값을 본다.
-            //
-            // **전제를 명시한다: 이 처리는 READ COMMITTED 를 가정한다.** 격리 수준을
-            // REPEATABLE READ 이상으로 올리면 이 경로는 애초에 `count === 0` 이 아니라
-            // 직렬화 오류로 터지므로, 그때는 이 블록 자체를 다시 설계해야 한다.
-            const latest = await tx.v1GameLineup.findFirst({
-              where: { gameId, sideId },
-              orderBy: { revision: 'desc' },
-              select: { revision: true },
-            });
-            throw new ConflictException({
-              code: 'VERSION_CONFLICT',
-              message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-              details: { expectedVersion: dto.expectedVersion, currentVersion: latest?.revision ?? previous.revision },
-            });
-          }
-          lineup = { id: previous.id, revision: previous.revision + 1 };
-        } else {
-          lineup = await tx.v1GameLineup.create({
-            data: {
-              gameId,
-              sideId,
-              revision: (previous?.revision ?? 0) + 1,
-              supersedesId: previous?.id,
-              formation: dto.formation,
-            },
-          });
-        }
-
-        for (const participant of dto.participants) {
-          const prior = takePrior(participant);
-          // 재사용 경로에서는 **짝지어 update** 한다. deleteMany+createMany 로 갈아끼우면
-          // 행 id 가 바뀌어 위 ①②③ 이 똑같이 끊긴다 -- 그러면 이 작업을 한 이유가 없다.
-          const createdParticipant =
-            reusesDraftRow && prior !== undefined
-              ? await tx.v1GameParticipant.update({
-                  where: { id: prior.id },
-                  data: {
-                    userId: participant.userId ?? null,
-                    displayNameSnapshot: participant.displayNameSnapshot,
-                    jerseyNumber: participant.jerseyNumber,
-                    position: participant.position,
-                    positionX: participant.positionX,
-                    positionY: participant.positionY,
-                    // Task 163 — 명단에 있으면 뛴 것이다(정본 §3). 재사용 행에 옛
-                    // 클라이언트가 보낸 false 가 남지 않도록 **명시**한다.
-                    started: true,
-                  },
-                })
-              : await tx.v1GameParticipant.create({
-                  data: {
-                    gameId,
-                    sideId,
-                    lineupId: lineup.id,
-                    userId: participant.userId,
-                    displayNameSnapshot: participant.displayNameSnapshot,
-                    jerseyNumber: participant.jerseyNumber,
-                    position: participant.position,
-                    positionX: participant.positionX,
-                    positionY: participant.positionY,
-                    // Task 163 — 위 update 경로와 같은 이유. 스키마 기본값도 true 지만
-                    // **의도한 값**임을 남기려고 명시한다(기본값이 바뀌어도 뜻이 안 흔들린다).
-                    started: true,
-                    // 제출본 위에 새 리비전을 여는 경로: 검인은 킥오프 직전이라 제출
-                    // **뒤에** 일어나는 것이 정상이므로, 이월하지 않으면 뒤늦은 명단
-                    // 수정 한 번에 이미 받아둔 검인이 통째로 사라진다.
-                    arrivedAt: prior?.arrivedAt ?? null,
-                  },
-                });
-          if (participant.userId === undefined) continue;
-          // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
-          // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
-          // 번 더 확인한다(재시도 등으로 이 루프가 두 번 돌 가능성에 대비).
-          await createRosterAssertedIdentityLink(
-            tx,
-            createdParticipant.id,
-            participant.userId,
-            { actorType: 'USER', actorUserId: user.id },
-            'roster',
-          );
-        }
-        if (reusesDraftRow) {
-          // 이번 저장에서 짝을 못 찾고 남은 행 = 명단에서 빠진 사람. 재사용 경로는 행을
-          // 그대로 두면 다음 조회에 그 사람이 계속 실리므로 지운다.
-          //
-          // 여기서 지우는 것이 안전한 이유: 이 경로는 `game.state === SCHEDULED` 에서만
-          // 열린다(위 2549 `LINEUP_DEADLINE_PASSED`). 공식 결과 리비전은 경기가 끝나야
-          // 생기므로 이 시점에 `V1GameResultParticipant` 가 이 행을 가리킬 수 없다.
-          // 라인업에서 빠진 사람의 검인 기록이 함께 사라지는 것도 의도한 동작이다 --
-          // 그 사람은 더 이상 이 경기의 명단이 아니다.
-          //
-          // **신원 연결(identity link)은 같이 지우지 않는다.** 참가자를 만들 때
-          // `createRosterAssertedIdentityLink` 가 자동으로 붙으므로(위) 행을 지우면 링크가
-          // 고아로 남는다. 그래도 지우지 않는 이유는 두 가지다:
-          //  ① 무해하다 -- 링크 소비처를 전수로 확인했다.
-          //     · `games.service.ts:3075`·`:3130`, `league-claimable-fixtures.service.ts:144`
-          //       — `participantId IN (현재 참가자)` 로 조회한다. 고아는 애초에 안 나온다.
-          //     · `public-records/player-card-stats.ts:89` — `where: { userId }` 라 고아 링크를
-          //       **읽는다**. 동의 자격 조회(`loadParticipantConsentEligibility`)도
-          //       `v1ParticipantIdentityLinkCurrent` 기준이라 고아가 그대로 통과한다.
-          //       무해해지는 지점은 그 다음이다: `:110` 의 `V1GameResultParticipant`
-          //       조회가 **행을 0건 돌려준다**(SCHEDULED 경기라 결과 자체가 없다).
-          //       즉 집계에 0 으로 기여할 뿐 숫자를 왜곡하지 않는다.
-          //       (처음엔 "자격 조회에서 걸러진다"고 적었다가 코드를 보고 정정했다 --
-          //        걸러지는 곳이 다르다.)
-          //  ② 링크는 **감사 이벤트**다(`V1ParticipantIdentityLinkEvent` 는 append-only).
-          //     "누가 언제 이 사람을 이 경기에 올렸다가 뺐다"는 기록이라 지우는 쪽이 정보
-          //     손실이다.
-          // 이 분석을 여기 남기는 이유: 안 적으면 다음 사람이 "고아 링크가 생기는데
-          // 괜찮은가"를 처음부터 다시 조사한다.
-          const leftovers = [...priorByKey.values()].flat();
-          if (leftovers.length > 0) {
-            await tx.v1GameParticipant.deleteMany({
-              where: { id: { in: leftovers.map((row) => row.id) } },
-            });
-          }
-        }
-        const updated = await tx.v1Game.update({
-          where: { id: gameId },
-          data: { version: { increment: 1 } },
-        });
-        return {
-          gameId,
-          lineupId: lineup.id,
-          lineupRevision: lineup.revision,
-          state: updated.state,
-          version: updated.version,
-          durableCommandId: context.durableCommandId,
-          replayed: false,
-        };
-      },
-    );
+      }
+      const arrivedAt = arrived ? (participant.arrivedAt ?? new Date()) : null;
+      // 이미 같은 상태면 시각을 다시 쓰지 않는다 — 같은 사람을 두 번 눌러도 최초 확인 시각이
+      // 유지돼야 분쟁 시 근거가 된다(위 `?? new Date()` 가 그 역할).
+      return tx.v1GameParticipant.update({
+        where: { id: participant.id },
+        data: { arrivedAt },
+        select: { id: true, sideId: true, arrivedAt: true },
+      });
+    });
   }
 
-  async submitLineup(
-    user: V1AuthUser,
-    gameId: string,
-    lineupId: string,
-    headerIdempotencyKey: string | undefined,
-    dto: SubmitGameLineupDto,
-  ) {
-    return this.withCommand(
-      {
-        gameId,
-        action: 'lineup_submit',
-        actor: await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate'),
-        expectedVersion: dto.expectedVersion,
-        versionScope: 'lineup',
-        headerIdempotencyKey,
-        bodyCommandId: dto.clientCommandId,
-        takeoverToken: dto.takeoverToken,
-        payload: { lineupId, ...dto },
-      },
-      async (tx, game, context) => {
-        const teamMatchCompetition =
-          game.sourceType === V1GameSourceType.TEAM_MATCH
-            ? await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)
-            : null;
-        if (game.sourceType === V1GameSourceType.TEAM_MATCH && teamMatchCompetition === null) {
-          throw new ConflictException({
-            code: 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN',
-            message: 'Friendly team matches manage lineups through their team-match route.',
-          });
-        }
-        // Submission remains available during LIVE/PAUSED for an operator holding the
-        // takeover lease, but a terminal game must never accept a draft transition.
-        // The save path already applies the same deadline contract; keep submission
-        // aligned for ENDED/CANCELLED without blocking legitimate live substitutions.
-        if (game.state === V1GameState.ENDED || game.state === V1GameState.CANCELLED) {
-          throw new ConflictException({
-            code: 'LINEUP_DEADLINE_PASSED',
-            message: '종료되거나 취소된 경기에는 라인업을 제출할 수 없어요.',
-          });
-        }
-        if (
-          teamMatchCompetition !== null &&
-          (teamMatchCompetition.status === V1TeamMatchStatus.completed ||
-            teamMatchCompetition.status === V1TeamMatchStatus.cancelled ||
-            teamMatchCompetition.status === V1TeamMatchStatus.archived)
-        ) {
-          throw new ConflictException({
-            code: 'LINEUP_DEADLINE_PASSED',
-            message: '종료되거나 취소된 경기에는 라인업을 제출할 수 없어요.',
-          });
-        }
-        const actorIsStaff =
-          context.actor.actorType === 'USER' &&
-          (context.actor.role === 'platform_ops' ||
-            context.actor.role === 'tournament_director' ||
-            context.actor.role === 'field_operator' ||
-            context.actor.role === 'support_readonly');
-        if (
-          teamMatchCompetition !== null &&
-          actorIsStaff &&
-          staffLineupSubmitRequiresTakeover(game.state)
-        ) {
-          // Task 20이 requireTakeover에 gameId를 추가해 인계 토큰을 게임 단위로
-          // 검증하도록 좁혔다(2-arg). 통합 브랜치에 남아 있던 1-arg 호출은 그
-          // 시그니처 변경 이전 형태라 여기서 함께 정리한다.
-          // 참가팀(team_manager/team_owner)의 사전 라인업 제출은 이 불변식 대상이
-          // 아니다 — takeover는 "현장 기기가 이 경기를 배타적으로 장악 중"이라는
-          // 라이브 운영 개념이라 경기 전 로스터 준비와는 무관하다(Task 27 후속).
-          // 스태프도 경기 시작 전(SCHEDULED)에는 같은 이유로 면제한다 —
-          // staffLineupSubmitRequiresTakeover 문서 주석 참고.
-          this.requireTakeover(game.id, game.sourceType, context);
-        }
-        const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId, invalidatedAt: null } });
-        if (lineup === null) {
-          throw this.notFound('GAME_LINEUP_NOT_FOUND');
-        }
-        const latestSideLineup = await tx.v1GameLineup.findFirst({
-          where: { gameId, sideId: lineup.sideId },
-          orderBy: { revision: 'desc' },
-          select: { id: true, revision: true },
-        });
-        const currentLineupRevision = latestSideLineup?.revision ?? 0;
-        if (
-          latestSideLineup === null ||
-          latestSideLineup.id !== lineup.id ||
-          dto.expectedVersion !== currentLineupRevision
-        ) {
-          throw new ConflictException({
-            code: 'VERSION_CONFLICT',
-            message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-            details: { expectedVersion: dto.expectedVersion, currentVersion: currentLineupRevision },
-          });
-        }
-        if (
-          context.actor.actorType === 'USER' &&
-          (context.actor.role === 'team_manager' || context.actor.role === 'team_owner')
-        ) {
-          const lineupSide = await tx.v1GameSide.findUnique({ where: { id: lineup.sideId } });
-          if (lineupSide === null || lineupSide.teamId !== context.actor.teamId) {
-            throw this.forbidden();
-          }
-        }
-        // 경고 누적·퇴장 출전정지 가드. 1차 대회 회고 "옐로카드 누적, 레드카드 퇴장등
-        // 필요해보임" — 지금까지 이 경로는 정지 여부를 **전혀 검사하지 않아** 퇴장당한
-        // 선수가 다음 경기에 그대로 뛸 수 있었다.
-        //
-        // **저장(saveLineup)이 아니라 제출에 건다.** 초안을 짜는 동안 막으면 팀장이
-        // 명단을 구성조차 못 한다 — 제출이 "이 명단으로 뛰겠다"고 확정하는 지점이다.
-        await this.assertNoSuspendedStarters(tx, game, lineup.id, teamMatchCompetition);
-        if (lineup.state !== V1GameLineupState.DRAFT) {
-          throw new ConflictException({
-            code: 'INVALID_LINEUP_STATE',
-            message: 'Only a draft lineup can be submitted',
-          });
-        }
-        const submitted = await tx.v1GameLineup.update({
-          where: { id: lineup.id },
-          data: {
-            state: V1GameLineupState.SUBMITTED,
-            submittedAt: new Date(),
-            version: { increment: 1 },
-          },
-        });
-        const updated = await tx.v1Game.update({
-          where: { id: gameId },
-          data: { version: { increment: 1 } },
-        });
-        return {
-          gameId,
-          lineupId: submitted.id,
-          lineupRevision: submitted.revision,
-          lineupState: submitted.state,
-          state: updated.state,
-          version: updated.version,
-          durableCommandId: context.durableCommandId,
-          replayed: false,
-        };
-      },
-    );
+  /**
+   * `PUT /games/:gameId/lineups/:sideId`·`POST .../lineups/:lineupId/submit`(대회 운영 어댑터 포함)은
+   * 더 이상 쓰지 않는다. 친선은 팀매치 참석명단 경로가, 대회·리그는 참가 명단에서 계산된 경기 명단과
+   * 조정 API(`/games/:gameId/sides/:sideId/roster-adjustments`)가 맡는다(Task 179). 인가는 그대로 태워
+   * 권한 없는 호출자에게는 예전과 같은 404/403 을 준다.
+   */
+  async rejectLineupWrite(user: V1AuthUser, gameId: string): Promise<never> {
+    await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
+    const game = await this.prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { teamMatchId: true } });
+    if ((await this.resolveTeamMatchCompetitionContext(this.prisma, game.teamMatchId)) === null) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN',
+        message: 'Friendly team matches manage lineups through their team-match route.',
+      });
+    }
+    throw new ConflictException({
+      code: 'ROSTER_MANAGED_BY_ADJUSTMENTS',
+      message: '대회·리그 경기 명단은 참가 명단에서 정해져요. 빠지는 선수는 경기 명단 조정에서 빼 주세요.',
+      details: { gameId },
+    });
   }
 
   /**
@@ -3669,109 +3075,6 @@ export class GamesService {
       awayTeamName: awayRegistration?.team.name ?? null,
       awayRegistrationId: awayRegistration?.id ?? null,
       awayTeamId,
-    };
-  }
-
-  /**
-   * 이 경기에서 어느 한 팀의 **참가 등록 명단**(V1TournamentPlayer)을 라인업 편집용으로
-   * 읽는다. 대회 경기 라인업의 선수는 등록 명단이 유일한 출처이고, 명단에 없는 사람을
-   * 임의로 적어 넣는 경로는 없앴다.
-   *
-   * 인가는 `resolveActor`(read)를 그대로 재사용한다 — 참가팀 매니저·오너는 자기 팀
-   * 사이드만, 대회 스태프는 양 팀 모두. 소비자용 로스터 API
-   * (`TournamentPlayersService.listPlayers`)를 쓰지 않는 이유가 바로 이것이다: 그쪽은
-   * `assertTeamMember` 라 팀에 속하지 않은 스태프가 항상 403이 되는데, 스태프는 팀
-   * 매니저가 없는 자리에서 라인업을 대신 제출해야 한다.
-   *
-   * 응답에는 이름과 userId만 담는다 — 생년월일·성별·연락처 같은 나머지 PII는 라인업을
-   * 짜는 데 필요 없다.
-   */
-  async resolveFixtureLineupRoster(
-    user: V1AuthUser,
-    tournamentId: string,
-    fixtureId: string,
-    sideId: string,
-  ) {
-    const canonicalTeamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: this.canonicalTournamentTeamMatchWhere(tournamentId, fixtureId),
-      select: {
-        game: { select: { id: true } },
-        tournamentDetails: {
-          select: {
-            homeRegistration: { select: { id: true, teamId: true } },
-            awayRegistration: { select: { id: true, teamId: true } },
-          },
-        },
-      },
-    });
-    let gameId: string;
-    let homeRegistration: { id: string; teamId: string } | null;
-    let awayRegistration: { id: string; teamId: string } | null;
-    if (canonicalTeamMatch?.game !== null && canonicalTeamMatch?.game !== undefined) {
-      gameId = canonicalTeamMatch.game.id;
-      homeRegistration = canonicalTeamMatch.tournamentDetails?.homeRegistration ?? null;
-      awayRegistration = canonicalTeamMatch.tournamentDetails?.awayRegistration ?? null;
-    } else {
-      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
-    }
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    const side = await this.prisma.v1GameSide.findFirst({ where: { id: sideId, gameId } });
-    if (side === null) {
-      throw this.notFound('GAME_SIDE_NOT_FOUND');
-    }
-    const resolved = resolveLineupRosterRegistration({
-      actorRole: actor.role,
-      actorTeamId: isTeamScopedActorRole(actor.role) ? (actor.teamId ?? null) : null,
-      sideTeamId: side.teamId,
-      homeRegistration,
-      awayRegistration,
-    });
-    if ('denied' in resolved) {
-      if (resolved.denied === 'forbidden') throw this.forbidden();
-      throw this.notFound('TOURNAMENT_REGISTRATION_NOT_FOUND');
-    }
-    const players = await this.prisma.v1TournamentPlayer.findMany({
-      where: { registrationId: resolved.registrationId, removedAt: null },
-      orderBy: { addedAt: 'asc' },
-      select: { id: true, userId: true, realName: true },
-    });
-    /**
-     * 팀이 지정한 고정 등번호(`V1TeamMembership.jerseyNumber`)를 함께 내려준다.
-     *
-     * 1차 대회(2026-08-15~16) 회고: "라인업에서 선수 번호 등록을 처음에만 하고 추후에는
-     * 안하는 문제". 프론트의 등번호 결정 로직은 `loaded ?? teamFixed ?? recent` 3단계로
-     * 이미 설계돼 있었는데, **2순위 teamFixed 가 死문이었다** — 이 응답에 번호 자체가
-     * 없어서 프론트가 넘길 값을 갖지 못했다. 그래서 팀장이 매 경기 번호를 다시 타이핑해야
-     * 했고, 그 반복 입력이 곧 오탈자 발생원이다.
-     *
-     * 이 사이드 팀의 **active 멤버십만** 본다 — 팀을 떠난 사람의 옛 번호를 되살리면
-     * 이미 그 번호를 물려받은 현재 멤버와 충돌한다(스키마에도 (teamId, jerseyNumber)
-     * 유니크가 걸려 있다).
-     */
-    const memberships =
-      side.teamId === null
-        ? []
-        : await this.prisma.v1TeamMembership.findMany({
-            where: {
-              teamId: side.teamId,
-              status: 'active',
-              userId: { in: players.map((player) => player.userId) },
-            },
-            select: { userId: true, jerseyNumber: true },
-          });
-    const teamJerseyByUserId = new Map(
-      memberships.map((membership) => [membership.userId, membership.jerseyNumber]),
-    );
-    return {
-      sideId,
-      registrationId: resolved.registrationId,
-      players: players.map((player) => ({
-        tournamentPlayerId: player.id,
-        userId: player.userId,
-        name: player.realName,
-        /** 팀 고정 등번호. 팀이 지정하지 않았거나 멤버십이 없으면 null. */
-        teamJerseyNumber: teamJerseyByUserId.get(player.userId) ?? null,
-      })),
     };
   }
 
@@ -5998,54 +5301,47 @@ export class GamesService {
   }
 
   /**
-   * canonical TeamMatch 축의 어댑터. 정지 판정 자체는 축을 모르는 공유 함수가 하고
-   * (`tournaments/discipline/suspension-verdicts.ts`), 여기서는 **이 축의 경기 순서**만
-   * 만들어 넘긴다. 리그 축(`TeamMatchLineupService`)이 같은 함수를 다른 정렬로 부른다.
-   *
-   * friendly TeamMatch이거나 competition context가 없으면 조회 없이 즉시 통과한다.
+   * 경기 명단 조정(Task 179)용 운영자 판정. 플랫폼 운영자·그 대회 스태프면 역할과 쓰기 가능 여부를,
+   * 아니면 null 을 준다. 팀 액터(`team_*`)는 사이드를 보지 않고 통과하므로 운영자로 치지 않는다 —
+   * 팀 권한은 호출부가 사이드 팀 멤버십으로 따로 판정한다.
    */
-  private async assertNoSuspendedStarters(
-    tx: Transaction,
-    game: LockedGame,
-    lineupId: string,
-    teamMatchCompetition: TeamMatchCompetitionContext | null = null,
-  ): Promise<void> {
-    let competitionId: string;
-    let upcomingKey: string;
-    let orderedGames: { key: string; gameId: string | null }[];
-    if (teamMatchCompetition !== null) {
-      competitionId = teamMatchCompetition.competitionId;
-      upcomingKey = teamMatchCompetition.teamMatchId;
-      const matches = teamMatchCompetition.isLeague
-        ? await tx.v1TeamMatch.findMany({
-            where: leagueFixtureListWhere(competitionId),
-            orderBy: leagueFixtureListOrder(),
-            select: { id: true, game: { select: { id: true } } },
-          })
-        : await tx.v1TeamMatch.findMany({
-            where: { tournamentId: competitionId, deletedAt: null },
-            orderBy: [
-              { startAt: { sort: 'asc', nulls: 'last' } },
-              { tournamentDetails: { round: 'asc' } },
-              { tournamentDetails: { fixtureNumber: 'asc' } },
-              { tournamentDetails: { legNumber: 'asc' } },
-              { id: 'asc' },
-            ],
-            select: { id: true, game: { select: { id: true } } },
-          });
-      orderedGames = matches.map((row) => ({ key: row.id, gameId: row.game?.id ?? null }));
-    } else if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
-      return;
-    } else {
-      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
+  async resolveCompetitionOperator(
+    tx: Transaction | PrismaService,
+    gameId: string,
+    userId: string,
+  ): Promise<{ role: GameActorRole; canMutateLineup: boolean; platformAdmin: boolean } | null> {
+    const operatorRoles: ReadonlySet<GameActorRole> = new Set([
+      'platform_ops',
+      'tournament_director',
+      'field_operator',
+      'support_readonly',
+    ]);
+    // ForbiddenException 은 "이 액션은 못 한다"는 판정값이다(3622 의 canMutateLineup 과 같은 규칙).
+    const probe = (action: GameAuthorizationAction) =>
+      this.resolveActor(tx, gameId, userId, action).catch((error: unknown) => {
+        if (!(error instanceof ForbiddenException)) throw error;
+        return null;
+      });
+    const mutate = await probe('lineup_mutate');
+    if (mutate !== null && operatorRoles.has(mutate.role)) {
+      return { role: mutate.role, canMutateLineup: true, platformAdmin: mutate.role === 'platform_ops' };
     }
-
-    await assertNoSuspendedParticipants(tx, {
-      competitionId,
-      orderedGames,
-      upcomingKey,
-      lineupId,
+    const read = await probe('read');
+    if (read !== null && operatorRoles.has(read.role)) {
+      return { role: read.role, canMutateLineup: false, platformAdmin: read.role === 'platform_ops' };
+    }
+    // support 어드민은 경기 인가(resolveActor)에서 빠지지만, 팀 표·어드민 표처럼 명단은 읽기로 본다.
+    const admin = await tx.v1AdminUser.findUnique({
+      where: { userId },
+      select: { adminRole: true, status: true, revokedAt: true, user: { select: { accountStatus: true } } },
     });
+    const activeSupport =
+      admin !== null &&
+      admin.adminRole === 'support' &&
+      admin.status === 'active' &&
+      admin.revokedAt === null &&
+      admin.user.accountStatus === 'active';
+    return activeSupport ? { role: 'support_readonly', canMutateLineup: false, platformAdmin: true } : null;
   }
 
   private async resolveActor(

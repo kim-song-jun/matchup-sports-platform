@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
-import { LineupTodoService } from './lineup-todo.service';
+import { LineupTodoService, loadRosterSummaries } from './lineup-todo.service';
 import { assertTeamLineupMember } from './team-lineup-access';
 
 /**
@@ -23,10 +23,15 @@ export class TeamUpcomingGamesService {
     // 전술보드 읽기와 같은 선 — 활성 팀원이면 본다. 팀이 없으면 404, 팀원이 아니면 403.
     await assertTeamLineupMember(this.prisma, teamId, user.id);
     const games = await this.lineupTodos.listUpcomingForTeam(teamId, new Date());
+    // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
+    const rosters = await loadRosterSummaries(this.prisma, teamId, games);
     return {
       items: games.map((game) => ({
         gameId: game.gameId,
         source: game.source,
+        competitionKind: game.competitionKind,
+        teamMatchId: rosters.get(game.gameId)?.teamMatchId ?? null,
+        sideId: rosters.get(game.gameId)?.sideId ?? null,
         title: game.title,
         opponentName: game.opponentName,
         scheduledAt: game.scheduledAt,
@@ -35,6 +40,8 @@ export class TeamUpcomingGamesService {
         // 라인업 상태는 그대로 넘긴다 — 전술보드와는 다른 축이지만, 팀장이 "라인업은
         // 냈나"를 같은 줄에서 확인할 수 있어야 두 화면을 오가지 않는다.
         lineupState: game.lineupState,
+        // 대회·리그만. 친선과 기준 명단이 없는 팀(확정 신청 없는 대회)은 null.
+        rosterSummary: rosters.get(game.gameId)?.summary ?? null,
       })),
     };
   }

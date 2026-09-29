@@ -64,6 +64,8 @@ interface FakeState {
   registeredTeamIds: Set<string>;
   /** 팀별 리그 참가 명단. 기본은 비어 있다(명단 미제출). */
   rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string }>>;
+  /** 명단 재계산 이벤트(outbox)를 남긴 팀. */
+  rosterSyncTeamIds: string[];
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -74,7 +76,7 @@ const KNOWN_TEAMS = new Map([
 
 function createFake() {
   const state: FakeState = {
-    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [],
+    participants: [], sides: [], links: [], linkEvents: [], scheduleCreates: [], calls: [], mirrorUpdates: [], rosterSyncTeamIds: [],
     // 기본: 서로 다른 두 경기일이 이미 있다(KST 9/5, 9/12).
     siblingStartAts: [new Date('2026-09-05T01:00:00.000Z'), new Date('2026-09-12T01:00:00.000Z')],
     teamMatchCreates: [],
@@ -203,7 +205,7 @@ function createFake() {
       ),
       findMany: track(
         'v1TournamentRegistration.findMany',
-        async (args: { where: { teamId?: { in: string[] }; id?: { in: string[] } } }) => {
+        async (args: { where: { teamId?: { in: string[] }; id?: { in: string[] }; players?: { none: object } } }) => {
           const regRow = (teamId: string) => ({
             id: `reg-${teamId}`,
             teamId,
@@ -212,12 +214,14 @@ function createFake() {
               userId: player.userId,
               user: { profile: { nickname: player.nickname, displayName: null } },
             })),
-            // 이 fake 는 소프트 삭제를 모델링하지 않는다 — "활성 선수 수" 와 "전체 행 수"
-            // 가 항상 같다. 실제 쿼리는 `_count.players` 로 "행이 아예 없다" 를 판정한다.
-            _count: { players: (state.rosterPlayers.get(teamId) ?? []).length },
           });
           if (args.where.teamId?.in) {
-            return args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map(regRow);
+            // 이 fake 는 소프트 삭제를 모델링하지 않는다 — "활성 선수 수" 와 "전체 행 수" 가 같다.
+            const withoutRows = args.where.players?.none !== undefined;
+            return args.where.teamId.in
+              .filter((id) => state.registeredTeamIds.has(id))
+              .filter((id) => !withoutRows || (state.rosterPlayers.get(id) ?? []).length === 0)
+              .map(regRow);
           }
           if (args.where.id?.in) {
             return args.where.id.in.map((id) => regRow(id.replace(/^reg-/, '')));
@@ -347,7 +351,16 @@ function createFake() {
       ),
     },
     $queryRaw: track('$queryRaw', async () => [{ id: 'league-1' }]),
-    $executeRaw: track('$executeRaw', async () => 1),
+    // 명단 재계산 이벤트(값 순서: id, business_key, aggregate_type, aggregate_id, type, payload)는 따로 모은다.
+    // 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
+    $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      if (values[4] === 'COMPETITION_ROSTER_RESYNC') {
+        state.rosterSyncTeamIds.push((JSON.parse(String(values[5])) as { teamId: string }).teamId);
+        return 1;
+      }
+      state.calls.push('$executeRaw');
+      return 1;
+    },
     $transaction: async <T>(fn: (client: unknown) => Promise<T>) => fn(tx),
   };
 
@@ -401,6 +414,12 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     expect(state.links).toHaveLength(0);
     expect(state.linkEvents).toHaveLength(0);
     expect(state.calls.filter((call) => call.startsWith('v1ParticipantIdentityLink'))).toEqual([]);
+  });
+
+  it('일괄 생성 직후 참가한 모든 팀의 명단 재계산 이벤트를 남긴다(결장 기간·출전정지)', async () => {
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    expect([...new Set(state.rosterSyncTeamIds)].sort()).toEqual(['team-a', 'team-b']);
   });
 
   it('참가자는 자기 팀 사이드에, 자기 멤버십 이름으로 붙는다', async () => {
@@ -558,6 +577,12 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
      * 자동·수동이 같은 함수를 쓰므로 경로를 단정하면 수동으로 넣은 경기가 "자동 생성" 이라고
      * 표시된다 — 운영자가 자기가 손으로 넣은 경기를 시스템이 만든 것으로 읽는다.
      */
+    it('끼어든 경기로 팀 경기 순서가 바뀌므로 양 팀의 명단 재계산 이벤트를 남긴다', async () => {
+      await service.createManualFixture(adminUser, 'league-1', { ...manual });
+
+      expect([...state.rosterSyncTeamIds].sort()).toEqual(['team-a', 'team-b']);
+    });
+
     it('자동 승인 신청서 문구가 경로를 단정하지 않는다', async () => {
       await service.createManualFixture(adminUser, 'league-1', { ...manual });
 

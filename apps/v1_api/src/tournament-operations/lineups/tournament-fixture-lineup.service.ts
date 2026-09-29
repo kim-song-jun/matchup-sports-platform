@@ -2,7 +2,6 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { GamesService } from '../../games/games.service';
-import type { SaveGameLineupDto, SubmitGameLineupDto } from '../../games/dto/game-lineup.dto';
 import {
   TournamentStaffAccessService,
   type TournamentStaffResource,
@@ -18,7 +17,7 @@ type CanonicalGameLookup = {
 
 /**
  * Thin canonical teamMatchId -> gameId adapter over GamesService's already-shipped lineup
- * capture/submit methods (listLineups/saveLineup/submitLineup).
+ * lineup read (listLineups); the write routes only reject (rejectLineupWrite).
  *
  * GamesService.resolveActor() still performs the authoritative, full
  * role-scoped authorization for TEAM_MATCH-sourced games (the same
@@ -132,37 +131,9 @@ export class TournamentFixtureLineupService {
     return { gameId, lineups };
   }
 
-  async saveLineup(
-    user: V1AuthUser,
-    tournamentId: string,
-    fixtureId: string,
-    sideId: string,
-    idempotencyKey: string | undefined,
-    dto: SaveGameLineupDto,
-  ) {
-    const gameId = await this.authorizeAndResolveGameId(
-      user.id,
-      tournamentId,
-      fixtureId,
-      'lineup_mutate',
-    );
-    return this.gamesService.saveLineup(user, gameId, sideId, idempotencyKey, dto);
-  }
-
-  async submitLineup(
-    user: V1AuthUser,
-    tournamentId: string,
-    fixtureId: string,
-    lineupId: string,
-    idempotencyKey: string | undefined,
-    dto: SubmitGameLineupDto,
-  ) {
-    const gameId = await this.authorizeAndResolveGameId(
-      user.id,
-      tournamentId,
-      fixtureId,
-      'lineup_mutate',
-    );
-    return this.gamesService.submitLineup(user, gameId, lineupId, idempotencyKey, dto);
+  /** 대회·리그 경기 명단은 조정 API 로만 바뀐다(Task 179) — 인가 뒤 409. */
+  async rejectLineupWrite(user: V1AuthUser, tournamentId: string, fixtureId: string): Promise<never> {
+    const gameId = await this.authorizeAndResolveGameId(user.id, tournamentId, fixtureId, 'lineup_mutate');
+    return this.gamesService.rejectLineupWrite(user, gameId);
   }
 }

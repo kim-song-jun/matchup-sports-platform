@@ -6,6 +6,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
 
@@ -267,6 +268,8 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       homeRegistrationId: ids.homeRegistration,
       awayRegistrationId: ids.awayRegistration,
     });
+    // Task 179: 팀 배정 뒤 명단은 워커 후속 이벤트(COMPETITION_ROSTER_RESYNC)가 채운다.
+    await drainOutboxWorker(prisma);
 
     const after = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: created.id },

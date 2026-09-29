@@ -134,6 +134,14 @@ function fixtureRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** updateTournamentMatchInTx 의 raw 조회 순서: 자기 경기 잠금 → 대진 상세 잠금 → 팀 매치 잠금. */
+function queueFixtureUpdateRaw(queryRaw: jest.Mock, gameRow: Record<string, unknown>, teamMatchRow: Record<string, unknown>) {
+  queryRaw
+    .mockResolvedValueOnce([gameRow])
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([teamMatchRow]);
+}
+
 function canonicalDetailsRow(overrides: Record<string, unknown> = {}) {
   return {
     teamMatchId: 'fixture-1',
@@ -277,6 +285,7 @@ describe('TournamentBracketService', () => {
     v1Game: { update: jest.Mock; findMany: jest.Mock };
     v1GameLineup: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
     v1GameSide: { update: jest.Mock };
+    v1GameRosterAdjustment: { updateMany: jest.Mock };
     v1TeamTacticsBoard: { deleteMany: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock };
     v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
@@ -329,10 +338,6 @@ describe('TournamentBracketService', () => {
       },
       v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
-      // createFixture 가 대진 생성 직후 대진 재동기화(syncTournamentRosterLineups)를 태운다 —
-      // 이 스위트는 그 자체 로직이 아니라 최초 참가자 스냅샷 복사를 검증하므로 "이 팀의 시작
-      // 전 대진 없음"으로 즉시 no-op 처리되게 둔다. 실제 동기화 동작은
-      // tournament-roster-sync.integration-spec.ts.
       v1Game: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
       v1GameLineup: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -340,6 +345,7 @@ describe('TournamentBracketService', () => {
         create: jest.fn().mockResolvedValue({}),
       },
       v1GameSide: { update: jest.fn().mockResolvedValue({}) },
+      v1GameRosterAdjustment: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamTacticsBoard: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },
@@ -1535,9 +1541,7 @@ describe('TournamentBracketService', () => {
   it('updateFixture: TeamMatch deleted after the pre-read is rejected by the transaction lock', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow());
-    prisma.$queryRaw
-      .mockResolvedValueOnce([{ id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }])
-      .mockResolvedValueOnce([{ id: 'fixture-1', deletedAt: new Date('2026-08-01T00:00:00.000Z') }]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: new Date('2026-08-01T00:00:00.000Z') });
 
     await expect(service.updateFixture(ownerUser, 'fixture-1', { venue: '경기장' })).rejects.toMatchObject({
       response: { code: 'FIXTURE_NOT_FOUND' },
@@ -1568,9 +1572,7 @@ describe('TournamentBracketService', () => {
       { id: 'reg-3', teamId: 'team-new', team: { name: '새 팀' } },
       { id: 'reg-2', teamId: 'team-away', team: { name: '어웨이 팀' } },
     ]);
-    prisma.$queryRaw
-      .mockResolvedValueOnce([{ id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: 'revision-void' }])
-      .mockResolvedValueOnce([{ id: 'fixture-1', deletedAt: null }]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: 'revision-void' }, { id: 'fixture-1', deletedAt: null });
     prisma.v1TeamMatch.update.mockResolvedValue({ id: 'fixture-1', tournamentId: 'tournament-1', title: '테스트 경기', startAt: null, placeName: null, status: 'matched', createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z') });
 
     const result = await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });
@@ -1593,9 +1595,7 @@ describe('TournamentBracketService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
       team: { id: 'team-new', name: '새로 들어온 팀' },
     });
-    prisma.$queryRaw
-      .mockResolvedValueOnce([{ id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }])
-      .mockResolvedValueOnce([{ id: 'fixture-1', deletedAt: null }]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
     prisma.v1TeamMatch.update.mockResolvedValue({ id: 'fixture-1', tournamentId: 'tournament-1', title: '테스트 경기', startAt: null, placeName: null, status: 'matched', createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z') });
 
     await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });
@@ -1629,9 +1629,7 @@ describe('TournamentBracketService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
       team: { id: 'team-same', name: '그대로인 팀' },
     });
-    prisma.$queryRaw
-      .mockResolvedValueOnce([{ id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }])
-      .mockResolvedValueOnce([{ id: 'fixture-1', deletedAt: null }]);
+    queueFixtureUpdateRaw(prisma.$queryRaw, { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }, { id: 'fixture-1', deletedAt: null });
     prisma.v1TeamMatch.update.mockResolvedValue({ id: 'fixture-1', tournamentId: 'tournament-1', title: '테스트 경기', startAt: null, placeName: null, status: 'matched', createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z') });
 
     await service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' });

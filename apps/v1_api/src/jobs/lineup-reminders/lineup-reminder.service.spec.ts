@@ -1,5 +1,5 @@
-import { buildDailyMessages, LineupReminderService } from './lineup-reminder.service';
-import type { LineupTodo } from '../../team-lineups/lineup-todo.service';
+import { buildDailyMessages, buildRosterCheckMessages, LineupReminderService } from './lineup-reminder.service';
+import type { CompetitionRosterCheck, LineupTodo } from '../../team-lineups/lineup-todo.service';
 
 /**
  * 2026-08-27 감사 41/44/45 회귀 커버리지.
@@ -46,44 +46,57 @@ describe('LineupReminderService', () => {
     };
   }
 
-  it('groups canonical tournament games by tournament while keeping league games separate', () => {
+  function fakeRosterCheck(overrides: Partial<CompetitionRosterCheck> = {}): CompetitionRosterCheck {
+    return {
+      source: 'TEAM_MATCH',
+      competitionKind: 'LEAGUE',
+      teamId: 'team-home',
+      teamName: '성수 FC',
+      gameId: 'game-league',
+      tournamentId: 'league-1',
+      tournamentTitle: '가을 리그',
+      title: '가을 리그 2주차',
+      opponentName: '망원 FC',
+      scheduledAt: new Date('2026-08-28T10:00:00Z'),
+      lineupState: 'DONE',
+      deepLink: '/teams/team-home/games/game-league/roster',
+      rosterSummary: { participating: 10, excluded: 0, unavailable: 0, suspended: 0 },
+      ...overrides,
+    };
+  }
+
+  // MD-QA #14 이후 할 일은 친선 참석명단뿐이다(Task 179 R1) — 경기마다 한 건, "참석명단" 문구.
+  it('친선 참석명단 일일 알림은 경기마다 한 건이고 "참석명단" 문구를 쓴다', () => {
     const messages = buildDailyMessages([
-      fakeTodo({ competitionKind: 'TOURNAMENT', tournamentId: 'cup', tournamentTitle: '대회', gameId: 'canonical', deepLink: '/team-matches/canonical/lineup' }),
-      fakeTodo({ competitionKind: 'TOURNAMENT', tournamentId: 'cup', tournamentTitle: '대회', gameId: 'canonical-2', scheduledAt: new Date('2026-08-30T00:00:00Z') }),
-      fakeTodo({ competitionKind: 'LEAGUE', tournamentId: 'league', tournamentTitle: '리그', gameId: 'league-1' }),
-      fakeTodo({ competitionKind: 'LEAGUE', tournamentId: 'league', tournamentTitle: '리그', gameId: 'league-2' }),
+      fakeTodo({ gameId: 'friendly-1', state: 'MISSING' }),
+      fakeTodo({ gameId: 'friendly-2', state: 'DRAFT', opponentName: null }),
     ], '2026-08-27');
 
-    expect(messages).toHaveLength(3);
-    expect(messages[0]).toMatchObject({
-      title: '대회 라인업을 확인해 주세요',
-      deepLink: '/team-matches/canonical/lineup',
-      keyPrefix: 'lineup-daily:tournament:cup:team-1:2026-08-27',
-    });
-    expect(messages[0].body).toContain('2경기');
-    expect(messages.slice(1).map((message) => message.keyPrefix)).toEqual([
-      'lineup-daily:game:league-1:team-1:2026-08-27',
-      'lineup-daily:game:league-2:team-1:2026-08-27',
+    expect(messages.map((message) => message.keyPrefix)).toEqual([
+      'lineup-daily:game:friendly-1:team-1:2026-08-27',
+      'lineup-daily:game:friendly-2:team-1:2026-08-27',
     ]);
+    expect(messages[0]).toMatchObject({
+      title: '팀 매치 참석명단을 확인해 주세요',
+      body: '테스트 팀 · 1경기는 참석명단이 비어 있고. 가장 가까운 경기는 팀 매치 vs 상대팀예요.',
+    });
+    expect(messages[1].body).toBe('테스트 팀 · 1경기는 아직 제출 전이에요. 가장 가까운 경기는 팀 매치예요.');
+    expect(messages.some((message) => message.body.includes('라인업'))).toBe(false);
   });
 
-  // MD-QA #14: 팀 매치 알림이 대회용 "라인업" 문구를 그대로 쓰고 있었다 — 대회는 라인업,
-  // 팀 매치는 참석명단으로 갈려야 한다.
-  it('uses "참석명단" wording for team-match (non-tournament) daily reminders, "라인업" for tournaments', () => {
-    const messages = buildDailyMessages([
-      fakeTodo({ competitionKind: 'FRIENDLY', gameId: 'friendly-1', state: 'MISSING' }),
-      fakeTodo({ competitionKind: 'TOURNAMENT', tournamentId: 'cup', tournamentTitle: '대회', gameId: 'tournament-1' }),
-    ], '2026-08-27');
+  it('명단 확인 알림은 계산된 출전 인원(빠짐·정지 제외)과 경기 명단 화면 링크를 싣고 키에 날짜가 없다', () => {
+    const [message] = buildRosterCheckMessages([
+      fakeRosterCheck({ rosterSummary: { participating: 9, excluded: 2, unavailable: 1, suspended: 1 } }),
+    ]);
 
-    const friendlyMessage = messages.find((message) => message.keyPrefix === 'lineup-daily:game:friendly-1:team-1:2026-08-27');
-    const tournamentMessage = messages.find((message) => message.keyPrefix.startsWith('lineup-daily:tournament:cup:'));
-
-    expect(friendlyMessage?.title).toBe('팀 매치 참석명단을 확인해 주세요');
-    expect(friendlyMessage?.body).toContain('참석명단이 비어 있고');
-    expect(friendlyMessage?.body).not.toContain('라인업');
-
-    expect(tournamentMessage?.title).toBe('대회 라인업을 확인해 주세요');
-    expect(tournamentMessage?.body).toContain('라인업이 비어 있고');
+    expect(message).toEqual({
+      teamId: 'team-home',
+      targetId: 'team-home',
+      title: '가을 리그 2주차 vs 망원 FC 명단을 확인해 주세요',
+      body: '내일 경기 출전 9명 · 빠지는 사람이 있으면 조정해 주세요',
+      deepLink: '/teams/team-home/games/game-league/roster',
+      keyPrefix: 'roster-check:game-league:team-home',
+    });
   });
 
   function fakeClaim(overrides: { id?: string; afterCommit?: Array<() => void | Promise<void>> } = {}) {
@@ -108,14 +121,20 @@ describe('LineupReminderService', () => {
 
   function fakeTx(
     options: {
-      memberships?: Array<{ userId: string }>;
+      memberships?: Array<{ userId: string }> | Record<string, Array<{ userId: string }>>;
       preferences?: Array<{ userId: string; teamEnabled: boolean }>;
       alreadyDelivered?: string[];
     } = {},
   ) {
     const createMany = jest.fn().mockResolvedValue({ count: 0 });
     return {
-      v1TeamMembership: { findMany: jest.fn().mockResolvedValue(options.memberships ?? []) },
+      v1TeamMembership: {
+        findMany: jest.fn(({ where }: { where: { teamId: string } }) =>
+          Promise.resolve(
+            Array.isArray(options.memberships) ? options.memberships : (options.memberships?.[where.teamId] ?? []),
+          ),
+        ),
+      },
       v1NotificationPreference: { findMany: jest.fn().mockResolvedValue(options.preferences ?? []) },
       v1Notification: {
         findMany: jest
@@ -138,7 +157,7 @@ describe('LineupReminderService', () => {
 
   describe('감사 45: 다음 스캔 예약은 스캔과 분리된 독립 트랜잭션으로 먼저 커밋된다', () => {
     it('scanHandler는 runScan을 시작하기 전에 이미 별도 트랜잭션으로 다음 스캔을 예약한다', async () => {
-      const todoService = { listAllPending: jest.fn().mockResolvedValue([]) };
+      const todoService = { listAllPending: jest.fn().mockResolvedValue([]), listCompetitionRosterChecks: jest.fn().mockResolvedValue([]) };
       const { prisma, scheduleTx } = fakePrisma();
       const service = new LineupReminderService(todoService as never, prisma as never);
       const tx = fakeTx();
@@ -168,7 +187,7 @@ describe('LineupReminderService', () => {
 
   describe('감사 41/44: 웹 푸시는 claim.afterCommit에 담기고 워커 트랜잭션 안에서 즉시 나가지 않는다', () => {
     it('claim.afterCommit이 있으면 push를 즉시 보내지 않고 커밋 후 실행할 effect로만 담는다', async () => {
-      const todoService = { listAllPending: jest.fn().mockResolvedValue([fakeTodo()]) };
+      const todoService = { listAllPending: jest.fn().mockResolvedValue([fakeTodo()]), listCompetitionRosterChecks: jest.fn().mockResolvedValue([]) };
       const { prisma } = fakePrisma();
       const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
       const service = new LineupReminderService(todoService as never, prisma as never, webPush as never);
@@ -187,6 +206,91 @@ describe('LineupReminderService', () => {
       // 워커가 커밋 확정 뒤 afterCommit을 실행하는 시점을 흉내낸다.
       await afterCommit[0]();
       expect(webPush.sendToUser).toHaveBeenCalledWith('manager-1', expect.anything());
+    });
+  });
+
+  describe('Task 179 R1: 대회·리그 경기는 전날 "명단 확인" 한 번', () => {
+    const managers = {
+      'team-home': [{ userId: 'home-owner' }, { userId: 'home-manager' }],
+      'team-away': [{ userId: 'away-owner' }],
+    };
+    const checks = () => [
+      fakeRosterCheck(),
+      fakeRosterCheck({ teamId: 'team-away', teamName: '망원 FC', opponentName: '성수 FC', deepLink: '/teams/team-away/games/game-league/roster', rosterSummary: { participating: 7, excluded: 1, unavailable: 0, suspended: 0 } }),
+    ];
+
+    function serviceWith(rosterChecks: CompetitionRosterCheck[]) {
+      const todoService = {
+        listAllPending: jest.fn().mockResolvedValue([]),
+        listCompetitionRosterChecks: jest.fn().mockResolvedValue(rosterChecks),
+      };
+      const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+      const service = new LineupReminderService(todoService as never, fakePrisma().prisma as never, webPush as never);
+      return { service, todoService, webPush };
+    }
+
+    it('내일(KST) 하루 창으로 대상 경기를 묻는다', async () => {
+      const { service, todoService } = serviceWith([]);
+      await service.scanHandler(fakeClaim() as never, fakeTx() as never);
+      // 지금 = KST 8/27 11:00 → 8/28 00:00 ~ 8/29 00:00 KST.
+      expect(todoService.listCompetitionRosterChecks).toHaveBeenCalledWith(
+        new Date('2026-08-27T15:00:00Z'),
+        new Date('2026-08-28T15:00:00Z'),
+      );
+    });
+
+    it('양 팀 owner·manager 각자에게 그 팀의 출전 인원으로 한 건씩 보낸다', async () => {
+      const { service, webPush } = serviceWith(checks());
+      const tx = fakeTx({ memberships: managers });
+      const afterCommit: Array<() => void | Promise<void>> = [];
+      await service.scanHandler(fakeClaim({ afterCommit }) as never, tx as never);
+
+      const rows = tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data);
+      expect(rows.map((row: { recipientUserId: string; businessKey: string; body: string }) => [row.recipientUserId, row.businessKey, row.body])).toEqual([
+        ['home-owner', 'roster-check:game-league:team-home:home-owner', '내일 경기 출전 10명 · 빠지는 사람이 있으면 조정해 주세요'],
+        ['home-manager', 'roster-check:game-league:team-home:home-manager', '내일 경기 출전 10명 · 빠지는 사람이 있으면 조정해 주세요'],
+        ['away-owner', 'roster-check:game-league:team-away:away-owner', '내일 경기 출전 7명 · 빠지는 사람이 있으면 조정해 주세요'],
+      ]);
+      await Promise.all(afterCommit.map((effect) => effect()));
+      expect(webPush.sendToUser).toHaveBeenCalledTimes(3);
+      expect(webPush.sendToUser).toHaveBeenCalledWith('away-owner', expect.objectContaining({ url: '/teams/team-away/games/game-league/roster' }));
+    });
+
+    it('같은 날 다음 스캔에서 이미 받은 사람에게는 푸시를 다시 보내지 않는다', async () => {
+      const { service, webPush } = serviceWith(checks());
+      const tx = fakeTx({
+        memberships: managers,
+        alreadyDelivered: [
+          'roster-check:game-league:team-home:home-owner',
+          'roster-check:game-league:team-home:home-manager',
+          'roster-check:game-league:team-away:away-owner',
+        ],
+      });
+      const afterCommit: Array<() => void | Promise<void>> = [];
+      await service.scanHandler(fakeClaim({ afterCommit }) as never, tx as never);
+
+      expect(tx.v1Notification.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }));
+      expect(afterCommit).toHaveLength(0);
+      expect(webPush.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('팀 알림을 끈 사람에게는 가지 않는다', async () => {
+      const { service } = serviceWith([fakeRosterCheck()]);
+      const tx = fakeTx({ memberships: managers, preferences: [{ userId: 'home-manager', teamEnabled: false }] });
+      await service.scanHandler(fakeClaim() as never, tx as never);
+
+      const recipients = tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data).map((row: { recipientUserId: string }) => row.recipientUserId);
+      expect(recipients).toEqual(['home-owner']);
+    });
+
+    it('야간(KST 21~9시)에는 대상 조회도 하지 않는다', async () => {
+      jest.setSystemTime(new Date('2026-08-27T13:00:00Z')); // KST 22:00
+      const { service, todoService } = serviceWith(checks());
+      const tx = fakeTx({ memberships: managers });
+      await service.scanHandler(fakeClaim() as never, tx as never);
+
+      expect(todoService.listCompetitionRosterChecks).not.toHaveBeenCalled();
+      expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
     });
   });
 });

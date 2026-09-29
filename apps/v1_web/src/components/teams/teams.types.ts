@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export type TeamStatus = 'open' | 'reviewing' | 'closed' | 'mine';
 
 export type TeamModel = {
@@ -118,6 +120,8 @@ export type TeamDetailViewModel = {
    */
   joinRequest?: { requestedAtLabel?: string };
   operations?: Array<{ label: string; sub: string; href: string; badge?: number; badgeLabel?: string }>;
+  /** 팀장·매니저 — 다가오는 경기의 명단·참석명단 버튼(Task 179 팀 A). */
+  canManageGameRosters?: boolean;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
   openMatchesLoading?: boolean;
@@ -186,6 +190,8 @@ export type TeamMembersViewModel = {
   activeTab: 'members' | 'requests' | 'invitations';
   tabs: Array<{ key: 'members' | 'requests' | 'invitations'; label: string; count: number; onSelect: () => void }>;
   summary: { total: number; managers: number; pending: number };
+  /** 팀원 본인에게만 보이는 안내(내 결장 기간 등). 멤버 탭 위에 놓인다. */
+  selfNotice?: ReactNode;
   members: Array<{
     name: string;
     role: string;

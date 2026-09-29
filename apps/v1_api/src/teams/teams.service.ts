@@ -20,6 +20,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
+import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-resync-events';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import {
   ChangeTeamMembershipJerseyDto,
@@ -877,6 +878,7 @@ export class TeamsService {
         teamId: target.teamId,
         at: removedAt,
       });
+      await enqueueRosterResync(tx, teamMembersTargets([target.teamId]));
 
       return { updated, team, removedRosterCount };
     });
@@ -965,6 +967,7 @@ export class TeamsService {
         teamId,
         at: leftAt,
       });
+      await enqueueRosterResync(tx, teamMembersTargets([teamId]));
 
       return { updated, team: updatedTeam, removedRosterCount };
     });
@@ -1262,6 +1265,7 @@ export class TeamsService {
         !wasActive,
         'team_join_application_approved',
       );
+      if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([application.teamId]));
 
       return { updatedApplication, membership, team };
     });
@@ -1721,6 +1725,7 @@ export class TeamsService {
         !wasActive,
         'team_invitation_accepted',
       );
+      if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([invitation.teamId]));
 
       return { updatedInvitation, membership, team };
     });

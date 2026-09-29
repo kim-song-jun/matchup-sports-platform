@@ -20,6 +20,7 @@ import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
+import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-resync-events';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { formatLevelRange } from '../sports/level-range';
 import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
@@ -2803,12 +2804,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     reason: string | undefined,
     at: Date = new Date(),
   ) {
-    const removedRosterCount = await removeUserFromActiveRosters(tx, userId, { at });
-
     const memberships = await tx.v1TeamMembership.findMany({
       where: { userId, status: 'active' },
       select: { id: true, teamId: true, role: true },
     });
+    const removedRosterCount = await removeUserFromActiveRosters(tx, userId, { at });
+
     for (const membership of memberships) {
       await tx.v1TeamMembership.update({
         where: { id: membership.id },
@@ -2833,6 +2834,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
       });
     }
+    await enqueueRosterResync(
+      tx,
+      teamMembersTargets(memberships.map((membership) => membership.teamId)),
+    );
 
     if (removedRosterCount > 0 || memberships.length > 0) {
       this.logger?.info(

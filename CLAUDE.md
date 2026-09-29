@@ -257,7 +257,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
 **`docs/design/competition-canonical-flow.md` 가 정본이다.** 대회·정규 리그·팀 매치·명단·결과 확정·전적에 관한
 설계·구현·리뷰는 그 문서를 먼저 읽고, 충돌하는 다른 문서(태스크 문서 포함)보다 그 문서를 따른다. 요지:
 대회 아래 정규 대회/정규 리그 · 모든 경기는 팀 대 팀 매치(공식/친선) · 참가는 신청제, 명단은 등번호+이름 ·
-명단 = 출전자(선후발 없음, 롤링 종목은 교체 기록 없음) · 결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음) ·
+경기 명단 = 출전자(선후발 없음, 참가 명단이 기본값이고 팀이 경기 시작 전까지 경기별로 조정, 롤링 종목은 교체 기록 없음) · 결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음) ·
 팀 전적 전체/대회/리그/친선 + 개인 기록. 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.
 
 ### 팀 역할 기반 권한
@@ -477,19 +477,18 @@ alpha에는 `status === 'live'` 경기가 보통 없다(전부 `ended`). 라이�
 하프타임 배지, 라이브 스코어, 콘솔 재연결)는 "재현 불가"로 접지 말고 운영자 경로를 그대로 밟는다.
 
 ```
-라인업 저장·제출 → start → end-period(하프타임) → start-period(후반) → end-period → end
+start → end-period(하프타임) → start-period(후반) → end-period → end
 ```
 
-실측으로 확인된 계약 4개(하나라도 어기면 400/409/422):
+대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 179 — 라인업 저장·제출
+API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
+
+실측으로 확인된 계약 2개(하나라도 어기면 409/422):
 1. **takeover 토큰은 REST로 못 받는다.** `TOURNAMENT_FIXTURE` 게임의 모든 커맨드에 필수인데
    발급 경로는 Socket.IO `/game-operations` 의 `game.takeover.request` 하나뿐이다
    (`socket.io-client` + `extraHeaders: { cookie }` + `auth: { clientInstanceId,
    authorizationSubjectVersion: 0 }`).
 2. **`Idempotency-Key` 헤더 = body의 `clientCommandId`.** 다르면 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`.
-3. **라인업 참가자에 `started: boolean` 필수.** 빼면 400인데 `details.messages`가 빈 배열로 와서
-   원인이 안 보인다. `participantId`는 optional이라 `displayNameSnapshot`만으로 구성 가능(풋살 `minPlayers: 3`).
-4. **라인업 수정은 `state === 'SCHEDULED'` 동안만.** 이후 409 `LINEUP_DEADLINE_PASSED` — 이미 시작된
-   경기를 재사용할 땐 라인업 단계를 건너뛴다.
 
 ### 4. 판정은 공개 API를 ground truth로
 

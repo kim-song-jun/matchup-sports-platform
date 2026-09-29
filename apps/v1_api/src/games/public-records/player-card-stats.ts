@@ -171,7 +171,7 @@ export async function loadPlayerCardRecordStats(
   //   · 화면은 이 null 을 이미 처리한다(v1_web `components/users/player-card.tsx` -- 포지션은
   //     '포지션 미정' 으로 표시하고 등번호 칩은 통째로 숨긴다). 깨진 화면이 아니다.
   //   · 관측 가능한 변화인 것은 맞다 -- "회귀 아님"으로 넘기지 말 것. 대회 라인업 저장
-  //     경로(`games/games.service.ts` saveLineup)는 이 변경 전에도 position·jerseyNumber 가
+  //     경로(옛 `GamesService.saveLineup`, Task 179 에서 제거)는 이 변경 전에도 position·jerseyNumber 가
   //     실린 participant 에 신원 연결을 만들었으므로, 동의를 켜 두고 결과가 아직 없는
   //     사람은 전에는 'FW·9번'이 보였고 지금은 안 보인다(대진 생성 경로
   //     `tournaments/tournament-bracket.service.ts` 는 애초에 둘을 싣지 않아 원래부터

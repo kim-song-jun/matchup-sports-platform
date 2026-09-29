@@ -46,10 +46,8 @@ describe('parseLineupConfigForResponse', () => {
 });
 
 /**
- * Extracted from a private duplicate in team-match-lineup.service.ts so
- * games.service.ts#saveLineup could reuse the exact same roster-size gate
- * instead of having no check at all — this spec locks the tolerant-defaults
- * contract both call sites depend on.
+ * Extracted from a private duplicate in team-match-lineup.service.ts — this spec
+ * locks the tolerant-defaults contract its call sites depend on.
  */
 describe('parseLineupLimits', () => {
   it('reads minPlayers/maxPlayers/substitutions/maxSubstitutions off a well-formed lineup blob', () => {

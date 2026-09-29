@@ -1,9 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { GamesService } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import type { SaveTeamMatchLineupDto } from '../../src/team-matches/dto/team-match-lineup.dto';
-import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 import { TournamentFixtureLineupService } from '../../src/tournament-operations/lineups/tournament-fixture-lineup.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
@@ -38,7 +35,6 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
   let cleanup: () => Promise<void>;
   let prisma: PrismaService;
   let games: GamesService;
-  let teamMatchLineup: TeamMatchLineupService;
   let consoleLineup: TournamentFixtureLineupService;
   let teamMatchId: string;
   let gameId: string;
@@ -49,7 +45,6 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
     accountStatus: 'active',
     onboardingStatus: 'completed',
   };
-  const ownerActor: V1AuthUser = { ...adminActor, id: ids.ownerUser };
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -58,7 +53,6 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
     ({ app, cleanup } = await createV1IntegrationApp());
     prisma = app.get(PrismaService);
     games = app.get(GamesService);
-    teamMatchLineup = app.get(TeamMatchLineupService);
     consoleLineup = app.get(TournamentFixtureLineupService);
 
     await prisma.v1Sport.create({
@@ -165,21 +159,17 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
     await cleanup();
   });
 
-  it('팀매치로 저장한 라인업을 콘솔의 listLineups 가 같은 명단으로 읽는다', async () => {
-    // 팀 오너가 팀매치 경로로 저장한다 — 163 이후의 "명단 = 출전자" 모양.
-    // `as never` 를 쓰지 않는다 — 캐스팅은 DTO 가 바뀌어도 스펙이 조용히 통과하게 만든다.
-    // 포지션은 빼둔다: 이 픽스처의 설정 버전 카탈로그에 없는 코드면 #978 의
-    // `LINEUP_POSITION_INVALID` 가드에 걸린다. 이 스펙이 보는 것은 **명단이 콘솔에
-    // 읽히는가** 이지 포지션 검증이 아니다.
-    const lineupDto: SaveTeamMatchLineupDto = {
-      expectedVersion: 0,
-      participants: [
-        { displayName: '가나다', jerseyNumber: 7 },
-        { displayName: '라마바', jerseyNumber: 9 },
+  it('리그 경기 명단을 콘솔의 listLineups 가 같은 명단으로 읽는다', async () => {
+    // 리그 경기 명단은 대진 생성·동기화가 만든다(Task 179 — 팀장 전체 저장 경로는 없다). 여기서는 그
+    // 결과 모양(홈 사이드 리비전 1 + 참가자)을 직접 심고 콘솔 읽기만 본다.
+    const homeSide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: 'HOME' } });
+    const lineup = await prisma.v1GameLineup.create({ data: { gameId, sideId: homeSide.id, revision: 1 } });
+    await prisma.v1GameParticipant.createMany({
+      data: [
+        { gameId, sideId: homeSide.id, lineupId: lineup.id, displayNameSnapshot: '가나다', jerseyNumber: 7, started: true },
+        { gameId, sideId: homeSide.id, lineupId: lineup.id, displayNameSnapshot: '라마바', jerseyNumber: 9, started: true },
       ],
-    };
-    const saved = await teamMatchLineup.saveLineup(ownerActor, teamMatchId, randomUUID(), lineupDto);
-    expect(saved).toBeDefined();
+    });
 
     // 콘솔이 쓰는 읽기 — 게임 축이다.
     const lineups = await games.listLineups(adminActor, gameId);

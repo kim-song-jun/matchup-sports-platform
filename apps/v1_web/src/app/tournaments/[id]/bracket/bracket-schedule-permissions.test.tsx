@@ -83,7 +83,6 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
             status: 'scheduled',
             isHome: true,
             opponentTeamName: '상대 팀',
-            lineupState: null,
           }],
         }],
       },

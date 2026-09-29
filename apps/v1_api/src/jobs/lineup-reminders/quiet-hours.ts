@@ -16,6 +16,13 @@ export function kstParts(at: Date): { dateKey: string; hour: number } {
   };
 }
 
+/** `at` 의 한국 날짜 기준 `offsetDays` 일 뒤 0시(UTC 로 표현). 0 이면 오늘 0시. */
+export function kstMidnight(at: Date, offsetDays: number): Date {
+  const shifted = new Date(at.getTime() + KST_OFFSET_MS);
+  const midnightShifted = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + offsetDays);
+  return new Date(midnightShifted - KST_OFFSET_MS);
+}
+
 /**
  * 지금 알림을 보내면 안 되는 시간인가.
  *

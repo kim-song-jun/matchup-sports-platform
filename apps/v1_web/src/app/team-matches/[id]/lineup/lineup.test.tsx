@@ -385,6 +385,16 @@ const hoisted = vi.hoisted(() => ({
   useV1MyTeamsMock: vi.fn(),
   useV1TeamMatchLineupMock: vi.fn(),
   useV1TeamMembersMock: vi.fn(),
+  useV1GameMock: vi.fn(),
+  // 결장 표시는 이 화면의 부가 정보 — 기본은 "결장 없음"으로 둬 다른 테스트가 신경 쓰지 않게 한다.
+  useV1TeamUnavailabilityMock: vi.fn(
+    (..._args: unknown[]): { data: { items: unknown[] } | undefined; isError: boolean; refetch: () => unknown } => ({
+      data: { items: [] },
+      isError: false,
+      refetch: vi.fn(),
+    }),
+  ),
+  refetchUnavailability: vi.fn(),
   saveMutate: vi.fn(),
   submitMutate: vi.fn(),
   refetchLineup: vi.fn(),
@@ -401,6 +411,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MyTeams: hoisted.useV1MyTeamsMock,
   useV1TeamMatchLineup: hoisted.useV1TeamMatchLineupMock,
   useV1TeamMembers: hoisted.useV1TeamMembersMock,
+  useV1Game: hoisted.useV1GameMock,
   // "이전 라인업 불러오기"/"프리셋으로 저장"이 쓰는 훅. 시트를 열기 전에는 조회하지
   // 않지만(enabled:false) 훅 자체는 매 렌더 호출되므로 모듈 모킹에 반드시 있어야 한다.
   useV1TeamLineupHistory: () => ({ data: undefined, isLoading: false }),
@@ -413,6 +424,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 모킹하는 이상 실제로 렌더되는 하위 트리가 쓰는 훅도 채워줘야 한다.
   useV1NotificationUnreadSummary: () => ({ data: undefined }),
 }));
+
+vi.mock('@/hooks/use-v1-game-roster', () => ({ useV1TeamUnavailability: hoisted.useV1TeamUnavailabilityMock }));
 
 import { TeamMatchLineupPageClient } from './lineup-client';
 
@@ -465,6 +478,7 @@ describe('TeamMatchLineupPageClient', () => {
       isLoading: false,
     });
     hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
   });
 
   it('상대팀 참석명단 정정 요청 영역을 노출하지 않는다', () => {
@@ -565,25 +579,6 @@ describe('TeamMatchLineupPageClient', () => {
     const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
     expect(notDesignated).toBeDisabled();
     expect(notDesignated.querySelector('svg')).toBeNull();
-  });
-
-  it('리그 대진에서도 팀장·운영진 직접 등록을 안내한다', () => {
-    hoisted.useV1TeamMatchMock.mockReturnValue({
-      data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '테스트 리그' } },
-      isLoading: false,
-      isError: false,
-    });
-    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: baseLineup(),
-      isLoading: false,
-      isError: false,
-      refetch: hoisted.refetchLineup,
-    });
-
-    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
-
-    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
-    expect(screen.queryByText(/참석으로 확정된 팀원만/)).not.toBeInTheDocument();
   });
 
   it('친선 매치도 참석 응답 없이 직접 등록한다고 안내한다', () => {
@@ -999,6 +994,7 @@ describe('TeamMatchLineupPageClient — 배치는 이 화면에 없다 (Task 163
     hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
     hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
   });
 
   it('피치 배치 탭과 전술보드 안내를 모두 노출하지 않는다', () => {
@@ -1033,5 +1029,214 @@ describe('TeamMatchLineupPageClient — 배치는 이 화면에 없다 (Task 163
 
     expect(screen.queryByRole('link', { name: /전술보드/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/선발·배치는 전술보드에서/)).not.toBeInTheDocument();
+  });
+});
+
+function apiError(statusCode: number, code: string, message: string) {
+  return new V1ApiError({ status: 'error', statusCode, code, message, timestamp: '2026-09-29T00:00:00.000Z' });
+}
+
+describe('TeamMatchLineupPageClient — 대회·리그 경기는 경기 명단 화면으로 안내한다 (Task 179)', () => {
+  const NOTICE = '대회·리그 경기는 경기 명단에서 관리해요';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: hoisted.refetchLineup,
+    });
+  });
+
+  it('리그 경기는 편집기 대신 우리 팀 경기 명단 화면으로 안내한다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '가을 리그' } },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '경기 명단 열기' })).toHaveAttribute('href', '/teams/team-host/games/game-1/roster');
+    expect(screen.queryByText('참석명단 (0)')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /참석명단 제출하기/ })).not.toBeInTheDocument();
+  });
+
+  it('대회 경기(팀매치 상세 404)는 명단 응답의 사이드가 속한 팀으로 보낸다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: apiError(404, 'NOT_FOUND_OR_ARCHIVED', 'Team match was not found'),
+    });
+    // 상대 사이드를 앞에 둔다 — 첫 사이드를 고르면 남의 팀 명단으로 보낸다.
+    hoisted.useV1GameMock.mockReturnValue({
+      data: {
+        sides: [
+          { id: 'side-away', gameId: 'game-1', sideKey: 'AWAY', teamId: 'team-rival', displayNameSnapshot: '상대' },
+          { id: 'side-host', gameId: 'game-1', sideKey: 'HOME', teamId: 'team-tournament', displayNameSnapshot: '우리' },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '경기 명단 열기' })).toHaveAttribute(
+      'href',
+      '/teams/team-tournament/games/game-1/roster',
+    );
+  });
+
+  it('리그 팀원처럼 명단 조회가 막혀도 안내는 하되 갈 곳을 모르면 버튼을 내지 않는다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '가을 리그' } },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'member' }], isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isSuccess: false,
+      error: apiError(403, 'PERMISSION_DENIED', 'denied'),
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+    expect(screen.getByText(/팀 상세의 다가오는 경기에서/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '경기 명단 열기' })).not.toBeInTheDocument();
+  });
+
+  it('친선 경기는 안내 없이 참석명단 편집기를 그대로 보여준다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: baseTeamMatch(), isLoading: false, isError: false });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+    expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
+  });
+
+  it('팀매치도 명단도 없으면 대회로 짐작하지 않고 오류를 보여준다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: apiError(404, 'NOT_FOUND_OR_ARCHIVED', 'Team match was not found'),
+    });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isSuccess: false,
+      error: apiError(404, 'TEAM_MATCH_NOT_FOUND', '팀 매칭을 찾을 수 없어요.'),
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+    expect(screen.getByText('팀매치를 찾을 수 없어요.')).toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)', () => {
+  const KICKOFF = futureIso(180);
+  const members = [
+    { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' },
+    { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active' },
+    { membershipId: 'm-3', userId: 'user-3', displayName: '박영희', role: 'member', status: 'active' },
+  ];
+  const away = (userId: string, reason: string | null) => ({
+    id: `u-${userId}`,
+    userId,
+    reason,
+    startsAt: '2026-01-01T00:00:00.000Z',
+    endsAt: '2099-01-01T00:00:00.000Z',
+    actorRole: 'TEAM_MANAGER',
+  });
+  const candidateRow = (name: string) => screen.getByText(name).closest('.tm-card') as HTMLElement;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), startsAt: KICKOFF }, isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: members }, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
+    hoisted.useV1TeamUnavailabilityMock.mockReturnValue({
+      data: { items: [away('user-1', null), away('user-2', 'INJURY')] },
+      isError: false,
+      refetch: hoisted.refetchUnavailability,
+    });
+  });
+
+  it('킥오프 시각 기준 결장 중인 후보에 경기 명단과 같은 결장 배지를 붙이고, 그대로 명단에 넣을 수 있다', () => {
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(hoisted.useV1TeamUnavailabilityMock).toHaveBeenLastCalledWith('team-host', KICKOFF, { enabled: true });
+    expect(within(candidateRow('김철수')).getByText('결장 · 부상')).toBeInTheDocument();
+    expect(within(candidateRow('홍길동')).getByText('결장')).toBeInTheDocument();
+    expect(within(candidateRow('박영희')).queryByText(/결장/)).toBeNull();
+
+    // 자동으로 빼지 않는다 — 결장 중이어도 팀장이 고르면 들어간다.
+    fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '명단 추가' }));
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.getByLabelText('김철수 등번호')).toBeInTheDocument();
+  });
+
+  it('경기 시각을 모르면 결장을 조회하지 않고 편집기는 그대로 동작한다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), startsAt: undefined }, isLoading: false, isError: false });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(hoisted.useV1TeamUnavailabilityMock).toHaveBeenLastCalledWith('team-host', null, { enabled: true });
+    expect(screen.getAllByRole('button', { name: '명단 추가' })).toHaveLength(3);
+  });
+
+  it('결장 조회가 실패하면 표시 없이 편집기가 동작하고, 안내와 다시 불러오기를 보여 준다', () => {
+    hoisted.useV1TeamUnavailabilityMock.mockReturnValue({
+      data: undefined,
+      isError: true,
+      refetch: hoisted.refetchUnavailability,
+    });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText('결장 정보를 불러오지 못해 결장 표시 없이 보여요.')).toBeInTheDocument();
+    expect(screen.queryByText(/^결장/, { selector: '.tm-badge' })).toBeNull();
+    fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '명단 추가' }));
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '결장 정보 다시 불러오기' }));
+    expect(hoisted.refetchUnavailability).toHaveBeenCalledTimes(1);
+  });
+
+  it('편집할 수 없는 참석명단에서는 결장을 조회하지 않는다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({ editable: false, lockReason: 'terminal', state: 'LOCKED' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(hoisted.useV1TeamUnavailabilityMock).toHaveBeenLastCalledWith('team-host', KICKOFF, { enabled: false });
+    expect(screen.queryByRole('button', { name: '명단 추가' })).toBeNull();
   });
 });

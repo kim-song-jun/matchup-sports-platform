@@ -12,7 +12,6 @@ import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
-import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
@@ -308,39 +307,18 @@ function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   );
 }
 
-/** 일정 행에 얹을 "내 팀 경기" 정보 — `useV1MyTournamentFixtures` 응답에서 온다. */
-type MyFixtureRowInfo = { lineupState: GameLineupState | null };
-
-/**
- * 라인업 상태는 팀장이 이 화면에서 가장 먼저 확인해야 하는 것이다 — 색만으로 구분하지
- * 않고 문구를 함께 둔다(디자인 규칙: 의미 구분은 컬러 + 텍스트 병행).
- */
-function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | null }) {
-  const { label, color, background } =
-    lineupState === null
-      ? { label: '라인업 미작성', color: 'var(--orange700)', background: 'var(--orange50)' }
-      : lineupState === 'DRAFT'
-        ? { label: '라인업 작성 중', color: 'var(--orange700)', background: 'var(--orange50)' }
-        : { label: '라인업 제출 완료', color: 'var(--blue700)', background: 'var(--blue50)' };
-  return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 'var(--radius-chip)', padding: '2px 8px' }}>
-      {label}
-    </span>
-  );
-}
-
 function ScheduleRow({
   tournamentId,
   entry,
-  myFixture,
+  isMine,
   showGroupLabel = true,
   isRegularLeague,
   fromHref,
 }: {
   tournamentId: string;
   entry: PublicScheduleEntry;
-  /** 이 경기가 로그인한 팀장의 팀 경기라면 그 정보 — 아니면 undefined(공개 방문자 포함). */
-  myFixture?: MyFixtureRowInfo;
+  /** 로그인한 팀장의 팀 경기인가(`useV1MyTournamentFixtures`) — 공개 방문자는 항상 false. */
+  isMine: boolean;
   /** 그룹 제목("A조")이 바로 위에 있으면 카드 안에서 같은 말을 되풀이하지 않는다. */
   showGroupLabel?: boolean;
   /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
@@ -359,7 +337,7 @@ function ScheduleRow({
       // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
       // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
       // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
-      className={`tm-pressable${myFixture ? '' : ' tm-schedule-card'}`}
+      className={`tm-pressable${isMine ? '' : ' tm-schedule-card'}`}
       style={{
         display: 'block',
         padding: '12px 16px',
@@ -367,7 +345,7 @@ function ScheduleRow({
         textDecoration: 'none',
       }}
     >
-      {myFixture ? (
+      {isMine ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <span className="tm-on-tint"
             style={{
@@ -384,11 +362,6 @@ function ScheduleRow({
           >
             우리 팀
           </span>
-          {/* 라인업 제출은 리그·팀매치 축의 단계다(`/team-matches/:id/lineup`). 대회 축은
-              대진 생성 때 등록 명단을 참가자로 복사하므로 제출할 화면 자체가 없다 —
-              거기서 "라인업 미작성"은 팀장에게 **할 수 없는 일을 안 했다고** 말하는 것이고,
-              이미 끝난 경기 위에도 그대로 떴다(alpha 실측). */}
-          {isRegularLeague ? <LineupStatusBadge lineupState={myFixture.lineupState} /> : null}
         </div>
       ) : null}
       {/* 카드 머리줄 — 왼쪽에 "어디서"(조·장소), 오른쪽에 "언제"(날짜·상태).
@@ -481,12 +454,9 @@ function ScheduleRow({
     </Link>
   );
 
-  if (myFixture === undefined) return row;
+  if (!isMine) return row;
 
-  // 내 팀 경기는 배지 + 옅은 배경으로 목록에서 즉시 떠오르게 하고, 라인업으로
-  // 가는 길을 행 안에 둔다 — 예전에는 경기 상세로 한 번 더 들어가야 라인업 진입점을 만날
-  // 수 있었고, 그마저 경기가 공개된 뒤에만 나타났다. 라인업 링크는 행 링크(경기 상세)와
-  // 형제로 둔다: 링크 안에 링크를 넣으면 유효하지 않은 마크업이 되고 클릭 대상도 모호해진다.
+  // 내 팀 경기는 배지 + 옅은 배경으로 목록에서 즉시 떠오르게 한다.
   return (
     <div
       className="tm-schedule-card tm-schedule-card-mine"
@@ -606,14 +576,14 @@ function ScheduleGroupBlock({
   tournamentId,
   group,
   showGroupHeading,
-  myFixtureById,
+  myFixtureIds,
   isRegularLeague,
   fromHref,
 }: {
   tournamentId: string;
   group: { key: string; label: string; entries: PublicScheduleEntry[] };
   showGroupHeading: boolean;
-  myFixtureById: Map<string, MyFixtureRowInfo>;
+  myFixtureIds: ReadonlySet<string>;
   isRegularLeague: boolean;
   /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
   fromHref?: string | null;
@@ -633,7 +603,7 @@ function ScheduleGroupBlock({
             key={entry.fixtureId}
             tournamentId={tournamentId}
             entry={entry}
-            myFixture={myFixtureById.get(entry.fixtureId)}
+            isMine={myFixtureIds.has(entry.fixtureId)}
             showGroupLabel={!showGroupHeading}
             isRegularLeague={isRegularLeague}
             fromHref={fromHref}
@@ -659,7 +629,7 @@ function ScheduleGroupBlock({
 function ScheduleSections({
   tournamentId,
   entries,
-  myFixtureById,
+  myFixtureIds,
   filters,
   activeFilter,
   onSelectFilter,
@@ -669,7 +639,7 @@ function ScheduleSections({
 }: {
   tournamentId: string;
   entries: readonly PublicScheduleEntry[];
-  myFixtureById: Map<string, MyFixtureRowInfo>;
+  myFixtureIds: ReadonlySet<string>;
   filters: ScheduleFilter[];
   activeFilter: string;
   onSelectFilter: (key: string) => void;
@@ -690,7 +660,7 @@ function ScheduleSections({
           ...group,
           entries:
             activeFilter === 'mine'
-              ? group.entries.filter((entry) => myFixtureById.has(entry.fixtureId))
+              ? group.entries.filter((entry) => myFixtureIds.has(entry.fixtureId))
               : group.entries,
         }))
         .filter((group) => group.entries.length > 0),
@@ -732,7 +702,7 @@ function ScheduleSections({
                 group={group}
                 // 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다.
                 showGroupHeading={group.label !== phase.label || phase.groups.length > 1}
-                myFixtureById={myFixtureById}
+                myFixtureIds={myFixtureIds}
                 isRegularLeague={isRegularLeague}
                 fromHref={fromHref}
               />
@@ -811,11 +781,9 @@ export function ScheduleContent({
 
   // fixtureId로 바로 찾을 수 있게 펼쳐 둔다 — 한 사용자가 이 대회에서 두 팀을 이끄는
   // 경우도 있어(팀별로 따로 등록) 팀을 가로질러 모은다.
-  const myFixtureById = new Map<string, MyFixtureRowInfo>();
+  const myFixtureIds = new Set<string>();
   for (const team of myFixtures?.teams ?? []) {
-    for (const fixture of team.fixtures) {
-      myFixtureById.set(fixture.fixtureId, { lineupState: fixture.lineupState });
-    }
+    for (const fixture of team.fixtures) myFixtureIds.add(fixture.fixtureId);
   }
   const myTeams = (myFixtures?.teams ?? []).filter((team) => team.fixtures.length > 0);
 
@@ -839,8 +807,8 @@ export function ScheduleContent({
     isRegularLeague && standingsGroupNames.size === 1 && standingsGroupNames.has(standingsHeading);
   const phases = groupScheduleEntries(data.items, phaseLabels);
   const hasMyFixtures =
-    data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||
-    data.unscheduled.some((entry) => myFixtureById.has(entry.fixtureId));
+    data.items.some((entry) => myFixtureIds.has(entry.fixtureId)) ||
+    data.unscheduled.some((entry) => myFixtureIds.has(entry.fixtureId));
   const filters = buildScheduleFilters(phases, hasMyFixtures);
   // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
   const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
@@ -849,7 +817,7 @@ export function ScheduleContent({
   // 경로 자체가 없어 어떤 칩을 눌러도 이 섹션은 항상 전체를 그렸다.
   const filteredUnscheduled = data.unscheduled.filter((entry) => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'mine') return myFixtureById.has(entry.fixtureId);
+    if (activeFilter === 'mine') return myFixtureIds.has(entry.fixtureId);
     return phaseKeyOf(entry) === activeFilter;
   });
 
@@ -920,7 +888,7 @@ export function ScheduleContent({
           <ScheduleSections
             tournamentId={tournamentId}
             entries={data.items}
-            myFixtureById={myFixtureById}
+            myFixtureIds={myFixtureIds}
             filters={filters}
             activeFilter={activeFilter}
             onSelectFilter={setFilter}
@@ -964,7 +932,7 @@ export function ScheduleContent({
                   tournamentId={tournamentId}
                   group={group}
                   showGroupHeading
-                  myFixtureById={myFixtureById}
+                  myFixtureIds={myFixtureIds}
                   isRegularLeague={isRegularLeague}
                   fromHref={fromHref}
                 />

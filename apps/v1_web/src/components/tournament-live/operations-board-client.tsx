@@ -18,8 +18,16 @@ import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/
 import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { useGameResultRevisions } from '@/hooks/use-tournament-result-review';
+import { useV1AdminRegistrationGameRosterList } from '@/hooks/use-v1-game-roster';
+import {
+  BoardRosterSummary,
+  boardRosterRegistrationIds,
+  indexBoardRosters,
+  type BoardRosterSideState,
+} from '@/components/game-roster/operations-board-roster';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
@@ -370,6 +378,31 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const items = useMemo(() => [...(board.data?.items ?? []), ...olderItems], [board.data?.items, olderItems]);
   const nextCursor = olderCursor !== undefined ? olderCursor : (board.data?.nextCursor ?? null);
 
+  // 경기 카드의 명단 요약 — 경기마다 명단을 부르지 않고 보이는 시작 전 경기의 팀(참가 신청)마다 표 한 장.
+  const rosterRegistrationIds = useMemo(() => boardRosterRegistrationIds(items), [items]);
+  const rosterQueries = useV1AdminRegistrationGameRosterList(tournamentId, rosterRegistrationIds);
+  const rosterIndex = indexBoardRosters(rosterQueries.flatMap((query) => (query.data === undefined ? [] : [query.data])));
+  const failedRosterIds = new Set(rosterRegistrationIds.filter((_, index) => rosterQueries[index]?.isError === true));
+  const currentHref = useCurrentHref();
+
+  function rosterSide(item: V1TournamentOperationsBoardItem, which: 'home' | 'away'): BoardRosterSideState {
+    const registrationId = which === 'home' ? item.homeRegistrationId : item.awayRegistrationId;
+    const names = teamNamesByFixtureId.get(item.fixtureId);
+    return {
+      registrationId,
+      name: names ? names[which] : null,
+      side: registrationId === null || item.gameId === null ? null : (rosterIndex.games.get(item.gameId)?.get(registrationId) ?? null),
+      teamId: registrationId === null ? null : (rosterIndex.teamIds.get(registrationId) ?? null),
+      failed: registrationId !== null && failedRosterIds.has(registrationId),
+    };
+  }
+
+  function rosterSummary(item: V1TournamentOperationsBoardItem) {
+    return (
+      <BoardRosterSummary item={item} home={rosterSide(item, 'home')} away={rosterSide(item, 'away')} from={currentHref} />
+    );
+  }
+
   function rowLabel(item: V1TournamentOperationsBoardItem): string {
     const names = teamNamesByFixtureId.get(item.fixtureId);
     if (names) return `${names.home} vs ${names.away}`;
@@ -648,6 +681,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                             {resultActionLabel}
                           </button>
                         </div>
+                        {rosterSummary(item)}
                       </td>
                     </tr>
                     {expandedGameId === item.gameId && item.gameId !== null ? (
@@ -727,6 +761,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     {resultActionLabel}
                   </button>
                 </div>
+                {rosterSummary(item)}
                 {expandedGameId === item.gameId && item.gameId !== null ? (
                   <div ref={(node) => { mobileEditorSlots.current[item.gameId!] = node; }} />
                 ) : null}

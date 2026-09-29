@@ -39,6 +39,16 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeaveTeam: vi.fn(),
 }));
 
+// 결장 기간(Task 179 팀 C) — 팀원 본인 안내가 읽는 조회만 갈아 끼운다. 나머지 명단 훅은 실제 것.
+const rosterMocks = vi.hoisted(() => ({
+  useV1MemberUnavailability: vi.fn((): { data: unknown; isError: boolean } => ({ data: undefined, isError: false })),
+}));
+
+vi.mock('@/hooks/use-v1-game-roster', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/use-v1-game-roster')>()),
+  ...rosterMocks,
+}));
+
 const routerMocks = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const navigationMocks = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
 
@@ -448,6 +458,8 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     // 이 팀(team-1)의 대기 건수만 배지로 — 다른 팀 건은 섞지 않는다.
     expect(screen.getAllByLabelText('답장을 기다리는 컨택 2건').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('답장을 기다리는 컨택 3건')).not.toBeInTheDocument();
+    // Task 179 팀 B 진입점.
+    expect(screen.getAllByRole('link', { name: /경기 명단 관리/ })[0]).toHaveAttribute('href', '/teams/team-1/game-rosters');
   });
 
   it('"팀매치 만들기" 는 이 팀 상세로 돌아오도록 항상 from= 을 담는다 (받은 출처가 없어도)', () => {
@@ -1198,5 +1210,114 @@ describe('TeamMembersPageClient 초대 폼', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('초대 메시지는 200자까지 쓸 수 있어요.');
     });
     expect(screen.queryByText('이메일 형식을 확인해 주세요.')).toBeNull();
+  });
+});
+
+describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
+  function member(overrides: Record<string, unknown>) {
+    return {
+      role: 'member',
+      status: 'active',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: false,
+      canRemove: false,
+      ...overrides,
+    };
+  }
+
+  function setup(viewerRole: 'owner' | 'member') {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: true, viewer: { role: viewerRole, membershipId: 'membership-me' } },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [
+          member({ membershipId: 'membership-me', userId: 'user-me', displayName: '김도윤', role: viewerRole, canEditJersey: true }),
+          member({ membershipId: 'membership-2', userId: 'user-2', displayName: '박서준', canEditJersey: true }),
+        ],
+        summary: { ownerCount: 1, managerCount: 0, memberCount: 2 },
+        viewerRole,
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    for (const hook of [
+      teamApiMocks.useV1ChangeTeamMembershipRole,
+      teamApiMocks.useV1RemoveTeamMembership,
+      teamApiMocks.useV1ApproveTeamJoinApplication,
+      teamApiMocks.useV1RejectTeamJoinApplication,
+      teamApiMocks.useV1SendTeamInvitation,
+      teamApiMocks.useV1CancelTeamInvitation,
+      teamApiMocks.useV1LeaveTeam,
+    ]) {
+      hook.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    }
+  }
+
+  function manageButtonOf(name: string) {
+    return within(screen.getByText(name).closest('.tm-card') as HTMLElement).getByRole('button', { name: '관리' });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    rosterMocks.useV1MemberUnavailability.mockReturnValue({ data: undefined, isError: false });
+  });
+
+  it('팀장은 다른 멤버 행에서 결장 기간 시트를 연다 — 본인 행에는 없다(본인 등록 없음)', async () => {
+    setup('owner');
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(manageButtonOf('김도윤'));
+    expect(screen.queryByRole('button', { name: '결장 기간' })).toBeNull();
+
+    fireEvent.click(manageButtonOf('박서준'));
+    fireEvent.click(screen.getByRole('button', { name: '결장 기간' }));
+    expect(await screen.findByRole('dialog', { name: '결장 기간 · 박서준' })).toBeInTheDocument();
+  });
+
+  it('팀원은 결장 기간을 등록할 수 없고, 자기 결장 기간만 안내로 본다', () => {
+    rosterMocks.useV1MemberUnavailability.mockReturnValue({
+      data: {
+        teamId: 'team-1',
+        userId: 'user-me',
+        items: [
+          {
+            id: 'u-1',
+            teamId: 'team-1',
+            userId: 'user-me',
+            startsAt: '2099-10-02T15:00:00.000Z',
+            endsAt: '2099-10-12T15:00:00.000Z',
+            reason: 'INJURY',
+            actor: { userId: 'user-owner', displayName: '팀장', role: 'TEAM_MANAGER' },
+            createdAt: '2099-09-28T00:00:00.000Z',
+            revokedAt: null,
+          },
+          {
+            id: 'u-0',
+            teamId: 'team-1',
+            userId: 'user-me',
+            startsAt: '2099-09-01T15:00:00.000Z',
+            endsAt: '2099-09-05T15:00:00.000Z',
+            reason: 'PERSONAL',
+            actor: { userId: 'user-owner', displayName: '팀장', role: 'TEAM_MANAGER' },
+            createdAt: '2099-08-28T00:00:00.000Z',
+            revokedAt: '2099-08-29T00:00:00.000Z',
+          },
+        ],
+      },
+      isError: false,
+    });
+    setup('member');
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(rosterMocks.useV1MemberUnavailability).toHaveBeenCalledWith('team-1', 'user-me');
+    // 취소된 기간은 빠지고 살아 있는 기간만, 사유와 함께 보인다.
+    expect(screen.getByText(/^내 결장 기간: 10\/3 \(.\)~10\/12 \(.\)\(부상\)\. /)).toBeInTheDocument();
+    expect(screen.queryByText(/개인 사정/)).toBeNull();
+    fireEvent.click(manageButtonOf('김도윤'));
+    expect(screen.queryByRole('button', { name: '결장 기간' })).toBeNull();
   });
 });

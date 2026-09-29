@@ -229,6 +229,11 @@ export function TeamMatchDetailPageSkeleton() {
   );
 }
 
+const LINEUP_ACTION_COPY = {
+  attendance: { title: '참석명단', description: '경기에 참석할 선수 명단을 작성하고 제출하세요.', cta: '참석명단 관리' },
+  'match-roster': { title: '경기 명단', description: '참가 명단 선수가 출전해요. 이번 경기에 빠지는 선수만 빼 주세요.', cta: '명단 조정' },
+} as const;
+
 export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode }) {
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
@@ -236,8 +241,11 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
   const shouldShowHostTeamCard = !match.platformManaged || hasAssignedHostTeam;
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
-   * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다. */
-  const matchManageNextAction: 'lineup' | 'result' | 'review' | null = model.lineupHref
+   * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다.
+   * 리그 경기 명단 조정은 하지 않아도 되는 일이라 primary 를 받지 않는다(Task 179 D4). */
+  const lineupAction = model.lineupAction;
+  const lineupCopy = lineupAction ? LINEUP_ACTION_COPY[lineupAction.kind] : null;
+  const matchManageNextAction: 'lineup' | 'result' | 'review' | null = lineupAction?.kind === 'attendance'
     ? 'lineup'
     : model.resultAction
       ? 'result'
@@ -604,25 +612,25 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
               ) : null}
               {/* 매치 관리: 라인업(Task 15)과 경기 결과(Task 17) CTA를 한 카드로 묶는다 —
                   예전엔 결과 입력 버튼이 카드 없이 붕 떠서 라인업 카드와 시각적으로
-                  분리돼 보였다(QA 지적). model.lineupHref/resultAction은
+                  분리돼 보였다(QA 지적). model.lineupAction/resultAction은
                   team-matches-client.tsx가 권한 조건일 때만 설정한다.
                   웨이브4(2026-09-04): 세 행이 모두 primary(파란 버튼)라 "무엇부터 해야 하는지"가
                   안 보였다(DESIGN.md §14 — 화면당 primary 1개). 순서(라인업 → 경기 결과 → 후기)상
                   가장 먼저 나타나는(=아직 안 끝난) 행 하나만 primary, 나머지는 outline. */}
-              {model.lineupHref || model.resultAction || model.reviewAction ? (
+              {lineupAction || model.resultAction || model.reviewAction ? (
                 <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">매치 관리</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-                    {model.lineupHref ? (
+                    {lineupAction && lineupCopy ? (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div style={{ minWidth: 0 }}>
-                          <div className="tm-text-label" style={{ fontWeight: 600 }}>참석명단</div>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>{lineupCopy.title}</div>
                           <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
-                            경기에 참석할 선수 명단을 작성하고 제출하세요.
+                            {lineupCopy.description}
                           </div>
                         </div>
-                        <Link className={`tm-btn tm-btn-sm ${matchManageNextAction === 'lineup' ? 'tm-btn-primary' : 'tm-btn-outline'}`} href={model.lineupHref} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
-                          참석명단 관리
+                        <Link className={`tm-btn tm-btn-sm ${matchManageNextAction === 'lineup' ? 'tm-btn-primary' : 'tm-btn-outline'}`} href={lineupAction.href} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                          {lineupCopy.cta}
                         </Link>
                       </div>
                     ) : null}
@@ -633,7 +641,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: 12,
-                          ...(model.lineupHref ? { borderTop: '1px solid var(--border)', paddingTop: 12 } : {}),
+                          ...(lineupAction ? { borderTop: '1px solid var(--border)', paddingTop: 12 } : {}),
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
@@ -660,7 +668,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: 12,
-                          ...(model.lineupHref || model.resultAction
+                          ...(lineupAction || model.resultAction
                             ? { borderTop: '1px solid var(--border)', paddingTop: 12 }
                             : {}),
                         }}

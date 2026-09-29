@@ -56,6 +56,8 @@ function createFake(options: {
   hasResultRevision?: boolean;
   hasSharedRecord?: boolean;
   startAt?: Date;
+  leagueId?: string | null;
+  tournamentId?: string | null;
 } = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
@@ -84,6 +86,8 @@ function createFake(options: {
         status: 'matched',
         // 마감(startAt) 이전이어야 저장이 허용된다.
         startAt: options.startAt ?? new Date(Date.now() + 60 * 60 * 1000),
+        leagueId: options.leagueId ?? null,
+        tournamentId: options.tournamentId ?? null,
       }),
     },
     v1Game: {
@@ -841,5 +845,44 @@ describe('TeamMatchLineupService.saveLineup host-only recruitment', () => {
       sideId: 'side-home',
       revision: 1,
     });
+  });
+});
+
+describe('TeamMatchLineupService — 대회·리그 경기는 전체 명단을 쓰지 않는다 (Task 179)', () => {
+  const competitions = [
+    { label: '리그 시작 전', leagueId: 'league-1', tournamentId: 'league-1', gameState: V1GameState.SCHEDULED },
+    { label: '리그 진행 중', leagueId: 'league-1', tournamentId: 'league-1', gameState: V1GameState.LIVE },
+    { label: '대회 시작 전', leagueId: null, tournamentId: 'tournament-1', gameState: V1GameState.SCHEDULED },
+  ] as const;
+
+  it.each(competitions)('$label: 저장·제출·정정 요청 모두 409 ROSTER_MANAGED_BY_ADJUSTMENTS 이고 리비전을 만들지 않는다', async (row) => {
+    const { state, prisma } = createFake({
+      leagueId: row.leagueId,
+      tournamentId: row.tournamentId,
+      gameState: row.gameState,
+      startAt: row.gameState === V1GameState.LIVE ? new Date(Date.now() - 60 * 60 * 1000) : undefined,
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+    const rejected = expect.objectContaining({
+      response: expect.objectContaining({ code: 'ROSTER_MANAGED_BY_ADJUSTMENTS' }),
+    });
+
+    await expect(service.saveLineup(manager, 'team-match-1', 'competition-save', lineupDto(0))).rejects.toEqual(rejected);
+    await expect(service.submitLineup(manager, 'team-match-1', 'competition-submit', { expectedVersion: 0 })).rejects.toEqual(rejected);
+    await expect(service.requestChange(manager, 'team-match-1', 'competition-change', { expectedVersion: 0, reason: '명단 정정' })).rejects.toEqual(rejected);
+    expect(state.lineups).toHaveLength(0);
+    expect(state.participants).toHaveLength(0);
+    expect(state.idempotency).toHaveLength(0);
+  });
+
+  it('친선은 같은 진행 중 상태에서 그대로 저장된다 (대조군)', async () => {
+    const { state, prisma } = createFake({
+      gameState: V1GameState.LIVE,
+      startAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.saveLineup(manager, 'team-match-1', 'friendly-live', lineupDto(0))).resolves.toMatchObject({ revision: 1 });
+    expect(state.lineups).toHaveLength(1);
   });
 });

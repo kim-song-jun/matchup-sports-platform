@@ -43,13 +43,14 @@ vi.mock('next/navigation', () => ({
 }));
 
 const resolveChatRoomMutateMock = vi.hoisted(() => vi.fn());
+// 명단 입구 계산용 내 팀 목록. 기본은 소속 팀 없음 — 명단 입구 스위트만 채운다.
+const myTeamsRef = vi.hoisted(() => ({ current: undefined as { items: Array<{ teamId: string; role: string }> } | undefined }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1TeamMatchEligibility: useV1TeamMatchEligibilityMock,
   useV1TeamMatchApplications: () => ({ data: undefined, isPending: false }),
-  // 라인업 CTA(Task 15) 계산용 — 이 스위트는 GA 이벤트만 검증하므로 소속 팀 없음으로 고정.
-  useV1MyTeams: () => ({ data: undefined, isPending: false }),
+  useV1MyTeams: () => ({ data: myTeamsRef.current, isPending: false }),
   useV1ApplyTeamMatch: () => ({ mutateAsync: applyTeamMatchMutateAsync, isPending: false }),
   useV1ApproveTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
   useV1RejectTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
@@ -89,6 +90,11 @@ vi.mock('./team-matches-page', () => ({
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
       <span data-testid="team-match-chat-label">{model.chatLabel}</span>
       {model.onChat && <button onClick={model.onChat}>채팅 열기</button>}
+      {model.lineupAction && (
+        <a data-testid="lineup-action" data-kind={model.lineupAction.kind} href={model.lineupAction.href}>
+          명단
+        </a>
+      )}
     </div>
   ),
   TeamMatchListPageView: ({ model }: { model: TeamMatchListViewModel }) => (
@@ -392,6 +398,75 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
     expect(screen.queryByRole('link', { name: '경기 기록 보기' })).not.toBeInTheDocument();
     expect(document.querySelector('a[href="/team-matches/team-match-1/result/approval"]')).toBeNull();
     expect(screen.queryByRole('link', { name: '경기 결과 보기' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageClient — 명단 입구는 친선이면 참석명단, 리그 대진이면 경기 명단 (Task 179)', () => {
+  function mockHostManagedMatch(extra: Partial<V1TeamMatch>) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        gameId: 'game-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        startsAt: '2026-10-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: 'matched',
+        status: 'matched',
+        viewer: { state: 'host_team', manageableHostTeam: true, manageableOpponentTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: { teamId: 'team-away', name: '상대 팀' },
+        ...extra,
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+    myTeamsRef.current = {
+      items: [
+        { teamId: 'team-away', role: 'member' },
+        { teamId: 'team-host', role: 'owner' },
+      ],
+    };
+  });
+
+  afterEach(() => {
+    myTeamsRef.current = undefined;
+  });
+
+  it('친선 팀매치는 참석명단 화면으로 보낸다', () => {
+    mockHostManagedMatch({});
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const action = screen.getByTestId('lineup-action');
+    expect(action).toHaveAttribute('data-kind', 'attendance');
+    expect(action).toHaveAttribute('href', '/team-matches/team-match-1/lineup');
+  });
+
+  it('리그 대진은 내가 관리하는 팀의 경기 명단 화면으로 보낸다', () => {
+    mockHostManagedMatch({ league: { leagueId: 'league-1', title: '가을 리그' } });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const action = screen.getByTestId('lineup-action');
+    expect(action).toHaveAttribute('data-kind', 'match-roster');
+    expect(action).toHaveAttribute('href', '/teams/team-host/games/game-1/roster');
+    expect(document.querySelector('a[href="/team-matches/team-match-1/lineup"]')).toBeNull();
+  });
+
+  it('관리하는 팀이 없으면 명단 입구가 없다', () => {
+    myTeamsRef.current = { items: [{ teamId: 'team-host', role: 'member' }] };
+    mockHostManagedMatch({ league: { leagueId: 'league-1', title: '가을 리그' } });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByTestId('lineup-action')).not.toBeInTheDocument();
   });
 });
 

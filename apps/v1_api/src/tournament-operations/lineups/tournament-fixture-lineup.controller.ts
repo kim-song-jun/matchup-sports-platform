@@ -1,8 +1,6 @@
 import {
-  Body,
   Controller,
   Get,
-  Headers,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -13,7 +11,6 @@ import {
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { SaveGameLineupDto, SubmitGameLineupDto } from '../../games/dto/game-lineup.dto';
 import { TournamentFixtureLineupService } from './tournament-fixture-lineup.service';
 
 // Review finding #14 (S2): board/fields/staff all reject malformed uuid path params with a
@@ -43,16 +40,15 @@ export class TournamentFixtureLineupController {
     return this.lineupService.listLineups(user, tournamentId, fixtureId);
   }
 
+  /** 쓰기 경로는 409 로 조정 API 를 안내한다. 경로 파라미터 형식 검사(422)는 그대로다. */
   @Put(':sideId')
   saveLineup(
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId', UUID_PARAM) tournamentId: string,
     @Param('fixtureId', UUID_PARAM) fixtureId: string,
-    @Param('sideId', UUID_PARAM) sideId: string,
-    @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() dto: SaveGameLineupDto,
+    @Param('sideId', UUID_PARAM) _sideId: string,
   ) {
-    return this.lineupService.saveLineup(user, tournamentId, fixtureId, sideId, idempotencyKey, dto);
+    return this.lineupService.rejectLineupWrite(user, tournamentId, fixtureId);
   }
 
   @Post(':lineupId/submit')
@@ -60,17 +56,8 @@ export class TournamentFixtureLineupController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId', UUID_PARAM) tournamentId: string,
     @Param('fixtureId', UUID_PARAM) fixtureId: string,
-    @Param('lineupId', UUID_PARAM) lineupId: string,
-    @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() dto: SubmitGameLineupDto,
+    @Param('lineupId', UUID_PARAM) _lineupId: string,
   ) {
-    return this.lineupService.submitLineup(
-      user,
-      tournamentId,
-      fixtureId,
-      lineupId,
-      idempotencyKey,
-      dto,
-    );
+    return this.lineupService.rejectLineupWrite(user, tournamentId, fixtureId);
   }
 }

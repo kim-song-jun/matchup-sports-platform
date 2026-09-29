@@ -41,6 +41,7 @@ describe('ProfileService identity binding', () => {
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -230,6 +231,7 @@ describe('ProfileService phone change proof gate', () => {
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -1296,6 +1298,7 @@ describe('ProfileService withdrawal admin lockout', () => {
       v1PushDevice: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -1309,7 +1312,13 @@ describe('ProfileService withdrawal admin lockout', () => {
   it('탈퇴는 멤버십을 먼저 끄고 그다음 대회 명단을 정리한다', async () => {
     const prisma = createPrisma(null);
     prisma.v1TeamMembership.findMany.mockResolvedValue([{ id: 'membership-1', teamId: 'team-1' }]);
-    prisma.v1TournamentPlayer.findMany.mockResolvedValue([{ id: 'player-1' }]);
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      {
+        id: 'player-1',
+        registrationId: 'reg-1',
+        registration: { rosterLockedAt: null, tournamentId: 'tournament-1', teamId: 'team-1' },
+      },
+    ]);
     prisma.v1TournamentPlayer.updateMany.mockResolvedValue({ count: 1 });
 
     const order: string[] = [];
@@ -1326,6 +1335,12 @@ describe('ProfileService withdrawal admin lockout', () => {
     await service.withdrawalRequest(user, { reason: 'leave' });
 
     expect(order).toEqual(['membership-off', 'roster-cleanup']);
+    // 경기 명단은 이 트랜잭션에서 잠그지 않고 후속 이벤트로 — 참가 명단 팀과 팀원 기준(폴백) 리그 양쪽.
+    const resync = prisma.$executeRaw.mock.calls.filter((call: unknown[]) => call[5] === 'COMPETITION_ROSTER_RESYNC');
+    expect(resync.map((call: unknown[]) => JSON.parse(String(call[6])))).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-1' },
+      { scope: 'teamMembers', teamId: 'team-1' },
+    ]);
   });
 
   it('fails closed with a stable error before mutating an active admin account', async () => {

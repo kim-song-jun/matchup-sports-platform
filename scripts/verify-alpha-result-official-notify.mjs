@@ -1,6 +1,6 @@
 /**
  * REACH-4 실배포 검증 — 예정 상태의 대회 픽스처를 운영 API 로 실제로 치르고
- * (라인업 → start → end), SUBMITTED 리비전을 officialize 한 뒤 **참가팀
+ * (start → end), SUBMITTED 리비전을 officialize 한 뒤 **참가팀
  * 운영진에게 '대회 경기 결과가 확정됐어요' 알림이 실제로 도착하는지**를
  * 팀장 계정으로 실측한다.
  *
@@ -86,52 +86,7 @@ async function main() {
   }
   console.log(`game state=${g.state} v${g.version}`);
 
-  // 라인업 (SCHEDULED 에서만) — LINEUP-2 이후 expectedVersion 은 **사이드별
-  // 라인업 버전**(versionScope:'lineup')이다. 게임 버전을 넣으면 409.
-  if (g.state === 'SCHEDULED') {
-    for (const lineup of (g.lineups ?? []).filter((l) => l.state === 'DRAFT')) {
-      const side = (g.sides ?? []).find((s) => s.id === lineup.sideId);
-      const tag = side?.sideKey ?? lineup.sideId.slice(0, 8);
-      const names = tag === 'HOME' ? ['E2E선수01','E2E선수03','E2E선수05'] : ['E2E선수02','E2E선수04','E2E선수06'];
-      const participants = names.map((n, i) => ({
-        displayNameSnapshot: n, jerseyNumber: i + 1,
-        position: i === 0 ? 'GOLEIRO' : i === 1 ? 'FIXO' : 'PIVO', started: true,
-      }));
-      // expectedVersion 은 사이드별 라인업의 `revision`(LINEUP-2 versionScope:'lineup').
-      // 409 의 details.currentVersion 1회 재시도는 순수 안전망으로만 남긴다.
-      const trySave = async (v) => {
-        const saveId = randomUUID();
-        return api('PUT', `/games/${gameId}/lineups/${lineup.sideId}`, {
-          expectedVersion: v, clientCommandId: saveId, formation: '1-2-1', participants,
-        }, { 'idempotency-key': saveId });
-      };
-      let saved = await trySave(lineup.revision ?? 1);
-      if (saved.status === 409 && saved.json?.details?.currentVersion !== undefined) {
-        saved = await trySave(saved.json.details.currentVersion);
-      }
-      console.log(`라인업 저장 ${tag}: HTTP ${saved.status}${saved.status >= 400 ? ' ' + saved.text.slice(0,200) : ''}`);
-      if (saved.status >= 400) throw new Error('save 실패');
-      // submit 의 expectedVersion 은 저장 직후 **다시 읽은** 라인업 버전 (저장소 관례)
-      g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
-      const fresh = (g.lineups ?? []).find((l) => l.sideId === lineup.sideId);
-      if (!fresh) {
-        throw new Error(`재조회에서 라인업(sideId=${lineup.sideId})을 찾지 못했어요 — 응답: ${JSON.stringify(g.lineups ?? []).slice(0, 200)}`);
-      }
-      const trySubmit = async (v) => {
-        const submitId = randomUUID();
-        return api('POST', `/games/${gameId}/lineups/${fresh.id}/submit`,
-          { expectedVersion: v, clientCommandId: submitId }, { 'idempotency-key': submitId });
-      };
-      let sub = await trySubmit(fresh.revision ?? 1);
-      if (sub.status === 409 && sub.json?.details?.currentVersion !== undefined) {
-        sub = await trySubmit(sub.json.details.currentVersion);
-      }
-      console.log(`라인업 제출 ${tag}: HTTP ${sub.status}${sub.status >= 400 ? ' ' + sub.text.slice(0,200) : ''}`);
-      if (sub.status >= 400) throw new Error('submit 실패');
-      g = expectData(await api('GET', `/games/${gameId}`), '게임 재조회');
-    }
-  }
-
+  // 경기 명단은 참가 명단에서 계산된 제출본이다(Task 179) — 라인업 단계 없이 바로 시작한다.
   // takeover → start → end
   const clientInstanceId = randomUUID();
   const socket = io(`${ORIGIN}/game-operations`, {

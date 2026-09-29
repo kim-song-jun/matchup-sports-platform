@@ -537,7 +537,15 @@ export const gameSchemaSourceManifest = {
   // tournament_hosting/partnership, backed by 20260927100000_v1_inquiry_public_categories.
   // No game model changed.
   // 2026-09-27: guestInquiryRetentionDays Int + nullable V1Inquiry.guestRetentionDays/purgedAt/purgedByAdminUserId, in the same two migrations.
-  schema: 'a253cc251952aa69690f275ce2ef6bdf72d7c6cdede9b5ce631f181735599dab',
+  // 2026-09-28 Task 179: additive V1GameRosterAdjustment + V1TeamMemberUnavailability tables
+  // (20260928090000_v1_game_roster_adjustments) and back-relation fields on V1Game/V1GameSide/
+  // V1Team/V1User. No existing column, constraint or index changed; the bound game-operations
+  // migration is unchanged. Same day: the unavailability actorRole doc comment dropped STAFF (comment only).
+  // 2026-09-29: task renumbered 176 -> 178 (dev took 176); schema.prisma comments only, no model change.
+  // 2026-09-29 Task 179 (same unreleased migration, edited): V1GameRosterAdjustment gains teamId (+ team FK,
+  // V1Team back-relation) and revokedByRole; the active partial unique key now includes team_id. No game model changed.
+  // 2026-09-29: task renumbered 178 -> 179 (dev took 178 as well); schema.prisma comments only.
+  schema: '1594b60981b035faee0a079522e7ac1632950ebc166c7a8084c432049f433c97',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

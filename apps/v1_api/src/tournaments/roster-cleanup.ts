@@ -1,6 +1,5 @@
 import { Prisma, V1CompetitionKind, V1StatusActorType, V1TournamentStatus } from '@prisma/client';
-import { syncLeagueRosterLineups } from '../league-matches/league-roster-sync';
-import { syncTournamentRosterLineups } from './tournament-roster-sync';
+import { enqueueRosterResync } from '../games/roster/roster-resync-events';
 
 // 팀을 벗어나는 모든 경로에서 대회 로스터를 함께 정리하기 위한 공용 헬퍼.
 //
@@ -123,16 +122,16 @@ export async function removeUserFromActiveRosters(
         })),
       });
     }
-    // 리그·대회 둘 다 팀을 떠난 사람을 시작 전 경기 명단에서도 뺀다 — 대상 경기가 없는 쪽은 no-op.
-    const teams = new Map(
+    // 팀을 떠난 사람을 그 대회·리그의 시작 전 경기 명단에서도 뺀다(후속 이벤트). 참가 명단 없이 팀원
+    // 기준으로 뛰는 리그는 여기 대상이 없으니 멤버십을 바꾼 호출부가 `teamMembers` 이벤트로 따로 맞춘다.
+    await enqueueRosterResync(
+      tx,
       targets.flatMap((target) =>
-        target.registration ? [[`${target.registration.tournamentId}:${target.registration.teamId}`, target.registration] as const] : [],
+        target.registration
+          ? [{ scope: 'competitionTeam' as const, competitionId: target.registration.tournamentId, teamId: target.registration.teamId }]
+          : [],
       ),
     );
-    for (const registration of teams.values()) {
-      await syncLeagueRosterLineups(tx, { leagueId: registration.tournamentId, teamId: registration.teamId });
-      await syncTournamentRosterLineups(tx, { tournamentId: registration.tournamentId, teamId: registration.teamId });
-    }
   }
 
   return updated.count;

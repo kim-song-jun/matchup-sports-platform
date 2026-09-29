@@ -44,7 +44,7 @@ export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'
 | `verify_alpha_modal_a11y.mjs` | `useModalA11y` 이관 모달의 **실브라우저 계약** — 포커스가 다이얼로그 안에 있는지, body 스크롤이 잠기는지, Tab 이 트랩되는지(누르는 횟수를 tabbable 수보다 크게 잡아 유효성 확보), ESC 가 document 까지 도달하는지. **닫힘 여부는 훅 성패로 판정하지 않는다** — 라우트 기반 시트는 `onClose` 가 `router.push` 라서 URL 을 되돌리는 다른 코드가 있으면 화면상 '안 닫힘'으로 똑같이 보인다. 그래서 훅과 무관한 백드롭 경로를 **대조군**으로 함께 눌러 `preExistingClosePathBug` 로 구분한다 | 선수 |
 | `capture-my-player-card.mjs` | 마이페이지의 **내 선수 카드** 3폭 캡처. `.tm-player-card` 존재 여부를 함께 판정한다 — 카드가 숨김·로딩·실패로 사라져도 화면은 200 이라 스크린샷만으로는 구분되지 않는다 | 본인 |
 | `verify-alpha-league-result-flow.mjs` | 리그 결과가 **순위표까지 닿는지** 릴레이 전체(홈팀 작성·제출 → 원정팀 승인 → 공개 순위표 반영)를 밟는다. 각 칸의 유닛 테스트가 전부 통과하는 동안 릴레이가 통째로 끊겨 있던 적이 있어서(2026-08-24 원정팀이 승인 화면에 진입 불가) 이어짐 자체를 본다. `--dry` 는 게이트 값과 순위표만 읽는다 | 홈팀장+원정팀장 |
-| `verify-alpha-result-official-notify.mjs` | 대회 결과 확정 알림(회고 REACH-4)이 **팀장에게 실제로 도착하는지** 전 구간을 밟는다: 예정 픽스처의 라인업 저장·제출 → start → end → SUBMITTED 리비전 officialize(previewHash 클라이언트 재구성) → 팀장 계정 알림 폴링. LINEUP-2 이후 라인업 save/submit 의 expectedVersion 은 **사이드별 라인업 버전**이다(게임 버전 아님 — 409 의 details.currentVersion 으로 1회 재시도해 흡수) | 관리자+팀장 |
+| `verify-alpha-result-official-notify.mjs` | 대회 결과 확정 알림(회고 REACH-4)이 **팀장에게 실제로 도착하는지** 전 구간을 밟는다: 예정 픽스처 start → end → SUBMITTED 리비전 officialize(previewHash 클라이언트 재구성) → 팀장 계정 알림 폴링. 경기 명단은 참가 명단에서 계산되므로 라인업 단계가 없다(Task 179) | 관리자+팀장 |
 | `verify-alpha-og-card.mjs` | 선수 카드 OG 이미지가 **사용자별로 다른 그림**인지 판정. 여러 id 의 응답 바이트를 sha 로 비교해 전원이 같은 폴백을 받는 상태를 잡는다 — HTTP 200·PNG 까지는 통과하므로 상태코드만 보면 못 잡는다 | 불필요 |
 | `capture-league-fixture-record.mjs` | 리그 경기 상세의 **대회 패리티 본문**(스코어·정정 배지·경기 기록·정정 이력) — 기록 API(`.../fixtures/:id/record`)의 round/scoreStatus/videos 를 먼저 찍고 예정·완료 경기를 3폭 캡처. `LEAGUE_HINT` 로 대상 리그 지정 | 불필요 |
 | `verify-alpha-league-video.mjs` | 리그 경기 영상 **전 구간 릴레이**: 어드민 목록(주차 라벨) → 링크 등록(재실행 시 중복 건너뜀) → 공개 기록 `videos` 반영 → 경기 상세·어드민 화면 캡처. 라우트가 모듈에 등록 안 된 채 배포돼 전부 404 였던 실사고(#755)를 잡으라고 있다 | 플랫폼 관리자 |
@@ -146,32 +146,23 @@ const n = await page.locator('a[href*="/tactics/"]:visible').count();
 "느린가 보다"로 넘긴다(3.5초·8초 둘 다 그렇게 실패했다). 요소가 보일 때까지 기다리고,
 안 나타나면 **경고를 남기고 진행**한다 — 그 경고가 곧 결함 신호다.
 
-## P1-b 참가자 고정 실측 하네스 (2026-08-30)
+## SCHEDULED 대회 경기 만들기
 
-`verify-alpha-participant-pinning.mjs` — 대회 경기에서 라인업을 다시 저장해도 참가자 행이
-유지되는지 잰다. 계약 3개: ① 참가자 수 불변 ② **participantId 동일** ③ `arrivedAt`(현장
-검인) 보존. ②가 중요하다 — 수만 세면 "지우고 같은 수만큼 다시 만든" 경우를 못 잡는다.
+`verify-alpha-participant-pinning.mjs`(P1-b)·`verify-alpha-card-suspension.mjs`(DISCIPLINE-1)는 Task 179 에서
+지웠다 — 둘이 재던 대회 라인업 저장·제출 경로가 없어졌다(대회·리그 명단은 참가 명단에서 계산되고 조정 API 로만
+바뀐다). 출전정지는 이제 다음 경기 명단 계산에서 빠지는 것으로 확인한다(`GET /games/:gameId/sides/:sideId/roster` 의
+`suspended`).
 
-**반드시 `TOURNAMENT_FIXTURE` 경기로 재야 한다.** 그 변경은 해당 sourceType 한정이고
-TEAM_MATCH 는 `saveLineup` 입구에서 거부되므로, 팀매치로 재면 **아무것도 검증하지 못한 것**이다.
-스크립트가 sourceType 을 직접 확인해서 아니면 멈춘다.
+**함정 — 참가자를 읽는 곳:** `GET /games/:id` 에는 `participants` 가 실리지 않는다. `GET /games/:id/lineups`
+(`listLineups()`)만 붙여 준다 — 참가자 수를 세는 검증은 이 소스부터 확인할 것.
 
-### 함정 — 참가자를 읽는 곳이 하나뿐이다
-
-**`GET /games/:id` 에는 `participants` 가 실리지 않는다.** `GET /games/:id/lineups`
-(`listLineups()`)만 붙여 준다. 실제로 이 하네스 첫 실행이 "참가자 0명"을 뱉었고, 저장은
-HTTP 200 이었다 — 제품이 아니라 **읽는 소스가 틀렸던 것**이다.
-
-이걸 모르면 결함이 있어도 `0 === 0` 으로 계약 ①이 통과한다. 참가자 수를 세는 어떤 검증이든
-이 소스부터 확인할 것.
-
-### SCHEDULED 대회 경기가 없을 때
+### 시작 전 대회 경기가 없을 때
 
 alpha 에는 보통 시작 전 대회 경기가 **하나도 없다**(전수 확인: 전부 종료 또는 팀매치).
 "재현 불가"로 접지 말고 만든다:
 
 1. `probe-alpha-tournament-state.mjs` — confirmed 등록이 2건 이상인 대회를 찾는다
-2. `add-alpha-fixture-for-pinning.mjs` — 그 대회에 fixture 를 붙이고 `publish-bracket`
+2. `add-alpha-fixture-for-pinning.mjs`(이름은 옛 용도) — 그 대회에 fixture 를 붙이고 `publish-bracket`
    (**이걸 해야 공개 API 에 `gameId` 가 생긴다** — 안 하면 계속 404)
 
 새 대회를 만들어 신청·승인까지 밟는 경로는 관문이 많다(대회는 `draft` 로 생기고

@@ -187,9 +187,9 @@ export type TeamMatchDetailViewModel = {
   chatError?: string | null;
   onChat?: () => void;
   onShare?: () => void;
-  /** 라인업 관리 화면(Task 15) 링크. 내가 owner/manager로 속한 팀(호스트팀 또는 승인된
-   * 상대팀)이 이 매치에 관여할 때만 설정된다 — 그 외에는 undefined라 CTA 자체가 안 보인다. */
-  lineupHref?: string;
+  /** 명단 입구. 내가 owner/manager로 속한 참가팀이 있을 때만 설정된다 — 친선은 참석명단,
+   * 리그 대진은 참가 명단에서 계산되는 경기 명단 화면이다(Task 179). */
+  lineupAction?: { href: string; kind: 'attendance' | 'match-roster' };
 };
 
 // 'complete' 스텝(웨이브4 이전): /team-matches/new/complete 페이지가 썼는데, 실제 제출 성공

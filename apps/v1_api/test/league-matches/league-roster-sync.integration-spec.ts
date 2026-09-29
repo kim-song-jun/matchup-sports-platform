@@ -3,16 +3,24 @@ import type { INestApplication } from '@nestjs/common';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { GamesService } from '../../src/games/games.service';
 import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-matches/league-fixture-creation';
-import { LEAGUE_ROSTER_SYNC_ACTION, syncLeagueRosterLineups } from '../../src/league-matches/league-roster-sync';
+import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import {
+  LEAGUE_ROSTER_MIGRATED_ACTION,
+  LEAGUE_ROSTER_SYNC_ACTION,
+  leagueRosterMigrationRequestId,
+  syncCompetitionTeamRosters,
+} from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolve-team-match-competition-config';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
- * Task 170 D1′ — 리그 참가 명단이 바뀌면 시작 전 경기의 시스템 명단(리비전 1 또는 동기화 리비전,
- * DRAFT)을 참가 명단에 다시 맞추고, 팀이 저장·제출한 라인업과 시작 시각이 지난 경기는 건드리지 않는다.
+ * Task 170 D1′ — 리그 참가 명단이 바뀌면 시작 전 경기 명단을 참가 명단에 다시 맞춘다.
+ * Task 179 부터 새 리비전은 SUBMITTED 이고, 팀장이 저장·제출한 옛 라인업은 이관 스크립트가
+ * 조정 기록으로 옮긴 표시(감사 행)를 남기기 전까지 덮지 않는다. 시작 시각이 지난 경기는 건드리지 않는다.
  */
 describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
   const suiteId = randomUUID().slice(0, 8);
@@ -118,7 +126,9 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
   const participantsOf = (lineupId: string) =>
     prisma.v1GameParticipant.findMany({ where: { lineupId }, orderBy: { displayNameSnapshot: 'asc' } });
   const sync = (leagueId: string, teamId: string) =>
-    prisma.$transaction((tx) => syncLeagueRosterLineups(tx, { leagueId, teamId }));
+    prisma.$transaction((tx) => syncCompetitionTeamRosters(tx, { competitionId: leagueId, teamId }));
+  /** 참가 명단 쓰기는 재계산 이벤트만 남긴다 — 경기 명단은 워커가 처리한 뒤에 본다. */
+  const drain = () => drainOutboxWorker(prisma);
 
   /**
    * #9 (2026-09-19 QA) 이후: `seedFixture()`의 팀장·팀원 전부(활성 멤버십엔 역할 구분이 없다 —
@@ -133,9 +143,10 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     const newMember = await makeMember(f.team.id);
 
     await app.get(TournamentPlayersService).addPlayer(f.captain, f.league.id, f.registration.id, { userId: newMember } as never);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
-    expect([latest.revision, latest.state]).toEqual([2, 'DRAFT']);
+    expect([latest.revision, latest.state]).toEqual([2, 'SUBMITTED']);
     const rows = await participantsOf(latest.id);
     expect(rows.map((row) => row.userId).sort()).toEqual([f.captain.id, f.members[0], f.members[1], newMember].sort());
     expect(rows.every((row) => row.started)).toBe(true);
@@ -160,6 +171,7 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     });
 
     await players.removePlayer(f.captain, f.league.id, f.registration.id, first.id);
+    await drain();
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect(latest.revision).toBe(2);
@@ -196,15 +208,16 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
       where: { registrationId: f.registration.id, removedAt: null },
     });
     expect(active).toBe(0);
-    // "올렸다가 전원 뺀 팀" 은 자동 채움 대상이 아니다 — 소프트 삭제된 3건 그대로이고
-    // 새로 생기지 않는다.
+    // "올렸다가 전원 뺀 팀" 은 자동 채움 대상이 아니다 — 워커가 재계산해도 소프트 삭제된 3건
+    // 그대로이고 새로 생기지 않는다.
+    await drain();
     const everRegistered = await prisma.v1TournamentPlayer.count({
       where: { registrationId: f.registration.id },
     });
     expect(everRegistered).toBe(3);
   });
 
-  it('팀장이 저장한 라인업은 덮지 않는다', async () => {
+  it('팀장이 저장한 라인업은 이관 전까지 덮지 않는다', async () => {
     const f = await seedFixture();
     const generated = await latestLineup(f.game.id, f.side.id);
     const teamSaved = await prisma.v1GameLineup.create({
@@ -217,7 +230,7 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     expect((await latestLineup(f.game.id, f.side.id)).id).toBe(teamSaved.id);
   });
 
-  it('자동 명단(리비전 1)이라도 팀장이 제출했으면 덮지 않는다', async () => {
+  it('자동 명단(리비전 1)이라도 팀장이 제출했으면 이관 전까지 덮지 않는다', async () => {
     const f = await seedFixture();
     const generated = await latestLineup(f.game.id, f.side.id);
     await prisma.v1GameLineup.update({
@@ -229,6 +242,63 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
 
     expect(await sync(f.league.id, f.team.id)).toBe(0);
     expect((await latestLineup(f.game.id, f.side.id)).id).toBe(generated.id);
+  });
+
+  it('이관 표시가 남은 사이드는 팀장 저장본 위에 새 제출본을 얹고, 그 뒤로도 계속 맞춘다', async () => {
+    const f = await seedFixture();
+    const generated = await latestLineup(f.game.id, f.side.id);
+    const teamSaved = await prisma.v1GameLineup.create({
+      data: { gameId: f.game.id, sideId: f.side.id, revision: 2, supersedesId: generated.id, state: 'SUBMITTED', submittedAt: new Date() },
+    });
+    await prisma.$transaction((tx) =>
+      new OperationAuditWriterService().create(tx, {
+        actor: { type: 'SYSTEM', id: 'LEAGUE_ROSTER_MIGRATION' },
+        requestId: leagueRosterMigrationRequestId(f.game.id, f.side.id),
+        action: LEAGUE_ROSTER_MIGRATED_ACTION,
+        targetType: 'GAME',
+        targetId: f.game.id,
+        tournamentId: f.league.id,
+        teamMatchId: null,
+        occurredAt: new Date(),
+        before: { lineupId: teamSaved.id },
+        after: { sideId: f.side.id },
+      }),
+    );
+    // 이관 표시는 그 사이드에만 걸린다 — 같은 경기 상대 사이드의 팀장 저장본(표시 없음)은 계속 덮지 않는다.
+    const opponentGenerated = await latestLineup(f.game.id, f.opponentSide.id);
+    const opponentSaved = await prisma.v1GameLineup.create({
+      data: {
+        gameId: f.game.id,
+        sideId: f.opponentSide.id,
+        revision: opponentGenerated.revision + 1,
+        supersedesId: opponentGenerated.id,
+        state: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+    });
+
+    expect(await sync(f.league.id, f.team.id)).toBe(1);
+    const latest = await latestLineup(f.game.id, f.side.id);
+    expect([latest.revision, latest.state, latest.supersedesId]).toEqual([3, 'SUBMITTED', teamSaved.id]);
+    expect((await participantsOf(latest.id)).map((row) => row.userId).sort()).toEqual(
+      [f.captain.id, f.members[0], f.members[1]].sort(),
+    );
+
+    const newMember = await makeMember(f.team.id);
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: newMember, realName: '명단 선수' } });
+    expect(await sync(f.league.id, f.team.id)).toBe(1);
+    expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(4);
+
+    const opponentTeamId = f.opponentSide.teamId!;
+    const opponentRegistration = await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: f.league.id, teamId: opponentTeamId } },
+    });
+    const opponentNewMember = await makeMember(opponentTeamId);
+    await prisma.v1TournamentPlayer.create({
+      data: { registrationId: opponentRegistration.id, userId: opponentNewMember, realName: '명단 선수' },
+    });
+    expect(await sync(f.league.id, opponentTeamId)).toBe(0);
+    expect((await latestLineup(f.game.id, f.opponentSide.id)).id).toBe(opponentSaved.id);
   });
 
   it('시작 시각이 지난 경기는 맞추지 않는다', async () => {

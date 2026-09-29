@@ -82,7 +82,6 @@ describe('Task 6 L1 game lifecycle', () => {
   let tournamentGameId: string;
   let teamGameId: string;
   let tournamentHomeSideId: string;
-  let tournamentAwaySideId: string;
   let teamRevisionId: string;
 
   beforeAll(async () => {
@@ -267,9 +266,6 @@ describe('Task 6 L1 game lifecycle', () => {
     tournamentHomeSideId = persisted.sides.find(
       (side) => side.sideKey === V1GameSideKey.HOME,
     )?.id ?? '';
-    tournamentAwaySideId = persisted.sides.find(
-      (side) => side.sideKey === V1GameSideKey.AWAY,
-    )?.id ?? '';
 
     expect(replay).toEqual(first);
     expect(persisted.competitionConfigVersionId).toBe(configId);
@@ -277,96 +273,14 @@ describe('Task 6 L1 game lifecycle', () => {
     expect(persisted.periods.length).toBeGreaterThan(0);
     expect(persisted.participants).toHaveLength(1);
 
-    const savedLineup = await service.saveLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      tournamentHomeSideId,
-      'lineup-save',
-      {
-        expectedVersion: 1,
-        clientCommandId: 'lineup-save',
-        formation: '1-0',
-        // football-v1 pins minPlayers:7/maxPlayers:11 (added lineup-size gate on
-        // this generic saveLineup route — previously unvalidated, an empty
-        // roster was silently accepted). This test is about lifecycle
-        // mechanics (idempotent replay, submit flow), not roster sizing, so a
-        // minimal-but-valid 7-player roster keeps that unrelated behavior
-        // exercised without tripping the new invariant.
-        participants: Array.from({ length: 7 }, (_, index) => ({
-          displayNameSnapshot: `Lifecycle Player ${index + 1}`,
-          ...(index === 0 ? { position: 'GK' } : {}),
-          started: true,
-        })),
-      },
-    );
-    const staleSameSideSave = await captureFailure(() =>
-      service.saveLineup(
-        authUser(ids.operatorUser),
-        tournamentGameId,
-        tournamentHomeSideId,
-        'lineup-save-stale-same-side',
-        {
-          expectedVersion: 0,
-          clientCommandId: 'lineup-save-stale-same-side',
-          formation: '1-0',
-          participants: Array.from({ length: 7 }, (_, index) => ({
-            displayNameSnapshot: `Stale Lifecycle Player ${index + 1}`,
-            ...(index === 0 ? { position: 'GK' } : {}),
-            started: true,
-          })),
-        },
-      ),
-    );
-    expectHttpCode(staleSameSideSave, 409, 'VERSION_CONFLICT');
-    const lineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
-    const submittedLineup = await service.submitLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      String(savedLineup.lineupId),
-      'lineup-submit',
-      {
-        expectedVersion: savedLineup.lineupRevision,
-        clientCommandId: 'lineup-submit',
-        takeoverToken: lineupSubmitToken,
-      },
-    );
-    expect(submittedLineup).toEqual(expect.objectContaining({ lineupState: 'SUBMITTED', version: 2 }));
-
-    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
-    // lineup on every side before `start` is allowed -- give the AWAY side one
-    // too so the next test's `start` command exercises lifecycle mechanics
-    // instead of tripping LINEUP_NOT_SUBMITTED.
-    const awaySavedLineup = await service.saveLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      tournamentAwaySideId,
-      'lineup-save-away',
-      {
-        // Lineup CAS is side-scoped: HOME save/submit must not stale AWAY's
-        // first editor, whose latest auto-created lineup revision is still 1.
-        expectedVersion: 1,
-        clientCommandId: 'lineup-save-away',
-        formation: '1-0',
-        participants: Array.from({ length: 7 }, (_, index) => ({
-          displayNameSnapshot: `Away Lifecycle Player ${index + 1}`,
-          ...(index === 0 ? { position: 'GK' } : {}),
-          started: true,
-        })),
-      },
-    );
-    const awayLineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
-    const awaySubmittedLineup = await service.submitLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      String(awaySavedLineup.lineupId),
-      'lineup-submit-away',
-      {
-        expectedVersion: awaySavedLineup.lineupRevision,
-        clientCommandId: 'lineup-submit-away',
-        takeoverToken: awayLineupSubmitToken,
-      },
-    );
-    expect(awaySubmittedLineup).toEqual(expect.objectContaining({ lineupState: 'SUBMITTED', version: 4 }));
+    // Task 179: 대회 경기 명단은 참가 명단에서 계산된다 — 운영자라도 라인업 저장·제출 경로는 409 이고
+    // 게임 버전·리비전을 건드리지 않는다.
+    const lineupWrite = await captureFailure(() => service.rejectLineupWrite(authUser(ids.operatorUser), tournamentGameId));
+    expectHttpCode(lineupWrite, 409, 'ROSTER_MANAGED_BY_ADJUSTMENTS');
+    expect(await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId }, select: { version: true } })).toEqual({
+      version: 0,
+    });
+    expect(await prisma.v1GameLineup.count({ where: { gameId: tournamentGameId } })).toBe(2);
 
     const missingPinInput = { ...input, sourceId: ids.invalidFixture, competitionConfigVersionId: '' };
     const missingPin = await captureFailure(() =>
@@ -385,9 +299,8 @@ describe('Task 6 L1 game lifecycle', () => {
   it('enforces header/body durable IDs, payload reuse, lifecycle, event append, and visibility', async () => {
     const startToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const start = {
-      // Game version at this point: create(0) + home lineup save(1) + home
-      // lineup submit(2) + away lineup save(3) + away lineup submit(4) -> 4.
-      expectedVersion: 4,
+      // 생성 직후 게임 버전 0 — 라인업 쓰기가 없다(Task 179).
+      expectedVersion: 0,
       clientCommandId: 'tournament-start',
       takeoverToken: startToken,
       occurredAt: new Date().toISOString(),
@@ -434,7 +347,7 @@ describe('Task 6 L1 game lifecycle', () => {
 
     const appendToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const append = {
-      expectedVersion: 5,
+      expectedVersion: 1,
       clientEventId: 'event-period-start',
       takeoverToken: appendToken,
       type: V1GameEventType.PERIOD_START,
@@ -481,7 +394,7 @@ describe('Task 6 L1 game lifecycle', () => {
   it('derives tournament participants while draft and freezes only after the complete snapshot exists', async () => {
     const endToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const endCommand = {
-      expectedVersion: 6,
+      expectedVersion: 2,
       clientCommandId: 'tournament-end',
       takeoverToken: endToken,
       occurredAt: new Date().toISOString(),
@@ -519,13 +432,10 @@ describe('Task 6 L1 game lifecycle', () => {
       failure: null,
       resultState: V1GameState.ENDED,
       gameState: V1GameState.ENDED,
-      gameVersion: 7,
+      gameVersion: 3,
       revisionStates: [V1GameResultRevisionState.SUBMITTED],
-      // The creation-time HOME placeholder ("Host One") is superseded once a submitted lineup exists.
-      // The latest 7-player HOME and AWAY lineup rosters are retained (the
-      // AWAY lineup exists so `start` clears assertLineupsSubmittedForStart --
-      // the official snapshot freezes 14 unique latest-lineup appearances).
-      participantCounts: [14],
+      // 제출본이 없으면 셀렉터는 최신 리비전을 읽는다 — 생성 시점 HOME 참가자("Host One") 한 명.
+      participantCounts: [1],
     });
 
     const replay = await service.executeCommand(
@@ -617,7 +527,7 @@ describe('Task 6 L1 game lifecycle', () => {
         tournamentGameId,
         'tournament-outsider-draft',
         {
-          expectedVersion: 7,
+          expectedVersion: 3,
           clientCommandId: 'tournament-outsider-draft',
           score: { home: 0, away: 0 },
           actualParticipants: [],
@@ -634,7 +544,7 @@ describe('Task 6 L1 game lifecycle', () => {
         tournamentGameId,
         'tournament-draft',
         {
-          expectedVersion: 7,
+          expectedVersion: 3,
           clientCommandId: 'tournament-draft',
           score: { home: 0, away: 0 },
           actualParticipants: [],

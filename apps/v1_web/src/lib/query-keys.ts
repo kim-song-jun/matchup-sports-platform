@@ -57,6 +57,22 @@ export const v1Keys = {
   teamUpcomingGames: (teamId: string) => [...v1Keys.team(teamId), 'upcoming-games'] as const,
   tacticsBoard: (teamId: string, gameId: string) =>
     [...v1Keys.team(teamId), 'tactics-board', gameId] as const,
+  /** Task 179 — 경기 한 사이드의 변경 기록 접두사(조정 뒤 무효화 단위). */
+  gameSideRosterAll: (gameId: string, sideId: string) => [...v1Keys.game(gameId), 'sides', sideId] as const,
+  gameRosterAdjustments: (gameId: string, sideId: string) =>
+    [...v1Keys.gameSideRosterAll(gameId, sideId), 'roster-adjustments'] as const,
+  /** 팀·경기로 찾는 경기 명단 — 결장 기간처럼 어느 경기가 바뀌는지 모르는 쓰기는 이 접두사로 통째 낡게 둔다. */
+  teamGameRosterAll: (teamId: string) => [...v1Keys.team(teamId), 'games'] as const,
+  teamGameRoster: (teamId: string, gameId: string) => [...v1Keys.teamGameRosterAll(teamId), gameId, 'roster'] as const,
+  teamGameRosters: (teamId: string) => [...v1Keys.team(teamId), 'game-rosters'] as const,
+  teamMemberUnavailability: (teamId: string, userId: string) =>
+    [...v1Keys.team(teamId), 'members', userId, 'unavailability'] as const,
+  teamUnavailabilityAll: (teamId: string) => [...v1Keys.team(teamId), 'unavailability'] as const,
+  teamUnavailability: (teamId: string, activeAt: string) => [...v1Keys.teamUnavailabilityAll(teamId), activeAt] as const,
+  /** 어드민 참가 신청 펼침 표 — 조정 쪽에선 신청 id 를 모르므로 이 접두사로 통째 무효화한다. */
+  adminGameRostersAll: () => [...v1Keys.all, 'admin', 'game-rosters'] as const,
+  adminRegistrationGameRosters: (tournamentId: string, registrationId: string) =>
+    [...v1Keys.adminGameRostersAll(), tournamentId, registrationId] as const,
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,

@@ -1,10 +1,13 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { V1GameLineupState } from '@prisma/client';
+import { V1GameLineupState, type Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 // 주차 규칙은 공용 모듈이 소유한다. 아래 private 메서드는 "DB 에서 형제 경기일을 모으는" 부분만
 // 담당하므로 이름이 겹친다 — 별칭으로 구분한다.
 import { resolveLeagueWeekNumbers as resolveWeekNumbersFromStartAts } from '../league-matches/league-week-number';
+import { loadCompetitionRosterBase, loadGameRoster } from '../games/roster/game-roster-loader';
+import { summarizeGameRoster, type GameRosterSummary } from '../games/roster/game-roster-matrix';
 import { PrismaService } from '../prisma/prisma.service';
+import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
@@ -39,9 +42,6 @@ export type LineupTodo = {
    * 분기 없이 하나의 필드를 읽게 하려는 것). 리그 전용 필드를 새로 만들면 소비자(알림
    * 워커·홈 카드)마다 "둘 중 채워진 쪽"을 고르는 분기가 늘어난다.
    *
-   * 주의: 알림 워커는 이 값을 **대회 단위 묶음의 열쇠**로도 쓴다
-   * (lineup-reminder.service.ts `buildDailyMessages`). `competitionKind === 'TOURNAMENT'`
-   * 조건으로 canonical 대회까지 함께 묶고, 리그 대진은 경기 단위를 유지한다.
    */
   tournamentId: string | null;
   tournamentTitle: string | null;
@@ -58,8 +58,17 @@ export type LineupTodo = {
   opponentName: string | null;
   scheduledAt: Date | null;
   state: LineupTodoState;
+  /** 대회·리그 = 경기 명단 화면(`rosterScreenPath`), 친선 = 참석명단 화면. */
   deepLink: string;
 };
+
+/** 대회·리그 경기의 "명단 확인" 대상 — 전날 알림이 쓴다. */
+export type CompetitionRosterCheck = TeamUpcomingGame & { rosterSummary: GameRosterSummary };
+
+/** 대회·리그 경기 명단 웹 화면. 알림 딥링크와 웹 라우트가 같은 값을 써야 한다. */
+export function rosterScreenPath(teamId: string, gameId: string): string {
+  return `/teams/${teamId}/games/${gameId}/roster`;
+}
 
 /**
  * "라인업을 넣어야 하는데 아직 안 된" 경기를 찾아낸다.
@@ -69,6 +78,8 @@ export type LineupTodo = {
  * 사용자는 둘 중 뭘 믿어야 할지 알 수 없다. 그래서 판정은 여기 한 곳에만 둔다.
  *
  * 다루지 않는 것:
+ * - **대회·리그 경기**(Task 179 R1). 경기 명단은 참가 명단에서 계산되고 팀장은 빠질 사람만
+ *   조정하므로 "제출" 할 일이 없다 — 전날 "명단 확인" 알림(`listCompetitionRosterChecks`)이 대신한다.
  * - **대진이 아직 안 잡힌 대회**. 참가가 확정돼도 상대와 시간이 정해지기 전에는 라인업을
  *   넣을 화면 자체가 없다. 재촉해봐야 할 수 있는 일이 없으므로 목록에 올리지 않는다.
  * - **이미 제출·잠긴 라인업**. 할 일이 아니다.
@@ -78,7 +89,7 @@ export type LineupTodo = {
 export class LineupTodoService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** 이 사용자가 owner/manager로 있는 모든 팀의 미완료 라인업. */
+  /** 이 사용자가 owner/manager로 있는 모든 팀의 미완료 참석명단(친선만). */
   async listForUser(user: V1AuthUser): Promise<{ items: LineupTodo[] }> {
     const memberships = await this.prisma.v1TeamMembership.findMany({
       where: { userId: user.id, status: 'active', role: { in: ['owner', 'manager'] } },
@@ -110,6 +121,28 @@ export class LineupTodoService {
    */
   async listUpcomingForTeam(teamId: string, now: Date): Promise<TeamUpcomingGame[]> {
     return this.collectWithLineupState([teamId], now);
+  }
+
+  /**
+   * `[from, to)` 에 시작하는 대회·리그 경기의 팀별 계산된 명단 요약. 기준 명단이 없는 팀
+   * (확정 신청 없는 대회 등)은 알릴 명단이 없으므로 빠진다.
+   */
+  async listCompetitionRosterChecks(from: Date, to: Date): Promise<CompetitionRosterCheck[]> {
+    const games = (await this.collectWithLineupState(null, from)).filter(
+      (game) => game.competitionKind !== 'FRIENDLY' && game.scheduledAt !== null && game.scheduledAt < to,
+    );
+    const byTeam = new Map<string, TeamUpcomingGame[]>();
+    for (const game of games) byTeam.set(game.teamId, [...(byTeam.get(game.teamId) ?? []), game]);
+
+    const checks: CompetitionRosterCheck[] = [];
+    for (const [teamId, teamGames] of byTeam) {
+      const rosters = await loadRosterSummaries(this.prisma, teamId, teamGames);
+      for (const game of teamGames) {
+        const summary = rosters.get(game.gameId)?.summary;
+        if (summary) checks.push({ ...game, rosterSummary: summary });
+      }
+    }
+    return checks;
   }
 
   // ─── internals ───────────────────────────────────────────────────────────
@@ -145,6 +178,7 @@ export class LineupTodoService {
     for (const { lineupState, ...rest } of rows) {
       // 제출됐거나 잠긴 라인업은 할 일이 아니다.
       if (lineupState === 'DONE') continue;
+      if (rest.competitionKind !== 'FRIENDLY') continue;
       items.push({ ...rest, state: lineupState });
     }
     return items;
@@ -252,7 +286,10 @@ export class LineupTodoService {
           title,
           opponentName: side.opponentName,
           scheduledAt: match.startAt,
-          deepLink: `/team-matches/${match.id}/lineup`,
+          deepLink:
+            competitionKind === 'FRIENDLY'
+              ? `/team-matches/${match.id}/lineup`
+              : rosterScreenPath(side.teamId, match.game.id),
         });
       }
     }
@@ -349,4 +386,42 @@ export class LineupTodoService {
     }
     return result;
   }
+}
+
+/** 한 팀의 경기들에 대한 사이드·계산된 명단 요약. 대회·리그만 요약이 있고 친선·기준 명단 없음은 null. */
+export async function loadRosterSummaries(
+  tx: Prisma.TransactionClient,
+  teamId: string,
+  games: readonly TeamUpcomingGame[],
+): Promise<Map<string, { teamMatchId: string | null; sideId: string; summary: GameRosterSummary | null }>> {
+  const sides = await tx.v1GameSide.findMany({
+    where: { gameId: { in: games.map((game) => game.gameId) }, teamId },
+    select: { id: true, gameId: true, game: { select: { teamMatchId: true } } },
+  });
+  const sideByGame = new Map(sides.map((side) => [side.gameId, side]));
+  const preloaded = new Map<string, Awaited<ReturnType<typeof preload>>>();
+  async function preload(competitionId: string, isLeague: boolean) {
+    const scope = { competitionId, isLeague, teamId };
+    const base = await loadCompetitionRosterBase(tx, scope);
+    return { base, orderedGames: base === null ? [] : await loadTeamCompetitionGameOrder(tx, scope) };
+  }
+
+  const result = new Map<string, { teamMatchId: string | null; sideId: string; summary: GameRosterSummary | null }>();
+  for (const game of games) {
+    const side = sideByGame.get(game.gameId);
+    if (side === undefined) continue;
+    let summary: GameRosterSummary | null = null;
+    if (game.competitionKind !== 'FRIENDLY' && game.tournamentId !== null) {
+      let cached = preloaded.get(game.tournamentId);
+      if (cached === undefined) {
+        cached = await preload(game.tournamentId, game.competitionKind === 'LEAGUE');
+        preloaded.set(game.tournamentId, cached);
+      }
+      const loaded =
+        cached.base === null ? null : await loadGameRoster(tx, { gameId: game.gameId, sideId: side.id }, cached);
+      summary = loaded === null ? null : summarizeGameRoster(loaded.computation);
+    }
+    result.set(game.gameId, { teamMatchId: side.game.teamMatchId, sideId: side.id, summary });
+  }
+  return result;
 }

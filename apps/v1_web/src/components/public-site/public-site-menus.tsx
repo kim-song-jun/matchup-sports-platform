@@ -4,15 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState, type FocusEvent } from 'react';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import type { PublicLink } from '@/lib/public-content/types';
-import {
-  PUBLIC_NAV_ABOUT,
-  PUBLIC_NAV_AUDIENCE_LABEL,
-  PUBLIC_NAV_AUDIENCES,
-  PUBLIC_NAV_CONTACT,
-  PUBLIC_NAV_HELP,
-  currentNavHref,
-  type PublicNavService,
-} from './public-site-nav';
+import { currentNavHref, type PublicNavService } from './public-site-nav';
 
 /**
  * 비모달 디스클로저: ESC 는 닫고 버튼으로 포커스를 돌려준다. 바깥 클릭·포커스가 밖으로 나가면
@@ -75,7 +67,7 @@ function NavLink({ href, label, current, onNavigate }: {
   );
 }
 
-/** 1024+ 헤더 드롭다운. "이용 대상"(/landing A안)·"이용 안내"(공용 GNB)처럼 라벨+링크 목록만 다른 메뉴가 이걸 공유한다. */
+/** 1024+ 헤더 드롭다운(공용 GNB 의 "이용 안내"). */
 export function PublicSiteDropdown({ label, links, currentPath }: {
   label: string;
   links: readonly PublicLink[];
@@ -110,11 +102,6 @@ export function PublicSiteDropdown({ label, links, currentPath }: {
   );
 }
 
-/** 1024+ 헤더의 "이용 대상" 드롭다운. */
-export function PublicSiteAudienceMenu({ currentPath }: { currentPath?: string }) {
-  return <PublicSiteDropdown label={PUBLIC_NAV_AUDIENCE_LABEL} links={PUBLIC_NAV_AUDIENCES} currentPath={currentPath} />;
-}
-
 function PrimaryNavLink({ href, label, description, current, onNavigate }: {
   href: string;
   label: string;
@@ -138,30 +125,24 @@ function PrimaryNavLink({ href, label, description, current, onNavigate }: {
 type MobileMenuGroup = { label: string; links: readonly PublicLink[] };
 
 /**
- * 1024 미만 전체 메뉴. 열면 첫 링크로 포커스를 옮기고, ESC·닫기 버튼은 메뉴 버튼으로 되돌린다.
- * `primary`·`groups` 를 안 주면(/landing A안 내비) About 링크 → 이용 대상 그룹 → 도움말·문의 → 로그인.
- * 공용 GNB 는 두 prop 을 줘서 매치·대회·팀 큰 행 → 이용 안내 그룹 → 로그인 순서로 바꾼다.
+ * 1024 미만 전체 메뉴: 큰 행(매치·대회·팀) → 링크 묶음(이용 안내) → 로그인.
+ * 열면 첫 링크로 포커스를 옮기고, ESC·닫기 버튼은 메뉴 버튼으로 되돌린다.
  */
 export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
   currentPath?: string;
-  primary?: readonly PublicNavService[];
-  groups?: readonly MobileMenuGroup[];
+  primary: readonly PublicNavService[];
+  groups: readonly MobileMenuGroup[];
 }) {
   const { open, setOpen, close, rootRef, buttonRef, onBlur } = useDisclosure();
   const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const isDefault = !primary && !groups;
 
   useEffect(() => {
     if (open) panelRef.current?.querySelector<HTMLElement>('a[href]')?.focus();
   }, [open]);
 
   const navigate = () => close(false);
-  const resolvedGroups = groups ?? [{ label: PUBLIC_NAV_AUDIENCE_LABEL, links: PUBLIC_NAV_AUDIENCES }];
-  const allLinks = [
-    ...(isDefault ? [PUBLIC_NAV_ABOUT, PUBLIC_NAV_HELP, PUBLIC_NAV_CONTACT] : (primary ?? [])),
-    ...resolvedGroups.flatMap((group) => group.links),
-  ];
+  const allLinks = [...primary, ...groups.flatMap((group) => group.links)];
   const current = currentNavHref(allLinks.map((link) => link.href), currentPath);
 
   return (
@@ -180,17 +161,13 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
       <div id={panelId} ref={panelRef} className="tm-ps-mobile-panel" hidden={!open}>
         <nav aria-label="전체 메뉴">
           <ul className="tm-ps-menu-list">
-            {isDefault ? (
-              <li><NavLink {...PUBLIC_NAV_ABOUT} current={current} onNavigate={navigate} /></li>
-            ) : (
-              primary?.map((item) => (
-                <li key={item.href}>
-                  <PrimaryNavLink {...item} current={current} onNavigate={navigate} />
-                </li>
-              ))
-            )}
-            {resolvedGroups.map((group, index) => {
-              const labelId = groups ? `${panelId}-group-${index}` : `${panelId}-audience`;
+            {primary.map((item) => (
+              <li key={item.href}>
+                <PrimaryNavLink {...item} current={current} onNavigate={navigate} />
+              </li>
+            ))}
+            {groups.map((group, index) => {
+              const labelId = `${panelId}-group-${index}`;
               return (
                 <li key={`${index}-${group.label}`}>
                   <p className="tm-ps-menu-group-label" id={labelId}>{group.label}</p>
@@ -204,12 +181,6 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
                 </li>
               );
             })}
-            {isDefault ? (
-              <>
-                <li><NavLink {...PUBLIC_NAV_HELP} current={current} onNavigate={navigate} /></li>
-                <li><NavLink {...PUBLIC_NAV_CONTACT} current={current} onNavigate={navigate} /></li>
-              </>
-            ) : null}
             <li className="tm-ps-menu-login">
               <NavLink href="/login" label="로그인" onNavigate={navigate} />
             </li>

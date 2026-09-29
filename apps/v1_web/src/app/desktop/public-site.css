@@ -325,17 +325,65 @@ html:has(.tm-ps) {
 }
 
 .tm-ps-honest-list li {
-  display: grid;
-  gap: 4px;
-  padding-left: 16px;
-  border-left: 2px solid var(--border-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   font-size: var(--font-size-body-sm);
   line-height: 1.6;
   color: var(--text);
 }
 
+.tm-ps-honest-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.tm-ps-honest-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .tm-ps-honest-list strong {
   color: var(--text-strong);
+}
+
+/* 접이식: 제목 줄 전체가 44px+ 누름 영역, 펼침은 FAQ 와 같은 꺾쇠 */
+.tm-ps-honest[data-collapsible='true'] {
+  padding-block: 4px;
+}
+
+.tm-ps-honest-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tm-ps-honest-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-ps-honest-summary .tm-ps-honest-title {
+  margin: 0;
+}
+
+.tm-ps-honest[open] > .tm-ps-honest-summary .tm-ps-faq-chevron {
+  margin-bottom: -3px;
+  transform: rotate(225deg);
+}
+
+.tm-ps-honest[data-collapsible='true'] .tm-ps-honest-list {
+  padding: 4px 0 16px;
 }
 
 /* ── FAQ 아코디언 ── */

@@ -314,6 +314,77 @@
   color: var(--text-muted);
 }
 
+/* ── 나눔 섹션(PublicSection layout='split'): 1024+ 에서 머리 | 콘텐츠 ── */
+.tm-ps-split {
+  display: grid;
+  gap: 24px;
+}
+
+.tm-ps-split-head .tm-ps-section-header {
+  margin-bottom: 0;
+}
+
+.tm-ps-split-body {
+  min-width: 0;
+}
+
+.tm-ps-split-more {
+  margin: 8px 0 0;
+}
+
+/* ── 아이콘 카드 목록(/contact·가이드·/for/*) ── */
+.tm-ps-cards {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-ps-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  height: 100%;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+}
+
+.tm-ps-card-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+  color: var(--blue700);
+}
+
+.tm-ps-card-title {
+  margin: 0;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+
+.tm-ps-card-body {
+  font-size: var(--font-size-body-sm);
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.tm-ps-card-body p {
+  margin: 0;
+}
+
+.tm-ps-card-body p + p {
+  margin-top: 8px;
+}
+
 /* ── 강조 밴드: 테마와 무관한 고정 파랑(--static-blue, 흰 글씨 5.41:1) ── */
 .tm-ps-band-section {
   padding: 48px 0 64px;
@@ -480,6 +551,8 @@
   .tm-ps-band-title { font-size: 36px; }
   .tm-ps-band-top { grid-template-columns: minmax(0, 1fr) 200px; align-items: start; gap: 24px; }
   .tm-ps-band-illu { width: 200px; margin: -24px -8px -24px 0; }
+  .tm-ps-cards[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .tm-ps-card { padding: 24px; }
 }
 
 /* ─── 데스크톱 (1024+) ─── */
@@ -552,6 +625,15 @@
     border-top: 1px solid var(--border);
   }
 
+  .tm-ps-split {
+    grid-template-columns: 380px minmax(0, 1fr);
+    align-items: start;
+    gap: 64px;
+  }
+  .tm-ps-split-head { position: sticky; top: 96px; }
+  /* 380px 칸이라 섹션 제목 기본값(42px)이면 세 줄로 꺾인다 */
+  .tm-ps-split-head .tm-ps-title { font-size: 36px; }
+  .tm-ps-cards[data-columns='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tm-ps-band-section { padding: 96px 0 120px; }
   .tm-ps-band { padding: 64px 64px 48px; }
   .tm-ps-band-title { font-size: 44px; line-height: 1.24; }

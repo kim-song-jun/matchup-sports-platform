@@ -1,5 +1,5 @@
 /**
- * PublicSiteMobileMenu 의 primary·groups prop 경로(설명 행 렌더·그룹·로그인 순서).
+ * PublicSiteMobileMenu 의 순서(설명 달린 큰 행 → 링크 묶음 → 로그인).
  * 공용 GNB 로 조립한 모습과 열고 닫기·현재 위치는 public-site-gnb.test.tsx 가 잡는다.
  */
 import { render, within } from '@testing-library/react';
@@ -20,7 +20,7 @@ const PRIMARY = [
 
 const GROUPS = [{ label: '이용 안내', links: [{ href: '/help', label: '시작 가이드' }, { href: '/faq', label: '자주 묻는 질문' }] }];
 
-describe('PublicSiteMobileMenu — primary·groups 경로', () => {
+describe('PublicSiteMobileMenu', () => {
   it('큰 행에 라벨과 한 줄 설명을 함께 렌더하고, 이용 안내 그룹 → 로그인 순서로 이어진다', async () => {
     const user = userEvent.setup();
     render(<PublicSiteMobileMenu primary={PRIMARY} groups={GROUPS} />);

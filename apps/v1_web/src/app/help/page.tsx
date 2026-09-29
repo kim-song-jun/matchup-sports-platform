@@ -107,23 +107,25 @@ export default async function HelpPage() {
           </PublicSection>
         </PublicSearchGroup>
         <PublicSearchGroup keys={[...keys(faqEntries), ...keys(termEntries)]}>
-          <section id="popular" className="tm-ps-section" data-tone="muted" aria-labelledby="popular-heading">
-            <div className="tm-ps-container tm-help-popular">
-              <div className="tm-help-popular-head">
-                <header className="tm-ps-section-header" data-reveal>
-                  <p className="tm-ps-kw">자주 찾는 질문</p>
-                  <h2 id="popular-heading" className="tm-ps-title">많이 묻는 질문부터 확인해 보세요</h2>
-                </header>
-                <p className="tm-help-more-link">
+          <PublicSection
+            id="popular"
+            tone="muted"
+            layout="split"
+            keyword="자주 찾는 질문"
+            title="많이 묻는 질문부터 확인해 보세요"
+            headExtra={(
+              <>
+                <p className="tm-ps-split-more">
                   <Link className="tm-ps-text-link" href="/faq">자주 묻는 질문 전체 보기</Link>
                 </p>
                 <PublicSearchGroup keys={keys(termEntries)}>
                   <HelpGlossaryShortcut terms={GLOSSARY_TERMS} />
                 </PublicSearchGroup>
-              </div>
-              <HelpFaqResults items={FAQ_ITEMS} popularIds={HELP_POPULAR_FAQ_IDS} categoryLabels={CATEGORY_LABELS} />
-            </div>
-          </section>
+              </>
+            )}
+          >
+            <HelpFaqResults items={FAQ_ITEMS} popularIds={HELP_POPULAR_FAQ_IDS} categoryLabels={CATEGORY_LABELS} />
+          </PublicSection>
         </PublicSearchGroup>
         <PublicHelpCtaBand email={siteInfo.contactEmail} />
       </PublicPageShell>

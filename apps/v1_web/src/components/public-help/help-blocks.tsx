@@ -31,7 +31,8 @@ export function HelpQuestionLinks({ items, label }: { items: readonly FaqItem[];
   );
 }
 
-const GUIDE_ILLUSTRATION: Readonly<Record<GuideSlug, PublicIllustration>> = {
+/** 가이드 카드·가이드 상세 히어로가 같은 그림을 쓴다. */
+export const GUIDE_ILLUSTRATION: Readonly<Record<GuideSlug, PublicIllustration>> = {
   'join-match': 'landing-hero',
   'create-team': 'auth-welcome',
   'join-competition': 'journey-done',
@@ -42,13 +43,18 @@ const GUIDE_ILLUSTRATION: Readonly<Record<GuideSlug, PublicIllustration>> = {
  * 가이드 카드: 대상 → 제목(카드 전체로 넓힌 링크) → 한 줄 요약 → 단계 미리보기.
  * 페이지 검색어(PublicSearchProvider)가 있으면 맞지 않는 카드를 hidden 으로 가린다.
  */
-export function HelpGuideCards({ guides, headingLevel = 'h3' }: { guides: readonly Guide[]; headingLevel?: 'h2' | 'h3' }) {
+export function HelpGuideCards({ guides, headingLevel = 'h3', columns = 2 }: {
+  guides: readonly Guide[];
+  headingLevel?: 'h2' | 'h3';
+  /** 1024+ 칸 수. 세 장만 보일 때(가이드 상세의 "다른 가이드") 3칸으로 한 줄을 채운다. */
+  columns?: 2 | 3;
+}) {
   const Heading = headingLevel;
   return (
-    <ul className="tm-help-guides">
+    <ul className="tm-help-guides" data-columns={columns}>
       {guides.map((guide, index) => (
         <PublicSearchItem key={guide.slug} matchKey={helpSearchKey('guide', guide.slug)}>
-          <div className="tm-help-guide-reveal" data-reveal style={{ '--i': index % 2 } as CSSProperties}>
+          <div className="tm-help-guide-reveal" data-reveal style={{ '--i': index % columns } as CSSProperties}>
             <div className="tm-help-guide-card">
               <div className="tm-help-guide-top">
                 <div>
@@ -134,21 +140,5 @@ export function HelpGlossaryShortcut({ terms }: { terms: readonly GlossaryTerm[]
         ))}
       </ul>
     </div>
-  );
-}
-
-/** 페이지 끝 문의 안내(가이드 상세용). 답변 목표 시간은 정해지지 않아 약속하지 않는다. */
-export function HelpContactCta() {
-  return (
-    <aside className="tm-help-cta" aria-labelledby="help-cta-heading">
-      <h2 id="help-cta-heading" className="tm-help-cta-title">찾는 답이 없나요?</h2>
-      <p className="tm-help-cta-body">
-        로그인했다면 1:1 문의로, 로그인이 안 되면 이메일로, 대회 개설·제휴는 문의 폼으로 보내 주세요. 문의 창구에서 한 번에 고를 수 있어요.
-      </p>
-      <div className="tm-help-cta-actions">
-        <Link className="tm-btn tm-btn-md tm-btn-primary" href="/contact">문의 창구 보기</Link>
-        <Link className="tm-btn tm-btn-md tm-btn-outline" href="/faq">자주 묻는 질문 전체 보기</Link>
-      </div>
-    </aside>
   );
 }

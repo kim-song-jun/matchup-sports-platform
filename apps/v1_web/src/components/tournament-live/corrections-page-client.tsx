@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
@@ -29,6 +30,8 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  // 공개 화면에서 뒤로가기를 누르면 이 정정 화면으로 돌아오게 한다(fixtureDetailHref 참고).
+  const selfHref = useCurrentHref();
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
@@ -80,6 +83,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
           isRegularLeague: tournament.data.kind === 'regular_league',
           competitionId: tournamentId,
           fixtureId: selectedItem.fixtureId,
+          fromHref: selfHref,
         })
       : undefined;
   const selectedFixtureTitle = selectedItem

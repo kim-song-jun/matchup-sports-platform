@@ -513,7 +513,7 @@ describe('TeamMatchLineupPageClient', () => {
    * 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 이 열이 무엇인지는 열 헤더가 말하고,
    * 스크린리더는 각 버튼의 aria-label 에서 같은 문맥을 얻는다(2026-09-08 사용자 확정).
    */
-  it('GK 글자는 지정된 행에만 있다 — 미지정 행은 빈 컨트롤이다', () => {
+  it('GK 글자는 지정된 행에만 있다 — 미지정 행은 "+" 아이콘만 있는 빈 컨트롤이다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         starters: [
@@ -533,13 +533,38 @@ describe('TeamMatchLineupPageClient', () => {
     const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
 
     expect(designated).toHaveTextContent('GK');
-    // 여기가 계약이다 — 미지정 행에 글자가 있으면 그게 "이 선수는 GK" 로 읽힌다.
-    // `toHaveTextContent('')` 는 쓰지 않는다: **포함 검사**라 빈 문자열이 무엇에나 매치돼
-    // 단언이 무력해진다. `toBeEmptyDOMElement()` 는 자식 노드가 없어야 통과하므로
-    // 공백 문자에도 걸리지 않으면서 계약을 그대로 지킨다.
-    expect(notDesignated).toBeEmptyDOMElement();
+    // 여기가 계약이다 — 미지정 행에 "GK" 글자가 있으면 그게 "이 선수는 GK" 로 읽힌다.
+    // "+" 아이콘(2026-09-29, "빈 원이 눌러야 하는지 알 수 없다"는 지적에 대한 A/B/C 3안 중
+    // C안)은 값이 아니라 "추가 가능" 신호일 뿐이라 이 계약을 건드리지 않는다.
+    expect(notDesignated).not.toHaveTextContent('GK');
+    expect(notDesignated.querySelector('svg')).not.toBeNull();
     // 그래도 누를 수 있어야 한다(빈 컨트롤이지 사라진 컨트롤이 아니다).
     expect(notDesignated).toBeEnabled();
+  });
+
+  it('열람 전용(editable=false)이면 미지정 행에 "+" 를 보여주지 않는다 — 누를 수 없는데 누르라는 신호를 주지 않는다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        gameState: 'LIVE',
+        hasRecordedEvents: true,
+        editable: false,
+        lockReason: 'records_exist',
+        state: 'LOCKED',
+        starters: [
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'p-2', userId: null, displayName: '김철수', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
+    expect(notDesignated).toBeDisabled();
+    expect(notDesignated.querySelector('svg')).toBeNull();
   });
 
   it('리그 대진에서도 팀장·운영진 직접 등록을 안내한다', () => {

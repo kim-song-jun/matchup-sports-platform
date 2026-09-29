@@ -290,6 +290,21 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
     );
   });
 
+  // 일정 탭에서 경기 상세로 들어갔다 뒤로가면 대진표 탭(route-chrome 고정 기본값)이
+  // 아니라 이 화면 자신으로 돌아와야 한다 — fromHref가 fixtureDetailHref까지 이어지는지 확인.
+  it('fromHref를 받으면 경기 카드 링크에 ?from=으로 실어 보낸다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({ fixtureId: 'team-match-9' })] };
+
+    render(
+      <ScheduleContent tournamentId="tour-1" data={data} fromHref="/tournaments/tour-1/bracket" />,
+    );
+
+    expect(screen.getByRole('link', { name: /홈팀/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-1/matches/team-match-9?from=%2Ftournaments%2Ftour-1%2Fbracket',
+    );
+  });
+
   it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
 

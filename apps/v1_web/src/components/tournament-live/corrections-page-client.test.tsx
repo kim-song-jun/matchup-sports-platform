@@ -168,9 +168,10 @@ describe('CorrectionsPageClient — 공개 화면 링크', () => {
 
     // 긍정 앵커 — 패널이 실제로 그려졌다는 증거를 먼저 둔다.
     expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-1');
+    // 공개 화면에서 뒤로가기를 누르면 이 정정 화면(자기 딥링크 포함)으로 돌아온다.
     expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
       'href',
-      '/tournaments/t-1/matches/fx-1',
+      '/tournaments/t-1/matches/fx-1?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Frecords%2Fcorrections%3FfixtureId%3Dfx-1',
     );
   });
 
@@ -180,7 +181,7 @@ describe('CorrectionsPageClient — 공개 화면 링크', () => {
 
     expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
       'href',
-      '/league-matches/t-1/fixtures/fx-1',
+      '/league-matches/t-1/fixtures/fx-1?from=%2Ftournament-ops%2Ftournaments%2Ft-1%2Frecords%2Fcorrections%3FfixtureId%3Dfx-1',
     );
   });
 

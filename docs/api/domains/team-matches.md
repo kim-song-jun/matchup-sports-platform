@@ -155,6 +155,8 @@ Rules:
 
 ## GET /team-matches (TeamMatchesQueryDto)
 
+Public discovery history (Task 178): when `status` is omitted, the list keeps `completed` team matches visible for a rolling seven days from `completedAt` (`gte now - 7 days`). A legacy completed row without `completedAt` falls back to `startAt`. An explicit `status=completed` query remains an unrestricted history query, while `sort=recommended` continues to exclude completed matches and only recommends recruiting or live matched games. Completed cards must render as `경기 종료`, not `신청 마감`.
+
 Query:
 
 | Field | Type | Required | Notes |

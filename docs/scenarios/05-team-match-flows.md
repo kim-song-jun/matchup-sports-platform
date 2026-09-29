@@ -9,6 +9,14 @@
 
 v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts` (`TeamMatchesController`), verified directly against the controller file (not inferred from an older doc):
 
+### V1 public recent-history scenario (Task 178)
+
+- Given a team match reached raw `completed` status less than or exactly seven days ago, when a user opens `/team-matches` without an explicit status filter, then the card remains visible and is labeled `경기 종료`.
+- Given the completion timestamp is older than seven days, when the same default list is requested, then the card is absent.
+- Given `sort=recommended`, completed cards stay absent so recommendation remains action-oriented.
+- Given `status=completed`, the API returns completed history without applying the seven-day public-discovery cutoff.
+- Cancelled matches are outside this rule.
+
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/team-matches` | list, `OptionalV1AuthGuard` |

@@ -641,10 +641,22 @@ describe('TeamMatchesService', () => {
 
     const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
     expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
-    expect(args.where.status).toEqual({ in: ['recruiting', 'closed', 'matched'] });
+    expect(args.where.status).toBeUndefined();
     expect(args.where.startAt).toBeUndefined();
     expect(args.where.AND).toEqual([
-      { OR: [{ startAt: { gte: expect.any(Date) } }, { status: 'matched' }] },
+      {
+        OR: [
+          { status: { in: ['recruiting', 'closed'] }, startAt: { gte: expect.any(Date) } },
+          { status: 'matched' },
+          {
+            status: 'completed',
+            OR: [
+              { completedAt: { gte: expect.any(Date) } },
+              { completedAt: null, startAt: { gte: expect.any(Date) } },
+            ],
+          },
+        ],
+      },
       {
         OR: [
           { hostTeam: { deletedAt: null, status: 'active' } },
@@ -1926,5 +1938,43 @@ describe('TeamMatchesService', () => {
     expect(result.hostTeam!.trustState).toBe('estimated');
     expect(result.hostTeam!.mannerScore).toBe(4);
     expect(result.hostTeam!.wins).toBe(2);
+  });
+
+  it('list: default discovery includes completed team matches from the last seven days', async () => {
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    const before = Date.now();
+    await service.list(null, {});
+    const after = Date.now();
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    const visibility = args.where.AND[0];
+    expect(args.where.status).toBeUndefined();
+    expect(visibility).toEqual({
+      OR: [
+        { status: { in: ['recruiting', 'closed'] }, startAt: { gte: expect.any(Date) } },
+        { status: 'matched' },
+        {
+          status: 'completed',
+          OR: [
+            { completedAt: { gte: expect.any(Date) } },
+            { completedAt: null, startAt: { gte: expect.any(Date) } },
+          ],
+        },
+      ],
+    });
+    const cutoff = visibility.OR[2].OR[0].completedAt.gte as Date;
+    expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - 7 * 24 * 60 * 60 * 1000);
+    expect(cutoff.getTime()).toBeLessThanOrEqual(after - 7 * 24 * 60 * 60 * 1000);
+  });
+
+  it('list: explicit completed status keeps full history without the public window', async () => {
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.list(null, { status: 'completed' });
+
+    const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where;
+    expect(where.status).toBe('completed');
+    expect(where.completedAt).toBeUndefined();
   });
 });

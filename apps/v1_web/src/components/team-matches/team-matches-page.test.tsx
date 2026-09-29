@@ -1372,3 +1372,21 @@ describe('팀매치 목록 필터 시트 — BottomSheet 배선(A안)', () => {
     expect(routerPush).not.toHaveBeenCalled();
   });
 });
+
+describe('TeamMatchListPageView completed card', () => {
+  it('labels a completed match as 경기 종료 instead of 신청 마감', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{
+      ...model.matches[0],
+      status: 'closed',
+      closed: true,
+      apiStatus: 'completed',
+    }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByText('경기 종료')).toBeInTheDocument();
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
+  });
+});

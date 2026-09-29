@@ -12,7 +12,7 @@ import {
 type Tx = Prisma.TransactionClient;
 
 /**
- * 리그 팀장 저장본(Task 176 이전 `/team-matches/:id/lineup` 으로 저장·제출한 리비전)을 경기 명단 조정으로 옮긴다.
+ * 리그 팀장 저장본(Task 178 이전 `/team-matches/:id/lineup` 으로 저장·제출한 리비전)을 경기 명단 조정으로 옮긴다.
  *
  * 기준 명단에 있는데 저장본에 없는 사람 → EXCLUDE(actor = 그 사이드를 저장한 팀장, reason 없음). 조정으로 표현할 수
  * 없는 저장본 행(게스트·기준 명단 밖 계정)은 세기만 한다. 옮긴 사이드에는 이관 표시 감사 행을 남기고 곧바로

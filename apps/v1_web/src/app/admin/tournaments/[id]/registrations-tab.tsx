@@ -380,7 +380,7 @@ export function RegistrationsTab({
   const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
-  // 경기별 명단 펼침(Task 176) — 한 번에 한 팀만 연다.
+  // 경기별 명단 펼침(Task 178) — 한 번에 한 팀만 연다.
   const [gameRostersRegistrationId, setGameRostersRegistrationId] = useState<string | null>(null);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
   // 거부 사유 모달 — 대상이 있으면 열려 있다.

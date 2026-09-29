@@ -13,14 +13,14 @@ set -Eeuo pipefail
 # Task 172 adds shared match record/history tables; M11 remains immutable.
 # 2026-09-26 adds nullable v1_auth_identities.provider_refresh_token_ciphertext (Apple revoke).
 # 2026-09-27 adds v1_site_info_settings (singleton) and additive v1_inquiries guest-retention/purge columns + categories.
-# 2026-09-28 Task 176 adds v1_game_roster_adjustments and v1_team_member_unavailabilities.
+# 2026-09-28 Task 178 adds v1_game_roster_adjustments and v1_team_member_unavailabilities.
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
 [[ -f "$schema" && -f "$m11" ]] || { echo 'Task168 final-policy source inputs missing' >&2; exit 1; }
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == 02be0c876bfdf683554a38efcf5391d6fc6935fabeeefbdf9a3473916795725f \
+[[ "$schema_sha" == ae51fe16f73288f86b4c93404fa3cda014e22f2903c2bac9519bdeb2c34f82d1 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

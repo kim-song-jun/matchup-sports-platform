@@ -848,7 +848,7 @@ describe('TeamMatchLineupService.saveLineup host-only recruitment', () => {
   });
 });
 
-describe('TeamMatchLineupService — 대회·리그 경기는 전체 명단을 쓰지 않는다 (Task 176)', () => {
+describe('TeamMatchLineupService — 대회·리그 경기는 전체 명단을 쓰지 않는다 (Task 178)', () => {
   const competitions = [
     { label: '리그 시작 전', leagueId: 'league-1', tournamentId: 'league-1', gameState: V1GameState.SCHEDULED },
     { label: '리그 진행 중', leagueId: 'league-1', tournamentId: 'league-1', gameState: V1GameState.LIVE },

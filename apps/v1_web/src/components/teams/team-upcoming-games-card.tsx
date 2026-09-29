@@ -7,7 +7,7 @@ import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 
 /**
- * 팀 상세의 "다가오는 경기" — 경기마다 명단 상태와 명단·전술 입구(Task 176 팀 A).
+ * 팀 상세의 "다가오는 경기" — 경기마다 명단 상태와 명단·전술 입구(Task 178 팀 A).
  * 대회·리그는 계산된 경기 명단 요약 → 경기 명단 화면, 친선은 참석명단 제출 여부 → 참석명단.
  * 명단 버튼은 팀장·매니저에게만(팀원은 요약만), 전술보드는 팀원도 읽기로 들어간다.
  *

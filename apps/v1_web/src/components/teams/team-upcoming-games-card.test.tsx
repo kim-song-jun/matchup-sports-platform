@@ -62,7 +62,7 @@ describe('TeamUpcomingGamesCard — 없을 때는 조용히', () => {
   });
 });
 
-describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 176 팀 A)', () => {
+describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 178 팀 A)', () => {
   const items = [
     game({ gameId: 'g-t', competitionKind: 'TOURNAMENT', opponentName: '번개FC', rosterSummary: { participating: 10, excluded: 1, unavailable: 0, suspended: 0 } }),
     game({ gameId: 'g-l', competitionKind: 'LEAGUE', opponentName: '한강유나이티드', rosterSummary: { participating: 9, excluded: 0, unavailable: 1, suspended: 1 } }),

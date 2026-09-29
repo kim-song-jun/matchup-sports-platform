@@ -17,7 +17,7 @@ export interface GameRosterBatchResult {
   readonly alreadyApplied: boolean;
 }
 
-/** Task 176 팀 B·어드민 — 한 팀의 선수 × 시작 전 대회·리그 경기 표와 일괄 변경. */
+/** Task 178 팀 B·어드민 — 한 팀의 선수 × 시작 전 대회·리그 경기 표와 일괄 변경. */
 @Injectable()
 export class TeamGameRosterService {
   constructor(

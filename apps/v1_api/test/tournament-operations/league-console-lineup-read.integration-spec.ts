@@ -160,7 +160,7 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
   });
 
   it('리그 경기 명단을 콘솔의 listLineups 가 같은 명단으로 읽는다', async () => {
-    // 리그 경기 명단은 대진 생성·동기화가 만든다(Task 176 — 팀장 전체 저장 경로는 없다). 여기서는 그
+    // 리그 경기 명단은 대진 생성·동기화가 만든다(Task 178 — 팀장 전체 저장 경로는 없다). 여기서는 그
     // 결과 모양(홈 사이드 리비전 1 + 참가자)을 직접 심고 콘솔 읽기만 본다.
     const homeSide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: 'HOME' } });
     const lineup = await prisma.v1GameLineup.create({ data: { gameId, sideId: homeSide.id, revision: 1 } });

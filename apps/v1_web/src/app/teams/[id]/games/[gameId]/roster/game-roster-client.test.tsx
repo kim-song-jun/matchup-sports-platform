@@ -1,5 +1,5 @@
 /**
- * 경기 명단 화면(Task 176 ②④) — 실제 훅이 MSW 상태형 서버에 보내는 요청과 그 결과 화면을 본다.
+ * 경기 명단 화면(Task 178 ②④) — 실제 훅이 MSW 상태형 서버에 보내는 요청과 그 결과 화면을 본다.
  * 권한별로 무엇이 보이는지, 저장이 어떤 일괄 요청으로 나가는지, 시작 후·마감 충돌에서 읽기 전용이 되는지.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

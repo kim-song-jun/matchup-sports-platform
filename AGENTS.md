@@ -417,7 +417,7 @@ Global rules inherited from `~/.codex/AGENTS.md`:
      `curl -fsSI .../landing | grep -iE 'x-teameet-(release|commit)'` 로 서빙 SHA를 확인하고 내 머지를 포함하는지
      `git merge-base --is-ancestor` 로 검증한다. 앞 배포 run이 `cancelled` 로 남을 수 있으니 마지막 **성공** 배포 SHA를 본다.
   3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 순서: start → end-period → start-period
-     → end-period → end. 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 176 — 라인업
+     → end-period → end. 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 178 — 라인업
      저장·제출 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
      계약 2개: takeover 토큰은 Socket.IO `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId`.
   4. **판정은 비인증 공개 API**(`GET /tournaments/:id/matches/:fixtureId`)를 ground truth로. 육안 스크린샷 대조로

@@ -16,7 +16,7 @@ import { GamesService } from './games.service';
  * ```
  *
  * `lineup-access` 는 **화면이 `my-fixtures` 로 옮겨간 것이지 기능이 죽은 게 아니다** — 시드의 라인업
- * 진입 검증이 그 200 응답에 의존한다. (등록 명단을 주던 `lineup-roster` 는 Task 176 에서 지웠다 —
+ * 진입 검증이 그 200 응답에 의존한다. (등록 명단을 주던 `lineup-roster` 는 Task 178 에서 지웠다 —
  * 그 소비처인 대회 라인업 편집·카드 정지 검증 스크립트가 함께 없어졌다.)
  *
  * ⚠️ 웹 grep 으로 소비처를 셀 때 `apps/v1_web/.next/` 를 제외해야 한다(빌드 산출물이 결과를

@@ -57,7 +57,7 @@ export const v1Keys = {
   teamUpcomingGames: (teamId: string) => [...v1Keys.team(teamId), 'upcoming-games'] as const,
   tacticsBoard: (teamId: string, gameId: string) =>
     [...v1Keys.team(teamId), 'tactics-board', gameId] as const,
-  /** Task 176 — 경기 한 사이드의 명단·변경 기록 공통 접두사(조정 뒤 무효화 단위). */
+  /** Task 178 — 경기 한 사이드의 명단·변경 기록 공통 접두사(조정 뒤 무효화 단위). */
   gameSideRosterAll: (gameId: string, sideId: string) => [...v1Keys.game(gameId), 'sides', sideId] as const,
   gameRoster: (gameId: string, sideId: string) => [...v1Keys.gameSideRosterAll(gameId, sideId), 'roster'] as const,
   gameRosterAdjustments: (gameId: string, sideId: string) =>

@@ -1025,7 +1025,7 @@ function apiError(statusCode: number, code: string, message: string) {
   return new V1ApiError({ status: 'error', statusCode, code, message, timestamp: '2026-09-29T00:00:00.000Z' });
 }
 
-describe('TeamMatchLineupPageClient — 대회·리그 경기는 경기 명단 화면으로 안내한다 (Task 176)', () => {
+describe('TeamMatchLineupPageClient — 대회·리그 경기는 경기 명단 화면으로 안내한다 (Task 178)', () => {
   const NOTICE = '대회·리그 경기는 경기 명단에서 관리해요';
 
   beforeEach(() => {

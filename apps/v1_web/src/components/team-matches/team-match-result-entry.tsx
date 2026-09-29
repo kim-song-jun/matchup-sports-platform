@@ -12,7 +12,7 @@ export function TeamMatchResultEntry({ teamMatchId, approval = false }: { teamMa
   if (!query.data) return query.isError ? <div role="alert">{extractErrorMessage(query.error, '경기 기록을 불러오지 못했어요.')}<Button onClick={() => void query.refetch()}>다시 시도</Button></div> : <PageSkeleton />;
   if (!query.data.lineupReady && query.data.phase !== 'official' && query.data.phase !== 'cancelled') {
     const ownTeamMissing = query.data.missingSides.some((side) => side.sideId === query.data?.ownSideId);
-    // 대회·리그(managed) 명단은 참가 명단에서 계산된다 — 참석명단 화면으로 보내면 저장이 409 다(Task 176).
+    // 대회·리그(managed) 명단은 참가 명단에서 계산된다 — 참석명단 화면으로 보내면 저장이 409 다(Task 178).
     const managed = query.data.phase === 'managed';
     return (
       <main className="tm-page-shell">

@@ -87,7 +87,7 @@ interface TeamMatchLineupContext {
 }
 
 /**
- * 대회·리그 경기 명단은 참가 명단에서 계산되고 팀장의 뜻은 조정 기록으로만 들어간다(Task 176).
+ * 대회·리그 경기 명단은 참가 명단에서 계산되고 팀장의 뜻은 조정 기록으로만 들어간다(Task 178).
  * 여기서 전체 명단을 쓰면 동기화가 그 리비전을 팀장 저장본으로 보고 멈추므로 쓰기를 모두 막는다.
  */
 function assertFriendlyLineupRoute(context: TeamMatchLineupContext): void {

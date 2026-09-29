@@ -12,10 +12,10 @@ import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axi
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
- * Task 176 — 경기 명단 쓰기의 잠금 순서(대회 행 KEY SHARE → 빈 리그 명단 채우기 → 경기). 두 트랜잭션을 실제로
+ * Task 178 — 경기 명단 쓰기의 잠금 순서(대회 행 KEY SHARE → 빈 리그 명단 채우기 → 경기). 두 트랜잭션을 실제로
  * 겹쳐, 먼저 잠근 쪽의 pid 를 다른 쪽이 기다리는지(`pg_blocking_pids`)를 장벽으로 쓴다.
  */
-describe('경기 명단 쓰기 잠금 순서 (Task 176)', () => {
+describe('경기 명단 쓰기 잠금 순서 (Task 178)', () => {
   const suiteId = randomUUID().slice(0, 8);
   let app: INestApplication;
   let cleanup: (() => Promise<void>) | undefined;

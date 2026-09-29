@@ -36,7 +36,7 @@ function toView(row: V1TeamMemberUnavailability, names: ReadonlyMap<string, stri
 }
 
 /**
- * Task 176 팀 C — 팀원 결장 기간. 기간 안에 시작하는 대회·리그 경기에서 자동으로 빠진다(친선 제외).
+ * Task 178 팀 C — 팀원 결장 기간. 기간 안에 시작하는 대회·리그 경기에서 자동으로 빠진다(친선 제외).
  * 등록·취소는 팀 owner·manager 와 플랫폼 운영자만, 본인 것은 등록하지 않는다(D6).
  */
 @Injectable()

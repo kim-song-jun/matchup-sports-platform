@@ -86,7 +86,7 @@ async function main() {
   }
   console.log(`game state=${g.state} v${g.version}`);
 
-  // 경기 명단은 참가 명단에서 계산된 제출본이다(Task 176) — 라인업 단계 없이 바로 시작한다.
+  // 경기 명단은 참가 명단에서 계산된 제출본이다(Task 178) — 라인업 단계 없이 바로 시작한다.
   // takeover → start → end
   const clientInstanceId = randomUUID();
   const socket = io(`${ORIGIN}/game-operations`, {

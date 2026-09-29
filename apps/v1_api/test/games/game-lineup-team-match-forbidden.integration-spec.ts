@@ -18,7 +18,7 @@ import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup
  * TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` instead of quietly accepting an
  * invariant-violating payload.
  *
- * Task 176 retired the generic write routes entirely (`GamesService.rejectLineupWrite`): a
+ * Task 178 retired the generic write routes entirely (`GamesService.rejectLineupWrite`): a
  * friendly TEAM_MATCH game still answers `TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN`, and a real
  * DRAFT built through the team-match path stays untouched.
  *

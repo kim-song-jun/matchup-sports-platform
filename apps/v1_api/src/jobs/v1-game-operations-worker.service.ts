@@ -118,7 +118,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
     // 결과가 제출·확정·무효가 되면 출전정지가 바뀔 수 있어, 양 팀의 시작 전 대회·리그 경기 명단을
-    // 다시 계산한다(Task 176). 결과 쓰기 경로가 많아 이 세 이벤트에서 한 번에 건다. 재계산은 모든
+    // 다시 계산한다(Task 178). 결과 쓰기 경로가 많아 이 세 이벤트에서 한 번에 건다. 재계산은 모든
     // 명단 트리거가 남기는 COMPETITION_ROSTER_RESYNC 이벤트가 맡는다(roster-resync-events.ts).
     const officialProjection = new GameResultOfficialProjectionService(this.webPush);
     this.registerHandler('GAME_RESULT_OFFICIAL', withCompetitionRosterResync(officialProjection.handler));

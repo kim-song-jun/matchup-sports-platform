@@ -12,7 +12,7 @@ import type {
 import type { V1GameState } from '@/types/api';
 
 /**
- * Task 176 경기별 출전 명단 MSW — 서버 계약(`apps/v1_api/src/games/roster/*`)을 흉내 낸 상태형 핸들러.
+ * Task 178 경기별 출전 명단 MSW — 서버 계약(`apps/v1_api/src/games/roster/*`)을 흉내 낸 상태형 핸들러.
  * 팀 1개 · 대회 경기 2개 · 선수 3명. 계산식은 서버와 같다: 기준 − 빼기 − 결장(시작 시각이 기간 안).
  * 팩토리마다 상태가 새로 생기고, `requests` 에 요청 경로·바디가 쌓인다(테스트가 호출 인자를 본다).
  */

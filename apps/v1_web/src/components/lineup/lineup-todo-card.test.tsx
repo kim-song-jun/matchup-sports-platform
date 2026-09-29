@@ -7,7 +7,7 @@ import type { V1LineupTodo } from '@/hooks/use-v1-api';
 
 /**
  * 이 카드는 친선 팀매치의 미제출 참석명단만 받는다 — 대회·리그 경기는 명단이 참가 명단에서
- * 계산돼 서버가 싣지 않는다(Task 176 R1). 카드는 받은 할 일을 그 참석명단 화면으로 잇는다.
+ * 계산돼 서버가 싣지 않는다(Task 178 R1). 카드는 받은 할 일을 그 참석명단 화면으로 잇는다.
  */
 
 const apiMocks = vi.hoisted(() => ({ useV1LineupTodos: vi.fn() }));

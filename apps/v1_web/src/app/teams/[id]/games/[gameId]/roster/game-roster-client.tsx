@@ -29,7 +29,7 @@ import { useGameRosterSide } from '@/components/game-roster/use-game-roster-side
 type Notice = { tone: 'info' | 'error'; message: string };
 
 /**
- * 대회·리그 경기 한 팀의 출전 명단(Task 176 ②④).
+ * 대회·리그 경기 한 팀의 출전 명단(Task 178 ②④).
  * 경기 명단 = 참가 명단 − 이번 경기 빠짐 − 결장 − 출전정지. 여기서 바꾸는 건 "이번 경기 빠짐"뿐이고,
  * 변경은 모아 두었다가 한 번에 저장한다(팀 일괄 API — 한 트랜잭션이라 일부만 저장되지 않는다).
  */

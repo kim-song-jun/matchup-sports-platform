@@ -125,7 +125,7 @@ const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득�
 export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
 export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }
 
-// ── Task 176 경기별 출전 명단 ────────────────────────────────────────────────
+// ── Task 178 경기별 출전 명단 ────────────────────────────────────────────────
 // 서버는 사유·역할을 문자열 컬럼으로 보낸다(DTO 가 enum 으로 검증) — 모르는 값은 null 로 돌려
 // 호출부가 빈칸으로 두게 한다(영문 코드 노출 방지).
 

@@ -11,12 +11,12 @@ import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
- * Task 176 단계 5 — 팀 B(선수 × 경기 표·일괄), 팀 C(결장 기간), 어드민 참가 신청 펼침, 다가오는 경기 요약.
+ * Task 178 단계 5 — 팀 B(선수 × 경기 표·일괄), 팀 C(결장 기간), 어드민 참가 신청 펼침, 다가오는 경기 요약.
  *
  * fixture 는 경기 단위 스펙과 같은 모양(A·B·C 세 팀, g1 A-B +1일, g2 A-C +2일)이라, 한 경기·한 팀의 변경이
  * 다른 경기·상대팀에 새지 않는지를 함께 단언한다.
  */
-describe('팀 경기 명단 표·일괄·결장 기간 API (Task 176)', () => {
+describe('팀 경기 명단 표·일괄·결장 기간 API (Task 178)', () => {
   const suiteId = randomUUID().slice(0, 8);
   const DAY = 86_400_000;
   let app: INestApplication;

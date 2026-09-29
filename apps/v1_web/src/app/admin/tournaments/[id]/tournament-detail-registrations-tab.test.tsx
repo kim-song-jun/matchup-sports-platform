@@ -453,7 +453,7 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
   });
 });
 
-describe('RegistrationsTab — 경기별 명단 펼침 (Task 176)', () => {
+describe('RegistrationsTab — 경기별 명단 펼침 (Task 178)', () => {
   const showToast = vi.fn();
 
   afterEach(() => vi.clearAllMocks());

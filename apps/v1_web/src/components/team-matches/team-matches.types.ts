@@ -184,7 +184,7 @@ export type TeamMatchDetailViewModel = {
   onChat?: () => void;
   onShare?: () => void;
   /** 명단 입구. 내가 owner/manager로 속한 참가팀이 있을 때만 설정된다 — 친선은 참석명단,
-   * 리그 대진은 참가 명단에서 계산되는 경기 명단 화면이다(Task 176). */
+   * 리그 대진은 참가 명단에서 계산되는 경기 명단 화면이다(Task 178). */
   lineupAction?: { href: string; kind: 'attendance' | 'match-roster' };
 };
 

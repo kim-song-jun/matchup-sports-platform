@@ -96,6 +96,17 @@ describe('후기 작성 화면 — 팀 평가가 기본', () => {
     expect(screen.getByText(/선수 개별 평가/).closest('details')).toHaveAttribute('open');
   });
 
+  // 개인 매치처럼 팀 대상이 없으면 "팀 후기만 전송"은 거짓 안내다.
+  it('팀 대상이 있을 때만 비워 두면 팀 후기만 전송된다고 안내한다', () => {
+    const { unmount } = renderCompose(model({ targets: [target({ targetUserId: 'u1', name: '선수1' })] }));
+    expect(screen.getByText('후기를 남기고 싶은 사람만 골라 주세요.')).toBeInTheDocument();
+    expect(screen.queryByText(/팀 후기만 전송돼요/)).toBeNull();
+    unmount();
+
+    renderCompose(model());
+    expect(screen.getByText('남기고 싶은 선수만 골라 주세요. 비워 두면 팀 후기만 전송돼요.')).toBeInTheDocument();
+  });
+
   // 작성자 팀은 화면 어디에도 "대표로 작성"으로 표기하지 않는다 — 팀원도 팀 후기를 쓴다.
   it('"대표로 작성" 문구를 쓰지 않는다', () => {
     renderCompose(model());

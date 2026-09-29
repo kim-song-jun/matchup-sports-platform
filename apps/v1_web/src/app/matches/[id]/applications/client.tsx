@@ -235,7 +235,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
             <button key={value} type="button" className={`tm-chip ${tab === value ? 'tm-chip-active' : ''}`} aria-pressed={tab === value} onClick={() => setTab(value)}>{label}</button>
           ))}
         </div>
-        {tab === 'approved' && match.host ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body">{match.host.displayName}</div><div className="tm-text-caption">호스트 · 참가 인원에 포함</div></Card> : null}
+        {tab === 'approved' && match.host ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body">{match.host.displayName}</div><div className="tm-text-caption">{match.hostParticipates === false ? '호스트 · 운영만 해요 (참가 인원 제외)' : '호스트 · 참가 인원에 포함'}</div></Card> : null}
         {/* 로딩 중 */}
         {applicationsQuery.isLoading ? (
           <div style={{ marginTop: 16 }}>

@@ -299,6 +299,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       ? <StateCard tone="orange" title={mode === 'mine' ? '종료 확인이 필요해요' : '경기 종료를 확인하고 있어요'} body={mode === 'mine' ? '참여 여부를 확인한 뒤 매치를 완료해 주세요.' : '호스트가 참여 여부를 확인하면 완료 상태로 바뀌어요.'} />
       : null;
   const isPostStartLifecycle = match.lifecycleStatus === 'in_progress' || match.lifecycleStatus === 'completion_pending';
+  const capacitySettled = isPostStartLifecycle || match.lifecycleStatus === 'completed' || match.lifecycleStatus === 'expired' || match.lifecycleStatus === 'cancelled';
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
     // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
@@ -397,7 +398,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
             <InfoRow label="장소" value={match.venue} sub={match.address} />
             {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 — 숫자(subhead/heading 크기) + 단위(body) 2:1 비율 */}
-            <CapacityRow current={match.current} capacity={match.capacity} />
+            <CapacityRow current={match.current} capacity={match.capacity} settled={capacitySettled} />
             <InfoRow label="레벨" value={match.level} />
             {/* **빈 값을 그대로 넘기면 값 슬롯이 통째로 빈다.** 공유 `InfoRow`
                 (`@/components/v1-ui/primitives`)는 `{value}` 를 그대로 그린다 — 팀매치
@@ -493,7 +494,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
           {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 (모바일) */}
-          <CapacityRow current={match.current} capacity={match.capacity} />
+          <CapacityRow current={match.current} capacity={match.capacity} settled={capacitySettled} />
           <InfoRow label="레벨" value={match.level} />
           {/* 위 상세와 같은 이유 — 공유 InfoRow 는 빈 값을 그대로 그린다. */}
           <InfoRow label="성별 조건" value={match.gender} />
@@ -953,9 +954,10 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
  * [P1 숫자:단위 2:1 + tabular-nums] 인원 행 — 숫자(subhead size, weight700)와 단위(body size)를 2:1로 조판.
  * 잔여 자리 ≤3 시 orange "마감 임박" 배지 병행 (색상 + 텍스트, WCAG 1.4.1).
  */
-function CapacityRow({ current, capacity }: { current: number; capacity: number }) {
+function CapacityRow({ current, capacity, settled = false }: { current: number; capacity: number; settled?: boolean }) {
   const remaining = Math.max(capacity - current, 0);
-  const isNearFull = remaining <= 3 && current < capacity;
+  // 시작했거나 끝난 매치는 더 받지 않으므로 남은 자리·마감 임박 안내를 내리고 인원만 보인다.
+  const isNearFull = !settled && remaining <= 3 && current < capacity;
   return (
     <div className="tm-info-row">
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>인원</div>
@@ -977,9 +979,11 @@ function CapacityRow({ current, capacity }: { current: number; capacity: number 
           </span>
           {isNearFull ? <span className="tm-badge tm-badge-orange">마감 임박</span> : null}
         </div>
-        <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>
-          {remaining}자리 남았어요
-        </div>
+        {settled ? null : (
+          <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>
+            {remaining}자리 남았어요
+          </div>
+        )}
       </div>
     </div>
   );

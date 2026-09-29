@@ -445,7 +445,8 @@ function toParticipants(match: V1Match, manageHref?: string) {
       // 호스트가 다른 사람 이름으로 보이던 결함이었다.
       name: match.host?.displayName ?? '호스트',
       meta: '호스트',
-      status: getStatus(match) === 'completed' ? '참여 완료' : '승인 완료',
+      // 참가하지 않는 호스트는 참가 확정·참여 완료 대상이 아니다.
+      status: match.hostParticipates === false ? '운영만 해요' : getStatus(match) === 'completed' ? '참여 완료' : '승인 완료',
       href: manageHref,
     }];
   }

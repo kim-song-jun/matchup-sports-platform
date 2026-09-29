@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useV1MyMatchesInfinite, useV1MyTeamMatchesInfinite } from '@/hooks/use-v1-api';
 import { withFromPath } from '@/lib/session-storage';
+import { personalMatchLifecycleLabel } from '@/lib/v1-status-labels';
 import type { V1Match, V1MyTeamMatch } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
@@ -170,8 +171,9 @@ function toPersonalMatch(match: V1Match, listHref: string): MyMatch {
     statusLabel: personalStatusLabel(status, match),
     note: buildPersonalNote(match, status),
     href: withFromPath(`/matches/${id}`, listHref),
-    manageHref: `/matches/${id}/applications`,
-    manageLabel: '참가 관리',
+    // 종료 확인이 필요한 호스트는 참여 여부를 체크하는 확정 명단 탭으로 바로 보낸다(매치 상세 CTA 와 같은 경로).
+    manageHref: match.canComplete ? `/matches/${id}/applications?tab=approved` : `/matches/${id}/applications`,
+    manageLabel: match.canComplete ? '참여 확인' : '참가 관리',
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,
   };
 }
@@ -252,6 +254,8 @@ function personalStatusLabel(status: MyMatchStatus, match: V1Match) {
   if ((match.displayState ?? match.status) === 'completed') {
     return match.viewer?.participantStatus === 'no_show' ? '불참' : '참여 완료';
   }
+  const lifecycle = personalMatchLifecycleLabel(match.displayState ?? match.status, getViewerState(match) === 'host');
+  if (lifecycle) return lifecycle;
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'ended') return '종료';
@@ -282,6 +286,11 @@ function teamRelationLabel(relation: V1MyTeamMatch['relation']) {
 
 function buildPersonalNote(match: V1Match, status: MyMatchStatus) {
   if ((match.displayState ?? match.status) === 'completed' && match.viewer?.participantStatus === 'no_show') return '불참으로 확인된 경기예요. 개인 경기 점수는 기록되지 않아요.';
+  const display = match.displayState ?? match.status;
+  if (display === 'in_progress') return '경기가 진행 중이에요.';
+  if (display === 'completion_pending') {
+    return getViewerState(match) === 'host' ? '경기가 끝났어요. 참가자가 실제로 참여했는지 확인해 주세요.' : '호스트가 참여 여부를 확인하고 있어요.';
+  }
   if (status === 'pending') return '호스트가 신청을 검토 중이에요.';
   if (status === 'approved') return '참가가 확정됐어요. 장소와 시간을 확인해 보세요.';
   if (status === 'ended' && isReviewablePersonalMatch(match)) return '참여한 경기로 기록됐어요. 함께한 참가자에게 후기를 남길 수 있어요.';

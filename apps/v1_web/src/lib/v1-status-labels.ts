@@ -125,6 +125,13 @@ const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득�
 export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
 export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }
 
+/** 개인 매치가 시작된 뒤의 표시 상태(displayState) 라벨. 시작 전·완료 상태는 null — 호출부의 기존 라벨을 쓴다. */
+export function personalMatchLifecycleLabel(displayState: string | null | undefined, isHost: boolean): string | null {
+  if (displayState === 'in_progress') return '진행중';
+  if (displayState === 'completion_pending') return isHost ? '종료 확인 필요' : '종료 확인 중';
+  return null;
+}
+
 // ── Task 179 경기별 출전 명단 ────────────────────────────────────────────────
 // 서버는 사유·역할을 문자열 컬럼으로 보낸다(DTO 가 enum 으로 검증) — 모르는 값은 null 로 돌려
 // 호출부가 빈칸으로 두게 한다(영문 코드 노출 방지).

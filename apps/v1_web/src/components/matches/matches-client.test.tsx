@@ -564,6 +564,23 @@ describe('MatchDetailPageClient — 로딩 중 목업 노출 방지', () => {
 
     expect(screen.getByTestId('participants').textContent).toBe('호스트');
   });
+
+  it('참가하지 않는 호스트는 승인 완료로 표시하지 않고, 참가하는 호스트는 그대로 둔다', () => {
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, participantsPreview: [], hostParticipates: false, viewerState: 'none' },
+      isError: false,
+    });
+    const { unmount } = render(<MatchDetailPageClient matchId="match-1" />);
+    expect(screen.getByTestId('participant-statuses').textContent).toBe('운영만 해요');
+    unmount();
+
+    useV1MatchMock.mockReturnValue({
+      data: { ...baseMatch, participantsPreview: [], hostParticipates: true, viewerState: 'none' },
+      isError: false,
+    });
+    render(<MatchDetailPageClient matchId="match-1" />);
+    expect(screen.getByTestId('participant-statuses').textContent).toBe('승인 완료');
+  });
 });
 
 describe('MatchDetailPageClient — 목록 캐시 승계(placeholder) 중 행동 잠금', () => {

@@ -234,6 +234,33 @@ describe('MyMatchesPageView — 빈 상태 CTA 출처', () => {
 
     expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
   });
+
+  it('긴 팀명과 매치명에 모바일 폭 축소용 구조를 유지한다', () => {
+    const title = '성수동우리동네오래된축구회최강연합팀정기토요일저녁팀매치';
+    const contextLabel = '성수동우리동네오래된축구회최강연합팀';
+    const { container } = render(<MyMatchesPageView model={matchesModel({
+      mode: 'joined',
+      matches: [{
+        id: 'team-match-long-copy',
+        kind: 'team',
+        kindLabel: '팀 매치',
+        contextLabel,
+        startsAt: '2026-10-03T20:00:00.000Z',
+        title,
+        meta: '2026. 10. 03. 토요일 오후 8:00 · 서울특별시성동구성수이로긴주소축구장',
+        status: 'approved',
+        statusLabel: '상대팀 확정',
+        note: '완료된 팀 경기예요.',
+        href: '/team-matches/team-match-long-copy',
+      }],
+    })} />);
+
+    expect(container.querySelector('.tm-my-matches-desktop')).not.toBeNull();
+    expect(screen.getByText(title)).toHaveClass('tm-my-card-title');
+    expect(screen.getByText(contextLabel)).toHaveClass('tm-my-card-context-label');
+    expect(container.querySelector('.tm-my-card-copy')).not.toBeNull();
+    expect(container.querySelector('.tm-my-card-status')).not.toBeNull();
+  });
 });
 
 describe('MyTeamsPageView — 팀 카드 출처', () => {

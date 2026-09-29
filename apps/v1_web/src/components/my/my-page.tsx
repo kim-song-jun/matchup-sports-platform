@@ -561,18 +561,18 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
   const canReview = Boolean(match.reviewHref);
   return (
     <Card pad={16}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+      <div className="tm-my-card-context">
         <span className="tm-badge tm-badge-grey">{match.kindLabel}</span>
-        {match.contextLabel ? <span className="tm-text-caption">{match.contextLabel}</span> : null}
+        {match.contextLabel ? <span className="tm-text-caption tm-my-card-context-label">{match.contextLabel}</span> : null}
       </div>
       <div className="tm-my-card-head">
-        <div>
-          <div className="tm-text-body-lg">{match.title}</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.meta}</div>
+        <div className="tm-my-card-copy">
+          <div className="tm-text-body-lg tm-my-card-title">{match.title}</div>
+          <div className="tm-text-caption tm-my-card-meta">{match.meta}</div>
         </div>
-        <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
+        <span className={`tm-badge tm-my-card-status ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
       </div>
-      <p className="tm-text-caption" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>{match.note}</p>
+      <p className="tm-text-caption tm-my-card-note">{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
         {manage && match.manageHref ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.manageHref}>{match.manageLabel ?? '참가 관리'}</Link> : !manage && canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : !manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button> : null}

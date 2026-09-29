@@ -12,7 +12,12 @@
 | POST | `/api/v1/team-matches/:id/record` | V1AuthGuard + 최신 유효 제출 라인업 참가자 | 득점 추가/수정/삭제/복구, 종료 확인/취소 |
 
 - 응답은 공통 `{ status, data, timestamp }`. `phase`: scheduled/live/official/cancelled/legacy/managed.
-- GET은 일반 사용자에게 점수·팀·확정 여부만 반환한다. 선수 명단·득점 상세·이력·확인자 이름은 참가자에게만 반환한다.
+- GET은 일반 사용자에게 점수·팀·확정 여부와 아래의 최소 공식 득점 요약만 반환한다. 선수 명단·편집용 득점 원본·이력·확인자 이름은 참가자에게만 반환한다.
+- 공식 확정(`phase=official`) 결과에서 점수가 공개되는 조회자는 `goalEvents[]`도 받는다. 각 항목은
+  `sideId`(점수를 얻은 팀), 공개 정책을 적용한 nullable `participantName`, nullable `minute`,
+  `ownGoal`, nullable `subMatchId`만 포함한다. 편집용 participant id와 변경 이력은 계속 공개하지 않는다.
+  `STATUS_ONLY`처럼 점수가 가려진 응답과 공식 확정 전 응답에서는 빈 배열이다. 선수 이름은 대회
+  경기결과와 같은 이름 공개 게이트 및 닉네임/실명 선택 정책을 사용한다.
 - 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 팀 owner/manager 역할만으로 권한을 부여하지 않는다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
 - `commandId` UUID와 `expectedVersion` 정수 필수. `action`: add/edit/delete/undo/confirm/reopen.
 - add/edit: `sideId`는 점수를 얻는 팀. `participantId`는 선택(null=미상), `ownGoal` 기본 false,

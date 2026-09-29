@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -10,6 +11,7 @@ import {
   useTeamMatchRecord,
   useMutateTeamMatchRecord,
   type SharedGoal,
+  type SharedPublicGoalEvent,
   type SharedRecord,
   type SharedSubMatch,
   type RecordCommand,
@@ -19,6 +21,10 @@ import { V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
+import {
+  eventPresentation,
+  presentGameEventParticipantName,
+} from '@/components/public-game-records/format';
 import styles from './team-match-shared-record.module.css';
 
 function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
@@ -36,6 +42,137 @@ function subMatchScore(data: SharedRecord, subMatch: SharedSubMatch, sideKey: 'H
 
 function playerInitials(name: string) {
   return Array.from(name.trim()).slice(0, 2).join('') || '?';
+}
+
+const RESULT_AXIS_COLUMNS = 'minmax(0, 1fr) 64px minmax(0, 1fr)';
+
+function GoalIcon({ ownGoal }: { ownGoal: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={styles.goalIcon}
+      data-goal-marker={ownGoal ? 'own-goal' : 'goal'}
+      style={{ color: ownGoal ? 'var(--red500)' : 'var(--text-strong)' }}
+      viewBox="0 0 24 24"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m12 7 3 2.2-1.1 3.5h-3.8L9 9.2 12 7Z" />
+      <path d="m9 9.2-3.2.2M15 9.2l3.2.2M10.1 12.7l-2 3M13.9 12.7l2 3M8.1 15.7l.7 3M15.9 15.7l-.7 3" />
+    </svg>
+  );
+}
+
+function GoalEventRow({
+  event,
+  sideKey,
+}: {
+  event: SharedPublicGoalEvent;
+  sideKey: 'HOME' | 'AWAY';
+}) {
+  const eventType = event.ownGoal ? 'OWN_GOAL' : 'GOAL';
+  const presentation = eventPresentation({ type: eventType, cardColor: null });
+  const playerName = presentGameEventParticipantName(eventType, event.participantName);
+  const content = (
+    <span>
+      {event.minute === null ? '' : `${event.minute}′ `}
+      {playerName}
+    </span>
+  );
+
+  return (
+    <div
+      role="listitem"
+      aria-label={`${sideKey === 'HOME' ? '홈' : '원정'} ${event.minute === null ? '' : `${event.minute}분 `}${playerName} ${presentation.label}`}
+      className={styles.goalEventRow}
+      style={{ gridTemplateColumns: RESULT_AXIS_COLUMNS }}
+    >
+      <div className={styles.goalEventHome}>{sideKey === 'HOME' ? content : null}</div>
+      <div className={styles.goalEventMarker}>
+        <GoalIcon ownGoal={event.ownGoal} />
+        <span className="sr-only">{presentation.label}</span>
+        {presentation.badge ? <span className={styles.ownGoalBadge}>{presentation.badge}</span> : null}
+      </div>
+      <div className={styles.goalEventAway}>{sideKey === 'AWAY' ? content : null}</div>
+    </div>
+  );
+}
+
+function GoalEventList({
+  events,
+  sides,
+}: {
+  events: readonly SharedPublicGoalEvent[];
+  sides: SharedRecord['sides'];
+}) {
+  const sideKeyById = new Map(sides.map((side) => [side.id, side.key] as const));
+  const ordered = events
+    .map((event, index) => ({ event, index }))
+    .sort((a, b) => (a.event.minute ?? Number.MAX_SAFE_INTEGER) - (b.event.minute ?? Number.MAX_SAFE_INTEGER) || a.index - b.index);
+  return (
+    <div role="list" aria-label="득점 기록" className={styles.goalEventList}>
+      {ordered.map(({ event, index }) => {
+        const sideKey = sideKeyById.get(event.sideId);
+        const key = `${event.subMatchId ?? 'match'}-${event.minute ?? 'unknown'}-${index}`;
+        if (!sideKey) {
+          return (
+            <div key={key} role="listitem" className={styles.invalidGoalEvent}>
+              득점 팀 정보를 확인할 수 없어요.
+            </div>
+          );
+        }
+        return <GoalEventRow key={key} event={event} sideKey={sideKey} />;
+      })}
+    </div>
+  );
+}
+
+function GoalEventsAccordion({ data }: { data: SharedRecord }) {
+  const panelId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const events = data.goalEvents;
+  const scoresVisible = data.sides.length > 0 && data.sides.every((side) => side.score !== null);
+  if (data.phase !== 'official' || !scoresVisible || events === undefined) return null;
+  if (events.length === 0) return <p className={styles.noGoals}>등록된 득점이 없어요.</p>;
+
+  const sections = data.subMatches.length === 0
+    ? [{ id: 'match', title: null, events }]
+    : [
+        ...data.subMatches.map((subMatch) => ({
+          id: subMatch.id,
+          title: subMatch.title,
+          events: events.filter((event) => event.subMatchId === subMatch.id),
+        })),
+        {
+          id: 'unassigned',
+          title: '기타',
+          events: events.filter((event) => event.subMatchId === null),
+        },
+      ].filter((section) => section.events.length > 0);
+
+  return (
+    <div className={styles.goalAccordion}>
+      <button
+        type="button"
+        className={styles.goalAccordionToggle}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span>{expanded ? '득점 기록 접기' : '득점 기록 보기'} ({events.length})</span>
+        <ChevronDown aria-hidden="true" size={18} className={styles.goalAccordionChevron} data-expanded={expanded} />
+      </button>
+      {expanded ? (
+        <div id={panelId} className={styles.goalAccordionPanel}>
+          {sections.map((section) => (
+            <section key={section.id} aria-label={section.title ?? '전체 득점 기록'}>
+              {section.title ? <h3 className={styles.goalSectionTitle}>{section.title}</h3> : null}
+              <GoalEventList events={section.events} sides={data.sides} />
+            </section>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) {
@@ -413,6 +550,7 @@ export function TeamMatchRecordEntry({
           ))}
         </div>
       )}
+      <GoalEventsAccordion data={data} />
       {data.participant ? (
         <Link className={styles.openLink} href={recordHref}>
           공동 경기 기록 열기

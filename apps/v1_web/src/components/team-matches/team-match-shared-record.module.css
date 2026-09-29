@@ -48,6 +48,23 @@
 .detailSubMatches > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .detailSubMatches > div:last-child { border-bottom: 0; }
 .openLink { display: inline-flex; min-height: var(--size-touch-min); align-items: center; color: var(--blue700); font-weight: 700; }
+.goalAccordion { margin: 16px 0 4px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.goalAccordionToggle { width: 100%; min-height: var(--size-touch-min); padding: 12px 0; border: 0; background: transparent; color: var(--text-strong); display: flex; align-items: center; justify-content: space-between; gap: 12px; font: inherit; font-size: var(--font-size-body-sm); font-weight: 700; cursor: pointer; text-align: left; }
+.goalAccordionChevron { flex: 0 0 auto; color: var(--text-caption); transition: transform 160ms ease; }
+.goalAccordionChevron[data-expanded='true'] { transform: rotate(180deg); }
+.goalAccordionPanel { display: grid; gap: 16px; padding: 4px 0 16px; }
+.goalSectionTitle { margin: 0 0 8px; font-size: var(--font-size-caption); color: var(--text-caption); font-weight: 700; }
+.goalEventList { display: grid; gap: 8px; color: var(--text-caption); font-size: var(--font-size-caption); }
+.invalidGoalEvent { min-height: 24px; display: flex; align-items: center; justify-content: center; color: var(--red700); text-align: center; }
+.goalEventRow { display: grid; align-items: center; column-gap: 12px; min-height: 24px; }
+.goalEventHome { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.goalEventAway { min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.goalEventMarker { display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1; }
+.goalIcon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ownGoalBadge { padding: 1px 4px; border-radius: var(--radius-tight); background: var(--tint-red); color: var(--red700); font-size: var(--font-size-micro); font-weight: 800; line-height: 1.4; }
+.noGoals { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-caption); font-size: var(--font-size-caption); }
+.goalAccordionToggle:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; border-radius: var(--radius-tight); }
+@media (prefers-reduced-motion: reduce) { .goalAccordionChevron { transition: none; } }
 .cardRenameForm { display: grid; gap: 12px; }
 .goalPlayer { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .playerField { border: 0; padding: 0; margin: 0; min-width: 0; }

@@ -41,7 +41,7 @@ describe('LandingPage', () => {
     );
   });
 
-  it('내비·푸터가 도움말·문의·이용 대상으로 이어지고, 사업자 정보는 어드민 설정 값을 그린다', async () => {
+  it('내비는 도움말·문의로, 푸터는 서비스·이용 안내·약관으로 이어지고, 사업자 정보는 어드민 설정 값을 그린다', async () => {
     const { container } = await renderLanding();
     const siteNav = container.querySelector<HTMLElement>('.tm-landing-nav-site')!;
     expect(within(siteNav).getByRole('link', { name: '도움말' })).toHaveAttribute('href', '/help');
@@ -51,7 +51,8 @@ describe('LandingPage', () => {
     const hrefs = within(footer).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual(
       expect.arrayContaining([
-        '/help', '/faq', '/contact', '/for/players', '/for/teams', '/for/organizers',
+        '/team-matches', '/tournaments', '/teams', '/landing',
+        '/help', '/faq', '/help/glossary', '/contact', '/notices',
         // 옛 랜딩 푸터가 걸던 약관 링크 — 공용 푸터로 바꾸며 빠지면 안 된다.
         '/terms?document=terms', '/terms?document=privacy',
       ]),

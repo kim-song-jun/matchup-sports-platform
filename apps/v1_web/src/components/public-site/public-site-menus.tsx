@@ -10,7 +10,7 @@ import {
   PUBLIC_NAV_AUDIENCES,
   PUBLIC_NAV_CONTACT,
   PUBLIC_NAV_HELP,
-  isCurrentNav,
+  currentNavHref,
   type PublicNavService,
 } from './public-site-nav';
 
@@ -57,17 +57,17 @@ function useDisclosure() {
   return { open, setOpen, close, rootRef, buttonRef, onBlur };
 }
 
-function NavLink({ href, label, currentPath, onNavigate }: {
+function NavLink({ href, label, current, onNavigate }: {
   href: string;
   label: string;
-  currentPath?: string;
+  current?: string;
   onNavigate: () => void;
 }) {
   return (
     <Link
       className="tm-ps-menu-link"
       href={href}
-      aria-current={isCurrentNav(href, currentPath) ? 'page' : undefined}
+      aria-current={href === current ? 'page' : undefined}
       onClick={onNavigate}
     >
       {label}
@@ -75,7 +75,7 @@ function NavLink({ href, label, currentPath, onNavigate }: {
   );
 }
 
-/** 1024+ 헤더 드롭다운. "이용 대상"·"이용 안내"처럼 라벨+링크 목록만 다른 메뉴가 이걸 공유한다. */
+/** 1024+ 헤더 드롭다운. "이용 대상"(/landing A안)·"이용 안내"(공용 GNB)처럼 라벨+링크 목록만 다른 메뉴가 이걸 공유한다. */
 export function PublicSiteDropdown({ label, links, currentPath }: {
   label: string;
   links: readonly PublicLink[];
@@ -83,7 +83,7 @@ export function PublicSiteDropdown({ label, links, currentPath }: {
 }) {
   const { open, setOpen, close, rootRef, buttonRef, onBlur } = useDisclosure();
   const panelId = useId();
-  const active = links.some((link) => isCurrentNav(link.href, currentPath));
+  const current = currentNavHref(links.map((link) => link.href), currentPath);
 
   return (
     <div className="tm-ps-dropdown" ref={rootRef} onBlur={onBlur}>
@@ -93,7 +93,7 @@ export function PublicSiteDropdown({ label, links, currentPath }: {
         className="tm-ps-nav-link tm-ps-dropdown-trigger"
         aria-expanded={open}
         aria-controls={panelId}
-        data-current={active ? 'true' : undefined}
+        data-current={current ? 'true' : undefined}
         onClick={() => setOpen(!open)}
       >
         {label}
@@ -102,7 +102,7 @@ export function PublicSiteDropdown({ label, links, currentPath }: {
       <ul id={panelId} className="tm-ps-dropdown-panel" hidden={!open}>
         {links.map((link) => (
           <li key={link.href}>
-            <NavLink {...link} currentPath={currentPath} onNavigate={() => close(false)} />
+            <NavLink {...link} current={current} onNavigate={() => close(false)} />
           </li>
         ))}
       </ul>
@@ -115,18 +115,18 @@ export function PublicSiteAudienceMenu({ currentPath }: { currentPath?: string }
   return <PublicSiteDropdown label={PUBLIC_NAV_AUDIENCE_LABEL} links={PUBLIC_NAV_AUDIENCES} currentPath={currentPath} />;
 }
 
-function PrimaryNavLink({ href, label, description, currentPath, onNavigate }: {
+function PrimaryNavLink({ href, label, description, current, onNavigate }: {
   href: string;
   label: string;
   description: string;
-  currentPath?: string;
+  current?: string;
   onNavigate: () => void;
 }) {
   return (
     <Link
       className="tm-ps-menu-link tm-ps-menu-link-primary"
       href={href}
-      aria-current={isCurrentNav(href, currentPath) ? 'page' : undefined}
+      aria-current={href === current ? 'page' : undefined}
       onClick={onNavigate}
     >
       <span>{label}</span>
@@ -139,9 +139,8 @@ type MobileMenuGroup = { label: string; links: readonly PublicLink[] };
 
 /**
  * 1024 미만 전체 메뉴. 열면 첫 링크로 포커스를 옮기고, ESC·닫기 버튼은 메뉴 버튼으로 되돌린다.
- * `primary`·`groups` 를 안 주면(기존 호출부 전부) 지금과 완전히 같은 마크업 — About 링크 →
- * 이용 대상 그룹 → 도움말·문의 → 로그인. 랜딩 v4 는 두 prop 을 줘서 매치·대회·팀 큰 행 →
- * 이용 안내 그룹 → 로그인 순서로 바꾼다.
+ * `primary`·`groups` 를 안 주면(/landing A안 내비) About 링크 → 이용 대상 그룹 → 도움말·문의 → 로그인.
+ * 공용 GNB 는 두 prop 을 줘서 매치·대회·팀 큰 행 → 이용 안내 그룹 → 로그인 순서로 바꾼다.
  */
 export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
   currentPath?: string;
@@ -159,6 +158,11 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
 
   const navigate = () => close(false);
   const resolvedGroups = groups ?? [{ label: PUBLIC_NAV_AUDIENCE_LABEL, links: PUBLIC_NAV_AUDIENCES }];
+  const allLinks = [
+    ...(isDefault ? [PUBLIC_NAV_ABOUT, PUBLIC_NAV_HELP, PUBLIC_NAV_CONTACT] : (primary ?? [])),
+    ...resolvedGroups.flatMap((group) => group.links),
+  ];
+  const current = currentNavHref(allLinks.map((link) => link.href), currentPath);
 
   return (
     <div className="tm-ps-mobile-menu" ref={rootRef} onBlur={onBlur}>
@@ -177,11 +181,11 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
         <nav aria-label="전체 메뉴">
           <ul className="tm-ps-menu-list">
             {isDefault ? (
-              <li><NavLink {...PUBLIC_NAV_ABOUT} currentPath={currentPath} onNavigate={navigate} /></li>
+              <li><NavLink {...PUBLIC_NAV_ABOUT} current={current} onNavigate={navigate} /></li>
             ) : (
               primary?.map((item) => (
                 <li key={item.href}>
-                  <PrimaryNavLink {...item} currentPath={currentPath} onNavigate={navigate} />
+                  <PrimaryNavLink {...item} current={current} onNavigate={navigate} />
                 </li>
               ))
             )}
@@ -193,7 +197,7 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
                   <ul className="tm-ps-menu-sublist" aria-labelledby={labelId}>
                     {group.links.map((link) => (
                       <li key={link.href}>
-                        <NavLink {...link} currentPath={currentPath} onNavigate={navigate} />
+                        <NavLink {...link} current={current} onNavigate={navigate} />
                       </li>
                     ))}
                   </ul>
@@ -202,8 +206,8 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
             })}
             {isDefault ? (
               <>
-                <li><NavLink {...PUBLIC_NAV_HELP} currentPath={currentPath} onNavigate={navigate} /></li>
-                <li><NavLink {...PUBLIC_NAV_CONTACT} currentPath={currentPath} onNavigate={navigate} /></li>
+                <li><NavLink {...PUBLIC_NAV_HELP} current={current} onNavigate={navigate} /></li>
+                <li><NavLink {...PUBLIC_NAV_CONTACT} current={current} onNavigate={navigate} /></li>
               </>
             ) : null}
             <li className="tm-ps-menu-login">

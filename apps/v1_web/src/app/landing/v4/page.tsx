@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import { buildPublicMetadata } from '@/lib/seo';
 import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
-import { PublicSiteFooter } from '@/components/public-site';
+import { PublicSiteFooter, PublicSiteGnb } from '@/components/public-site';
 import { LandingRoot } from '@/components/landing/landing-root';
 import { LandingMobileCta } from '@/components/landing/landing-mobile-cta';
 import { fetchLandingV4Data, formatLandingCount, sportChips } from '@/lib/landing/landing-v4-data';
-import { LandingV4Nav } from '@/components/landing/v4/landing-v4-nav';
 import { LandingV4Hero } from '@/components/landing/v4/landing-v4-hero';
 import { LandingV4Stage } from '@/components/landing/v4/landing-v4-stage';
 import { LandingV4Now } from '@/components/landing/v4/landing-v4-now';
@@ -39,7 +38,8 @@ export default async function LandingV4Page() {
   const sports = sportChips(data.bySport, 'teamMatches').chips.map((chip) => chip.name);
   return (
     <LandingRoot variant="v4">
-      <LandingV4Nav />
+      {/* 로고·활성 표시 규약은 정본(/landing) 기준 — 이 경로 자체가 아니다 */}
+      <PublicSiteGnb currentPath="/landing" landing />
       <main>
         <LandingV4Hero />
         <LandingV4Stage

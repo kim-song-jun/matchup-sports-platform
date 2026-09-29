@@ -1,179 +1,70 @@
 /*
- * 도움말 트랙(/faq, /help, /help/guides/*, /help/glossary). 셸·섹션·FAQ 아코디언은 public-site.css 것을 쓰고
- * 여기에는 검색·주제 칩·가이드 카드·가이드 본문·용어집만 둔다. 모바일 기본 → 768 → 1024 순.
+ * 도움말 트랙(/help, /faq, /help/guides/*, /help/glossary) 전용 카드. 히어로·검색·분류 필터·강조 밴드는
+ * public-site-blocks.css, 셸·섹션·FAQ 목록은 public-site.css 것을 쓴다. 모바일 기본 → 768 → 1024 순.
  */
 
-/* ── 검색(허브) ── */
-.tm-help-search {
-  max-width: 640px;
+/* ── 주제별 질문 카드(허브 히어로 아래): 모바일 2열 → 768 4열 → 1024 7열 ── */
+.tm-help-topics {
+  margin-top: 40px;
 }
 
-.tm-help-search-label {
-  display: block;
-  margin-bottom: 8px;
+.tm-help-topics-label {
+  margin: 0 0 12px;
   font-size: var(--font-size-body-sm);
   font-weight: 700;
   color: var(--text-strong);
 }
 
-.tm-help-search-field {
-  position: relative;
-}
-
-.tm-help-search-input {
-  padding-right: 52px;
-}
-
-.tm-help-search-input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-}
-
-.tm-help-search-clear {
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  transform: translateY(-50%);
-  border: 0;
-  border-radius: var(--radius-circle);
-  background: transparent;
-  font-size: var(--font-size-subhead);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.tm-help-suggest {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.tm-help-suggest-label {
-  margin-right: 4px;
-  font-size: var(--font-size-label);
-  color: var(--text-muted);
-}
-
-.tm-help-search-status {
-  margin: 16px 0 8px;
-}
-
-.tm-help-search-status:empty {
-  margin: 0;
-}
-
-.tm-help-results {
+.tm-help-topics ul {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tm-help-result {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+.tm-help-topic {
+  display: flex;
   align-items: center;
-  gap: 4px 12px;
-  min-height: 56px;
-  padding: 12px 16px;
+  gap: 12px;
+  height: 100%;
+  min-height: 64px;
+  padding: 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-container);
   background: var(--card-surface);
-  transition: border-color var(--duration-fast) ease;
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-base) var(--ease-out);
 }
 
-.tm-help-result-kind {
-  grid-row: span 2;
-  padding: 4px 8px;
-  border-radius: var(--radius-pill);
+.tm-help-topic-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
   background: var(--blue50);
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  color: var(--blue700);
+  color: var(--blue600);
 }
 
-.tm-help-result-title {
-  font-size: var(--font-size-body);
-  font-weight: 700;
+.tm-help-topic-text {
+  display: grid;
+  min-width: 0;
+}
+
+.tm-help-topic-text b {
+  font-size: var(--font-size-body-sm);
   color: var(--text-strong);
 }
 
-.tm-help-result-context {
+.tm-help-topic-text small {
   font-size: var(--font-size-label);
   color: var(--text-muted);
 }
 
-.tm-help-search-empty {
-  margin: 0;
-  font-size: var(--font-size-body-sm);
-  line-height: 1.7;
-  color: var(--text);
-}
-
-/* ── 주제 칩(허브) · 주제 필터(/faq): 좁은 화면에서는 가로로 넘긴다 ── */
-.tm-help-topics {
-  margin-top: 24px;
-}
-
-.tm-help-topics ul,
-.tm-help-filter {
-  display: flex;
-  gap: 8px;
-  margin: 0 -20px;
-  padding: 4px 20px;
-  overflow-x: auto;
-  list-style: none;
-  scrollbar-width: none;
-}
-
-.tm-help-topics ul::-webkit-scrollbar,
-.tm-help-filter::-webkit-scrollbar {
-  display: none;
-}
-
-.tm-help-topics li,
-.tm-help-filter .tm-chip {
-  flex-shrink: 0;
-}
-
-/* ── /faq 주제 묶음 ── */
-.tm-help-faq {
-  margin-top: 24px;
-}
-
-.tm-help-filter {
-  margin-bottom: 16px;
-}
-
-.tm-help-group + .tm-help-group {
-  margin-top: 40px;
-}
-
-.tm-help-group-title {
-  margin: 0;
-  font-size: var(--font-size-heading);
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.tm-help-group-desc {
-  margin: 4px 0 12px;
-  font-size: var(--font-size-body-sm);
-  color: var(--text-muted);
-}
-
-.tm-help-cta-wrap {
-  padding-bottom: 48px;
-}
-
-/* ── 가이드 카드: 제목 링크를 카드 전체로 넓힌다 ── */
+/* ── 가이드 카드: 제목 링크를 카드 전체로 넓힌다. 등장 모션은 바깥 칸이, 호버 들림은 카드가 맡는다 ── */
 .tm-help-guides {
   display: grid;
   gap: 12px;
@@ -182,16 +73,21 @@
   list-style: none;
 }
 
+.tm-help-guide-reveal {
+  height: 100%;
+}
+
 .tm-help-guide-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  height: 100%;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-container);
+  border-radius: var(--radius-hero);
   background: var(--card-surface);
-  transition: border-color var(--duration-fast) ease;
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--duration-fast) ease, transform var(--duration-slow) var(--ease-out);
 }
 
 .tm-help-guide-card:focus-within {
@@ -210,34 +106,238 @@
   border-radius: inherit;
 }
 
+.tm-help-guide-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px;
+  align-items: start;
+  gap: 12px;
+}
+
 .tm-help-guide-who {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   margin: 0;
-  font-size: var(--font-size-label);
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--blue50);
+  font-size: var(--font-size-caption);
   font-weight: 700;
   color: var(--blue700);
 }
 
 .tm-help-guide-title {
-  margin: 0;
-  font-size: var(--font-size-body-lg);
+  margin: 12px 0 0;
+  font-size: var(--font-size-subhead);
   font-weight: 800;
-  line-height: 1.4;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
   color: var(--text-strong);
 }
 
 .tm-help-guide-summary {
-  margin: 0;
+  margin: 8px 0 0;
   font-size: var(--font-size-body-sm);
   line-height: 1.6;
   color: var(--text);
 }
 
+.tm-help-guide-illu {
+  width: 80px;
+  height: auto;
+}
+
+/* 단계 미리보기는 768+ 에서만 — 모바일은 요약 한 줄로 충분하고 단계는 가이드 본문에 있다 */
+.tm-help-guide-steps {
+  display: none;
+  gap: 4px;
+  margin: 16px 0 0;
+  padding: 12px 0 0;
+  list-style: none;
+  counter-reset: tm-help-guide-step;
+  border-top: 1px solid var(--border);
+}
+
+.tm-help-guide-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  counter-increment: tm-help-guide-step;
+  font-size: var(--font-size-body-sm);
+  color: var(--text);
+}
+
+.tm-help-guide-steps li::before {
+  content: counter(tm-help-guide-step);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-circle);
+  background: var(--surface-soft);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
 .tm-help-guide-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: auto 0 0;
-  padding-top: 4px;
+  padding-top: 16px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.tm-help-guide-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--blue700);
+}
+
+.tm-help-guide-go svg {
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+/* ── 허브 "자주 찾는 질문": 머리·용어집 | 질문 제자리 펼침 ── */
+.tm-help-popular {
+  display: grid;
+  gap: 24px;
+}
+
+.tm-help-popular-head .tm-ps-section-header {
+  margin-bottom: 0;
+}
+
+.tm-help-more-link {
+  margin: 8px 0 0;
+}
+
+.tm-help-gloss {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+}
+
+.tm-help-gloss-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+}
+
+.tm-help-gloss-head small {
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-help-gloss-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 36px 칩 + 위아래 4px 투명 판 = 44px 누름 영역. 줄 간격 8px 이라 이웃 줄과 겹치지 않는다 */
+.tm-help-gloss-term {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-chip);
+  background: var(--surface-soft);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.tm-help-gloss-term::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.tm-help-faq-caption {
+  margin: 0 0 12px;
   font-size: var(--font-size-label);
   font-weight: 600;
   color: var(--text-muted);
+}
+
+.tm-help-faq-none {
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  font-size: var(--font-size-body-sm);
+  color: var(--text);
+}
+
+/* /faq·용어집 본문: 히어로 바로 아래라 위 여백을 줄인다 */
+.tm-help-browse {
+  padding-top: 32px;
+}
+
+/* ── 용어집 카드: 1열 → 768+ 2열 ── */
+.tm-help-terms {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-help-term {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  scroll-margin-top: 88px;
+}
+
+.tm-help-term-name {
+  margin: 0;
+  font-size: var(--font-size-subhead);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-help-term-alias {
+  margin: 4px 0 0;
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-help-term-def {
+  margin: 12px 0 0;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--text-strong);
+}
+
+.tm-help-term-detail {
+  margin: 8px 0 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.tm-help-term .tm-help-qlinks {
+  margin-top: 12px;
 }
 
 /* ── 질문 링크 목록(인기·관련 질문) ── */
@@ -268,15 +368,6 @@
   content: '→';
   flex-shrink: 0;
   color: var(--text-muted);
-}
-
-.tm-help-more-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 24px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
 }
 
 /* ── 문의 안내 ── */
@@ -417,77 +508,29 @@
   margin-top: 4px;
 }
 
-/* ── 용어집 ── */
-.tm-help-toc ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 16px;
-  margin: 24px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-help-toc-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  font-size: var(--font-size-body-sm);
-  font-weight: 600;
-  color: var(--blue700);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.tm-help-terms {
-  display: grid;
-  gap: 0;
-  margin: 24px 0 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--border);
-}
-
-.tm-help-term {
-  padding: 24px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.tm-help-term-name {
-  margin: 0;
-  font-size: var(--font-size-heading);
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.tm-help-term-alias {
-  margin: 4px 0 0;
-  font-size: var(--font-size-label);
-  color: var(--text-muted);
-}
-
-.tm-help-term-def {
-  margin: 12px 0 0;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  line-height: 1.7;
-  color: var(--text-strong);
-}
-
-.tm-help-term-detail {
-  margin: 8px 0 0;
-  font-size: var(--font-size-body-sm);
-  line-height: 1.7;
-  color: var(--text);
-}
-
-.tm-help-term .tm-help-qlinks {
-  margin-top: 12px;
+/* 가이드 상세의 페이지 끝 문의 안내 자리 */
+.tm-help-cta-wrap {
+  padding-bottom: 48px;
 }
 
 @media (hover: hover) {
-  .tm-help-result:hover,
+  .tm-help-topic:hover {
+    border-color: var(--blue100);
+    transform: translateY(-2px);
+  }
+
   .tm-help-guide-card:hover {
-    border-color: var(--border-strong);
+    border-color: var(--blue100);
+    transform: translateY(-4px);
+  }
+
+  .tm-help-guide-card:hover .tm-help-guide-go svg {
+    transform: translateX(3px);
+  }
+
+  .tm-help-gloss-term:hover {
+    background: var(--blue50);
+    color: var(--blue700);
   }
 
   .tm-help-qlink:hover {
@@ -496,39 +539,56 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tm-help-result,
-  .tm-help-guide-card {
+  .tm-help-topic,
+  .tm-help-guide-card,
+  .tm-help-guide-go svg,
+  .tm-help-gloss-term {
     transition: none;
   }
 }
 
 /* ─── 태블릿 (768+) ─── */
 @media (min-width: 768px) {
-  .tm-help-topics ul,
-  .tm-help-filter {
-    flex-wrap: wrap;
-    margin-inline: 0;
-    padding: 4px 0;
-    overflow: visible;
-  }
+  .tm-help-topics ul { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 
-  .tm-help-guides {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
+  .tm-help-guides { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .tm-help-guide-card { padding: 24px; }
+  .tm-help-guide-top { grid-template-columns: minmax(0, 1fr) 112px; gap: 16px; }
+  .tm-help-guide-illu { width: 112px; margin: -8px -8px 0 0; }
+  .tm-help-guide-steps { display: grid; }
 
-  .tm-help-cta {
-    padding: 32px;
-  }
+  .tm-help-terms { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .tm-help-term { padding: 24px; }
 
-  .tm-help-cta-wrap {
-    padding-bottom: 72px;
-  }
+  .tm-help-browse { padding-top: 48px; }
+
+  .tm-help-cta { padding: 32px; }
+  .tm-help-cta-wrap { padding-bottom: 72px; }
 }
 
 /* ─── 데스크톱 (1024+) ─── */
 @media (min-width: 1024px) {
-  .tm-help-cta-wrap {
-    padding-bottom: 96px;
+  .tm-help-topics { margin-top: 56px; }
+  .tm-help-topics ul { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .tm-help-topic {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 120px;
+    padding: 16px;
   }
+
+  .tm-help-guide-card { padding: 28px 28px 24px; }
+  .tm-help-guide-title { font-size: var(--font-size-heading); }
+
+  .tm-help-popular {
+    grid-template-columns: 380px minmax(0, 1fr);
+    align-items: start;
+    gap: 64px;
+  }
+  .tm-help-popular-head { position: sticky; top: 96px; }
+  /* 380px 칸이라 섹션 제목 기본값(42px)이면 세 줄로 꺾인다 */
+  .tm-help-popular-head .tm-ps-title { font-size: 36px; }
+
+  .tm-help-cta-wrap { padding-bottom: 96px; }
 }

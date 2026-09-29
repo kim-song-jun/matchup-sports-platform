@@ -112,7 +112,8 @@ describe('/contact', () => {
 
   it('지킬 수 없는 약속(운영 계정·어드민 권한·실시간·답변 시간·앱 스토어)을 쓰지 않는다', async () => {
     const { container } = await renderPage();
-    const text = container.textContent ?? '';
+    // 문의 페이지 본문만 본다 — 공용 GNB 의 대회 설명("실시간 스코어")은 라이브 스코어 기능 이야기다
+    const text = container.querySelector('main')?.textContent ?? '';
     for (const phrase of ['운영 계정', '어드민 권한', '관리자 권한', '실시간', 'AI 매칭', '영업일', '시간 안에', '앱 스토어', 'App Store', 'Google Play']) {
       expect(text, phrase).not.toContain(phrase);
     }

@@ -1,3 +1,2 @@
-export { FaqBrowser } from './faq-browser';
-export { HelpSearch } from './help-search';
-export { HelpContactCta, HelpGuideCards, HelpQuestionLinks } from './help-blocks';
+export { HelpFaqResults } from './help-faq-results';
+export { HelpContactCta, HelpGlossaryShortcut, HelpGuideCards, HelpQuestionLinks, HelpTopics } from './help-blocks';

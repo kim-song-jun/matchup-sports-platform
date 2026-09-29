@@ -7,6 +7,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { FAQ_CATEGORIES, FAQ_ITEMS, FAQ_UPDATED_AT, type FaqCategoryId } from '@/lib/public-content/faq';
+import { faqSearchEntries } from '@/lib/public-site/help-index';
+import { matchHelpEntries } from '@/lib/public-site/help-search';
 import FaqPage, { metadata } from './page';
 
 vi.mock('next/link', () => ({
@@ -135,5 +137,66 @@ describe('/faq 주제 필터', () => {
     expect(target.closest('[hidden]')).toBeNull();
     expect(target.open).toBe(true);
     expect(screen.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('/faq 검색 즉시 필터', () => {
+  const matchedIds = (query: string) => {
+    const keys = matchHelpEntries(faqSearchEntries(FAQ_ITEMS), query)!;
+    return FAQ_ITEMS.filter((item) => keys.has(`faq:${item.id}`)).map((item) => item.id);
+  };
+  const visibleIds = (container: HTMLElement) =>
+    [...container.querySelectorAll('details')].filter((node) => !node.closest('[hidden]')).map((node) => node.id);
+
+  it('검색어에 맞는 질문만 남기고 맞는 것이 없는 주제 묶음은 가리며, 주제 칩과 함께 좁혀진다', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderFaq();
+    await user.type(screen.getByLabelText('질문 검색'), '팀장');
+    const expected = matchedIds('팀장');
+    // 여러 주제에 걸쳐 일부만 맞는 검색어여야 이 단언이 의미가 있다
+    expect(expected.length).toBeGreaterThan(1);
+    expect(expected.length).toBeLessThan(FAQ_ITEMS.length);
+    expect(visibleIds(container)).toEqual(expected);
+    expect(screen.getByRole('status')).toHaveTextContent(`질문 ${expected.length}개`);
+    for (const category of FAQ_CATEGORIES) {
+      const hasHit = expected.some((id) => FAQ_ITEMS.find((item) => item.id === id)!.category === category.id);
+      expect(container.querySelector(`#cat-${category.id}`)!.closest('[hidden]') === null).toBe(hasHit);
+    }
+    // 답은 가려져도 DOM 에 남는다(FAQPage 와의 1:1)
+    expect(container.querySelectorAll('details')).toHaveLength(FAQ_ITEMS.length);
+
+    const group = screen.getByRole('group', { name: '주제로 좁혀 보기' });
+    await user.click(within(group).getByRole('button', { name: '팀' }));
+    const teamHits = expected.filter((id) => FAQ_ITEMS.find((item) => item.id === id)!.category === 'team');
+    expect(visibleIds(container)).toEqual(teamHits);
+    expect(screen.getByRole('status')).toHaveTextContent(`질문 ${teamHits.length}개`);
+  });
+
+  it('맞는 질문이 없으면 없다고 알리고 문의 창구로 안내한다', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderFaq();
+    await user.type(screen.getByLabelText('질문 검색'), '없는낱말조합');
+    expect(screen.getByRole('status')).toHaveTextContent('찾는 결과가 없어요');
+    expect(visibleIds(container)).toEqual([]);
+    const hint = container.querySelector('.tm-ps-browser-main .tm-ps-search-empty')!;
+    expect(within(hint as HTMLElement).getByRole('link', { name: '문의 창구' })).toHaveAttribute('href', '/contact');
+  });
+
+  it('검색어에 가려진 질문을 #id 딥링크로 가리키면 검색어를 지워 그 질문이 보이게 한다', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderFaq();
+    const input = screen.getByLabelText('질문 검색');
+    await user.type(input, '팀장');
+    const target = container.querySelector<HTMLDetailsElement>('#entry-fee-refund')!;
+    expect(target.closest('[hidden]')).not.toBeNull();
+
+    act(() => {
+      window.history.replaceState(null, '', '/faq#entry-fee-refund');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    expect(input).toHaveValue('');
+    expect(target.closest('[hidden]')).toBeNull();
+    expect(target.open).toBe(true);
   });
 });

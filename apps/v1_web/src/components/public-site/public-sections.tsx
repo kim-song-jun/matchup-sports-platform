@@ -26,7 +26,7 @@ export function PublicSection({
   return (
     <section id={id} className="tm-ps-section" data-tone={tone === 'muted' ? 'muted' : undefined} aria-labelledby={headingId}>
       <div className="tm-ps-container">
-        <header className="tm-ps-section-header">
+        <header className="tm-ps-section-header" data-reveal>
           {keyword ? <p className="tm-ps-kw">{keyword}</p> : null}
           <Heading id={headingId} className={Heading === 'h1' ? 'tm-ps-title-page' : 'tm-ps-title'}>{title}</Heading>
           {lead ? <p className="tm-ps-lead">{lead}</p> : null}

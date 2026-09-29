@@ -7,7 +7,7 @@ import { buildFaqPageLd } from '@/lib/public-site/structured-data';
 import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 import { AUDIENCE_PAGES } from './audiences';
 import { FAQ_CATEGORIES, FAQ_ITEMS, faqsByIds } from './faq';
-import { GLOSSARY_TERMS } from './glossary';
+import { GLOSSARY_GROUPS, GLOSSARY_TERMS } from './glossary';
 import { GUIDES, guidePath } from './guides';
 
 /** alpha 에 없는 약속: 주최자 운영 계정·어드민 권한(스태프 지정까지만), 소켓식 실시간, AI 매칭. */
@@ -99,5 +99,12 @@ describe('공개 콘텐츠 전체', () => {
     for (const ids of [GLOSSARY_TERMS.map((t) => t.id), GUIDES.map((g) => g.slug), AUDIENCE_PAGES.map((a) => a.slug)]) {
       expect(new Set(ids).size).toBe(ids.length);
     }
+  });
+
+  // 화면은 분류별로 묶어 그리고 DefinedTermSet 은 배열 순서대로 싣는다 — 분류가 섞이면 둘의 순서가 어긋난다.
+  it('용어는 분류 순서대로 이어서 놓이고, 정의된 분류는 전부 쓰인다', () => {
+    const groupOrder = GLOSSARY_GROUPS.map((group) => group.id);
+    const runs = GLOSSARY_TERMS.map((t) => t.group).filter((group, i, all) => i === 0 || all[i - 1] !== group);
+    expect(runs).toEqual(groupOrder);
   });
 });

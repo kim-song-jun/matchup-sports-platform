@@ -35,7 +35,7 @@ describe('friendly match shared score sheet (real DB)', () => {
     expect(restored.goals[0].participantId).toBe(f.participants[1].id);
     const publicView = await records.read(null, f.match.id);
     expect(publicView.sides.find((s) => s.key === 'HOME')?.score).toBeNull();
-    expect(publicView).toMatchObject({ canEdit: false, participant: false, participants: [], history: [], goals: [] });
+    expect(publicView).toMatchObject({ canEdit: false, participant: false, participants: [], history: [], goals: [], goalEvents: [] });
   });
   it('honors public visibility policy and the live-score kill switch without limiting participants', async () => {
     const f = await createSharedRecordFixture(prisma);
@@ -106,6 +106,22 @@ describe('friendly match shared score sheet (real DB)', () => {
     const view = await records.mutate(user(f.userIds[3]), f.match.id, cmd('add', 1, { sideId: f.sides[0].id }));
     expect(view.sides.map((s) => s.score)).toEqual([1, 1]);
     expect(view.goals.find((g) => !g.ownGoal)?.participantId).toBeNull();
+    await records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 2));
+    await records.mutate(user(f.userIds[3]), f.match.id, cmd('confirm', 3));
+    const publicView = await records.read(null, f.match.id);
+    expect(publicView).toMatchObject({ participants: [], goals: [], history: [] });
+    expect(publicView.goalEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sideId: f.sides[1].id,
+        participantName: expect.any(String),
+        ownGoal: true,
+      }),
+      expect.objectContaining({
+        sideId: f.sides[0].id,
+        participantName: null,
+        ownGoal: false,
+      }),
+    ]));
   });
   it('invalidates previous confirmations on edits and requires different teams; finalizes canonical result atomically and locks writes', async () => {
     const f = await createSharedRecordFixture(prisma);

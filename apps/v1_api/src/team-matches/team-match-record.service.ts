@@ -7,6 +7,16 @@ import { completeTeamMatchAtResultBoundary } from '../games/team-match-result-bo
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
+import {
+  isTournamentParticipantNameGatingReverted,
+  loadParticipantNameProfiles,
+  resolveParticipantDisplayName,
+  resolveParticipantNameEligible,
+} from '../games/public-records/participant-name-gating';
+import {
+  loadParticipantConsentEligibility,
+  type ParticipantConsentEligibility,
+} from '../games/public-records/public-consent';
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
 
 type Tx = Prisma.TransactionClient;
@@ -124,6 +134,60 @@ export class TeamMatchRecordService {
     return entries.length === 1 ? entries[0] : null;
   }
 
+  /**
+   * 완료된 공동 기록을 팀매치 상세에서 대회 경기결과와 같은 축으로 보여 주기 위한
+   * 최소 공개 projection. 편집용 participant id, 변경 이력, 확인자 정보는 내보내지
+   * 않는다. 이름은 대회 일정 카드와 같은 게이트/닉네임 정책을 그대로 사용한다.
+   */
+  private async publicGoalEvents(
+    tx: Tx,
+    game: Loaded,
+    goals: readonly SharedGoal[],
+    phase: ReturnType<TeamMatchRecordService['phase']>,
+    showScore: boolean,
+  ) {
+    if (phase !== 'official' || !showScore || goals.length === 0) return [];
+
+    const roster = this.roster(game);
+    const participantIds = roster.map((participant) => participant.id);
+    const identityLinks = participantIds.length === 0
+      ? []
+      : await tx.v1ParticipantIdentityLinkCurrent.findMany({
+          where: { participantId: { in: participantIds } },
+          select: { participantId: true, userId: true },
+        });
+    const linkedUserIdByParticipant = new Map(
+      identityLinks.map((link) => [link.participantId, link.userId] as const),
+    );
+    const publicParticipants = roster.map((participant) => ({
+      ...participant,
+      userId: participant.userId ?? linkedUserIdByParticipant.get(participant.id) ?? null,
+    }));
+    const participantById = new Map(publicParticipants.map((participant) => [participant.id, participant] as const));
+    const consentMap = isTournamentParticipantNameGatingReverted()
+      ? await loadParticipantConsentEligibility(tx, participantIds)
+      : new Map<string, ParticipantConsentEligibility>();
+    const nameProfileByUserId = await loadParticipantNameProfiles(
+      tx,
+      publicParticipants.map((participant) => participant.userId),
+    );
+
+    return goals.map((goal) => {
+      const participant = goal.participantId === null ? undefined : participantById.get(goal.participantId);
+      const consent = goal.participantId === null ? undefined : consentMap.get(goal.participantId);
+      const eligible = resolveParticipantNameEligible(false, consent);
+      return {
+        sideId: goal.sideId,
+        participantName: eligible
+          ? resolveParticipantDisplayName(participant, nameProfileByUserId)
+          : null,
+        minute: goal.minute,
+        ownGoal: goal.ownGoal,
+        subMatchId: goal.subMatchId,
+      };
+    });
+  }
+
   private phase(game: Loaded) {
     const match = game.teamMatch!;
     if (match.leagueId || match.tournamentId) return 'managed' as const;
@@ -146,6 +210,7 @@ export class TeamMatchRecordService {
     const visibility = privateView ? 'live' : effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'STATUS_ONLY', await isPublicLiveEnabled(tx));
     if (visibility === 'hidden') throw new NotFoundException({ code: 'TEAM_MATCH_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     const showScore = privateView || visibility === 'live' || (visibility === 'official_only' && phase === 'official');
+    const goalEvents = await this.publicGoalEvents(tx, game, goals, phase, showScore);
     const changes = privateView ? await tx.v1TeamMatchRecordChange.findMany({ where: { gameId: game.id }, orderBy: { version: 'desc' }, take: 100 }) : [];
     const participants = privateView ? await this.participantViews(tx, game) : [];
     return {
@@ -157,6 +222,7 @@ export class TeamMatchRecordService {
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
       participants,
       goals: privateView ? goals : [],
+      goalEvents,
       confirmations: privateView ? ((record?.confirmations ?? []) as Confirmation[]).map((c) => ({ sideId: c.sideId, name: c.name, at: c.at })) : [],
       history: changes.map((c) => ({ id: c.id, version: c.version, action: c.action, actorName: c.actorName, goalId: c.goalId, subMatchId: c.subMatchId, before: c.before, after: c.after, at: c.createdAt })),
       officialAt: record?.officialAt ?? null,

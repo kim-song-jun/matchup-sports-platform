@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
@@ -48,6 +48,56 @@ describe('shared record participant flow', () => {
   it('출처가 없으면 뒤로가기 경로 없이 열린다 — 셸이 정적 backHref(?view=detail)로 대신한다', () => {
     render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
     expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute('href', '/team-matches/match/record');
+  });
+
+  it('확정 결과의 득점 기록을 대회 결과 축으로 펼치고 일반 득점은 검정, 자책골은 빨강으로 표시한다', () => {
+    state.data = {
+      ...state.data,
+      phase: 'official',
+      canEdit: false,
+      officialAt: state.data.serverTime,
+      sides: [
+        { id: 'home', key: 'HOME', name: '한강', score: 2 },
+        { id: 'away', key: 'AWAY', name: '마포', score: 1 },
+      ],
+      goalEvents: [
+        { sideId: 'home', participantName: '김민수', minute: 12, ownGoal: false, subMatchId: null },
+        { sideId: 'away', participantName: '박지훈', minute: 18, ownGoal: false, subMatchId: null },
+        { sideId: 'home', participantName: '박지훈', minute: 24, ownGoal: true, subMatchId: null },
+      ],
+    };
+    const { container } = render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
+    const toggle = screen.getByRole('button', { name: '득점 기록 보기 (3)' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: '득점 기록 접기 (3)' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('list', { name: '득점 기록' })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: '홈 12분 김민수 골' })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: '원정 18분 박지훈 골' })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: '홈 24분 박지훈 자책골' })).toBeInTheDocument();
+    expect(screen.getByText('OG')).toBeInTheDocument();
+    const goalMarkers = Array.from(container.querySelectorAll('[data-goal-marker="goal"]'));
+    expect(goalMarkers).toHaveLength(2);
+    for (const marker of goalMarkers) expect(marker).toHaveStyle({ color: 'var(--text-strong)' });
+    const ownGoalMarkers = Array.from(container.querySelectorAll('[data-goal-marker="own-goal"]'));
+    expect(ownGoalMarkers).toHaveLength(1);
+    expect(ownGoalMarkers[0]).toHaveStyle({ color: 'var(--red500)' });
+  });
+
+  it('0대0 확정 결과는 빈 아코디언 대신 득점 없음 상태를 보여준다', () => {
+    state.data = {
+      ...state.data,
+      phase: 'official',
+      canEdit: false,
+      officialAt: state.data.serverTime,
+      goalEvents: [],
+    };
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
+    expect(screen.getByText('등록된 득점이 없어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /득점 기록 보기/ })).not.toBeInTheDocument();
   });
 
   it('라이브 참가자는 받은 출처를 그대로 실은 경로로 자동 리다이렉트된다', () => {
@@ -100,6 +150,26 @@ describe('shared record participant flow', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /자책골/ }));
     expect(screen.queryByRole('radio', { name: /김민수/ })).toBeNull();
     expect(screen.getByRole('radio', { name: /박지훈/ })).toBeInTheDocument();
+  });
+  it('득점 카드는 선수·팀·시간을 구분하고 수정·삭제를 별도 관리 영역으로 묶는다', () => {
+    state.data = {
+      ...state.data,
+      sides: [
+        { id: 'home', key: 'HOME', name: '한강 런너스 풀백 축구클럽', score: 1 },
+        { id: 'away', key: 'AWAY', name: '마포', score: 0 },
+      ],
+      goals: [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 12, subMatchId: null }],
+    };
+
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+
+    const goalRow = screen.getByRole('group', { name: '김민수 득점 기록' });
+    expect(within(goalRow).getByText('김민수')).toBeInTheDocument();
+    expect(within(goalRow).getByText('한강 런너스 풀백 축구클럽')).toBeInTheDocument();
+    expect(within(goalRow).getByLabelText('득점 시간 12분')).toHaveTextContent('12분');
+    const actions = screen.getByRole('group', { name: '김민수 득점 관리' });
+    expect(within(actions).getByRole('button', { name: /수정$/ })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: /삭제$/ })).toHaveClass('tm-btn-ghost');
   });
   it('does not overwrite a newer remote edit while a local form is open', () => {
     const { rerender } = render(<TeamMatchSharedRecord teamMatchId="match" />);

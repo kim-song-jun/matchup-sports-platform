@@ -4,6 +4,13 @@ import { v1Get, v1Post, retryTransientFailure } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 
 export type SharedGoal = { id: string; sideId: string; participantId: string | null; ownGoal: boolean; minute: number | null; subMatchId: string | null };
+export type SharedPublicGoalEvent = {
+  sideId: string;
+  participantName: string | null;
+  minute: number | null;
+  ownGoal: boolean;
+  subMatchId: string | null;
+};
 export type SharedSubMatch = { id: string; title: string; order: number; scores: { sideId: string; score: number | null }[] };
 export type RecordChange = { id: string; version: number; action: string; actorName: string; goalId: string | null; subMatchId: string | null; before: SharedGoal | SharedSubMatch | null; after: SharedGoal | SharedSubMatch | null; at: string };
 export type SharedRecord = {
@@ -14,7 +21,7 @@ export type SharedRecord = {
   sides: { id: string; key: 'HOME' | 'AWAY'; name: string; score: number | null }[];
   subMatches: SharedSubMatch[];
   participants: { id: string; sideId: string; name: string; jerseyNumber: number | null; profileImageUrl: string | null }[];
-  goals: SharedGoal[]; history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
+  goals: SharedGoal[]; goalEvents?: SharedPublicGoalEvent[]; history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
 };
 export type RecordCommand = {
   commandId: string;

@@ -1,5 +1,4 @@
 import type { Prisma } from '@prisma/client';
-import type { PrismaService } from '../../prisma/prisma.service';
 import { isParticipantPubliclyEligible, type ParticipantConsentEligibility } from './public-consent';
 
 /**
@@ -35,7 +34,7 @@ export type ParticipantNameProfileRow = {
  * 그대로 공개 응답 페이로드의 이름 문자열로 변환될 값이라 select 범위가 곧 노출 범위다.
  */
 export async function loadParticipantNameProfiles(
-  prisma: PrismaService,
+  prisma: Pick<Prisma.TransactionClient, 'v1UserProfile'>,
   userIds: readonly (string | null)[],
 ): Promise<ReadonlyMap<string, ParticipantNameProfileRow>> {
   const uniqueUserIds = Array.from(new Set(userIds.filter((id): id is string => id !== null)));

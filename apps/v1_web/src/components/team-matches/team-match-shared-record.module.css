@@ -22,7 +22,8 @@
 .history { list-style: none; margin: 0; padding: 0; }
 .history li { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .history time { display: block; color: var(--text-caption); font-size: var(--font-size-caption); margin: 8px 0; }
-@media(max-width: 767px) { .page { padding: 16px 16px 100px; } .columns { grid-template-columns: 1fr; gap: 16px; } .board { padding: 20px 16px; } .score { gap: 12px; } .team { font-size: var(--font-size-body-sm); } .header h1 { font-size: var(--font-size-heading); } .header { align-items: flex-start; } .section { padding: 16px; } }
+@media(max-width: 1023px) { .columns { grid-template-columns: 1fr; gap: 16px; } }
+@media(max-width: 767px) { .page { padding: 16px 16px 100px; } .board { padding: 20px 16px; } .score { gap: 12px; } .team { font-size: var(--font-size-body-sm); } .header h1 { font-size: var(--font-size-heading); } .header { align-items: flex-start; } .section { padding: 16px; } }
 
 .historyTitle { cursor: pointer; font-size: var(--font-size-body-lg); font-weight: 750; min-height: 44px; display: flex; align-items: center; }
 
@@ -44,12 +45,40 @@
 .subMatchTitle { min-width: 0; font-size: var(--font-size-body-lg); font-weight: 750; overflow-wrap: anywhere; }
 .subScore { font-size: var(--font-size-subhead); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .goalList { display: grid; }
+.goalRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.goalRow:last-child { border-bottom: 0; }
 .detailSubMatches { display: grid; gap: 8px; margin: 16px 0; }
 .detailSubMatches > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .detailSubMatches > div:last-child { border-bottom: 0; }
 .openLink { display: inline-flex; min-height: var(--size-touch-min); align-items: center; color: var(--blue700); font-weight: 700; }
+.goalAccordion { margin: 16px 0 4px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.goalAccordionToggle { width: 100%; min-height: var(--size-touch-min); padding: 12px 0; border: 0; background: transparent; color: var(--text-strong); display: flex; align-items: center; justify-content: space-between; gap: 12px; font: inherit; font-size: var(--font-size-body-sm); font-weight: 700; cursor: pointer; text-align: left; }
+.goalAccordionChevron { flex: 0 0 auto; color: var(--text-caption); transition: transform 160ms ease; }
+.goalAccordionChevron[data-expanded='true'] { transform: rotate(180deg); }
+.goalAccordionPanel { display: grid; gap: 16px; padding: 4px 0 16px; }
+.goalSectionTitle { margin: 0 0 8px; font-size: var(--font-size-caption); color: var(--text-caption); font-weight: 700; }
+.goalEventList { display: grid; gap: 8px; color: var(--text-caption); font-size: var(--font-size-caption); }
+.invalidGoalEvent { min-height: 24px; display: flex; align-items: center; justify-content: center; color: var(--red700); text-align: center; }
+.goalEventRow { display: grid; align-items: center; column-gap: 12px; min-height: 24px; }
+.goalEventHome { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.goalEventAway { min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.goalEventMarker { display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1; }
+.goalIcon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ownGoalBadge { padding: 1px 4px; border-radius: var(--radius-tight); background: var(--tint-red); color: var(--red700); font-size: var(--font-size-micro); font-weight: 800; line-height: 1.4; }
+.noGoals { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-caption); font-size: var(--font-size-caption); }
+.goalAccordionToggle:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; border-radius: var(--radius-tight); }
+@media (prefers-reduced-motion: reduce) { .goalAccordionChevron { transition: none; } }
 .cardRenameForm { display: grid; gap: 12px; }
 .goalPlayer { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.goalPlayerText { flex: 1; min-width: 0; }
+.goalTitleRow { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.goalTitleRow strong { min-width: 0; overflow-wrap: anywhere; }
+.goalTime { flex: 0 0 auto; border-radius: var(--radius-control); background: var(--surface-soft); padding: 2px 8px; color: var(--text-caption); font-size: var(--font-size-caption); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.goalMeta { display: flex; gap: 8px; align-items: baseline; margin: 3px 0 0; color: var(--text-caption); font-size: var(--font-size-body-sm); line-height: 1.5; }
+.goalTeam { min-width: 0; overflow-wrap: anywhere; }
+.goalActions { display: flex; flex: 0 0 auto; gap: 8px; flex-wrap: nowrap; justify-content: flex-end; }
+.goalDeleteAction { color: var(--red700); }
+.goalDeleteAction:hover { background: var(--red50); color: var(--red700); }
 .playerField { border: 0; padding: 0; margin: 0; min-width: 0; }
 .playerField legend { font-size: var(--font-size-body-sm); font-weight: 600; margin-bottom: 8px; }
 .playerChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -59,4 +88,5 @@
 .playerChoice span { display: grid; gap: 2px; min-width: 0; }
 .playerChoice strong { overflow-wrap: anywhere; }
 .playerChoice small { color: var(--text-caption); font-size: var(--font-size-caption); }
+@media(max-width: 640px) { .goalRow { grid-template-columns: minmax(0, 1fr); gap: 8px; } .goalActions { padding-left: 52px; } }
 @media(max-width: 767px) { .sectionHead { align-items: stretch; flex-direction: column; } .inlineForm { grid-template-columns: 1fr; } .subMatchHead { flex-direction: column; } .subMatchHead > .actions { justify-content: flex-start; } .playerChoices { grid-template-columns: 1fr; } }

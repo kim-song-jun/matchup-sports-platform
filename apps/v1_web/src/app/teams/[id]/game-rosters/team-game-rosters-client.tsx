@@ -14,7 +14,7 @@ import {
   type V1TeamRosterMatrixPlayer,
 } from '@/hooks/use-v1-game-roster';
 import { V1ApiError } from '@/lib/api-client';
-import { formatKstMonthDaySlash } from '@/lib/date-utils';
+import { formatKstMonthDaySlash, formatKstTime } from '@/lib/date-utils';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -73,7 +73,14 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: dirty || data.games.some((g) => g.editable) ? 112 : 16 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: `16px var(--v1-shell-page-x) ${dirty || data.games.some((g) => g.editable) ? 112 : 16}px`,
+      }}
+    >
       <p className="tm-text-caption" style={{ margin: 0 }}>
         다가오는 대회·리그 경기 {data.games.length}개 · 칩을 누르면 그 경기에서 빠져요
       </p>
@@ -149,6 +156,7 @@ function PlayerCard({
   onOpenUnavailability: (() => void) | null;
 }) {
   const summary = playerSummary(player, draft);
+  const labels = gameChipLabels(games);
   return (
     <Card pad={16} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -168,7 +176,7 @@ function PlayerCard({
           const status = effectiveStatus(cell, draft, player.userId);
           const toggleable = isToggleable(game, cell);
           const changed = cellKey(game.gameId, player.userId) in draft;
-          const label = gameChipLabel(game);
+          const label = labels[index];
           const playing = status === 'PARTICIPATING';
           return (
             <button
@@ -213,9 +221,17 @@ function playerSummary(player: V1TeamRosterMatrixPlayer, draft: TeamRosterDraft)
   return { text: `${reason === null ? '' : `${reason} · `}${excluded.length}경기 빠짐`, tone: 'grey' };
 }
 
-function gameChipLabel(game: V1TeamRosterMatrixGame): string {
-  const day = formatKstMonthDaySlash(game.scheduledAt) ?? '날짜 미정';
-  return `${day} ${game.opponentName ?? game.competitionTitle ?? '상대 미정'}`;
+/** 같은 날 같은 상대 경기가 둘 이상이면 시각을 붙여 칩을 가른다(대회 하루 2경기). */
+function gameChipLabels(games: readonly V1TeamRosterMatrixGame[]): string[] {
+  const parts = games.map((game) => ({
+    day: formatKstMonthDaySlash(game.scheduledAt) ?? '날짜 미정',
+    opponent: game.opponentName ?? game.competitionTitle ?? '상대 미정',
+  }));
+  return games.map((game, index) => {
+    const { day, opponent } = parts[index];
+    const twin = parts.some((other, j) => j !== index && other.day === day && other.opponent === opponent);
+    return twin && game.scheduledAt !== null ? `${day} ${formatKstTime(game.scheduledAt)} ${opponent}` : `${day} ${opponent}`;
+  });
 }
 
 function chipAriaLabel(label: string, status: string, remaining: number | null, toggleable: boolean, changed: boolean): string {

@@ -167,6 +167,59 @@ describe('경기 명단 관리 — 칩 토글과 일괄 저장', () => {
   });
 });
 
+describe('경기 명단 관리 — 칩 이름', () => {
+  it('같은 날 같은 상대 경기는 시각을 붙여 가르고, 그날 하나뿐인 경기는 날짜만 둔다', async () => {
+    const game = (gameId: string, scheduledAt: string) => ({
+      gameId,
+      sideId: `${gameId}-side`,
+      teamMatchId: `${gameId}-tm`,
+      competitionId: 'cup-1',
+      competitionKind: 'TOURNAMENT',
+      competitionTitle: '성수 풋살컵',
+      opponentName: '마포 FC',
+      scheduledAt,
+      gameState: 'SCHEDULED',
+      editable: true,
+      summary: { participating: 1, excluded: 0, unavailable: 0, suspended: 0 },
+    });
+    const games = [
+      game('day-1-am', '2026-10-15T01:00:00.000Z'),
+      game('day-1-pm', '2026-10-15T05:00:00.000Z'),
+      game('day-2', '2026-10-16T01:00:00.000Z'),
+    ];
+    const cell = (gameId: string) => ({
+      gameId,
+      status: 'PARTICIPATING',
+      reason: null,
+      actorRole: null,
+      adjustmentId: null,
+      unavailabilityId: null,
+      remainingMatches: null,
+    });
+    server.use(
+      http.get('*/api/v1/teams/:teamId/game-rosters', () =>
+        HttpResponse.json({
+          status: 'success',
+          data: {
+            teamId,
+            viewerRole: 'TEAM_MANAGER',
+            games,
+            players: [{ userId: 'solo', displayName: '혼자', accountLinked: true, cells: games.map((g) => cell(g.gameId)) }],
+          },
+          timestamp: NOW,
+        }),
+      ),
+    );
+    renderPage();
+    const group = await screen.findByRole('group', { name: '혼자 경기별 출전' });
+    expect(within(group).getAllByRole('button').map((chip) => chip.textContent)).toEqual([
+      '10/15 10:00 마포 FC',
+      '10/15 14:00 마포 FC',
+      '10/16 마포 FC',
+    ]);
+  });
+});
+
 describe('경기 명단 관리 — 칩 접근성', () => {
   // 칩이 인라인으로 거는 색 토큰을 globals.css 의 라이트·다크 값으로 풀어 대비를 잰다.
   const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');

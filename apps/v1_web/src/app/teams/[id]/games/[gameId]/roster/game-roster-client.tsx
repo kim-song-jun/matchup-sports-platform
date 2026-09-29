@@ -144,7 +144,14 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   ) : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: canEdit ? 112 : 16 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: `16px var(--v1-shell-page-x) ${canEdit ? 112 : 16}px`,
+      }}
+    >
       <Card pad={16}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <h1 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0, overflowWrap: 'anywhere' }}>

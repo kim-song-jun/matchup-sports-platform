@@ -1,3 +1,5 @@
+import { withFromPath } from './session-storage';
+
 /**
  * 경기 상세로 가는 링크. **대회와 정규 리그는 라우트가 다르다.**
  *
@@ -23,10 +25,18 @@ export function fixtureDetailHref(input: {
   readonly competitionId: string;
   /** 대회면 `V1TournamentFixture.id`, 리그면 `V1TeamMatch.id`. */
   readonly fixtureId: string;
+  /**
+   * 지금 이 링크를 그리는 화면 자신의 URL(`useCurrentHref()`). 실려 있으면 경기 상세의
+   * 셸 뒤로가기(`AppBackLink`)가 여기로 정확히 돌아온다 — 없으면 route-chrome 의 고정
+   * 기본값(대진표 탭 등)으로 떨어져, 예를 들어 일정 탭에서 들어갔다가 순위 탭으로
+   * 돌아오는 것처럼 보일 수 있다.
+   */
+  readonly fromHref?: string | null;
 }): string {
   const competition = encodeURIComponent(input.competitionId);
   const fixture = encodeURIComponent(input.fixtureId);
-  return input.isRegularLeague
+  const path = input.isRegularLeague
     ? `/league-matches/${competition}/fixtures/${fixture}`
     : `/tournaments/${competition}/matches/${fixture}`;
+  return withFromPath(path, input.fromHref);
 }

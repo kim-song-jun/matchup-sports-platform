@@ -25,4 +25,18 @@ describe('fixtureDetailHref', () => {
       '/league-matches/a%2Fb/fixtures/c%20d',
     );
   });
+
+  // 이 링크를 그리는 화면(일정 탭 등)으로 뒤로가기가 정확히 돌아오게 한다 — 빠지면
+  // 경기 상세의 셸 뒤로가기가 route-chrome 고정 기본값(대진표 탭 등)으로 떨어진다.
+  it('fromHref가 있으면 ?from=으로 실어 보낸다', () => {
+    expect(
+      fixtureDetailHref({ isRegularLeague: false, competitionId: 't-1', fixtureId: 'f-1', fromHref: '/tournaments/t-1/bracket' }),
+    ).toBe('/tournaments/t-1/matches/f-1?from=%2Ftournaments%2Ft-1%2Fbracket');
+  });
+
+  it('fromHref가 없으면 예전처럼 쿼리 없는 경로를 준다', () => {
+    expect(
+      fixtureDetailHref({ isRegularLeague: false, competitionId: 't-1', fixtureId: 'f-1', fromHref: null }),
+    ).toBe('/tournaments/t-1/matches/f-1');
+  });
 });

@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
@@ -15,6 +16,20 @@ import { FixturePickerList } from '@/components/tournament-result-review/fixture
 import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
 import { describeResultReviewError } from '@/components/tournament-result-review/result-review-copy';
 import { ResultReviewGridStyles } from '@/components/tournament-result-review/result-review-grid-styles';
+
+const INTERNAL_URL_BASE = 'https://teameet.invalid';
+
+/**
+ * 정정 목록에서 선택한 경기와 복귀 딥링크를 맞춘다. 선택은 로컬 상태라 현재 주소의
+ * `fixtureId`가 이전 경기를 가리킬 수 있으므로, 공개 화면에 넘길 때 현재 선택으로 교체한다.
+ * 받은 `from` 체인과 hash는 그대로 보존한다.
+ */
+function withSelectedFixtureId(href: string | null, fixtureId: string) {
+  if (!href) return null;
+  const parsed = new URL(href, INTERNAL_URL_BASE);
+  parsed.searchParams.set('fixtureId', fixtureId);
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
 
 /**
  * Screen A-04 -- `/tournament-ops/tournaments/:tournamentId/records/
@@ -29,6 +44,8 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  // 공개 화면에서 뒤로가기를 누르면 이 정정 화면으로 돌아오게 한다(fixtureDetailHref 참고).
+  const selfHref = useCurrentHref();
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
@@ -63,6 +80,9 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   );
 
   const selectedItem = hasOfficialResult.find((item) => item.fixtureId === selectedFixtureId) ?? null;
+  const selectedSelfHref = selectedItem
+    ? withSelectedFixtureId(selfHref, selectedItem.fixtureId)
+    : selfHref;
 
   /**
    * **확정된 결과를 관전자 화면에서 확인하는 자리.** 원래 결과 검토 화면에 뒀는데 거기서는
@@ -80,6 +100,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
           isRegularLeague: tournament.data.kind === 'regular_league',
           competitionId: tournamentId,
           fixtureId: selectedItem.fixtureId,
+          fromHref: selectedSelfHref,
         })
       : undefined;
   const selectedFixtureTitle = selectedItem

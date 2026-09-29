@@ -348,6 +348,7 @@ function BracketEmpty({
 export function BracketScheduleTab({
   tournamentId,
   isRegularLeague = false,
+  fromHref,
 }: {
   tournamentId: string;
   /**
@@ -356,6 +357,8 @@ export function BracketScheduleTab({
    * 단계 어휘(칩·aria-label)만 가른다 — `ScheduleContent` 참조.
    */
   isRegularLeague?: boolean;
+  /** 이 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기(일정 탭)로 돌아오게 한다. */
+  fromHref?: string | null;
 }) {
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
@@ -401,6 +404,7 @@ export function BracketScheduleTab({
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={() => void fetchNextPage()}
         myFixtures={myFixtures.data}
+        fromHref={fromHref}
         /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
            같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
         showStandings={false}
@@ -638,6 +642,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           <BracketScheduleTab
             tournamentId={tournament.id}
             isRegularLeague={isRegularLeague}
+            fromHref={bracketSelfHref}
           />
         </div>
       </div>

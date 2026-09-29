@@ -280,9 +280,10 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     // 뺐다. 그 두 결정 — 어드민이 팀에게 결과를 되돌려 보내는 왕복 — 이 사라져 그 이름의
     // 아웃박스 이벤트가 더는 만들어지지 않는다(정본 §4). `GAME_RESULT_LEAGUE_AUTO_APPROVE`
     // 도 같은 이유로 빠졌다(11 → 10) — 어드민 확인을 건너뛰는 단계라 예약 자체를 지웠다.
+    // Task 178 이 `COMPETITION_ROSTER_RESYNC`(경기 명단 재계산 후속 이벤트)를 더했다(10 → 11).
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 10,
+      registeredHandlers: 11,
       queue: {
         pending: 0,
         retry: 0,
@@ -295,7 +296,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 11,
+      registeredHandlers: 12,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

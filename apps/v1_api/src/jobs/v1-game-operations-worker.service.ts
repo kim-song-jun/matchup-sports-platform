@@ -20,7 +20,7 @@ import {
   IdentityLinkExpiryService,
 } from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { handleCompetitionRosterResync } from '../games/roster/game-roster-sync';
+import { handleCompetitionRosterResync, resultRosterImpact } from '../games/roster/game-roster-sync';
 import { COMPETITION_ROSTER_RESYNC_TYPE, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { WebPushService } from '../notifications/web-push.service';
 import { VideoUploadCleanupService } from './video-upload-cleanup.service';
@@ -73,6 +73,8 @@ export function withCompetitionRosterResync(handler: GameOperationHandler): Game
   return async (claim, tx) => {
     await handler(claim, tx);
     if (claim.aggregateType !== 'GAME') return;
+    // 출전정지 규정이 없으면 결과가 명단을 바꿀 수 없어 이벤트를 남기지 않는다(빈 이벤트가 대기열을 채우지 않게).
+    if ((await resultRosterImpact(tx, claim.aggregateId)) === null) return;
     await enqueueRosterResync(tx, [{ scope: 'result', gameId: claim.aggregateId }], {
       businessKey: `${claim.businessKey}:roster-resync`,
     });

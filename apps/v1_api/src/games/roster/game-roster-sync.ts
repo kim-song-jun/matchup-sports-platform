@@ -465,10 +465,13 @@ export async function syncTeamMemberFallbackRosters(tx: Tx, teamIds: readonly st
 }
 
 /**
- * 결과 리비전이 제출·확정·무효가 된 경기의 양 팀 시작 전 경기를 다시 계산한다(출전정지 변동).
- * 출전정지 규정이 없는 대회·리그는 결과가 명단을 바꿀 수 없으므로 조회 두 번으로 끝난다.
+ * 결과가 명단을 바꿀 수 있는 경기면 그 대회·리그와 양 팀을 돌려준다. 결과는 출전정지를 통해서만 명단에
+ * 닿으므로, 규정이 없는 대회·리그·친선은 null — 결과 핸들러가 후속 이벤트를 남길지도 이것으로 정한다.
  */
-export async function syncRostersAfterResultChange(tx: Tx, gameId: string): Promise<number> {
+export async function resultRosterImpact(
+  tx: Tx,
+  gameId: string,
+): Promise<{ competitionId: string; teamIds: string[] } | null> {
   const game = await tx.v1Game.findUnique({
     where: { id: gameId },
     select: {
@@ -477,12 +480,19 @@ export async function syncRostersAfterResultChange(tx: Tx, gameId: string): Prom
   });
   const teamMatch = game?.teamMatch ?? null;
   const competitionId = teamMatch === null ? null : (teamMatch.leagueId ?? teamMatch.tournamentId);
-  if (teamMatch === null || competitionId === null) return 0;
-  if (!suspensionRulesEnabled(await readSuspensionRules(tx, competitionId))) return 0;
+  if (teamMatch === null || competitionId === null) return null;
+  if (!suspensionRulesEnabled(await readSuspensionRules(tx, competitionId))) return null;
   const teamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId].filter((id): id is string => id !== null);
+  return { competitionId, teamIds };
+}
+
+/** 결과 리비전이 제출·확정·무효가 된 경기의 양 팀 시작 전 경기를 다시 계산한다(출전정지 변동). */
+export async function syncRostersAfterResultChange(tx: Tx, gameId: string): Promise<number> {
+  const impact = await resultRosterImpact(tx, gameId);
+  if (impact === null) return 0;
   return syncCompetitionTeams(
     tx,
-    teamIds.map((teamId) => ({ competitionId, teamId })),
+    impact.teamIds.map((teamId) => ({ competitionId: impact.competitionId, teamId })),
   );
 }
 

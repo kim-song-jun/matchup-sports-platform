@@ -93,11 +93,16 @@ describe('경기 명단 조정 API (Task 178)', () => {
 
   async function createGame(input: {
     teamMatch: Prisma.V1TeamMatchUncheckedCreateInput;
+    // 일반 대회 경기는 게임을 만들기 전에 대회 경기 정보가 있어야 한다(게임 생성 감사의 소유 범위 검사).
+    details?: Omit<Prisma.V1TournamentMatchDetailsUncheckedCreateInput, 'teamMatchId'>;
     homeTeamId: string;
     awayTeamId: string;
     actorUserId: string;
   }) {
     const teamMatch = await prisma.v1TeamMatch.create({ data: input.teamMatch });
+    if (input.details !== undefined) {
+      await prisma.v1TournamentMatchDetails.create({ data: { ...input.details, teamMatchId: teamMatch.id } });
+    }
     const creation: GameSourceCreationInput = {
       sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: teamMatch.id,
@@ -166,19 +171,16 @@ describe('경기 명단 조정 API (Task 178)', () => {
           startAt: new Date(Date.now() + days * DAY),
           competitionConfigVersionId: configId,
         },
-        homeTeamId: home.id,
-        awayTeamId: away.id,
-        actorUserId: adminId,
-      });
-      await prisma.v1TournamentMatchDetails.create({
-        data: {
-          teamMatchId: games[key].teamMatchId,
+        details: {
           tournamentId: tournament.id,
           round: 'group',
           fixtureNumber: index + 1,
           homeRegistrationId: registrations.get(home.id)!,
           awayRegistrationId: registrations.get(away.id)!,
         },
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        actorUserId: adminId,
       });
     }
     for (const team of [teamA, teamB, teamC]) {

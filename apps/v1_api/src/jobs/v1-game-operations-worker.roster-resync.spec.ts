@@ -28,9 +28,20 @@ function claim(overrides: Partial<GameOperationClaim> = {}): GameOperationClaim 
 describe('결과 이벤트 뒤 명단 재계산 — 결과 트랜잭션 밖의 후속 이벤트', () => {
   // 결과 핸들러(순위 투영 등)는 이미 경기·팀 매치를 쥐고 있다. 그 트랜잭션에서 양 팀의 다른 경기를
   // 잡으면 경기 잠금 순서가 깨져 대진 수정과 교착하므로, 재계산은 자기 트랜잭션의 첫 잠금이 되게 넘긴다.
+  // 결과는 출전정지를 통해서만 명단에 닿는다 — 규정이 있는 대회·리그의 경기만 후속 이벤트를 남긴다.
+  const competitionRead = (rules: { yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null }) => ({
+    v1Game: {
+      findUnique: jest.fn(async () => ({
+        teamMatch: { tournamentId: 'tournament-1', leagueId: null, hostTeamId: 'team-a', approvedApplicantTeamId: 'team-b' },
+      })),
+    },
+    v1Tournament: { findFirst: jest.fn(async () => rules) },
+  });
+
   it('결과 핸들러 트랜잭션에서는 경기를 잠그지 않고 후속 이벤트만 남긴다', async () => {
     const order: string[] = [];
     const tx = {
+      ...competitionRead({ yellowAccumulationLimit: 2, redCardSuspensionMatches: 1 }),
       $executeRaw: jest.fn(async (strings: TemplateStringsArray) => {
         order.push(`execute:${strings.join('?').includes('INSERT INTO v1_outbox_events') ? 'outbox' : 'other'}`);
         return 1;
@@ -52,6 +63,14 @@ describe('결과 이벤트 뒤 명단 재계산 — 결과 트랜잭션 밖의 �
       expect.arrayContaining(['game:game-1:revision:2:official:roster-resync', 'game-1', COMPETITION_ROSTER_RESYNC_TYPE]),
     );
     expect(JSON.parse(String(values[5]))).toEqual({ scope: 'result', gameId: 'game-1' });
+  });
+
+  it('출전정지 규정이 없는 대회·리그의 결과는 명단을 바꿀 수 없어 후속 이벤트를 남기지 않는다', async () => {
+    const tx = { ...competitionRead({ yellowAccumulationLimit: null, redCardSuspensionMatches: null }), $executeRaw: jest.fn(async () => 1) };
+    const handler = jest.fn(async () => undefined);
+    await withCompetitionRosterResync(handler)(claim(), tx as unknown as Prisma.TransactionClient);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('경기가 아닌 집계의 이벤트에는 후속 이벤트를 남기지 않는다', async () => {

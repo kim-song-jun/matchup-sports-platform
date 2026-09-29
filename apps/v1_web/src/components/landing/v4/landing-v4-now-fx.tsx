@@ -83,7 +83,8 @@ export function LandingV4Parallax({ src, illustration }: { src: string; illustra
   );
 }
 
-/** 흐르는 팀 매치 카드. 끊김 없이 돌리려고 복제한 카드는 탭 순서·보조기술에서 뺀다. */
+/** 흐르는 팀 매치 카드. 끊김 없이 돌리려고 복제한 카드는 탭 순서·보조기술에서 뺀다.
+ * 칩 줄은 카드 맨 아래에 늘 있다 — 한 줄에 선 카드 높이가 같아서, 칩이 없는 카드만 아래가 비어 보이지 않게. */
 export function LandingV4MatchCard({ match, clone }: { match: LandingLiveTeamMatch; clone?: boolean }) {
   const where = match.place ?? match.region;
   const tags = [match.formatText, match.levelLabel].filter(Boolean).join(' ');
@@ -95,16 +96,16 @@ export function LandingV4MatchCard({ match, clone }: { match: LandingLiveTeamMat
         tabIndex={clone ? -1 : undefined}
         onClick={() => trackEvent('landing_cta_click', { cta: 'live_open_team_match' })}
       >
-        <span className="tm-landing-v4-mcard-top">
-          <span className="tm-landing-v4-mcard-logos">
-            <TeamAvatar seed={match.hostName} name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
-            <TeamAvatar seed={match.opponentName} name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
-          </span>
-          {match.isLeague ? <span className="tm-landing-v4-mtag" data-tone="blue">리그</span> : null}
+        <span className="tm-landing-v4-mcard-logos">
+          <TeamAvatar seed={match.hostName} name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
+          <TeamAvatar seed={match.opponentName} name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
         </span>
         <b>{match.hostName} <span className="tm-landing-v4-mcard-vs">vs</span> {match.opponentName}</b>
         <small>{[where, match.dateTimeText].filter(Boolean).join(' · ')}</small>
-        {tags ? <span className="tm-landing-v4-mtag" data-tone="grey">{tags}</span> : null}
+        <span className="tm-landing-v4-mcard-tags">
+          {match.isLeague ? <span className="tm-landing-v4-mtag" data-tone="blue">리그</span> : null}
+          {tags || !match.isLeague ? <span className="tm-landing-v4-mtag" data-tone="grey">{tags || '팀 매치'}</span> : null}
+        </span>
       </Link>
     </li>
   );

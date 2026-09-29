@@ -1,5 +1,5 @@
 /**
- * 랜딩 v4(/landing/v4)의 고정 무대·"지금 팀밋에서" 섹션이 쓰는 실데이터 요약.
+ * 랜딩(/landing)의 고정 무대·"지금 팀밋에서" 섹션이 쓰는 실데이터 요약.
  * 서버 전용 — fetchSeoSeed 는 실패해도 던지지 않고 null 을 돌려주므로, 이 파일도 null 을
  * 그대로 전파한다(빈 배열로 메우면 "0건"과 "못 받음"이 섞인다).
  */
@@ -220,21 +220,28 @@ function liveTeamMatches(items: readonly V1TeamMatch[], now: Date): LandingLiveT
     }));
 }
 
-/** 운영 종목 — 수치가 0 인 종목도 "준비 중"으로 이름을 남기려고 고정 목록을 둔다. */
+/** 운영 종목 — 어느 수치에도 없는 종목을 "준비 중"으로 이름을 남기려고 고정 목록을 둔다. */
 export const LANDING_SPORTS = ['풋살', '축구', '러닝', '수영'] as const;
 
-export type LandingSportChips = {
-  readonly chips: readonly { readonly name: string; readonly count: number }[];
-  /** 이 지표가 0 인 운영 종목을 한 줄로("러닝·수영 준비 중"). 없으면 null. */
-  readonly soon: string | null;
-};
+export type LandingSportChip = { readonly name: string; readonly count: number };
 
-export function sportChips(bySport: LandingBySport, key: keyof LandingBySport[string]): LandingSportChips {
-  const names = new Set<string>([...LANDING_SPORTS, ...Object.keys(bySport)]);
-  const chips = [...names]
-    .map((name) => ({ name, count: bySport[name]?.[key] ?? 0 }))
+/** 이 지표가 1 이상인 종목만 많은 순으로. */
+export function sportChips(bySport: LandingBySport, key: keyof LandingBySport[string]): LandingSportChip[] {
+  return Object.entries(bySport)
+    .map(([name, counts]) => ({ name, count: counts[key] }))
     .filter((chip) => chip.count > 0)
     .sort((a, b) => b.count - a.count);
-  const idle = LANDING_SPORTS.filter((name) => !(bySport[name]?.[key] ?? 0));
-  return { chips, soon: idle.length > 0 ? `${idle.join('·')} 준비 중` : null };
+}
+
+/**
+ * 팀 매치·대회·팀이 모두 0 인 운영 종목을 한 줄로("러닝·수영 준비 중"). 없으면 null.
+ * 목록을 하나라도 못 받았으면 0 이 "없음"인지 "못 셈"인지 모르므로 단정하지 않고 null 이다.
+ */
+export function idleSportsText({ bySport, counts }: Pick<LandingV4Data, 'bySport' | 'counts'>): string | null {
+  if (!counts.teamMatches || !counts.tournaments || !counts.teams) return null;
+  const idle = LANDING_SPORTS.filter((name) => {
+    const s = bySport[name];
+    return !s || s.teamMatches + s.tournaments + s.teams === 0;
+  });
+  return idle.length > 0 ? `${idle.join('·')} 준비 중` : null;
 }

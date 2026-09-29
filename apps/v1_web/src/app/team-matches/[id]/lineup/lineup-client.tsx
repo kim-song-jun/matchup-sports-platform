@@ -9,6 +9,7 @@ import {
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { GameRosterStatusBadge } from '@/components/game-roster/game-roster-player-row';
 import { useV1TeamUnavailability } from '@/hooks/use-v1-game-roster';
 import {
@@ -732,6 +733,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                           {entry.position}
                         </span>
                       ) : null}
+                      {entry.userId !== null && unavailableByUser.has(entry.userId) ? (
+                        <span style={{ marginLeft: 8, display: 'inline-flex', verticalAlign: 'middle' }}>
+                          <GameRosterStatusBadge status="UNAVAILABLE" reason={unavailableByUser.get(entry.userId)?.reason} />
+                        </span>
+                      ) : null}
                     </span>
                     <input
                       type="number"
@@ -947,6 +953,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
 /** 대회·리그 경기로 열렸을 때 편집기 대신 경기 명단 화면을 안내한다. 자동 이동은 하지 않는다. */
 function CompetitionRosterNotice({ href }: { href: string | null }) {
+  useShellOverride({ title: '경기 명단' });
   return (
     <div style={{ padding: '40px 20px' }}>
       <EmptyState

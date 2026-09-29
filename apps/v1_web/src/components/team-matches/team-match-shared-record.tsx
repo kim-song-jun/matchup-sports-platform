@@ -418,17 +418,28 @@ function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
   if (goals.length === 0) return <p className={styles.muted}>{data.participant ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
   return <div className={styles.goalList}>{goals.map((goal) => {
     const participant = data.participants.find((row) => row.id === goal.participantId);
-    return <div className={styles.row} key={goal.id}>
+    const participantName = participant?.name ?? '득점자 미상';
+    const sideName = data.sides.find((side) => side.id === goal.sideId)?.name ?? '팀 미상';
+    return <div className={styles.goalRow} key={goal.id} role="group" aria-label={`${participantName} 득점 기록`}>
     <div className={styles.goalPlayer}>
-      <ProfileAvatar imageUrl={participant?.profileImageUrl} initials={playerInitials(participant?.name ?? '?')} size={40} />
-      <div>
-        <strong>{participant?.name ?? '득점자 미상'}{goal.ownGoal ? ' · 자책골' : ''}</strong>
-        <p className={styles.muted}>{data.sides.find((s) => s.id === goal.sideId)?.name}{goal.minute !== null ? ` · ${goal.minute}분` : ' · 시간 미입력'}</p>
+      <ProfileAvatar imageUrl={participant?.profileImageUrl} initials={playerInitials(participantName)} size={40} />
+      <div className={styles.goalPlayerText}>
+        <div className={styles.goalTitleRow}>
+          <strong>{participantName}</strong>
+          <span className={styles.goalTime} aria-label={goal.minute !== null ? `득점 시간 ${goal.minute}분` : '득점 시간 없음'}>
+            {goal.minute !== null ? `${goal.minute}분` : '시간 없음'}
+          </span>
+        </div>
+        <p className={styles.goalMeta}>
+          <span className={styles.goalTeam}>{sideName}</span>
+          <span aria-hidden="true">·</span>
+          <span>{goal.ownGoal ? '자책골' : '득점'}</span>
+        </p>
       </div>
     </div>
-    {canEdit && <div className={styles.actions}>
+    {canEdit && <div className={styles.goalActions} role="group" aria-label={`${participantName} 득점 관리`}>
       <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${goalLabel(data, goal)} 수정`} onClick={() => onEdit(goal)}>수정</Button>
-      <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${goalLabel(data, goal)} 삭제`} onClick={() => onDelete(goal)}>삭제</Button>
+      <Button size="sm" variant="ghost" className={styles.goalDeleteAction} disabled={disabled} aria-label={`${goalLabel(data, goal)} 삭제`} onClick={() => onDelete(goal)}>삭제</Button>
     </div>}
   </div>})}</div>;
 }

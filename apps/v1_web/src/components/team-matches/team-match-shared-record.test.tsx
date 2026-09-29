@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
@@ -150,6 +150,26 @@ describe('shared record participant flow', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /자책골/ }));
     expect(screen.queryByRole('radio', { name: /김민수/ })).toBeNull();
     expect(screen.getByRole('radio', { name: /박지훈/ })).toBeInTheDocument();
+  });
+  it('득점 카드는 선수·팀·시간을 구분하고 수정·삭제를 별도 관리 영역으로 묶는다', () => {
+    state.data = {
+      ...state.data,
+      sides: [
+        { id: 'home', key: 'HOME', name: '한강 런너스 풀백 축구클럽', score: 1 },
+        { id: 'away', key: 'AWAY', name: '마포', score: 0 },
+      ],
+      goals: [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 12, subMatchId: null }],
+    };
+
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+
+    const goalRow = screen.getByRole('group', { name: '김민수 득점 기록' });
+    expect(within(goalRow).getByText('김민수')).toBeInTheDocument();
+    expect(within(goalRow).getByText('한강 런너스 풀백 축구클럽')).toBeInTheDocument();
+    expect(within(goalRow).getByLabelText('득점 시간 12분')).toHaveTextContent('12분');
+    const actions = screen.getByRole('group', { name: '김민수 득점 관리' });
+    expect(within(actions).getByRole('button', { name: /수정$/ })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: /삭제$/ })).toHaveClass('tm-btn-ghost');
   });
   it('does not overwrite a newer remote edit while a local form is open', () => {
     const { rerender } = render(<TeamMatchSharedRecord teamMatchId="match" />);

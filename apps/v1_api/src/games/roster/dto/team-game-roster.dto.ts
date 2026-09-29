@@ -10,6 +10,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
@@ -73,5 +74,7 @@ export class TeamUnavailabilityQueryDto {
   @ApiPropertyOptional({ description: '이 시각을 덮는 결장 기간만(ISO 8601). 없으면 지금' })
   @IsOptional()
   @IsISO8601({ strict: true })
+  // IsISO8601 는 주·연중 일수·기본 형식도 통과시키는데 new Date() 가 못 읽어 500 이 난다 — 확장 형식 + 시간대만 받는다.
+  @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/)
   activeAt?: string;
 }

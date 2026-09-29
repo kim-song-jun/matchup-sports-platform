@@ -161,7 +161,8 @@ describe('TeamUnavailabilityQueryDto', () => {
   it('activeAt 은 선택이고, 있으면 실제로 있는 날짜의 ISO 8601 이어야 한다', async () => {
     expect(await errorsOf({})).toEqual([]);
     expect(await errorsOf({ activeAt: '2026-10-03T19:00:00+09:00' })).toEqual([]);
-    for (const activeAt of ['tomorrow', '2026-02-30T00:00:00Z', '1759449600000']) {
+    expect(await errorsOf({ activeAt: new Date('2026-10-03T10:00:00Z').toISOString() })).toEqual([]);
+    for (const activeAt of ['tomorrow', '2026-02-30T00:00:00Z', '1759449600000', '2026-W40-1', '2026-273', '2026-09-29T10Z', '20260929T100000Z', '2026-09-29T10:00:00,5Z', '2026-09-29T10:00']) {
       expect(await errorsOf({ activeAt })).toEqual(['activeAt']);
     }
   });

@@ -9,8 +9,10 @@ import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-mat
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolve-team-match-competition-config';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
+import { updateTournamentMatchInTx } from '../../src/tournaments/tournament-match-update';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
+import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
@@ -121,6 +123,8 @@ describe('경기 명단 조정 API (Task 178)', () => {
   async function seedTournament() {
     const adminId = await makeUser('운영자');
     await prisma.v1AdminUser.create({ data: { userId: adminId, adminRole: 'ops', status: 'active' } });
+    const supportAdminId = await makeUser('지원어드민');
+    await prisma.v1AdminUser.create({ data: { userId: supportAdminId, adminRole: 'support', status: 'active' } });
     const directorId = await makeUser('총괄');
     const supportId = await makeUser('조회스태프');
     const outsiderId = await makeUser('외부인');
@@ -182,7 +186,7 @@ describe('경기 명단 조정 API (Task 178)', () => {
     }
     const sidePath = (key: 'g1' | 'g2', teamId: string) =>
       `/api/v1/games/${games[key].gameId}/sides/${games[key].sideByTeam.get(teamId)!}`;
-    return { adminId, directorId, supportId, outsiderId, teamA, teamB, teamC, tournament, registrations, games, sidePath };
+    return { adminId, supportAdminId, directorId, supportId, outsiderId, teamA, teamB, teamC, tournament, registrations, games, sidePath };
   }
 
   const http = () => request(app.getHttpServer());
@@ -208,28 +212,32 @@ describe('경기 명단 조정 API (Task 178)', () => {
       const sideA = f.sidePath('g1', f.teamA.id);
       const [a1, a2] = f.teamA.members;
 
-      const reads = await Promise.all(
-        [f.teamA.ownerId, f.teamA.managerId, a1, f.adminId, f.directorId, f.supportId].map((id) => getAs(`${sideA}/roster`, id)),
-      );
-      expect(reads.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200]);
+      const readers = [f.teamA.ownerId, f.teamA.managerId, a1, f.adminId, f.supportAdminId, f.directorId, f.supportId];
+      const reads = await Promise.all(readers.map((id) => getAs(`${sideA}/roster`, id)));
+      expect(reads.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200, 200]);
       expect(reads.map((res) => [res.body.data.viewerRole, res.body.data.editable])).toEqual([
         ['TEAM_MANAGER', true],
         ['TEAM_MANAGER', true],
         ['TEAM_MEMBER', false],
         ['ADMIN', true],
+        // support 어드민은 팀 표·어드민 표처럼 경기 명단도 읽기로 본다.
+        ['ADMIN', false],
         ['STAFF', true],
         ['STAFF', false],
       ]);
+      const histories = await Promise.all(readers.map((id) => getAs(`${sideA}/roster-adjustments`, id)));
+      expect(histories.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200, 200]);
       // 상대팀 팀장·팀원·외부인은 A 사이드를 못 본다(사유는 팀 내부 정보다).
       for (const id of [f.teamB.ownerId, f.teamB.members[0], f.outsiderId]) {
         const res = await getAs(`${sideA}/roster`, id);
         expect([res.status, res.body.code]).toEqual([403, 'PERMISSION_DENIED']);
         expect((await getAs(`${sideA}/roster-adjustments`, id)).status).toBe(403);
       }
-      // 쓰기 거부: A 팀원, 상대팀 팀장·매니저, 조회 전용 스태프, 외부인.
-      for (const id of [a1, f.teamB.ownerId, f.teamB.managerId, f.supportId, f.outsiderId]) {
+      // 쓰기 거부: A 팀원, 상대팀 팀장·매니저, support 어드민, 조회 전용 스태프, 외부인.
+      for (const id of [a1, f.teamB.ownerId, f.teamB.managerId, f.supportAdminId, f.supportId, f.outsiderId]) {
         const res = await excludeAs(sideA, id, { userId: a2 });
         expect([res.status, res.body.code]).toEqual([403, 'PERMISSION_DENIED']);
+        expect((await revokeAs(sideA, id, a2)).status).toBe(403);
       }
       expect(await prisma.v1GameRosterAdjustment.count({ where: { gameId: f.games.g1.gameId } })).toBe(0);
 
@@ -322,10 +330,66 @@ describe('경기 명단 조정 API (Task 178)', () => {
         ]),
       ).toEqual([
         ['EXCLUDE', a1, 'LATE_OR_EARLY', f.teamA.ownerId, 'TEAM_MANAGER'],
-        ['REVOKE', a1, 'LATE_OR_EARLY', f.adminId, null],
+        // 운영자가 되돌린 것도 역할이 남는다.
+        ['REVOKE', a1, 'LATE_OR_EARLY', f.adminId, 'ADMIN'],
       ]);
       // 팀원 쓰기 거부는 되돌리기에도 같다.
       expect((await revokeAs(sideA, a2, a1)).status).toBe(403);
+    });
+
+    it('대진 수정으로 사이드 팀이 바뀌면 옛 팀의 빼기·사유는 새 팀에 안 보이고, 옛 팀이 돌아와도 되살아나지 않는다', async () => {
+      const f = await seedTournament();
+      const [a1] = f.teamA.members;
+      const [b1] = f.teamB.members;
+      const [c1] = f.teamC.members;
+      const awaySide = f.games.g1.sideByTeam.get(f.teamB.id)!;
+      const awayPath = `/api/v1/games/${f.games.g1.gameId}/sides/${awaySide}`;
+      const g1A = { gameId: f.games.g1.gameId, sideId: f.games.g1.sideByTeam.get(f.teamA.id)! };
+      expect((await excludeAs(awayPath, f.teamB.ownerId, { userId: b1, reason: 'INJURY' })).status).toBe(200);
+      expect((await excludeAs(f.sidePath('g1', f.teamA.id), f.teamA.ownerId, { userId: a1, reason: 'PERSONAL' })).status).toBe(200);
+      const setAway = async (teamId: string) => {
+        await inTx((client) =>
+          updateTournamentMatchInTx(client, { teamMatchId: f.games.g1.teamMatchId, awayRegistrationId: f.registrations.get(teamId)! }),
+        );
+        await drainOutboxWorker(prisma);
+      };
+
+      await setAway(f.teamC.id);
+      // 옛 팀(B)의 활성 조정은 시스템이 닫는다. 바뀌지 않은 홈 사이드(A)의 조정은 그대로다.
+      expect(await prisma.v1GameRosterAdjustment.findFirstOrThrow({ where: { sideId: awaySide, userId: b1 } })).toMatchObject({
+        teamId: f.teamB.id,
+        revokedAt: expect.any(Date),
+        revokedByUserId: null,
+        revokedByRole: 'SYSTEM',
+      });
+      expect(await prisma.v1GameRosterAdjustment.count({ where: { ...g1A, userId: a1, revokedAt: null } })).toBe(1);
+      // 새 팀(C) 멤버는 옛 팀 선수 이름·사유를 보지 못하고, 옛 팀은 이 사이드를 더는 못 본다.
+      const cHistory = await getAs(`${awayPath}/roster-adjustments`, c1);
+      expect([cHistory.status, cHistory.body.data.teamId, cHistory.body.data.events]).toEqual([200, f.teamC.id, []]);
+      const cView = await getAs(`${awayPath}/roster`, f.teamC.ownerId);
+      expect([cView.body.data.teamId, cView.body.data.excluded, cView.body.data.counts.excluded]).toEqual([f.teamC.id, [], 0]);
+      expect((await getAs(`${awayPath}/roster-adjustments`, f.teamB.ownerId)).status).toBe(403);
+      expect(await lineupUserIds(f.games.g1.gameId, awaySide)).toEqual([c1]);
+      expect(await lineupUserIds(g1A.gameId, g1A.sideId)).toEqual([f.teamA.members[1]]);
+
+      await setAway(f.teamB.id);
+      // B 가 돌아와도 예전 빼기는 되살아나지 않는다 — b1 이 다시 출전하고, 기록에는 시스템 되돌리기가 보인다.
+      expect(await lineupUserIds(f.games.g1.gameId, awaySide)).toEqual([b1]);
+      const bHistory = await getAs(`${awayPath}/roster-adjustments`, f.teamB.ownerId);
+      expect(
+        bHistory.body.data.events.map((event: { type: string; userId: string; reason: string | null; actor: { userId: string | null; role: string | null } }) => [
+          event.type,
+          event.userId,
+          event.reason,
+          event.actor.userId,
+          event.actor.role,
+        ]),
+      ).toEqual([
+        ['EXCLUDE', b1, 'INJURY', f.teamB.ownerId, 'TEAM_MANAGER'],
+        ['REVOKE', b1, 'INJURY', null, 'SYSTEM'],
+      ]);
+      expect((await getAs(`${awayPath}/roster`, f.teamB.ownerId)).body.data.excluded).toEqual([]);
+      expect(await prisma.v1GameRosterAdjustment.count({ where: { ...g1A, userId: a1, revokedAt: null } })).toBe(1);
     });
 
     it('경기가 시작되면 빼기·되돌리기가 409 LINEUP_DEADLINE_PASSED 이고 화면은 읽기 전용이다', async () => {
@@ -367,6 +431,30 @@ describe('경기 명단 조정 API (Task 178)', () => {
       ).toEqual(expect.arrayContaining([[a2, false], [a3, true]]));
       expect(view.body.data.excluded.map((row: { userId: string }) => row.userId)).toEqual([a1]);
       expect(view.body.data.counts).toEqual({ base: 3, participating: 2, excluded: 1, unavailable: 0, suspended: 0 });
+    });
+
+    it('폐기한 라인업 쓰기 라우트(경기·대회 운영 어댑터)는 HTTP 로도 인가 뒤 409 이고 명단을 바꾸지 않는다', async () => {
+      const f = await seedTournament();
+      const g1 = f.games.g1;
+      const sideId = g1.sideByTeam.get(f.teamA.id)!;
+      const lineup = await prisma.v1GameLineup.findFirstOrThrow({ where: { gameId: g1.gameId, sideId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+      const opsBase = `/api/v1/tournament-ops/tournaments/${f.tournament.id}/fixtures/${g1.teamMatchId}/lineup`;
+      const routes = [
+        (userId: string) => http().put(`/api/v1/games/${g1.gameId}/lineups/${sideId}`).set('x-v1-user-id', userId).send({}),
+        (userId: string) => http().post(`/api/v1/games/${g1.gameId}/lineups/${lineup.id}/submit`).set('x-v1-user-id', userId).send({}),
+        (userId: string) => http().put(`${opsBase}/${sideId}`).set('x-v1-user-id', userId).send({}),
+        (userId: string) => http().post(`${opsBase}/${lineup.id}/submit`).set('x-v1-user-id', userId).send({}),
+      ];
+      const lineupCount = await prisma.v1GameLineup.count({ where: { gameId: g1.gameId } });
+
+      for (const call of routes) {
+        const res = await call(f.adminId);
+        expect([res.status, res.body.code]).toEqual([409, 'ROSTER_MANAGED_BY_ADJUSTMENTS']);
+        // 인가는 그대로 탄다 — 권한 없는 사람은 409 로 경기 존재·형태를 알 수 없다.
+        expect((await call(f.outsiderId)).status).toBe(403);
+      }
+      expect((await routes[0](f.teamA.ownerId)).body.code).toBe('ROSTER_MANAGED_BY_ADJUSTMENTS');
+      expect(await prisma.v1GameLineup.count({ where: { gameId: g1.gameId } })).toBe(lineupCount);
     });
 
     it('친선 경기는 이 API 대상이 아니다(404 GAME_ROSTER_NOT_AVAILABLE)', async () => {

@@ -14,7 +14,7 @@ import {
 import { GameRosterService } from '../../src/games/roster/game-roster.service';
 import { GameResultBracketProjectionService } from '../../src/game-operations/game-result-bracket-projection.service';
 import type { OfficialRevisionRow } from '../../src/game-operations/game-result-official-projection.types';
-import { enqueueRosterResync } from '../../src/games/roster/roster-resync-events';
+import { enqueueRosterResync, teamMembersTargets } from '../../src/games/roster/roster-resync-events';
 import { V1GameOperationsWorkerService } from '../../src/jobs/v1-game-operations-worker.service';
 import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-matches/league-fixture-creation';
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
@@ -233,8 +233,9 @@ describe('경기 명단 계산 동기화 (Task 178)', () => {
   /** 조정 API 밖의 트리거는 재계산 이벤트만 남긴다 — 워커가 처리한 뒤에 명단이 바뀐다. */
   const drainWorker = () => drainOutboxWorker(prisma);
   async function exclude(target: { gameId: string; sideId: string }, userId: string, actorUserId: string) {
+    const { teamId } = await prisma.v1GameSide.findUniqueOrThrow({ where: { id: target.sideId }, select: { teamId: true } });
     return prisma.v1GameRosterAdjustment.create({
-      data: { ...target, userId, action: 'EXCLUDE', reason: 'injury', actorUserId, actorRole: 'TEAM_MANAGER' },
+      data: { ...target, teamId: teamId!, userId, action: 'EXCLUDE', reason: 'injury', actorUserId, actorRole: 'TEAM_MANAGER' },
     });
   }
 
@@ -288,6 +289,8 @@ describe('경기 명단 계산 동기화 (Task 178)', () => {
 
       const events = await prisma.v1OutboxEvent.findMany({ where: { type: 'COMPETITION_ROSTER_RESYNC', aggregateId: f.teamA.id } });
       expect(events.map((event) => event.status)).toEqual(['COMPLETED', 'COMPLETED', 'COMPLETED']);
+      // 워커가 집은(claim) 것은 하나뿐이다 — 나머지 둘은 그 처리 안에서 닫혀 한 번도 시도되지 않았다.
+      expect(events.map((event) => event.attempts).sort()).toEqual([0, 0, 1]);
       expect(await rosterOf(g4.gameId, g4.sideId)).toEqual(sorted([a1]));
       expect((await latestLineup(g4.gameId, g4.sideId)).revision).toBe(before.revision + 1);
     });
@@ -666,6 +669,27 @@ describe('경기 명단 계산 동기화 (Task 178)', () => {
       expect(rows).toHaveLength(2);
       expect(rows.every((row) => row.userId === null)).toBe(true);
       expect(rows.map((row) => row.displayNameSnapshot)).not.toContain(excludedName);
+    });
+
+    it('팀원 폴백 팀은 멤버십이 바뀐 뒤(teamMembers 이벤트) 시작 전 경기 명단에서 나간 팀원이 빠진다', async () => {
+      const f = await seedLeague({ eligibleA: false });
+      const [m1, m2] = f.teamA.members;
+      const names = async (userIds: readonly string[]) =>
+        (await prisma.v1UserProfile.findMany({ where: { userId: { in: [...userIds] } } })).map((row) => `name:${row.nickname}`).sort();
+      // 지운 선수 행만 있는 신청은 여전히 명단이 없는 팀(폴백)이다.
+      await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: m2, realName: '지운 선수', removedAt: new Date() } });
+      const l1 = leagueSide(f, 'L1', f.teamA.id);
+      const l2 = leagueSide(f, 'L2', f.teamA.id);
+      const l1B = leagueSide(f, 'L1', f.teamB.id);
+      const l1BBefore = await latestLineup(l1B.gameId, l1B.sideId);
+      expect(await rosterOf(l1.gameId, l1.sideId)).toEqual(await names([f.teamA.ownerId, m1, m2]));
+
+      await prisma.v1TeamMembership.updateMany({ where: { teamId: f.teamA.id, userId: m1 }, data: { status: 'left', leftAt: new Date() } });
+      await inTx((client) => enqueueRosterResync(client, teamMembersTargets([f.teamA.id])));
+      await drainWorker();
+
+      for (const target of [l1, l2]) expect(await rosterOf(target.gameId, target.sideId)).toEqual(await names([f.teamA.ownerId, m2]));
+      expect((await latestLineup(l1B.gameId, l1B.sideId)).id).toBe(l1BBefore.id);
     });
 
     it('경기 시각을 결장 기간 안으로 옮기면(updateFixture) 그 경기에서만 빠진다', async () => {

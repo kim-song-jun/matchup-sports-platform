@@ -285,6 +285,7 @@ describe('TournamentBracketService', () => {
     v1Game: { update: jest.Mock; findMany: jest.Mock };
     v1GameLineup: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
     v1GameSide: { update: jest.Mock };
+    v1GameRosterAdjustment: { updateMany: jest.Mock };
     v1TeamTacticsBoard: { deleteMany: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock };
     v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
@@ -344,6 +345,7 @@ describe('TournamentBracketService', () => {
         create: jest.fn().mockResolvedValue({}),
       },
       v1GameSide: { update: jest.fn().mockResolvedValue({}) },
+      v1GameRosterAdjustment: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TeamTacticsBoard: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },

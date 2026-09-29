@@ -17,15 +17,15 @@ export interface GameRosterAccess {
  */
 export function decideGameRosterAccess(input: {
   sideMembershipRole: 'owner' | 'manager' | 'member' | null;
-  operator: { role: GameActorRole; canMutateLineup: boolean } | null;
+  operator: { role: GameActorRole; canMutateLineup: boolean; platformAdmin: boolean } | null;
 }): GameRosterAccess | null {
   const { sideMembershipRole, operator } = input;
   if (sideMembershipRole === 'owner' || sideMembershipRole === 'manager') {
     return { viewerRole: 'TEAM_MANAGER', writeRole: 'TEAM_MANAGER' };
   }
   if (operator !== null) {
-    const viewerRole: GameRosterViewerRole = operator.role === 'platform_ops' ? 'ADMIN' : 'STAFF';
-    // support_readonly 는 정책상 lineup_mutate 가 없지만, 정책이 바뀌어도 조정 쓰기는 열지 않는다.
+    const viewerRole: GameRosterViewerRole = operator.platformAdmin ? 'ADMIN' : 'STAFF';
+    // support_readonly(대회 조회 스태프·support 어드민)는 정책이 바뀌어도 조정 쓰기를 열지 않는다.
     const writable = operator.canMutateLineup && operator.role !== 'support_readonly';
     return { viewerRole, writeRole: writable ? viewerRole : null };
   }

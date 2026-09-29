@@ -116,18 +116,14 @@ export class TeamGameRosterService {
       const results: GameRosterBatchResult[] = [];
       const touched = new Set<string>();
       for (const change of dto.changes) {
-        const target = { gameId: change.gameId, sideId: sideIdByGame.get(change.gameId)! };
+        const target = { gameId: change.gameId, sideId: sideIdByGame.get(change.gameId)!, teamId };
+        const actor = { userId: user.id, role: accessByGame.get(change.gameId)!.writeRole! };
         const { alreadyApplied } =
           change.op === 'EXCLUDE'
-            ? await this.gameRoster.applyExclude(
-                tx,
-                { userId: user.id, role: accessByGame.get(change.gameId)!.writeRole! },
-                target,
-                { userId: change.userId, reason: change.reason },
-              )
-            : await this.gameRoster.applyRevoke(tx, user.id, target, change.userId);
+            ? await this.gameRoster.applyExclude(tx, actor, target, { userId: change.userId, reason: change.reason })
+            : await this.gameRoster.applyRevoke(tx, actor, target, change.userId);
         if (!alreadyApplied) touched.add(change.gameId);
-        results.push({ ...target, userId: change.userId, op: change.op, alreadyApplied });
+        results.push({ gameId: target.gameId, sideId: target.sideId, userId: change.userId, op: change.op, alreadyApplied });
       }
       for (const gameId of touched) {
         await syncPreparedGameSideRoster(tx, { gameId, sideId: sideIdByGame.get(gameId)! });

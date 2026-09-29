@@ -264,8 +264,18 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
         after: { sideId: f.side.id },
       }),
     );
-    // 이관 표시는 그 사이드에만 걸린다 — 같은 경기의 상대 사이드는 대상이 아니다.
-    const opponentBefore = await latestLineup(f.game.id, f.opponentSide.id);
+    // 이관 표시는 그 사이드에만 걸린다 — 같은 경기 상대 사이드의 팀장 저장본(표시 없음)은 계속 덮지 않는다.
+    const opponentGenerated = await latestLineup(f.game.id, f.opponentSide.id);
+    const opponentSaved = await prisma.v1GameLineup.create({
+      data: {
+        gameId: f.game.id,
+        sideId: f.opponentSide.id,
+        revision: opponentGenerated.revision + 1,
+        supersedesId: opponentGenerated.id,
+        state: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+    });
 
     expect(await sync(f.league.id, f.team.id)).toBe(1);
     const latest = await latestLineup(f.game.id, f.side.id);
@@ -278,7 +288,17 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: newMember, realName: '명단 선수' } });
     expect(await sync(f.league.id, f.team.id)).toBe(1);
     expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(4);
-    expect((await latestLineup(f.game.id, f.opponentSide.id)).id).toBe(opponentBefore.id);
+
+    const opponentTeamId = f.opponentSide.teamId!;
+    const opponentRegistration = await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: f.league.id, teamId: opponentTeamId } },
+    });
+    const opponentNewMember = await makeMember(opponentTeamId);
+    await prisma.v1TournamentPlayer.create({
+      data: { registrationId: opponentRegistration.id, userId: opponentNewMember, realName: '명단 선수' },
+    });
+    expect(await sync(f.league.id, opponentTeamId)).toBe(0);
+    expect((await latestLineup(f.game.id, f.opponentSide.id)).id).toBe(opponentSaved.id);
   });
 
   it('시작 시각이 지난 경기는 맞추지 않는다', async () => {

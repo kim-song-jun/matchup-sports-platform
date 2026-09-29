@@ -542,7 +542,9 @@ export const gameSchemaSourceManifest = {
   // V1Team/V1User. No existing column, constraint or index changed; the bound game-operations
   // migration is unchanged. Same day: the unavailability actorRole doc comment dropped STAFF (comment only).
   // 2026-09-29: task renumbered 176 -> 178 (dev took 176); schema.prisma comments only, no model change.
-  schema: 'ae51fe16f73288f86b4c93404fa3cda014e22f2903c2bac9519bdeb2c34f82d1',
+  // 2026-09-29 Task 178 (same unreleased migration, edited): V1GameRosterAdjustment gains teamId (+ team FK,
+  // V1Team back-relation) and revokedByRole; the active partial unique key now includes team_id. No game model changed.
+  schema: '90507b41412597ff5f20c90e96dee6456cde8be6fd0dd7727dbaa860d7f22ce6',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

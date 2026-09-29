@@ -1321,6 +1321,7 @@ model V1Team {
   contactBlocksReceived        V1TeamContactBlock[]        @relation("V1TeamContactBlockTarget")
   reportedInquiries            V1Inquiry[]                 @relation("V1InquiryReportedTeam")
   memberUnavailabilities       V1TeamMemberUnavailability[]
+  gameRosterAdjustments        V1GameRosterAdjustment[]
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -3883,6 +3884,8 @@ model V1GameRosterAdjustment {
   id              String                       @id @default(uuid())
   gameId          String                       @map("game_id")
   sideId          String                       @map("side_id")
+  /// 조정한 때의 사이드 팀. 계산·기록은 지금 사이드 팀의 행만 읽는다(진출 재투영·대진 수정으로 팀이 바뀐다).
+  teamId          String                       @map("team_id")
   userId          String                       @map("user_id")
   action          V1GameRosterAdjustmentAction
   /// INJURY | PERSONAL | LATE_OR_EARLY | OTHER — DTO 에서 검증한다.
@@ -3892,12 +3895,16 @@ model V1GameRosterAdjustment {
   actorRole       String                       @map("actor_role")
   createdAt       DateTime                     @default(now()) @map("created_at")
   revokedAt       DateTime?                    @map("revoked_at")
+  /// SYSTEM(사이드 팀이 바뀌어 자동으로 되돌림)이면 null.
   revokedByUserId String?                      @map("revoked_by_user_id")
+  /// TEAM_MANAGER | ADMIN | STAFF | SYSTEM
+  revokedByRole   String?                      @map("revoked_by_role")
   game            V1Game                       @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_roster_adjustments_game_fk")
   side            V1GameSide                   @relation(fields: [sideId], references: [id], onDelete: Cascade, map: "v1_game_roster_adjustments_side_fk")
+  team            V1Team                       @relation(fields: [teamId], references: [id], onDelete: Cascade, map: "v1_game_roster_adjustments_team_fk")
   user            V1User                       @relation(fields: [userId], references: [id], onDelete: Restrict, map: "v1_game_roster_adjustments_user_fk")
 
-  /// 활성(revoked_at IS NULL) 행은 (game, side, user) 당 하나 — 부분 unique 인덱스라
+  /// 활성(revoked_at IS NULL) 행은 (game, side, team, user) 당 하나 — 부분 unique 인덱스라
   /// 마이그레이션 SQL 에만 있다(`v1_game_roster_adjustments_active_key`).
   @@index([gameId, sideId], map: "v1_game_roster_adjustments_game_id_side_id_idx")
   @@index([userId], map: "v1_game_roster_adjustments_user_id_idx")

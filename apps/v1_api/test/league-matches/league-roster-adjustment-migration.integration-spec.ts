@@ -126,7 +126,8 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
   }
 
   /**
-   * 리그 하나에 시작 전 경기(A·B 모두 팀장 저장본, B는 저장한 사람을 알 수 없음)와 끝난 경기(A 저장본).
+   * 리그 하나에 시작 전 경기(A·B 모두 팀장 저장본, B는 저장한 사람을 알 수 없음)와 끝난 경기(A 저장본),
+   * 킥오프가 지났지만 결과 입력 전이라 SCHEDULED 인 경기(A 저장본 — 게스트 포함, 이미 치렀을 수 있다).
    * A팀 확정 신청은 명단 행이 한 번도 없는 상태 — 이관이 기준 명단을 읽으려고 채운다(dry-run 은 되돌린다).
    */
   async function seed() {
@@ -165,6 +166,8 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     const upcoming = await fixture('이관 대상 경기', 7);
     const ended = await fixture('끝난 경기', 14);
     await prisma.v1Game.update({ where: { id: ended.a.gameId }, data: { state: 'ENDED' } });
+    const played = await fixture('킥오프 지난 경기', 21);
+    await prisma.v1TeamMatch.update({ where: { id: played.a.teamMatchId }, data: { startAt: new Date(Date.now() - DAY) } });
     const [m1] = teamA.members;
     const legacyA = await saveLegacyLineup(
       upcoming.a,
@@ -177,11 +180,19 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     );
     const legacyB = await saveLegacyLineup(upcoming.b, [{ userId: teamB.ownerId, name: 'B팀장' }], null);
     const legacyEnded = await saveLegacyLineup(ended.a, [{ userId: teamA.ownerId, name: 'A팀장' }], teamA.ownerId);
+    const legacyPlayed = await saveLegacyLineup(
+      played.a,
+      [
+        { userId: teamA.ownerId, name: 'A팀장' },
+        { userId: null, name: '용병 박' },
+      ],
+      teamA.ownerId,
+    );
     const registrationA = await prisma.v1TournamentRegistration.findUniqueOrThrow({
       where: { tournamentId_teamId: { tournamentId: league.id, teamId: teamA.id } },
     });
     await prisma.v1TournamentPlayer.deleteMany({ where: { registrationId: registrationA.id } });
-    return { league, teamA, teamB, upcoming, ended, legacyA, legacyB, legacyEnded, registrationA };
+    return { league, teamA, teamB, upcoming, ended, played, legacyA, legacyB, legacyEnded, legacyPlayed, registrationA };
   }
 
   const reportOf = (result: Awaited<ReturnType<typeof migrateLeagueRosterAdjustments>>, sideId: string) =>
@@ -201,6 +212,11 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     });
     expect(reportOf(result, f.upcoming.b.sideId)).toMatchObject({ status: 'ACTOR_UNRESOLVED', excludeCount: 1 });
     expect(reportOf(result, f.ended.a.sideId)).toBeUndefined();
+    // 킥오프가 지난 팀장 저장본은 옮기지 않고 따로 센다(승인 판단용). 저장본이 없는 상대 사이드는 세지 않는다.
+    expect(reportOf(result, f.played.a.sideId)).toMatchObject({ status: 'KICKOFF_PASSED', excludeCount: 0 });
+    expect(reportOf(result, f.played.b.sideId)).toBeUndefined();
+    expect(result.kickoffPassedSides).toBe(result.sides.filter((row) => row.status === 'KICKOFF_PASSED').length);
+    expect(result.migratedSides).toBe(result.sides.filter((row) => row.status === 'WOULD_MIGRATE').length);
     expect(await prisma.v1GameRosterAdjustment.count({ where: { gameId: f.upcoming.a.gameId } })).toBe(0);
     expect(
       await prisma.v1OperationAudit.findFirst({
@@ -220,9 +236,9 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     expect(reportOf(result, f.upcoming.a.sideId)).toMatchObject({ status: 'MIGRATED', excludeCount: 1, unrepresentableRows: 1 });
     expect(reportOf(result, f.upcoming.b.sideId)).toMatchObject({ status: 'ACTOR_UNRESOLVED' });
     const adjustments = await prisma.v1GameRosterAdjustment.findMany({ where: { gameId: f.upcoming.a.gameId } });
-    expect(adjustments.map((row) => [row.sideId, row.userId, row.actorUserId, row.actorRole, row.reason, row.revokedAt])).toEqual([
-      [f.upcoming.a.sideId, m2, f.teamA.ownerId, 'TEAM_MANAGER', null, null],
-    ]);
+    expect(
+      adjustments.map((row) => [row.sideId, row.teamId, row.userId, row.actorUserId, row.actorRole, row.reason, row.revokedAt]),
+    ).toEqual([[f.upcoming.a.sideId, f.teamA.id, m2, f.teamA.ownerId, 'TEAM_MANAGER', null, null]]);
     expect(
       await prisma.v1OperationAudit.findFirst({
         where: {
@@ -238,6 +254,16 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     expect((await latestLineup(f.upcoming.b.gameId, f.upcoming.b.sideId)).id).toBe(f.legacyB.id);
     expect((await latestLineup(f.ended.a.gameId, f.ended.a.sideId)).id).toBe(f.legacyEnded.id);
     expect(await prisma.v1GameRosterAdjustment.count({ where: { gameId: f.ended.a.gameId } })).toBe(0);
+    // 킥오프가 지난 경기의 저장본(게스트 포함)은 덮지 않는다 — 이관 표시도 남기지 않아 동기화도 건드리지 않는다.
+    expect(reportOf(result, f.played.a.sideId)).toMatchObject({ status: 'KICKOFF_PASSED' });
+    expect((await latestLineup(f.played.a.gameId, f.played.a.sideId)).id).toBe(f.legacyPlayed.id);
+    expect(await rosterOf(f.played.a.gameId, f.played.a.sideId)).toEqual(sorted([f.teamA.ownerId, 'name:용병 박']));
+    expect(await prisma.v1GameRosterAdjustment.count({ where: { gameId: f.played.a.gameId } })).toBe(0);
+    expect(
+      await prisma.v1OperationAudit.findFirst({
+        where: { requestId: leagueRosterMigrationRequestId(f.played.a.gameId, f.played.a.sideId) },
+      }),
+    ).toBeNull();
 
     const m3 = await makeUser('m3');
     await prisma.v1TeamMembership.create({ data: { teamId: f.teamA.id, userId: m3, role: 'member', status: 'active' } });

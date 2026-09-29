@@ -47,6 +47,7 @@ function makeTx() {
     },
     v1TeamTacticsBoard: { deleteMany: jest.fn() },
     v1GameSide: { update: jest.fn() },
+    v1GameRosterAdjustment: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     v1Game: { update: jest.fn() },
     // 진출한 사이드의 명단 재계산 이벤트(outbox). 실제 계산은 통합 스펙.
     $executeRaw: jest.fn().mockResolvedValue(1),
@@ -65,6 +66,11 @@ describe('GameResultBracketProjectionService canonical TeamMatch projection', ()
     // 이 트랜잭션은 원천 경기를 먼저 쥐고 있어 대상 경기 명단을 여기서 계산하지 않는다(교착 방지).
     const events = (tx as any).$executeRaw.mock.calls.map((call: unknown[]) => JSON.parse(String(call[6])));
     expect(events).toEqual([{ scope: 'game', gameId: 'game-target' }]);
+    // 진출 팀이 아닌 옛 조정은 닫는다 — 같은 팀이 다시 배정돼도 옛 빼기가 되살아나지 않는다.
+    expect((tx as any).v1GameRosterAdjustment.updateMany).toHaveBeenCalledWith({
+      where: { gameId: 'game-target', sideId: 'target-home-side', revokedAt: null, teamId: { not: 'team-home' } },
+      data: { revokedAt: expect.any(Date), revokedByUserId: null, revokedByRole: 'SYSTEM' },
+    });
   });
 
   it.each<OfficialScore>([

@@ -1,4 +1,10 @@
-import { planLeagueSideMigration, resolveLineupSaver } from './league-roster-adjustment-migration';
+import type { Prisma } from '@prisma/client';
+import {
+  leagueKickoffPassed,
+  migrateLeagueRosterAdjustments,
+  planLeagueSideMigration,
+  resolveLineupSaver,
+} from './league-roster-adjustment-migration';
 
 describe('planLeagueSideMigration — 팀장 저장본을 조정으로 옮기는 계획', () => {
   const base = ['u-1', 'u-2', 'u-3', 'u-4'];
@@ -61,5 +67,77 @@ describe('resolveLineupSaver — 저장본을 만든 팀장', () => {
   it('찾을 수 없으면 null — 작성자를 지어내지 않는다', () => {
     expect(resolveLineupSaver(records, 'side-home', 1)).toBeNull();
     expect(resolveLineupSaver([{ actorUserId: 'x', responseBody: null, createdAt: at(0) }], 'side-home', 9)).toBeNull();
+  });
+});
+
+describe('leagueKickoffPassed — 동기화와 같은 리그 "시작 전" 경계', () => {
+  const now = new Date('2026-10-01T10:00:00Z');
+  it.each([
+    ['킥오프 시각 그 순간', new Date('2026-10-01T10:00:00Z'), true],
+    ['1초 전 킥오프', new Date('2026-10-01T09:59:59Z'), true],
+    ['1초 뒤 킥오프', new Date('2026-10-01T10:00:01Z'), false],
+    ['시각 없는 경기', null, false],
+  ])('%s → %s', (_label, startAt, passed) => {
+    expect(leagueKickoffPassed(startAt, now)).toBe(passed);
+  });
+});
+
+describe('migrateLeagueRosterAdjustments — 킥오프 지난 SCHEDULED 리그 경기', () => {
+  const HOUR = 3_600_000;
+  /** 사이드마다 최신 리비전(팀장 저장본이면 rev 3 SUBMITTED)과 킥오프 시각. 이관 표시 감사 행은 없다. */
+  function fakePrisma(sides: Array<{ id: string; teamAuthored: boolean; startAt: Date | null }>) {
+    const bySide = new Map(sides.map((side) => [side.id, side]));
+    const writes: string[] = [];
+    const tx = {
+      v1GameLineup: {
+        findFirst: jest.fn(async ({ where }: { where: { sideId: string } }) =>
+          bySide.get(where.sideId)!.teamAuthored
+            ? { id: `lineup-${where.sideId}`, revision: 3, state: 'SUBMITTED' }
+            : { id: `lineup-${where.sideId}`, revision: 1, state: 'DRAFT' },
+        ),
+      },
+      v1OperationAudit: { findFirst: jest.fn(async () => null) },
+      v1Game: {
+        findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
+          const side = bySide.get(where.id.replace('game-', 'side-'))!;
+          return {
+            id: where.id,
+            state: 'SCHEDULED',
+            teamMatch: { id: `tm-${side.id}`, tournamentId: 'league-1', leagueId: 'league-1', startAt: side.startAt },
+            sides: [{ id: side.id, teamId: 'team-A' }],
+          };
+        }),
+        // 잠금(lockRosterWriteScope)의 첫 조회 — 킥오프 지난 사이드는 여기까지 오면 안 된다.
+        findMany: jest.fn(async () => {
+          writes.push('lock');
+          return [];
+        }),
+      },
+      $queryRaw: jest.fn(async () => {
+        writes.push('lock');
+        return [];
+      }),
+    };
+    const prisma = {
+      v1GameSide: {
+        findMany: jest.fn(async () => sides.map((side) => ({ id: side.id, gameId: side.id.replace('side-', 'game-'), game: { teamMatchId: `tm-${side.id}` } }))),
+      },
+      $transaction: jest.fn(async (fn: (client: Prisma.TransactionClient) => Promise<unknown>) => fn(tx as never)),
+    };
+    return { prisma: prisma as never as Parameters<typeof migrateLeagueRosterAdjustments>[0], writes };
+  }
+
+  it.each([false, true])('apply=%s: 팀장 저장본은 KICKOFF_PASSED 로 세기만 하고 잠그거나 쓰지 않는다', async (apply) => {
+    const { prisma, writes } = fakePrisma([
+      { id: 'side-played', teamAuthored: true, startAt: new Date(Date.now() - HOUR) },
+      { id: 'side-played-system', teamAuthored: false, startAt: new Date(Date.now() - HOUR) },
+      { id: 'side-upcoming-system', teamAuthored: false, startAt: new Date(Date.now() + HOUR) },
+    ]);
+    const result = await migrateLeagueRosterAdjustments(prisma, { apply });
+    expect(result).toMatchObject({ sidesScanned: 3, teamAuthoredSides: 1, migratedSides: 0, kickoffPassedSides: 1 });
+    expect(result.sides).toEqual([
+      expect.objectContaining({ sideId: 'side-played', status: 'KICKOFF_PASSED', excludeCount: 0, rosterChanged: false }),
+    ]);
+    expect(writes).toEqual([]);
   });
 });

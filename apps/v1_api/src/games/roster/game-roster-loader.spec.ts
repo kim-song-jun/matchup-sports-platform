@@ -54,7 +54,11 @@ function fakeTx(world: FakeWorld) {
       ),
     },
     $queryRaw: jest.fn(async () => world.jerseys ?? []),
-    v1GameRosterAdjustment: { findMany: jest.fn(async () => world.adjustments ?? []) },
+    v1GameRosterAdjustment: {
+      findMany: jest.fn(async ({ where }: { where: { teamId?: string } }) =>
+        (world.adjustments ?? []).filter((row) => where.teamId === undefined || row.teamId === where.teamId),
+      ),
+    },
     v1TeamMemberUnavailability: { findMany: jest.fn(async () => world.unavailabilities ?? []) },
     v1Tournament: {
       findFirst: jest.fn(async () => world.rules ?? { yellowAccumulationLimit: null, redCardSuspensionMatches: null }),
@@ -100,7 +104,7 @@ describe('loadGameRoster — 대회 경기', () => {
       jerseys: [{ id: 'tp-1', jersey_number: 10 }],
       adjustments: [
         {
-          id: 'adj-1', userId: 'pb', reason: 'INJURY', actorUserId: 'mgr', actorRole: 'TEAM_MANAGER',
+          id: 'adj-1', teamId: 'team-A', userId: 'pb', reason: 'INJURY', actorUserId: 'mgr', actorRole: 'TEAM_MANAGER',
           createdAt: new Date('2026-10-01T00:00:00Z'), revokedAt: null,
         },
       ],
@@ -123,6 +127,23 @@ describe('loadGameRoster — 대회 경기', () => {
     expect(loaded?.computation.unavailable).toEqual([
       expect.objectContaining({ unavailabilityId: 'un-1', actorRole: 'ADMIN' }),
     ]);
+  });
+
+  it('사이드 팀이 바뀌었으면 옛 팀의 활성 조정은 새 팀 명단에 걸리지 않는다', async () => {
+    const adjustment = (id: string, teamId: string, userId: string) => ({
+      id, teamId, userId, reason: 'INJURY', actorUserId: 'mgr', actorRole: 'TEAM_MANAGER',
+      createdAt: new Date('2026-10-01T00:00:00Z'), revokedAt: null,
+    });
+    // 같은 계정이 두 팀 참가 명단에 모두 있다 — 옛 팀(A)이 뺀 pa 는 새 팀(C)에서 출전한다.
+    const tx = fakeTx({
+      teamMatch: TOURNAMENT_MATCH,
+      sideTeamId: 'team-C',
+      registration: TOURNAMENT_REGISTRATION,
+      adjustments: [adjustment('adj-old', 'team-A', 'pa'), adjustment('adj-new', 'team-C', 'pc')],
+    });
+    const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+    expect(loaded?.computation.excluded.map((row) => row.adjustmentId)).toEqual(['adj-new']);
+    expect(loaded?.computation.participants.map((row) => row.userId)).toEqual(['pa', 'pb']);
   });
 
   it('규정이 있는 대회는 그 팀 경기 순서로 판정한 출전정지 선수를 뺀다', async () => {
@@ -175,7 +196,7 @@ describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
       leagueRegistrations: [],
       adjustments: [
         {
-          id: 'adj-9', userId: 'u2', reason: null, actorUserId: 'mgr', actorRole: 'TEAM_MANAGER',
+          id: 'adj-9', teamId: 'team-A', userId: 'u2', reason: null, actorUserId: 'mgr', actorRole: 'TEAM_MANAGER',
           createdAt: new Date('2026-10-01T00:00:00Z'), revokedAt: null,
         },
       ],

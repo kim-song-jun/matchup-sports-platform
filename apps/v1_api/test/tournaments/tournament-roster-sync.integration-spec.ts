@@ -326,14 +326,36 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     expect((await latestLineup(f.game.id, f.opponentSide.id)).revision).toBe(1);
   });
 
-  it('다른 대회로 부르면 이 대회 경기에 손대지 않는다', async () => {
+  it('같은 팀이 두 대회에 확정 신청했어도 한 대회로 부르면 그 대회 경기만 맞춘다', async () => {
     const f = await seedFixture();
     const other = await seedFixture();
+    const admin: V1AuthUser = { id: adminUserId, email: `${adminUserId}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' };
+    const otherRegistration = await prisma.v1TournamentRegistration.create({
+      data: { tournamentId: other.tournament.id, teamId: f.team.id, appliedByUserId: f.captain.id, status: 'confirmed' },
+    });
+    const otherMatch = await app.get(TournamentBracketService).createFixture(admin, other.tournament.id, {
+      round: '1라운드',
+      fixtureNumber: 2,
+      homeRegistrationId: otherRegistration.id,
+      awayRegistrationId: other.registration.id,
+      venue: '테스트 구장',
+    });
+    await drain();
+    const otherGame = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: otherMatch.id } });
+    const otherSide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId: otherGame.id, teamId: f.team.id } });
+    // 이벤트 없이 두 대회 참가 명단을 다르게 채운다 — 스코프가 새면 다른 대회 명단이 이 경기에 쓰인다.
     await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' } });
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: otherRegistration.id, userId: f.members[1], realName: '명단 선수' } });
+    const userIdsOf = async (gameId: string, sideId: string) =>
+      (await participantsOf((await latestLineup(gameId, sideId)).id)).map((row) => row.userId);
 
-    expect(await sync(other.tournament.id, f.team.id)).toBe(0);
+    expect(await sync(other.tournament.id, f.team.id)).toBe(1);
+    expect(await userIdsOf(otherGame.id, otherSide.id)).toEqual([f.members[1]]);
     expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(1);
-    // 대조군: 제 대회로 부르면 맞춘다.
+
+    const otherRevision = (await latestLineup(otherGame.id, otherSide.id)).revision;
     expect(await sync(f.tournament.id, f.team.id)).toBe(1);
+    expect(await userIdsOf(f.game.id, f.side.id)).toEqual([f.members[0]]);
+    expect((await latestLineup(otherGame.id, otherSide.id)).revision).toBe(otherRevision);
   });
 });

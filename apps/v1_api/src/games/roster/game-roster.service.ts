@@ -29,6 +29,13 @@ interface SideTarget {
   readonly sideId: string;
 }
 
+/** 인가를 받은 때의 사이드 팀. 잠근 뒤 이 팀이 아니면 쓰지 않는다. */
+export interface TeamSideTarget extends SideTarget {
+  readonly teamId: string;
+}
+
+export type GameRosterSideAccess = GameRosterAccess & { readonly teamId: string };
+
 export interface GameRosterAdjustmentView {
   readonly id: string;
   readonly userId: string;
@@ -44,8 +51,8 @@ export interface GameRosterHistoryEvent {
   readonly userId: string;
   readonly displayName: string;
   readonly reason: string | null;
-  /** 되돌리기는 누가 했는지만 남고 역할은 기록하지 않는다(role null). */
-  readonly actor: { userId: string; displayName: string; role: string | null };
+  /** 사이드 팀이 바뀌어 자동으로 되돌린 기록은 userId null · role SYSTEM. */
+  readonly actor: { userId: string | null; displayName: string; role: string | null };
   readonly at: Date;
 }
 
@@ -62,6 +69,16 @@ function adjustmentView(row: V1GameRosterAdjustment): GameRosterAdjustmentView {
 
 function rosterNotAvailable(message: string) {
   return new NotFoundException({ code: 'GAME_ROSTER_NOT_AVAILABLE', message });
+}
+
+// 인가는 잠그기 전에 읽은 사이드 팀 기준이다. 그 사이 진출·대진 수정으로 팀이 바뀌었으면 쓰지 않는다.
+function assertSideTeamUnchanged(target: TeamSideTarget, currentTeamId: string | null): void {
+  if (currentTeamId === target.teamId) return;
+  throw new ConflictException({
+    code: 'COMMAND_CONCURRENCY_CONFLICT',
+    message: '경기 팀이 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.',
+    details: { gameId: target.gameId, sideId: target.sideId },
+  });
 }
 
 /** 계정 id → 화면 표시 이름. 없는 계정은 맵에서 빠진다. */
@@ -93,9 +110,9 @@ export class GameRosterService {
 
   listAdjustments(user: V1AuthUser, target: SideTarget) {
     return this.prisma.$transaction(async (tx) => {
-      await this.authorizeSide(tx, user.id, target, 'read');
+      const { teamId } = await this.authorizeSide(tx, user.id, target, 'read');
       const rows = await tx.v1GameRosterAdjustment.findMany({
-        where: { gameId: target.gameId, sideId: target.sideId },
+        where: { gameId: target.gameId, sideId: target.sideId, teamId },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
       const names = await loadDisplayNames(
@@ -112,17 +129,18 @@ export class GameRosterService {
           actor: { userId: row.actorUserId, displayName: name(row.actorUserId), role: row.actorRole },
           at: row.createdAt,
         });
-        if (row.revokedAt !== null && row.revokedByUserId !== null) {
+        if (row.revokedAt !== null) {
+          const revoker = row.revokedByUserId;
           events.push({
             ...common,
             type: 'REVOKE',
-            actor: { userId: row.revokedByUserId, displayName: name(row.revokedByUserId), role: null },
+            actor: { userId: revoker, displayName: revoker === null ? '시스템' : name(revoker), role: row.revokedByRole },
             at: row.revokedAt,
           });
         }
       }
       events.sort((a, b) => a.at.getTime() - b.at.getTime());
-      return { gameId: target.gameId, sideId: target.sideId, events };
+      return { gameId: target.gameId, sideId: target.sideId, teamId, events };
     });
   }
 
@@ -130,7 +148,12 @@ export class GameRosterService {
     return this.prisma.$transaction(async (tx) => {
       const access = await this.authorizeSide(tx, user.id, target, 'write');
       await this.lockScheduledGames(tx, [target]);
-      const result = await this.applyExclude(tx, { userId: user.id, role: access.writeRole! }, target, dto);
+      const result = await this.applyExclude(
+        tx,
+        { userId: user.id, role: access.writeRole! },
+        { ...target, teamId: access.teamId },
+        dto,
+      );
       if (!result.alreadyApplied) await syncPreparedGameSideRoster(tx, target);
       return { ...result, roster: await this.readView(tx, target, access) };
     });
@@ -140,7 +163,12 @@ export class GameRosterService {
     return this.prisma.$transaction(async (tx) => {
       const access = await this.authorizeSide(tx, user.id, target, 'write');
       await this.lockScheduledGames(tx, [target]);
-      const result = await this.applyRevoke(tx, user.id, target, userId);
+      const result = await this.applyRevoke(
+        tx,
+        { userId: user.id, role: access.writeRole! },
+        { ...target, teamId: access.teamId },
+        userId,
+      );
       if (!result.alreadyApplied) await syncPreparedGameSideRoster(tx, target);
       return { ...result, roster: await this.readView(tx, target, access) };
     });
@@ -148,16 +176,17 @@ export class GameRosterService {
 
   /**
    * EXCLUDE 한 건. 명단 동기화는 하지 않는다 — 호출자가 바뀐 사이드마다 한 번 돌린다.
-   * 이미 활성이면 첫 행을 그대로 돌려준다(사유를 덮지 않는다).
+   * 이미 활성이면 첫 행을 그대로 돌려준다(사유를 덮지 않는다). 호출자가 경기를 잠갔다.
    */
   async applyExclude(
     tx: Tx,
     actor: { userId: string; role: GameRosterActorRole },
-    target: SideTarget,
+    target: TeamSideTarget,
     input: { userId: string; reason?: string | null },
   ): Promise<{ alreadyApplied: boolean; adjustment: GameRosterAdjustmentView }> {
     const loaded = await loadGameRoster(tx, target);
     if (loaded === null) throw rosterNotAvailable('참가 명단이 확정되지 않은 팀이에요.');
+    assertSideTeamUnchanged(target, loaded.context.teamId);
     if (!loaded.base.some((entry) => entry.userId === input.userId)) {
       throw new UnprocessableEntityException({
         code: 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER',
@@ -166,13 +195,14 @@ export class GameRosterService {
       });
     }
     const existing = await tx.v1GameRosterAdjustment.findFirst({
-      where: { gameId: target.gameId, sideId: target.sideId, userId: input.userId, revokedAt: null },
+      where: { gameId: target.gameId, sideId: target.sideId, teamId: target.teamId, userId: input.userId, revokedAt: null },
     });
     if (existing !== null) return { alreadyApplied: true, adjustment: adjustmentView(existing) };
     const created = await tx.v1GameRosterAdjustment.create({
       data: {
         gameId: target.gameId,
         sideId: target.sideId,
+        teamId: target.teamId,
         userId: input.userId,
         action: V1GameRosterAdjustmentAction.EXCLUDE,
         reason: input.reason ?? null,
@@ -183,15 +213,22 @@ export class GameRosterService {
     return { alreadyApplied: false, adjustment: adjustmentView(created) };
   }
 
-  /** 활성 EXCLUDE 되돌리기 한 건. 동기화는 호출자 몫이다. */
-  async applyRevoke(tx: Tx, actorUserId: string, target: SideTarget, userId: string): Promise<{ alreadyApplied: boolean }> {
+  /** 활성 EXCLUDE 되돌리기 한 건. 동기화는 호출자 몫이다. 호출자가 경기를 잠갔다. */
+  async applyRevoke(
+    tx: Tx,
+    actor: { userId: string; role: GameRosterActorRole },
+    target: TeamSideTarget,
+    userId: string,
+  ): Promise<{ alreadyApplied: boolean }> {
+    const side = await tx.v1GameSide.findUnique({ where: { id: target.sideId }, select: { teamId: true } });
+    assertSideTeamUnchanged(target, side?.teamId ?? null);
     const existing = await tx.v1GameRosterAdjustment.findFirst({
-      where: { gameId: target.gameId, sideId: target.sideId, userId, revokedAt: null },
+      where: { gameId: target.gameId, sideId: target.sideId, teamId: target.teamId, userId, revokedAt: null },
     });
     if (existing === null) return { alreadyApplied: true };
     await tx.v1GameRosterAdjustment.update({
       where: { id: existing.id },
-      data: { revokedAt: new Date(), revokedByUserId: actorUserId },
+      data: { revokedAt: new Date(), revokedByUserId: actor.userId, revokedByRole: actor.role },
     });
     return { alreadyApplied: false };
   }
@@ -205,7 +242,7 @@ export class GameRosterService {
     userId: string,
     target: SideTarget,
     mode: 'read' | 'write',
-  ): Promise<GameRosterAccess> {
+  ): Promise<GameRosterSideAccess> {
     const game = await tx.v1Game.findUnique({
       where: { id: target.gameId },
       select: {
@@ -240,7 +277,7 @@ export class GameRosterService {
     if (access === null || (mode === 'write' && access.writeRole === null)) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이 경기 명단을 바꿀 권한이 없어요.' });
     }
-    return access;
+    return { ...access, teamId: side.teamId };
   }
 
   /**

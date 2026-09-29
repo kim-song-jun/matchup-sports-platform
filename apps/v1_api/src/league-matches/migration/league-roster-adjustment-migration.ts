@@ -16,7 +16,7 @@ type Tx = Prisma.TransactionClient;
  *
  * 기준 명단에 있는데 저장본에 없는 사람 → EXCLUDE(actor = 그 사이드를 저장한 팀장, reason 없음). 조정으로 표현할 수
  * 없는 저장본 행(게스트·기준 명단 밖 계정)은 세기만 한다. 옮긴 사이드에는 이관 표시 감사 행을 남기고 곧바로
- * 동기화한다 — 그 뒤로 그 사이드는 참가 명단 계산을 따른다. 시작 전(SCHEDULED) 경기만 다룬다.
+ * 동기화한다 — 그 뒤로 그 사이드는 참가 명단 계산을 따른다. 동기화와 같은 "시작 전"(SCHEDULED + 킥오프 전)만 다룬다.
  */
 
 export interface SavedLineupRow {
@@ -69,7 +69,21 @@ export function resolveLineupSaver(records: readonly LineupSaveRecord[], sideId:
   return best?.actorUserId ?? null;
 }
 
-export type LeagueSideMigrationStatus = 'MIGRATED' | 'WOULD_MIGRATE' | 'ACTOR_UNRESOLVED' | 'ROSTER_NOT_AVAILABLE';
+export type LeagueSideMigrationStatus =
+  | 'MIGRATED'
+  | 'WOULD_MIGRATE'
+  | 'ACTOR_UNRESOLVED'
+  | 'ROSTER_NOT_AVAILABLE'
+  /** 팀장 저장본이지만 킥오프가 지나 옮기지 않았다(치렀는데 결과 입력 전일 수 있다). */
+  | 'KICKOFF_PASSED';
+
+/**
+ * 동기화(`upcomingCompetitionGameWhere`)의 리그 기준과 같다 — 결과 입력이 SCHEDULED 에서 바로 끝내므로
+ * 킥오프가 지난 SCHEDULED 리그 경기는 이미 치렀을 수 있다. 시각 없는 경기는 시작 전이다.
+ */
+export function leagueKickoffPassed(startAt: Date | null, now: Date): boolean {
+  return startAt !== null && startAt.getTime() <= now.getTime();
+}
 
 export interface LeagueSideMigrationReport {
   readonly gameId: string;
@@ -91,6 +105,8 @@ export interface LeagueRosterMigrationResult {
   readonly unrepresentableRows: number;
   readonly actorUnresolvedSides: number;
   readonly rosterNotAvailableSides: number;
+  /** 팀장 저장본이 최신인데 킥오프가 지나 옮기지 않은 사이드 수. */
+  readonly kickoffPassedSides: number;
   readonly sides: LeagueSideMigrationReport[];
 }
 
@@ -104,6 +120,21 @@ class DryRunRollback extends Error {
   constructor(readonly report: LeagueSideMigrationReport | null) {
     super('dry-run rollback');
   }
+}
+
+function sideReport(
+  side: { gameId: string; sideId: string; teamMatchId: string },
+  status: LeagueSideMigrationStatus,
+  plan: LeagueSideMigrationPlan | null,
+  rosterChanged: boolean,
+): LeagueSideMigrationReport {
+  return {
+    ...side,
+    status,
+    excludeCount: plan?.excludeUserIds.length ?? 0,
+    unrepresentableRows: plan?.unrepresentableRows ?? 0,
+    rosterChanged,
+  };
 }
 
 /** 그 사이드의 최신 리비전이 이관 전 팀장 저장본이면 그 리비전. */
@@ -124,25 +155,25 @@ async function migrateSide(
   const target = { gameId: side.gameId, sideId: side.sideId };
   // 잠금(빈 리그 명단 채우기 포함)은 옮길 사이드에만 건다. 잠근 뒤 다시 보고 그 사이 시작된 경기는 건너뛴다.
   if ((await unmigratedTeamLineup(tx, target)) === null) return null;
+  // 킥오프가 지난 경기는 잠그기 전(채우기 쓰기 전)에 거르고, 승인 판단용으로 세기만 한다.
+  const beforeLock = await loadGameRosterContext(tx, target);
+  if (beforeLock !== null && leagueKickoffPassed(beforeLock.startAt, new Date())) {
+    return sideReport(side, 'KICKOFF_PASSED', null, false);
+  }
   await lockRosterWriteScope(tx, [side.gameId], [side.sideId]);
   const context = await loadGameRosterContext(tx, target);
   if (context !== null && context.gameState !== V1GameState.SCHEDULED) return null;
   const latest = await unmigratedTeamLineup(tx, target);
   if (latest === null) return null;
 
-  const report = (status: LeagueSideMigrationStatus, plan: LeagueSideMigrationPlan | null, rosterChanged = false) => ({
-    ...side,
-    status,
-    excludeCount: plan?.excludeUserIds.length ?? 0,
-    unrepresentableRows: plan?.unrepresentableRows ?? 0,
-    rosterChanged,
-  });
+  const report = (status: LeagueSideMigrationStatus, plan: LeagueSideMigrationPlan | null, rosterChanged = false) =>
+    sideReport(side, status, plan, rosterChanged);
   const loaded = context === null ? null : await loadGameRosterForContext(tx, context);
   if (loaded === null) return report('ROSTER_NOT_AVAILABLE', null);
 
   const saved = await tx.v1GameParticipant.findMany({ where: { lineupId: latest.id }, select: { userId: true } });
   const active = await tx.v1GameRosterAdjustment.findMany({
-    where: { ...target, revokedAt: null },
+    where: { ...target, teamId: loaded.context.teamId, revokedAt: null },
     select: { userId: true },
   });
   const plan = planLeagueSideMigration({
@@ -165,6 +196,7 @@ async function migrateSide(
     await tx.v1GameRosterAdjustment.createMany({
       data: plan.excludeUserIds.map((userId) => ({
         ...target,
+        teamId: loaded.context.teamId,
         userId,
         action: V1GameRosterAdjustmentAction.EXCLUDE,
         reason: null,
@@ -235,6 +267,7 @@ export async function migrateLeagueRosterAdjustments(
     unrepresentableRows: reports.reduce((sum, row) => sum + row.unrepresentableRows, 0),
     actorUnresolvedSides: reports.filter((row) => row.status === 'ACTOR_UNRESOLVED').length,
     rosterNotAvailableSides: reports.filter((row) => row.status === 'ROSTER_NOT_AVAILABLE').length,
+    kickoffPassedSides: reports.filter((row) => row.status === 'KICKOFF_PASSED').length,
     sides: reports,
   };
 }

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS "v1_game_roster_adjustments" (
     "id" TEXT NOT NULL,
     "game_id" TEXT NOT NULL,
     "side_id" TEXT NOT NULL,
+    "team_id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
     "action" "V1GameRosterAdjustmentAction" NOT NULL,
     "reason" TEXT,
@@ -14,17 +15,19 @@ CREATE TABLE IF NOT EXISTS "v1_game_roster_adjustments" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "revoked_at" TIMESTAMP(3),
     "revoked_by_user_id" TEXT,
+    "revoked_by_role" TEXT,
     CONSTRAINT "v1_game_roster_adjustments_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "v1_game_roster_adjustments_game_fk" FOREIGN KEY ("game_id") REFERENCES "v1_games"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "v1_game_roster_adjustments_side_fk" FOREIGN KEY ("side_id") REFERENCES "v1_game_sides"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "v1_game_roster_adjustments_team_fk" FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "v1_game_roster_adjustments_user_fk" FOREIGN KEY ("user_id") REFERENCES "v1_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS "v1_game_roster_adjustments_game_id_side_id_idx" ON "v1_game_roster_adjustments"("game_id", "side_id");
 CREATE INDEX IF NOT EXISTS "v1_game_roster_adjustments_user_id_idx" ON "v1_game_roster_adjustments"("user_id");
--- 활성 조정은 (경기, 사이드, 사용자)당 하나. 되돌린 행은 기록으로 남아 여러 개일 수 있다.
+-- 활성 조정은 (경기, 사이드, 그 사이드 팀, 사용자)당 하나. 되돌린 행은 기록으로 남아 여러 개일 수 있다.
 CREATE UNIQUE INDEX IF NOT EXISTS "v1_game_roster_adjustments_active_key"
-    ON "v1_game_roster_adjustments"("game_id", "side_id", "user_id")
+    ON "v1_game_roster_adjustments"("game_id", "side_id", "team_id", "user_id")
     WHERE "revoked_at" IS NULL;
 
 CREATE TABLE IF NOT EXISTS "v1_team_member_unavailabilities" (

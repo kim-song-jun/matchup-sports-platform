@@ -74,6 +74,7 @@ model V1GameRosterAdjustment {
   id              String   @id @default(uuid())
   gameId          String
   sideId          String
+  teamId          String   // 조정한 때의 사이드 팀 — 계산·기록은 지금 사이드 팀의 행만 본다
   userId          String   // 참가 명단(V1TournamentPlayer.userId) 또는 리그 폴백 팀원의 계정
   action          V1GameRosterAdjustmentAction
   reason          String?  // INJURY | PERSONAL | LATE_OR_EARLY | OTHER (DTO 에서 enum 검증)
@@ -81,9 +82,10 @@ model V1GameRosterAdjustment {
   actorRole       String   // TEAM_MANAGER | ADMIN | STAFF — 변경 기록에 "팀장/운영자" 로 보인다
   createdAt       DateTime @default(now())
   revokedAt       DateTime?
-  revokedByUserId String?
+  revokedByUserId String?  // SYSTEM 되돌리기면 null
+  revokedByRole   String?  // TEAM_MANAGER | ADMIN | STAFF | SYSTEM
   @@index([gameId, sideId])
-  // 같은 (gameId, sideId, userId) 에 revokedAt IS NULL 인 행은 하나만 — 부분 유니크 인덱스(raw SQL)
+  // 같은 (gameId, sideId, teamId, userId) 에 revokedAt IS NULL 인 행은 하나만 — 부분 유니크 인덱스(raw SQL)
 }
 ```
 
@@ -109,6 +111,9 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 - 키를 `tournamentPlayerId` 가 아니라 `userId` 로 잡는다. 리그의 명단 없는 팀 폴백(팀원 전원, `leagueTeamRosterEntries`)
   에도 계정이 있어서 한 규칙으로 쓸 수 있고, 참가 명단에서 빠졌다 다시 들어온 선수의 조정도 이어진다.
 - 행은 지우지 않는다. 변경 기록 화면과 "팀 책임" 확인이 이 행을 읽는다.
+- 녹아웃 진출 재투영·배정 해제·대진 수정으로 **사이드 팀이 바뀌면** 새 팀이 아닌 활성 조정을 시스템 되돌리기
+  (`revokedByRole = SYSTEM`)로 닫는다. 계산·변경 기록은 지금 사이드 팀의 행만 읽으므로 옛 팀의 선수 이름·사유가 새 팀에
+  보이지 않고, 옛 팀이 다시 배정돼도 옛 빼기가 되살아나지 않는다(2026-09-29 리뷰 반영).
 
 ### 계산 — 경기 명단은 결과물
 
@@ -135,10 +140,10 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 
 | 메서드 | 경로 | 권한 | 내용 |
 |---|---|---|---|
-| GET | `/games/:gameId/sides/:sideId/roster` | 그 팀 활성 멤버 · 운영자 | 기준 명단, 활성 조정, 출전정지, 계산된 경기 명단, `editable`, 마감 시각 |
+| GET | `/games/:gameId/sides/:sideId/roster` | 그 팀 활성 멤버 · 운영자(support 어드민은 읽기만) | 기준 명단, 활성 조정, 출전정지, 계산된 경기 명단, `editable`, 마감 시각 |
 | POST | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 owner·manager · 운영자 | `{ userId, reason? }` → EXCLUDE. 이미 활성이면 멱등 200 |
 | DELETE | `/games/:gameId/sides/:sideId/roster-adjustments/:userId` | 같음 | 활성 EXCLUDE 를 revoke. 없으면 멱등 200 |
-| GET | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 활성 멤버 · 운영자 | 변경 기록(revoke 포함, 시간순) |
+| GET | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 활성 멤버 · 운영자(support 어드민은 읽기만) | 지금 사이드 팀의 변경 기록(revoke 포함, 되돌린 사람 역할 포함, 시간순) |
 | GET | `/teams/:teamId/game-rosters` | 그 팀 owner·manager · 운영자 | 팀 B: 선수 × 다가오는 대회·리그 경기 매트릭스(출전/빠짐/결장/정지 + 사유·actor) |
 | POST | `/teams/:teamId/game-rosters/batch` | 같음 | 팀 B: `{ changes: [{ gameId, userId, op: 'EXCLUDE'\|'REVOKE', reason? }] }` 한 트랜잭션. 시작된 경기가 섞이면 전체 409 |
 | GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | 조회: 그 팀 활성 멤버 · 플랫폼 어드민 · 쓰기: owner·manager · 플랫폼 어드민(support 제외, D6). 대회 스태프 불가 | 팀 C: 결장 기간 조회·등록·취소 |
@@ -187,6 +192,8 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 리그에는 팀장이 저장한 경기별 명단 리비전이 있다. 시작 전 경기에 대해 "기준 명단에 있는데 팀장 저장본에 없는 사람"을
 EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장, reason = null). 게스트(계정 없는 참가자)처럼 조정으로
 표현할 수 없는 행은 dry-run 에서 건수를 세어 보고한다. **alpha 실행은 dry-run 결과를 보고 사용자 승인 후.** 끝난 경기는 옮기지 않는다.
+"시작 전"은 동기화와 같다 — `SCHEDULED` 이고 킥오프 시각 전(시각 없으면 시작 전). 킥오프가 지난 `SCHEDULED` 리그 경기는
+결과 입력 전이라 이미 치렀을 수 있어 옮기지 않고, 팀장 저장본인 사이드를 보고의 `kickoffPassedSides`(사이드별 `KICKOFF_PASSED`)로 따로 센다.
 
 ## Test Scenarios
 
@@ -233,7 +240,8 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 
 - 쓰기 인가: 그 경기 그 사이드의 팀 owner·manager 또는 운영자만. 사이드 ID 는 요청 값이 아니라 경기에서 다시 확인한다.
 - `userId` 는 기준 명단에 있는지 서버에서 검증(다른 팀 선수·임의 계정 차단).
-- 조정 사유는 팀 내부 정보 — 공개 응답·상대팀 응답에 싣지 않는다.
+- 조정 사유는 팀 내부 정보 — 공개 응답·상대팀 응답에 싣지 않는다. 사이드 팀이 바뀐 뒤의 새 팀에도 싣지 않는다(조정은 `teamId` 에 묶인다).
+- 쓰기 인가는 잠그기 전 사이드 팀 기준이라, 잠근 뒤 사이드 팀이 바뀌었으면 쓰지 않는다(409 `COMMAND_CONCURRENCY_CONFLICT`).
 - 변경 기록은 지우지 않는다(감사 근거).
 
 ## Risks & Dependencies

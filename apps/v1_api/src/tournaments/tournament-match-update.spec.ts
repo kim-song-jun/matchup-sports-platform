@@ -112,6 +112,12 @@ function fakeTx() {
     },
     v1TeamTacticsBoard: { deleteMany: jest.fn(async () => ({ count: 0 })) },
     v1GameSide: { update: jest.fn(async () => ({})) },
+    v1GameRosterAdjustment: {
+      updateMany: jest.fn(async () => {
+        calls.push('revoke-adjustments');
+        return { count: 1 };
+      }),
+    },
     v1TeamSchedule: { updateMany: jest.fn(async () => ({ count: 0 })), findUnique: jest.fn(async () => ({ id: 'schedule-1' })), update: jest.fn(async () => ({})) },
   };
   return { tx: tx as unknown as Prisma.TransactionClient, calls, events };
@@ -134,11 +140,23 @@ describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후
       { scope: 'competitionTeam', competitionId: 'tour-1', teamId: 'team-b' },
       { scope: 'competitionTeam', competitionId: 'tour-1', teamId: 'team-c' },
     ]);
+    // 바뀐 홈 사이드에서 새 팀(C)이 아닌 활성 조정만 시스템으로 되돌린다. 원정 사이드는 건드리지 않는다.
+    const revoke = (tx as unknown as { v1GameRosterAdjustment: { updateMany: jest.Mock } }).v1GameRosterAdjustment.updateMany;
+    expect(revoke.mock.calls).toEqual([
+      [
+        {
+          where: { gameId: 'game-m', sideId: 'side-home', revokedAt: null, teamId: { not: 'team-c' } },
+          data: { revokedAt: expect.any(Date), revokedByUserId: null, revokedByRole: 'SYSTEM' },
+        },
+      ],
+    ]);
+    expect(calls.indexOf('read-game:locking')).toBeLessThan(calls.indexOf('revoke-adjustments'));
   });
 
-  it('시각만 바꾸면 양 팀 재계산 이벤트만 남긴다(사이드 명단은 그대로)', async () => {
-    const { tx, events } = fakeTx();
+  it('시각만 바꾸면 양 팀 재계산 이벤트만 남긴다(사이드 명단·조정은 그대로)', async () => {
+    const { tx, calls, events } = fakeTx();
     await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', scheduledAt: new Date('2099-01-01T00:00:00Z') });
+    expect(calls).not.toContain('revoke-adjustments');
     expect(events).toEqual([
       { scope: 'competitionTeam', competitionId: 'tour-1', teamId: 'team-a' },
       { scope: 'competitionTeam', competitionId: 'tour-1', teamId: 'team-b' },

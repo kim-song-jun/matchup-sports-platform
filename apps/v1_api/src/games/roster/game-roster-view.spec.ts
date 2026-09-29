@@ -26,10 +26,10 @@ describe('decideGameRosterAccess — 사이드 팀 멤버십 · 운영자', () =
 
   it('플랫폼 운영자는 ADMIN, 쓰기 가능한 대회 스태프는 STAFF 로 쓴다', () => {
     expect(
-      decideGameRosterAccess({ sideMembershipRole: null, operator: { role: 'platform_ops', canMutateLineup: true } }),
+      decideGameRosterAccess({ sideMembershipRole: null, operator: { role: 'platform_ops', canMutateLineup: true, platformAdmin: true } }),
     ).toEqual({ viewerRole: 'ADMIN', writeRole: 'ADMIN' });
     for (const role of ['tournament_director', 'field_operator'] as const) {
-      expect(decideGameRosterAccess({ sideMembershipRole: null, operator: { role, canMutateLineup: true } })).toEqual({
+      expect(decideGameRosterAccess({ sideMembershipRole: null, operator: { role, canMutateLineup: true, platformAdmin: false } })).toEqual({
         viewerRole: 'STAFF',
         writeRole: 'STAFF',
       });
@@ -38,19 +38,31 @@ describe('decideGameRosterAccess — 사이드 팀 멤버십 · 운영자', () =
 
   it('support_readonly 는 라인업 쓰기 판정이 열려 있어도 조정은 읽기만 한다', () => {
     expect(
-      decideGameRosterAccess({ sideMembershipRole: null, operator: { role: 'support_readonly', canMutateLineup: true } }),
+      decideGameRosterAccess({
+        sideMembershipRole: null,
+        operator: { role: 'support_readonly', canMutateLineup: true, platformAdmin: false },
+      }),
     ).toEqual({ viewerRole: 'STAFF', writeRole: null });
+  });
+
+  it('support 어드민은 어드민으로 읽기만 한다', () => {
+    expect(
+      decideGameRosterAccess({
+        sideMembershipRole: null,
+        operator: { role: 'support_readonly', canMutateLineup: false, platformAdmin: true },
+      }),
+    ).toEqual({ viewerRole: 'ADMIN', writeRole: null });
   });
 
   it('담당 구장 밖 현장 스태프처럼 쓰기 판정이 없는 운영자는 읽기만 한다', () => {
     expect(
-      decideGameRosterAccess({ sideMembershipRole: null, operator: { role: 'field_operator', canMutateLineup: false } }),
+      decideGameRosterAccess({ sideMembershipRole: null, operator: { role: 'field_operator', canMutateLineup: false, platformAdmin: false } }),
     ).toEqual({ viewerRole: 'STAFF', writeRole: null });
   });
 
   it('일반 멤버이면서 운영자면 운영자 권한이 이긴다(팀장 권한은 멤버십이 먼저)', () => {
     expect(
-      decideGameRosterAccess({ sideMembershipRole: 'member', operator: { role: 'platform_ops', canMutateLineup: true } }),
+      decideGameRosterAccess({ sideMembershipRole: 'member', operator: { role: 'platform_ops', canMutateLineup: true, platformAdmin: true } }),
     ).toEqual({ viewerRole: 'ADMIN', writeRole: 'ADMIN' });
   });
 });

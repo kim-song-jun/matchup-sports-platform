@@ -151,8 +151,9 @@ export async function loadGameRosterForContext(
   const base = preloaded.base !== undefined ? preloaded.base : await loadCompetitionRosterBase(tx, context);
   if (base === null) return null;
 
+  // 사이드 팀이 바뀌었으면 옛 팀의 조정은 이 팀 명단과 무관하다.
   const adjustments = await tx.v1GameRosterAdjustment.findMany({
-    where: { gameId: context.gameId, sideId: context.sideId, revokedAt: null },
+    where: { gameId: context.gameId, sideId: context.sideId, teamId: context.teamId, revokedAt: null },
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,

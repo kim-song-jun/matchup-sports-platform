@@ -5309,7 +5309,7 @@ export class GamesService {
     tx: Transaction | PrismaService,
     gameId: string,
     userId: string,
-  ): Promise<{ role: GameActorRole; canMutateLineup: boolean } | null> {
+  ): Promise<{ role: GameActorRole; canMutateLineup: boolean; platformAdmin: boolean } | null> {
     const operatorRoles: ReadonlySet<GameActorRole> = new Set([
       'platform_ops',
       'tournament_director',
@@ -5323,10 +5323,25 @@ export class GamesService {
         return null;
       });
     const mutate = await probe('lineup_mutate');
-    if (mutate !== null && operatorRoles.has(mutate.role)) return { role: mutate.role, canMutateLineup: true };
+    if (mutate !== null && operatorRoles.has(mutate.role)) {
+      return { role: mutate.role, canMutateLineup: true, platformAdmin: mutate.role === 'platform_ops' };
+    }
     const read = await probe('read');
-    if (read !== null && operatorRoles.has(read.role)) return { role: read.role, canMutateLineup: false };
-    return null;
+    if (read !== null && operatorRoles.has(read.role)) {
+      return { role: read.role, canMutateLineup: false, platformAdmin: read.role === 'platform_ops' };
+    }
+    // support 어드민은 경기 인가(resolveActor)에서 빠지지만, 팀 표·어드민 표처럼 명단은 읽기로 본다.
+    const admin = await tx.v1AdminUser.findUnique({
+      where: { userId },
+      select: { adminRole: true, status: true, revokedAt: true, user: { select: { accountStatus: true } } },
+    });
+    const activeSupport =
+      admin !== null &&
+      admin.adminRole === 'support' &&
+      admin.status === 'active' &&
+      admin.revokedAt === null &&
+      admin.user.accountStatus === 'active';
+    return activeSupport ? { role: 'support_readonly', canMutateLineup: false, platformAdmin: true } : null;
   }
 
   private async resolveActor(

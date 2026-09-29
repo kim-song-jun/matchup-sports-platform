@@ -327,6 +327,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     mode: toDetailMode(viewerState, getStatus(query.data)),
     backHref: fromPath ?? '/matches',
     completed: getStatus(query.data) === 'completed',
+    noShow: getStatus(query.data) === 'completed' && query.data.viewer?.participantStatus === 'no_show',
     canComplete: !seeding && query.data.canComplete === true,
     withdrawApplicationId: !seeding && query.data.canWithdraw ? query.data.viewer?.applicationId : null,
     reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
@@ -335,7 +336,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     // 처리하는 중)으로 읽어 applyLabel 을 덮어쓴다. 잠금은 onApply 를 비우는 것으로
     // 충분하고(canRunAction=false → disabled), 라벨은 '불러오는 중'이 남는다.
     applyPending: applyMatch.isPending || withdrawMatch.isPending,
-    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data), query.data.viewer?.participantStatus, query.data.hostParticipates),
     chatLabel: chatLabel(viewerState),
     chatPending: resolveChatRoom.isPending,
     chatError,
@@ -569,10 +570,12 @@ function statusLabel(
   viewerState: V1ViewerState,
   status: V1MatchApiStatus,
   participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
+  hostParticipates?: boolean,
 ) {
   if (status === 'in_progress') return '진행중';
   if (status === 'completion_pending') return viewerState === 'host' ? '종료 확인 필요' : '종료 확인 중';
   if (status === 'completed' && participantStatus === 'no_show') return '불참 기록';
+  if (status === 'completed' && viewerState === 'host' && hostParticipates === false) return '경기 완료';
   if (status === 'completed' && (viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant')) return '참여 완료';
   if (viewerState === 'host') return '내가 만든 매치';
   if (viewerState === 'requested') return '승인 대기';

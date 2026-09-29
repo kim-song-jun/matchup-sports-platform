@@ -988,6 +988,59 @@ describe('MatchesService', () => {
     });
   });
 
+  it('detail: 본인의 불참 행을 읽어 viewer 를 불참 참가자로 내려주고 인원에는 넣지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({
+        status: 'completed',
+        startAt: PAST,
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [{
+          id: 'guest-participant',
+          userId: otherUser.id,
+          role: 'participant',
+          status: 'no_show',
+          applicationId: 'application-1',
+        }],
+        applications: [{ id: 'application-1', applicantUserId: otherUser.id, status: 'approved' }],
+        hostUser: {
+          id: host.id,
+          profile: { nickname: '호스트', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    );
+
+    const result = await service.detail(otherUser, 'match-1');
+
+    expect(prisma.v1Match.findFirst.mock.calls[0][0].include.participants.where.OR).toContainEqual({
+      userId: otherUser.id,
+      status: 'no_show',
+    });
+    expect(result).toMatchObject({
+      participantCount: 0,
+      viewer: { state: 'participant', participantId: 'guest-participant', participantStatus: 'no_show' },
+    });
+  });
+
+  it('detail: 비로그인 조회는 불참 행을 읽지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      status: 'completed',
+      startAt: PAST,
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      applications: [],
+      hostUser: { id: host.id, profile: { nickname: '호스트', displayName: null, profileImageUrl: null }, reputationSummary: null },
+    }));
+
+    await service.detail(null, 'match-1');
+
+    expect(prisma.v1Match.findFirst.mock.calls[0][0].include.participants.where).toEqual({
+      status: { in: ['active', 'completed'] },
+    });
+  });
+
   it('update: costNote를 갱신한다', async () => {
     prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
     prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });

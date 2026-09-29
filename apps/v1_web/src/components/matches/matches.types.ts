@@ -94,6 +94,8 @@ export type MatchStateViewModel = MatchListViewModel & {
 
 export type MatchDetailViewModel = {
   completed?: boolean;
+  /** 완료된 매치에서 호스트가 이 뷰어를 불참으로 확인했다. */
+  noShow?: boolean;
   canComplete?: boolean;
   withdrawApplicationId?: string | null;
   /**

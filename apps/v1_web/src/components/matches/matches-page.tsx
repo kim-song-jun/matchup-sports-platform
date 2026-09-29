@@ -299,6 +299,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       ? <StateCard tone="orange" title={mode === 'mine' ? '종료 확인이 필요해요' : '경기 종료를 확인하고 있어요'} body={mode === 'mine' ? '참여 여부를 확인한 뒤 매치를 완료해 주세요.' : '호스트가 참여 여부를 확인하면 완료 상태로 바뀌어요.'} />
       : null;
   const isPostStartLifecycle = match.lifecycleStatus === 'in_progress' || match.lifecycleStatus === 'completion_pending';
+  const approvedStateCard = model.noShow
+    ? <StateCard tone="grey" title="불참으로 기록됐어요" body="호스트가 불참으로 확인한 경기예요. 개인 경기 기록과 후기 대상에서 빠져요." />
+    : <StateCard tone="green" title={model.completed ? '참여 완료' : '승인 완료'} body={model.completed ? '함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요.' : '참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요.'} />;
   const capacitySettled = isPostStartLifecycle || match.lifecycleStatus === 'completed' || match.lifecycleStatus === 'expired' || match.lifecycleStatus === 'cancelled';
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
@@ -419,7 +422,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' && !isPostStartLifecycle ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
+            {mode === 'approved' && !isPostStartLifecycle ? approvedStateCard : null}
             {/* [P2] 마감 사유를 아는 만큼만 정확히 말한다 — 시각이 지났으면 그 이유를,
                 아니면(정원 마감·취소·완료·만료) 기존 중립 문구를 유지한다. */}
             {mode === 'closed' && !isPostStartLifecycle ? (
@@ -456,7 +459,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             {isDeadlinePassedClosed ? null : (
               <div className="tm-match-detail-desktop-cta-label">
                 <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-                <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+                <span className="tm-text-label">{model.statusLabel ?? (model.completed ? '참여 완료' : match.actionLabel)}</span>
               </div>
             )}
             <div className="tm-match-detail-desktop-cta-actions">
@@ -509,7 +512,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' && !isPostStartLifecycle ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
+          {mode === 'approved' && !isPostStartLifecycle ? approvedStateCard : null}
           {mode === 'closed' && !isPostStartLifecycle ? (
             isDeadlinePassedClosed
               ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
@@ -545,7 +548,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             {mode === 'mine' && !model.completed && !model.canComplete ? (
               <Link className="tm-match-detail-edit-link tm-text-label" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
             ) : (
-              <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+              <span className="tm-text-label">{model.statusLabel ?? (model.completed ? '참여 완료' : match.actionLabel)}</span>
             )}
           </div>
         )}

@@ -156,7 +156,7 @@ export class MatchesService {
                   some: {
                     userId: user.id,
                     role: 'participant',
-                    status: { in: ['active', 'completed'] },
+                    status: { in: ['active', 'completed', 'no_show'] },
                   },
                 },
               },
@@ -178,7 +178,9 @@ export class MatchesService {
       orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: this.matchInclude(user),
+      // 공개 목록·상세의 참가자 목록에는 불참자를 섞지 않되, 내 이력에서는 현재 사용자의
+      // no_show 행을 함께 읽어 viewer.participantStatus로 구분한다.
+      include: this.matchInclude(user, true),
     });
     const pageItems = matches.slice(0, limit);
     const hasNext = matches.length > limit;
@@ -625,6 +627,11 @@ export class MatchesService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const hostParticipates = dto.hostParticipates !== false;
+    // create()와 같은 불변조건을 수정에도 적용한다. 이 검사가 없으면 웹 폼은 2명으로
+    // 보정해도 API 직접 호출로 "주최자 포함 정원 1명" 상태를 다시 만들 수 있다.
+    if (hostParticipates && dto.capacity < 2) {
+      throw validationError('주최자가 참가하면 정원은 2명 이상이어야 해요', 'capacity');
+    }
     const { updated, hostParticipant } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
       const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
@@ -1332,14 +1339,21 @@ export class MatchesService {
     };
   }
 
-  private matchInclude(user: V1AuthUser | null) {
+  private matchInclude(user: V1AuthUser | null, includeViewerNoShow = false) {
     return {
       sport: { select: { id: true, name: true } },
       minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
       maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
       region: { select: { id: true, name: true } },
       participants: {
-        where: { status: { in: ['active', 'completed'] } },
+        where: includeViewerNoShow && user
+          ? {
+              OR: [
+                { status: { in: ['active', 'completed'] } },
+                { userId: user.id, status: 'no_show' },
+              ],
+            }
+          : { status: { in: ['active', 'completed'] } },
         include: {
           user: {
             select: {
@@ -1367,6 +1381,7 @@ export class MatchesService {
   }
 
   private toListItem(match: MatchWithRelations, user: V1AuthUser | null) {
+    const viewer = this.getViewer(match, user);
     return {
       matchId: match.id,
       title: match.title,
@@ -1403,7 +1418,10 @@ export class MatchesService {
         profileImageUrl: match.hostUser.profile?.profileImageUrl ?? null,
         trustState: match.hostUser.reputationSummary?.trustState ?? 'none',
       },
-      viewerState: this.getViewer(match, user).state === 'guest' ? 'none' : this.getViewer(match, user).state,
+      viewerState: viewer.state === 'guest' ? 'none' : viewer.state,
+      // `/me/matches`를 활동 기록에서도 재사용하므로 참가 완료/불참을 구분할 수 있어야 한다.
+      // viewerState만 내려주면 no_show 참가자도 단순 participant로 보여 실제 참여로 오인된다.
+      viewer,
     };
   }
 
@@ -1413,6 +1431,7 @@ export class MatchesService {
         state: 'guest',
         applicationId: null,
         participantId: null,
+        participantStatus: null,
         canApply: false,
         ctaLabel: '로그인 후 신청',
         disabledReason: 'LOGIN_REQUIRED',
@@ -1421,10 +1440,14 @@ export class MatchesService {
     }
 
     if (match.hostUserId === user.id) {
+      const hostParticipant = match.participants.find(
+        (item) => item.userId === user.id && item.role === 'host',
+      );
       return {
         state: 'host',
         applicationId: null,
-        participantId: null,
+        participantId: hostParticipant?.id ?? null,
+        participantStatus: hostParticipant?.status ?? null,
         canApply: false,
         ctaLabel: '신청자 관리',
         disabledReason: null,
@@ -1438,6 +1461,7 @@ export class MatchesService {
         state: participant.role === 'host' ? 'host' : 'participant',
         applicationId: participant.applicationId,
         participantId: participant.id,
+        participantStatus: participant.status,
         canApply: false,
         ctaLabel: '참여 확정',
         disabledReason: null,
@@ -1451,6 +1475,7 @@ export class MatchesService {
         state: application.status === 'approved' ? 'approved' : application.status,
         applicationId: application.id,
         participantId: null,
+        participantStatus: null,
         canApply: false,
         ctaLabel: application.status === 'requested' ? '승인 대기' : '다시 신청',
         disabledReason: application.status === 'requested' ? 'ALREADY_REQUESTED' : null,
@@ -1463,6 +1488,7 @@ export class MatchesService {
       state: 'none',
       applicationId: null,
       participantId: null,
+      participantStatus: null,
       canApply: reasonCode === 'OK',
       ctaLabel: reasonCode === 'OK' ? '참가 신청' : getReasonMessage(reasonCode),
       disabledReason: reasonCode === 'OK' ? null : reasonCode,

@@ -917,6 +917,77 @@ describe('MatchesService', () => {
     }));
   });
 
+  it('update: 주최자가 참가하는데 정원이 1명이면 400 VALIDATION_FAILED', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({ status: 'recruiting', startAt: FUTURE });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+
+    await expect(service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 1,
+      hostParticipates: true,
+      manualPlaceName: '강남역',
+      version: current.updatedAt.toISOString(),
+    })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED', details: { field: 'capacity' } },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('myMatches: 완료 경기의 불참 상태를 viewer.participantStatus로 내려준다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({
+        status: 'completed',
+        startAt: PAST,
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [{
+          id: 'guest-participant',
+          userId: otherUser.id,
+          role: 'participant',
+          status: 'no_show',
+          applicationId: 'application-1',
+        }],
+        applications: [{
+          id: 'application-1',
+          applicantUserId: otherUser.id,
+          status: 'approved',
+        }],
+        hostUser: {
+          id: host.id,
+          profile: { nickname: '호스트', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    ]);
+
+    const result = await service.myMatches(otherUser, { mode: 'joined' });
+
+    const findManyArgs = prisma.v1Match.findMany.mock.calls[0][0];
+    expect(findManyArgs.where.OR[0].participants.some.status.in).toEqual([
+      'active',
+      'completed',
+      'no_show',
+    ]);
+    expect(findManyArgs.include.participants.where.OR).toContainEqual({
+      userId: otherUser.id,
+      status: 'no_show',
+    });
+
+    expect(result.items[0]).toMatchObject({
+      viewerState: 'participant',
+      viewer: {
+        state: 'participant',
+        participantId: 'guest-participant',
+        participantStatus: 'no_show',
+      },
+    });
+  });
+
   it('update: costNote를 갱신한다', async () => {
     prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
     prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });

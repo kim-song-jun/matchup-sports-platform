@@ -37,6 +37,12 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const [tab, setTab] = useState<'requested' | 'approved' | 'all'>(
     requestedTab === 'approved' || requestedTab === 'all' ? requestedTab : 'requested',
   );
+  // 프로필의 공용 뒤로가기가 이 신청자 목록과 현재 탭으로 돌아오도록 자기 경로를 출처로 넘긴다.
+  // 신청자 목록이 상세에서 받은 from 체인도 함께 보존해 목록 → 상세 → 최초 진입점 순서가 이어진다.
+  const applicationsSelfHref = withFromPath(
+    `/matches/${matchId}/applications?tab=${tab}`,
+    sanitizeRedirectPath(searchParams.get('from')),
+  );
   // Fetch once we know user is host — avoids 403 for non-hosts.
   // Cursor-paginated: a match can hold up to 100 participants while the API caps each
   // page at 50, so the host loads further pages via "더 보기" to manage every applicant.
@@ -255,6 +261,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
               <ApplicationRow
                 key={application.applicationId}
                 application={application}
+                profileHref={withFromPath(`/users/${application.applicantUserId}`, applicationsSelfHref)}
                 actionPending={actionPending}
                 onApprove={() => handleApprove(application)}
                 onReject={() => handleReject(application)}
@@ -327,6 +334,7 @@ function DesktopPageHead({ matchId }: { matchId: string }) {
 
 function ApplicationRow({
   application,
+  profileHref,
   actionPending,
   onApprove,
   onReject,
@@ -334,6 +342,7 @@ function ApplicationRow({
   children,
 }: {
   application: V1MatchApplication;
+  profileHref: string;
   actionPending: boolean;
   onApprove: () => void;
   onReject: () => void;
@@ -362,7 +371,7 @@ function ApplicationRow({
       >
         {/* 프로필 이미지 + 이름 — 클릭하면 개인 프로필로 이동 */}
         <Link
-          href={`/users/${application.applicantUserId}`}
+          href={profileHref}
           aria-label={`${application.displayName} 프로필 보기`}
           style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, textDecoration: 'none', color: 'inherit' }}
         >

@@ -34,9 +34,6 @@ function toEntry(match: V1Match, mode: 'joined' | 'created'): PersonalMatchEntry
  * 이 탭은 본인 페이지에서만 노출되므로(UserRecordsContent가 viewerIsOwner일 때만 탭을
  * 보여준다) 이미 있는 "내 매치" 조회(useV1MyMatchesInfinite, /my/matches/* 와 동일)를
  * 그대로 재사용한다 -- 새 백엔드 엔드포인트 없이 참여 이력만 최소하게 보여준다.
- *
- * ponytail: 무한스크롤은 안 붙였다 -- mode당 limit=50(최근 100건). 완료된 개인매치가
- * 그보다 많은 사용자가 생기면 두 커서를 합쳐 넘기는 "더보기"를 추가한다.
  */
 export function PersonalMatchRecordsSection({ fromHref }: { fromHref: string }) {
   const joined = useV1MyMatchesInfinite('joined');
@@ -108,6 +105,20 @@ export function PersonalMatchRecordsSection({ fromHref }: { fromHref: string }) 
             ))}
           </Card>
         )}
+        {joined.hasNextPage || created.hasNextPage ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 12 }}
+            disabled={joined.isFetchingNextPage || created.isFetchingNextPage}
+            onClick={() => {
+              if (joined.hasNextPage) void joined.fetchNextPage();
+              if (created.hasNextPage) void created.fetchNextPage();
+            }}
+          >
+            {joined.isFetchingNextPage || created.isFetchingNextPage ? '불러오는 중…' : '더 보기'}
+          </button>
+        ) : null}
       </section>
     </>
   );

@@ -79,6 +79,25 @@ describe('PersonalMatchRecordsSection — 활동 기록 개인 탭', () => {
     expect(screen.getByText('아직 참여한 개인매치가 없어요')).toBeInTheDocument();
   });
 
+  it('더 보기로 참여·주최 이력의 남은 페이지를 함께 요청한다', () => {
+    const fetchJoined = vi.fn();
+    const fetchCreated = vi.fn();
+    mocks.query.mockImplementation((mode: 'joined' | 'created') => ({
+      isLoading: false,
+      isError: false,
+      isFetchingNextPage: false,
+      hasNextPage: true,
+      fetchNextPage: mode === 'joined' ? fetchJoined : fetchCreated,
+      data: { pages: [{ items: [match({ id: mode, title: `${mode} 매치` })] }] },
+    }));
+
+    render(<PersonalMatchRecordsSection fromHref="/users/user-1/records" />);
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+
+    expect(fetchJoined).toHaveBeenCalledOnce();
+    expect(fetchCreated).toHaveBeenCalledOnce();
+  });
+
   it('조회에 실패하면 에러 상태를 보여주고 재시도가 두 조회를 모두 다시 부른다', () => {
     const refetchJoined = vi.fn();
     const refetchCreated = vi.fn();

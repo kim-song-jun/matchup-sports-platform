@@ -172,6 +172,7 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
       return { a: sideOf(teamA.id), b: sideOf(teamB.id) };
     };
     const upcoming = await fixture('이관 대상 경기', 7);
+    const later = await fixture('뒤 경기', 10);
     const ended = await fixture('끝난 경기', 14);
     await prisma.v1Game.update({ where: { id: ended.a.gameId }, data: { state: 'ENDED' } });
     const played = await fixture('킥오프 지난 경기', 21);
@@ -184,6 +185,15 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
         // 참가 명단(채움)에는 번호가 없다 — 옮긴 뒤 명단은 참가 명단 번호를 따르므로 dry-run 이 따로 센다.
         { userId: m1, name: '선수 m1', jersey: 7 },
         { userId: null, name: '용병 김' },
+      ],
+      teamA.ownerId,
+    );
+    // 같은 선수가 뒤 경기 저장본에선 다른 번호 — 참가 명단에는 킥오프가 이른 경기 번호(7)만 옮겨 적는다.
+    const legacyLater = await saveLegacyLineup(
+      later.a,
+      [
+        { userId: teamA.ownerId, name: 'A팀장' },
+        { userId: m1, name: '선수 m1', jersey: 8 },
       ],
       teamA.ownerId,
     );
@@ -201,7 +211,21 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
       where: { tournamentId_teamId: { tournamentId: league.id, teamId: teamA.id } },
     });
     await prisma.v1TournamentPlayer.deleteMany({ where: { registrationId: registrationA.id } });
-    return { league, teamA, teamB, upcoming, ended, played, legacyA, legacyB, legacyEnded, legacyPlayed, registrationA };
+    return {
+      league,
+      teamA,
+      teamB,
+      upcoming,
+      later,
+      ended,
+      played,
+      legacyA,
+      legacyLater,
+      legacyB,
+      legacyEnded,
+      legacyPlayed,
+      registrationA,
+    };
   }
 
   const reportOf = (result: Awaited<ReturnType<typeof migrateLeagueRosterAdjustments>>, sideId: string) =>
@@ -217,10 +241,17 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
       status: 'WOULD_MIGRATE',
       excludeCount: 1,
       unrepresentableRows: 1,
-      jerseyChangedRows: 1,
+      jerseyCopiedRows: 1,
+      jerseyChangedRows: 0,
       rosterChanged: true,
     });
-    expect(result.jerseyChangedRows).toBe(1);
+    // 사이드마다 되돌려도 뒤 경기는 앞 경기가 옮겨 적은 번호를 본다 — 적용과 같은 보고.
+    expect(reportOf(result, f.later.a.sideId)).toMatchObject({
+      status: 'WOULD_MIGRATE',
+      jerseyCopiedRows: 0,
+      jerseyChangedRows: 1,
+    });
+    expect([result.jerseyCopiedRows, result.jerseyChangedRows]).toEqual([1, 1]);
     expect(reportOf(result, f.upcoming.b.sideId)).toMatchObject({ status: 'ACTOR_UNRESOLVED', excludeCount: 1 });
     expect(reportOf(result, f.ended.a.sideId)).toBeUndefined();
     // 킥오프가 지난 팀장 저장본은 옮기지 않고 따로 센다(승인 판단용). 저장본이 없는 상대 사이드는 세지 않는다.
@@ -261,6 +292,18 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     const latestA = await latestLineup(f.upcoming.a.gameId, f.upcoming.a.sideId);
     expect([latestA.state, latestA.supersedesId]).toEqual(['SUBMITTED', f.legacyA.id]);
     expect(await rosterOf(f.upcoming.a.gameId, f.upcoming.a.sideId)).toEqual(sorted([f.teamA.ownerId, m1]));
+    // 저장본 번호 7은 참가 명단으로 옮겨 적혀 두 경기 명단 모두 7이다(뒤 경기 저장본의 8은 덮지 않는다).
+    expect(reportOf(result, f.later.a.sideId)).toMatchObject({ status: 'MIGRATED', jerseyCopiedRows: 0, jerseyChangedRows: 1 });
+    const m1Player = await prisma.v1TournamentPlayer.findFirstOrThrow({
+      where: { registrationId: f.registrationA.id, userId: m1, removedAt: null },
+    });
+    expect(m1Player.jerseyNumber).toBe(7);
+    for (const side of [f.upcoming.a, f.later.a]) {
+      const m1Row = await prisma.v1GameParticipant.findFirstOrThrow({
+        where: { lineupId: (await latestLineup(side.gameId, side.sideId)).id, userId: m1 },
+      });
+      expect(m1Row.jerseyNumber).toBe(7);
+    }
     // 저장한 사람을 모르는 사이드와 끝난 경기는 그대로다.
     expect((await latestLineup(f.upcoming.b.gameId, f.upcoming.b.sideId)).id).toBe(f.legacyB.id);
     expect((await latestLineup(f.ended.a.gameId, f.ended.a.sideId)).id).toBe(f.legacyEnded.id);

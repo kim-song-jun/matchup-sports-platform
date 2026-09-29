@@ -8,6 +8,7 @@ import {
   lockRosterWriteScope,
   syncPreparedGameSideRoster,
 } from '../../games/roster/game-roster-sync';
+import { competitionTeamTargets, enqueueRosterResync } from '../../games/roster/roster-resync-events';
 
 type Tx = Prisma.TransactionClient;
 
@@ -17,6 +18,9 @@ type Tx = Prisma.TransactionClient;
  * 기준 명단에 있는데 저장본에 없는 사람 → EXCLUDE(actor = 그 사이드를 저장한 팀장, reason 없음). 조정으로 표현할 수
  * 없는 저장본 행(게스트·기준 명단 밖 계정)은 세기만 한다. 옮긴 사이드에는 이관 표시 감사 행을 남기고 곧바로
  * 동기화한다 — 그 뒤로 그 사이드는 참가 명단 계산을 따른다. 동기화와 같은 "시작 전"(SCHEDULED + 킥오프 전)만 다룬다.
+ *
+ * 저장본 등번호는 경기 명단이 참가 명단 번호를 따르므로, 참가 명단 번호가 비어 있고 팀 안에서 안 겹칠 때만 참가 명단에
+ * 옮겨 적는다(있는 번호는 덮지 않는다).
  */
 
 export interface SavedLineupRow {
@@ -27,29 +31,48 @@ export interface SavedLineupRow {
 export interface LeagueSideMigrationPlan {
   readonly excludeUserIds: string[];
   readonly unrepresentableRows: number;
-  /** 남는 사람인데 저장본 등번호가 참가 명단 번호와 다른 행 — 옮긴 뒤 명단은 참가 명단 번호를 따른다. */
+  /** 저장본 번호를 옮겨 적을 참가 명단 행(`V1TournamentPlayer.id`). */
+  readonly jerseyCopies: ReadonlyArray<{ readonly playerId: string; readonly userId: string; readonly jerseyNumber: number }>;
+  /** 옮겨 적지 못해(참가 명단에 다른 번호가 있거나 팀 안에서 겹침) 경기 명단 번호가 저장본과 달라지는 행. */
   readonly jerseyChangedRows: number;
 }
 
 export function planLeagueSideMigration(input: {
-  readonly base: ReadonlyArray<{ readonly userId: string; readonly jerseyNumber: number | null }>;
+  readonly base: ReadonlyArray<{
+    readonly userId: string;
+    readonly jerseyNumber: number | null;
+    readonly sourceParticipantId: string;
+  }>;
+  /** 기준 명단이 참가 명단 행인가(팀원 폴백이면 번호를 적을 행이 없다). */
+  readonly baseIsRegistration: boolean;
   readonly saved: readonly SavedLineupRow[];
   readonly activeExcludedUserIds: ReadonlySet<string>;
 }): LeagueSideMigrationPlan {
-  const baseJersey = new Map(input.base.map((entry) => [entry.userId, entry.jerseyNumber]));
+  const byUser = new Map(input.base.map((entry) => [entry.userId, entry]));
   const saved = new Set(input.saved.flatMap((row) => (row.userId === null ? [] : [row.userId])));
-  const excludeUserIds = [...baseJersey.keys()].filter(
+  const excludeUserIds = [...byUser.keys()].filter(
     (userId) => !saved.has(userId) && !input.activeExcludedUserIds.has(userId),
   );
-  const unrepresentableRows = input.saved.filter((row) => row.userId === null || !baseJersey.has(row.userId)).length;
-  const jerseyChangedRows = input.saved.filter(
-    (row) =>
-      row.userId !== null &&
-      baseJersey.has(row.userId) &&
-      row.jerseyNumber !== null &&
-      row.jerseyNumber !== baseJersey.get(row.userId),
-  ).length;
-  return { excludeUserIds, unrepresentableRows, jerseyChangedRows };
+  const unrepresentableRows = input.saved.filter((row) => row.userId === null || !byUser.has(row.userId)).length;
+
+  const taken = new Set(input.base.flatMap((entry) => (entry.jerseyNumber === null ? [] : [entry.jerseyNumber])));
+  const assigned = new Map<string, number>();
+  const jerseyCopies: Array<{ playerId: string; userId: string; jerseyNumber: number }> = [];
+  let jerseyChangedRows = 0;
+  for (const row of input.saved) {
+    const entry = row.userId === null ? undefined : byUser.get(row.userId);
+    if (entry === undefined || row.jerseyNumber === null) continue;
+    const current = assigned.get(entry.userId) ?? entry.jerseyNumber;
+    if (row.jerseyNumber === current) continue;
+    if (input.baseIsRegistration && current === null && !taken.has(row.jerseyNumber)) {
+      taken.add(row.jerseyNumber);
+      assigned.set(entry.userId, row.jerseyNumber);
+      jerseyCopies.push({ playerId: entry.sourceParticipantId, userId: entry.userId, jerseyNumber: row.jerseyNumber });
+    } else {
+      jerseyChangedRows += 1;
+    }
+  }
+  return { excludeUserIds, unrepresentableRows, jerseyCopies, jerseyChangedRows };
 }
 
 export interface LineupSaveRecord {
@@ -104,6 +127,8 @@ export interface LeagueSideMigrationReport {
   readonly status: LeagueSideMigrationStatus;
   readonly excludeCount: number;
   readonly unrepresentableRows: number;
+  /** 참가 명단에 실제로 옮겨 적은 저장본 번호 수(dry-run 은 적었다가 되돌린 수). */
+  readonly jerseyCopiedRows: number;
   readonly jerseyChangedRows: number;
   /** 옮긴 뒤 동기화가 새 명단 리비전을 만들었는가(저장본의 게스트·등번호 차이 등). */
   readonly rosterChanged: boolean;
@@ -116,6 +141,7 @@ export interface LeagueRosterMigrationResult {
   readonly migratedSides: number;
   readonly excludeCount: number;
   readonly unrepresentableRows: number;
+  readonly jerseyCopiedRows: number;
   readonly jerseyChangedRows: number;
   readonly actorUnresolvedSides: number;
   readonly rosterNotAvailableSides: number;
@@ -141,12 +167,14 @@ function sideReport(
   status: LeagueSideMigrationStatus,
   plan: LeagueSideMigrationPlan | null,
   rosterChanged: boolean,
+  jerseyCopiedRows = 0,
 ): LeagueSideMigrationReport {
   return {
     ...side,
     status,
     excludeCount: plan?.excludeUserIds.length ?? 0,
     unrepresentableRows: plan?.unrepresentableRows ?? 0,
+    jerseyCopiedRows,
     jerseyChangedRows: plan?.jerseyChangedRows ?? 0,
     rosterChanged,
   };
@@ -162,10 +190,16 @@ async function unmigratedTeamLineup(tx: Tx, target: { gameId: string; sideId: st
   return latest;
 }
 
+/**
+ * `copiedJerseys` 는 이번 실행에서 앞 사이드가 참가 명단에 옮겨 적은 번호다. dry-run 은 사이드마다 되돌리므로 DB 만 보면
+ * 뒤 사이드가 같은 선수에게 다른 번호를 또 적는 것으로 보고한다. 키는 리그·팀·선수 — 되돌려진 빈 명단 채우기가 사이드마다
+ * 다시 돌아 참가 명단 행 id 가 바뀐다.
+ */
 async function migrateSide(
   tx: Tx,
   side: { gameId: string; sideId: string; teamMatchId: string },
   outcome: 'MIGRATED' | 'WOULD_MIGRATE',
+  copiedJerseys: Map<string, number>,
 ): Promise<LeagueSideMigrationReport | null> {
   const target = { gameId: side.gameId, sideId: side.sideId };
   // 잠금(빈 리그 명단 채우기 포함)은 옮길 사이드에만 건다. 잠근 뒤 다시 보고 그 사이 시작된 경기는 건너뛴다.
@@ -181,8 +215,12 @@ async function migrateSide(
   const latest = await unmigratedTeamLineup(tx, target);
   if (latest === null) return null;
 
-  const report = (status: LeagueSideMigrationStatus, plan: LeagueSideMigrationPlan | null, rosterChanged = false) =>
-    sideReport(side, status, plan, rosterChanged);
+  const report = (
+    status: LeagueSideMigrationStatus,
+    plan: LeagueSideMigrationPlan | null,
+    rosterChanged = false,
+    jerseyCopiedRows = 0,
+  ) => sideReport(side, status, plan, rosterChanged, jerseyCopiedRows);
   const loaded = context === null ? null : await loadGameRosterForContext(tx, context);
   if (loaded === null) return report('ROSTER_NOT_AVAILABLE', null);
 
@@ -194,8 +232,13 @@ async function migrateSide(
     where: { ...target, teamId: loaded.context.teamId, revokedAt: null },
     select: { userId: true },
   });
+  const copyKey = (userId: string) => `${loaded.context.competitionId}:${loaded.context.teamId}:${userId}`;
   const plan = planLeagueSideMigration({
-    base: loaded.base,
+    base: loaded.base.map((entry) => ({
+      ...entry,
+      jerseyNumber: copiedJerseys.get(copyKey(entry.userId)) ?? entry.jerseyNumber,
+    })),
+    baseIsRegistration: loaded.baseSource === 'REGISTRATION',
     saved,
     activeExcludedUserIds: new Set(active.map((row) => row.userId)),
   });
@@ -223,6 +266,19 @@ async function migrateSide(
       })),
     });
   }
+  let jerseyCopiedRows = 0;
+  for (const copy of plan.jerseyCopies) {
+    const { count } = await tx.v1TournamentPlayer.updateMany({
+      where: { id: copy.playerId, removedAt: null, jerseyNumber: null },
+      data: { jerseyNumber: copy.jerseyNumber },
+    });
+    jerseyCopiedRows += count;
+    if (count > 0) copiedJerseys.set(copyKey(copy.userId), copy.jerseyNumber);
+  }
+  // 참가 명단 번호는 그 팀의 다른 시작 전 경기 명단에도 찍힌다 — 참가 명단 번호 수정과 같은 후속 이벤트.
+  if (jerseyCopiedRows > 0) {
+    await enqueueRosterResync(tx, competitionTeamTargets(loaded.context.competitionId, [loaded.context.teamId]));
+  }
   await new OperationAuditWriterService().create(tx, {
     actor: { type: 'SYSTEM', id: MIGRATION_SYSTEM_ACTOR },
     requestId: leagueRosterMigrationRequestId(side.gameId, side.sideId),
@@ -238,11 +294,12 @@ async function migrateSide(
       sideId: side.sideId,
       excludeCount: plan.excludeUserIds.length,
       unrepresentableRows: plan.unrepresentableRows,
+      jerseyCopiedRows,
       jerseyChangedRows: plan.jerseyChangedRows,
     },
   });
   const rosterChanged = await syncPreparedGameSideRoster(tx, target);
-  return report(outcome, plan, rosterChanged);
+  return report(outcome, plan, rosterChanged, jerseyCopiedRows);
 }
 
 /** 시작 전 리그 경기의 팀장 저장본을 조정으로 옮긴다. `apply` 가 false(기본)면 아무것도 쓰지 않는다. */
@@ -260,16 +317,18 @@ export async function migrateLeagueRosterAdjustments(
       },
     },
     select: { id: true, gameId: true, game: { select: { teamMatchId: true } } },
-    orderBy: [{ gameId: 'asc' }, { sideKey: 'asc' }],
+    // 킥오프 순 — 같은 선수의 저장본 번호가 경기마다 다르면 가장 이른 경기 번호가 참가 명단에 남는다.
+    orderBy: [{ game: { teamMatch: { startAt: 'asc' } } }, { gameId: 'asc' }, { sideKey: 'asc' }],
   });
 
   const reports: LeagueSideMigrationReport[] = [];
+  const copiedJerseys = new Map<string, number>();
   for (const side of sides) {
     if (side.game.teamMatchId === null) continue;
     const input = { gameId: side.gameId, sideId: side.id, teamMatchId: side.game.teamMatchId };
     try {
       const report = await prisma.$transaction(async (tx) => {
-        const result = await migrateSide(tx, input, apply ? 'MIGRATED' : 'WOULD_MIGRATE');
+        const result = await migrateSide(tx, input, apply ? 'MIGRATED' : 'WOULD_MIGRATE', copiedJerseys);
         if (!apply) throw new DryRunRollback(result);
         return result;
       });
@@ -288,6 +347,7 @@ export async function migrateLeagueRosterAdjustments(
     migratedSides: moved.length,
     excludeCount: moved.reduce((sum, row) => sum + row.excludeCount, 0),
     unrepresentableRows: reports.reduce((sum, row) => sum + row.unrepresentableRows, 0),
+    jerseyCopiedRows: moved.reduce((sum, row) => sum + row.jerseyCopiedRows, 0),
     jerseyChangedRows: moved.reduce((sum, row) => sum + row.jerseyChangedRows, 0),
     actorUnresolvedSides: reports.filter((row) => row.status === 'ACTOR_UNRESOLVED').length,
     rosterNotAvailableSides: reports.filter((row) => row.status === 'ROSTER_NOT_AVAILABLE').length,

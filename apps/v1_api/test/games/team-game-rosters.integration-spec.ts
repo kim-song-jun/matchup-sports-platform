@@ -555,6 +555,9 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 178)', () => {
           title: `친선 ${suiteId}`,
           hostTeamId: f.teamA.id,
           approvedApplicantTeamId: f.teamC.id,
+          // 친선 팀매치 필수 필드(v1_team_matches_friendly_required_ck).
+          createdByUserId: f.teamA.ownerId,
+          placeName: '친선 구장',
           startAt: new Date(Date.now() + 3 * DAY),
           competitionConfigVersionId: configId,
           status: 'matched',

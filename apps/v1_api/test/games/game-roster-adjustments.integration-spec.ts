@@ -525,6 +525,9 @@ describe('경기 명단 조정 API (Task 178)', () => {
           title: '친선',
           hostTeamId: f.teamA.id,
           approvedApplicantTeamId: f.teamB.id,
+          // 친선 팀매치 필수 필드(v1_team_matches_friendly_required_ck).
+          createdByUserId: f.teamA.ownerId,
+          placeName: '친선 구장',
           startAt: new Date(Date.now() + DAY),
           competitionConfigVersionId: configId,
         },

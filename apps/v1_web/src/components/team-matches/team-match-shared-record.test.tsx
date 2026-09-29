@@ -45,24 +45,38 @@ describe('shared record participant flow', () => {
     expect(screen.getByRole('link', { name: '← 매치 상세' })).toHaveAttribute('href', '/team-matches/match?view=detail');
   });
 
-  // 매치 상세에서 "공동 경기 기록 열기"로 들어갈 때도 출처를 실어야, 공동 기록 화면의 셸
-  // 뒤로가기가 route-chrome 고정 backHref 대신 이 출처로 돌아간다.
-  it('매치 상세 카드의 열기 링크가 받은 출처를 ?from= 으로 함께 싣는다', () => {
-    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/team-matches/match" />);
+  // 매치 상세에서 "공동 경기 기록 열기"로 들어갈 때, 뒤로가기 목적지는 반드시 `?view=detail`을
+  // 실어야 한다 — 없으면 참가자 + live/official 조건에서 매치 상세가 이 화면으로 즉시 되튕겨
+  // 셸 뒤로가기가 아무 반응 없어 보인다(2026-09-29 실사고). 받은 출처가 있으면 그 출처도 이어 싣는다.
+  it('매치 상세 카드의 열기 링크가 view=detail 뒤로가기 경로와 받은 출처를 함께 싣는다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/my/team-matches" />);
     expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute(
       'href',
-      `/team-matches/match/record?from=${encodeURIComponent('/team-matches/match')}`,
+      `/team-matches/match/record?from=${encodeURIComponent('/team-matches/match?view=detail&from=%2Fmy%2Fteam-matches')}`,
     );
   });
 
-  it('출처가 없으면 열기 링크는 ?from= 없이 그대로 간다', () => {
+  it('출처가 없어도 view=detail 뒤로가기 경로는 싣는다', () => {
     render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
-    expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute('href', '/team-matches/match/record');
+    expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute(
+      'href',
+      `/team-matches/match/record?from=${encodeURIComponent('/team-matches/match?view=detail')}`,
+    );
   });
 
-  it('라이브 참가자는 출처를 실은 경로로 자동 리다이렉트된다', () => {
-    render(<TeamMatchRecordEntry teamMatchId="match" fromHref="/team-matches/match" />);
-    expect(state.replace).toHaveBeenCalledWith(`/team-matches/match/record?from=${encodeURIComponent('/team-matches/match')}`);
+  it('라이브 참가자는 view=detail 뒤로가기 경로를 실은 경로로 자동 리다이렉트된다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" fromHref="/my/team-matches" />);
+    expect(state.replace).toHaveBeenCalledWith(
+      `/team-matches/match/record?from=${encodeURIComponent('/team-matches/match?view=detail&from=%2Fmy%2Fteam-matches')}`,
+    );
+  });
+
+  // 회귀 방지: 뒤로가기로 `?view=detail`에 도착하면(detailOnly=true) 참가자·라이브여도
+  // 다시 이 화면으로 리다이렉트하지 않아야 한다 — 안 그러면 뒤로가기가 replace→replace로
+  // 제자리에 돌아와 아무 반응이 없어 보인다(2026-09-29 실사고, alpha 실측으로 확인).
+  it('view=detail로 도착하면 참가자·라이브여도 다시 이 화면으로 리다이렉트하지 않는다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/my/team-matches" />);
+    expect(state.replace).not.toHaveBeenCalled();
   });
 
   it('selects scorer from the credited team and sends the opened version with the goal', async () => {

@@ -353,9 +353,11 @@ export function TeamMatchRecordEntry({
   const query = useTeamMatchRecord(teamMatchId);
   const router = useRouter();
   const data = query.data;
-  // 매치 상세에서 들어왔다는 출처를 그대로 실어야, 공동 기록 화면의 셸 뒤로가기(AppBackLink)가
-  // `?from=` 을 받아 이 매치 상세로 돌아간다 — 없으면 route-chrome 의 고정 backHref 로만 열화된다.
-  const recordHref = withFromPath(`/team-matches/${teamMatchId}/record`, fromHref);
+  // 뒤로가기 목적지는 반드시 `?view=detail`로 매치 상세를 가리켜야 한다 — 이 값이 없으면
+  // 매치 상세가 이 화면과 같은 조건(참가자 + live/official)에서 즉시 이 화면으로 되튕겨,
+  // 셸 뒤로가기를 눌러도 URL 이 replace→replace 로 제자리로 돌아와 아무 반응이 없어 보인다.
+  const detailHref = withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromHref);
+  const recordHref = withFromPath(`/team-matches/${teamMatchId}/record`, detailHref);
 
   useEffect(() => {
     if (

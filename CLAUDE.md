@@ -480,7 +480,7 @@ alpha에는 `status === 'live'` 경기가 보통 없다(전부 `ended`). 라이�
 start → end-period(하프타임) → start-period(후반) → end-period → end
 ```
 
-대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 178 — 라인업 저장·제출
+대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 179 — 라인업 저장·제출
 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
 
 실측으로 확인된 계약 2개(하나라도 어기면 409/422):

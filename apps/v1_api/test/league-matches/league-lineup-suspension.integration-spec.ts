@@ -24,7 +24,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * ## 이 스펙이 재는 것
  *
  * - 규정을 켠 리그: 앞 경기에서 레드카드를 받은 선수가 다음 경기 명단 계산에서 빠진다
- *   (Task 178 — 예전의 제출 가드 400 대신 계산이 뺀다).
+ *   (Task 179 — 예전의 제출 가드 400 대신 계산이 뺀다).
  * - 규정을 끈 리그: **똑같은 상황에서 그대로 출전한다**(옵트인 전제). 이 대조가 없으면
  *   "리그는 무조건 뺀다" 와 구분되지 않는다.
  * - 규정 수정은 첫 경기가 시작되면 잠긴다(소급 적용 방지).
@@ -463,7 +463,7 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
     });
   }
 
-  /** 그 경기 홈 사이드의 계산된 경기 명단(Task 178 — 정지 선수는 계산이 뺀다). */
+  /** 그 경기 홈 사이드의 계산된 경기 명단(Task 179 — 정지 선수는 계산이 뺀다). */
   async function homeRoster(teamMatchId: string) {
     const game = await prisma.v1Game.findUniqueOrThrow({
       where: { teamMatchId },

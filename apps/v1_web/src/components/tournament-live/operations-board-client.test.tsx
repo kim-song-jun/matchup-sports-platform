@@ -157,7 +157,7 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
   });
 
-  describe('경기 명단 요약(Task 178)', () => {
+  describe('경기 명단 요약(Task 179)', () => {
     const BOARD_FROM = encodeURIComponent('/tournament-ops/tournaments/t-1/operations');
     const SCHEDULED_ITEM: V1TournamentOperationsBoardItem = {
       ...ITEM_A,

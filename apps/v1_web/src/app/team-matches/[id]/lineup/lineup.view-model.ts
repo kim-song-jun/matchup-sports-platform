@@ -72,7 +72,7 @@ export function resolveOwnTeamId(
 
 /**
  * 이 참석명단 화면이 대회·리그 경기로 열렸는가(옛 알림 링크 등). 그 경기 명단은 참가 명단에서
- * 계산돼 여기서의 저장·제출이 409 `ROSTER_MANAGED_BY_ADJUSTMENTS` 다(Task 178).
+ * 계산돼 여기서의 저장·제출이 409 `ROSTER_MANAGED_BY_ADJUSTMENTS` 다(Task 179).
  * 팀매치 상세는 대회 경기를 `NOT_FOUND_OR_ARCHIVED` 로 숨기고 명단 조회만 성공시킨다.
  */
 export function isCompetitionLineupRoute(input: {

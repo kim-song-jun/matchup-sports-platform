@@ -11,7 +11,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 코드 리딩으로는 트리거·unique 제약 통과 여부를 증명할 수 없다.
  *
  * 예전에는 `GamesService.saveLineup` 의 연결 갈래(팀 멤버 검증·중복 userId·게스트)도 여기서 쟀지만
- * Task 178 에서 그 저장 경로가 없어졌다 — 대회·리그 명단은 동기화가 만든다(`game-roster-sync`).
+ * Task 179 에서 그 저장 경로가 없어졌다 — 대회·리그 명단은 동기화가 만든다(`game-roster-sync`).
  */
 
 const ids = {

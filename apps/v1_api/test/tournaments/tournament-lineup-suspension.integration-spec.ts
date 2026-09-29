@@ -8,7 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
  * 대회 축 출전정지 — 규정이 있는 대회에서 앞 경기 레드카드 선수는 다음 경기 명단 계산에서 빠진다
- * (Task 178, 예전에는 `GamesService.submitLineup` 의 400 가드였다).
+ * (Task 179, 예전에는 `GamesService.submitLineup` 의 400 가드였다).
  *
  * 판정이 성립하려면 **네 테이블의 관계**가 필요하다 — 대회의 규정 컬럼 · 경기 순서 · 앞 경기
  * 결과 리비전의 카드 · 그 카드가 붙은 참가자의 `userId`. mock 으로는 그 관계를 지어내게 된다.
@@ -282,7 +282,7 @@ describe('대회 축 출전정지 — 다음 경기 명단 계산에서 빠진�
     return { game, homeSide, homeLineup };
   }
 
-  /** 다음 경기 홈 사이드의 계산된 경기 명단(Task 178 — 정지 선수는 계산이 뺀다). */
+  /** 다음 경기 홈 사이드의 계산된 경기 명단(Task 179 — 정지 선수는 계산이 뺀다). */
   async function homeRoster(fixtureId: string) {
     const { game, homeSide } = await loadGame(fixtureId);
     const loaded = await prisma.$transaction((tx) => loadGameRoster(tx, { gameId: game.id, sideId: homeSide.id }));

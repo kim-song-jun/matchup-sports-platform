@@ -136,7 +136,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       )
     : null;
   const editable = Boolean(phase?.editable) && isOnline;
-  // 친선 참석명단은 결장 기간으로 자동으로 빼지 않는다(제출하는 명단이다) — 고를 때 보이게만 한다(Task 178).
+  // 친선 참석명단은 결장 기간으로 자동으로 빼지 않는다(제출하는 명단이다) — 고를 때 보이게만 한다(Task 179).
   const kickoffIso = kickoffAt && Number.isFinite(Date.parse(kickoffAt)) ? new Date(kickoffAt).toISOString() : null;
   const unavailabilityQuery = useV1TeamUnavailability(ownTeamId, kickoffIso, {
     enabled: !isCompetition && phase?.editable === true,

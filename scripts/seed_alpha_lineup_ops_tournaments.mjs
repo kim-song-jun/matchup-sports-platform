@@ -4,7 +4,7 @@
 // 승부차기 입력이 열리는 경로다.
 //
 // 대회 선수 명단(로스터)까지만 채운다. 경기 명단은 대진 생성 때 참가 명단에서 계산된 제출본으로
-// 서고(Task 178 — 라인업 저장·제출 단계 없음), 빠질 선수는 경기별 조정으로 뺀다.
+// 서고(Task 179 — 라인업 저장·제출 단계 없음), 빠질 선수는 경기별 조정으로 뺀다.
 //
 // 사용법:
 //   ALPHA_ADMIN_EMAIL=... ALPHA_CAPTAIN_A_EMAIL=... ALPHA_CAPTAIN_B_EMAIL=... \
@@ -287,7 +287,7 @@ async function createOne(index, cookies, termsDocumentIds, entrants) {
   must('status→in_progress', await call('POST', `/admin/tournaments/${tid}/status`, admin, { status: 'in_progress' }));
 
   // 참가팀 매니저의 경기 진입(lineup-access)이 실제로 열렸는지 확인한다 — 경기만 만들어두고
-  // 접근이 막혀 있으면 만든 의미가 없다. 대회 경기 명단은 참가 명단에서 계산되므로(Task 178) 라인업
+  // 접근이 막혀 있으면 만든 의미가 없다. 대회 경기 명단은 참가 명단에서 계산되므로(Task 179) 라인업
   // 저장 단계는 없고, 빠질 선수는 /games/:gameId/sides/:sideId/roster-adjustments 로 조정한다.
   const access = await call(
     'GET',

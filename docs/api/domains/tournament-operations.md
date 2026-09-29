@@ -115,7 +115,7 @@ These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK
 
 `apps/v1_api/src/tournament-operations/lineups/**`. A thin `fixtureId → gameId` adapter over `GamesService.listLineups`.
 
-**Task 178**: 대회·리그 경기 명단은 참가 명단에서 계산되고, 팀장·운영자의 뜻은 경기 명단 조정
+**Task 179**: 대회·리그 경기 명단은 참가 명단에서 계산되고, 팀장·운영자의 뜻은 경기 명단 조정
 (`/games/:gameId/sides/:sideId/roster-adjustments`, [games.md](./games.md))으로만 들어간다. 그래서 아래 쓰기 두 경로는
 인가(스태프 `lineup_mutate`, 이어서 `GamesService.resolveActor`)만 태운 뒤 항상 `409 ROSTER_MANAGED_BY_ADJUSTMENTS` 다.
 위 deviation 2·3 과 idempotency 설명 중 fixture-lineup save/submit 부분은 이 변경 전 계약이다.

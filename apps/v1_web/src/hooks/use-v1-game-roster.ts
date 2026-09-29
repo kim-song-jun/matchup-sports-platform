@@ -10,7 +10,7 @@ import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-pollin
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 
 /**
- * Task 178 경기별 출전 명단 — 데이터 계층.
+ * Task 179 경기별 출전 명단 — 데이터 계층.
  * 서버 계약: `apps/v1_api/src/games/roster/*`(GameRosterView·TeamRosterMatrix·MemberUnavailabilityView).
  * 날짜는 JSON 이라 ISO 문자열이고, 사유·역할은 서버 컬럼이 문자열이라 `string | null` 그대로 둔다.
  */

@@ -381,7 +381,7 @@ export function RegistrationsTab({
   const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
-  // 경기별 명단 펼침(Task 178) — 한 번에 한 팀만 연다.
+  // 경기별 명단 펼침(Task 179) — 한 번에 한 팀만 연다.
   const [gameRostersRegistrationId, setGameRostersRegistrationId] = useState<string | null>(null);
   // 펼친 표의 저장 전 칸 변경 — 펼침을 닫거나(다른 팀·접기·필터) 화면을 떠나면 사라진다.
   const [gameRostersDirty, setGameRostersDirty] = useState(false);

@@ -273,7 +273,7 @@ describe('Task 6 L1 game lifecycle', () => {
     expect(persisted.periods.length).toBeGreaterThan(0);
     expect(persisted.participants).toHaveLength(1);
 
-    // Task 178: 대회 경기 명단은 참가 명단에서 계산된다 — 운영자라도 라인업 저장·제출 경로는 409 이고
+    // Task 179: 대회 경기 명단은 참가 명단에서 계산된다 — 운영자라도 라인업 저장·제출 경로는 409 이고
     // 게임 버전·리비전을 건드리지 않는다.
     const lineupWrite = await captureFailure(() => service.rejectLineupWrite(authUser(ids.operatorUser), tournamentGameId));
     expectHttpCode(lineupWrite, 409, 'ROSTER_MANAGED_BY_ADJUSTMENTS');
@@ -299,7 +299,7 @@ describe('Task 6 L1 game lifecycle', () => {
   it('enforces header/body durable IDs, payload reuse, lifecycle, event append, and visibility', async () => {
     const startToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const start = {
-      // 생성 직후 게임 버전 0 — 라인업 쓰기가 없다(Task 178).
+      // 생성 직후 게임 버전 0 — 라인업 쓰기가 없다(Task 179).
       expectedVersion: 0,
       clientCommandId: 'tournament-start',
       takeoverToken: startToken,

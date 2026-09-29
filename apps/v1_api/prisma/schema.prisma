@@ -3878,7 +3878,7 @@ enum V1GameRosterAdjustmentAction {
   EXCLUDE
 }
 
-/// Task 178: 대회·리그 경기 명단은 참가 명단에서 계산된다 — 이 행이 그 계산에서 뺄 사람이다.
+/// Task 179: 대회·리그 경기 명단은 참가 명단에서 계산된다 — 이 행이 그 계산에서 뺄 사람이다.
 /// 행은 지우지 않는다(변경 기록). 되돌리기는 revokedAt.
 model V1GameRosterAdjustment {
   id              String                       @id @default(uuid())
@@ -3911,7 +3911,7 @@ model V1GameRosterAdjustment {
   @@map("v1_game_roster_adjustments")
 }
 
-/// Task 178: 팀원 결장 기간. 경기 시작 시각이 [startsAt, endsAt) 안인 대회·리그 경기에서 빠진다.
+/// Task 179: 팀원 결장 기간. 경기 시작 시각이 [startsAt, endsAt) 안인 대회·리그 경기에서 빠진다.
 /// 팀장·운영자만 등록한다(본인 등록 없음). startsAt < endsAt 는 CHECK 제약(마이그레이션 SQL).
 model V1TeamMemberUnavailability {
   id              String    @id @default(uuid())

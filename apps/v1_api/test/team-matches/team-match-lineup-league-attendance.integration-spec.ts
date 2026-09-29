@@ -10,7 +10,7 @@ import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup
 /**
  * 팀매치 참석명단 저장에는 리그·친선 구분 없이 **참석 응답 게이트를 걸지 않는다.**
  *
- * Task 178 이후 리그 대진은 이 경로로 명단을 저장하지 않는다(409, 경기 명단 조정으로 대체) —
+ * Task 179 이후 리그 대진은 이 경로로 명단을 저장하지 않는다(409, 경기 명단 조정으로 대체) —
  * 아래 결함 설명은 친선 계약과 리그 조회(eligibleMembers)에만 남는다.
  *
  * ## 무엇이 결함이었나
@@ -250,7 +250,7 @@ describe('팀매치 참석명단 — 팀장·운영진 직접 등록', () => {
     await prisma.$disconnect();
   });
 
-  it('리그 대진은 팀장이 전체 명단을 저장할 수 없다 — 409 ROSTER_MANAGED_BY_ADJUSTMENTS, 새 리비전 없음 (Task 178)', async () => {
+  it('리그 대진은 팀장이 전체 명단을 저장할 수 없다 — 409 ROSTER_MANAGED_BY_ADJUSTMENTS, 새 리비전 없음 (Task 179)', async () => {
     const version = await currentVersion(ids.leagueMatch);
 
     const rejected = await captureFailure(() =>

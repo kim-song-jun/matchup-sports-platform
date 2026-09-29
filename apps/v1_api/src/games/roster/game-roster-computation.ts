@@ -87,7 +87,7 @@ function coversKickoff(period: GameRosterUnavailabilityInput, kickoff: Date): bo
 }
 
 /**
- * 경기 명단 = 기준 명단 − 출전정지 − 결장 기간 − 활성 EXCLUDE (Task 178).
+ * 경기 명단 = 기준 명단 − 출전정지 − 결장 기간 − 활성 EXCLUDE (Task 179).
  *
  * 한 사람이 여러 사유에 걸리면 **출전정지 > 결장 > 조정** 한 칸에만 넣는다. 정지는 팀이
  * 되돌릴 수 없는 사유라 먼저 보여야 하고, 결장은 기간으로 여러 경기를 덮는 사유라 경기 단위

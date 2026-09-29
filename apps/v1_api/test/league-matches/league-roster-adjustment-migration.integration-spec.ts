@@ -14,7 +14,7 @@ import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axi
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
- * Task 178 리그 이관 — 팀장 저장본(예전 `/team-matches/:id/lineup` 저장)을 경기 명단 조정으로 옮긴다.
+ * Task 179 리그 이관 — 팀장 저장본(예전 `/team-matches/:id/lineup` 저장)을 경기 명단 조정으로 옮긴다.
  * dry-run 은 아무것도 남기지 않고, 적용 뒤 시작 전 경기 명단은 저장본(계정 있는 행)과 같으며 그 뒤로는 계산을 따른다.
  * 저장본은 지금 경로로 만들 수 없어(대회·리그 라인업 저장은 409) 저장 경로가 남기던 행·멱등 기록을 그대로 심는다.
  */

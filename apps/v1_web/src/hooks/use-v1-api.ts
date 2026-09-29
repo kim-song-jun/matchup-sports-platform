@@ -2161,7 +2161,7 @@ export function useV1DeleteLineupPreset(teamId: string | null) {
   });
 }
 
-/** 참석명단을 아직 내지 않은 다가오는 친선 경기 — 홈 "할 일" 카드. 대회·리그는 오지 않는다(Task 178 R1). */
+/** 참석명단을 아직 내지 않은 다가오는 친선 경기 — 홈 "할 일" 카드. 대회·리그는 오지 않는다(Task 179 R1). */
 export type V1LineupTodo = {
   source: 'TEAM_MATCH';
   teamId: string;

@@ -65,7 +65,7 @@ describe('LineupReminderService', () => {
     };
   }
 
-  // MD-QA #14 이후 할 일은 친선 참석명단뿐이다(Task 178 R1) — 경기마다 한 건, "참석명단" 문구.
+  // MD-QA #14 이후 할 일은 친선 참석명단뿐이다(Task 179 R1) — 경기마다 한 건, "참석명단" 문구.
   it('친선 참석명단 일일 알림은 경기마다 한 건이고 "참석명단" 문구를 쓴다', () => {
     const messages = buildDailyMessages([
       fakeTodo({ gameId: 'friendly-1', state: 'MISSING' }),
@@ -209,7 +209,7 @@ describe('LineupReminderService', () => {
     });
   });
 
-  describe('Task 178 R1: 대회·리그 경기는 전날 "명단 확인" 한 번', () => {
+  describe('Task 179 R1: 대회·리그 경기는 전날 "명단 확인" 한 번', () => {
     const managers = {
       'team-home': [{ userId: 'home-owner' }, { userId: 'home-manager' }],
       'team-away': [{ userId: 'away-owner' }],

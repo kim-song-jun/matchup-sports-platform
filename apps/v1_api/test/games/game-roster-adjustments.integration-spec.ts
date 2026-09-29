@@ -16,12 +16,12 @@ import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
- * Task 178 — 경기 단위 명단 API(GET roster · POST/DELETE roster-adjustments · GET 변경 기록).
+ * Task 179 — 경기 단위 명단 API(GET roster · POST/DELETE roster-adjustments · GET 변경 기록).
  *
  * 인가는 "그 사이드 팀"이 기준이라, 대회 fixture 를 A·B·C 세 팀 · 경기 둘(g1 A-B, g2 A-C)로 두고
  * 상대팀 팀장·다른 경기·다른 사이드가 영향을 받지 않는지를 함께 단언한다.
  */
-describe('경기 명단 조정 API (Task 178)', () => {
+describe('경기 명단 조정 API (Task 179)', () => {
   const suiteId = randomUUID().slice(0, 8);
   const DAY = 86_400_000;
   let app: INestApplication;

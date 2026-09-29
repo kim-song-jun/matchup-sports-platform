@@ -95,7 +95,7 @@ export async function loadDisplayNames(tx: Tx, userIds: readonly string[]): Prom
   return new Map(users.map((row) => [row.id, participantDisplayName({ user: { profile: row.profile } })]));
 }
 
-/** Task 178 — 대회·리그 경기 한 사이드의 명단 조회와 경기별 빼기·되돌리기. */
+/** Task 179 — 대회·리그 경기 한 사이드의 명단 조회와 경기별 빼기·되돌리기. */
 @Injectable()
 export class GameRosterService {
   constructor(

@@ -39,7 +39,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeaveTeam: vi.fn(),
 }));
 
-// 결장 기간(Task 178 팀 C) — 팀원 본인 안내가 읽는 조회만 갈아 끼운다. 나머지 명단 훅은 실제 것.
+// 결장 기간(Task 179 팀 C) — 팀원 본인 안내가 읽는 조회만 갈아 끼운다. 나머지 명단 훅은 실제 것.
 const rosterMocks = vi.hoisted(() => ({
   useV1MemberUnavailability: vi.fn((): { data: unknown; isError: boolean } => ({ data: undefined, isError: false })),
 }));
@@ -458,7 +458,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     // 이 팀(team-1)의 대기 건수만 배지로 — 다른 팀 건은 섞지 않는다.
     expect(screen.getAllByLabelText('답장을 기다리는 컨택 2건').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('답장을 기다리는 컨택 3건')).not.toBeInTheDocument();
-    // Task 178 팀 B 진입점.
+    // Task 179 팀 B 진입점.
     expect(screen.getAllByRole('link', { name: /경기 명단 관리/ })[0]).toHaveAttribute('href', '/teams/team-1/game-rosters');
   });
 
@@ -1213,7 +1213,7 @@ describe('TeamMembersPageClient 초대 폼', () => {
   });
 });
 
-describe('TeamMembersPageClient — 결장 기간(Task 178 팀 C)', () => {
+describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
   function member(overrides: Record<string, unknown>) {
     return {
       role: 'member',

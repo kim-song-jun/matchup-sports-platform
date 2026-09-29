@@ -3,7 +3,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
 
-// Task 178 경기 명단 화면의 운영자 판정. support 어드민은 경기 인가(resolveActor)에서 빠지지만
+// Task 179 경기 명단 화면의 운영자 판정. support 어드민은 경기 인가(resolveActor)에서 빠지지만
 // 팀 표·어드민 표처럼 명단을 읽기로 본다 — 쓰기는 열지 않는다.
 // 스태프 정책은 UUID 가 아닌 id 를 INVALID_INPUT 으로 거부한다.
 const ids = {

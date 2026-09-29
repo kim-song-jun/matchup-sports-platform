@@ -131,7 +131,7 @@ export class TournamentFixtureLineupService {
     return { gameId, lineups };
   }
 
-  /** 대회·리그 경기 명단은 조정 API 로만 바뀐다(Task 178) — 인가 뒤 409. */
+  /** 대회·리그 경기 명단은 조정 API 로만 바뀐다(Task 179) — 인가 뒤 409. */
   async rejectLineupWrite(user: V1AuthUser, tournamentId: string, fixtureId: string): Promise<never> {
     const gameId = await this.authorizeAndResolveGameId(user.id, tournamentId, fixtureId, 'lineup_mutate');
     return this.gamesService.rejectLineupWrite(user, gameId);

@@ -7,7 +7,7 @@ import { gameRosterReasonLabel } from '@/lib/v1-status-labels';
 import { isActive } from './member-unavailability-sheet';
 
 /**
- * 팀원 본인의 결장 기간(Task 178 팀 C, D6) — 선수는 등록할 수 없고 볼 수만 있다.
+ * 팀원 본인의 결장 기간(Task 179 팀 C, D6) — 선수는 등록할 수 없고 볼 수만 있다.
  * 지금 걸려 있거나 앞으로 걸릴 기간이 없으면 아무것도 띄우지 않는다(조회 실패도 조용히 — 이 화면의 본론이 아니다).
  */
 export function MyUnavailabilityNotice({ teamId, userId }: { teamId: string; userId: string }) {

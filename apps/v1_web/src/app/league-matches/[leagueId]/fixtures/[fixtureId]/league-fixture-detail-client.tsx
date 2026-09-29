@@ -368,7 +368,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               </button>
             ) : null}
             {chatError ? <p role="alert" className="text-sm text-red-700 dark:text-red-300">{chatError}</p> : null}
-            {/* 리그 경기는 친선 참석명단이 아니라 경기 명단(참가 명단 기준 조정)으로 간다(Task 178). */}
+            {/* 리그 경기는 친선 참석명단이 아니라 경기 명단(참가 명단 기준 조정)으로 간다(Task 179). */}
             {rosterTeam.status === 'resolved' ? (
               <Link
                 href={withFromPath(gameRosterScreenPath(rosterTeam.teamId, rosterTeam.gameId), selfHref)}

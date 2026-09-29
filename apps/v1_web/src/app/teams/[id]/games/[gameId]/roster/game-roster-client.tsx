@@ -32,7 +32,7 @@ import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from
 type Notice = { tone: 'info' | 'error'; message: string };
 
 /**
- * 대회·리그 경기 한 팀의 출전 명단(Task 178 ②④).
+ * 대회·리그 경기 한 팀의 출전 명단(Task 179 ②④).
  * 경기 명단 = 참가 명단 − 이번 경기 빠짐 − 결장 − 출전정지. 여기서 바꾸는 건 "이번 경기 빠짐"뿐이고,
  * 변경은 모아 두었다가 한 번에 저장한다(팀 일괄 API — 한 트랜잭션이라 일부만 저장되지 않는다).
  * 경로에 사이드가 없어 팀·경기로 명단을 받는다 — 권한(팀원 읽기·팀장/운영자 쓰기·지원 계정 읽기)은 서버 판정이다.

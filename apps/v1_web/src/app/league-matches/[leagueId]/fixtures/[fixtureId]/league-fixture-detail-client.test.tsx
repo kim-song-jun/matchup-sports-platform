@@ -262,7 +262,7 @@ describe('LeagueFixtureDetailClient', () => {
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     expect(screen.getByRole('button', { name: '상대팀과 채팅' })).toBeInTheDocument();
-    // 리그 경기는 친선 참석명단이 아니라 우리 팀 경기 명단으로 간다(Task 178). 뒤로가면 이 화면으로 돌아온다.
+    // 리그 경기는 친선 참석명단이 아니라 우리 팀 경기 명단으로 간다(Task 179). 뒤로가면 이 화면으로 돌아온다.
     expect(screen.getByRole('link', { name: '경기 명단' })).toHaveAttribute(
       'href',
       '/teams/t2/games/game-1/roster?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1',
@@ -487,7 +487,7 @@ describe('LeagueFixtureDetailClient', () => {
   });
 });
 
-describe('LeagueFixtureDetailClient — 우리 팀 출전(Task 178)', () => {
+describe('LeagueFixtureDetailClient — 우리 팀 출전(Task 179)', () => {
   afterEach(() => {
     useMyMatchRosterTeamMock.mockReturnValue({ status: 'none' });
   });

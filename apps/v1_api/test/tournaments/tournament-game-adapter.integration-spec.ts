@@ -268,7 +268,7 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       homeRegistrationId: ids.homeRegistration,
       awayRegistrationId: ids.awayRegistration,
     });
-    // Task 178: 팀 배정 뒤 명단은 워커 후속 이벤트(COMPETITION_ROSTER_RESYNC)가 채운다.
+    // Task 179: 팀 배정 뒤 명단은 워커 후속 이벤트(COMPETITION_ROSTER_RESYNC)가 채운다.
     await drainOutboxWorker(prisma);
 
     const after = await prisma.v1TeamMatch.findUniqueOrThrow({

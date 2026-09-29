@@ -61,7 +61,7 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     },
   },
   {
-    // Task 178 대회·리그 경기 명단. 제목은 로딩·에러·성공 모두 같고, 상대팀은 본문 첫 줄이 싣는다.
+    // Task 179 대회·리그 경기 명단. 제목은 로딩·에러·성공 모두 같고, 상대팀은 본문 첫 줄이 싣는다.
     pattern: '/teams/:id/games/:gameId/roster',
     chrome: {
       title: '경기 명단',
@@ -71,7 +71,7 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     },
   },
   {
-    // Task 178 팀 B — 선수 × 다가오는 대회·리그 경기. 저장 버튼이 하단 고정이라 탭바를 숨긴다.
+    // Task 179 팀 B — 선수 × 다가오는 대회·리그 경기. 저장 버튼이 하단 고정이라 탭바를 숨긴다.
     pattern: '/teams/:id/game-rosters',
     chrome: {
       title: '경기 명단 관리',

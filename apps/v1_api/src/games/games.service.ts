@@ -2623,7 +2623,7 @@ export class GamesService {
   /**
    * `PUT /games/:gameId/lineups/:sideId`·`POST .../lineups/:lineupId/submit`(대회 운영 어댑터 포함)은
    * 더 이상 쓰지 않는다. 친선은 팀매치 참석명단 경로가, 대회·리그는 참가 명단에서 계산된 경기 명단과
-   * 조정 API(`/games/:gameId/sides/:sideId/roster-adjustments`)가 맡는다(Task 178). 인가는 그대로 태워
+   * 조정 API(`/games/:gameId/sides/:sideId/roster-adjustments`)가 맡는다(Task 179). 인가는 그대로 태워
    * 권한 없는 호출자에게는 예전과 같은 404/403 을 준다.
    */
   async rejectLineupWrite(user: V1AuthUser, gameId: string): Promise<never> {
@@ -5301,7 +5301,7 @@ export class GamesService {
   }
 
   /**
-   * 경기 명단 조정(Task 178)용 운영자 판정. 플랫폼 운영자·그 대회 스태프면 역할과 쓰기 가능 여부를,
+   * 경기 명단 조정(Task 179)용 운영자 판정. 플랫폼 운영자·그 대회 스태프면 역할과 쓰기 가능 여부를,
    * 아니면 null 을 준다. 팀 액터(`team_*`)는 사이드를 보지 않고 통과하므로 운영자로 치지 않는다 —
    * 팀 권한은 호출부가 사이드 팀 멤버십으로 따로 판정한다.
    */

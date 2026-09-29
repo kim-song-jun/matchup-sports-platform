@@ -1,4 +1,4 @@
--- Task 178: 대회·리그 경기 명단 조정 기록과 팀원 결장 기간. 새 테이블 두 개뿐인 additive 변경이다.
+-- Task 179: 대회·리그 경기 명단 조정 기록과 팀원 결장 기간. 새 테이블 두 개뿐인 additive 변경이다.
 -- CREATE TYPE 은 IF NOT EXISTS 를 지원하지 않고 DO 가드는 expand-contract 게이트가 거부한다.
 CREATE TYPE "V1GameRosterAdjustmentAction" AS ENUM ('EXCLUDE');
 

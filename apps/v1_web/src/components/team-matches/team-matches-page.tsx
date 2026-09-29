@@ -242,7 +242,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
    * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다.
-   * 리그 경기 명단 조정은 하지 않아도 되는 일이라 primary 를 받지 않는다(Task 178 D4). */
+   * 리그 경기 명단 조정은 하지 않아도 되는 일이라 primary 를 받지 않는다(Task 179 D4). */
   const lineupAction = model.lineupAction;
   const lineupCopy = lineupAction ? LINEUP_ACTION_COPY[lineupAction.kind] : null;
   const matchManageNextAction: 'lineup' | 'result' | 'review' | null = lineupAction?.kind === 'attendance'

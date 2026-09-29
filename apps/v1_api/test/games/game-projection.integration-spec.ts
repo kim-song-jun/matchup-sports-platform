@@ -2112,7 +2112,7 @@ async function processExactOutboxEvent(
         AND (
           business_key LIKE ${`${prefix}%`}
           OR aggregate_id IN (${ids.game}, ${ids.tournamentGame}, ${ids.lane4Game})
-          -- Task 178: 준비 단계의 명단 쓰기가 남긴 재계산 이벤트는 팀 단위 집계라 위 두 조건을 비껴간다.
+          -- Task 179: 준비 단계의 명단 쓰기가 남긴 재계산 이벤트는 팀 단위 집계라 위 두 조건을 비껴간다.
           OR type = 'COMPETITION_ROSTER_RESYNC'
         )
       ORDER BY id ASC

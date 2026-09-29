@@ -64,7 +64,7 @@
  * team-match 라인업이 선발 골키퍼를 표시하는 센티널(같은 파일의 `GOALKEEPER_MARKER`).
  *
  * 종목별 골키퍼 코드(축구 'GK', 풋살 'GOLEIRO')와 **별개로** 반드시 함께 봐야 한다:
- * 옛 대회 라인업 저장 경로(Task 178 에서 제거)는 competition config 사전의 코드를 그대로
+ * 옛 대회 라인업 저장 경로(Task 179 에서 제거)는 competition config 사전의 코드를 그대로
  * 저장하지만, team-match 라인업은 `goalkeeper: true` 를 받아 **항상 리터럴 'GK'** 로
  * 눌러 담는다. 리그 대진은 team-match 경로를 쓰므로 config 코드만 비교하면 풋살
  * 리그의 골키퍼는 영원히 goalkeeper=false 로 저장된다. 두 값 모두 소비처

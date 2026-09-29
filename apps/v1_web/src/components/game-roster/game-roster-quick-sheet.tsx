@@ -19,7 +19,7 @@ import { GameRosterReasonChips } from './game-roster-reason-chips';
 type Leaving = Readonly<Record<string, GameRosterAdjustmentReason | null>>;
 
 /**
- * 빠른 선택 시트(Task 178 ③) — 경기 상세에서 "이번 경기 빠지는 선수"만 골라 저장한다.
+ * 빠른 선택 시트(Task 179 ③) — 경기 상세에서 "이번 경기 빠지는 선수"만 골라 저장한다.
  * 되돌리기·결장·출전정지처럼 긴 편집은 경기 명단 화면(②)의 몫이라 링크로 넘긴다.
  * 뒤로가기·ESC·배경으로 닫히고(저장 중엔 잠김), 포커스는 시트 안에 갇힌다.
  */

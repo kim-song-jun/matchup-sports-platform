@@ -19,7 +19,7 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
  * Task 170 D1′ — 리그 참가 명단이 바뀌면 시작 전 경기 명단을 참가 명단에 다시 맞춘다.
- * Task 178 부터 새 리비전은 SUBMITTED 이고, 팀장이 저장·제출한 옛 라인업은 이관 스크립트가
+ * Task 179 부터 새 리비전은 SUBMITTED 이고, 팀장이 저장·제출한 옛 라인업은 이관 스크립트가
  * 조정 기록으로 옮긴 표시(감사 행)를 남기기 전까지 덮지 않는다. 시작 시각이 지난 경기는 건드리지 않는다.
  */
 describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {

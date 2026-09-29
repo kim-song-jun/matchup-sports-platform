@@ -27,12 +27,12 @@ import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 /**
- * Task 178 — 대회·리그 경기 명단 = 기준 명단 − 출전정지 − 결장 기간 − 활성 EXCLUDE.
+ * Task 179 — 대회·리그 경기 명단 = 기준 명단 − 출전정지 − 결장 기간 − 활성 EXCLUDE.
  *
  * 좁히는 변경이라 fixture 는 팀 셋·경기 넷(대회), 경기 둘·팀 둘(리그)로 두고, 빠져야 할 사람과
  * **남아야 할 사람**(다른 경기·다른 팀·정지가 끝난 뒤)을 같이 단언한다.
  */
-describe('경기 명단 계산 동기화 (Task 178)', () => {
+describe('경기 명단 계산 동기화 (Task 179)', () => {
   const suiteId = randomUUID().slice(0, 8);
   const adminUserId = `grs-admin-${suiteId}`;
   let app: INestApplication;

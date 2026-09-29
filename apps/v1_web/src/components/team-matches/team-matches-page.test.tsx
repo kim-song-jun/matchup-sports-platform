@@ -1089,7 +1089,7 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
   });
 });
 
-describe('TeamMatchDetailPageView — 매치 관리 명단 행 (Task 178)', () => {
+describe('TeamMatchDetailPageView — 매치 관리 명단 행 (Task 179)', () => {
   it('친선은 참석명단 관리가 첫 할 일(primary)이다', () => {
     const model = getTeamMatchDetailViewModel('mine');
     model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };

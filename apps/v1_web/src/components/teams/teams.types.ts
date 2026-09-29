@@ -120,7 +120,7 @@ export type TeamDetailViewModel = {
    */
   joinRequest?: { requestedAtLabel?: string };
   operations?: Array<{ label: string; sub: string; href: string; badge?: number; badgeLabel?: string }>;
-  /** 팀장·매니저 — 다가오는 경기의 명단·참석명단 버튼(Task 178 팀 A). */
+  /** 팀장·매니저 — 다가오는 경기의 명단·참석명단 버튼(Task 179 팀 A). */
   canManageGameRosters?: boolean;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;

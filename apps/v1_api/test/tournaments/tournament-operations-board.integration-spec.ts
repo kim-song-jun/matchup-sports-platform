@@ -1799,7 +1799,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     );
   });
 
-  // Task 178: 대회·리그 경기 명단은 참가 명단에서 계산되고 조정 API 로만 바뀐다. 스태프 인가는 그대로
+  // Task 179: 대회·리그 경기 명단은 참가 명단에서 계산되고 조정 API 로만 바뀐다. 스태프 인가는 그대로
   // 태우고(권한 없는 호출자는 위 403 그대로) 그 뒤 쓰기는 항상 409 다.
   it.each([
     ['tournament_director', (): string => lineupIds.director],
@@ -3314,7 +3314,7 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       .expect(422);
   });
 
-  // Task 178: 라인업 쓰기는 폐기됐다 — 인가된 스태프도 409 로 조정 API 를 안내받는다. body 는 읽지 않는다.
+  // Task 179: 라인업 쓰기는 폐기됐다 — 인가된 스태프도 409 로 조정 API 를 안내받는다. body 는 읽지 않는다.
   it.each([
     ['director', (): string => httpIds.directorA, (): string => homeSideAId],
     ['fixture-scoped field_operator', (): string => httpIds.fieldOperatorA, (): string => awaySideAId],

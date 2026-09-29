@@ -401,7 +401,7 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
   });
 });
 
-describe('TeamMatchDetailPageClient — 명단 입구는 친선이면 참석명단, 리그 대진이면 경기 명단 (Task 178)', () => {
+describe('TeamMatchDetailPageClient — 명단 입구는 친선이면 참석명단, 리그 대진이면 경기 명단 (Task 179)', () => {
   function mockHostManagedMatch(extra: Partial<V1TeamMatch>) {
     useV1TeamMatchMock.mockReturnValue({
       data: {

@@ -82,7 +82,10 @@ function userRecordHref(item: PublicUserRecordItem, fromHref: string): string | 
   if (item.tournamentId && item.teamMatchId) {
     return withFromPath(`/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`, fromHref);
   }
-  if (item.teamMatchId) return withFromPath(`/team-matches/${item.teamMatchId}`, fromHref);
+  // 리그·대회 대진(위 두 분기)은 각 상세 화면이 곧 스코어·기록 전체화면이라 한 번에 들어간다.
+  // 친선 팀매치만 매치 상세(관리용 요약)를 거쳐야 경기 기록에 닿는 구조였는데, 이 목록은
+  // "경기 기록"을 보러 오는 화면이라 여기서도 곧장 전체화면 경기 기록으로 보내야 한다.
+  if (item.teamMatchId) return withFromPath(`/team-matches/${item.teamMatchId}/record`, fromHref);
   if (item.tournamentId) return withFromPath(`/tournaments/${item.tournamentId}`, fromHref);
   return null;
 }

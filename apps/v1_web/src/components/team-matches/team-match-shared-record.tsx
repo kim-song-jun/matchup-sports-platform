@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
@@ -17,7 +17,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
-import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
 import styles from './team-match-shared-record.module.css';
 
@@ -41,10 +41,6 @@ function playerInitials(name: string) {
 export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) {
   const query = useTeamMatchRecord(teamMatchId);
   const mutation = useMutateTeamMatchRecord(teamMatchId);
-  // 이 화면 자신이 받은 출처를 "매치 상세" 링크에도 이어 싣는다 — 공유 링크로 바로 들어오면
-  // 출처가 없어 `?view=detail` 만 남는다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  const matchDetailHref = withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromPath);
   const [editing, setEditing] = useState<{ goal: SharedGoal | null; version: number; subMatchId: string | null } | null>(null);
   const [subMatchForm, setSubMatchForm] = useState<{ subMatch: SharedSubMatch | null; version: number; title: string } | null>(null);
   const [endPrompt, setEndPrompt] = useState<number | null>(null);
@@ -88,7 +84,6 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
   return <main className={styles.page}>
     <header className={styles.header}>
       <div>
-        <Link href={matchDetailHref} className={styles.muted}>← 매치 상세</Link>
         <h1>함께 쓰는 경기 기록</h1>
         <p className={styles.muted}>{data.title}</p>
       </div>
@@ -353,11 +348,13 @@ export function TeamMatchRecordEntry({
   const query = useTeamMatchRecord(teamMatchId);
   const router = useRouter();
   const data = query.data;
-  // 뒤로가기 목적지는 반드시 `?view=detail`로 매치 상세를 가리켜야 한다 — 이 값이 없으면
-  // 매치 상세가 이 화면과 같은 조건(참가자 + live/official)에서 즉시 이 화면으로 되튕겨,
-  // 셸 뒤로가기를 눌러도 URL 이 replace→replace 로 제자리로 돌아와 아무 반응이 없어 보인다.
-  const detailHref = withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromHref);
-  const recordHref = withFromPath(`/team-matches/${teamMatchId}/record`, detailHref);
+  // 뒤로가기는 매치 상세를 거치지 않고 이 화면이 받은 출처로 곧장 돌아간다 — 활동기록 등에서
+  // 들어왔다면 거기로 바로 돌아가는 게 맞고, 매치 상세는 이제 중간 경유지가 아니다.
+  // 출처가 아예 없을 때만(공유 링크로 바로 들어온 경우) route-chrome 의 정적 backHref가
+  // `?view=detail`로 매치 상세를 가리킨다 — 그 값이 없으면 매치 상세가 이 화면과 같은 조건
+  // (참가자 + live/official)에서 즉시 이 화면으로 되튕겨 뒤로가기가 제자리로 돌아와 버린다
+  // (route-chrome/fragments/team-matches.ts 참고, 2026-09-29 실사고).
+  const recordHref = withFromPath(`/team-matches/${teamMatchId}/record`, fromHref);
 
   useEffect(() => {
     if (

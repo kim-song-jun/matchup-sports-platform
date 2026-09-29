@@ -454,6 +454,60 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 178)', () => {
       expect(await lineupUserIds(f.games.g1.gameId, f.games.g1.sideByTeam.get(f.teamA.id)!)).toEqual([a2]);
       expect(await lineupUserIds(f.games.g2.gameId, f.games.g2.sideByTeam.get(f.teamA.id)!)).toEqual([a2]);
     });
+
+    it('팀 단위 조회(GET /teams/:teamId/unavailability)는 activeAt 을 덮는 활동 팀원의 기간만 싣고, 권한은 팀원별 조회와 같다', async () => {
+      const f = await seedTournament();
+      const [a1, a2] = f.teamA.members;
+      const [b1] = f.teamB.members;
+      const supportAdminId = await makeUser('조회어드민');
+      await prisma.v1AdminUser.create({ data: { userId: supportAdminId, adminRole: 'support', status: 'active' } });
+      const leaverId = await makeUser('떠난팀원');
+      await prisma.v1TeamMembership.create({ data: { teamId: f.teamA.id, userId: leaverId, role: 'member', status: 'left' } });
+      // 경기(+1·+2일)와 겹치지 않는 +10~12일 — 이 조회는 경기 명단과 무관하다.
+      const startsAt = new Date(Date.now() + 10 * DAY);
+      const endsAt = new Date(Date.now() + 12 * DAY);
+      const period = { teamId: f.teamA.id, startsAt, endsAt, actorUserId: f.teamA.ownerId, actorRole: 'TEAM_MANAGER' };
+      const active = await prisma.v1TeamMemberUnavailability.create({ data: { ...period, userId: a1, reason: 'INJURY' } });
+      await prisma.v1TeamMemberUnavailability.createMany({
+        data: [
+          { ...period, userId: a2, revokedAt: new Date(), revokedByUserId: f.teamA.ownerId },
+          { ...period, userId: leaverId },
+          { ...period, teamId: f.teamB.id, userId: b1, actorUserId: f.teamB.ownerId },
+          { ...period, userId: a2, startsAt: new Date(Date.now() - DAY), endsAt: new Date(Date.now() + DAY) },
+        ],
+      });
+      const path = (teamId: string, activeAt?: Date) =>
+        `/api/v1/teams/${teamId}/unavailability${activeAt === undefined ? '' : `?activeAt=${encodeURIComponent(activeAt.toISOString())}`}`;
+      const idsAt = async (teamId: string, viewerId: string, activeAt?: Date) => {
+        const res = await getAs(path(teamId, activeAt), viewerId);
+        expect(res.status).toBe(200);
+        return res.body.data.items.map((item: { userId: string }) => item.userId);
+      };
+
+      // [startsAt, endsAt) — 취소한 기간·떠난 팀원·다른 팀은 빠진다. activeAt 이 없으면 지금.
+      expect(await idsAt(f.teamA.id, a2, new Date(startsAt.getTime() - 1))).toEqual([]);
+      expect(await idsAt(f.teamA.id, a2, startsAt)).toEqual([a1]);
+      expect(await idsAt(f.teamA.id, a2, new Date(endsAt.getTime() - 1))).toEqual([a1]);
+      expect(await idsAt(f.teamA.id, a2, endsAt)).toEqual([]);
+      expect(await idsAt(f.teamA.id, a2)).toEqual([a2]);
+      expect((await getAs(path(f.teamA.id, startsAt), f.teamA.ownerId)).body.data).toEqual({
+        items: [
+          { id: active.id, userId: a1, reason: 'INJURY', startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), actorRole: 'TEAM_MANAGER' },
+        ],
+      });
+      expect(await idsAt(f.teamB.id, f.teamB.ownerId, startsAt)).toEqual([b1]);
+
+      for (const id of [f.teamA.ownerId, f.teamA.managerId, a1, f.adminId, supportAdminId]) {
+        expect(await idsAt(f.teamA.id, id, startsAt)).toEqual([a1]);
+      }
+      for (const id of [f.teamB.ownerId, b1, f.directorId, f.supportId, leaverId, f.outsiderId]) {
+        const res = await getAs(path(f.teamA.id, startsAt), id);
+        expect([res.status, res.body.code]).toEqual([403, 'PERMISSION_DENIED']);
+      }
+      for (const query of ['activeAt=tomorrow', 'activeAt=2026-02-30T00:00:00Z', 'userId=x']) {
+        expect((await getAs(`/api/v1/teams/${f.teamA.id}/unavailability?${query}`, f.teamA.ownerId)).status).toBe(400);
+      }
+    });
   });
 
   describe('어드민 — 참가 신청 팀의 경기별 명단', () => {

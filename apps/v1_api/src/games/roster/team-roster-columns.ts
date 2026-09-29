@@ -12,6 +12,18 @@ export interface TeamRosterColumn {
   readonly loaded: LoadedGameRoster | null;
 }
 
+/** 대회·리그 대진에서 그 팀의 상대 팀 이름. 상대가 아직 정해지지 않았으면 null. */
+export function competitionOpponentName(
+  teamMatch: {
+    hostTeamId: string | null;
+    hostTeam: { name: string } | null;
+    approvedApplicantTeam: { name: string } | null;
+  },
+  teamId: string,
+): string | null {
+  return (teamMatch.hostTeamId === teamId ? teamMatch.approvedApplicantTeam?.name : teamMatch.hostTeam?.name) ?? null;
+}
+
 /**
  * 한 팀의 시작 전 대회·리그 경기와 경기마다 계산된 명단. 시각순(시각 없는 대회 대진은 뒤).
  * 기준 명단·팀 경기 순서는 대회·리그마다 한 번만 읽는다.
@@ -47,7 +59,6 @@ export async function loadTeamRosterColumns(
     const competitionId = teamMatch === null ? null : (teamMatch.leagueId ?? teamMatch.tournamentId);
     if (teamMatch === null || side === undefined || competitionId === null) return [];
     const isLeague = teamMatch.leagueId !== null;
-    const isHost = teamMatch.hostTeamId === input.teamId;
     const column: TeamRosterMatrixGame = {
       gameId: game.id,
       sideId: side.id,
@@ -55,7 +66,7 @@ export async function loadTeamRosterColumns(
       competitionId,
       competitionKind: isLeague ? 'LEAGUE' : 'TOURNAMENT',
       competitionTitle: (isLeague ? teamMatch.league?.title : teamMatch.tournament?.title) ?? null,
-      opponentName: (isHost ? teamMatch.approvedApplicantTeam?.name : teamMatch.hostTeam?.name) ?? null,
+      opponentName: competitionOpponentName(teamMatch, input.teamId),
       scheduledAt: teamMatch.startAt,
       gameState: game.state,
     };

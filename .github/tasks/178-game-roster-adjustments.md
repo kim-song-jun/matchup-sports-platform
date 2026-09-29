@@ -144,9 +144,11 @@ model V1TeamMemberUnavailability {   // 팀 C안 — 결장 기간
 | POST | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 owner·manager · 운영자 | `{ userId, reason? }` → EXCLUDE. 이미 활성이면 멱등 200 |
 | DELETE | `/games/:gameId/sides/:sideId/roster-adjustments/:userId` | 같음 | 활성 EXCLUDE 를 revoke. 없으면 멱등 200 |
 | GET | `/games/:gameId/sides/:sideId/roster-adjustments` | 그 팀 활성 멤버 · 운영자(support 어드민은 읽기만) | 지금 사이드 팀의 변경 기록(revoke 포함, 되돌린 사람 역할 포함, 시간순) |
+| GET | `/teams/:teamId/games/:gameId/roster` | 경기 명단 GET 과 같음(같은 판정 재사용) | 팀·경기로 그 팀 사이드를 찾아 경기 명단 본문 + `opponentName`(`sideId` 포함). 그 팀 사이드가 아니거나 친선이면 404 `GAME_ROSTER_NOT_AVAILABLE`. 사이드 ID 없이 여는 화면용(2026-09-29 추가) |
 | GET | `/teams/:teamId/game-rosters` | 그 팀 owner·manager · 운영자 | 팀 B: 선수 × 다가오는 대회·리그 경기 매트릭스(출전/빠짐/결장/정지 + 사유·actor) |
 | POST | `/teams/:teamId/game-rosters/batch` | 같음 | 팀 B: `{ changes: [{ gameId, userId, op: 'EXCLUDE'\|'REVOKE', reason? }] }` 한 트랜잭션. 시작된 경기가 섞이면 전체 409 |
 | GET/POST/DELETE | `/teams/:teamId/members/:userId/unavailability` | 조회: 그 팀 활성 멤버 · 플랫폼 어드민 · 쓰기: owner·manager · 플랫폼 어드민(support 제외, D6). 대회 스태프 불가 | 팀 C: 결장 기간 조회·등록·취소 |
+| GET | `/teams/:teamId/unavailability?activeAt=` | 팀원별 결장 조회와 같음(그 팀 활성 멤버 · 플랫폼 어드민) | `activeAt`(없으면 지금)을 덮는 활동 팀원의 결장 기간 `{ items }` — 친선 참석명단 "결장 중" 배지용(2026-09-29 추가, R-1) |
 | GET | `/admin/tournaments/:id/registrations/:registrationId/game-rosters` | 어드민·그 대회 스태프 | 어드민: 참가 신청 화면의 팀별 경기 × 선수. 쓰기는 위 API 를 운영자 권한으로 |
 
 - 쓰기는 경기 `SCHEDULED` 일 때만 — 아니면 409 `LINEUP_DEADLINE_PASSED`(기존 코드 재사용).
@@ -262,4 +264,8 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
    지연 경기로 보고 재계산한다(출전정지·참가 명단 추가·결장 기간이 반영되지 않던 결함). 리그 경기는 결과 입력이 `SCHEDULED` 에서
    바로 끝낼 수 있어 이미 치른 경기일 수 있으므로 재계산은 킥오프 시각 전까지만 한다. 리그의 조정 API·`editable` 은 `SCHEDULED`
    기준이라 킥오프 뒤에도 수동 조정은 된다 — 리그 지연 경기의 자동 재계산이 필요하면 사용자 결정.
+   → **R-11 결정(2026-09-29): 리그 지연 경기는 킥오프에서 재계산 멈춤 유지.**
+8. **친선 참석명단의 결장 표시.** 결장 기간은 친선에 자동 적용하지 않는데(제출하는 참석명단), 표시까지 할지가 OC "친선 참석명단은 바꾸지 않는다"와 긴장했다.
+   → **R-1 결정(2026-09-29): 친선 참석명단 결장 배지 표시.** 팀 단위 조회(`GET /teams/:teamId/unavailability?activeAt=<킥오프>`) 한 번으로
+   후보 행에 "결장 중" 배지만 붙인다 — 선택을 막거나 자동으로 빼지 않는다(친선 동작 불변).
 5. **회의 화자.** 녹취에 화자 구분이 없어 일부 발언의 주체가 불명확하다(아티팩트 표시). 결정에는 영향 없음.

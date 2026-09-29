@@ -143,6 +143,11 @@ export async function loadGameRosterContext(
   return context;
 }
 
+/** 그 시각을 덮는(`startsAt <= at < endsAt`) 취소 안 된 그 팀 결장 기간. */
+export function unavailabilityCoveringWhere(teamId: string, at: Date): Prisma.V1TeamMemberUnavailabilityWhereInput {
+  return { teamId, revokedAt: null, startsAt: { lte: at }, endsAt: { gt: at } };
+}
+
 export async function loadGameRosterForContext(
   tx: Tx,
   context: GameRosterSideContext,
@@ -169,12 +174,7 @@ export async function loadGameRosterForContext(
     context.startAt === null
       ? []
       : await tx.v1TeamMemberUnavailability.findMany({
-          where: {
-            teamId: context.teamId,
-            revokedAt: null,
-            startsAt: { lte: context.startAt },
-            endsAt: { gt: context.startAt },
-          },
+          where: unavailabilityCoveringWhere(context.teamId, context.startAt),
           select: {
             id: true,
             userId: true,

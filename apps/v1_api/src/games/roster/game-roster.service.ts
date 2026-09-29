@@ -21,6 +21,7 @@ import type { GameRosterActorRole } from './game-roster-computation';
 import { loadGameRoster } from './game-roster-loader';
 import { isUnmigratedTeamAuthoredLineup, lockRosterWriteScope, syncPreparedGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
+import { competitionOpponentName } from './team-roster-columns';
 
 type Tx = Prisma.TransactionClient;
 
@@ -35,6 +36,8 @@ export interface TeamSideTarget extends SideTarget {
 }
 
 export type GameRosterSideAccess = GameRosterAccess & { readonly teamId: string };
+
+export type TeamGameRosterView = GameRosterView & { readonly opponentName: string | null };
 
 export interface GameRosterAdjustmentView {
   readonly id: string;
@@ -105,6 +108,33 @@ export class GameRosterService {
     return this.prisma.$transaction(async (tx) => {
       const access = await this.authorizeSide(tx, user.id, target, 'read');
       return this.readView(tx, target, access);
+    });
+  }
+
+  /** 팀·경기로 그 팀 사이드를 찾아 `getRoster` 와 같은 인가·본문으로 읽는다. */
+  getTeamGameRoster(user: V1AuthUser, input: { teamId: string; gameId: string }): Promise<TeamGameRosterView> {
+    return this.prisma.$transaction(async (tx) => {
+      const game = await tx.v1Game.findUnique({
+        where: { id: input.gameId },
+        select: {
+          sides: { where: { teamId: input.teamId }, select: { id: true } },
+          teamMatch: {
+            select: { hostTeamId: true, hostTeam: { select: { name: true } }, approvedApplicantTeam: { select: { name: true } } },
+          },
+        },
+      });
+      if (game === null) throw new NotFoundException({ code: 'GAME_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+      const side = game.sides[0];
+      if (side === undefined) throw rosterNotAvailable('이 팀이 뛰는 경기가 아니에요.');
+      const target = { gameId: input.gameId, sideId: side.id };
+      const access = await this.authorizeSide(tx, user.id, target, 'read');
+      // 찾은 뒤 인가하는 사이 대진 수정으로 사이드 팀이 바뀌었으면 다른 팀 명단을 이 팀 경로로 주지 않는다.
+      if (access.teamId !== input.teamId) throw rosterNotAvailable('이 팀이 뛰는 경기가 아니에요.');
+      const view = await this.readView(tx, target, access);
+      return {
+        ...view,
+        opponentName: game.teamMatch === null ? null : competitionOpponentName(game.teamMatch, input.teamId),
+      };
     });
   }
 

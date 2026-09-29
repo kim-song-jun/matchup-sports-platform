@@ -3,6 +3,7 @@ import { Prisma, type V1TeamMemberUnavailability } from '@prisma/client';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateMemberUnavailabilityDto } from './dto/team-game-roster.dto';
+import { unavailabilityCoveringWhere } from './game-roster-loader';
 import { enqueueRosterResync } from './roster-resync-events';
 import { loadDisplayNames } from './game-roster.service';
 import { resolveTeamRosterAccess, type TeamRosterAccess } from './team-roster-access';
@@ -52,6 +53,27 @@ export class MemberUnavailabilityService {
       });
       const names = await loadDisplayNames(tx, rows.map((row) => row.actorUserId));
       return { teamId, userId, items: rows.map((row) => toView(row, names)) };
+    });
+  }
+
+  /**
+   * 그 시각(없으면 지금)을 덮는 활동 팀원의 결장 기간 — 친선 참석명단의 "결장 중" 표시용.
+   * 한 사람이 겹치는 기간을 여러 개 가지면 경기 명단 계산처럼 먼저 시작한 기간이 앞선다.
+   */
+  listActive(user: V1AuthUser, teamId: string, activeAt?: string) {
+    const at = activeAt === undefined ? new Date() : new Date(activeAt);
+    return this.prisma.$transaction(async (tx) => {
+      await this.authorize(tx, teamId, user.id, 'read');
+      const members = await tx.v1TeamMembership.findMany({
+        where: { teamId, status: 'active' },
+        select: { userId: true },
+      });
+      const items = await tx.v1TeamMemberUnavailability.findMany({
+        where: { ...unavailabilityCoveringWhere(teamId, at), userId: { in: members.map((member) => member.userId) } },
+        orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
+        select: { id: true, userId: true, reason: true, startsAt: true, endsAt: true, actorRole: true },
+      });
+      return { items };
     });
   }
 

@@ -6,6 +6,7 @@ import {
   IsArray,
   IsDateString,
   IsIn,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -66,4 +67,11 @@ export class CreateMemberUnavailabilityDto {
   @IsOptional()
   @IsIn(MEMBER_UNAVAILABILITY_REASONS)
   reason?: MemberUnavailabilityReason;
+}
+
+export class TeamUnavailabilityQueryDto {
+  @ApiPropertyOptional({ description: '이 시각을 덮는 결장 기간만(ISO 8601). 없으면 지금' })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  activeAt?: string;
 }

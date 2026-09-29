@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { CreateMemberUnavailabilityDto, GameRosterBatchDto } from './dto/team-game-roster.dto';
+import { CreateMemberUnavailabilityDto, GameRosterBatchDto, TeamUnavailabilityQueryDto } from './dto/team-game-roster.dto';
+import { GameRosterService } from './game-roster.service';
 import { MemberUnavailabilityService } from './member-unavailability.service';
 import { TeamGameRosterService } from './team-game-roster.service';
 
@@ -14,7 +15,26 @@ export class TeamGameRosterController {
   constructor(
     private readonly teamGameRoster: TeamGameRosterService,
     private readonly unavailability: MemberUnavailabilityService,
+    private readonly gameRoster: GameRosterService,
   ) {}
+
+  @Get('games/:gameId/roster')
+  @ApiOperation({
+    summary: '그 팀이 뛰는 대회·리그 경기의 명단 + sideId·상대 팀 이름 (경기 명단 GET 과 같은 권한 — 팀 멤버·운영자)',
+  })
+  gameRosterForTeam(@CurrentUser() user: V1AuthUser, @Param('teamId') teamId: string, @Param('gameId') gameId: string) {
+    return this.gameRoster.getTeamGameRoster(user, { teamId, gameId });
+  }
+
+  @Get('unavailability')
+  @ApiOperation({ summary: 'activeAt(없으면 지금)에 결장 중인 활동 팀원의 기간 — 취소 제외 (팀 활성 멤버·플랫폼 운영자)' })
+  activeUnavailability(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Query() query: TeamUnavailabilityQueryDto,
+  ) {
+    return this.unavailability.listActive(user, teamId, query.activeAt);
+  }
 
   @Get('game-rosters')
   @ApiOperation({ summary: '선수 × 시작 전 대회·리그 경기 명단 표 (팀 owner·manager·플랫폼 운영자)' })

@@ -475,6 +475,45 @@ describe('경기 명단 조정 API (Task 178)', () => {
       expect(await prisma.v1GameLineup.count({ where: { gameId: g1.gameId } })).toBe(lineupCount);
     });
 
+    it('팀·경기 경로(GET /teams/:teamId/games/:gameId/roster)는 사이드 경로와 같은 권한·본문에 상대 팀 이름을 더한다', async () => {
+      const f = await seedTournament();
+      const [a1] = f.teamA.members;
+      const teamPath = (teamId: string, key: 'g1' | 'g2') => `/api/v1/teams/${teamId}/games/${f.games[key].gameId}/roster`;
+      const teams = await prisma.v1Team.findMany({
+        where: { id: { in: [f.teamA.id, f.teamB.id, f.teamC.id] } },
+        select: { id: true, name: true },
+      });
+      const nameOf = new Map(teams.map((row) => [row.id, row.name]));
+      expect((await excludeAs(f.sidePath('g1', f.teamA.id), f.teamA.ownerId, { userId: a1, reason: 'INJURY' })).status).toBe(200);
+
+      for (const id of [f.teamA.ownerId, f.teamA.managerId, a1, f.adminId, f.supportAdminId, f.directorId, f.supportId]) {
+        const [bySide, byTeam] = await Promise.all([getAs(`${f.sidePath('g1', f.teamA.id)}/roster`, id), getAs(teamPath(f.teamA.id, 'g1'), id)]);
+        expect([bySide.status, byTeam.status]).toEqual([200, 200]);
+        const { opponentName, ...rest } = byTeam.body.data;
+        expect(rest).toEqual(bySide.body.data);
+        expect(opponentName).toBe(nameOf.get(f.teamB.id));
+      }
+      // 경로의 팀이 아니라 그 사이드 팀 멤버십으로 판정한다 — 상대팀 팀장·다른 팀·외부인은 A 명단을 못 본다.
+      for (const id of [f.teamB.ownerId, f.teamB.members[0], f.teamC.ownerId, f.outsiderId]) {
+        const res = await getAs(teamPath(f.teamA.id, 'g1'), id);
+        expect([res.status, res.body.code]).toEqual([403, 'PERMISSION_DENIED']);
+      }
+
+      // 두 팀 대조: 같은 경기라도 경로의 팀 사이드를 읽고, 빼기·사유는 그 팀 것만 보인다.
+      const byB = (await getAs(teamPath(f.teamB.id, 'g1'), f.teamB.ownerId)).body.data;
+      expect([byB.sideId, byB.teamId, byB.opponentName]).toEqual([f.games.g1.sideByTeam.get(f.teamB.id), f.teamB.id, nameOf.get(f.teamA.id)]);
+      expect([byB.participants.map((row: { userId: string }) => row.userId), byB.excluded]).toEqual([f.teamB.members, []]);
+      const byA = (await getAs(teamPath(f.teamA.id, 'g1'), f.teamA.ownerId)).body.data;
+      expect(byA.excluded.map((row: { userId: string; reason: string }) => [row.userId, row.reason])).toEqual([[a1, 'INJURY']]);
+      const g2 = (await getAs(teamPath(f.teamA.id, 'g2'), f.teamA.ownerId)).body.data;
+      expect([g2.sideId, g2.opponentName, g2.excluded]).toEqual([f.games.g2.sideByTeam.get(f.teamA.id), nameOf.get(f.teamC.id), []]);
+
+      const notSide = await getAs(teamPath(f.teamC.id, 'g1'), f.teamC.ownerId);
+      expect([notSide.status, notSide.body.code]).toEqual([404, 'GAME_ROSTER_NOT_AVAILABLE']);
+      const missing = await getAs(`/api/v1/teams/${f.teamA.id}/games/missing-${suiteId}/roster`, f.teamA.ownerId);
+      expect([missing.status, missing.body.code]).toEqual([404, 'GAME_NOT_FOUND']);
+    });
+
     it('친선 경기는 이 API 대상이 아니다(404 GAME_ROSTER_NOT_AVAILABLE)', async () => {
       const f = await seedTournament();
       const friendly = await createGame({
@@ -492,7 +531,11 @@ describe('경기 명단 조정 API (Task 178)', () => {
         actorUserId: f.adminId,
       });
       const path = `/api/v1/games/${friendly.gameId}/sides/${friendly.sideByTeam.get(f.teamA.id)!}`;
-      for (const res of [await getAs(`${path}/roster`, f.teamA.ownerId), await excludeAs(path, f.teamA.ownerId, { userId: f.teamA.members[0] })]) {
+      for (const res of [
+        await getAs(`${path}/roster`, f.teamA.ownerId),
+        await getAs(`/api/v1/teams/${f.teamA.id}/games/${friendly.gameId}/roster`, f.teamA.ownerId),
+        await excludeAs(path, f.teamA.ownerId, { userId: f.teamA.members[0] }),
+      ]) {
         expect([res.status, res.body.code]).toEqual([404, 'GAME_ROSTER_NOT_AVAILABLE']);
       }
     });
@@ -548,6 +591,13 @@ describe('경기 명단 조정 API (Task 178)', () => {
       expect(await lineupUserIds(f.game.id, f.sideB.id)).toEqual(
         sorted([f.teamB.ownerId, f.teamB.managerId, ...f.teamB.members]),
       );
+      const byTeam = await getAs(`/api/v1/teams/${f.teamA.id}/games/${f.game.id}/roster`, m2);
+      expect([byTeam.status, byTeam.body.data.sideId, byTeam.body.data.competitionKind, byTeam.body.data.viewerRole]).toEqual([
+        200,
+        f.sideA.id,
+        'LEAGUE',
+        'TEAM_MEMBER',
+      ]);
     });
 
     it('이관 전 팀장 저장본이 최신인 사이드는 조정은 기록되지만 경기 명단은 그대로이고, 화면에 이관 대기가 보인다', async () => {

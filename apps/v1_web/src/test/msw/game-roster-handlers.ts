@@ -94,7 +94,12 @@ export function createV1GameRosterMswHandlers() {
     state.unavailabilities.find(
       (u) => u.userId === userId && u.revokedAt === null && u.startsAt <= startAt && startAt < u.endsAt,
     );
-  const actor = (userId: string, role: string | null) => ({ userId, displayName: NAMES[userId] ?? '알 수 없음', role });
+  // 서버와 같이 되돌린 사람이 없는 기록(사이드 팀이 바뀌어 자동으로 닫힘)은 '시스템'.
+  const actor = (userId: string | null, role: string | null) => ({
+    userId,
+    displayName: userId === null ? '시스템' : (NAMES[userId] ?? '알 수 없음'),
+    role,
+  });
   const person = (p: (typeof GAME_ROSTER_MSW.players)[number]) => ({ ...p, accountLinked: true });
   const canWrite = () => state.viewerRole !== 'TEAM_MEMBER' && state.canWrite;
 
@@ -255,7 +260,7 @@ export function createV1GameRosterMswHandlers() {
           const rows: V1GameRosterHistoryEvent[] = [
             { ...common, type: 'EXCLUDE', actor: actor(a.actorUserId, a.actorRole), at: a.createdAt },
           ];
-          if (a.revokedAt !== null && a.revokedByUserId !== null) {
+          if (a.revokedAt !== null) {
             rows.push({ ...common, type: 'REVOKE', actor: actor(a.revokedByUserId, a.revokedByRole), at: a.revokedAt });
           }
           return rows;

@@ -1,18 +1,12 @@
 /*
- * 대상별 안내(/for/players · /for/teams · /for/organizers). 공용 셸·섹션은 public-site.css 것을 쓰고,
- * 여기에는 이 세 페이지에만 있는 블록(사실 줄·카드 목록·단계·FAQ 요약·교차 링크)만 둔다.
+ * 대상별 안내(/for/players · /for/teams · /for/organizers). 히어로·섹션·아이콘 카드·강조 밴드는 공용
+ * (public-site*.css) 것을 쓰고, 여기에는 이 세 페이지에만 있는 블록(사실 줄·단계·표 카드·FAQ 요약·교차 링크)만 둔다.
  */
-
-/* 히어로는 이동 경로 바로 아래라 윗 여백을 줄인다 */
-.tm-ps-aud > #intro {
-  padding-top: 16px;
-}
 
 .tm-ps-aud-ctas {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 24px;
 }
 
 .tm-ps-aud-ctas .tm-btn {
@@ -27,14 +21,11 @@
   color: var(--text-muted);
 }
 
+/* 사실 줄: 모바일은 한 칸에 "이름 · 값", 768+ 는 세 칸 타일 */
 .tm-ps-aud-facts {
   display: grid;
-  gap: 1px;
+  gap: 8px;
   margin: 24px 0 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-container);
-  background: var(--border);
-  overflow: hidden;
 }
 
 .tm-ps-aud-fact {
@@ -42,6 +33,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   background: var(--card-surface);
 }
 
@@ -58,7 +51,6 @@
   text-align: right;
 }
 
-.tm-ps-aud-points,
 .tm-ps-aud-steps,
 .tm-ps-aud-faq,
 .tm-ps-aud-more,
@@ -68,27 +60,44 @@
   list-style: none;
 }
 
-.tm-ps-aud-points {
+/* ── 시작하는 방법: 번호 카드 ── */
+.tm-ps-aud-steps {
   display: grid;
   gap: 12px;
 }
 
-.tm-ps-aud-point {
+.tm-ps-aud-step {
+  display: grid;
+  align-content: start;
+  gap: 8px;
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-container);
   background: var(--card-surface);
 }
 
-.tm-ps-aud-point-title {
-  margin: 0 0 8px;
+.tm-ps-aud-step-num {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-circle);
+  background: var(--blue50);
+  color: var(--blue700);
+  font-size: var(--font-size-body-sm);
+  font-weight: 800;
+}
+
+.tm-ps-aud-step-title,
+.tm-ps-aud-faq-question {
+  margin: 0;
   font-size: var(--font-size-body-lg);
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.4;
   color: var(--text-strong);
 }
 
-.tm-ps-aud-point p,
 .tm-ps-aud-step p,
 .tm-ps-aud-faq p {
   margin: 0;
@@ -97,71 +106,69 @@
   color: var(--text);
 }
 
-.tm-ps-aud-steps {
-  display: grid;
-  gap: 16px;
-}
-
-.tm-ps-aud-step {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-
-.tm-ps-aud-step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-circle);
-  border: 1.5px solid var(--blue500);
+/* ── 역할표: 카드 안에 넣어 오른쪽 칸을 채운다 ── */
+.tm-ps-aud-table {
+  padding: 4px 16px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
   background: var(--card-surface);
-  color: var(--blue700);
-  font-size: var(--font-size-body-sm);
-  font-weight: 800;
 }
 
+/* ── 자주 묻는 질문 요약 카드: 제목 링크를 카드 전체로 넓힌다 ── */
 .tm-ps-aud-faq {
-  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
 }
 
-.tm-ps-aud-faq li {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.tm-ps-aud-faq .tm-ps-aud-point-title {
-  margin-bottom: 4px;
+.tm-ps-aud-faq-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  transition: border-color var(--duration-fast) ease;
 }
 
 .tm-ps-aud-faq-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--text-strong);
-  text-decoration: underline;
-  text-decoration-color: var(--border-strong);
-  text-underline-offset: 4px;
+  color: inherit;
+}
+
+.tm-ps-aud-faq-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.tm-ps-aud-faq-card:has(.tm-ps-aud-faq-link:focus-visible) {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-ps-aud-faq-link:focus-visible {
+  outline: none;
 }
 
 .tm-ps-aud-more {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 20px;
-  margin-top: 16px;
+  gap: 0 20px;
+  margin-top: 8px;
 }
 
+/* ── 다른 이용 대상 ── */
 .tm-ps-aud-others {
   display: grid;
   gap: 12px;
 }
 
 .tm-ps-aud-other {
-  display: grid;
-  gap: 4px;
-  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 88px;
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-container);
@@ -173,37 +180,66 @@
   transition: border-color var(--duration-fast) ease;
 }
 
+.tm-ps-aud-other .tm-ps-card-icon {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.tm-ps-aud-other-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .tm-ps-aud-other-label {
   font-size: var(--font-size-label);
   font-weight: 700;
   color: var(--blue700);
 }
 
+.tm-ps-aud-other-arrow {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
 @media (hover: hover) {
-  .tm-ps-aud-other:hover { border-color: var(--blue500); }
-  .tm-ps-aud-faq-link:hover { text-decoration-color: currentColor; }
+  .tm-ps-aud-other:hover,
+  .tm-ps-aud-faq-card:hover {
+    border-color: var(--blue500);
+  }
+
+  .tm-ps-aud-other:hover .tm-ps-aud-other-arrow {
+    transform: translateX(3px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tm-ps-aud-other { transition: none; }
+  .tm-ps-aud-other,
+  .tm-ps-aud-other-arrow,
+  .tm-ps-aud-faq-card {
+    transition: none;
+  }
 }
 
 /* ─── 태블릿 (768+) ─── */
 @media (min-width: 768px) {
-  .tm-ps-aud > #intro { padding-top: 24px; }
   .tm-ps-aud-ctas .tm-btn { flex: 0 0 auto; padding-inline: 28px; }
   .tm-ps-aud-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tm-ps-aud-fact { flex-direction: column; justify-content: flex-start; gap: 4px; }
   .tm-ps-aud-fact dd { text-align: left; font-size: var(--font-size-body); }
-  .tm-ps-aud-points { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tm-ps-aud-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
-  .tm-ps-aud-step { grid-template-columns: minmax(0, 1fr); }
-  .tm-ps-aud-others { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tm-ps-aud-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .tm-ps-aud-step { padding: 24px; }
+  .tm-ps-aud-faq { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .tm-ps-aud-others { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .tm-ps-aud-table { padding: 8px 24px 12px; }
 }
 
 /* ─── 데스크톱 (1024+) ─── */
 @media (min-width: 1024px) {
-  .tm-ps-aud > #intro { padding-top: 32px; }
-  .tm-ps-aud-points { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tm-ps-aud-faq { max-width: 880px; }
+  /* 히어로 오른쪽이 일러스트라 사실 줄은 왼쪽 칸 폭에 맞춘다 */
+  .tm-ps-aud-facts { max-width: 560px; }
+  .tm-ps-aud-honest .tm-ps-honest { padding: 28px 32px; }
+  .tm-ps-aud-honest .tm-ps-honest-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; }
 }

@@ -448,6 +448,7 @@ export class ReviewsService {
       select: {
         id: true,
         title: true,
+        hostUserId: true,
         completedAt: true,
         startAt: true,
         participants: {
@@ -467,7 +468,10 @@ export class ReviewsService {
 
     return matches
       .map((match) => {
-        const targetCount = match.participants.filter((participant) => participant.userId !== user.id).length;
+        const targetUserIds = new Set(match.participants.map((participant) => participant.userId));
+        if (match.hostUserId) targetUserIds.add(match.hostUserId);
+        targetUserIds.delete(user.id);
+        const targetCount = targetUserIds.size;
         const reviewedCount = reviewedBySource.get(match.id)?.size ?? 0;
         return {
           sourceType: 'match' as const,
@@ -584,6 +588,9 @@ export class ReviewsService {
         id: true,
         title: true,
         hostUserId: true,
+        hostUser: {
+          select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } },
+        },
         status: true,
         completedAt: true,
         startAt: true,
@@ -607,7 +614,11 @@ export class ReviewsService {
       throw forbidden('NOT_SOURCE_PARTICIPANT', 'Only participants can review this match');
     }
 
-    const targetUserIds = match.participants.map((participant) => participant.userId).filter((userId) => userId !== user.id);
+    const targetUsers = [...match.participants];
+    if (match.hostUserId && match.hostUser && !targetUsers.some((participant) => participant.userId === match.hostUserId)) {
+      targetUsers.push({ userId: match.hostUserId, user: match.hostUser });
+    }
+    const targetUserIds = targetUsers.map((participant) => participant.userId).filter((userId) => userId !== user.id);
     const existingReviews = targetUserIds.length
       ? await this.prisma.v1PostEventReview.findMany({
           where: { reviewerUserId: user.id, sourceType: 'match', sourceId: match.id, targetUserId: { in: targetUserIds } },
@@ -620,7 +631,7 @@ export class ReviewsService {
       source: sourceSummary('match', match.id, match.title, match.completedAt ?? match.startAt),
       sportId: match.sportId,
       reviewerTeam: null,
-      targets: match.participants
+      targets: targetUsers
         .filter((participant) => participant.userId !== user.id)
         .map((participant) => {
           const existing = existingByTarget.get(participant.userId);

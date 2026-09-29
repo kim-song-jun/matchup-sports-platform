@@ -121,6 +121,80 @@ describe('ReviewsService', () => {
     });
   });
 
+  it('match source: an eligible participant can review a non-playing host', async () => {
+    const hostUserId = '00000000-0000-4000-8000-000000000003';
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          hostUserId,
+          hostUser: { id: hostUserId, profile: { nickname: 'Organizer', profileImageUrl: null } },
+          title: 'Host review regression match',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: user.id, user: { id: user.id, profile: { nickname: 'Reviewer', profileImageUrl: null } } },
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: 'Player', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new ReviewsService(
+      prisma as never,
+      { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() } as never,
+      adminContextStub(),
+      reviewPolicyStub(),
+    );
+
+    const result = await service.source(user, { sourceType: 'match', sourceId });
+
+    expect(result.targets.map((target) => target.targetUserId)).toEqual([targetUserId, hostUserId]);
+    expect(result.targets[1]).toMatchObject({ name: 'Organizer', locked: false });
+  });
+
+  it('pending personal-match count includes a non-playing host without duplicating a playing host', async () => {
+    const hostUserId = '00000000-0000-4000-8000-000000000003';
+    const prisma = {
+      v1Match: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'non-playing-host-match',
+            title: 'Non-playing host',
+            hostUserId,
+            completedAt: submittedAt,
+            startAt: submittedAt,
+            participants: [{ userId: user.id }, { userId: targetUserId }],
+          },
+          {
+            id: 'playing-host-match',
+            title: 'Playing host',
+            hostUserId,
+            completedAt: submittedAt,
+            startAt: submittedAt,
+            participants: [{ userId: user.id }, { userId: targetUserId }, { userId: hostUserId }],
+          },
+        ]),
+      },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new ReviewsService(
+      prisma as never,
+      { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() } as never,
+      adminContextStub(),
+      reviewPolicyStub(),
+    );
+
+    const result = await service['pendingPersonalReviews'](user, 20);
+
+    expect(result).toEqual([
+      expect.objectContaining({ sourceId: 'non-playing-host-match', targetCount: 2, remainingCount: 2 }),
+      expect.objectContaining({ sourceId: 'playing-host-match', targetCount: 2, remainingCount: 2 }),
+    ]);
+  });
+
   it('returns an idempotent duplicate response when personal review create hits the unique constraint', async () => {
     const existingReview = {
       id: 'review-1',

@@ -482,7 +482,8 @@ star rating `1-5`, one or more predefined review tags, idempotent review submit,
 written review list, received review grouping.
 
 - `V1-14-008`: 개인매치 방장이 `hostParticipates=false`여도 완료 후 실제 참가자를 리뷰할 수 있고,
-  방장도 참가자도 아닌 사용자는 동일 source 조회에서 `403 NOT_SOURCE_PARTICIPANT`로 차단된다.
+  실제 참가자도 비참가 방장을 리뷰할 수 있다. 본인과 중복 방장 대상은 제외하며, 방장도 참가자도 아닌
+  사용자는 동일 source 조회에서 `403 NOT_SOURCE_PARTICIPANT`로 차단된다.
 
 DB evidence:
 `v1_matches`, `v1_match_participants`, `v1_team_matches`,
@@ -492,7 +493,7 @@ DB evidence:
 
 | ID | Scenario | Expected E2E assertion |
 |---|---|---|
-| V1-14-001 | Personal match review unlocks after completion | A completed personal match where the user has `active` or `completed` participation appears in `/my/reviews?tab=pending`; self-review is excluded; submitted user-target reviews reduce remaining count |
+| V1-14-001 | Personal match review unlocks after completion | A completed personal match where the user has `active` or `completed` participation appears in `/my/reviews?tab=pending`; targets include other eligible participants and the organizer even when the organizer is non-playing; self-review and duplicate organizer targets are excluded; submitted user-target reviews reduce remaining count |
 | V1-14-002 | Team match review unlocks for representative team actor | A completed team match with host and approved applicant teams appears for a current active owner/manager of exactly one participating team; target is the opposing team and reviewer team context is shown |
 | V1-14-003 | Submit rating and predefined tags | Source page accepts rating `1-5` plus one or more predefined tag codes, posts DTO-compatible payload, creates review/tag records, and navigates to completion or written state without free-text review body |
 | V1-14-004 | Duplicate review convergence | Re-submitting the same reviewer, target, source tuple returns existing review data with `alreadySubmitted: true` and does not create duplicate review/tag records |

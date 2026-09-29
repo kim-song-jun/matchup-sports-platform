@@ -73,7 +73,7 @@ describe.each(AUDIENCE_PAGES.map((page) => [page.slug, page] as const))('/for/%s
     expect(nodes.map((node) => node['@type']).sort()).toEqual(['BreadcrumbList', 'WebPage']);
     const webPage = nodes.find((node) => node['@type'] === 'WebPage')!;
     expect(webPage.name).toBe(h1s[0].textContent);
-    const lead = h1s[0].closest('header')!.querySelector('.tm-ps-lead')!;
+    const lead = h1s[0].closest('.tm-ps-hero-copy')!.querySelector('.tm-ps-hero-lead')!;
     expect(webPage.description).toBe(lead.textContent);
     expect(String(webPage.url)).toMatch(new RegExp(`${page.path}$`));
   });
@@ -93,6 +93,13 @@ describe.each(AUDIENCE_PAGES.map((page) => [page.slug, page] as const))('/for/%s
     const { container } = await renderPage(slug);
     const text = mainText(container);
     for (const phrase of FORBIDDEN) expect(text, phrase).not.toContain(phrase);
+  });
+
+  it('페이지 끝 강조 밴드는 이 역할의 주요 CTA 로 보낸다', async () => {
+    const { container } = await renderPage(slug);
+    const band = within(container.querySelector<HTMLElement>('#audience-cta')!);
+    expect(band.getByRole('heading', { level: 2 })).toHaveTextContent(page.band.title);
+    expect(band.getByRole('link', { name: page.ctas[0].label })).toHaveAttribute('href', page.ctas[0].href);
   });
 
   it('히어로 사실 줄에 근거 없는 숫자가 없다', async () => {

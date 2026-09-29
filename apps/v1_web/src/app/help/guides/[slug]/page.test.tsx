@@ -1,5 +1,5 @@
 /**
- * 이용 가이드 4편. 빌드 때 정해진 4편만 만들고, 맨 위 답 상자 = meta description = Article LD description 이
+ * 이용 가이드 4편. 빌드 때 정해진 4편만 만들고, 히어로 설명(요약) = meta description = Article LD description 이
  * 같은 문장이어야 한다. HowTo·FAQPage 는 싣지 않는다(리치 결과 폐지 · FAQ 원출처는 /faq).
  */
 import { render, screen, within } from '@testing-library/react';
@@ -63,24 +63,36 @@ describe('가이드 라우트', () => {
 });
 
 describe.each(GUIDES.map((guide) => [guide.slug, guide] as const))('가이드 %s 본문', (_slug, guide) => {
-  it('답 상자가 요약 한 문장으로 먼저 오고, 단계가 순서대로 번호 목록에 있다', async () => {
+  it('제목 바로 아래 요약 한 문장이 오고, 단계가 순서대로 번호 목록에 있다', async () => {
     const { container } = await renderGuide(guide);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(guide.title);
-    expect(container.querySelector('.tm-help-answer')?.textContent).toBe(guide.summary);
+    expect(container.querySelector('.tm-ps-hero-lead')?.textContent).toBe(guide.summary);
     const steps = container.querySelectorAll('ol.tm-help-steps > li');
     expect([...steps].map((li) => li.querySelector('h3')?.textContent)).toEqual(guide.steps.map((step) => step.title));
     expect(container.querySelector('.tm-ps-updated time')?.getAttribute('datetime')).toBe(guide.updatedAt);
   });
 
-  it('관련 질문은 답 없이 /faq#id 로 딥링크한다', async () => {
-    await renderGuide(guide);
-    const list = screen.getByRole('list', { name: '관련 질문' });
-    expect(within(list).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(
-      guide.relatedFaqIds.map((id) => `/faq#${id}`),
-    );
-    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(
-      guide.relatedFaqIds.map((id) => faqById(id)!.question),
-    );
+  it('관련 질문은 제자리에서 펼치고, 접혀 있어도 답이 HTML 에 있다', async () => {
+    const { container } = await renderGuide(guide);
+    const section = container.querySelector<HTMLElement>('#guide-faq')!;
+    const items = [...section.querySelectorAll<HTMLDetailsElement>('details.tm-ps-faq-item')];
+    expect(items.map((item) => item.id)).toEqual(guide.relatedFaqIds);
+    for (const item of items) {
+      const faq = faqById(item.id)!;
+      expect(item.open).toBe(false);
+      expect(item.querySelector('.tm-ps-faq-question')?.textContent).toBe(faq.question);
+      expect(item.querySelector('.tm-ps-faq-answer')?.textContent).toContain(faq.answer[0]);
+    }
+    expect(within(section).getByRole('link', { name: '자주 묻는 질문 전체 보기' })).toHaveAttribute('href', '/faq');
+  });
+
+  it('다른 가이드 3편을 싣고, 이 가이드는 빼며, 끝에 문의 밴드가 있다', async () => {
+    const { container } = await renderGuide(guide);
+    const others = within(container.querySelector<HTMLElement>('#guide-others')!);
+    const hrefs = others.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(GUIDES.filter((other) => other.slug !== guide.slug).map((other) => `/help/guides/${other.slug}`));
+    expect(within(container.querySelector<HTMLElement>('#help-cta')!).getByRole('link', { name: '문의 창구 보기' }))
+      .toHaveAttribute('href', '/contact');
   });
 
   it('Article LD 가 화면의 제목·답 상자·갱신일과 같고, HowTo·FAQPage 는 없다', async () => {
@@ -89,7 +101,7 @@ describe.each(GUIDES.map((guide) => [guide.slug, guide] as const))('가이드 %s
     expect(nodes.map((node) => node['@type']).sort()).toEqual(['Article', 'BreadcrumbList']);
     const article = nodes.find((node) => node['@type'] === 'Article')!;
     expect(article.headline).toBe(screen.getByRole('heading', { level: 1 }).textContent);
-    expect(article.description).toBe(container.querySelector('.tm-help-answer')?.textContent);
+    expect(article.description).toBe(container.querySelector('.tm-ps-hero-lead')?.textContent);
     expect(article.dateModified).toBe(container.querySelector('.tm-ps-updated time')?.getAttribute('datetime'));
     expect(article).not.toHaveProperty('datePublished');
   });

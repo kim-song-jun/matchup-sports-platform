@@ -4,17 +4,14 @@ import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 
 const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn() }));
-const navigation = vi.hoisted(() => ({ search: '' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: state.replace }),
-  useSearchParams: () => new URLSearchParams(navigation.search),
 }));
 vi.mock('@/hooks/use-team-match-record', () => ({
   useTeamMatchRecord: () => ({ data: state.data, isError: false, refetch: state.refetch }),
   useMutateTeamMatchRecord: () => ({ mutateAsync: state.mutate, isPending: false, isError: false, reset: vi.fn() }),
 }));
 beforeEach(() => {
-  navigation.search = '';
   state.mutate.mockReset().mockResolvedValue({});
   state.replace.mockReset();
   state.data = {
@@ -30,39 +27,38 @@ beforeEach(() => {
   };
 });
 describe('shared record participant flow', () => {
-  // "← 매치 상세" 는 `?view=detail` 은 항상 유지하면서, 이 화면이 받은 출처가 있으면 그 출처까지 이어 싣는다.
-  it('받은 출처가 있으면 매치 상세 링크가 view=detail 과 그 출처를 함께 싣는다', () => {
-    navigation.search = `from=${encodeURIComponent('/my/team-matches')}`;
+  // 2026-09-29: "← 매치 상세" 카드 링크는 제거했다 — 뒤로가기는 매치 상세를 거치지 않고
+  // 이 화면이 받은 출처로 곧장 돌아간다(활동기록 등). 출처가 아예 없을 때만(공유 링크로
+  // 바로 들어온 경우) route-chrome 의 정적 backHref가 `?view=detail`로 매치 상세를 대신 가리킨다.
+  it('경기 기록 화면에는 매치 상세로 가는 버튼이 없다', () => {
     render(<TeamMatchSharedRecord teamMatchId="match" />);
-    expect(screen.getByRole('link', { name: '← 매치 상세' })).toHaveAttribute(
-      'href',
-      `/team-matches/match?view=detail&from=${encodeURIComponent('/my/team-matches')}`,
-    );
+    expect(screen.queryByRole('link', { name: '← 매치 상세' })).not.toBeInTheDocument();
   });
 
-  it('출처가 없으면 매치 상세 링크는 view=detail 만 싣는다', () => {
-    render(<TeamMatchSharedRecord teamMatchId="match" />);
-    expect(screen.getByRole('link', { name: '← 매치 상세' })).toHaveAttribute('href', '/team-matches/match?view=detail');
-  });
-
-  // 매치 상세에서 "공동 경기 기록 열기"로 들어갈 때도 출처를 실어야, 공동 기록 화면의 셸
-  // 뒤로가기가 route-chrome 고정 backHref 대신 이 출처로 돌아간다.
-  it('매치 상세 카드의 열기 링크가 받은 출처를 ?from= 으로 함께 싣는다', () => {
-    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/team-matches/match" />);
+  it('공동 경기 기록 열기 링크가 받은 출처를 그대로 뒤로가기 경로로 싣는다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/my/team-matches" />);
     expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute(
       'href',
-      `/team-matches/match/record?from=${encodeURIComponent('/team-matches/match')}`,
+      `/team-matches/match/record?from=${encodeURIComponent('/my/team-matches')}`,
     );
   });
 
-  it('출처가 없으면 열기 링크는 ?from= 없이 그대로 간다', () => {
+  it('출처가 없으면 뒤로가기 경로 없이 열린다 — 셸이 정적 backHref(?view=detail)로 대신한다', () => {
     render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
     expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute('href', '/team-matches/match/record');
   });
 
-  it('라이브 참가자는 출처를 실은 경로로 자동 리다이렉트된다', () => {
-    render(<TeamMatchRecordEntry teamMatchId="match" fromHref="/team-matches/match" />);
-    expect(state.replace).toHaveBeenCalledWith(`/team-matches/match/record?from=${encodeURIComponent('/team-matches/match')}`);
+  it('라이브 참가자는 받은 출처를 그대로 실은 경로로 자동 리다이렉트된다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" fromHref="/my/team-matches" />);
+    expect(state.replace).toHaveBeenCalledWith(`/team-matches/match/record?from=${encodeURIComponent('/my/team-matches')}`);
+  });
+
+  // 회귀 방지: 뒤로가기로 `?view=detail`에 도착하면(detailOnly=true) 참가자·라이브여도
+  // 다시 이 화면으로 리다이렉트하지 않아야 한다 — 안 그러면 뒤로가기가 replace→replace로
+  // 제자리에 돌아와 아무 반응이 없어 보인다(2026-09-29 실사고, alpha 실측으로 확인).
+  it('view=detail로 도착하면 참가자·라이브여도 다시 이 화면으로 리다이렉트하지 않는다', () => {
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/my/team-matches" />);
+    expect(state.replace).not.toHaveBeenCalled();
   });
 
   it('selects scorer from the credited team and sends the opened version with the goal', async () => {

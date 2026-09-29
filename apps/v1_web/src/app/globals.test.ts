@@ -30,6 +30,12 @@ describe('Android bottom inset layout', () => {
       /\.tm-app-frame-no-bottom \.tm-scroll-area:has\(\.tm-fixed-cta\),\s*\.tm-app-frame-no-bottom \.tm-scroll-area:has\(\.tm-chat-room\)\s*\{\s*bottom:\s*0;/,
     );
   });
+
+  it('lets sheets cover the fixed CTA on pages without a bottom nav instead of leaving the tab-bar gap', () => {
+    expect(globalsCss).toMatch(
+      /\.tm-app-frame-no-bottom \.tm-filter-scrim,\s*\.tm-app-frame-no-bottom \.tm-filter-layer\s*\{\s*bottom:\s*0;/,
+    );
+  });
 });
 
 describe('keyboard viewport layout', () => {

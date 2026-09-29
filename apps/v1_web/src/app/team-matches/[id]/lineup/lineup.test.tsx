@@ -1199,7 +1199,7 @@ describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)',
     fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '명단 추가' }));
     expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
     // 명단에 넣은 뒤에도 그 행에 결장 배지가 남아 제출 전에 다시 볼 수 있다.
-    const placedRow = screen.getByLabelText('김철수 등번호').parentElement as HTMLElement;
+    const placedRow = screen.getByLabelText('김철수 등번호').parentElement?.parentElement as HTMLElement;
     expect(within(placedRow).getByText('결장 · 부상')).toBeInTheDocument();
   });
 

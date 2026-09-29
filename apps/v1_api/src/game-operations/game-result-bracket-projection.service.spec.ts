@@ -68,7 +68,7 @@ describe('GameResultBracketProjectionService canonical TeamMatch projection', ()
     expect(events).toEqual([{ scope: 'game', gameId: 'game-target' }]);
     // 진출 팀이 아닌 옛 조정은 닫는다 — 같은 팀이 다시 배정돼도 옛 빼기가 되살아나지 않는다.
     expect((tx as any).v1GameRosterAdjustment.updateMany).toHaveBeenCalledWith({
-      where: { gameId: 'game-target', sideId: 'target-home-side', revokedAt: null, teamId: { not: 'team-home' } },
+      where: { gameId: 'game-target', sideId: 'target-home-side', revokedAt: null },
       data: { revokedAt: expect.any(Date), revokedByUserId: null, revokedByRole: 'SYSTEM' },
     });
   });

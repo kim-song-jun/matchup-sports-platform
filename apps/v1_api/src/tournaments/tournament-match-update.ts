@@ -171,7 +171,7 @@ export async function updateTournamentMatchInTx(
     if (sideChange.changed) {
       const newLineupId = await invalidateLineupAndTactics(tx, game.id, side.id);
       await tx.v1GameSide.update({ where: { id: side.id }, data: { teamId: sideChange.nextTeamId, displayNameSnapshot: sideChange.name } });
-      await revokeReplacedSideTeamAdjustments(tx, { gameId: game.id, sideId: side.id, nextTeamId: sideChange.nextTeamId });
+      await revokeReplacedSideTeamAdjustments(tx, { gameId: game.id, sideId: side.id });
       // 새 팀의 명단은 방금 만든 빈 리비전 위에 후속 이벤트가 채운다. 시각이 지난 경기도 SCHEDULED 면
       // 채워야 하므로 팀 단위가 아니라 이 경기를 대상으로 남긴다.
       if (newLineupId !== null && sideChange.nextTeamId !== null) resync.push({ scope: 'game', gameId: game.id });

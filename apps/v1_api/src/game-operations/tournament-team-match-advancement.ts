@@ -457,7 +457,7 @@ async function assignTarget(
       const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
       if (sideId !== null) {
         await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: registration.teamId, displayNameSnapshot: registration.teamName } });
-        await revokeReplacedSideTeamAdjustments(tx, { gameId: target.gameId, sideId, nextTeamId: registration.teamId });
+        await revokeReplacedSideTeamAdjustments(tx, { gameId: target.gameId, sideId });
         // 새 팀 명단은 후속 이벤트가 채운다 — 이 트랜잭션은 원천 경기를 먼저 쥐고 있다.
         await enqueueRosterResync(tx, [{ scope: 'game', gameId: target.gameId }]);
       }
@@ -499,7 +499,7 @@ async function replaceTargetAssignment(
     const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
     if (sideId !== null) {
       await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: registration.teamId, displayNameSnapshot: registration.teamName } });
-      await revokeReplacedSideTeamAdjustments(tx, { gameId: target.gameId, sideId, nextTeamId: registration.teamId });
+      await revokeReplacedSideTeamAdjustments(tx, { gameId: target.gameId, sideId });
       await enqueueRosterResync(tx, [{ scope: 'game', gameId: target.gameId }]);
     }
     await tx.v1Game.update({ where: { id: target.gameId }, data: { version: { increment: 1 } } });
@@ -517,7 +517,7 @@ async function clearTarget(tx: Tx, target: MatchRow, side: Side, registrations: 
     const sideId = side === 'HOME' ? target.homeSideId : target.awaySideId;
     if (sideId !== null) {
       await tx.v1GameSide.update({ where: { id: sideId }, data: { teamId: null, displayNameSnapshot: 'TBD' } });
-      await revokeReplacedSideTeamAdjustments(tx, { gameId: target.gameId, sideId, nextTeamId: null });
+      await revokeReplacedSideTeamAdjustments(tx, { gameId: target.gameId, sideId });
     }
     await tx.v1Game.update({ where: { id: target.gameId }, data: { version: { increment: 1 } } });
   }

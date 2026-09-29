@@ -145,7 +145,7 @@ describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후
     expect(revoke.mock.calls).toEqual([
       [
         {
-          where: { gameId: 'game-m', sideId: 'side-home', revokedAt: null, teamId: { not: 'team-c' } },
+          where: { gameId: 'game-m', sideId: 'side-home', revokedAt: null },
           data: { revokedAt: expect.any(Date), revokedByUserId: null, revokedByRole: 'SYSTEM' },
         },
       ],

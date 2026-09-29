@@ -372,6 +372,21 @@ describe('경기 명단 조정 API (Task 178)', () => {
       expect(await lineupUserIds(f.games.g1.gameId, awaySide)).toEqual([c1]);
       expect(await lineupUserIds(g1A.gameId, g1A.sideId)).toEqual([f.teamA.members[1]]);
 
+      // 결과 검토(Serializable 스냅샷) 사이에 끼어들어 C 로 바뀐 뒤에도 남은 B 의 활성 조정을 흉내 낸다.
+      // B 가 돌아올 때 이 행도 닫혀야 한다 — 새 팀 것을 남기면 여기서 되살아난다.
+      await prisma.v1GameRosterAdjustment.create({
+        data: {
+          gameId: f.games.g1.gameId,
+          sideId: awaySide,
+          teamId: f.teamB.id,
+          userId: b1,
+          action: 'EXCLUDE',
+          reason: 'OTHER',
+          actorUserId: f.teamB.ownerId,
+          actorRole: 'TEAM_MANAGER',
+        },
+      });
+
       await setAway(f.teamB.id);
       // B 가 돌아와도 예전 빼기는 되살아나지 않는다 — b1 이 다시 출전하고, 기록에는 시스템 되돌리기가 보인다.
       expect(await lineupUserIds(f.games.g1.gameId, awaySide)).toEqual([b1]);
@@ -387,7 +402,10 @@ describe('경기 명단 조정 API (Task 178)', () => {
       ).toEqual([
         ['EXCLUDE', b1, 'INJURY', f.teamB.ownerId, 'TEAM_MANAGER'],
         ['REVOKE', b1, 'INJURY', null, 'SYSTEM'],
+        ['EXCLUDE', b1, 'OTHER', f.teamB.ownerId, 'TEAM_MANAGER'],
+        ['REVOKE', b1, 'OTHER', null, 'SYSTEM'],
       ]);
+      expect(await prisma.v1GameRosterAdjustment.count({ where: { sideId: awaySide, revokedAt: null } })).toBe(0);
       expect((await getAs(`${awayPath}/roster`, f.teamB.ownerId)).body.data.excluded).toEqual([]);
       expect(await prisma.v1GameRosterAdjustment.count({ where: { ...g1A, userId: a1, revokedAt: null } })).toBe(1);
     });

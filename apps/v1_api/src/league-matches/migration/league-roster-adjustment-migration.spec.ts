@@ -7,42 +7,57 @@ import {
 } from './league-roster-adjustment-migration';
 
 describe('planLeagueSideMigration — 팀장 저장본을 조정으로 옮기는 계획', () => {
-  const base = ['u-1', 'u-2', 'u-3', 'u-4'];
+  const base = ['u-1', 'u-2', 'u-3', 'u-4'].map((userId) => ({ userId, jerseyNumber: null }));
+  const row = (userId: string | null, jerseyNumber: number | null = null) => ({ userId, jerseyNumber });
 
   it('기준 명단에 있는데 저장본에 없는 사람만 EXCLUDE 로 옮기고, 저장본에 있는 사람은 그대로 둔다', () => {
     const plan = planLeagueSideMigration({
-      baseUserIds: base,
-      saved: [{ userId: 'u-1' }, { userId: 'u-3' }],
+      base,
+      saved: [row('u-1'), row('u-3')],
       activeExcludedUserIds: new Set(),
     });
-    expect(plan).toEqual({ excludeUserIds: ['u-2', 'u-4'], unrepresentableRows: 0 });
+    expect(plan).toEqual({ excludeUserIds: ['u-2', 'u-4'], unrepresentableRows: 0, jerseyChangedRows: 0 });
   });
 
   it('저장본이 기준 명단과 같으면 옮길 것이 없다 (회귀 방향)', () => {
     const plan = planLeagueSideMigration({
-      baseUserIds: base,
-      saved: base.map((userId) => ({ userId })),
+      base,
+      saved: base.map((entry) => row(entry.userId)),
       activeExcludedUserIds: new Set(),
     });
-    expect(plan).toEqual({ excludeUserIds: [], unrepresentableRows: 0 });
+    expect(plan).toEqual({ excludeUserIds: [], unrepresentableRows: 0, jerseyChangedRows: 0 });
   });
 
   it('게스트(계정 없음)와 기준 명단 밖 계정은 조정으로 표현할 수 없어 세기만 한다', () => {
     const plan = planLeagueSideMigration({
-      baseUserIds: base,
-      saved: [{ userId: 'u-1' }, { userId: null }, { userId: null }, { userId: 'outsider' }, { userId: 'u-2' }],
+      base,
+      saved: [row('u-1'), row(null), row(null), row('outsider'), row('u-2')],
       activeExcludedUserIds: new Set(),
     });
-    expect(plan).toEqual({ excludeUserIds: ['u-3', 'u-4'], unrepresentableRows: 3 });
+    expect(plan).toEqual({ excludeUserIds: ['u-3', 'u-4'], unrepresentableRows: 3, jerseyChangedRows: 0 });
   });
 
   it('이미 활성 EXCLUDE 가 있는 사람은 다시 만들지 않는다', () => {
     const plan = planLeagueSideMigration({
-      baseUserIds: base,
-      saved: [{ userId: 'u-1' }],
+      base,
+      saved: [row('u-1')],
       activeExcludedUserIds: new Set(['u-2']),
     });
     expect(plan.excludeUserIds).toEqual(['u-3', 'u-4']);
+  });
+
+  it('남는 사람의 저장본 등번호가 참가 명단 번호와 다를 때만 센다 — 같거나 저장본에 번호가 없으면 세지 않는다', () => {
+    const plan = planLeagueSideMigration({
+      base: [
+        { userId: 'u-1', jerseyNumber: null },
+        { userId: 'u-2', jerseyNumber: 10 },
+        { userId: 'u-3', jerseyNumber: 11 },
+        { userId: 'u-4', jerseyNumber: 12 },
+      ],
+      saved: [row('u-1', 7), row('u-2', 10), row('u-3', 99), row('u-4'), row(null, 5), row('outsider', 6)],
+      activeExcludedUserIds: new Set(),
+    });
+    expect(plan.jerseyChangedRows).toBe(2);
   });
 });
 

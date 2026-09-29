@@ -44,7 +44,13 @@ function teamRow(id: string, name: string, membershipIds: string[]) {
 }
 
 interface FakeState {
-  participants: Array<{ id: string; sideId: string; userId: string | null; displayNameSnapshot: string }>;
+  participants: Array<{
+    id: string;
+    sideId: string;
+    userId: string | null;
+    displayNameSnapshot: string;
+    jerseyNumber: number | null;
+  }>;
   sides: Array<{ id: string; sideKey: string }>;
   links: Array<{ participantId: string; userId: string }>;
   linkEvents: Array<{ participantId: string; action: string; userId: string }>;
@@ -63,7 +69,7 @@ interface FakeState {
   /** 잠금 뒤 재조회가 보는 **커밋된** 로스터. 기본은 등록된 두 팀. */
   registeredTeamIds: Set<string>;
   /** 팀별 리그 참가 명단. 기본은 비어 있다(명단 미제출). */
-  rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string }>>;
+  rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string; jerseyNumber?: number }>>;
   /** 명단 재계산 이벤트(outbox)를 남긴 팀. */
   rosterSyncTeamIds: string[];
 }
@@ -212,6 +218,7 @@ function createFake() {
             players: (state.rosterPlayers.get(teamId) ?? []).map((player) => ({
               id: player.id,
               userId: player.userId,
+              jerseyNumber: player.jerseyNumber ?? null,
               user: { profile: { nickname: player.nickname, displayName: null } },
             })),
           });
@@ -307,12 +314,15 @@ function createFake() {
     v1GameParticipant: {
       create: track(
         'v1GameParticipant.create',
-        async (args: { data: { sideId: string; userId?: string | null; displayNameSnapshot: string } }) => {
+        async (args: {
+          data: { sideId: string; userId?: string | null; displayNameSnapshot: string; jerseyNumber?: number | null };
+        }) => {
           const row = {
             id: next('participant'),
             sideId: args.data.sideId,
             userId: args.data.userId ?? null,
             displayNameSnapshot: args.data.displayNameSnapshot,
+            jerseyNumber: args.data.jerseyNumber ?? null,
           };
           state.participants.push(row);
           return row;
@@ -435,9 +445,9 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     expect(namesOn(awaySideId)).toEqual(['membership-b1 님', 'membership-b2 님']);
   });
 
-  it('참가 명단이 있는 팀은 명단 선수를 계정과 함께 넣고 선수마다 ROSTER_ASSERTED 연결이 생긴다', async () => {
+  it('참가 명단이 있는 팀은 명단 선수를 계정·등번호와 함께 넣고 선수마다 ROSTER_ASSERTED 연결이 생긴다', async () => {
     state.rosterPlayers.set('team-a', [
-      { id: 'player-a1', userId: 'user-a1', nickname: '가나' },
+      { id: 'player-a1', userId: 'user-a1', nickname: '가나', jerseyNumber: 9 },
       { id: 'player-a2', userId: 'user-a2', nickname: '다라' },
       { id: 'player-a3', userId: 'user-a3', nickname: '마바' },
     ]);
@@ -454,6 +464,12 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     // 팀원 수(각 2명)가 아니라 명단 인원(3명·1명)으로 들어가야 한다.
     expect(sideRows(V1GameSideKey.HOME)).toEqual([['user-a1', '가나'], ['user-a2', '다라'], ['user-a3', '마바']]);
     expect(sideRows(V1GameSideKey.AWAY)).toEqual([['user-b1', '사아']]);
+    const homeSideId = state.sides.find((side) => side.sideKey === V1GameSideKey.HOME)!.id;
+    expect(state.participants.filter((row) => row.sideId === homeSideId).map((row) => row.jerseyNumber)).toEqual([
+      9,
+      null,
+      null,
+    ]);
 
     expect(state.links).toHaveLength(4);
     for (const link of state.links) {

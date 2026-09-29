@@ -210,7 +210,7 @@ describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
     expect(loaded?.computation.excluded.map((row) => row.entry.sourceParticipantId)).toEqual(['ms-2']);
   });
 
-  it('리그 참가 명단이 있으면 폴백하지 않고 선수(계정 연결)가 기준이다', async () => {
+  it('리그 참가 명단이 있으면 폴백하지 않고 선수(계정 연결)가 기준이며 등번호도 참가 명단 것이다', async () => {
     const tx = fakeTx({
       teamMatch: { id: 'lm-1', tournamentId: 'league-1', leagueId: 'league-1', startAt: KICKOFF },
       sideTeamId: 'team-A',
@@ -219,15 +219,19 @@ describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
         {
           id: 'lreg-1',
           teamId: 'team-A',
-          players: [{ id: 'lp-1', userId: 'u7', user: PROFILE('칠') }],
-          _count: { players: 1 },
+          players: [
+            { id: 'lp-1', userId: 'u7', jerseyNumber: 7, user: PROFILE('칠') },
+            { id: 'lp-2', userId: 'u8', jerseyNumber: null, user: PROFILE('팔') },
+          ],
+          _count: { players: 2 },
         },
       ],
     });
     const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
     expect(loaded?.baseSource).toBe('REGISTRATION');
     expect(loaded?.computation.participants).toEqual([
-      { userId: 'u7', accountLinked: true, displayNameSnapshot: '칠', jerseyNumber: null, sourceParticipantId: 'lp-1' },
+      { userId: 'u7', accountLinked: true, displayNameSnapshot: '칠', jerseyNumber: 7, sourceParticipantId: 'lp-1' },
+      { userId: 'u8', accountLinked: true, displayNameSnapshot: '팔', jerseyNumber: null, sourceParticipantId: 'lp-2' },
     ]);
   });
 });

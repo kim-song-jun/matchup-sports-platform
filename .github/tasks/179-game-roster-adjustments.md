@@ -196,6 +196,8 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 표현할 수 없는 행은 dry-run 에서 건수를 세어 보고한다. **alpha 실행은 dry-run 결과를 보고 사용자 승인 후.** 끝난 경기는 옮기지 않는다.
 "시작 전"은 동기화와 같다 — `SCHEDULED` 이고 킥오프 시각 전(시각 없으면 시작 전). 킥오프가 지난 `SCHEDULED` 리그 경기는
 결과 입력 전이라 이미 치렀을 수 있어 옮기지 않고, 팀장 저장본인 사이드를 보고의 `kickoffPassedSides`(사이드별 `KICKOFF_PASSED`)로 따로 센다.
+등번호는 대회와 같이 **참가 명단 번호**를 따른다(리그도 `v1_tournament_players.jersey_number`). 팀장 저장본에만 있던 경기별
+번호는 조정으로 옮길 곳이 없어, 남는 사람의 저장본 번호가 참가 명단 번호와 다른 행을 `jerseyChangedRows` 로 세어 보고한다.
 
 ## Test Scenarios
 

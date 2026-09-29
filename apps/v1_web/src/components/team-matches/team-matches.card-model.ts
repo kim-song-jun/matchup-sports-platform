@@ -75,6 +75,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     manner: match.hostTeam?.mannerScore ?? null,
     wins: match.hostTeam?.wins ?? null,
     status,
+    apiStatus,
     closed: isClosedApiStatus(apiStatus),
   };
 }

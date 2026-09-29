@@ -1064,7 +1064,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
           {isClosed ? (
             <span className="tm-badge tm-badge-grey tm-card-closed-badge">
               <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-              신청 마감
+              {match.apiStatus === 'completed' ? '경기 종료' : '신청 마감'}
             </span>
           ) : null}
           {openLabel ? (

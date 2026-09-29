@@ -172,6 +172,18 @@ describe('toTeamMatch — 마감 여부는 관계와 독립이다', () => {
   });
 });
 
+describe('completed team-match card state', () => {
+  it('preserves completed API status for the list badge', () => {
+    const model = toTeamMatch(
+      { id: 'completed', title: 'Completed', displayState: 'completed', viewerState: 'none' } as unknown as V1TeamMatch,
+      base.matches[0],
+    );
+
+    expect(model.apiStatus).toBe('completed');
+    expect(model.closed).toBe(true);
+  });
+});
+
 describe('friendly match live card', () => {
   it('shows a matched game as live after kickoff but never a cancelled one', () => {
     const base = getTeamMatchListViewModel();

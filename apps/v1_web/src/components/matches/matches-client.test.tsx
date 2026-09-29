@@ -565,6 +565,22 @@ describe('MatchDetailPageClient — 로딩 중 목업 노출 방지', () => {
     expect(screen.getByTestId('participants').textContent).toBe('호스트');
   });
 
+  it('완료 매치의 상태 라벨은 불참자·불참 호스트·참여자를 구분한다', () => {
+    const cases = [
+      [{ viewerState: 'participant', viewer: { state: 'participant', participantStatus: 'no_show' } }, '불참 기록', false],
+      [{ viewerState: 'host', viewer: { state: 'host', participantStatus: null }, hostParticipates: false }, '경기 완료', true],
+      [{ viewerState: 'host', viewer: { state: 'host', participantStatus: 'completed' }, hostParticipates: true }, '참여 완료', true],
+      [{ viewerState: 'participant', viewer: { state: 'participant', participantStatus: 'completed' } }, '참여 완료', true],
+    ] as const;
+    for (const [viewer, label, reviewable] of cases) {
+      useV1MatchMock.mockReturnValue({ data: { ...baseMatch, status: 'completed', displayState: 'completed', ...viewer }, isError: false });
+      const { unmount } = render(<MatchDetailPageClient matchId="match-1" />);
+      expect(screen.getByTestId('status-label').textContent).toBe(label);
+      expect(Boolean(screen.queryByText('후기 남기기'))).toBe(reviewable);
+      unmount();
+    }
+  });
+
   it('참가하지 않는 호스트는 승인 완료로 표시하지 않고, 참가하는 호스트는 그대로 둔다', () => {
     useV1MatchMock.mockReturnValue({
       data: { ...baseMatch, participantsPreview: [], hostParticipates: false, viewerState: 'none' },

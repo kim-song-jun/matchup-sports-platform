@@ -200,7 +200,8 @@ export class MatchesService {
         id: matchId,
         deletedAt: null,
       },
-      include: this.matchInclude(user),
+      // 본인의 불참 행도 읽어야 viewer 가 신청 승인 상태로 떨어지지 않는다(myMatches 와 같은 규칙).
+      include: this.matchInclude(user, true),
     });
 
     if (!match) {

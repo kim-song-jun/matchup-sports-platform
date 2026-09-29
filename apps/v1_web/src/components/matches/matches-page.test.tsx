@@ -717,6 +717,22 @@ describe('개인 매치 참여 기능', () => {
     expect(screen.queryByText(/경기 당일 늦지 않게/)).not.toBeInTheDocument();
   });
 
+  it('불참으로 확인된 참가자에게는 참여 완료 대신 불참 안내와 불참 라벨을 보여준다', () => {
+    const noShow = { ...getMatchDetailViewModel('approved'), completed: true, noShow: true, statusLabel: '불참 기록' };
+    noShow.match.lifecycleStatus = 'completed';
+    const { unmount } = render(<MatchDetailPageView model={noShow} />);
+    expect(screen.getAllByText('불참으로 기록됐어요').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('불참 기록').length).toBeGreaterThan(0);
+    expect(screen.queryByText('참여 완료')).toBeNull();
+    unmount();
+
+    const attended = { ...getMatchDetailViewModel('approved'), completed: true, statusLabel: '참여 완료' };
+    attended.match.lifecycleStatus = 'completed';
+    render(<MatchDetailPageView model={attended} />);
+    expect(screen.queryByText('불참으로 기록됐어요')).toBeNull();
+    expect(screen.getAllByText('참여 완료').length).toBeGreaterThan(0);
+  });
+
   it('시작했거나 끝난 매치는 남은 자리 안내를 내리고, 모집 중인 매치는 그대로 보인다', () => {
     const recruiting = getMatchDetailViewModel('mine');
     recruiting.match.lifecycleStatus = 'recruiting';

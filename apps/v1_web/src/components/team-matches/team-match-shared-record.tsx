@@ -344,13 +344,18 @@ function GoalForm({ data, goal, subMatchId, disabled, stale, onCancel, onRefresh
 export function TeamMatchRecordEntry({
   teamMatchId,
   detailOnly = false,
+  fromHref = null,
 }: {
   teamMatchId: string;
   detailOnly?: boolean;
+  fromHref?: string | null;
 }) {
   const query = useTeamMatchRecord(teamMatchId);
   const router = useRouter();
   const data = query.data;
+  // 매치 상세에서 들어왔다는 출처를 그대로 실어야, 공동 기록 화면의 셸 뒤로가기(AppBackLink)가
+  // `?from=` 을 받아 이 매치 상세로 돌아간다 — 없으면 route-chrome 의 고정 backHref 로만 열화된다.
+  const recordHref = withFromPath(`/team-matches/${teamMatchId}/record`, fromHref);
 
   useEffect(() => {
     if (
@@ -358,9 +363,9 @@ export function TeamMatchRecordEntry({
       data?.participant &&
       (data.phase === 'live' || data.phase === 'official')
     ) {
-      router.replace(`/team-matches/${teamMatchId}/record`);
+      router.replace(recordHref);
     }
-  }, [data?.participant, data?.phase, detailOnly, router, teamMatchId]);
+  }, [data?.participant, data?.phase, detailOnly, recordHref, router]);
 
   if (query.isError) {
     return (
@@ -402,7 +407,7 @@ export function TeamMatchRecordEntry({
         </div>
       )}
       {data.participant ? (
-        <Link className={styles.openLink} href={`/team-matches/${teamMatchId}/record`}>
+        <Link className={styles.openLink} href={recordHref}>
           공동 경기 기록 열기
         </Link>
       ) : (

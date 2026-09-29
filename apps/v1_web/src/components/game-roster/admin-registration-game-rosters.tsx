@@ -13,17 +13,16 @@ import {
   type V1TeamRosterMatrixGame,
   type V1TeamRosterMatrixPlayer,
 } from '@/hooks/use-v1-game-roster';
-import { extractErrorCode } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterActorRoleLabel, gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import {
+  batchFailureRecovery,
   cellKey,
   draftToBatchChanges,
-  dropGamesFromDraft,
   effectiveStatus,
   isToggleable,
-  startedGameIds,
+  liveDraft,
   toggleCell,
   type TeamRosterDraft,
 } from './game-roster-matrix-draft';
@@ -60,6 +59,7 @@ export function AdminRegistrationGameRosters({
   const pickerId = useId();
 
   const changes = useMemo(() => (data === undefined ? [] : draftToBatchChanges(draft, data)), [draft, data]);
+  const shownDraft = useMemo(() => (data === undefined ? {} : liveDraft(draft, data)), [draft, data]);
   const dirty = changes.length > 0;
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -107,19 +107,10 @@ export function AdminRegistrationGameRosters({
       setDraft({});
       setNotice({ tone: 'info', message: `변경 ${changes.length}건을 저장했어요.` });
     } catch (caught) {
-      const code = extractErrorCode(caught);
-      if (code === 'LINEUP_DEADLINE_PASSED') {
-        const startedIds = startedGameIds(caught);
-        setDraft((current) => (startedIds.length > 0 ? dropGamesFromDraft(current, startedIds) : {}));
-        void matrix.refetch();
-        setNotice({
-          tone: 'error',
-          message: '그사이 시작된 경기가 있어 저장하지 못했어요. 그 경기 변경은 뺐으니 나머지를 다시 저장해 주세요.',
-        });
-        return;
-      }
-      if (code === 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER') void matrix.refetch();
-      setNotice({ tone: 'error', message: gameRosterErrorMessage(caught, '명단을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.') });
+      const recovery = batchFailureRecovery(caught);
+      setDraft(recovery.nextDraft);
+      if (recovery.refetch) void matrix.refetch();
+      setNotice({ tone: 'error', message: recovery.message });
     }
   }
 
@@ -171,10 +162,10 @@ export function AdminRegistrationGameRosters({
                             game={game}
                             player={player}
                             cell={cell}
-                            draft={draft}
+                            draft={shownDraft}
                             onToggle={() => {
                               setNotice(null);
-                              setDraft((current) => toggleCell(current, cell, player.userId));
+                              setDraft((current) => toggleCell(liveDraft(current, data), cell, player.userId));
                             }}
                           />
                         )}

@@ -24,8 +24,7 @@ import {
   type V1GameRosterView,
 } from '@/hooks/use-v1-game-roster';
 import { V1ApiError } from '@/lib/api-client';
-import { extractErrorCode } from '@/lib/error-message';
-import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
+import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roster-errors';
 import { gameRosterEditStateLabel } from '@/lib/v1-status-labels';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
@@ -121,9 +120,8 @@ function GameRosterScreen({
       setDraft({});
       setNotice({ tone: 'info', message: successMessage });
     } catch (caught) {
-      const code = extractErrorCode(caught);
-      // 마감·명단 변경은 화면이 낡은 것이다 — 최신으로 다시 받고, 이미 무의미한 초안은 버린다.
-      if (code === 'LINEUP_DEADLINE_PASSED' || code === 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER') {
+      // 화면이 낡은 거절(시작·명단·대진·권한 변경)이면 최신으로 다시 받고, 이미 무의미한 초안은 버린다.
+      if (isStaleGameRosterWrite(caught)) {
         setDraft({});
         void roster.refetch();
         void history.refetch();

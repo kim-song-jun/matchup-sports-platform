@@ -7,8 +7,7 @@ import { Button } from '@/components/v1-ui/button';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1ApplyGameRosterBatch, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
-import { extractErrorCode } from '@/lib/error-message';
-import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
+import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roster-errors';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { withFromPath } from '@/lib/session-storage';
 import type { GameRosterAdjustmentReason } from '@/lib/v1-status-labels';
@@ -83,8 +82,7 @@ export function GameRosterQuickSheet({
       await batch.mutateAsync(changes);
       onSaved(changes.length);
     } catch (caught) {
-      const code = extractErrorCode(caught);
-      if (code === 'LINEUP_DEADLINE_PASSED' || code === 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER') {
+      if (isStaleGameRosterWrite(caught)) {
         setLeaving({});
         onStale();
       }

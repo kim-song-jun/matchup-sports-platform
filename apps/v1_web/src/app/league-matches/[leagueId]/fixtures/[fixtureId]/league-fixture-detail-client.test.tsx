@@ -499,7 +499,13 @@ describe('LeagueFixtureDetailClient — 우리 팀 출전(Task 178)', () => {
     useMyMatchRosterSideMock.mockReturnValue(RESOLVED_SIDE);
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(useMyMatchRosterSideMock).toHaveBeenLastCalledWith({ teamIds: ['t1', 't2'], gameId: 'game-1', teamMatchId: 'fx-1' });
+    // 킥오프 시각을 넘겨 지난 경기는 다가오는 경기 목록을 부르지 않게 한다.
+    expect(useMyMatchRosterSideMock).toHaveBeenLastCalledWith({
+      teamIds: ['t1', 't2'],
+      gameId: 'game-1',
+      teamMatchId: 'fx-1',
+      kickoffAt: '2026-09-08T10:00:00.000Z',
+    });
     expect(screen.getAllByTestId('roster-card')).toHaveLength(1);
   });
 
@@ -509,7 +515,12 @@ describe('LeagueFixtureDetailClient — 우리 팀 출전(Task 178)', () => {
     mockRecord('absent');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(useMyMatchRosterSideMock).toHaveBeenLastCalledWith({ teamIds: ['t1', 't2'], gameId: null, teamMatchId: 'fx-1' });
+    expect(useMyMatchRosterSideMock).toHaveBeenLastCalledWith({
+      teamIds: ['t1', 't2'],
+      gameId: null,
+      teamMatchId: 'fx-1',
+      kickoffAt: '2026-09-08T10:00:00.000Z',
+    });
     expect(screen.getAllByTestId('roster-card')).toHaveLength(1);
   });
 

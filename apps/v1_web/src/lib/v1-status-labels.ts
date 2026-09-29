@@ -162,12 +162,13 @@ export function gameRosterReasonLabel(reason: string | null | undefined): string
 export const GAME_ROSTER_AUTO_ACTOR_LABEL = '자동';
 
 /**
- * 조정·결장 기록의 주체. 되돌리기 기록은 서버가 역할을 남기지 않아(role null) 라벨이 없다 —
- * 그때는 이름만 보인다. 자동 계산 결과에는 `GAME_ROSTER_AUTO_ACTOR_LABEL` 을 쓴다.
+ * 조정·결장 기록의 주체. 서버가 사이드 팀 변경으로 자동으로 되돌린 기록(SYSTEM)은 `GAME_ROSTER_AUTO_ACTOR_LABEL`.
+ * 역할을 모르면(옛 기록 null) 라벨 없이 이름만 보인다.
  */
 export function gameRosterActorRoleLabel(role: string | null | undefined): string | null {
   if (role === 'TEAM_MANAGER') return '팀장';
   if (role === 'ADMIN' || role === 'STAFF') return '운영자';
+  if (role === 'SYSTEM') return GAME_ROSTER_AUTO_ACTOR_LABEL;
   return null;
 }
 

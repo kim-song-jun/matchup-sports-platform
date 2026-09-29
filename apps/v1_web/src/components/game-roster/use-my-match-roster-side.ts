@@ -22,10 +22,13 @@ export function useMyMatchRosterSide({
   teamIds,
   gameId,
   teamMatchId,
+  kickoffAt,
 }: {
   teamIds: readonly (string | null)[];
   gameId: string | null;
   teamMatchId: string;
+  /** 경기 상세가 아는 시작 시각 — 지난 경기는 다가오는 경기 목록을 부르지 않는다(`GameRosterSideTarget`). */
+  kickoffAt?: string | null;
 }): MyMatchRosterSide {
   // 비로그인 관전자에게 401 을 만들지 않는다 — 세션 힌트가 있을 때만 확인한다(SSR 불일치를 피해 effect 에서 읽는다).
   const [hasSessionHint, setHasSessionHint] = useState(false);
@@ -35,7 +38,7 @@ export function useMyMatchRosterSide({
   const me = useV1AuthMe({ enabled: hasSessionHint, retry: false });
   const myTeams = useV1MyTeams(undefined, { enabled: me.data !== undefined });
   const myTeamId = myTeams.data?.items.find((team) => teamIds.includes(team.teamId))?.teamId ?? null;
-  const side = useGameRosterSide(myTeamId, { gameId, teamMatchId });
+  const side = useGameRosterSide(myTeamId, { gameId, teamMatchId, kickoffAt });
 
   if (!hasSessionHint || me.isError) return { status: 'none' };
   if (me.data === undefined || myTeams.isPending) return { status: 'loading' };

@@ -51,6 +51,7 @@ type Adjustment = {
   createdAt: string;
   revokedAt: string | null;
   revokedByUserId: string | null;
+  revokedByRole: string | null;
 };
 
 type Unavailability = Omit<V1MemberUnavailability, 'actor'> & { actorUserId: string; actorRole: string };
@@ -79,6 +80,8 @@ export function createV1GameRosterMswHandlers() {
     suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
     /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
     joinedAfter: new Set<string>(),
+    /** 대진 수정으로 이 팀이 더는 뛰지 않는 경기 — 표에서 빠지고 일괄 저장은 404 GAME_SIDE_NOT_FOUND. */
+    detached: new Set<string>(),
   };
 
   const nextId = (prefix: string) => `${prefix}-${++state.seq}`;
@@ -158,7 +161,7 @@ export function createV1GameRosterMswHandlers() {
   }
 
   function matrix(): Pick<V1TeamRosterMatrix, 'games' | 'players'> {
-    const views = GAME_ROSTER_MSW.games.map((g) => ({ game: g, roster: view(g) }));
+    const views = GAME_ROSTER_MSW.games.filter((g) => !state.detached.has(g.gameId)).map((g) => ({ game: g, roster: view(g) }));
     const games: V1TeamRosterMatrixGame[] = views.map(({ game, roster }) => ({
       gameId: game.gameId,
       sideId: game.sideId,
@@ -210,6 +213,7 @@ export function createV1GameRosterMswHandlers() {
       createdAt: at(),
       revokedAt: null,
       revokedByUserId: null,
+      revokedByRole: null,
     });
     return false;
   }
@@ -219,6 +223,7 @@ export function createV1GameRosterMswHandlers() {
     if (!adj) return true;
     adj.revokedAt = at();
     adj.revokedByUserId = GAME_ROSTER_MSW.viewerUserId;
+    adj.revokedByRole = writerRole();
     return false;
   }
 
@@ -251,12 +256,12 @@ export function createV1GameRosterMswHandlers() {
             { ...common, type: 'EXCLUDE', actor: actor(a.actorUserId, a.actorRole), at: a.createdAt },
           ];
           if (a.revokedAt !== null && a.revokedByUserId !== null) {
-            rows.push({ ...common, type: 'REVOKE', actor: actor(a.revokedByUserId, null), at: a.revokedAt });
+            rows.push({ ...common, type: 'REVOKE', actor: actor(a.revokedByUserId, a.revokedByRole), at: a.revokedAt });
           }
           return rows;
         })
         .sort((x, y) => x.at.localeCompare(y.at));
-      return ok({ gameId: game.gameId, sideId: game.sideId, events });
+      return ok({ gameId: game.gameId, sideId: game.sideId, teamId: GAME_ROSTER_MSW.teamId, events });
     }),
     http.post(`${sidePath}/roster-adjustments`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
@@ -267,7 +272,7 @@ export function createV1GameRosterMswHandlers() {
       if (!inRoster(body.userId)) return fail(422, 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER', '기준 명단에 없는 선수예요.');
       const alreadyApplied = exclude(game.gameId, body.userId, body.reason ?? null);
       const adj = activeAdjustment(game.gameId, body.userId)!;
-      const { gameId: _gameId, actorUserId: _actor, revokedByUserId: _revoker, ...adjustment } = adj;
+      const { gameId: _gameId, actorUserId: _actor, revokedByUserId: _revoker, revokedByRole: _revokerRole, ...adjustment } = adj;
       return ok({ alreadyApplied, adjustment, roster: view(game) });
     }),
     http.delete(`${sidePath}/roster-adjustments/:userId`, async ({ request, params }) => {
@@ -290,6 +295,8 @@ export function createV1GameRosterMswHandlers() {
         changes: { gameId: string; userId: string; op: 'EXCLUDE' | 'REVOKE'; reason?: string }[];
       };
       if (!canWrite()) return forbidden('팀장·매니저만 경기 명단을 바꿀 수 있어요.');
+      const detached = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.detached.has(id));
+      if (detached.length > 0) return fail(404, 'GAME_SIDE_NOT_FOUND', '이 팀이 뛰는 경기가 아니에요.', { gameIds: detached });
       const started = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.gameStates.get(id) !== 'SCHEDULED');
       if (started.length > 0) return deadlinePassed(started);
       const results = changes.map((c) => {
@@ -370,6 +377,9 @@ export function createV1GameRosterMswHandlers() {
     },
     markJoinedAfterFixture(userId: string) {
       state.joinedAfter.add(userId);
+    },
+    detachGame(gameId: string) {
+      state.detached.add(gameId);
     },
     markUnavailable(userId: string, startsAt: string, endsAt: string, reason: string | null) {
       state.unavailabilities.push({

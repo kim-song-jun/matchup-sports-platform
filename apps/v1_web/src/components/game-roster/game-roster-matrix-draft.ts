@@ -1,4 +1,6 @@
 import { V1ApiError } from '@/lib/api-client';
+import { extractErrorCode } from '@/lib/error-message';
+import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roster-errors';
 import type {
   V1GameRosterBatchChange,
   V1TeamRosterCell,
@@ -63,15 +65,51 @@ export function draftToBatchChanges(
   );
 }
 
-/** 409 로 거절된 경기(시작됨)의 초안만 버린다 — 나머지는 다시 저장할 수 있게 남긴다. */
+/** 지금 표로 보낼 수 있는 초안만. 표가 새로 오면(경기 시작·권한·명단 변경) "저장 전" 표시도 보낼 것만 남는다. */
+export function liveDraft(draft: TeamRosterDraft, matrix: Pick<V1TeamRosterMatrix, 'games' | 'players'>): TeamRosterDraft {
+  return Object.fromEntries(draftToBatchChanges(draft, matrix).map((change) => [cellKey(change.gameId, change.userId), change.op]));
+}
+
+/** 거절된 경기의 초안만 버린다 — 나머지는 다시 저장할 수 있게 남긴다. */
 export function dropGamesFromDraft(draft: TeamRosterDraft, gameIds: readonly string[]): TeamRosterDraft {
   const blocked = new Set(gameIds);
   return Object.fromEntries(Object.entries(draft).filter(([key]) => !blocked.has(key.split(':')[0] ?? '')));
 }
 
-/** 일괄 저장 409(`LINEUP_DEADLINE_PASSED`)가 알려 준 시작된 경기 id. */
-export function startedGameIds(error: unknown): string[] {
+/** 일괄 저장이 거절한 경기 id(`details.gameIds` — 409 시작됨, 404 이 팀 경기 아님). */
+export function rejectedGameIds(error: unknown): string[] {
   if (!(error instanceof V1ApiError)) return [];
   const details = error.details as { gameIds?: unknown } | null | undefined;
   return Array.isArray(details?.gameIds) ? details.gameIds.filter((id): id is string => typeof id === 'string') : [];
+}
+
+const REJECTED_GAME_MESSAGES: Record<string, string> = {
+  LINEUP_DEADLINE_PASSED: '그사이 시작된 경기가 있어 저장하지 못했어요. 그 경기 변경은 뺐으니 나머지를 다시 저장해 주세요.',
+  GAME_SIDE_NOT_FOUND: '대진이 바뀌어 이 팀이 뛰지 않게 된 경기가 있어요. 그 경기 변경은 뺐으니 나머지를 다시 저장해 주세요.',
+};
+
+/**
+ * 표(팀 경기 명단·어드민 펼침) 일괄 저장이 실패한 뒤 할 일. 경기 단위로 거절됐으면 그 경기 초안만 버리고,
+ * 화면이 낡은 거절이면 표를 다시 받는다 — 안 그러면 같은 초안으로 같은 에러를 되풀이한다.
+ */
+export function batchFailureRecovery(error: unknown): {
+  nextDraft: (current: TeamRosterDraft) => TeamRosterDraft;
+  refetch: boolean;
+  message: string;
+} {
+  const code = extractErrorCode(error);
+  const rejectedMessage = code === null ? undefined : REJECTED_GAME_MESSAGES[code];
+  if (rejectedMessage !== undefined) {
+    const ids = rejectedGameIds(error);
+    return {
+      nextDraft: (current) => (ids.length > 0 ? dropGamesFromDraft(current, ids) : {}),
+      refetch: true,
+      message: rejectedMessage,
+    };
+  }
+  return {
+    nextDraft: (current) => current,
+    refetch: isStaleGameRosterWrite(error),
+    message: gameRosterErrorMessage(error, '명단을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'),
+  };
 }

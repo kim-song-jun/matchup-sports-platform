@@ -6,6 +6,8 @@ import { v1Keys } from '@/lib/query-keys';
 import type { GameRosterAdjustmentReason, MemberUnavailabilityReason } from '@/lib/v1-status-labels';
 import type { V1GameState } from '@/types/api';
 import type { V1GameRosterSummary } from '@/hooks/use-v1-api';
+import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
+import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 
 /**
  * Task 178 경기별 출전 명단 — 데이터 계층.
@@ -19,9 +21,10 @@ export type V1GameRosterViewerRole = 'TEAM_MANAGER' | 'TEAM_MEMBER' | 'ADMIN' | 
 export type V1GameRosterPlayerStatus = 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED';
 
 export type V1GameRosterActor = {
-  userId: string;
+  /** 사이드 팀이 바뀌어 자동으로 되돌린 기록은 사람이 없어 null. */
+  userId: string | null;
   displayName: string;
-  /** TEAM_MANAGER | ADMIN | STAFF. 되돌리기 기록은 역할이 남지 않아 null. */
+  /** TEAM_MANAGER | ADMIN | STAFF | SYSTEM(자동 되돌림). 옛 기록은 null 일 수 있다. */
   role: string | null;
 };
 
@@ -77,7 +80,8 @@ export type V1GameRosterHistoryEvent = {
   at: string;
 };
 
-export type V1GameRosterHistory = { gameId: string; sideId: string; events: V1GameRosterHistoryEvent[] };
+/** `teamId` = 지금 사이드 팀 — 기록은 이 팀의 조정만 온다(대진이 바뀌면 이전 팀 기록은 빠진다). */
+export type V1GameRosterHistory = { gameId: string; sideId: string; teamId: string; events: V1GameRosterHistoryEvent[] };
 
 export type V1GameRosterAdjustment = {
   id: string;
@@ -189,8 +193,10 @@ export type V1CreateMemberUnavailabilityPayload = {
 
 // ── 캐시 무효화 규칙 ─────────────────────────────────────────────────────────
 // 조정·일괄 저장은 서버가 같은 트랜잭션에서 경기 명단(라인업 리비전)을 다시 계산하고, 결장 기간은
-// 워커가 이어서 맞춘다. 어느 쪽이든 명단·변경 기록뿐 아니라 그 경기 라인업, 팀 다가오는 경기 요약,
-// 팀 표, 어드민 펼침 표가 전부 낡는다. 어드민 표는 신청 id 를 여기서 모르므로 접두사로 통째 무효화한다.
+// 워커가 이어서 맞춘다. 어느 쪽이든 명단·변경 기록뿐 아니라 그 경기 라인업을 읽는 화면 전부(운영 콘솔,
+// 팀매치 경량 콘솔, 경기 상세 공개 기록 — 킥오프 60분 전부터 시작 전 경기에도 라인업이 나간다), 팀 다가오는
+// 경기 요약, 팀 표, 어드민 펼침 표가 낡는다. 키에 gameId 가 없는 것(대회 콘솔·공개 기록·어드민 표)은
+// 접두사·모양으로 통째 낡게 둔다 — 떠 있는 쿼리만 다시 받는다.
 
 function invalidateTeamRosterViews(queryClient: QueryClient, teamId: string) {
   void queryClient.invalidateQueries({ queryKey: v1Keys.teamUpcomingGames(teamId) });
@@ -198,21 +204,42 @@ function invalidateTeamRosterViews(queryClient: QueryClient, teamId: string) {
   void queryClient.invalidateQueries({ queryKey: v1Keys.adminGameRostersAll() });
 }
 
-function invalidateGameSide(queryClient: QueryClient, gameId: string, sideId: string) {
-  void queryClient.invalidateQueries({ queryKey: v1Keys.gameSideRosterAll(gameId, sideId) });
-  void queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(gameId) });
+/** `v1Keys.fixtureLineup(t, f)` — 대회 운영 콘솔의 라인업. */
+function isFixtureLineupKey(key: readonly unknown[]): boolean {
+  return key[0] === 'v1' && key[1] === 'tournament-ops' && key[3] === 'fixtures' && key[5] === 'lineup';
 }
 
-/** 결장 기간은 그 팀의 기간 안 경기 여러 개를 바꾼다 — 어느 경기인지 응답이 알려 주지 않는다. */
-function isAnyGameRosterOrLineupKey(key: readonly unknown[]): boolean {
-  return key[0] === 'v1' && key[1] === 'games' && (key[3] === 'sides' || key[3] === 'lineups');
+/** 경기 상세 공개 기록(대회 `match`·리그 `league-fixture-record`) — 공개 라인업이 여기 실린다. */
+function isPublicMatchRecordKey(key: readonly unknown[]): boolean {
+  const [root, lane] = publicGameRecordsKeys.all;
+  return key[0] === root && key[1] === lane && (key[2] === 'match' || key[2] === 'league-fixture-record');
+}
+
+/** 경기 id 단위 라인업 키 — 결과 검토용 `lineups`, 팀매치 콘솔용 `operations-lineup`. */
+function isGameLineupKey(key: readonly unknown[]): boolean {
+  return key[0] === 'v1' && key[1] === 'games' && (key[3] === 'lineups' || key[3] === 'operations-lineup');
+}
+
+/** 명단이 바뀐 경기의 라인업을 읽는 화면들. `gameIds` 를 모르면(결장 기간) 모든 경기 라인업을 낡게 둔다. */
+function invalidateLineupReaders(queryClient: QueryClient, gameIds: readonly string[] | null) {
+  if (gameIds === null) {
+    void queryClient.invalidateQueries({ predicate: (query) => isGameLineupKey(query.queryKey) });
+  } else {
+    for (const gameId of gameIds) {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(gameId) });
+      void queryClient.invalidateQueries({ queryKey: v1Keys.gameOperationsLineup(gameId) });
+    }
+  }
+  void queryClient.invalidateQueries({
+    predicate: (query) => isFixtureLineupKey(query.queryKey) || isPublicMatchRecordKey(query.queryKey),
+  });
 }
 
 function afterSideWrite(queryClient: QueryClient, roster: V1GameRosterView) {
   // 응답이 새 명단을 싣고 오므로 명단은 바로 넣고, 기록·라인업만 다시 받는다.
   queryClient.setQueryData(v1Keys.gameRoster(roster.gameId, roster.sideId), roster);
   void queryClient.invalidateQueries({ queryKey: v1Keys.gameRosterAdjustments(roster.gameId, roster.sideId) });
-  void queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(roster.gameId) });
+  invalidateLineupReaders(queryClient, [roster.gameId]);
   invalidateTeamRosterViews(queryClient, roster.teamId);
 }
 
@@ -289,7 +316,10 @@ export function useV1ApplyGameRosterBatch(teamId: string) {
       v1Post<V1GameRosterBatchResult>(`/teams/${teamId}/game-rosters/batch`, { changes }),
     onSuccess: (result) => {
       const sides = new Map(result.results.map((row) => [`${row.gameId}:${row.sideId}`, row]));
-      for (const row of sides.values()) invalidateGameSide(queryClient, row.gameId, row.sideId);
+      for (const row of sides.values()) {
+        void queryClient.invalidateQueries({ queryKey: v1Keys.gameSideRosterAll(row.gameId, row.sideId) });
+      }
+      invalidateLineupReaders(queryClient, [...new Set(result.results.map((row) => row.gameId))]);
       invalidateTeamRosterViews(queryClient, result.teamId);
     },
   });
@@ -314,9 +344,13 @@ export function useV1MemberUnavailability(
   });
 }
 
+/** 결장 기간은 그 팀의 기간 안 경기 여러 개를 바꾼다 — 어느 경기인지 응답이 알려 주지 않는다. */
 function afterUnavailabilityWrite(queryClient: QueryClient, teamId: string, userId: string) {
   void queryClient.invalidateQueries({ queryKey: v1Keys.teamMemberUnavailability(teamId, userId) });
-  void queryClient.invalidateQueries({ predicate: (query) => isAnyGameRosterOrLineupKey(query.queryKey) });
+  void queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'v1' && query.queryKey[1] === 'games' && query.queryKey[3] === 'sides',
+  });
+  invalidateLineupReaders(queryClient, null);
   invalidateTeamRosterViews(queryClient, teamId);
 }
 
@@ -366,6 +400,7 @@ export function useV1AdminRegistrationGameRosters(
 /**
  * 운영 보드 — 보이는 시작 전 경기의 참가 신청 여러 개를 한 번에. 경기마다 명단을 부르지 않고
  * 팀(신청)마다 한 번씩 표를 받는다(표 한 장이 그 팀의 시작 전 경기 전부를 싣는다).
+ * 팀장이 다른 기기에서 빼거나 앞 경기 결과로 출전정지가 생겨도 보이게 보드 본체와 같은 주기로 다시 받는다.
  */
 export function useV1AdminRegistrationGameRosterList(tournamentId: string, registrationIds: readonly string[]) {
   return useQueries({
@@ -376,6 +411,7 @@ export function useV1AdminRegistrationGameRosterList(tournamentId: string, regis
           `/admin/tournaments/${tournamentId}/registrations/${registrationId}/game-rosters`,
         ),
       retry: false,
+      refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
     })),
   });
 }

@@ -5,6 +5,7 @@ import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiE
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload } from '@/lib/image-compress';
 import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
+import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
@@ -5167,7 +5168,7 @@ export function useV1TournamentOperationsBoard(
       ),
     enabled: Boolean(tournamentId) && (options?.enabled ?? true),
     placeholderData: keepPreviousData,
-    refetchInterval: 15_000,
+    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
   });
 }
 

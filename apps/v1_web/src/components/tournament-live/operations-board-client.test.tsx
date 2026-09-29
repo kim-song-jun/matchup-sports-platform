@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperationsBoardClient } from './operations-board-client';
@@ -242,9 +242,41 @@ describe('OperationsBoardClient', () => {
       expect(screen.queryByText(/블루팀 ·/)).toBeNull();
     });
 
-    it('진행 중 경기에는 명단 요약·버튼을 보이지 않고, 조회 실패는 실패라고 말한다', () => {
+    it('진행 중 경기에는 요약 표에 그 경기 열이 있어도 명단 요약·버튼을 보이지 않는다', () => {
+      // 같은 두 팀의 시작 전 경기(대조군)와 진행 중 경기 — 두 경기 모두 표에 열이 있다.
+      const LIVE_ITEM: V1TournamentOperationsBoardItem = { ...ITEM_A, fixtureId: 'fixture-live', fixtureNumber: 7, gameId: 'game-live' };
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
-        data: { ...PAGE, items: [SCHEDULED_ITEM, { ...ITEM_A, fixtureId: 'fixture-live', gameId: 'game-live', homeRegistrationId: 'reg-live' }] },
+        data: { ...PAGE, items: [SCHEDULED_ITEM, LIVE_ITEM] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      const withLiveColumn = (matrix: ReturnType<typeof matrixFor>) => ({
+        ...matrix,
+        data: { ...matrix.data, games: [...matrix.data.games, { ...matrix.data.games[0], gameId: 'game-live', gameState: 'LIVE' }] },
+      });
+      mocks.useRosterList.mockReturnValue([
+        withLiveColumn(matrixFor('reg-home', 'team-red', '블루팀', { excluded: 1, unavailable: 0, suspended: 0 })),
+        withLiveColumn(matrixFor('reg-away', 'team-blue', '레드팀', { excluded: 0, unavailable: 0, suspended: 0 })),
+      ]);
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      const rowsOf = (label: string) =>
+        screen.getAllByText(label).map((node) => (node.closest('tr') ?? node.closest('li')) as HTMLElement);
+      const liveRows = rowsOf('8강 7번');
+      expect(liveRows.length).toBeGreaterThan(0);
+      for (const row of liveRows) {
+        expect(within(row).queryByRole('link', { name: /경기 명단$/ })).toBeNull();
+        expect(within(row).queryByText(/빠짐 \d/)).toBeNull();
+      }
+      const scheduledRows = rowsOf('레드팀 vs 블루팀');
+      expect(scheduledRows.some((row) => within(row).queryByRole('link', { name: '레드팀 경기 명단' }) !== null)).toBe(true);
+    });
+
+    it('요약 조회가 실패한 팀은 실패라고 말하고 버튼을 만들지 않는다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [SCHEDULED_ITEM] },
         isPending: false,
         isError: false,
         isFetching: false,

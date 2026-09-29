@@ -14,6 +14,7 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
     data: {
       gameId: 'g1',
       tournamentTitle: '대회',
+      scheduledAt: '2026-09-08T10:00:00.000Z',
       home: { registrationId: 'r1', teamId: 'team-h', teamName: '홈' },
       away: { registrationId: 'r2', teamId: 'team-a', teamName: '원정' },
     },
@@ -60,6 +61,7 @@ describe('MatchPageClient', () => {
       teamIds: ['team-h', 'team-a'],
       gameId: 'g1',
       teamMatchId: 'fx-1',
+      kickoffAt: '2026-09-08T10:00:00.000Z',
     });
     expect(screen.getByTestId('detail-after-header')).toContainElement(screen.getByTestId('roster-card'));
   });

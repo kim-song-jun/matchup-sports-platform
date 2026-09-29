@@ -129,6 +129,36 @@ describe('경기 명단 관리 — 칩 토글과 일괄 저장', () => {
     expect(batchBodies().at(-1)).toEqual({ changes: [{ gameId: G2.gameId, userId: 'player-1', op: 'EXCLUDE' }] });
   });
 
+  it('대진이 바뀌어 우리 팀 경기가 아니게 되면(404) 그 경기 변경만 빼고 표를 다시 받는다', async () => {
+    renderPage();
+    const card = within(await playerCard('김민재'));
+    fireEvent.click(card.getByRole('button', { name: /^10\/4 마포 FC 출전/ }));
+    fireEvent.click(card.getByRole('button', { name: /^10\/11 강남 유나이티드 출전/ }));
+    mock.detachGame(G1.gameId);
+    const matrixGets = () => mock.requests.filter((r) => r.method === 'GET' && r.path.endsWith('/game-rosters')).length;
+    const before = matrixGets();
+
+    fireEvent.click(screen.getByRole('button', { name: '변경 2건 저장' }));
+    await screen.findByText(/대진이 바뀌어 이 팀이 뛰지 않게 된 경기가 있어요/);
+    await waitFor(() => expect(matrixGets()).toBe(before + 1));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /10\/4 마포 FC/ })).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+    await screen.findByText('변경 1건을 저장했어요.');
+    expect(batchBodies().at(-1)).toEqual({ changes: [{ gameId: G2.gameId, userId: 'player-1', op: 'EXCLUDE' }] });
+  });
+
+  it('열어 둔 사이 권한이 바뀌면(403) 표를 다시 받아 보기 전용이 된다', async () => {
+    renderPage();
+    fireEvent.click(within(await playerCard('김민재')).getByRole('button', { name: /^10\/4 마포 FC 출전/ }));
+    mock.setCanWrite(false);
+
+    fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+    await screen.findByText('팀장·매니저만 경기 명단을 바꿀 수 있어요.');
+    await waitFor(() => expect(screen.queryByRole('button', { name: /저장/ })).toBeNull());
+    expect(within(await playerCard('김민재')).getByRole('button', { name: /^10\/4 마포 FC 출전/ })).toBeDisabled();
+  });
+
   it('팀원은 표를 받지 못하고 팀장에게 알리라는 안내를 본다', async () => {
     mock.setViewerRole('TEAM_MEMBER');
     renderPage();

@@ -208,6 +208,23 @@ describe('팀장 — 모아서 저장', () => {
   });
 });
 
+describe('열어 둔 사이 바뀐 서버 상태', () => {
+  it('저장할 때 권한이 없어졌으면(403) 명단을 다시 받아 읽기 전용으로 바꾼다', async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole('checkbox', { name: '박서준 이번 경기 출전' }));
+    mock.setCanWrite(false);
+    const rosterGets = () => mock.requests.filter((r) => r.method === 'GET' && r.path.endsWith('/roster')).length;
+    const before = rosterGets();
+
+    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    expect(await screen.findByText('팀장·매니저만 경기 명단을 바꿀 수 있어요.')).toBeInTheDocument();
+    await waitFor(() => expect(rosterGets()).toBe(before + 1));
+    expect(await screen.findByText('보기 전용')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /저장/ })).toBeNull();
+  });
+});
+
 describe('읽기 전용', () => {
   it('팀원에게는 편집 조작이 없고 팀장에게 알리라고 안내한다', async () => {
     mock.setViewerRole('TEAM_MEMBER');

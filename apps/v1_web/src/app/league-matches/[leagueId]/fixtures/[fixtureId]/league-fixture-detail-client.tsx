@@ -123,6 +123,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     teamIds: [fixture?.homeTeamId ?? null, fixture?.awayTeamId ?? null],
     gameId: recordQuery.data?.gameId ?? null,
     teamMatchId: fixtureId,
+    kickoffAt: fixture === null ? undefined : fixture.startAt,
   });
   const rosterCard = <MatchTeamRosterCard side={rosterSide} />;
 

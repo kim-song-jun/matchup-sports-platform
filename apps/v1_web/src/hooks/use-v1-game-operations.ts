@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { retryTransientFailure, v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
+import { extractErrorCode } from '@/lib/error-message';
 import type {
   FixtureLineupResponse,
   GameCommandName,
@@ -71,19 +72,25 @@ export function useV1SetParticipantArrival(
   scope: { tournamentId: string; fixtureId: string } | null,
 ) {
   const queryClient = useQueryClient();
+  const refreshLineups = () => {
+    if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameOperationsLineup(gameId) });
+    if (scope) {
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.fixtureLineup(scope.tournamentId, scope.fixtureId),
+      });
+    }
+  };
   return useMutation({
     mutationFn: (vars: { participantId: string; arrived: boolean }) =>
       v1Patch<{ id: string; sideId: string; arrivedAt: string | null }>(
         `/games/${gameId}/participants/${vars.participantId}/arrival`,
         { arrived: vars.arrived },
       ),
-    onSuccess: () => {
-      if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameOperationsLineup(gameId) });
-      if (scope) {
-        queryClient.invalidateQueries({
-          queryKey: v1Keys.fixtureLineup(scope.tournamentId, scope.fixtureId),
-        });
-      }
+    onSuccess: refreshLineups,
+    // 명단이 다시 계산돼 띄워 둔 참가자 행이 사라졌다(409 SUPERSEDED·404) — 새 명단을 받아야 다시 누를 수 있다.
+    onError: (error) => {
+      const code = extractErrorCode(error);
+      if (code === 'GAME_PARTICIPANT_SUPERSEDED' || code === 'GAME_PARTICIPANT_NOT_FOUND') refreshLineups();
     },
   });
 }

@@ -40,6 +40,7 @@ export function MatchPageClient({
     teamIds: [data?.home?.teamId ?? null, data?.away?.teamId ?? null],
     gameId: data?.gameId ?? null,
     teamMatchId: fixtureId,
+    kickoffAt: data === undefined ? undefined : data.scheduledAt,
   });
 
   // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).

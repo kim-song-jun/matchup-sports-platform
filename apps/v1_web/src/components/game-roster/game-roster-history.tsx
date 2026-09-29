@@ -8,10 +8,15 @@ export function gameRosterHistoryTitle(event: V1GameRosterHistoryEvent): string 
   return reason === null ? `${event.displayName} 빠짐` : `${event.displayName} 빠짐 · ${reason}`;
 }
 
-/** 시각 · 누가. 되돌리기는 서버가 역할을 남기지 않아 이름만 보인다. */
+/** 시각 · 누가. 사람이 없는 기록(대진이 바뀌어 자동으로 되돌림)은 이름 대신 역할 라벨("자동")만. */
 export function gameRosterHistoryCaption(event: V1GameRosterHistoryEvent): string {
   const role = gameRosterActorRoleLabel(event.actor.role);
-  const who = role === null ? event.actor.displayName : `${role} ${event.actor.displayName}`;
+  const who =
+    event.actor.userId === null
+      ? (role ?? event.actor.displayName)
+      : role === null
+        ? event.actor.displayName
+        : `${role} ${event.actor.displayName}`;
   const when = formatTournamentDateTimeShort(event.at);
   return when === null ? who : `${when} · ${who}`;
 }

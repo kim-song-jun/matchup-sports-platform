@@ -114,7 +114,10 @@ export function buildTeamRosterMatrix(input: {
       editable: input.canWrite && loaded !== null && game.gameState === 'SCHEDULED',
       summary: loaded === null ? null : summarizeGameRoster(loaded.computation),
     })),
-    players: [...players.entries()].map(([userId, player]) => ({
+    // 대회·리그마다 등번호가 달라 한 번호로 줄 세울 수 없다 — 이름순.
+    players: [...players.entries()]
+      .sort(([aId, a], [bId, b]) => a.displayName.localeCompare(b.displayName, 'ko') || aId.localeCompare(bId))
+      .map(([userId, player]) => ({
       userId,
       ...player,
       cells: input.columns.map(

@@ -176,6 +176,9 @@ describe('읽기 전용', () => {
     await screen.findByRole('heading', { name: '출전 3명' });
     expect(screen.getByText('보기 전용')).toBeInTheDocument();
     expect(screen.getByText(/명단은 팀장·매니저가 바꿀 수 있어요/)).toBeInTheDocument();
+    // 머리 문구도 팀원이 바꿀 수 있는 것처럼 말하지 않는다.
+    expect(screen.getByText(/시작 전까지 명단이 바뀔 수 있어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/시작 전까지 바꿀 수 있어요/)).toBeNull();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /저장|참가 명단대로/ })).toBeNull();
     expect(screen.getByText('7 김민재')).toBeInTheDocument();

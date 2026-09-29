@@ -159,3 +159,21 @@ describe('decideTeamRosterAccess — 팀 단위 명단 권한', () => {
     expect(decideTeamRosterAccess({ membershipRole: null, adminRole: null })).toBeNull();
   });
 });
+
+describe('buildTeamRosterMatrix — 선수 순서', () => {
+  it('처음 나온 순서가 아니라 이름순이다 — 대회·리그마다 등번호가 달라 번호로 줄 세울 수 없다', () => {
+    const named = (userId: string, name: string, jerseyNumber: number | null): GameRosterBaseEntry => ({
+      ...entry(userId),
+      displayNameSnapshot: name,
+      jerseyNumber,
+    });
+    const matrix = buildTeamRosterMatrix({
+      canWrite: true,
+      columns: [
+        { game: game('cup-1'), loaded: loaded([named('u1', '하늘', 1), named('u2', '가람', 9)]) },
+        { game: game('league-1', { competitionId: 'league', competitionKind: 'LEAGUE' }), loaded: loaded([named('u3', '나래', 2)]) },
+      ],
+    });
+    expect(matrix.players.map((player) => player.displayName)).toEqual(['가람', '나래', '하늘']);
+  });
+});

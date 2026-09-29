@@ -8,6 +8,7 @@ import { loadCompetitionRosterBase, loadGameRoster } from '../games/roster/game-
 import { summarizeGameRoster, type GameRosterSummary } from '../games/roster/game-roster-matrix';
 import { PrismaService } from '../prisma/prisma.service';
 import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
+import { tournamentRoundLabel } from '../tournaments/tournament-round-label';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
@@ -270,7 +271,7 @@ export class LineupTodoService {
       const competitionKind = isTournamentMatch ? 'TOURNAMENT' as const : leagueTitle === null ? 'FRIENDLY' as const : 'LEAGUE' as const;
       const weekNumber = weekNumberByTeamMatchId.get(match.id);
       const title = isTournamentMatch
-        ? [tournamentTitle, match.tournamentDetails!.round].filter(Boolean).join(' · ')
+        ? [tournamentTitle, tournamentRoundLabel(match.tournamentDetails!.round)].filter(Boolean).join(' · ')
         : leagueTitle === null || weekNumber === undefined ? '팀 매치' : `${leagueTitle} ${weekNumber}주차`;
       for (const side of sides) {
         if (side.teamId === null || side.teamName === null) continue;

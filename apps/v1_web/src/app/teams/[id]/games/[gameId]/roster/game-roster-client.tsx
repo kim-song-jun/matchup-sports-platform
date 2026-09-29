@@ -162,7 +162,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
         <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
           {started
             ? '경기가 시작돼 명단을 바꿀 수 없어요.'
-            : `${formatTournamentDateTimeShort(data.deadline) ?? '경기'} 시작 전까지 바꿀 수 있어요.`}
+            : `${formatTournamentDateTimeShort(data.deadline) ?? '경기'} 시작 전까지 ${canEdit ? '바꿀 수 있어요.' : '명단이 바뀔 수 있어요.'}`}
           {data.baseSource === 'TEAM_MEMBERS' ? ' 참가 명단이 없어 팀원 전체가 기준이에요.' : ''}
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>

@@ -36,7 +36,7 @@ export async function loadCompetitionRosterBase(
     if (team === undefined) return null;
     return {
       source: team.registeredPlayers.length > 0 ? 'REGISTRATION' : 'TEAM_MEMBERS',
-      entries: leagueTeamRosterBase(team),
+      entries: leagueTeamRosterBase(team).sort(rosterOrder),
     };
   }
 
@@ -65,8 +65,18 @@ export async function loadCompetitionRosterBase(
       displayNameSnapshot: participantDisplayName(player),
       jerseyNumber: jerseys.get(player.id) ?? null,
       sourceParticipantId: player.id,
-    })),
+    })).sort(rosterOrder),
   };
+}
+
+/** 명단 화면·요약·계산 목록이 이 순서를 그대로 쓴다 — 등번호 오름차순, 번호 없는 선수는 뒤에 이름순. */
+function rosterOrder(a: GameRosterBaseEntry, b: GameRosterBaseEntry): number {
+  if (a.jerseyNumber !== b.jerseyNumber) {
+    if (a.jerseyNumber === null) return 1;
+    if (b.jerseyNumber === null) return -1;
+    return a.jerseyNumber - b.jerseyNumber;
+  }
+  return a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, 'ko') || a.userId.localeCompare(b.userId);
 }
 
 export interface GameRosterSideContext extends CompetitionTeamScope {

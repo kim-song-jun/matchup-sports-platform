@@ -143,7 +143,26 @@ describe('loadGameRoster — 대회 경기', () => {
     });
     const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
     expect(loaded?.computation.excluded.map((row) => row.adjustmentId)).toEqual(['adj-new']);
-    expect(loaded?.computation.participants.map((row) => row.userId)).toEqual(['pa', 'pb']);
+    expect(loaded?.computation.participants.map((row) => row.userId)).toEqual(['pb', 'pa']);
+  });
+
+  it('기준 명단은 등번호 오름차순, 번호 없는 선수는 뒤에 이름순이다 — 계산 목록도 그 순서다', async () => {
+    const tx = fakeTx({
+      teamMatch: TOURNAMENT_MATCH,
+      sideTeamId: 'team-A',
+      registration: TOURNAMENT_REGISTRATION,
+      jerseys: [
+        { id: 'tp-1', jersey_number: 10 },
+        { id: 'tp-3', jersey_number: 3 },
+      ],
+    });
+    const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+    expect(loaded?.base.map((entry) => [entry.userId, entry.jerseyNumber])).toEqual([
+      ['pc', 3],
+      ['pa', 10],
+      ['pb', null],
+    ]);
+    expect(loaded?.computation.participants.map((row) => row.userId)).toEqual(['pc', 'pa', 'pb']);
   });
 
   it('규정이 있는 대회는 그 팀 경기 순서로 판정한 출전정지 선수를 뺀다', async () => {

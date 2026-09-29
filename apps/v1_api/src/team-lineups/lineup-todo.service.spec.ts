@@ -177,7 +177,7 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
             approvedApplicantTeam: { name: '망원 FC' },
             tournamentId,
             tournament: { title: '가을 컵' },
-            tournamentDetails: { round: '준결승' },
+            tournamentDetails: { round: 'league_r2' },
             leagueId: null,
             league: null,
             game: { id: 'game-tournament' },
@@ -197,7 +197,8 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
           competitionKind: 'TOURNAMENT',
           tournamentId,
           tournamentTitle: '가을 컵',
-          title: '가을 컵 · 준결승',
+          // 대진 생성기의 라운드 코드는 화면 이름으로 바꿔 싣는다.
+          title: '가을 컵 · 조별리그 2라운드',
           deepLink: `/teams/${teamId}/games/game-tournament/roster`,
         }),
       ]));

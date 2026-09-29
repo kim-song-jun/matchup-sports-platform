@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react';
+import { Hourglass } from 'lucide-react';
 import { formatTournamentDateLong } from '@/lib/date-utils';
 
 type HeadingLevel = 'h1' | 'h2' | 'h3';
 
-/** landing-rhythm 모듈: 키워드 → 제목 → 본문 → 그 아래 자유 콘텐츠. */
+/**
+ * landing-rhythm 모듈: 키워드 → 제목 → 본문 → 그 아래 자유 콘텐츠.
+ * `layout='split'` 은 1024+ 에서 머리(+`headExtra`)를 왼쪽에 붙여 두고 콘텐츠를 오른쪽에 놓는다(그 아래는 위아래).
+ */
 export function PublicSection({
   id,
   keyword,
@@ -11,6 +15,8 @@ export function PublicSection({
   lead,
   as: Heading = 'h2',
   tone = 'default',
+  layout = 'stack',
+  headExtra,
   children,
 }: {
   id: string;
@@ -20,44 +26,82 @@ export function PublicSection({
   as?: HeadingLevel;
   /** 페이지당 하나의 강조 섹션만 `muted` 배경을 쓴다. */
   tone?: 'default' | 'muted';
+  layout?: 'stack' | 'split';
+  headExtra?: ReactNode;
   children?: ReactNode;
 }) {
   const headingId = `${id}-heading`;
+  const header = (
+    <header className="tm-ps-section-header" data-reveal>
+      {keyword ? <p className="tm-ps-kw">{keyword}</p> : null}
+      <Heading id={headingId} className={Heading === 'h1' ? 'tm-ps-title-page' : 'tm-ps-title'}>{title}</Heading>
+      {lead ? <p className="tm-ps-lead">{lead}</p> : null}
+    </header>
+  );
   return (
     <section id={id} className="tm-ps-section" data-tone={tone === 'muted' ? 'muted' : undefined} aria-labelledby={headingId}>
-      <div className="tm-ps-container">
-        <header className="tm-ps-section-header">
-          {keyword ? <p className="tm-ps-kw">{keyword}</p> : null}
-          <Heading id={headingId} className={Heading === 'h1' ? 'tm-ps-title-page' : 'tm-ps-title'}>{title}</Heading>
-          {lead ? <p className="tm-ps-lead">{lead}</p> : null}
-        </header>
-        {children}
-      </div>
+      {layout === 'split' ? (
+        <div className="tm-ps-container tm-ps-split">
+          <div className="tm-ps-split-head">
+            {header}
+            {headExtra}
+          </div>
+          <div className="tm-ps-split-body">{children}</div>
+        </div>
+      ) : (
+        <div className="tm-ps-container">
+          {header}
+          {headExtra}
+          {children}
+        </div>
+      )}
     </section>
   );
 }
 
-/** 정직 고지 블록. alpha 에 없는 기능을 약속하지 않기 위한 경계를 페이지에 그대로 보여 준다. */
+/**
+ * 정직 고지 블록. alpha 에 없는 기능을 약속하지 않기 위한 경계를 페이지에 그대로 보여 준다.
+ * `collapsible` 이면 <details> 로 접되 항목은 서버 HTML 에 그대로 있다.
+ */
 export function PublicHonestNote({
   title = '아직 지원하지 않는 것',
   items,
   as: Heading = 'h3',
+  collapsible = false,
 }: {
   title?: string;
   items: readonly { readonly title: string; readonly body: string }[];
   as?: 'h2' | 'h3';
+  collapsible?: boolean;
 }) {
+  const list = (
+    <ul className="tm-ps-honest-list">
+      {items.map((item) => (
+        <li key={item.title}>
+          <span className="tm-ps-honest-icon" aria-hidden="true"><Hourglass size={16} /></span>
+          <span className="tm-ps-honest-text">
+            <strong>{item.title}</strong>
+            <span>{item.body}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+  if (collapsible) {
+    return (
+      <details className="tm-ps-honest" data-collapsible="true">
+        <summary className="tm-ps-honest-summary">
+          <Heading className="tm-ps-honest-title">{title}</Heading>
+          <span className="tm-ps-faq-chevron" aria-hidden="true" />
+        </summary>
+        {list}
+      </details>
+    );
+  }
   return (
     <aside className="tm-ps-honest" aria-label={title}>
       <Heading className="tm-ps-honest-title">{title}</Heading>
-      <ul className="tm-ps-honest-list">
-        {items.map((item) => (
-          <li key={item.title}>
-            <strong>{item.title}</strong>
-            <span>{item.body}</span>
-          </li>
-        ))}
-      </ul>
+      {list}
     </aside>
   );
 }

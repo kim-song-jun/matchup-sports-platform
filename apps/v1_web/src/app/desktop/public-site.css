@@ -1,7 +1,8 @@
 /*
  * 공개 소개·도움말 페이지(/faq, /contact, /for/*, /help/*) 공용 셸. 랜딩처럼 앱 셸 밖 독립 페이지라
  * 모바일 기본 스타일까지 이 파일에 두고 768 → 1024 → 1440 순으로 덧씌운다.
- * 테마 토글 버튼(.tm-landing-icon-btn)은 랜딩 컴포넌트를 그대로 쓰므로 스타일도 landing.css 것을 쓴다.
+ * GNB 는 랜딩 v4 와 같은 컴포넌트(PublicSiteGnb)라 바 자체의 스타일은 landing.css 의 .tm-landing-nav* 를 쓴다.
+ * 숨김 모션은 .tm-ps[data-motion='on'](JS 준비 + 모션 감소 아님) 아래에서만 건다 — 서버 HTML 은 최종 상태다.
  */
 
 .tm-ps {
@@ -42,6 +43,24 @@ html:has(.tm-ps) {
   outline: none;
 }
 
+/* 검색·분류 필터가 hidden 으로 가린 항목이 display 를 지정한 클래스에 이겨 다시 보이지 않게 */
+.tm-ps [hidden] {
+  display: none !important;
+}
+
+/* 스크롤 등장 — PublicSiteRoot 가 보이는 순간 .is-in 을 붙인다(1회) */
+@media (prefers-reduced-motion: no-preference) {
+  .tm-ps[data-motion='on'] [data-reveal] {
+    transition: opacity 600ms var(--ease-standard), transform 800ms var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 120ms);
+  }
+
+  .tm-ps[data-motion='on'] [data-reveal]:not(.is-in) {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
 .tm-ps-container {
   width: 100%;
   max-width: 1200px;
@@ -49,46 +68,6 @@ html:has(.tm-ps) {
   padding: 0 20px;
 }
 
-/* ── 헤더 ── */
-.tm-ps-header {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-layer);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  -webkit-backdrop-filter: saturate(1.6) blur(12px);
-  backdrop-filter: saturate(1.6) blur(12px);
-  border-bottom: 1px solid var(--border);
-}
-
-.tm-ps-header-inner {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 60px;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 12px 0 20px;
-}
-
-.tm-ps-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  margin-right: auto;
-  font-size: var(--font-size-body-lg);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--text-strong);
-  white-space: nowrap;
-}
-
-.tm-ps-nav {
-  display: none;
-}
-
-.tm-ps-nav-list,
 .tm-ps-menu-list,
 .tm-ps-menu-sublist,
 .tm-ps-dropdown-panel {
@@ -122,17 +101,7 @@ html:has(.tm-ps) {
   color: var(--blue700);
 }
 
-.tm-ps-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.tm-ps-login {
-  display: none;
-}
-
-/* ── 이용 대상 드롭다운(1024+) ── */
+/* ── 드롭다운(1024+): 공용 GNB 이용 안내 · /landing 이용 대상 ── */
 .tm-ps-dropdown {
   position: relative;
 }
@@ -356,17 +325,65 @@ html:has(.tm-ps) {
 }
 
 .tm-ps-honest-list li {
-  display: grid;
-  gap: 4px;
-  padding-left: 16px;
-  border-left: 2px solid var(--border-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   font-size: var(--font-size-body-sm);
   line-height: 1.6;
   color: var(--text);
 }
 
+.tm-ps-honest-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.tm-ps-honest-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .tm-ps-honest-list strong {
   color: var(--text-strong);
+}
+
+/* 접이식: 제목 줄 전체가 44px+ 누름 영역, 펼침은 FAQ 와 같은 꺾쇠 */
+.tm-ps-honest[data-collapsible='true'] {
+  padding-block: 4px;
+}
+
+.tm-ps-honest-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tm-ps-honest-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-ps-honest-summary .tm-ps-honest-title {
+  margin: 0;
+}
+
+.tm-ps-honest[open] > .tm-ps-honest-summary .tm-ps-faq-chevron {
+  margin-bottom: -3px;
+  transform: rotate(225deg);
+}
+
+.tm-ps-honest[data-collapsible='true'] .tm-ps-honest-list {
+  padding: 4px 0 16px;
 }
 
 /* ── FAQ 아코디언 ── */
@@ -393,22 +410,60 @@ html:has(.tm-ps) {
   display: none;
 }
 
-/* 펼침 표시는 +/− 글자(색 아닌 모양)로 */
-.tm-ps-faq-summary::after {
-  content: '+';
+/* 펼침 표시는 방향이 바뀌는 꺾쇠(색 아닌 모양)로 */
+.tm-ps-faq-chevron {
   flex-shrink: 0;
-  width: 24px;
-  text-align: center;
-  font-size: var(--font-size-subhead);
-  font-weight: 500;
-  color: var(--text-muted);
+  width: 10px;
+  height: 10px;
+  margin: 0 8px 3px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform var(--duration-base) var(--ease-out);
 }
 
-.tm-ps-faq-item[open] > .tm-ps-faq-summary::after {
-  content: '−';
+.tm-ps-faq-item[open] > .tm-ps-faq-summary .tm-ps-faq-chevron {
+  margin-bottom: -3px;
+  transform: rotate(225deg);
+}
+
+/* 여러 주제가 섞인 목록: 모바일은 주제 이름을 질문 위 한 줄로, 768+ 는 질문 앞 칸으로 */
+.tm-ps-faq-summary:has(> .tm-ps-faq-cat) {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.tm-ps-faq-cat {
+  flex-basis: 100%;
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--blue700);
+}
+
+.tm-ps-faq[data-appearance='cards'] {
+  display: grid;
+  gap: 8px;
+  border-top: 0;
+}
+
+.tm-ps-faq[data-appearance='cards'] .tm-ps-faq-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+}
+
+.tm-ps-faq[data-appearance='cards'] .tm-ps-faq-summary {
+  min-height: 64px;
+  padding: 16px 12px 16px 20px;
+}
+
+.tm-ps-faq[data-appearance='cards'] .tm-ps-faq-answer {
+  padding: 0 20px 20px;
 }
 
 .tm-ps-faq-question {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: var(--font-size-body);
   font-weight: 700;
@@ -581,16 +636,15 @@ html:has(.tm-ps) {
   .tm-ps-nav-link,
   .tm-ps-menu-link,
   .tm-ps-footer-link,
-  .tm-ps-dropdown-chevron {
+  .tm-ps-dropdown-chevron,
+  .tm-ps-faq-chevron {
     transition: none;
   }
 }
 
 /* ─── 태블릿 (768+) ─── */
 @media (min-width: 768px) {
-  .tm-ps-header-inner { padding: 0 24px 0 32px; }
   .tm-ps-container { padding: 0 32px; }
-  .tm-ps-login { display: inline-flex; }
 
   .tm-ps-section { padding: 72px 0; }
   .tm-ps-kw { font-size: var(--font-size-body); }
@@ -599,16 +653,14 @@ html:has(.tm-ps) {
   .tm-ps-lead { font-size: var(--font-size-body-lg); }
   .tm-ps-faq-question { font-size: var(--font-size-body-lg); }
   .tm-ps-faq-answer { font-size: var(--font-size-body); }
+  .tm-ps-faq-summary:has(> .tm-ps-faq-cat) { flex-wrap: nowrap; }
+  .tm-ps-faq-cat { flex: 0 0 88px; }
 
   .tm-ps-footer-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* ─── 데스크톱 (1024+) ─── */
 @media (min-width: 1024px) {
-  .tm-ps-header-inner { height: 64px; }
-  .tm-ps-brand { margin-right: 24px; }
-  .tm-ps-nav { display: block; margin-right: auto; }
-  .tm-ps-nav-list { display: flex; align-items: center; gap: 4px; }
   .tm-ps-mobile-menu { display: none; }
 
   .tm-ps-section { padding: 96px 0; }
@@ -623,7 +675,6 @@ html:has(.tm-ps) {
 
 /* ─── 와이드 (1440+) ─── */
 @media (min-width: 1440px) {
-  .tm-ps-header-inner,
   .tm-ps-container { padding: 0 40px; }
   .tm-ps-title { font-size: 46px; }
   .tm-ps-title-page { font-size: 52px; }

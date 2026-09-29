@@ -1,6 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { audienceBySlug } from '@/lib/public-content/audiences';
+import { faqById } from '@/lib/public-content/faq';
 import { organizationId } from '@/lib/structured-data';
 import { CONTACT_HEADING, CONTACT_LEAD } from './contact-content';
 import ContactPage, { metadata, revalidate } from './page';
@@ -22,8 +25,9 @@ const SITE_INFO = {
   guestInquiryRetentionDays: 365,
 };
 
+/** 호출마다 새 응답 — 한 테스트에서 페이지를 두 번 그리면 같은 Response 본문을 두 번 읽지 못한다. */
 function stubSiteInfo(response: Response) {
-  vi.stubGlobal('fetch', vi.fn(async () => response));
+  vi.stubGlobal('fetch', vi.fn(async () => response.clone()));
 }
 
 beforeEach(() => {
@@ -72,12 +76,31 @@ describe('/contact', () => {
     );
   });
 
-  it('로그인 흔적에 맞는 카드만 강조하고, 두 카드의 내용은 그대로 둔다', async () => {
+  it('로그인 흔적이 있으면 1:1 문의를, 없으면 이메일을 기본으로 고르고 두 창구 카드는 그대로 둔다', async () => {
     session.signedIn = true;
-    const { container } = await renderPage();
-    const grid = container.querySelector('[data-viewer]');
-    await waitFor(() => expect(grid).toHaveAttribute('data-viewer', 'member'));
+    const { container, unmount } = await renderPage();
+    await waitFor(() => expect(container.querySelector('[data-viewer]')).toHaveAttribute('data-viewer', 'member'));
+    expect(screen.getByRole('radio', { name: /1:1 문의/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /이메일/ })).not.toBeChecked();
     expect(screen.getByRole('region', { name: '로그인하지 않았다면 이메일' })).toBeInTheDocument();
+    unmount();
+
+    session.signedIn = false;
+    const second = await renderPage();
+    await waitFor(() => expect(second.container.querySelector('[data-viewer]')).toHaveAttribute('data-viewer', 'guest'));
+    expect(screen.getByRole('radio', { name: /이메일/ })).toBeChecked();
+    expect(screen.getByRole('region', { name: '로그인했다면 1:1 문의' })).toBeInTheDocument();
+  });
+
+  it('창구 고르기는 라디오 묶음이라 다른 창구로 바꿀 수 있다(흔적이 틀려도 막히지 않는다)', async () => {
+    session.signedIn = true;
+    const user = userEvent.setup();
+    await renderPage();
+    const group = screen.getByRole('group', { name: '문의 창구' });
+    await waitFor(() => expect(within(group).getByRole('radio', { name: /1:1 문의/ })).toBeChecked());
+    await user.click(within(group).getByRole('radio', { name: /이메일/ }));
+    expect(within(group).getByRole('radio', { name: /이메일/ })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: /1:1 문의/ })).not.toBeChecked();
   });
 
   it('ContactPage JSON-LD 는 화면 제목·소개와 같고, 회사는 전역 Organization 을 가리킨다', async () => {
@@ -110,12 +133,40 @@ describe('/contact', () => {
     expect(hosting.textContent).not.toMatch(/보관 기간/);
   });
 
+  it('대회 개설 안내: 도입 3단계와 접힌 "아직 지원하지 않는 것"(항목은 HTML 에 있다)', async () => {
+    await renderPage();
+    const hosting = document.getElementById('hosting')!;
+    const organizers = audienceBySlug('organizers');
+    const steps = within(hosting).getByRole('list', { name: '이렇게 시작해요' });
+    expect(within(steps).getAllByRole('listitem').map((li) => li.querySelector('p')?.textContent))
+      .toEqual(organizers.steps.map((step) => step.title));
+    const notYet = hosting.querySelector<HTMLDetailsElement>('details.tm-ps-honest')!;
+    expect(notYet.open).toBe(false);
+    for (const item of organizers.notYet) expect(notYet.textContent).toContain(item.body);
+  });
+
+  it('자주 묻는 질문은 제자리에서 펼치고, 접혀 있어도 답이 HTML 에 있다', async () => {
+    const { container } = await renderPage();
+    const faq = container.querySelector<HTMLElement>('#contact-faq')!;
+    const items = [...faq.querySelectorAll<HTMLDetailsElement>('details.tm-ps-faq-item')];
+    expect(items.map((item) => item.id)).toEqual([
+      'entry-fee-refund', 'result-correction', 'how-to-sign-up', 'delete-account', 'host-a-competition',
+    ]);
+    for (const item of items) {
+      expect(item.open).toBe(false);
+      expect(item.querySelector('.tm-ps-faq-answer')?.textContent).toContain(faqById(item.id)!.answer[0]);
+    }
+  });
+
   it('지킬 수 없는 약속(운영 계정·어드민 권한·실시간·답변 시간·앱 스토어)을 쓰지 않는다', async () => {
     const { container } = await renderPage();
-    const text = container.textContent ?? '';
-    for (const phrase of ['운영 계정', '어드민 권한', '관리자 권한', '실시간', 'AI 매칭', '영업일', '시간 안에', '앱 스토어', 'App Store', 'Google Play']) {
+    // 문의 페이지 본문만 본다 — 공용 GNB 의 대회 설명("실시간 스코어")은 라이브 스코어 기능 이야기다
+    const text = container.querySelector('main')?.textContent ?? '';
+    for (const phrase of ['운영 계정', '어드민 권한', '관리자 권한', '실시간', 'AI 매칭', '시간 안에', '앱 스토어', 'App Store', 'Google Play']) {
       expect(text, phrase).not.toContain(phrase);
     }
+    // 환불 처리 기간(영업일 3~7일)은 FAQ 답으로 싣는다 — 막을 것은 답변 시간 약속이다
+    expect(text).not.toMatch(/\d+\s*(시간|영업일)\s*(이내|안에)\s*(답|회신)/);
     expect(text).toContain('대회 스태프로 지정해 드려요');
   });
 });

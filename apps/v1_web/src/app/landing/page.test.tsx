@@ -152,13 +152,14 @@ describe('LandingPage', () => {
     expect(getByRole('link', { name: '무료로 시작' })).toBeInTheDocument();
   });
 
-  it('푸터가 도움말·문의·이용 대상·약관으로 이어지고, 사업자 정보는 어드민 설정 값을 그린다', async () => {
+  it('푸터가 서비스·이용 안내·약관으로 이어지고, 사업자 정보는 어드민 설정 값을 그린다', async () => {
     const { container } = await renderLanding();
     const footer = container.querySelector('footer')!;
     const hrefs = within(footer).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual(
       expect.arrayContaining([
-        '/help', '/faq', '/contact', '/for/players', '/for/teams', '/for/organizers',
+        '/team-matches', '/tournaments', '/teams', '/landing',
+        '/help', '/faq', '/help/glossary', '/contact', '/notices',
         '/terms?document=terms', '/terms?document=privacy',
       ]),
     );

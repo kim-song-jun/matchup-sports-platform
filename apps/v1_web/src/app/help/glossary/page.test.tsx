@@ -2,10 +2,13 @@
  * 용어집의 DefinedTermSet 은 "정규 리그란?" 같은 개념 질문의 인용 원천이다. LD 의 용어·정의·별칭이
  * 화면과 어긋나거나 @id 앵커가 없는 곳을 가리키면 인용 링크가 깨진다.
  */
-import { render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/components/providers/theme-provider';
-import { GLOSSARY_TERMS } from '@/lib/public-content/glossary';
+import { GLOSSARY_GROUPS, GLOSSARY_TERMS } from '@/lib/public-content/glossary';
+import { termSearchEntries } from '@/lib/public-site/help-index';
+import { matchHelpEntries } from '@/lib/public-site/help-search';
 import GlossaryPage, { metadata } from './page';
 
 vi.mock('next/link', () => ({
@@ -25,6 +28,10 @@ vi.mock('@/lib/public-site/site-info', async (importOriginal) => {
 beforeEach(() => {
   hooks.useV1Settings.mockReturnValue({ data: undefined });
   hooks.useV1UpdateSettings.mockReturnValue({ mutate: vi.fn(), isPending: false });
+});
+
+afterEach(() => {
+  window.history.replaceState(null, '', '/');
 });
 
 async function renderGlossary() {
@@ -51,7 +58,7 @@ describe('/help/glossary', () => {
     expect(terms).toHaveLength(items.length);
     terms.forEach((term, index) => {
       const item = items[index];
-      expect(term.name).toBe(item.querySelector('h2')?.textContent);
+      expect(term.name).toBe(item.querySelector('h3')?.textContent);
       expect(term.description).toBe(item.querySelector('.tm-help-term-def')?.textContent);
       expect(new URL(term['@id']).hash).toBe(`#${item.id}`);
       const alias = item.querySelector('.tm-help-term-alias')?.textContent ?? null;
@@ -59,12 +66,41 @@ describe('/help/glossary', () => {
     });
   });
 
-  it('용어 바로가기는 전부 화면에 있는 용어로 이어진다', async () => {
+  it('용어는 분류 묶음 안에 놓이고, 분류 칩을 고르면 다른 묶음만 가린다', async () => {
+    const user = userEvent.setup();
     const { container } = await renderGlossary();
-    const toc = screen.getByRole('navigation', { name: '용어 바로가기' });
-    const hrefs = within(toc).getAllByRole('link').map((a) => a.getAttribute('href')!);
-    expect(hrefs).toEqual(GLOSSARY_TERMS.map((term) => `#${term.id}`));
-    for (const href of hrefs) expect(container.querySelector(href)).not.toBeNull();
+    for (const group of GLOSSARY_GROUPS) {
+      const ids = [...container.querySelectorAll(`#group-${group.id} li.tm-help-term`)].map((li) => li.id);
+      expect(ids).toEqual(GLOSSARY_TERMS.filter((term) => term.group === group.id).map((term) => term.id));
+    }
+    expect(screen.getByRole('status')).toHaveTextContent(`용어 ${GLOSSARY_TERMS.length}개`);
+
+    await user.click(within(screen.getByRole('group', { name: '분류로 좁혀 보기' })).getByRole('button', { name: '매치' }));
+    const visible = [...container.querySelectorAll('li.tm-help-term')].filter((li) => !li.closest('[hidden]'));
+    expect(visible.map((li) => li.id)).toEqual(GLOSSARY_TERMS.filter((term) => term.group === 'match').map((term) => term.id));
+    expect(screen.getByRole('status')).toHaveTextContent(`용어 ${visible.length}개`);
+  });
+
+  it('검색어에 맞는 용어만 남기고, 가려진 용어를 #id 로 가리키면 검색어를 지워 보이게 한다', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderGlossary();
+    const input = screen.getByLabelText('용어 검색');
+    await user.type(input, '승강');
+    const keys = matchHelpEntries(termSearchEntries(GLOSSARY_TERMS), '승강')!;
+    const expected = GLOSSARY_TERMS.filter((term) => keys.has(`term:${term.id}`)).map((term) => term.id);
+    expect(expected.length).toBeGreaterThan(0);
+    expect(expected.length).toBeLessThan(GLOSSARY_TERMS.length);
+    const visibleIds = () =>
+      [...container.querySelectorAll('li.tm-help-term')].filter((li) => !li.closest('[hidden]')).map((li) => li.id);
+    expect(visibleIds()).toEqual(expected);
+
+    const hiddenTerm = GLOSSARY_TERMS.find((term) => !keys.has(`term:${term.id}`))!;
+    act(() => {
+      window.history.replaceState(null, '', `/help/glossary#${hiddenTerm.id}`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(input).toHaveValue('');
+    expect(visibleIds()).toEqual(GLOSSARY_TERMS.map((term) => term.id));
   });
 
   it('대회 스태프 설명은 스태프 지정까지만 말하고 운영 계정·어드민 권한을 약속하지 않는다', async () => {

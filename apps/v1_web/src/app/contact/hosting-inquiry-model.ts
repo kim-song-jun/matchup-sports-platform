@@ -89,6 +89,25 @@ export function validateHostingDraft(draft: HostingDraft): HostingFieldError[] {
 }
 
 /**
+ * 폼 3단계. 입력 칸은 HOSTING_FIELD_ORDER 를 순서대로 나눈 것이다 — 단계를 넘길 때는 그 단계 칸만 검사한다.
+ * 문의 유형·종목은 고르기만 하고 검사할 것이 없어 칸 목록에는 없다(유형은 1단계, 종목은 2단계 화면에 있다).
+ */
+export const HOSTING_STEPS: readonly { readonly title: string; readonly fields: readonly HostingField[] }[] = [
+  { title: '유형·연락처', fields: ['name', 'email'] },
+  { title: '대회 정보', fields: ['organization', 'expectedSchedule'] },
+  { title: '내용·동의', fields: ['message', 'consent'] },
+];
+
+export function hostingStepOf(field: HostingField): number {
+  return HOSTING_STEPS.findIndex((step) => step.fields.includes(field));
+}
+
+export function validateHostingStep(draft: HostingDraft, step: number): HostingFieldError[] {
+  const fields = HOSTING_STEPS[step].fields;
+  return validateHostingDraft(draft).filter((error) => fields.includes(error.field));
+}
+
+/**
  * 서버 400 `VALIDATION_ERROR` 의 필드를 화면 문구로 바꾼다. 서버 메시지는 class-validator 기본(영문)이라
  * 그대로 보여 주지 않는다. 화면에 없는 필드(category·sportType·formStartedAt 등)는 null.
  */

@@ -117,8 +117,14 @@ html:has(.tm-landing) {
   display: block;
 }
 
+/* 공용 GNB(공개 페이지)에서 현재 대분류 — 색 + 배경 두 신호로 */
+.tm-landing-nav-link[aria-current='page'] {
+  background: var(--blue50);
+  color: var(--blue700);
+}
+
 @media (hover: hover) {
-  .tm-landing-nav-link:hover {
+  .tm-landing-nav-link:not([aria-current='page']):hover {
     background: var(--grey100);
     color: var(--text-strong);
   }

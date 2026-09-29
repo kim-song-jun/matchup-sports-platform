@@ -1,14 +1,46 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import type { CSSProperties } from 'react';
+import {
+  Activity,
+  ArrowRight,
+  BadgeCheck,
+  CalendarDays,
+  ChartNoAxesColumn,
+  ClipboardCheck,
+  Eye,
+  Flag,
+  IdCard,
+  Medal,
+  MessageCircle,
+  Network,
+  Send,
+  Shirt,
+  Trophy,
+  UserCog,
+  UserPlus,
+  UserRound,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   PublicContentTable,
+  PublicCtaBand,
   PublicHonestNote,
+  PublicIconCards,
   PublicPageShell,
   PublicSection,
   PublicUpdatedAt,
+  type PublicIllustration,
 } from '@/components/public-site';
 import { JsonLd } from '@/components/seo/json-ld';
-import { AUDIENCE_PAGES, audienceBySlug, type AudiencePage, type AudienceSlug } from '@/lib/public-content/audiences';
+import {
+  AUDIENCE_PAGES,
+  audienceBySlug,
+  type AudienceFeatureIcon,
+  type AudiencePage,
+  type AudienceSlug,
+} from '@/lib/public-content/audiences';
 import { faqsByIds } from '@/lib/public-content/faq';
 import { guideBySlug, guidePath } from '@/lib/public-content/guides';
 import { buildAudiencePageLd } from '@/lib/public-site/audience-ld';
@@ -21,34 +53,37 @@ export function audienceMetadata(slug: AudienceSlug): Metadata {
   return buildPublicMetadata({ title: page.metaTitle, description: page.metaDescription, path: page.path });
 }
 
-function PointList({ points }: { points: AudiencePage['points'] }) {
-  return (
-    <ul className="tm-ps-aud-points">
-      {points.map((point) => (
-        <li key={point.title} className="tm-ps-aud-point">
-          <h3 className="tm-ps-aud-point-title">{point.title}</h3>
-          <p>{point.body}</p>
-        </li>
-      ))}
-    </ul>
-  );
-}
+const FEATURE_ICON: Readonly<Record<AudienceFeatureIcon, LucideIcon>> = {
+  browse: Eye,
+  apply: Send,
+  chat: MessageCircle,
+  card: IdCard,
+  team: UsersRound,
+  create: Flag,
+  invite: UserPlus,
+  roles: UserCog,
+  competition: Trophy,
+  schedule: CalendarDays,
+  record: ChartNoAxesColumn,
+  registration: ClipboardCheck,
+  roster: Shirt,
+  bracket: Network,
+  live: Activity,
+  confirm: BadgeCheck,
+  award: Medal,
+};
 
-function StepList({ steps }: { steps: AudiencePage['steps'] }) {
-  return (
-    <ol className="tm-ps-aud-steps" role="list">
-      {steps.map((step, index) => (
-        <li key={step.title} className="tm-ps-aud-step">
-          <span className="tm-ps-aud-step-num" aria-hidden="true">{index + 1}</span>
-          <div>
-            <h3 className="tm-ps-aud-point-title">{step.title}</h3>
-            <p>{step.body}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
+const AUDIENCE_ICON: Readonly<Record<AudienceSlug, LucideIcon>> = {
+  players: UserRound,
+  teams: UsersRound,
+  organizers: Trophy,
+};
+
+const AUDIENCE_ILLUSTRATION: Readonly<Record<AudienceSlug, { hero: PublicIllustration; band: PublicIllustration }>> = {
+  players: { hero: 'sport-soccer-hero', band: 'landing-hero' },
+  teams: { hero: 'auth-welcome', band: 'sport-futsal-hero' },
+  organizers: { hero: 'journey-done', band: 'chat-empty' },
+};
 
 function CtaRow({ page }: { page: AudiencePage }) {
   const [primary, ...rest] = page.ctas;
@@ -62,77 +97,136 @@ function CtaRow({ page }: { page: AudiencePage }) {
   );
 }
 
+function StepList({ steps }: { steps: AudiencePage['steps'] }) {
+  return (
+    <ol className="tm-ps-aud-steps" role="list">
+      {steps.map((step, index) => (
+        <li key={step.title} className="tm-ps-aud-step" data-reveal style={{ '--i': index } as CSSProperties}>
+          <span className="tm-ps-aud-step-num" aria-hidden="true">{index + 1}</span>
+          <h3 className="tm-ps-aud-step-title">{step.title}</h3>
+          <p>{step.body}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function AudiencePageView({ slug, siteInfo }: { slug: AudienceSlug; siteInfo: PublicSiteInfo }) {
   const page = audienceBySlug(slug);
   const faqs = faqsByIds(page.relatedFaqIds);
   const guide = guideBySlug(page.relatedGuideSlug);
   if (!guide) throw new Error(`Unknown guide: ${page.relatedGuideSlug}`);
   const others = AUDIENCE_PAGES.filter((item) => item.slug !== page.slug);
+  const [primaryCta] = page.ctas;
 
   return (
-    <PublicPageShell currentPath={page.path} breadcrumbs={[{ name: page.metaTitle, path: page.path }]} siteInfo={siteInfo}>
-      <div className="tm-ps-aud">
-        <PublicSection id="intro" as="h1" keyword={page.keyword} title={page.title} lead={page.lead}>
-          <CtaRow page={page} />
-          {page.heroNote ? <p className="tm-ps-aud-note">{page.heroNote}</p> : null}
-          <dl className="tm-ps-aud-facts">
-            {page.facts.map((fact) => (
-              <div key={fact.label} className="tm-ps-aud-fact">
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-          <PublicUpdatedAt date={page.updatedAt} />
-        </PublicSection>
+    <PublicPageShell
+      currentPath={page.path}
+      breadcrumbs={[{ name: page.metaTitle, path: page.path }]}
+      siteInfo={siteInfo}
+      hero={{
+        id: 'intro',
+        keyword: page.keyword,
+        title: page.title,
+        lead: page.lead,
+        illustration: AUDIENCE_ILLUSTRATION[slug].hero,
+        children: (
+          <>
+            <CtaRow page={page} />
+            {page.heroNote ? <p className="tm-ps-aud-note">{page.heroNote}</p> : null}
+            <dl className="tm-ps-aud-facts">
+              {page.facts.map((fact) => (
+                <div key={fact.label} className="tm-ps-aud-fact">
+                  <dt>{fact.label}</dt>
+                  <dd>{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <PublicUpdatedAt date={page.updatedAt} />
+          </>
+        ),
+      }}
+    >
+      <PublicSection id="what" keyword={page.pointsHead.keyword} title={page.pointsHead.title} lead={page.pointsHead.lead}>
+        <PublicIconCards
+          items={page.points.map((point) => ({ key: point.title, icon: FEATURE_ICON[point.icon], title: point.title, body: point.body }))}
+        />
+      </PublicSection>
 
-        <PublicSection id="what" keyword={page.pointsHead.keyword} title={page.pointsHead.title} lead={page.pointsHead.lead}>
-          <PointList points={page.points} />
-        </PublicSection>
-
-        {page.roleTable ? (
-          <PublicSection id="roles" keyword={page.roleTable.keyword} title={page.roleTable.title} lead={page.roleTable.lead}>
+      {page.roleTable ? (
+        <PublicSection
+          id="roles"
+          layout="split"
+          keyword={page.roleTable.keyword}
+          title={page.roleTable.title}
+          lead={page.roleTable.lead}
+          headExtra={page.roleTable.note ? <p className="tm-ps-aud-note">{page.roleTable.note}</p> : null}
+        >
+          <div className="tm-ps-aud-table" data-reveal>
             <PublicContentTable table={page.roleTable.table} />
-            {page.roleTable.note ? <p className="tm-ps-aud-note">{page.roleTable.note}</p> : null}
-          </PublicSection>
-        ) : null}
-
-        <PublicSection id="start" tone="muted" keyword={page.stepsHead.keyword} title={page.stepsHead.title} lead={page.stepsHead.lead}>
-          <StepList steps={page.steps} />
-          <PublicHonestNote items={page.notYet} />
-          <CtaRow page={page} />
+          </div>
         </PublicSection>
+      ) : null}
 
-        <PublicSection id="faq" keyword="자주 묻는 질문" title="먼저 많이 물어보는 것들이에요">
-          <ul className="tm-ps-aud-faq">
-            {faqs.map((faq) => (
-              <li key={faq.id}>
-                <h3 className="tm-ps-aud-point-title">
-                  <Link className="tm-ps-aud-faq-link" href={`/faq#${faq.id}`}>{faq.question}</Link>
-                </h3>
-                <p>{faq.answer[0]}</p>
-              </li>
-            ))}
-          </ul>
+      <PublicSection id="start" tone="muted" keyword={page.stepsHead.keyword} title={page.stepsHead.title} lead={page.stepsHead.lead}>
+        <StepList steps={page.steps} />
+        <div className="tm-ps-aud-honest">
+          <PublicHonestNote items={page.notYet} />
+        </div>
+      </PublicSection>
+
+      <PublicSection
+        id="faq"
+        layout="split"
+        keyword="자주 묻는 질문"
+        title="먼저 많이 물어보는 것들이에요"
+        headExtra={(
           <ul className="tm-ps-aud-more">
             <li><Link className="tm-ps-text-link" href={guidePath(guide.slug)}>가이드: {guide.title}</Link></li>
             <li><Link className="tm-ps-text-link" href="/faq">자주 묻는 질문 전체 보기</Link></li>
           </ul>
-        </PublicSection>
+        )}
+      >
+        <ul className="tm-ps-aud-faq">
+          {faqs.map((faq, index) => (
+            <li key={faq.id} className="tm-ps-aud-faq-card" data-reveal style={{ '--i': index % 2 } as CSSProperties}>
+              <h3 className="tm-ps-aud-faq-question">
+                <Link className="tm-ps-aud-faq-link" href={`/faq#${faq.id}`}>{faq.question}</Link>
+              </h3>
+              <p>{faq.answer[0]}</p>
+            </li>
+          ))}
+        </ul>
+      </PublicSection>
 
-        <PublicSection id="others" keyword="다른 이용 대상" title="다른 입장에서도 살펴보세요">
-          <ul className="tm-ps-aud-others">
-            {others.map((other) => (
+      <PublicSection id="others" keyword="다른 이용 대상" title="다른 입장에서도 살펴보세요">
+        <ul className="tm-ps-aud-others">
+          {others.map((other) => {
+            const Icon = AUDIENCE_ICON[other.slug];
+            return (
               <li key={other.slug}>
                 <Link className="tm-ps-aud-other" href={other.path}>
-                  <span className="tm-ps-aud-other-label">{other.metaTitle}</span>
-                  <span>{other.title}</span>
+                  <span className="tm-ps-card-icon" aria-hidden="true"><Icon size={22} /></span>
+                  <span className="tm-ps-aud-other-text">
+                    <span className="tm-ps-aud-other-label">{other.metaTitle}</span>
+                    <span>{other.title}</span>
+                  </span>
+                  <ArrowRight className="tm-ps-aud-other-arrow" size={18} aria-hidden="true" />
                 </Link>
               </li>
-            ))}
-          </ul>
-        </PublicSection>
-      </div>
+            );
+          })}
+        </ul>
+      </PublicSection>
+
+      <PublicCtaBand
+        id="audience-cta"
+        keyword={page.metaTitle}
+        title={page.band.title}
+        body={page.band.body}
+        action={primaryCta}
+        illustration={AUDIENCE_ILLUSTRATION[slug].band}
+      />
 
       <JsonLd data={buildAudiencePageLd(page)} />
     </PublicPageShell>

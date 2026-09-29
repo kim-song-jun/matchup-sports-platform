@@ -1,7 +1,16 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { HelpContactCta, HelpGuideCards, HelpQuestionLinks } from '@/components/public-help';
-import { PublicPageShell, PublicSection, PublicUpdatedAt } from '@/components/public-site';
+import { Lightbulb } from 'lucide-react';
+import { GUIDE_ILLUSTRATION, HelpGuideCards } from '@/components/public-help';
+import {
+  PublicFaqList,
+  PublicHelpCtaBand,
+  PublicIconCards,
+  PublicPageShell,
+  PublicSection,
+  PublicUpdatedAt,
+} from '@/components/public-site';
 import { JsonLd } from '@/components/seo/json-ld';
 import { faqsByIds } from '@/lib/public-content/faq';
 import { GUIDES, guideBySlug, guidePath } from '@/lib/public-content/guides';
@@ -29,55 +38,81 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   });
 }
 
+/** 히어로 설명 = 가이드 요약 = meta description = Article LD description(한 문장으로 전체 흐름). */
 export default async function HelpGuidePage({ params }: Params) {
   const guide = guideBySlug((await params).slug);
   if (!guide) notFound();
   const siteInfo = await fetchPublicSiteInfo();
   const path = guidePath(guide.slug);
+
   return (
     <PublicPageShell
       currentPath={path}
       breadcrumbs={[{ name: '도움말', path: '/help' }, { name: guide.title, path }]}
       siteInfo={siteInfo}
+      hero={{
+        id: 'guide',
+        keyword: '이용 가이드',
+        title: guide.title,
+        lead: guide.summary,
+        illustration: GUIDE_ILLUSTRATION[guide.slug],
+        children: (
+          <>
+            <ul className="tm-help-guide-facts" aria-label="가이드 정보">
+              <li><span>대상</span>{guide.audience}</li>
+              <li><span>단계</span>{guide.steps.length}단계</li>
+            </ul>
+            <PublicUpdatedAt date={guide.updatedAt} />
+          </>
+        ),
+      }}
     >
-      <PublicSection id="guide" as="h1" keyword="이용 가이드" title={guide.title}>
-        <div className="tm-help-article">
-          <p className="tm-help-answer">{guide.summary}</p>
-          <p className="tm-help-meta">대상: {guide.audience} · {guide.steps.length}단계</p>
-          <PublicUpdatedAt date={guide.updatedAt} />
-
-          <h2 id="guide-steps" className="tm-help-h2">순서대로 따라 해 보세요</h2>
-          <ol className="tm-help-steps" role="list" aria-labelledby="guide-steps">
-            {guide.steps.map((step) => (
-              <li key={step.title} className="tm-help-step">
+      <PublicSection id="guide-steps" layout="split" keyword="따라 하기" title="순서대로 따라 해 보세요">
+        <ol className="tm-help-steps" role="list" aria-labelledby="guide-steps-heading">
+          {guide.steps.map((step) => (
+            <li key={step.title} className="tm-help-step" data-reveal>
+              <div className="tm-help-step-card">
                 <h3 className="tm-help-step-title">{step.title}</h3>
                 <p className="tm-help-step-body">{step.body}</p>
-              </li>
-            ))}
-          </ol>
-
-          {guide.notes.length > 0 ? (
-            <>
-              <h2 className="tm-help-h2">알아 두면 좋아요</h2>
-              {guide.notes.map((note) => (
-                <div key={note.title} className="tm-help-note">
-                  <h3 className="tm-help-note-title">{note.title}</h3>
-                  {note.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-                </div>
-              ))}
-            </>
-          ) : null}
-
-          <h2 className="tm-help-h2">관련 질문</h2>
-          <HelpQuestionLinks items={faqsByIds(guide.relatedFaqIds)} label="관련 질문" />
-
-          <h2 className="tm-help-h2">다른 가이드</h2>
-          <HelpGuideCards guides={GUIDES.filter((other) => other.slug !== guide.slug)} />
-        </div>
+              </div>
+            </li>
+          ))}
+        </ol>
       </PublicSection>
-      <div className="tm-ps-container tm-help-cta-wrap">
-        <HelpContactCta />
-      </div>
+
+      {guide.notes.length > 0 ? (
+        <PublicSection id="guide-notes" tone="muted" keyword="놓치기 쉬운 것" title="알아 두면 좋아요">
+          <PublicIconCards
+            columns={2}
+            items={guide.notes.map((note) => ({
+              key: note.title,
+              icon: Lightbulb,
+              title: note.title,
+              body: note.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>),
+            }))}
+          />
+        </PublicSection>
+      ) : null}
+
+      <PublicSection
+        id="guide-faq"
+        layout="split"
+        keyword="관련 질문"
+        title="이 가이드와 함께 많이 찾는 질문"
+        headExtra={(
+          <p className="tm-ps-split-more">
+            <Link className="tm-ps-text-link" href="/faq">자주 묻는 질문 전체 보기</Link>
+          </p>
+        )}
+      >
+        <PublicFaqList items={faqsByIds(guide.relatedFaqIds)} appearance="cards" />
+      </PublicSection>
+
+      <PublicSection id="guide-others" keyword="다른 가이드" title="다른 일도 해 보고 싶다면">
+        <HelpGuideCards guides={GUIDES.filter((other) => other.slug !== guide.slug)} columns={3} />
+      </PublicSection>
+
+      <PublicHelpCtaBand email={siteInfo.contactEmail} />
       <JsonLd data={buildGuideArticleLd(guide)} />
     </PublicPageShell>
   );

@@ -27,6 +27,7 @@ import {
 } from '@/components/game-roster/operations-board-roster';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
@@ -382,6 +383,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const rosterQueries = useV1AdminRegistrationGameRosterList(tournamentId, rosterRegistrationIds);
   const rosterIndex = indexBoardRosters(rosterQueries.flatMap((query) => (query.data === undefined ? [] : [query.data])));
   const failedRosterIds = new Set(rosterRegistrationIds.filter((_, index) => rosterQueries[index]?.isError === true));
+  const currentHref = useCurrentHref();
 
   function rosterSide(item: V1TournamentOperationsBoardItem, which: 'home' | 'away'): BoardRosterSideState {
     const registrationId = which === 'home' ? item.homeRegistrationId : item.awayRegistrationId;
@@ -389,13 +391,16 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     return {
       registrationId,
       name: names ? names[which] : null,
-      side: registrationId === null || item.gameId === null ? null : (rosterIndex.get(item.gameId)?.get(registrationId) ?? null),
+      side: registrationId === null || item.gameId === null ? null : (rosterIndex.games.get(item.gameId)?.get(registrationId) ?? null),
+      teamId: registrationId === null ? null : (rosterIndex.teamIds.get(registrationId) ?? null),
       failed: registrationId !== null && failedRosterIds.has(registrationId),
     };
   }
 
   function rosterSummary(item: V1TournamentOperationsBoardItem) {
-    return <BoardRosterSummary item={item} home={rosterSide(item, 'home')} away={rosterSide(item, 'away')} />;
+    return (
+      <BoardRosterSummary item={item} home={rosterSide(item, 'home')} away={rosterSide(item, 'away')} from={currentHref} />
+    );
   }
 
   function rowLabel(item: V1TournamentOperationsBoardItem): string {

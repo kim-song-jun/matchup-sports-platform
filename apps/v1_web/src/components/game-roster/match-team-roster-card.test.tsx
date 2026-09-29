@@ -198,11 +198,12 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
     expect(mock.requests.some((r) => r.path === BATCH)).toBe(false);
   });
 
-  it('전체 명단 링크는 우리 팀 경기 명단 화면으로 간다', async () => {
+  it('전체 명단 링크는 우리 팀 경기 명단 화면으로 가고, 뒤로가기가 이 경기 상세로 오게 출처를 싣는다', async () => {
     const dialog = await openSheet();
+    const matchDetail = `/tournaments/tournament-1/matches/${TEAM_MATCH_ID}`;
     expect(within(dialog).getByRole('link', { name: '경기 명단' })).toHaveAttribute(
       'href',
-      `/teams/${teamId}/games/${G1.gameId}/roster`,
+      `/teams/${teamId}/games/${G1.gameId}/roster?from=${encodeURIComponent(matchDetail)}`,
     );
   });
 

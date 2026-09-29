@@ -158,6 +158,7 @@ describe('OperationsBoardClient', () => {
   });
 
   describe('경기 명단 요약(Task 176)', () => {
+    const BOARD_FROM = encodeURIComponent('/tournament-ops/tournaments/t-1/operations');
     const SCHEDULED_ITEM: V1TournamentOperationsBoardItem = {
       ...ITEM_A,
       gameState: 'SCHEDULED',
@@ -207,9 +208,38 @@ describe('OperationsBoardClient', () => {
       expect(mocks.useRosterList).toHaveBeenLastCalledWith('t-1', ['reg-home', 'reg-away']);
       expect(screen.getAllByText('레드팀 · 빠짐 2 · 정지 1').length).toBeGreaterThan(0);
       expect(screen.getAllByText('블루팀 · 빠짐 0 · 정지 0').length).toBeGreaterThan(0);
+      // 명단 화면의 뒤로가기가 팀 상세가 아니라 이 보드로 돌아오게 출처를 싣는다.
       const redLinks = screen.getAllByRole('link', { name: '레드팀 경기 명단' });
-      expect(redLinks[0]).toHaveAttribute('href', '/teams/team-red/games/game-1/roster');
-      expect(screen.getAllByRole('link', { name: '블루팀 경기 명단' })[0]).toHaveAttribute('href', '/teams/team-blue/games/game-1/roster');
+      expect(redLinks[0]).toHaveAttribute('href', `/teams/team-red/games/game-1/roster?from=${BOARD_FROM}`);
+      expect(screen.getAllByRole('link', { name: '블루팀 경기 명단' })[0]).toHaveAttribute(
+        'href',
+        `/teams/team-blue/games/game-1/roster?from=${BOARD_FROM}`,
+      );
+    });
+
+    it('표에 그 경기 열이 없어도(시작 시각이 지났지만 아직 시작 전) 불러온 팀에는 "명단" 버튼을 둔다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [SCHEDULED_ITEM] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      const withoutColumn = matrixFor('reg-home', 'team-red', '블루팀', { excluded: 0, unavailable: 0, suspended: 0 });
+      mocks.useRosterList.mockReturnValue([
+        { ...withoutColumn, data: { ...withoutColumn.data, games: [] } },
+        { data: undefined, isError: false },
+      ]);
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.getAllByText('레드팀 · 요약은 명단 화면에서 볼 수 있어요').length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('link', { name: '레드팀 경기 명단' })[0]).toHaveAttribute(
+        'href',
+        `/teams/team-red/games/game-1/roster?from=${BOARD_FROM}`,
+      );
+      // 아직 불러오는 팀은 팀을 몰라 버튼을 만들 수 없다 — 줄을 비워 둔다.
+      expect(screen.queryAllByRole('link', { name: '블루팀 경기 명단' })).toHaveLength(0);
+      expect(screen.queryByText(/블루팀 ·/)).toBeNull();
     });
 
     it('진행 중 경기에는 명단 요약·버튼을 보이지 않고, 조회 실패는 실패라고 말한다', () => {

@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1ApplyGameRosterBatch, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
 import { extractErrorCode } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
+import { withFromPath } from '@/lib/session-storage';
 import type { GameRosterAdjustmentReason } from '@/lib/v1-status-labels';
 import { draftToChanges, type GameRosterDraft } from './game-roster-draft';
 import { GameRosterPlayerRow } from './game-roster-player-row';
@@ -39,6 +41,7 @@ export function GameRosterQuickSheet({
   onStale: () => void;
 }) {
   const batch = useV1ApplyGameRosterBatch(teamId);
+  const currentHref = useCurrentHref();
   const [leaving, setLeaving] = useState<Leaving>({});
   const [error, setError] = useState<string | null>(null);
   const titleId = useId();
@@ -163,7 +166,7 @@ export function GameRosterQuickSheet({
           <p className="tm-text-caption" style={{ margin: '12px 0 0' }}>
             전체 명단은{' '}
             <Link
-              href={gameRosterScreenPath(teamId, roster.gameId)}
+              href={withFromPath(gameRosterScreenPath(teamId, roster.gameId), currentHref)}
               style={{ color: 'var(--blue700)', fontWeight: 700, textDecoration: 'underline' }}
             >
               경기 명단

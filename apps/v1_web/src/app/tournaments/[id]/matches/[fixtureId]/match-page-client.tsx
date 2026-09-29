@@ -9,7 +9,7 @@ import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { MatchTeamRosterCard } from '@/components/game-roster/match-team-roster-card';
-import { useMyMatchRosterSide } from '@/components/game-roster/use-my-match-roster-side';
+import { useMyMatchRosterTeam } from '@/components/game-roster/use-my-match-roster-team';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 
 function MatchSkeleton() {
@@ -35,12 +35,10 @@ export function MatchPageClient({
   const { data, isPending, isError, error, refetch } = usePublicMatch(tournamentId, fixtureId, { seed });
   // 경기 기록의 팀·다음 경기 링크가 이 화면(받은 출처 포함)으로 돌아오게 한다.
   const currentHref = useCurrentHref();
-  // 참가팀 팀원에게만 "우리 팀 출전" 카드가 뜬다. 대진 id 가 곧 팀매치 id 라 게임이 비공개여도 찾는다.
-  const rosterSide = useMyMatchRosterSide({
+  // 참가팀 팀원에게만 "우리 팀 출전" 카드가 뜬다.
+  const rosterTeam = useMyMatchRosterTeam({
     teamIds: [data?.home?.teamId ?? null, data?.away?.teamId ?? null],
     gameId: data?.gameId ?? null,
-    teamMatchId: fixtureId,
-    kickoffAt: data === undefined ? undefined : data.scheduledAt,
   });
 
   // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).
@@ -64,7 +62,7 @@ export function MatchPageClient({
       <MatchDetailContent
         data={data}
         from={currentHref ?? undefined}
-        afterHeader={<MatchTeamRosterCard side={rosterSide} />}
+        afterHeader={<MatchTeamRosterCard team={rosterTeam} />}
       />
       <div style={{ padding: '0 16px' }}>
         {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는

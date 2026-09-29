@@ -3,17 +3,17 @@
 import { useState } from 'react';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
-import { useV1GameRoster, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
+import { useV1TeamGameRoster, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
 import { V1ApiError } from '@/lib/api-client';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel } from '@/lib/v1-status-labels';
 import { GameRosterQuickSheet } from './game-roster-quick-sheet';
-import type { MyMatchRosterSide } from './use-my-match-roster-side';
+import type { MyMatchRosterTeam } from './use-my-match-roster-team';
 
 /** 칩으로 이름을 보여 줄 인원 — 나머지는 "+N". */
 const CHIP_LIMIT = 3;
 
-/** 명단이 없거나(404) 볼 수 없는(401·403) 경우는 이 경기에 우리 팀 카드가 없는 게 정상이다. */
+/** 우리 팀 명단이 없거나(404 — 친선·명단 없음·대진이 바뀜) 볼 수 없는(401·403) 경우는 카드가 없는 게 정상이다. */
 function isExpectedAbsence(error: unknown): boolean {
   return error instanceof V1ApiError && [401, 403, 404].includes(error.statusCode);
 }
@@ -23,26 +23,26 @@ function isExpectedAbsence(error: unknown): boolean {
  * 출전 인원·빠진 사람 요약은 우리 팀 팀원 모두, "명단 조정"(빠른 선택 시트 ③)은 서버가 편집 가능하다고 한
  * 사람(팀장·매니저·운영자)에게만. 상대팀 명단은 여기서 다루지 않는다 — 공개 기록 본문의 라인업이 그 몫이다.
  */
-export function MatchTeamRosterCard({ side }: { side: MyMatchRosterSide }) {
-  if (side.status === 'none' || side.status === 'loading') return null;
-  if (side.status === 'error') {
-    if (isExpectedAbsence(side.error)) return null;
+export function MatchTeamRosterCard({ team }: { team: MyMatchRosterTeam }) {
+  if (team.status === 'none' || team.status === 'loading') return null;
+  if (team.status === 'error') {
+    if (isExpectedAbsence(team.error)) return null;
     return (
       <Card pad={16}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
           우리 팀 출전
         </h2>
         <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
-          {gameRosterErrorMessage(side.error, '우리 팀 경기 정보를 불러오지 못했어요.')}
+          {gameRosterErrorMessage(team.error, '우리 팀 경기 정보를 불러오지 못했어요.')}
         </p>
       </Card>
     );
   }
-  return <ResolvedRosterCard teamId={side.teamId} gameId={side.gameId} sideId={side.sideId} />;
+  return <ResolvedRosterCard teamId={team.teamId} gameId={team.gameId} />;
 }
 
-function ResolvedRosterCard({ teamId, gameId, sideId }: { teamId: string; gameId: string; sideId: string }) {
-  const roster = useV1GameRoster(gameId, sideId);
+function ResolvedRosterCard({ teamId, gameId }: { teamId: string; gameId: string }) {
+  const roster = useV1TeamGameRoster(teamId, gameId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 

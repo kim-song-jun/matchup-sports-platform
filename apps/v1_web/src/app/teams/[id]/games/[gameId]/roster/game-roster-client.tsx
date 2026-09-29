@@ -18,7 +18,7 @@ import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reas
 import { TEAM_UPCOMING_GAMES_ANCHOR } from '@/components/teams/team-upcoming-games-card';
 import {
   useV1ApplyGameRosterBatch,
-  useV1GameRoster,
+  useV1TeamGameRoster,
   useV1GameRosterAdjustments,
   type V1GameRosterBatchChange,
   type V1GameRosterView,
@@ -28,7 +28,6 @@ import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roste
 import { gameRosterEditStateLabel } from '@/lib/v1-status-labels';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
-import { useGameRosterSide } from '@/components/game-roster/use-game-roster-side';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -36,60 +35,11 @@ type Notice = { tone: 'info' | 'error'; message: string };
  * 대회·리그 경기 한 팀의 출전 명단(Task 178 ②④).
  * 경기 명단 = 참가 명단 − 이번 경기 빠짐 − 결장 − 출전정지. 여기서 바꾸는 건 "이번 경기 빠짐"뿐이고,
  * 변경은 모아 두었다가 한 번에 저장한다(팀 일괄 API — 한 트랜잭션이라 일부만 저장되지 않는다).
+ * 경로에 사이드가 없어 팀·경기로 명단을 받는다 — 권한(팀원 읽기·팀장/운영자 쓰기·지원 계정 읽기)은 서버 판정이다.
  */
 export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: string }) {
-  const side = useGameRosterSide(teamId, { gameId });
-
-  if (side.status === 'loading') return <PageSkeleton variant="detail" />;
-  if (side.status === 'friendly') {
-    return (
-      <EmptyState
-        title="친선 경기는 참석명단으로 관리해요"
-        sub="대회·리그 경기만 경기 명단을 조정해요. 친선 경기는 참석명단에서 출전 선수를 정해 주세요."
-        cta={side.teamMatchId === null ? undefined : '참석명단 열기'}
-        ctaHref={side.teamMatchId === null ? undefined : `/team-matches/${side.teamMatchId}/lineup`}
-      />
-    );
-  }
-  if (side.status === 'not-found') {
-    return (
-      <ErrorState
-        title="이 경기에서 우리 팀을 찾을 수 없어요"
-        message="대진이 바뀌었을 수 있어요. 팀 상세의 다가오는 경기에서 다시 들어와 주세요."
-      />
-    );
-  }
-  if (side.status === 'error') {
-    const forbidden = side.error instanceof V1ApiError && side.error.statusCode === 403;
-    return (
-      <ErrorState
-        title={forbidden ? '이 경기 명단은 볼 수 없어요' : '경기 정보를 불러오지 못했어요'}
-        message={
-          forbidden
-            ? '시작된 대회 경기의 명단은 팀장·매니저와 운영자가 볼 수 있어요.'
-            : '잠시 후 다시 시도해 주세요.'
-        }
-      />
-    );
-  }
-  return (
-    <GameRosterScreen teamId={teamId} gameId={gameId} sideId={side.sideId} opponentName={side.opponentName} />
-  );
-}
-
-function GameRosterScreen({
-  teamId,
-  gameId,
-  sideId,
-  opponentName,
-}: {
-  teamId: string;
-  gameId: string;
-  sideId: string;
-  opponentName: string | null;
-}) {
-  const roster = useV1GameRoster(gameId, sideId);
-  const history = useV1GameRosterAdjustments(gameId, sideId);
+  const roster = useV1TeamGameRoster(teamId, gameId);
+  const history = useV1GameRosterAdjustments(gameId, roster.data?.sideId ?? null);
   const batch = useV1ApplyGameRosterBatch(teamId);
   const { confirm, ConfirmModal } = useConfirm();
   const [draft, setDraft] = useState<GameRosterDraft>({});
@@ -198,7 +148,7 @@ function GameRosterScreen({
       <Card pad={16}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <h1 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0, overflowWrap: 'anywhere' }}>
-            {opponentName === null ? '경기 명단' : `vs ${opponentName}`}
+            {data.opponentName === null ? '경기 명단' : `vs ${data.opponentName}`}
           </h1>
           <StateBadge view={data} />
         </div>
@@ -452,11 +402,12 @@ function RosterSection({
 
 function RosterLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const status = error instanceof V1ApiError ? error.statusCode : null;
+  // 서버는 "이 팀이 뛰지 않는 경기"·친선·명단 없음을 같은 404 로 준다 — 셋을 함께 안내한다.
   if (status === 404) {
     return (
       <EmptyState
-        title="이 경기는 명단을 조정할 수 없어요"
-        sub="참가 신청이 확정되지 않았거나 상대가 아직 정해지지 않은 경기예요."
+        title="이 경기는 경기 명단이 없어요"
+        sub="이 팀이 뛰는 대회·리그 경기가 아니거나, 대진이 바뀌었거나, 참가 신청이 아직 확정되지 않았어요. 친선 경기는 참석명단에서 출전 선수를 정해요."
       />
     );
   }

@@ -1,6 +1,6 @@
 /**
  * 경기 상세 "우리 팀 출전" 카드 + 빠른 선택 시트(Task 178 ①③).
- * 실제 훅(내 팀 → 사이드 → 명단)이 MSW 상태형 서버에 보내는 요청과 그 결과 화면을 본다 —
+ * 실제 훅(내 팀 → 팀·경기 명단)이 MSW 상태형 서버에 보내는 요청과 그 결과 화면을 본다 —
  * 누가 카드를 보는지, 누가 "명단 조정"을 보는지, 시트 저장이 어떤 일괄 요청으로 나가는지.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,9 +9,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createV1GameRosterMswHandlers, GAME_ROSTER_MSW } from '@/test/msw/game-roster-handlers';
-import type { V1TeamUpcomingGame } from '@/hooks/use-v1-api';
 import { MatchTeamRosterCard } from './match-team-roster-card';
-import { useMyMatchRosterSide } from './use-my-match-roster-side';
+import { useMyMatchRosterTeam } from './use-my-match-roster-team';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -24,28 +23,12 @@ const [G1] = GAME_ROSTER_MSW.games;
 const TEAM_MATCH_ID = `team-match-${G1.gameId}`;
 const NOW = '2026-10-01T00:00:00.000Z';
 const BATCH = `/api/v1/teams/${teamId}/game-rosters/batch`;
+const rosterPath = (team: string) => `/api/v1/teams/${team}/games/${G1.gameId}/roster`;
 
 let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
 let myTeamIds: string[];
 let meTeamsHits: number;
-let upcomingHits: number;
-let gameHits: number;
-
-const upcoming: V1TeamUpcomingGame = {
-  gameId: G1.gameId,
-  source: 'TOURNAMENT_FIXTURE',
-  competitionKind: 'TOURNAMENT',
-  teamMatchId: TEAM_MATCH_ID,
-  sideId: G1.sideId,
-  title: '성수 풋살컵 조별리그',
-  opponentName: G1.opponentName,
-  scheduledAt: G1.startAt,
-  tournamentId: GAME_ROSTER_MSW.tournamentId,
-  tournamentTitle: '성수 풋살컵',
-  lineupState: 'DONE',
-  rosterSummary: { participating: 3, excluded: 0, unavailable: 0, suspended: 0 },
-};
 
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
@@ -53,29 +36,14 @@ beforeEach(() => {
   mock = createV1GameRosterMswHandlers();
   myTeamIds = [teamId];
   meTeamsHits = 0;
-  upcomingHits = 0;
-  gameHits = 0;
   const ok = (data: unknown) => HttpResponse.json({ status: 'success', data, timestamp: NOW });
+  // 다가오는 경기·경기 조회 핸들러는 두지 않는다 — 부르면 onUnhandledRequest 로 실패한다.
   server = setupServer(
     ...mock.handlers,
     http.get('*/api/v1/auth/me', () => ok({ id: GAME_ROSTER_MSW.viewerUserId })),
     http.get('*/api/v1/me/teams', () => {
       meTeamsHits += 1;
       return ok({ items: myTeamIds.map((id) => ({ teamId: id, membershipId: `m-${id}`, name: '우리 팀', role: 'owner', status: 'active' })) });
-    }),
-    http.get('*/api/v1/teams/:teamId/upcoming-games', () => {
-      upcomingHits += 1;
-      return ok({ items: [upcoming] });
-    }),
-    http.get('*/api/v1/games/:gameId', ({ params }) => {
-      gameHits += 1;
-      return ok({
-        id: params.gameId,
-        sides: [
-          { id: G1.sideId, gameId: G1.gameId, sideKey: 'HOME', teamId, displayNameSnapshot: '우리 팀' },
-          { id: 'side-away', gameId: G1.gameId, sideKey: 'AWAY', teamId: 'team-2', displayNameSnapshot: G1.opponentName },
-        ],
-      });
     }),
     http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
   );
@@ -88,25 +56,26 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-/** 경기 상세가 하는 그대로 — 두 팀 id·게임 id·대진 id 로 사이드를 풀어 카드에 넘긴다. */
-function Harness({ gameId, kickoffAt }: { gameId: string | null; kickoffAt?: string | null }) {
-  const side = useMyMatchRosterSide({ teamIds: [teamId, 'team-2'], gameId, teamMatchId: TEAM_MATCH_ID, kickoffAt });
-  return <MatchTeamRosterCard side={side} />;
+/** 경기 상세가 하는 그대로 — 두 팀 id·게임 id 로 우리 팀을 골라 카드에 넘긴다. */
+function Harness({ gameId }: { gameId: string | null }) {
+  const team = useMyMatchRosterTeam({ teamIds: [teamId, 'team-2'], gameId });
+  return <MatchTeamRosterCard team={team} />;
 }
 
-function renderCard(gameId: string | null = G1.gameId, kickoffAt?: string | null) {
+function renderCard(gameId: string | null = G1.gameId) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <Harness gameId={gameId} kickoffAt={kickoffAt} />
+      <Harness gameId={gameId} />
     </QueryClientProvider>,
   );
 }
 
 const rosterRequests = () => mock.requests.filter((r) => r.path.endsWith('/roster'));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 describe('MatchTeamRosterCard', () => {
-  it('팀장에게 출전 요약과 "명단 조정"을 보여 준다', async () => {
+  it('팀장에게 출전 요약과 "명단 조정"을 보여 준다 — 팀·경기 명단 한 번의 조회로', async () => {
     renderCard();
     expect(await screen.findByRole('heading', { name: '우리 팀 출전' })).toBeInTheDocument();
     expect(screen.getByText('3명')).toBeInTheDocument();
@@ -114,30 +83,16 @@ describe('MatchTeamRosterCard', () => {
     expect(within(chips).getByText('7 김민재')).toBeInTheDocument();
     expect(screen.getByText('참가 명단 기준 · 빠진 선수 없음')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '명단 조정' })).toBeInTheDocument();
+    expect(mock.requests.map((r) => `${r.method} ${r.path}`)).toEqual([`GET ${rosterPath(teamId)}`]);
   });
 
-  it('게임이 비공개라 gameId 를 몰라도 대진 id 로 우리 팀 사이드를 찾는다', async () => {
-    renderCard(null);
-    expect(await screen.findByRole('heading', { name: '우리 팀 출전' })).toBeInTheDocument();
-    expect(rosterRequests().map((r) => r.path)).toContain(`/api/v1/games/${G1.gameId}/sides/${G1.sideId}/roster`);
-  });
-
-  it.each([
-    ['시작 시각이 지난 경기', '2020-01-01T00:00:00.000Z'],
-    ['시각 미정 경기', null],
-  ])('%s는 다가오는 경기 목록을 부르지 않고 경기 조회로 사이드를 찾는다', async (_label, kickoffAt) => {
+  it('시작된 경기도 팀원에게 요약을 보여 주고 조정 버튼은 없다', async () => {
+    mock.setViewerRole('TEAM_MEMBER');
     mock.setGameState(G1.gameId, 'ENDED');
-    renderCard(G1.gameId, kickoffAt);
+    renderCard();
     expect(await screen.findByRole('heading', { name: '우리 팀 출전' })).toBeInTheDocument();
-    expect(gameHits).toBe(1);
-    expect(upcomingHits).toBe(0);
-  });
-
-  it('시작 전 경기는 다가오는 경기 목록에서 찾고 경기 조회를 부르지 않는다', async () => {
-    renderCard(G1.gameId, '2999-01-01T00:00:00.000Z');
-    expect(await screen.findByRole('button', { name: '명단 조정' })).toBeInTheDocument();
-    expect(upcomingHits).toBe(1);
-    expect(gameHits).toBe(0);
+    expect(screen.getByText('경기가 시작돼 명단을 바꿀 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '명단 조정' })).not.toBeInTheDocument();
   });
 
   it('팀원에게는 요약만 보여 주고 조정 버튼은 없다', async () => {
@@ -147,11 +102,27 @@ describe('MatchTeamRosterCard', () => {
     expect(screen.queryByRole('button', { name: '명단 조정' })).not.toBeInTheDocument();
   });
 
+  it('우리 팀이 이 경기 사이드가 아니면(404) 카드를 숨긴다', async () => {
+    myTeamIds = ['team-2'];
+    renderCard();
+    await waitFor(() => expect(rosterRequests().map((r) => r.path)).toEqual([rosterPath('team-2')]));
+    await settle();
+    expect(screen.queryByRole('heading', { name: '우리 팀 출전' })).not.toBeInTheDocument();
+  });
+
+  it('게임이 아직 없으면(gameId 없음) 카드가 없고 명단을 조회하지도 않는다', async () => {
+    renderCard(null);
+    await waitFor(() => expect(meTeamsHits).toBe(1));
+    await settle();
+    expect(screen.queryByRole('heading', { name: '우리 팀 출전' })).not.toBeInTheDocument();
+    expect(rosterRequests()).toHaveLength(0);
+  });
+
   it('두 팀 어디에도 속하지 않으면 카드가 없고 명단을 조회하지도 않는다', async () => {
     myTeamIds = ['team-other'];
     renderCard();
     await waitFor(() => expect(meTeamsHits).toBe(1));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
     expect(screen.queryByRole('heading', { name: '우리 팀 출전' })).not.toBeInTheDocument();
     expect(rosterRequests()).toHaveLength(0);
   });
@@ -159,7 +130,7 @@ describe('MatchTeamRosterCard', () => {
   it('비로그인(세션 힌트 없음)이면 아무것도 조회하지 않는다', async () => {
     window.localStorage.clear();
     renderCard();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle();
     expect(screen.queryByRole('heading', { name: '우리 팀 출전' })).not.toBeInTheDocument();
     expect(meTeamsHits).toBe(0);
     expect(mock.requests).toHaveLength(0);

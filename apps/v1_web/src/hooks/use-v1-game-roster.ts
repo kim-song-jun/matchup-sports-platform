@@ -70,6 +70,9 @@ export type V1GameRosterView = {
   legacyLineupPending: boolean;
 };
 
+/** 팀·경기로 찾은 명단 — 사이드 명단 조회와 같은 본문·권한에 상대 팀 이름을 더한다. */
+export type V1TeamGameRosterView = V1GameRosterView & { opponentName: string | null };
+
 export type V1GameRosterHistoryEvent = {
   type: 'EXCLUDE' | 'REVOKE';
   adjustmentId: string;
@@ -178,6 +181,18 @@ export type V1MemberUnavailability = {
 
 export type V1MemberUnavailabilityList = { teamId: string; userId: string; items: V1MemberUnavailability[] };
 
+/** 한 시각에 결장 중인(취소 안 된) 활성 팀원의 기간. */
+export type V1TeamUnavailabilityItem = {
+  id: string;
+  userId: string;
+  reason: string | null;
+  startsAt: string;
+  endsAt: string;
+  actorRole: string;
+};
+
+export type V1TeamUnavailabilityList = { items: V1TeamUnavailabilityItem[] };
+
 /** 기간 안 경기 명단(라인업)은 서버 워커가 이어서 맞춘다 — 명단 조회는 볼 때 계산하므로 바로 반영된다. */
 export type V1MemberUnavailabilityWriteResult = { unavailability: V1MemberUnavailability };
 
@@ -236,8 +251,10 @@ function invalidateLineupReaders(queryClient: QueryClient, gameIds: readonly str
 }
 
 function afterSideWrite(queryClient: QueryClient, roster: V1GameRosterView) {
-  // 응답이 새 명단을 싣고 오므로 명단은 바로 넣고, 기록·라인업만 다시 받는다.
-  queryClient.setQueryData(v1Keys.gameRoster(roster.gameId, roster.sideId), roster);
+  // 응답이 새 명단을 싣고 오므로 명단은 바로 넣고(상대 팀 이름은 쓰기 응답에 없어 이어받는다), 기록·라인업만 다시 받는다.
+  queryClient.setQueryData<V1TeamGameRosterView>(v1Keys.teamGameRoster(roster.teamId, roster.gameId), (current) =>
+    current === undefined ? current : { ...roster, opponentName: current.opponentName },
+  );
   void queryClient.invalidateQueries({ queryKey: v1Keys.gameRosterAdjustments(roster.gameId, roster.sideId) });
   invalidateLineupReaders(queryClient, [roster.gameId]);
   invalidateTeamRosterViews(queryClient, roster.teamId);
@@ -245,14 +262,18 @@ function afterSideWrite(queryClient: QueryClient, roster: V1GameRosterView) {
 
 // ── 경기 한 사이드 ───────────────────────────────────────────────────────────
 
-export function useV1GameRoster(gameId: string | null, sideId: string | null, options?: { enabled?: boolean }) {
+/**
+ * 그 팀이 뛰는 대회·리그 경기의 명단. 사이드는 서버가 팀으로 찾는다 — 그 팀이 사이드가 아니거나 친선·명단 없는
+ * 경기는 404 `GAME_ROSTER_NOT_AVAILABLE`. 조정·변경 기록 훅은 응답의 `sideId` 로 부른다.
+ */
+export function useV1TeamGameRoster(teamId: string | null, gameId: string | null, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: v1Keys.gameRoster(gameId ?? '', sideId ?? ''),
+    queryKey: v1Keys.teamGameRoster(teamId ?? '', gameId ?? ''),
     queryFn: () => {
-      if (!gameId || !sideId) throw new Error('경기·팀 정보 없이 명단을 조회할 수 없어요.');
-      return v1Get<V1GameRosterView>(`/games/${gameId}/sides/${sideId}/roster`);
+      if (!teamId || !gameId) throw new Error('팀·경기 정보 없이 명단을 조회할 수 없어요.');
+      return v1Get<V1TeamGameRosterView>(`/teams/${teamId}/games/${gameId}/roster`);
     },
-    enabled: (options?.enabled ?? true) && Boolean(gameId) && Boolean(sideId),
+    enabled: (options?.enabled ?? true) && Boolean(teamId) && Boolean(gameId),
     retry: false,
   });
 }
@@ -319,7 +340,11 @@ export function useV1ApplyGameRosterBatch(teamId: string) {
       for (const row of sides.values()) {
         void queryClient.invalidateQueries({ queryKey: v1Keys.gameSideRosterAll(row.gameId, row.sideId) });
       }
-      invalidateLineupReaders(queryClient, [...new Set(result.results.map((row) => row.gameId))]);
+      const gameIds = [...new Set(result.results.map((row) => row.gameId))];
+      for (const gameId of gameIds) {
+        void queryClient.invalidateQueries({ queryKey: v1Keys.teamGameRoster(result.teamId, gameId) });
+      }
+      invalidateLineupReaders(queryClient, gameIds);
       invalidateTeamRosterViews(queryClient, result.teamId);
     },
   });
@@ -344,12 +369,31 @@ export function useV1MemberUnavailability(
   });
 }
 
+/**
+ * 친선 참석명단 편집기의 "결장" 표시용 — `activeAt`(킥오프) 을 덮는 기간만 온다. 시각을 모르면 조회하지 않는다
+ * (지금 기준으로 보이면 다른 날 경기에 틀린 표시가 된다). 그 팀 활성 멤버·플랫폼 운영자.
+ */
+export function useV1TeamUnavailability(
+  teamId: string | null,
+  activeAt: string | null,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: v1Keys.teamUnavailability(teamId ?? '', activeAt ?? ''),
+    queryFn: () => {
+      if (!teamId || !activeAt) throw new Error('팀·경기 시각 없이 결장 정보를 조회할 수 없어요.');
+      return v1Get<V1TeamUnavailabilityList>(`/teams/${teamId}/unavailability`, { activeAt });
+    },
+    enabled: (options?.enabled ?? true) && Boolean(teamId) && Boolean(activeAt),
+    retry: false,
+  });
+}
+
 /** 결장 기간은 그 팀의 기간 안 경기 여러 개를 바꾼다 — 어느 경기인지 응답이 알려 주지 않는다. */
 function afterUnavailabilityWrite(queryClient: QueryClient, teamId: string, userId: string) {
   void queryClient.invalidateQueries({ queryKey: v1Keys.teamMemberUnavailability(teamId, userId) });
-  void queryClient.invalidateQueries({
-    predicate: (query) => query.queryKey[0] === 'v1' && query.queryKey[1] === 'games' && query.queryKey[3] === 'sides',
-  });
+  void queryClient.invalidateQueries({ queryKey: v1Keys.teamUnavailabilityAll(teamId) });
+  void queryClient.invalidateQueries({ queryKey: v1Keys.teamGameRosterAll(teamId) });
   invalidateLineupReaders(queryClient, null);
   invalidateTeamRosterViews(queryClient, teamId);
 }

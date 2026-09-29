@@ -243,11 +243,14 @@ export function createV1GameRosterMswHandlers() {
 
   const sidePath = `${api}/games/:gameId/sides/:sideId`;
   const handlers = [
-    http.get(`${sidePath}/roster`, async ({ request, params }) => {
+    // 사이드는 팀으로 찾는다 — 그 팀이 사이드가 아닌 경기(다른 팀·대진이 바뀐 경기)는 명단 없음과 같은 404.
+    http.get(`${api}/teams/:teamId/games/:gameId/roster`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
-      const game = findGame(String(params.gameId), String(params.sideId));
-      if (!game) return fail(404, 'GAME_ROSTER_NOT_AVAILABLE', '이 경기는 명단을 조정할 수 없어요.');
-      return ok(view(game));
+      const game = findGame(String(params.gameId));
+      if (!game || params.teamId !== GAME_ROSTER_MSW.teamId || state.detached.has(game.gameId)) {
+        return fail(404, 'GAME_ROSTER_NOT_AVAILABLE', '이 경기는 명단을 조정할 수 없어요.');
+      }
+      return ok({ ...view(game), opponentName: game.opponentName });
     }),
     http.get(`${sidePath}/roster-adjustments`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
@@ -310,6 +313,16 @@ export function createV1GameRosterMswHandlers() {
         return { gameId: c.gameId, sideId: game.sideId, userId: c.userId, op: c.op, alreadyApplied };
       });
       return ok({ teamId: String(params.teamId), results });
+    }),
+    http.get(`${api}/teams/:teamId/unavailability`, async ({ request, params }) => {
+      const url = new URL(request.url);
+      await record(request, `${url.pathname}${url.search}`);
+      const activeAt = url.searchParams.get('activeAt') ?? NOW;
+      if (Number.isNaN(Date.parse(activeAt))) return fail(400, 'VALIDATION_ERROR', 'activeAt 형식이 올바르지 않아요.');
+      const items = state.unavailabilities
+        .filter((u) => u.teamId === params.teamId && u.revokedAt === null && u.startsAt <= activeAt && activeAt < u.endsAt)
+        .map(({ id, userId, reason, startsAt, endsAt, actorRole }) => ({ id, userId, reason, startsAt, endsAt, actorRole }));
+      return ok({ items });
     }),
     http.get(`${api}/teams/:teamId/members/:userId/unavailability`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);

@@ -2195,7 +2195,7 @@ export type V1TeamUpcomingGame = {
   source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
   competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
   teamMatchId: string | null;
-  /** 이 팀의 경기 사이드 — 경기 명단 화면(`/games/:gameId/sides/:sideId/roster` API)의 키. */
+  /** 이 팀의 경기 사이드. 경기 명단 화면은 이 값 없이 팀·경기로 찾는다(`useV1TeamGameRoster`). */
   sideId: string | null;
   title: string;
   opponentName: string | null;

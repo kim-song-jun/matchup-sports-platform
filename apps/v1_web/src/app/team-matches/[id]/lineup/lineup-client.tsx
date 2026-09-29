@@ -9,6 +9,8 @@ import {
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
+import { GameRosterStatusBadge } from '@/components/game-roster/game-roster-player-row';
+import { useV1TeamUnavailability } from '@/hooks/use-v1-game-roster';
 import {
   useV1MyTeams,
   useV1SaveTeamMatchLineup,
@@ -134,6 +136,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       )
     : null;
   const editable = Boolean(phase?.editable) && isOnline;
+  // 친선 참석명단은 결장 기간으로 자동으로 빼지 않는다(제출하는 명단이다) — 고를 때 보이게만 한다(Task 178).
+  const kickoffIso = kickoffAt && Number.isFinite(Date.parse(kickoffAt)) ? new Date(kickoffAt).toISOString() : null;
+  const unavailabilityQuery = useV1TeamUnavailability(ownTeamId, kickoffIso, {
+    enabled: !isCompetition && phase?.editable === true,
+  });
 
   // ── 자동저장: 서버 ack 전에는 절대 "저장됨"이라 말하지 않는다 ──
   //
@@ -355,6 +362,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
   const addableWaitingMembers = waitingMembers;
+  const unavailableByUser = new Map((unavailabilityQuery.data?.items ?? []).map((item) => [item.userId, item]));
 
   const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? []).map((item) => ({
     key: `history:${item.lineupId}`,
@@ -771,6 +779,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
               팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요. 별도의 참석 초대나 응답은 필요하지 않아요.
             </p>
+            {unavailabilityQuery.isError ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>
+                  결장 정보를 불러오지 못해 결장 표시 없이 보여요.
+                </p>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-sm tm-btn-outline"
+                  onClick={() => void unavailabilityQuery.refetch()}
+                >
+                  결장 정보 다시 불러오기
+                </button>
+              </div>
+            ) : null}
             {rosterQuery.isLoading ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
                 팀원 목록을 불러오는 중이에요…
@@ -784,23 +806,31 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {addableWaitingMembers.map((member) => (
-                  <Card key={member.userId} pad={12}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
-                      {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
-                          선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
-                          outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
-                      <button
-                        type="button"
-                        className="tm-btn tm-btn-sm tm-btn-outline"
-                        onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
-                      >
-                        명단 추가
-                      </button>
-                    </div>
-                  </Card>
-                ))}
+                {addableWaitingMembers.map((member) => {
+                  const away = unavailableByUser.get(member.userId);
+                  return (
+                    <Card key={member.userId} pad={12}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <span className="tm-text-label" style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
+                            {member.displayName}
+                          </span>
+                          {away === undefined ? null : <GameRosterStatusBadge status="UNAVAILABLE" reason={away.reason} />}
+                        </div>
+                        {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
+                            선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
+                            outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
+                        <button
+                          type="button"
+                          className="tm-btn tm-btn-sm tm-btn-outline"
+                          onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
+                        >
+                          명단 추가
+                        </button>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             )}
 

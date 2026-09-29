@@ -11,7 +11,7 @@ import { LeagueClaimMyRecordSection } from '@/components/public-game-records/cla
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { MatchTeamRosterCard } from '@/components/game-roster/match-team-roster-card';
-import { useMyMatchRosterSide } from '@/components/game-roster/use-my-match-roster-side';
+import { useMyMatchRosterTeam } from '@/components/game-roster/use-my-match-roster-team';
 import { extractErrorMessage } from '@/lib/error-message';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
@@ -118,14 +118,12 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     [series, fixtureId],
   );
 
-  // 참가팀 팀원에게만 "우리 팀 출전" 카드가 뜬다. 게임이 비공개(기록 404)여도 대진 id 로 찾는다.
-  const rosterSide = useMyMatchRosterSide({
+  // 참가팀 팀원에게만 "우리 팀 출전" 카드가 뜬다. 게임이 비공개(기록 404)면 팀매치 상세의 gameId 로 찾는다.
+  const rosterTeam = useMyMatchRosterTeam({
     teamIds: [fixture?.homeTeamId ?? null, fixture?.awayTeamId ?? null],
-    gameId: recordQuery.data?.gameId ?? null,
-    teamMatchId: fixtureId,
-    kickoffAt: fixture === null ? undefined : fixture.startAt,
+    gameId: recordQuery.data?.gameId ?? teamMatchQuery.data?.gameId ?? null,
   });
-  const rosterCard = <MatchTeamRosterCard side={rosterSide} />;
+  const rosterCard = <MatchTeamRosterCard team={rosterTeam} />;
 
   const rowByTeam = useMemo(() => {
     const map = new Map<string, V1LeagueStandingRow>();
@@ -371,9 +369,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
             ) : null}
             {chatError ? <p role="alert" className="text-sm text-red-700 dark:text-red-300">{chatError}</p> : null}
             {/* 리그 경기는 친선 참석명단이 아니라 경기 명단(참가 명단 기준 조정)으로 간다(Task 178). */}
-            {rosterSide.status === 'resolved' ? (
+            {rosterTeam.status === 'resolved' ? (
               <Link
-                href={withFromPath(gameRosterScreenPath(rosterSide.teamId, rosterSide.gameId), selfHref)}
+                href={withFromPath(gameRosterScreenPath(rosterTeam.teamId, rosterTeam.gameId), selfHref)}
                 className="tm-btn tm-btn-lg tm-btn-neutral"
               >
                 경기 명단

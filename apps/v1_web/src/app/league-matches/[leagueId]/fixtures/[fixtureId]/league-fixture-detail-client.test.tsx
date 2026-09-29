@@ -4,7 +4,7 @@ import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
 import { V1ApiError } from '@/lib/api-client';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
-import { useMyMatchRosterSide, type MyMatchRosterSide } from '@/components/game-roster/use-my-match-roster-side';
+import { useMyMatchRosterTeam, type MyMatchRosterTeam } from '@/components/game-roster/use-my-match-roster-team';
 import LeagueFixtureDetailClient from './league-fixture-detail-client';
 
 const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
@@ -23,9 +23,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 // 우리 팀 판별·카드 내부는 match-team-roster-card.test.tsx 가 실제 훅으로 검증한다 — 여기서는
 // 이 화면이 어떤 인자로 판별을 부르고, 그 결과로 카드·경기 명단 링크를 어디에 두는지만 본다.
-vi.mock('@/components/game-roster/use-my-match-roster-side', () => ({ useMyMatchRosterSide: vi.fn() }));
+vi.mock('@/components/game-roster/use-my-match-roster-team', () => ({ useMyMatchRosterTeam: vi.fn() }));
 vi.mock('@/components/game-roster/match-team-roster-card', () => ({
-  MatchTeamRosterCard: ({ side }: { side: MyMatchRosterSide }) => <div data-testid="roster-card">{side.status}</div>,
+  MatchTeamRosterCard: ({ team }: { team: MyMatchRosterTeam }) => <div data-testid="roster-card">{team.status}</div>,
 }));
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
@@ -53,9 +53,9 @@ const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { par
 const useV1TeamMatchMock = vi.mocked(useV1TeamMatch, { partial: true });
 const useV1ResolveChatRoomMock = vi.mocked(useV1ResolveChatRoom, { partial: true });
 const usePublicLeagueFixtureRecordMock = vi.mocked(usePublicLeagueFixtureRecord, { partial: true });
-const useMyMatchRosterSideMock = vi.mocked(useMyMatchRosterSide);
-useMyMatchRosterSideMock.mockReturnValue({ status: 'none' });
-const RESOLVED_SIDE: MyMatchRosterSide = { status: 'resolved', teamId: 't2', gameId: 'game-1', sideId: 'side-2' };
+const useMyMatchRosterTeamMock = vi.mocked(useMyMatchRosterTeam);
+useMyMatchRosterTeamMock.mockReturnValue({ status: 'none' });
+const RESOLVED_TEAM: MyMatchRosterTeam = { status: 'resolved', teamId: 't2', gameId: 'game-1' };
 
 /** 게임 프로젝션(대회와 동일한 본문) 픽스처 — MatchDetailContent 가 소비하는 필드 전부. */
 function makeRecord(overrides: Record<string, unknown> = {}) {
@@ -158,7 +158,7 @@ function mockViewer(state: 'none' | 'approved' | 'host_team', extra: Record<stri
 
 describe('LeagueFixtureDetailClient', () => {
   afterEach(() => {
-    useMyMatchRosterSideMock.mockReturnValue({ status: 'none' });
+    useMyMatchRosterTeamMock.mockReturnValue({ status: 'none' });
   });
 
   // 픽스처가 **고정 날짜**다 — fx-1 은 2026-09-08T10:00Z 이고 "예정"으로 보여야 한다.
@@ -254,7 +254,7 @@ describe('LeagueFixtureDetailClient', () => {
 
   it('참가팀(approved)에게는 채팅·경기 명단 통로가 뜬다', () => {
     mockLeague();
-    useMyMatchRosterSideMock.mockReturnValue(RESOLVED_SIDE);
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     // 실제 API 응답에서 state='approved'(신청서를 낸 사람)는 항상 신청팀 owner/manager이므로
     // manageableOpponentTeam=true 와 함께 온다(둘 다 team-matches.service.ts getViewer()의
     // 같은 호출에서 나온다) — canChat 이 이제 이 플래그를 직접 보므로 목도 실제 응답 모양을 따른다.
@@ -273,7 +273,7 @@ describe('LeagueFixtureDetailClient', () => {
   });
 
   it('활동 기록에서 들어온 경우 경기 명단·결과 CTA 는 받은 출처까지 이어 붙인다', () => {
-    useMyMatchRosterSideMock.mockReturnValue(RESOLVED_SIDE);
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     navigation.searchParams = new URLSearchParams('from=%2Fusers%2Fu1%2Frecords');
     mockLeague({
       fixtures: [
@@ -321,7 +321,7 @@ describe('LeagueFixtureDetailClient', () => {
   // away 팀장도 채팅 버튼을 봐야 한다 — 이 테스트는 그 새 계약을 고정한다.
   it('away 팀 팀장(manageableOpponentTeam)에게도 채팅·경기 명단 통로가 뜬다', () => {
     mockLeague();
-    useMyMatchRosterSideMock.mockReturnValue(RESOLVED_SIDE);
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     mockViewer('none', { manageableOpponentTeam: true });
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
@@ -489,38 +489,30 @@ describe('LeagueFixtureDetailClient', () => {
 
 describe('LeagueFixtureDetailClient — 우리 팀 출전(Task 178)', () => {
   afterEach(() => {
-    useMyMatchRosterSideMock.mockReturnValue({ status: 'none' });
+    useMyMatchRosterTeamMock.mockReturnValue({ status: 'none' });
   });
 
-  it('두 팀 id·기록의 gameId·대진 id 로 우리 팀을 찾고, 카드를 기록 헤더 아래에 둔다', () => {
+  it('두 팀 id·기록의 gameId 로 우리 팀을 찾고, 카드를 기록 헤더 아래에 둔다', () => {
     mockLeague();
     mockViewer('none', { participantMember: true });
     mockRecord('present');
-    useMyMatchRosterSideMock.mockReturnValue(RESOLVED_SIDE);
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    // 킥오프 시각을 넘겨 지난 경기는 다가오는 경기 목록을 부르지 않게 한다.
-    expect(useMyMatchRosterSideMock).toHaveBeenLastCalledWith({
-      teamIds: ['t1', 't2'],
-      gameId: 'game-1',
-      teamMatchId: 'fx-1',
-      kickoffAt: '2026-09-08T10:00:00.000Z',
-    });
+    expect(useMyMatchRosterTeamMock).toHaveBeenLastCalledWith({ teamIds: ['t1', 't2'], gameId: 'game-1' });
     expect(screen.getAllByTestId('roster-card')).toHaveLength(1);
   });
 
-  it('기록이 비공개(404)여도 gameId 없이 찾고 카드는 요약 카드 아래 한 번만 뜬다', () => {
+  it('기록이 비공개(404)면 팀매치 상세의 gameId 로 찾고 카드는 요약 카드 아래 한 번만 뜬다', () => {
     mockLeague();
     mockViewer('none', { participantMember: true });
+    useV1TeamMatchMock.mockReturnValue({
+      data: { id: 'fx-1', gameId: 'game-9', viewer: { state: 'none', participantMember: true } },
+    } as never);
     mockRecord('absent');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(useMyMatchRosterSideMock).toHaveBeenLastCalledWith({
-      teamIds: ['t1', 't2'],
-      gameId: null,
-      teamMatchId: 'fx-1',
-      kickoffAt: '2026-09-08T10:00:00.000Z',
-    });
+    expect(useMyMatchRosterTeamMock).toHaveBeenLastCalledWith({ teamIds: ['t1', 't2'], gameId: 'game-9' });
     expect(screen.getAllByTestId('roster-card')).toHaveLength(1);
   });
 

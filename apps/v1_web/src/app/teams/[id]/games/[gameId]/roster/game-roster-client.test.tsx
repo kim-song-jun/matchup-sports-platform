@@ -8,7 +8,6 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createV1GameRosterMswHandlers, GAME_ROSTER_MSW } from '@/test/msw/game-roster-handlers';
-import type { V1TeamUpcomingGame } from '@/hooks/use-v1-api';
 import { GameRosterClient } from './game-roster-client';
 
 vi.mock('next/navigation', () => ({
@@ -19,75 +18,18 @@ vi.mock('next/navigation', () => ({
 
 const { teamId } = GAME_ROSTER_MSW;
 const [G1] = GAME_ROSTER_MSW.games;
-const NOW = '2026-10-01T00:00:00.000Z';
 const BATCH = `/api/v1/teams/${teamId}/game-rosters/batch`;
+const ROSTER = `/api/v1/teams/${teamId}/games/${G1.gameId}/roster`;
+const HISTORY = `/api/v1/games/${G1.gameId}/sides/${G1.sideId}/roster-adjustments`;
 
 let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
-let upcomingItems: V1TeamUpcomingGame[];
-/** 서버의 다가오는 경기는 그 팀 활성 멤버만 받는다(assertTeamLineupMember) — 팀원이 아닌 운영자는 403. */
-let upcomingForbidden: boolean;
-let gameFetches: number;
-
-function upcoming(overrides: Partial<V1TeamUpcomingGame> = {}): V1TeamUpcomingGame {
-  return {
-    gameId: G1.gameId,
-    source: 'TOURNAMENT_FIXTURE',
-    competitionKind: 'TOURNAMENT',
-    teamMatchId: `team-match-${G1.gameId}`,
-    sideId: G1.sideId,
-    title: '성수 풋살컵 조별리그',
-    opponentName: G1.opponentName,
-    scheduledAt: G1.startAt,
-    tournamentId: GAME_ROSTER_MSW.tournamentId,
-    tournamentTitle: '성수 풋살컵',
-    lineupState: 'DONE',
-    rosterSummary: { participating: 3, excluded: 0, unavailable: 0, suspended: 0 },
-    ...overrides,
-  };
-}
 
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   mock = createV1GameRosterMswHandlers();
-  upcomingItems = [upcoming()];
-  upcomingForbidden = false;
-  gameFetches = 0;
-  server = setupServer(
-    ...mock.handlers,
-    http.get('*/api/v1/teams/:teamId/upcoming-games', () =>
-      upcomingForbidden
-        ? HttpResponse.json(
-            { status: 'error', statusCode: 403, code: 'PERMISSION_DENIED', message: '팀원만 볼 수 있어요.', timestamp: NOW },
-            { status: 403 },
-          )
-        : HttpResponse.json({ status: 'success', data: { items: upcomingItems }, timestamp: NOW }),
-    ),
-    http.get('*/api/v1/games/:gameId', ({ params }) => {
-      gameFetches += 1;
-      return HttpResponse.json({
-        status: 'success',
-        data: {
-          id: params.gameId,
-          sourceType: 'TEAM_MATCH',
-          state: 'LIVE',
-          version: 1,
-          lastSequence: 0,
-          competitionConfigVersionId: 'config-1',
-          currentOfficialRevisionId: null,
-          sides: [
-            { id: G1.sideId, gameId: G1.gameId, sideKey: 'HOME', teamId, displayNameSnapshot: '우리 팀' },
-            { id: 'side-away', gameId: G1.gameId, sideKey: 'AWAY', teamId: 'team-2', displayNameSnapshot: '마포 FC' },
-          ],
-          periods: [],
-          lineups: [],
-          actorRole: 'team_owner',
-        },
-        timestamp: NOW,
-      });
-    }),
-    http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
-  );
+  // 다가오는 경기·경기 조회 핸들러는 두지 않는다 — 사이드를 따로 찾으러 가면 onUnhandledRequest 로 실패한다.
+  server = setupServer(...mock.handlers, http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })));
   server.listen({ onUnhandledRequest: 'error' });
 });
 
@@ -96,14 +38,16 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function renderScreen() {
+function renderScreen(screenTeamId: string = teamId) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <GameRosterClient teamId={teamId} gameId={G1.gameId} />
+      <GameRosterClient teamId={screenTeamId} gameId={G1.gameId} />
     </QueryClientProvider>,
   );
 }
+
+const getPaths = () => mock.requests.filter((r) => r.method === 'GET').map((r) => r.path);
 
 function batchBodies() {
   return mock.requests.filter((r) => r.method === 'POST' && r.path === BATCH).map((r) => r.body);
@@ -243,7 +187,6 @@ describe('읽기 전용', () => {
 
   it('운영자에게는 "우리 팀 다른 경기" 링크를 보이지 않는다(그 팀 화면에 다가오는 경기가 없다)', async () => {
     mock.setViewerRole('ADMIN');
-    upcomingForbidden = true;
     renderScreen();
     await screen.findByRole('heading', { name: '출전 3명' });
     expect(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeInTheDocument();
@@ -300,39 +243,48 @@ describe('자동으로 빠지거나 들어온 선수', () => {
   });
 });
 
-describe('사이드 찾기', () => {
-  it('다가오는 경기에 없으면(시작된 경기) 경기 조회로 우리 팀 사이드를 찾는다', async () => {
-    upcomingItems = [];
+describe('권한별 — 팀·경기 명단 한 번의 조회로 연다', () => {
+  it('팀장은 편집 화면으로 열리고, 사이드를 따로 찾지 않는다', async () => {
+    renderScreen();
+    expect(await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeInTheDocument();
+    await waitFor(() => expect(getPaths()).toEqual([ROSTER, HISTORY]));
+  });
+
+  it('대회 일반 팀원은 시작된 경기도 읽기 전용으로 본다', async () => {
+    mock.setViewerRole('TEAM_MEMBER');
     mock.setGameState(G1.gameId, 'LIVE');
     renderScreen();
-    expect(await screen.findByRole('heading', { name: 'vs 마포 FC' })).toBeInTheDocument();
-    expect(gameFetches).toBe(1);
-    expect(screen.getByText('경기 시작됨')).toBeInTheDocument();
+    expect(await screen.findByText('경기 시작됨')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: `vs ${G1.opponentName}` })).toBeInTheDocument();
+    expect(screen.getByText('7 김민재')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /저장|참가 명단대로|되돌리기/ })).toBeNull();
+    await waitFor(() => expect(getPaths()).toEqual([ROSTER, HISTORY]));
   });
 
-  it.each(['ADMIN', 'STAFF'] as const)(
-    '팀원이 아닌 운영자(%s)는 다가오는 경기가 403 이어도 경기 조회로 사이드를 찾아 편집한다',
-    async (role) => {
-      mock.setViewerRole(role);
-      upcomingForbidden = true;
-      renderScreen();
-      expect(await screen.findByRole('heading', { name: '출전 3명' })).toBeInTheDocument();
-      expect(gameFetches).toBe(1);
-      expect(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeInTheDocument();
-    },
-  );
-
-  it('다가오는 경기에서 찾으면 경기 조회를 부르지 않는다', async () => {
+  it('지원(support) 어드민은 보기만 한다', async () => {
+    mock.setViewerRole('ADMIN');
+    mock.setCanWrite(false);
     renderScreen();
-    await screen.findByRole('heading', { name: '출전 3명' });
-    expect(gameFetches).toBe(0);
+    expect(await screen.findByText('보기 전용')).toBeInTheDocument();
+    expect(screen.getByText('이 명단은 볼 수만 있어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /저장/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: '우리 팀 다른 경기' })).toBeNull();
   });
 
-  it('친선 경기는 명단 조정 대신 참석명단으로 보낸다', async () => {
-    upcomingItems = [upcoming({ competitionKind: 'FRIENDLY', source: 'TEAM_MATCH', teamMatchId: 'tm-9' })];
+  it.each(['ADMIN', 'STAFF'] as const)('운영자(%s)는 팀원이 아니어도 편집한다', async (role) => {
+    mock.setViewerRole(role);
     renderScreen();
-    expect(await screen.findByText('친선 경기는 참석명단으로 관리해요')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '참석명단 열기' })).toHaveAttribute('href', '/team-matches/tm-9/lineup');
-    expect(mock.requests.some((r) => r.path.endsWith('/roster'))).toBe(false);
+    expect(await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeInTheDocument();
+    expect(screen.getByText('수정 가능')).toBeInTheDocument();
+  });
+
+  it('이 팀이 뛰지 않는 경기(404)는 경기 명단이 없다고 안내하고 변경 기록을 부르지 않는다', async () => {
+    renderScreen('team-2');
+    expect(await screen.findByText('이 경기는 경기 명단이 없어요')).toBeInTheDocument();
+    expect(screen.getByText(/친선 경기는 참석명단에서 출전 선수를 정해요/)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(getPaths()).toEqual([`/api/v1/teams/team-2/games/${G1.gameId}/roster`]);
   });
 });

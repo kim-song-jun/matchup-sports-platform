@@ -21,17 +21,19 @@ import {
   useV1ApplyGameRosterBatch,
   useV1CreateMemberUnavailability,
   useV1ExcludeGameRosterPlayer,
-  useV1GameRoster,
   useV1GameRosterAdjustments,
   useV1MemberUnavailability,
   useV1RevokeGameRosterAdjustment,
+  useV1RevokeMemberUnavailability,
+  useV1TeamGameRoster,
   useV1TeamGameRosters,
+  useV1TeamUnavailability,
 } from './use-v1-game-roster';
 
 const { teamId } = GAME_ROSTER_MSW;
 const [G1, G2] = GAME_ROSTER_MSW.games;
-const ROSTER_1 = `/api/v1/games/${G1.gameId}/sides/${G1.sideId}/roster`;
-const ROSTER_2 = `/api/v1/games/${G2.gameId}/sides/${G2.sideId}/roster`;
+const ROSTER_1 = `/api/v1/teams/${teamId}/games/${G1.gameId}/roster`;
+const ROSTER_2 = `/api/v1/teams/${teamId}/games/${G2.gameId}/roster`;
 const HISTORY_1 = `/api/v1/games/${G1.gameId}/sides/${G1.sideId}/roster-adjustments`;
 const MATRIX = `/api/v1/teams/${teamId}/game-rosters`;
 
@@ -105,7 +107,7 @@ afterEach(() => {
 
 function useSideScreen() {
   return {
-    roster: useV1GameRoster(G1.gameId, G1.sideId),
+    roster: useV1TeamGameRoster(teamId, G1.gameId),
     history: useV1GameRosterAdjustments(G1.gameId, G1.sideId),
     matrix: useV1TeamGameRosters(teamId),
     upcoming: useV1TeamUpcomingGames(teamId),
@@ -130,6 +132,8 @@ describe('경기 한 사이드 조정', () => {
     });
     await waitFor(() => expect(result.current.roster.data?.counts).toMatchObject({ participating: 2, excluded: 1 }));
     expect(result.current.roster.data?.excluded[0]).toMatchObject({ userId: 'player-2', reason: 'INJURY' });
+    // 쓰기 응답엔 상대 팀 이름이 없다 — 화면 머리("vs …")가 비지 않게 이어받는다.
+    expect(result.current.roster.data?.opponentName).toBe(G1.opponentName);
     await waitFor(() => expect(gets(HISTORY_1)).toBe(2));
     await waitFor(() => expect(gets(MATRIX)).toBe(2));
     await waitFor(() => expect(upcomingFetches).toBe(2));
@@ -178,8 +182,8 @@ describe('팀 B 일괄 저장', () => {
   it('변경 목록을 한 번에 보내고, 바뀐 두 경기 명단과 팀 표를 다시 받는다', async () => {
     const { result } = renderHook(
       () => ({
-        r1: useV1GameRoster(G1.gameId, G1.sideId),
-        r2: useV1GameRoster(G2.gameId, G2.sideId),
+        r1: useV1TeamGameRoster(teamId, G1.gameId),
+        r2: useV1TeamGameRoster(teamId, G2.gameId),
         matrix: useV1TeamGameRosters(teamId),
         batch: useV1ApplyGameRosterBatch(teamId),
       }),
@@ -351,8 +355,8 @@ describe('팀 C 결장 기간', () => {
   it('등록하면 기간 안 경기 명단만 결장으로 바뀌고 결장 목록을 다시 받는다', async () => {
     const { result } = renderHook(
       () => ({
-        r1: useV1GameRoster(G1.gameId, G1.sideId),
-        r2: useV1GameRoster(G2.gameId, G2.sideId),
+        r1: useV1TeamGameRoster(teamId, G1.gameId),
+        r2: useV1TeamGameRoster(teamId, G2.gameId),
         list: useV1MemberUnavailability(teamId, 'player-3'),
         create: useV1CreateMemberUnavailability(teamId, 'player-3'),
       }),
@@ -375,6 +379,50 @@ describe('팀 C 결장 기간', () => {
     await waitFor(() => expect(gets(ROSTER_2)).toBe(2));
     expect(result.current.r2.data?.counts.unavailable).toBe(0);
     await waitFor(() => expect(result.current.list.data?.items).toHaveLength(1));
+  });
+});
+
+describe('팀 결장 조회 — 친선 참석명단의 결장 표시', () => {
+  const UNAVAILABILITY = `/api/v1/teams/${teamId}/unavailability`;
+  const unavailabilityGets = () =>
+    mock.requests.filter((r) => r.method === 'GET' && r.path.startsWith(UNAVAILABILITY)).map((r) => r.path);
+
+  it('경기 시각을 activeAt 으로 보내 그 시각에 결장 중인 팀원을 받는다', async () => {
+    mock.markUnavailable('player-1', '2026-10-03T15:00:00.000Z', '2026-10-05T15:00:00.000Z', 'INJURY');
+    mock.markUnavailable('player-2', '2026-10-10T15:00:00.000Z', '2026-10-12T15:00:00.000Z', null);
+    const { result } = renderHook(() => useV1TeamUnavailability(teamId, G1.startAt), { wrapper: wrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(unavailabilityGets()).toEqual([`${UNAVAILABILITY}?${new URLSearchParams({ activeAt: G1.startAt })}`]);
+    expect(result.current.data?.items.map((item) => [item.userId, item.reason])).toEqual([['player-1', 'INJURY']]);
+  });
+
+  it('경기 시각을 모르면 조회하지 않는다', async () => {
+    const { result } = renderHook(() => useV1TeamUnavailability(teamId, null), { wrapper: wrapper() });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(unavailabilityGets()).toEqual([]);
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('결장 기간을 등록·취소하면 다시 받는다', async () => {
+    const { result } = renderHook(
+      () => ({
+        active: useV1TeamUnavailability(teamId, G1.startAt),
+        create: useV1CreateMemberUnavailability(teamId, 'player-3'),
+        revoke: useV1RevokeMemberUnavailability(teamId, 'player-3'),
+      }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.active.data?.items).toEqual([]));
+
+    const created = await act(() =>
+      result.current.create.mutateAsync({ startsAt: '2026-10-03T15:00:00.000Z', endsAt: '2026-10-05T15:00:00.000Z' }),
+    );
+    await waitFor(() => expect(result.current.active.data?.items.map((item) => item.userId)).toEqual(['player-3']));
+
+    await act(() => result.current.revoke.mutateAsync(created.unavailability.id));
+    await waitFor(() => expect(result.current.active.data?.items).toEqual([]));
   });
 });
 

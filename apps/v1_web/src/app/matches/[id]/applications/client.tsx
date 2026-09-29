@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -359,75 +360,81 @@ function ApplicationRow({
         style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}
         aria-label={`신청자 ${application.displayName}`}
       >
-        {/* 프로필 이미지 */}
-        <div
-          role="img"
-          aria-label={`${application.displayName} 프로필 사진`}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 'var(--radius-field)',
-            backgroundColor: 'var(--grey200)',
-            backgroundImage: application.profileImageUrl
-              ? cssUrl(application.profileImageUrl)
-              : undefined,
-            backgroundPosition: 'center',
-            backgroundSize: 'cover',
-            backgroundRepeat: 'no-repeat',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            color: 'var(--text)',
-            fontSize: 18,
-            fontWeight: 800,
-          }}
+        {/* 프로필 이미지 + 이름 — 클릭하면 개인 프로필로 이동 */}
+        <Link
+          href={`/users/${application.applicantUserId}`}
+          aria-label={`${application.displayName} 프로필 보기`}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, textDecoration: 'none', color: 'inherit' }}
         >
-          {!application.profileImageUrl
-            ? (application.displayName.slice(0, 1) || '?')
-            : null}
-        </div>
+          <div
+            role="img"
+            aria-hidden="true"
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 'var(--radius-field)',
+              backgroundColor: 'var(--grey200)',
+              backgroundImage: application.profileImageUrl
+                ? cssUrl(application.profileImageUrl)
+                : undefined,
+              backgroundPosition: 'center',
+              backgroundSize: 'cover',
+              backgroundRepeat: 'no-repeat',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              color: 'var(--text)',
+              fontSize: 18,
+              fontWeight: 800,
+            }}
+          >
+            {!application.profileImageUrl
+              ? (application.displayName.slice(0, 1) || '?')
+              : null}
+          </div>
 
-        {/* 이름 / 부가 정보 */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            className="tm-text-body"
-            style={{ color: 'var(--text-strong)', fontWeight: 600 }}
-          >
-            {application.displayName}
+          {/* 이름 / 부가 정보 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              className="tm-text-body"
+              style={{ color: 'var(--text-strong)', fontWeight: 600 }}
+            >
+              {application.displayName}
+            </div>
+            <div
+              className="tm-text-caption"
+              style={{ marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}
+            >
+              {mannerScore !== null ? (
+                /* [P1 숫자:단위 2:1 + tabular-nums] 매너점수 숫자(body-sm weight600) : 단위(caption) */
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-strong)' }}>{mannerScore}</span>
+                  <span>점</span>
+                </span>
+              ) : null}
+              {application.reviewCount > 0 ? (
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                  리뷰{' '}
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-strong)' }}>{application.reviewCount}</span>개
+                </span>
+              ) : null}
+              {application.message ? (
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 160,
+                    display: 'inline-block',
+                  }}
+                >
+                  "{application.message}"
+                </span>
+              ) : null}
+            </div>
           </div>
-          <div
-            className="tm-text-caption"
-            style={{ marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}
-          >
-            {mannerScore !== null ? (
-              /* [P1 숫자:단위 2:1 + tabular-nums] 매너점수 숫자(body-sm weight600) : 단위(caption) */
-              <span style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-strong)' }}>{mannerScore}</span>
-                <span>점</span>
-              </span>
-            ) : null}
-            {application.reviewCount > 0 ? (
-              <span style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                리뷰{' '}
-                <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-strong)' }}>{application.reviewCount}</span>개
-              </span>
-            ) : null}
-            {application.message ? (
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  maxWidth: 160,
-                  display: 'inline-block',
-                }}
-              >
-                "{application.message}"
-              </span>
-            ) : null}
-          </div>
-        </div>
+        </Link>
 
         {/* 상태 뱃지 */}
         <span className={`tm-badge ${statusBadgeClass}`} aria-label={`상태: ${statusLabel}`}>

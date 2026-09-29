@@ -329,6 +329,11 @@ export class MatchesService {
     const dates = this.validateMatchDates(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
+    // 주최자가 참가하면 정원엔 나 + 1명 이상 자리가 있어야 한다 — 안 그러면 아무도 못 받는 매치가 된다.
+    if (dto.hostParticipates !== false && dto.capacity < 2) {
+      throw validationError('주최자가 참가하면 정원은 2명 이상이어야 해요', 'capacity');
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const match = await tx.v1Match.create({

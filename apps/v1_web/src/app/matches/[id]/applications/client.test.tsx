@@ -64,13 +64,18 @@ describe('개인 매치 신청 관리', () => {
   function confirmedApplication(overrides = {}) {
     mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
     mocks.applications.mockReturnValue({ data: { pages: [{ items: [{
-      applicationId: 'a1', participantId: 'p1', displayName: '참가자', status: 'approved',
+      applicationId: 'a1', participantId: 'p1', applicantUserId: 'u1', displayName: '참가자', status: 'approved',
       participantStatus: 'active', mannerScore: null, reviewCount: 0,
       canCancelApproval: true, canMarkCancelled: false, ...overrides,
     }] }] } });
     render(<MatchApplicationsPageClient matchId="m1" />);
     fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
   }
+
+  it('신청자 프로필을 클릭하면 개인 프로필 페이지로 이동한다', () => {
+    confirmedApplication({ applicantUserId: 'user-77' });
+    expect(screen.getByRole('link', { name: '참가자 프로필 보기' })).toHaveAttribute('href', '/users/user-77');
+  });
 
   it('승인 취소는 사유와 확인을 거쳐 실제 참가자 ID로 요청한다', async () => {
     confirmedApplication();

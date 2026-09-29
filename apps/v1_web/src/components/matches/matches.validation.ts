@@ -153,7 +153,8 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       startsAt: startsAt.toISOString(),
       endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
       deadlineAt: deadlineAt ? deadlineAt.toISOString() : null,
-      capacity: Math.max(Number(draft.capacity) || 1, 1),
+      // 주최자가 참가하면 최소 정원은 2명(나 + 1명) — UI 스테퍼와 같은 하한을 여기서도 강제한다.
+      capacity: Math.max(Number(draft.capacity) || 1, draft.hostParticipates ? 2 : 1),
       hostParticipates: draft.hostParticipates,
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,

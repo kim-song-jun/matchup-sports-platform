@@ -9,8 +9,16 @@ import { userRecordResultLabel } from './format';
 import { resultChipStyle } from './result-emphasis';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { RECORD_TYPE_TABS, recordEmptyCopy, type RecordTypeFilter } from './record-category-tabs';
+import { PersonalMatchRecordsSection } from './personal-match-records-section';
 import { withFromPath } from '@/lib/session-storage';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
+
+/**
+ * "개인"(개인매치) 탭 -- 팀 전적 4탭(RECORD_TYPE_TABS)과 달리 이 화면(개인 활동 기록)에만
+ * 있고, 본인 페이지에서만 보인다(아래 tabItems). team-records-content.tsx와 공유하는
+ * `TeamRecordCategory`에는 넣지 않는다 -- 팀 전적에는 개인매치 개념 자체가 없다.
+ */
+export type UserRecordTabFilter = RecordTypeFilter | 'personal';
 
 /**
  * `viewerIsOwner && !consentGranted`일 때만 뜬다 — 본인은 동의 없이도 자기 기록을
@@ -154,8 +162,8 @@ export function UserRecordsContent({
   onLoadMore?: () => void;
   /** Task 166 BE-4. 미전달이면 탭을 그리지 않는다 — 아직 탭 없이 이 컴포넌트를 쓰는
    *  화면이 있을 수 있어 팀 전적(`onChangeType`)과 같은 방식으로 optional 이다. */
-  activeType?: RecordTypeFilter;
-  onChangeType?: (next: RecordTypeFilter) => void;
+  activeType?: UserRecordTabFilter;
+  onChangeType?: (next: UserRecordTabFilter) => void;
   /** 상세로 넘길 출처. 이 화면이 받은 `?from=` 까지 담아야 여러 단계 뒤에도 처음 출처가 남는다. */
   selfHref?: string;
 }) {
@@ -171,7 +179,12 @@ export function UserRecordsContent({
   // 탭에 흔들리지 않는 전체 집계로 판정한다.
   const showOwnerVisibilityBanner =
     data.viewerIsOwner && !data.consentGranted && data.summary.appearances > 0;
-  const resolvedActiveType: RecordTypeFilter = activeType ?? 'all';
+  const resolvedActiveType: UserRecordTabFilter = activeType ?? 'all';
+  // 개인매치 참여 내역은 본인에게만 노출한다 -- 팀 전적과 달리 공개 동의 개념 자체가
+  // 없고, 지금까지 한 번도 타인에게 공개된 적 없는 데이터라 이번에 조용히 넓히지 않는다.
+  const tabItems = data.viewerIsOwner
+    ? [...RECORD_TYPE_TABS, { key: 'personal' as const, label: '개인' }]
+    : RECORD_TYPE_TABS;
   // 탭별 KPI 는 서버가 이미 계산해 보낸 `summary.byType[종류]` 를 읽는다 — 팀 전적과
   // 같은 계약이라 탭을 바꿔도 KPI 를 다시 받지 않는다. '전체'만 최상위 summary 다.
   //
@@ -179,159 +192,167 @@ export function UserRecordsContent({
   // 배포 롤링 창에서는 새 화면이 **옛 응답**(byType 없음)을 받는다 — 그때 첨자 접근이
   // `undefined` 를 주고 아래 KPI 렌더가 통째로 크래시한다. 전체 summary 로 떨어뜨리면
   // 숫자가 잠깐 탭과 어긋날 뿐 화면은 산다(그 창은 배포가 끝나면 닫힌다).
+  // '개인' 탭은 아래에서 이 값 자체를 쓰지 않는 별도 분기로 렌더한다 — 'all'과 함께
+  // byType 인덱싱에서 걸러 TeamRecordCategory 로 좁힌다(byType에 'personal' 키가 없다).
   const activeTotals =
-    resolvedActiveType === 'all'
+    resolvedActiveType === 'all' || resolvedActiveType === 'personal'
       ? data.summary
       : (data.summary.byType?.[resolvedActiveType] ?? data.summary);
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {showOwnerVisibilityBanner ? <OwnerVisibilityBanner /> : null}
+      {showOwnerVisibilityBanner && resolvedActiveType !== 'personal' ? <OwnerVisibilityBanner /> : null}
 
       {onChangeType ? (
         <SegmentedTabs
-          items={RECORD_TYPE_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
+          items={tabItems.map((tab) => ({ id: tab.key, label: tab.label }))}
           activeId={resolvedActiveType}
-          onSelect={(id) => onChangeType(id as RecordTypeFilter)}
+          onSelect={(id) => onChangeType(id as UserRecordTabFilter)}
           ariaLabel="경기 종류"
           role="tablist"
         />
       ) : null}
 
-      <Card>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
-          {/* "출전"이 아니라 "엔트리" — 이 숫자는 **명단에 이름이 오른 경기 수**다.
-              명단에 오르면 곧 참가자로 집계되므로(D3), 벤치에 있었어도 세어진다.
-              "출전"이라 부르면 뛰지 않은 경기까지 뛴 것처럼 말하게 된다. */}
-          <KPIStat label="엔트리" value={activeTotals.appearances} unit="경기" />
-          <KPIStat label="골" value={activeTotals.goals} unit="골" />
-          {/* 매치 MVP·대회 수상은 탭과 무관하게 **전체 기준**이다 — 대회 수상은 애초에
-              대회에만 있고, 매치 MVP 를 탭별로 쪼개면 '친선 MVP 0회' 같은 칸이 생긴다. */}
-          <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />
-          <KPIStat label="대회 수상" value={data.summary.tournamentAwardCount} unit="회" />
-        </div>
-      </Card>
+      {resolvedActiveType === 'personal' ? (
+        <PersonalMatchRecordsSection fromHref={fromHref} />
+      ) : (
+        <>
+          <Card>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+              {/* "출전"이 아니라 "엔트리" — 이 숫자는 **명단에 이름이 오른 경기 수**다.
+                  명단에 오르면 곧 참가자로 집계되므로(D3), 벤치에 있었어도 세어진다.
+                  "출전"이라 부르면 뛰지 않은 경기까지 뛴 것처럼 말하게 된다. */}
+              <KPIStat label="엔트리" value={activeTotals.appearances} unit="경기" />
+              <KPIStat label="골" value={activeTotals.goals} unit="골" />
+              {/* 매치 MVP·대회 수상은 탭과 무관하게 **전체 기준**이다 — 대회 수상은 애초에
+                  대회에만 있고, 매치 MVP 를 탭별로 쪼개면 '친선 MVP 0회' 같은 칸이 생긴다. */}
+              <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />
+              <KPIStat label="대회 수상" value={data.summary.tournamentAwardCount} unit="회" />
+            </div>
+          </Card>
 
-      {data.tournamentAwards.length > 0 ? (
-        <section aria-labelledby="tournament-awards-title">
-          <h3 id="tournament-awards-title" className="tm-hub-section-title" style={{ marginBottom: 12 }}>대회 수상</h3>
-          <Card pad={0}>
-            {data.tournamentAwards.map((award) => (
-              <Link
-                key={award.id}
-                href={withFromPath(`/tournaments/${award.tournamentId}`, fromHref)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '16px 16px',
-                  borderTop: '1px solid var(--grey100)',
-                  color: 'inherit',
-                  textDecoration: 'none',
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: 'inline-flex',
-                    width: 40,
-                    height: 40,
-                    flexShrink: 0,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 'var(--radius-control)',
-                    background: 'var(--surface-soft)',
-                  }}
-                >
-                  <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} size={20} />
-                </span>
-                <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
-                    {award.awardLabel}
-                  </span>
-                  <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {award.tournamentTitle}
-                    {award.teamName ? ` · ${award.teamName}` : ''}
-                    {formatTournamentDateShort(award.awardedAt) ? ` · ${formatTournamentDateShort(award.awardedAt)}` : ''}
-                  </span>
-                  {award.note ? (
-                    <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
-                      {award.note}
+          {data.tournamentAwards.length > 0 ? (
+            <section aria-labelledby="tournament-awards-title">
+              <h3 id="tournament-awards-title" className="tm-hub-section-title" style={{ marginBottom: 12 }}>대회 수상</h3>
+              <Card pad={0}>
+                {data.tournamentAwards.map((award) => (
+                  <Link
+                    key={award.id}
+                    href={withFromPath(`/tournaments/${award.tournamentId}`, fromHref)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '16px 16px',
+                      borderTop: '1px solid var(--grey100)',
+                      color: 'inherit',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'inline-flex',
+                        width: 40,
+                        height: 40,
+                        flexShrink: 0,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 'var(--radius-control)',
+                        background: 'var(--surface-soft)',
+                      }}
+                    >
+                      <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} size={20} />
                     </span>
-                  ) : null}
-                </span>
-              </Link>
-            ))}
-          </Card>
-        </section>
-      ) : null}
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
+                        {award.awardLabel}
+                      </span>
+                      <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {award.tournamentTitle}
+                        {award.teamName ? ` · ${award.teamName}` : ''}
+                        {formatTournamentDateShort(award.awardedAt) ? ` · ${formatTournamentDateShort(award.awardedAt)}` : ''}
+                      </span>
+                      {award.note ? (
+                        <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                          {award.note}
+                        </span>
+                      ) : null}
+                    </span>
+                  </Link>
+                ))}
+              </Card>
+            </section>
+          ) : null}
 
-      <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>활동 기록</h3>
-        {data.items.length === 0 ? (
-          // 탭이 걸려 있으면 "이 종류가 없다" 가 정확한 설명이다 — 전체 문구를 그대로
-          // 쓰면 기록이 있는데도 "아직 등록된 경기 기록이 없어요" 로 읽힌다.
-          resolvedActiveType !== 'all' ? (
-            <EmptyState illustration={{ name: 'journey-done' }} {...recordEmptyCopy(resolvedActiveType, { title: '', sub: '' })} />
-          ) : data.viewerIsOwner ? (
-            // 본인 페이지에서 0건이면 본인은 동의 여부와 무관하게 이미 자기 기록을 볼 수
-            // 있으므로(showOwnerVisibilityBanner가 그 상태를 별도로 알린다), 남는 원인은
-            // "대회 등록 명단에 아직 팀원으로 연결되지 않음" 하나뿐이다.
-            <EmptyState
-              illustration={{ name: 'journey-done' }}
-              title="아직 등록된 경기 기록이 없어요"
-              sub="팀 매니저가 대회 등록 명단에 회원님을 팀원으로 연결하고, 대회 결과가 확정되면 이곳에 표시돼요."
-            />
-          ) : (
-            // 타인이 보는 페이지에서 0건이면 원인이 신원 연결 미완료·결과 미확정·공개 동의
-            // 미완료 중 무엇이든 될 수 있고, 서버는 어느 쪽인지 구분해 내려주지 않는다.
-            //
-            // 2026-08-24 프로덕션 실측으로 문구 순서를 바꿨다. 이전 문구는 "팀 매니저가
-            // 연결해야 하고" 를 **먼저** 말했는데, 실제로는 신원 연결이 1,384건 이미 쌓여
-            // 있고 공개 동의를 켠 사람이 0명이었다 -- 즉 압도적 다수의 원인은 동의 쪽이다.
-            // 이미 끝난 조건을 먼저 안내하니 사용자가 엉뚱한 곳을 확인하다 "오류인가?" 로
-            // 되물었다(이 태스크의 출발점이 그 문의였다).
-            //
-            // 그렇다고 "동의를 안 켰다"고 단정하지는 않는다 -- 서버가 원인을 구분해 주지
-            // 않으므로 단정은 틀릴 수 있다. 가장 흔한 원인을 앞에 두되 나머지도 함께 적는다.
-            <EmptyState
-              illustration={{ name: 'journey-done' }}
-              title="공개된 경기 기록이 없어요"
-              sub="이 선수가 경기 기록 공개를 켜면 이곳에 표시돼요. 대회 결과가 확정되기 전이거나 대회 등록 명단에 연결되지 않은 경기는 표시되지 않아요."
-            />
-          )
-        ) : (
-          <Card pad={0}>
-            {data.items.map((item) => {
-              const href = userRecordHref(item, fromHref);
-              return href ? (
-                <Link
-                  key={item.id}
-                  href={href}
-                  style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
-                >
-                  <UserRecordRow item={item} />
-                </Link>
+          <section>
+            <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>활동 기록</h3>
+            {data.items.length === 0 ? (
+              // 탭이 걸려 있으면 "이 종류가 없다" 가 정확한 설명이다 — 전체 문구를 그대로
+              // 쓰면 기록이 있는데도 "아직 등록된 경기 기록이 없어요" 로 읽힌다.
+              resolvedActiveType !== 'all' ? (
+                <EmptyState illustration={{ name: 'journey-done' }} {...recordEmptyCopy(resolvedActiveType, { title: '', sub: '' })} />
+              ) : data.viewerIsOwner ? (
+                // 본인 페이지에서 0건이면 본인은 동의 여부와 무관하게 이미 자기 기록을 볼 수
+                // 있으므로(showOwnerVisibilityBanner가 그 상태를 별도로 알린다), 남는 원인은
+                // "대회 등록 명단에 아직 팀원으로 연결되지 않음" 하나뿐이다.
+                <EmptyState
+                  illustration={{ name: 'journey-done' }}
+                  title="아직 등록된 경기 기록이 없어요"
+                  sub="팀 매니저가 대회 등록 명단에 회원님을 팀원으로 연결하고, 대회 결과가 확정되면 이곳에 표시돼요."
+                />
               ) : (
-                <div key={item.id}>
-                  <UserRecordRow item={item} />
-                </div>
-              );
-            })}
-          </Card>
-        )}
-        {hasNextPage ? (
-          <button
-            type="button"
-            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 12 }}
-            disabled={isFetchingNextPage}
-            onClick={onLoadMore}
-          >
-            {isFetchingNextPage ? '불러오는 중…' : '더 보기'}
-          </button>
-        ) : null}
-      </section>
+                // 타인이 보는 페이지에서 0건이면 원인이 신원 연결 미완료·결과 미확정·공개 동의
+                // 미완료 중 무엇이든 될 수 있고, 서버는 어느 쪽인지 구분해 내려주지 않는다.
+                //
+                // 2026-08-24 프로덕션 실측으로 문구 순서를 바꿨다. 이전 문구는 "팀 매니저가
+                // 연결해야 하고" 를 **먼저** 말했는데, 실제로는 신원 연결이 1,384건 이미 쌓여
+                // 있고 공개 동의를 켠 사람이 0명이었다 -- 즉 압도적 다수의 원인은 동의 쪽이다.
+                // 이미 끝난 조건을 먼저 안내하니 사용자가 엉뚱한 곳을 확인하다 "오류인가?" 로
+                // 되물었다(이 태스크의 출발점이 그 문의였다).
+                //
+                // 그렇다고 "동의를 안 켰다"고 단정하지는 않는다 -- 서버가 원인을 구분해 주지
+                // 않으므로 단정은 틀릴 수 있다. 가장 흔한 원인을 앞에 두되 나머지도 함께 적는다.
+                <EmptyState
+                  illustration={{ name: 'journey-done' }}
+                  title="공개된 경기 기록이 없어요"
+                  sub="이 선수가 경기 기록 공개를 켜면 이곳에 표시돼요. 대회 결과가 확정되기 전이거나 대회 등록 명단에 연결되지 않은 경기는 표시되지 않아요."
+                />
+              )
+            ) : (
+              <Card pad={0}>
+                {data.items.map((item) => {
+                  const href = userRecordHref(item, fromHref);
+                  return href ? (
+                    <Link
+                      key={item.id}
+                      href={href}
+                      style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
+                    >
+                      <UserRecordRow item={item} />
+                    </Link>
+                  ) : (
+                    <div key={item.id}>
+                      <UserRecordRow item={item} />
+                    </div>
+                  );
+                })}
+              </Card>
+            )}
+            {hasNextPage ? (
+              <button
+                type="button"
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                style={{ marginTop: 12 }}
+                disabled={isFetchingNextPage}
+                onClick={onLoadMore}
+              >
+                {isFetchingNextPage ? '불러오는 중…' : '더 보기'}
+              </button>
+            ) : null}
+          </section>
+        </>
+      )}
     </div>
   );
 }

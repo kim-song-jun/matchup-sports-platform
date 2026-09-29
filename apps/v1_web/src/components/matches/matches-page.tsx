@@ -1060,7 +1060,7 @@ function InfoStep({ model }: { model: MatchCreateViewModel }) {
       <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
-      <CapacityField value={draft.capacity} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
+      <CapacityField value={draft.capacity} min={draft.hostParticipates ? 2 : 1} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
       <Card pad={16} style={{ marginTop: 12 }}>
         <div className="tm-my-toggle-row">
           <div>
@@ -1075,7 +1075,15 @@ function InfoStep({ model }: { model: MatchCreateViewModel }) {
             aria-checked={draft.hostParticipates}
             aria-label="나도 참가해요"
             className={`tm-toggle ${draft.hostParticipates ? 'tm-toggle-on' : ''}`}
-            onClick={() => model.form?.onFieldChange('hostParticipates', !draft.hostParticipates)}
+            onClick={() => {
+              const nextHostParticipates = !draft.hostParticipates;
+              model.form?.onFieldChange('hostParticipates', nextHostParticipates);
+              // 내가 참가하면 최소 정원은 나 + 1명이다 — 이미 1명이던 정원을 그대로 두면
+              // 참가 인원을 못 받는 모순이 생긴다.
+              if (nextHostParticipates && draft.capacity < 2) {
+                model.form?.onFieldChange('capacity', 2);
+              }
+            }}
           />
         </div>
       </Card>
@@ -1137,15 +1145,15 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
   );
 }
 
-function CapacityField({ value, onChange }: { value: number; onChange?: (value: number) => void }) {
-  const options = Array.from({ length: 100 }, (_, index) => index + 1);
-  const normalized = Math.min(100, Math.max(1, Number(value) || 1));
+function CapacityField({ value, onChange, min = 1 }: { value: number; onChange?: (value: number) => void; min?: number }) {
+  const options = Array.from({ length: 100 - min + 1 }, (_, index) => index + min);
+  const normalized = Math.min(100, Math.max(min, Number(value) || min));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">최대 인원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(1, normalized - 1))}>-</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(min, normalized - 1))}>-</button>
         <select className="tm-create-input tm-create-select-control" value={normalized} aria-label="최대 인원 선택" onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>

@@ -850,6 +850,42 @@ describe('MatchesService', () => {
     expect(result.hostParticipantId).toBe('host-participant');
   });
 
+  it('create: 주최자가 참가하는데 정원이 1명이면 400 VALIDATION_FAILED', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+
+    await expect(service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 1,
+      manualPlaceName: '강남역',
+    })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED', details: { field: 'capacity' } },
+    });
+    expect(prisma.v1Match.create).not.toHaveBeenCalled();
+  });
+
+  it('create: 주최자가 참가하지 않으면 정원 1명도 허용한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow({ maxParticipants: 1 }));
+
+    const result = await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '용병 1명 모집',
+      startsAt: FUTURE.toISOString(),
+      capacity: 1,
+      hostParticipates: false,
+      manualPlaceName: '강남역',
+    });
+
+    expect(prisma.v1MatchParticipant.create).not.toHaveBeenCalled();
+    expect(result.hostParticipantId).toBeUndefined();
+  });
+
   it('update: hostParticipates=false면 활성 호스트를 취소하고 정원 계산에서도 제외한다', async () => {
     prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
     prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });

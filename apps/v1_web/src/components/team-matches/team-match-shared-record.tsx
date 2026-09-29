@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
@@ -17,7 +17,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
-import { withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
 import styles from './team-match-shared-record.module.css';
 
@@ -47,6 +47,16 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
   const [announcement, setAnnouncement] = useState('');
   const previousVersion = useRef<number | null>(null);
   const data = query.data;
+  const router = useRouter();
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  // 공동 기록 이전 경기는 이 화면에 보여줄 기록이 없다 — 목록에서 곧장 들어와도 매치 상세로 넘기고
+  // 출처를 이어 실어 뒤로가기가 목록으로 돌아가게 한다. view=detail 은 참가자 자동 진입을 막는다.
+  const handoffHref = data?.phase === 'legacy' || data?.phase === 'managed'
+    ? withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromPath)
+    : null;
+  useEffect(() => {
+    if (handoffHref) router.replace(handoffHref);
+  }, [handoffHref, router]);
 
   useEffect(() => {
     if (data && previousVersion.current !== null && previousVersion.current !== data.version) setAnnouncement('공동 경기 기록이 업데이트됐어요.');
@@ -70,9 +80,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
       ? <main className={styles.page}><h1>경기 기록을 불러오지 못했어요</h1><p role="alert">{extractErrorMessage(query.error, '경기 기록을 불러오지 못했어요.')}</p><Button onClick={() => void query.refetch()}>다시 불러오기</Button></main>
       : <PageSkeleton />;
   }
-  if (data.phase === 'legacy' || data.phase === 'managed') {
-    return <main className={styles.page}><h1>경기 결과</h1><p>이 경기는 기존 경기 기록 화면에서 확인할 수 있어요.</p><Link className="tm-btn tm-btn-md tm-btn-primary" href={`/team-matches/${teamMatchId}/result`}>경기 결과 보기</Link></main>;
-  }
+  if (handoffHref) return <PageSkeleton />;
 
   const home = data.sides.find((s) => s.key === 'HOME');
   const away = data.sides.find((s) => s.key === 'AWAY');

@@ -72,6 +72,21 @@ describe('개인 매치 신청 관리', () => {
     fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
   }
 
+  it('확정 명단의 호스트 안내는 호스트 참가 여부를 따른다', () => {
+    mocks.applications.mockReturnValue({ data: { pages: [{ items: [] }] } });
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, host: { displayName: '방장' }, hostParticipates: false } });
+    const { unmount } = render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+    expect(screen.getByText('호스트 · 운영만 해요 (참가 인원 제외)')).toBeInTheDocument();
+    expect(screen.queryByText('호스트 · 참가 인원에 포함')).toBeNull();
+    unmount();
+
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, host: { displayName: '방장' }, hostParticipates: true } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+    expect(screen.getByText('호스트 · 참가 인원에 포함')).toBeInTheDocument();
+  });
+
   it('신청자 프로필을 클릭하면 개인 프로필 페이지로 이동한다', () => {
     confirmedApplication({ applicantUserId: 'user-77' });
     expect(screen.getByRole('link', { name: '참가자 프로필 보기' })).toHaveAttribute(

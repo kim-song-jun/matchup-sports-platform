@@ -717,6 +717,23 @@ describe('개인 매치 참여 기능', () => {
     expect(screen.queryByText(/경기 당일 늦지 않게/)).not.toBeInTheDocument();
   });
 
+  it('시작했거나 끝난 매치는 남은 자리 안내를 내리고, 모집 중인 매치는 그대로 보인다', () => {
+    const recruiting = getMatchDetailViewModel('mine');
+    recruiting.match.lifecycleStatus = 'recruiting';
+    const { unmount } = render(<MatchDetailPageView model={recruiting} />);
+    expect(screen.getAllByText(/자리 남았어요/).length).toBeGreaterThan(0);
+    unmount();
+
+    for (const lifecycleStatus of ['in_progress', 'completion_pending', 'completed'] as const) {
+      const settled = getMatchDetailViewModel('mine');
+      settled.match.lifecycleStatus = lifecycleStatus;
+      const view = render(<MatchDetailPageView model={settled} />);
+      expect(screen.queryByText(/자리 남았어요/)).toBeNull();
+      expect(screen.queryByText('마감 임박')).toBeNull();
+      view.unmount();
+    }
+  });
+
   it('종료 확인이 가능한 호스트에게 더 이상 저장할 수 없는 수정 CTA를 보여주지 않는다', () => {
     const model = { ...getMatchDetailViewModel('mine'), canComplete: true };
     model.match.lifecycleStatus = 'completion_pending';

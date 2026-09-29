@@ -643,7 +643,8 @@ export class ReviewsService {
             reviewerTeam: null,
             name: participant.user.profile?.nickname ?? '참가자',
             imageUrl: participant.user.profile?.profileImageUrl ?? null,
-            subtitle: '개인 매치 참가자',
+            // 호스트는 참가하지 않았어도 후기 대상이 된다 — 참가자로 표시하지 않는다.
+            subtitle: participant.userId === match.hostUserId ? '호스트' : '개인 매치 참가자',
             alreadySubmitted: Boolean(existing),
             review: existing ? this.toReviewDetail(existing) : null,
             locked: Boolean(existing),

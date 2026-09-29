@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 
-const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn() }));
+const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn(), search: '' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: state.replace }),
+  useSearchParams: () => new URLSearchParams(state.search),
 }));
 vi.mock('@/hooks/use-team-match-record', () => ({
   useTeamMatchRecord: () => ({ data: state.data, isError: false, refetch: state.refetch }),
@@ -14,6 +15,7 @@ vi.mock('@/hooks/use-team-match-record', () => ({
 beforeEach(() => {
   state.mutate.mockReset().mockResolvedValue({});
   state.replace.mockReset();
+  state.search = '';
   state.data = {
     teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
     serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, ownSideId: 'home',
@@ -59,6 +61,27 @@ describe('shared record participant flow', () => {
   it('view=detail로 도착하면 참가자·라이브여도 다시 이 화면으로 리다이렉트하지 않는다', () => {
     render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/my/team-matches" />);
     expect(state.replace).not.toHaveBeenCalled();
+  });
+
+  it('공동 기록 이전 경기(legacy)는 출처를 실은 채 매치 상세로 넘긴다', () => {
+    state.data = { ...state.data, phase: 'legacy' };
+    state.search = `from=${encodeURIComponent('/users/u1/records')}`;
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(state.replace).toHaveBeenCalledWith(`/team-matches/match?view=detail&from=${encodeURIComponent('/users/u1/records')}`);
+    expect(screen.queryByText('이 경기는 기존 경기 기록 화면에서 확인할 수 있어요.')).toBeNull();
+  });
+
+  it('운영 관리 경기(managed)도 출처가 없으면 매치 상세로만 넘긴다', () => {
+    state.data = { ...state.data, phase: 'managed' };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(state.replace).toHaveBeenCalledWith('/team-matches/match?view=detail');
+  });
+
+  it('공동 기록 경기(live)는 넘기지 않고 이 화면에서 기록을 보여준다', () => {
+    state.search = `from=${encodeURIComponent('/users/u1/records')}`;
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(state.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '득점 추가' })).toBeInTheDocument();
   });
 
   it('selects scorer from the credited team and sends the opened version with the goal', async () => {

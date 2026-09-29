@@ -63,6 +63,38 @@ describe('내 개인·팀 매치 이력', () => {
     expect(screen.getByRole('link', { name: '참가 관리' })).toHaveAttribute('href', '/matches/m1/applications');
   });
 
+  it('시작 후 개인매치는 모집 중이 아니라 진행중·종료 확인 상태로 보인다', () => {
+    const items = [
+      { id: 'm1', title: '모집 매치', startsAt: '2026-10-02T11:00:00Z', status: 'recruiting', displayState: 'recruiting', viewerState: 'host' },
+      { id: 'm2', title: '진행 매치', startsAt: '2026-09-29T07:15:00Z', status: 'recruiting', displayState: 'in_progress', viewerState: 'host' },
+      // 목록 응답 모양 그대로 — canComplete 는 상세에만 있다.
+      { id: 'm3', title: '끝난 매치', startsAt: '2026-09-02T11:00:00Z', status: 'expired', displayState: 'completion_pending', viewerState: 'host' },
+    ];
+    mock.personalQuery.mockReturnValue({ ...emptyQuery(), data: { pages: [{ items }] } });
+    render(<MyMatchesPageClient mode="created" />);
+    const badge = (title: string) => screen.getByText(title).closest('.tm-my-card-head')?.querySelector('.tm-my-card-status')?.textContent;
+    expect(badge('모집 매치')).toBe('모집 중');
+    expect(badge('진행 매치')).toBe('진행중');
+    expect(badge('끝난 매치')).toBe('종료 확인 필요');
+    expect(screen.getByRole('link', { name: '참여 확인' })).toHaveAttribute('href', '/matches/m3/applications?tab=approved');
+  });
+
+  it('참가자에게 종료 확인 대기 매치는 호스트 확인 중으로 보인다', () => {
+    const item = { id: 'm4', title: '참가한 매치', startsAt: '2026-09-02T11:00:00Z', status: 'expired', displayState: 'completion_pending', viewerState: 'participant' };
+    mock.personalQuery.mockReturnValue({ ...emptyQuery(), data: { pages: [{ items: [item] }] } });
+    render(<MyMatchesPageClient mode="joined" />);
+    expect(screen.getByText('종료 확인 중')).toBeInTheDocument();
+    expect(screen.getByText('호스트가 참여 여부를 확인하고 있어요.')).toBeInTheDocument();
+  });
+
+  it('승인되지 않은 신청자에게는 시작 후에도 승인 대기로 보인다', () => {
+    const item = { id: 'm5', title: '신청만 한 매치', startsAt: '2026-09-29T07:15:00Z', status: 'expired', displayState: 'in_progress', viewerState: 'requested' };
+    mock.personalQuery.mockReturnValue({ ...emptyQuery(), data: { pages: [{ items: [item] }] } });
+    render(<MyMatchesPageClient mode="joined" />);
+    expect(screen.getByText('신청만 한 매치').closest('.tm-my-card-head')?.querySelector('.tm-my-card-status')?.textContent).toBe('승인 대기');
+    expect(screen.queryByText('경기가 진행 중이에요.')).toBeNull();
+  });
+
   it('전체 필터에서 개인매치와 우리 팀이 신청한 팀매치를 함께 보여준다', () => {
     mock.personalQuery.mockReturnValue({
       ...emptyQuery(),

@@ -152,7 +152,8 @@ describe('ReviewsService', () => {
     const result = await service.source(user, { sourceType: 'match', sourceId });
 
     expect(result.targets.map((target) => target.targetUserId)).toEqual([targetUserId, hostUserId]);
-    expect(result.targets[1]).toMatchObject({ name: 'Organizer', locked: false });
+    expect(result.targets[1]).toMatchObject({ name: 'Organizer', locked: false, subtitle: '호스트' });
+    expect(result.targets[0]).toMatchObject({ name: 'Player', subtitle: '개인 매치 참가자' });
   });
 
   it('pending personal-match count includes a non-playing host without duplicating a playing host', async () => {

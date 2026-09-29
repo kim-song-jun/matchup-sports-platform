@@ -101,7 +101,7 @@ describe('UserRecordsContent match links', () => {
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
       '/tournaments/tournament-1/matches/team-match-1?from=%2Fusers%2Fuser-1%2Frecords',
       '/league-matches/league-1/fixtures/team-match-league?from=%2Fusers%2Fuser-1%2Frecords',
-      '/team-matches/team-match-friendly?from=%2Fusers%2Fuser-1%2Frecords',
+      '/team-matches/team-match-friendly/record?from=%2Fusers%2Fuser-1%2Frecords',
       '/tournaments/tournament-1?from=%2Fusers%2Fuser-1%2Frecords',
     ]);
   });
@@ -127,7 +127,7 @@ describe('UserRecordsContent match links', () => {
   // D2: withFromPath 로 바꾼 뒤에만 드러나는 차이 — 받은 출처가 지금 누르는 행과 같은
   // 화면을 가리키면 다시 감싸지 않고 그 값을 그대로 재사용한다.
   it('받은 출처가 지금 누르는 경기 화면 자신이면 다시 감싸지 않고 그대로 재사용한다', () => {
-    const selfHref = '/team-matches/team-match-9?from=%2Fusers%2Fuser-1%2Frecords';
+    const selfHref = '/team-matches/team-match-9/record?from=%2Fusers%2Fuser-1%2Frecords';
     render(
       <UserRecordsContent
         selfHref={selfHref}

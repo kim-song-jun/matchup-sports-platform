@@ -3551,6 +3551,12 @@ label.tm-btn:focus-within {
   pointer-events: none;
 }
 
+/* 탭바 없는 화면은 비워 둘 탭바가 없다 — 끝까지 덮어야 하단 고정 버튼(.tm-fixed-cta)이 시트 아래로 비치지 않는다. */
+.tm-app-frame-no-bottom .tm-filter-scrim,
+.tm-app-frame-no-bottom .tm-filter-layer {
+  bottom: 0;
+}
+
 .tm-filter-sheet {
   position: absolute;
   left: 0;

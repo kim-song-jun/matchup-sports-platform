@@ -40,7 +40,7 @@ beforeEach(() => {
   // 다가오는 경기·경기 조회 핸들러는 두지 않는다 — 부르면 onUnhandledRequest 로 실패한다.
   server = setupServer(
     ...mock.handlers,
-    http.get('*/api/v1/auth/me', () => ok({ id: GAME_ROSTER_MSW.viewerUserId })),
+    http.get('*/api/v1/auth/me', () => ok({ user: { id: GAME_ROSTER_MSW.viewerUserId } })),
     http.get('*/api/v1/me/teams', () => {
       meTeamsHits += 1;
       return ok({ items: myTeamIds.map((id) => ({ teamId: id, membershipId: `m-${id}`, name: '우리 팀', role: 'owner', status: 'active' })) });

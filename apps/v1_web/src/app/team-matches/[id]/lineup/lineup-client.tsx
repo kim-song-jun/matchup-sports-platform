@@ -733,11 +733,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                           {entry.position}
                         </span>
                       ) : null}
-                      {entry.userId !== null && unavailableByUser.has(entry.userId) ? (
-                        <span style={{ marginLeft: 8, display: 'inline-flex', verticalAlign: 'middle' }}>
-                          <GameRosterStatusBadge status="UNAVAILABLE" reason={unavailableByUser.get(entry.userId)?.reason} />
-                        </span>
-                      ) : null}
                     </span>
                     <input
                       type="number"
@@ -772,6 +767,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       </>
                     ) : null}
                   </div>
+                  {entry.userId !== null && unavailableByUser.has(entry.userId) ? (
+                    // 이름 칸(GK 44 + 간격 12) 아래 줄 — 이름 옆에 두면 390 에서 "명단에서 제거" 가 두 줄로 밀린다.
+                    <div style={{ marginTop: 4, paddingLeft: 56 }}>
+                      <GameRosterStatusBadge status="UNAVAILABLE" reason={unavailableByUser.get(entry.userId)?.reason} />
+                    </div>
+                  ) : null}
                 </div>
               ))}
               </Card>

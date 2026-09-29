@@ -55,7 +55,12 @@ export interface LeagueFixtureTeam {
   name: string;
   memberships: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
   /** 이 리그의 참가 명단(confirmed 신청에서 제외되지 않은 선수). 비어 있으면 명단 미제출이다. */
-  registeredPlayers: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
+  registeredPlayers: Array<{
+    id: string;
+    userId: string;
+    jerseyNumber: number | null;
+    user: { profile: ParticipantProfile | null };
+  }>;
 }
 
 /**
@@ -87,6 +92,7 @@ export interface LeagueRosterEntry {
   sourceParticipantId: string;
   userId?: string;
   displayNameSnapshot: string;
+  jerseyNumber?: number;
 }
 
 /**
@@ -104,6 +110,7 @@ export function leagueTeamRosterEntries(team: LeagueFixtureTeam): LeagueRosterEn
     sourceParticipantId: entry.sourceParticipantId,
     ...(entry.accountLinked ? { userId: entry.userId } : {}),
     displayNameSnapshot: entry.displayNameSnapshot,
+    ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
   }));
 }
 
@@ -118,7 +125,8 @@ export function leagueTeamRosterBase(team: LeagueFixtureTeam): GameRosterBaseEnt
       userId: player.userId,
       accountLinked: true,
       displayNameSnapshot: participantDisplayName(player),
-      jerseyNumber: null,
+      // 대회와 같다 — 경기 명단의 등번호는 참가 명단 번호다(경기별로 바꾸는 경로는 Task 179 로 없어졌다).
+      jerseyNumber: player.jerseyNumber,
       sourceParticipantId: player.id,
     }));
   }
@@ -212,7 +220,11 @@ export async function readLeagueTeamRosters(
     where: { tournamentId: leagueId, teamId: { in: [...teamIds] }, status: 'confirmed' },
     select: {
       teamId: true,
-      players: { where: { removedAt: null }, orderBy: { id: 'asc' }, select: { id: true, userId: true, user: profile } },
+      players: {
+        where: { removedAt: null },
+        orderBy: { id: 'asc' },
+        select: { id: true, userId: true, jerseyNumber: true, user: profile },
+      },
     },
   });
   const playersByTeam = new Map(registrations.map((row) => [row.teamId, row.players]));

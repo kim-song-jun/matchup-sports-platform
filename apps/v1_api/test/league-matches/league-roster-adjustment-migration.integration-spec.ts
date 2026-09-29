@@ -80,7 +80,7 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
   /** 팀장 저장본 한 리비전(SUBMITTED)과, `saver` 가 있으면 저장 요청이 남기던 멱등 기록. */
   async function saveLegacyLineup(
     target: { gameId: string; sideId: string; teamMatchId: string },
-    rows: ReadonlyArray<{ userId: string | null; name: string }>,
+    rows: ReadonlyArray<{ userId: string | null; name: string; jersey?: number }>,
     saver: string | null,
   ) {
     const previous = await latestLineup(target.gameId, target.sideId);
@@ -96,7 +96,15 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
     });
     for (const row of rows) {
       await prisma.v1GameParticipant.create({
-        data: { gameId: target.gameId, sideId: target.sideId, lineupId: lineup.id, userId: row.userId, displayNameSnapshot: row.name, started: true },
+        data: {
+          gameId: target.gameId,
+          sideId: target.sideId,
+          lineupId: lineup.id,
+          userId: row.userId,
+          displayNameSnapshot: row.name,
+          jerseyNumber: row.jersey ?? null,
+          started: true,
+        },
       });
     }
     if (saver !== null) {
@@ -173,7 +181,8 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
       upcoming.a,
       [
         { userId: teamA.ownerId, name: 'A팀장' },
-        { userId: m1, name: '선수 m1' },
+        // 참가 명단(채움)에는 번호가 없다 — 옮긴 뒤 명단은 참가 명단 번호를 따르므로 dry-run 이 따로 센다.
+        { userId: m1, name: '선수 m1', jersey: 7 },
         { userId: null, name: '용병 김' },
       ],
       teamA.ownerId,
@@ -208,8 +217,10 @@ describe('리그 팀장 저장본 → 경기 명단 조정 이관', () => {
       status: 'WOULD_MIGRATE',
       excludeCount: 1,
       unrepresentableRows: 1,
+      jerseyChangedRows: 1,
       rosterChanged: true,
     });
+    expect(result.jerseyChangedRows).toBe(1);
     expect(reportOf(result, f.upcoming.b.sideId)).toMatchObject({ status: 'ACTOR_UNRESOLVED', excludeCount: 1 });
     expect(reportOf(result, f.ended.a.sideId)).toBeUndefined();
     // 킥오프가 지난 팀장 저장본은 옮기지 않고 따로 센다(승인 판단용). 저장본이 없는 상대 사이드는 세지 않는다.

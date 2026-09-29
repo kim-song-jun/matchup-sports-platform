@@ -21,23 +21,35 @@ type Tx = Prisma.TransactionClient;
 
 export interface SavedLineupRow {
   readonly userId: string | null;
+  readonly jerseyNumber: number | null;
 }
 
 export interface LeagueSideMigrationPlan {
   readonly excludeUserIds: string[];
   readonly unrepresentableRows: number;
+  /** 남는 사람인데 저장본 등번호가 참가 명단 번호와 다른 행 — 옮긴 뒤 명단은 참가 명단 번호를 따른다. */
+  readonly jerseyChangedRows: number;
 }
 
 export function planLeagueSideMigration(input: {
-  readonly baseUserIds: readonly string[];
+  readonly base: ReadonlyArray<{ readonly userId: string; readonly jerseyNumber: number | null }>;
   readonly saved: readonly SavedLineupRow[];
   readonly activeExcludedUserIds: ReadonlySet<string>;
 }): LeagueSideMigrationPlan {
-  const base = new Set(input.baseUserIds);
+  const baseJersey = new Map(input.base.map((entry) => [entry.userId, entry.jerseyNumber]));
   const saved = new Set(input.saved.flatMap((row) => (row.userId === null ? [] : [row.userId])));
-  const excludeUserIds = [...base].filter((userId) => !saved.has(userId) && !input.activeExcludedUserIds.has(userId));
-  const unrepresentableRows = input.saved.filter((row) => row.userId === null || !base.has(row.userId)).length;
-  return { excludeUserIds, unrepresentableRows };
+  const excludeUserIds = [...baseJersey.keys()].filter(
+    (userId) => !saved.has(userId) && !input.activeExcludedUserIds.has(userId),
+  );
+  const unrepresentableRows = input.saved.filter((row) => row.userId === null || !baseJersey.has(row.userId)).length;
+  const jerseyChangedRows = input.saved.filter(
+    (row) =>
+      row.userId !== null &&
+      baseJersey.has(row.userId) &&
+      row.jerseyNumber !== null &&
+      row.jerseyNumber !== baseJersey.get(row.userId),
+  ).length;
+  return { excludeUserIds, unrepresentableRows, jerseyChangedRows };
 }
 
 export interface LineupSaveRecord {
@@ -92,6 +104,7 @@ export interface LeagueSideMigrationReport {
   readonly status: LeagueSideMigrationStatus;
   readonly excludeCount: number;
   readonly unrepresentableRows: number;
+  readonly jerseyChangedRows: number;
   /** 옮긴 뒤 동기화가 새 명단 리비전을 만들었는가(저장본의 게스트·등번호 차이 등). */
   readonly rosterChanged: boolean;
 }
@@ -103,6 +116,7 @@ export interface LeagueRosterMigrationResult {
   readonly migratedSides: number;
   readonly excludeCount: number;
   readonly unrepresentableRows: number;
+  readonly jerseyChangedRows: number;
   readonly actorUnresolvedSides: number;
   readonly rosterNotAvailableSides: number;
   /** 팀장 저장본이 최신인데 킥오프가 지나 옮기지 않은 사이드 수. */
@@ -133,6 +147,7 @@ function sideReport(
     status,
     excludeCount: plan?.excludeUserIds.length ?? 0,
     unrepresentableRows: plan?.unrepresentableRows ?? 0,
+    jerseyChangedRows: plan?.jerseyChangedRows ?? 0,
     rosterChanged,
   };
 }
@@ -171,13 +186,16 @@ async function migrateSide(
   const loaded = context === null ? null : await loadGameRosterForContext(tx, context);
   if (loaded === null) return report('ROSTER_NOT_AVAILABLE', null);
 
-  const saved = await tx.v1GameParticipant.findMany({ where: { lineupId: latest.id }, select: { userId: true } });
+  const saved = await tx.v1GameParticipant.findMany({
+    where: { lineupId: latest.id },
+    select: { userId: true, jerseyNumber: true },
+  });
   const active = await tx.v1GameRosterAdjustment.findMany({
     where: { ...target, teamId: loaded.context.teamId, revokedAt: null },
     select: { userId: true },
   });
   const plan = planLeagueSideMigration({
-    baseUserIds: loaded.base.map((entry) => entry.userId),
+    base: loaded.base,
     saved,
     activeExcludedUserIds: new Set(active.map((row) => row.userId)),
   });
@@ -216,7 +234,12 @@ async function migrateSide(
     teamMatchId: loaded.context.tournamentId === null ? null : side.teamMatchId,
     occurredAt: new Date(),
     before: { lineupId: latest.id },
-    after: { sideId: side.sideId, excludeCount: plan.excludeUserIds.length, unrepresentableRows: plan.unrepresentableRows },
+    after: {
+      sideId: side.sideId,
+      excludeCount: plan.excludeUserIds.length,
+      unrepresentableRows: plan.unrepresentableRows,
+      jerseyChangedRows: plan.jerseyChangedRows,
+    },
   });
   const rosterChanged = await syncPreparedGameSideRoster(tx, target);
   return report(outcome, plan, rosterChanged);
@@ -265,6 +288,7 @@ export async function migrateLeagueRosterAdjustments(
     migratedSides: moved.length,
     excludeCount: moved.reduce((sum, row) => sum + row.excludeCount, 0),
     unrepresentableRows: reports.reduce((sum, row) => sum + row.unrepresentableRows, 0),
+    jerseyChangedRows: moved.reduce((sum, row) => sum + row.jerseyChangedRows, 0),
     actorUnresolvedSides: reports.filter((row) => row.status === 'ACTOR_UNRESOLVED').length,
     rosterNotAvailableSides: reports.filter((row) => row.status === 'ROSTER_NOT_AVAILABLE').length,
     kickoffPassedSides: reports.filter((row) => row.status === 'KICKOFF_PASSED').length,

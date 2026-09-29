@@ -5542,6 +5542,22 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 20px var(--v1-shell-page-x) 124px;
 }
 
+/* 내 매치 목록은 API에서 팀명·장소·매치명을 그대로 받는다. 공백 없는 긴 값이 들어와도
+   grid의 min-content 폭이 모바일 앱 프레임보다 커지지 않도록 이 화면의 단일 열을 명시한다. */
+.tm-my-matches-desktop {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tm-my-matches-desktop > *,
+.tm-my-matches-desktop .tm-my-list-stack,
+.tm-my-matches-desktop .tm-card {
+  min-width: 0;
+}
+
+.tm-my-matches-desktop .tm-segment-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 /* ── 모바일 순서: 카드 다음이 곧 메뉴 ───────────────────────────────────────
    모바일에서는 데스크톱 래퍼(.tm-my-desktop-*)가 display:contents 라(desktop/my.css)
    카드·프로필·메뉴 섹션이 **레이아웃상** 이 그리드의 아이템이 된다. 그래서 DOM 을
@@ -5911,7 +5927,47 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-my-card-head > :first-child {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+.tm-my-card-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.tm-my-card-context-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tm-my-card-copy {
+  min-width: 0;
+}
+
+.tm-my-card-title,
+.tm-my-card-meta,
+.tm-my-card-note {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tm-my-card-meta {
+  margin-top: 4px;
+}
+
+.tm-my-card-note {
+  margin: 12px 0 0;
+  line-height: 1.5;
+}
+
+.tm-my-card-status {
+  flex: 0 0 auto;
 }
 
 .tm-my-card-actions {

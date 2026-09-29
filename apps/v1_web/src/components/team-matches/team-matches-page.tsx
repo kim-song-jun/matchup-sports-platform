@@ -1053,28 +1053,33 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             카드에 배지가 붙어(모집 중·신청 마감·승인 완료…), 제목 줄에 인라인으로 두면 매 카드에서
             제목이 그만큼 잘린다 — 데스크톱 실측(2026-09-07)에서 본문 191px 중 제목이 111px 였다. */}
         <div className="tm-text-caption tm-match-row-meta tm-team-match-row-id">
-          {match.platformManaged ? <span className="tm-badge tm-badge-grey">플랫폼 주관</span> : null}
-          {relation ? (
-            <span className={`tm-badge ${relation.className}`}>
-              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-              {relation.label}
-            </span>
-          ) : null}
-          {match.live && <span className="tm-badge tm-badge-green">진행 중</span>}
-          {isClosed ? (
-            <span className="tm-badge tm-badge-grey tm-card-closed-badge">
-              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-              {match.apiStatus === 'completed' ? '경기 종료' : '신청 마감'}
-            </span>
-          ) : null}
-          {openLabel ? (
-            <span className="tm-badge tm-badge-blue">
-              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-              {openLabel}
-            </span>
-          ) : null}
-          {/* 리그 배지는 형제 배지와 같은 정적 칩이다(링크 아님). 리그명은 조건 줄에 적는다. */}
-          {league ? <span className="tm-badge tm-badge-grey">정규 리그</span> : null}
+          {/* 상태는 여러 개가 동시에 참일 수 있다. 팀명과 한 flex 줄을 공유하면
+              320~430px에서 고정폭 배지가 카드 밖으로 밀린다. 배지만 독립적으로 줄바꿈하고
+              신원은 아래 한 줄에서 말줄임해 세 상태를 모두 보존한다. */}
+          <div className="tm-team-match-row-badges">
+            {match.platformManaged ? <span className="tm-badge tm-badge-grey">플랫폼 주관</span> : null}
+            {relation ? (
+              <span className={`tm-badge ${relation.className}`}>
+                <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                {relation.label}
+              </span>
+            ) : null}
+            {match.live && <span className="tm-badge tm-badge-green">진행 중</span>}
+            {isClosed ? (
+              <span className="tm-badge tm-badge-grey tm-card-closed-badge">
+                <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                {match.apiStatus === 'completed' ? '경기 종료' : '신청 마감'}
+              </span>
+            ) : null}
+            {openLabel ? (
+              <span className="tm-badge tm-badge-blue">
+                <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                {openLabel}
+              </span>
+            ) : null}
+            {/* 리그 배지는 형제 배지와 같은 정적 칩이다(링크 아님). 리그명은 조건 줄에 적는다. */}
+            {league ? <span className="tm-badge tm-badge-grey">정규 리그</span> : null}
+          </div>
           <span className="tm-team-match-row-host">
             {/* **누구와 붙는지**. 목록 응답에 상대팀이 없어 화면 어디에도 없던 정보다
                 (`toListItem` 이 `approvedOpponentTeam` 을 싣게 되면서 생겼다 — 추가 쿼리 없음).

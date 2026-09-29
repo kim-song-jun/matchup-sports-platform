@@ -344,9 +344,33 @@ describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', (
     const cards = [...container.querySelectorAll('.tm-match-row')];
     expect(cards).toHaveLength(statuses.length);
     cards.forEach((card) => {
-      expect(card.querySelectorAll('.tm-team-match-row-id > .tm-badge').length).toBeGreaterThanOrEqual(1);
+      expect(card.querySelectorAll('.tm-team-match-row-badges > .tm-badge').length).toBeGreaterThanOrEqual(1);
       expect(card.querySelectorAll('.tm-match-row-headline .tm-badge')).toHaveLength(0);
     });
+  });
+
+  it('플랫폼 주관·승인 완료·경기 종료가 겹쳐도 배지 줄과 팀 신원 줄을 분리한다', () => {
+    const model = listWithOneCard();
+    model.matches = [{
+      ...model.matches[0],
+      platformManaged: true,
+      status: 'approved',
+      closed: true,
+      apiStatus: 'completed',
+      hostTeam: '성수동우리동네오래된축구회최강연합팀',
+    }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    const identity = container.querySelector('.tm-team-match-row-id');
+    const badges = identity?.querySelector('.tm-team-match-row-badges');
+    const host = identity?.querySelector('.tm-team-match-row-host');
+
+    expect(badges).toHaveTextContent('플랫폼 주관');
+    expect(badges).toHaveTextContent('승인 완료');
+    expect(badges).toHaveTextContent('경기 종료');
+    expect(badges?.querySelectorAll(':scope > .tm-badge')).toHaveLength(3);
+    expect(host).toHaveTextContent(model.matches[0].hostTeam);
+    expect(badges?.contains(host as Node)).toBe(false);
   });
 });
 
@@ -658,7 +682,7 @@ describe('리그전 배지', () => {
 
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
 
-    const badge = container.querySelector('.tm-team-match-row-id .tm-badge-grey');
+    const badge = container.querySelector('.tm-team-match-row-badges .tm-badge-grey');
     expect(badge).not.toBeNull();
     expect(badge).toHaveTextContent('정규 리그');
     expect(container.querySelector('.tm-team-match-row-cond')).toHaveTextContent('풋살 · 가을 리그');

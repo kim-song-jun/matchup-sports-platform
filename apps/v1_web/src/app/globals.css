@@ -2801,10 +2801,13 @@ label.tm-btn:focus-within {
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }
 
 .tm-match-row-when {
   margin-top: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /*
@@ -2847,17 +2850,21 @@ label.tm-btn:focus-within {
   font-weight: 600;
 }
 
-/* 팀매치 행의 신원 줄 — 상태 배지 + 팀 이름 + 매너·승.
-   배지는 flex: none 으로 폭을 고정하고, 폭이 모자라면 팀 이름 쪽이 말줄임된다.
-   반대로 배지를 줄이면 '신청 마…' 처럼 상태를 못 읽게 되므로 그쪽을 고정한다. */
+/* 팀매치 행의 신원 영역 — 상태 그룹과 팀 신원을 서로 다른 줄에 둔다.
+   상태는 줄바꿈해 모두 읽히고, 신원은 남은 폭에서 한 줄 말줄임한다. */
 .tm-team-match-row-id {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
-.tm-team-match-row-id .tm-badge {
+.tm-team-match-row-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tm-team-match-row-badges .tm-badge {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -2865,7 +2872,9 @@ label.tm-btn:focus-within {
 }
 
 .tm-team-match-row-host {
+  display: block;
   min-width: 0;
+  margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

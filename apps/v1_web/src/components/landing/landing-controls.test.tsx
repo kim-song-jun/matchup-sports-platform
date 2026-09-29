@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/components/providers/theme-provider';
-import { LandingBeforeAfter } from './landing-before-after';
 import { LandingMotionToggle, LandingThemeToggle } from './landing-nav-controls';
 import { LandingRoot } from './landing-root';
 import { setMotionPaused } from './landing-motion-store';
@@ -68,26 +67,5 @@ describe('LandingMotionToggle', () => {
     expect(root).not.toHaveAttribute('data-paused');
     expect(toggle).toHaveAccessibleName('움직임 멈추기');
     expect(toggle).toHaveAttribute('title', '움직임 멈추기');
-  });
-});
-
-describe('LandingBeforeAfter', () => {
-  it('기본은 "이제는" 보기이고, 누른 쪽만 눌림 상태가 된다', async () => {
-    const user = userEvent.setup();
-    const { container } = render(
-      <LandingBeforeAfter>
-        <p>본문</p>
-      </LandingBeforeAfter>,
-    );
-    const wrapper = container.querySelector('.tm-landing-ba')!;
-    const before = screen.getByRole('button', { name: '예전엔' });
-    const after = screen.getByRole('button', { name: '이제는' });
-    expect(wrapper).toHaveAttribute('data-view', 'after');
-    expect(after).toHaveAttribute('aria-pressed', 'true');
-
-    await user.click(before);
-    expect(wrapper).toHaveAttribute('data-view', 'before');
-    expect(before).toHaveAttribute('aria-pressed', 'true');
-    expect(after).toHaveAttribute('aria-pressed', 'false');
   });
 });

@@ -1,4 +1,4 @@
-/* ── 랜딩 v4 (/landing/v4) ──
+/* ── 랜딩 (/landing) ──
  * landing.css(.tm-landing·.lpm-*) 위에 얹는다. 새 규칙은 전부 tm-landing-v4-* 접두사다.
  * 움직임은 transform·opacity 만 쓰고, 모션 감소 설정이면 최종 상태로 보인다. */
 
@@ -731,7 +731,7 @@
   color: var(--blue700);
 }
 
-/* ════ 스크롤 무대 구성(/landing/v4) ════
+/* ════ 스크롤 무대 구성 ════
  * 모션 켜짐 = .tm-landing-v4[data-motion='on']:not([data-paused='true']). 숨김·재생은 전부 그 아래에서만 건다.
  * 고정 무대는 컴포넌트가 data-mode 로 직접 가른다(stack = 서버 HTML·모션 꺼짐의 최종 상태). */
 
@@ -1124,8 +1124,10 @@
   .tm-landing-v4-day[data-mode='stage'] .tm-landing-v4-scene-points { display: grid; }
   .tm-landing-v4-day[data-mode='stage'] .tm-landing-v4-scene-copy h3 { margin-top: 8px; font-size: 32px; line-height: 1.3; }
   .tm-landing-v4-day[data-mode='stage'] .tm-landing-v4-scene-copy p { margin-top: 12px; font-size: var(--font-size-body-lg); line-height: 1.7; }
+  /* 폰(.tm-landing-device z 2)보다 앞 — 폰 왼쪽 가장자리에 걸쳐 앞으로 나온다 */
   .tm-landing-v4-day-badges {
     position: absolute;
+    z-index: 3;
     left: calc(50% - var(--tm-landing-v4-dw, 300) * 0.5px - 96px);
     bottom: 64px;
     display: grid;
@@ -1527,9 +1529,15 @@
   color: var(--overlay-white-90);
 }
 
-.tm-landing-v4-stat-sub li[data-soon='true'] {
-  background: transparent;
+/* 모든 수치가 0 인 종목 — 수치 칩과 섞으면 그 지표만 비어 있다고 읽혀 섹션에 한 번만 둔다 */
+.tm-landing-v4-soon {
+  width: fit-content;
+  margin: 16px 0 0;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
   border: 1px dashed var(--overlay-white-35);
+  font-size: var(--font-size-label);
+  font-weight: 600;
   color: var(--overlay-white-70);
 }
 
@@ -1781,7 +1789,7 @@
 
 .tm-landing-v4-mcard {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto auto auto 1fr;
   gap: 8px;
   width: 260px;
   min-height: 100%;
@@ -1799,10 +1807,11 @@
   border-color: var(--overlay-white-35);
 }
 
-.tm-landing-v4-mcard-top {
+.tm-landing-v4-mcard-tags {
+  align-self: end;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .tm-landing-v4-mcard b {
@@ -1823,7 +1832,6 @@
 }
 
 .tm-landing-v4-mtag {
-  justify-self: start;
   padding: 2px 8px;
   border-radius: var(--radius-chip);
   font-size: var(--font-size-micro);
@@ -2394,7 +2402,9 @@
 
 /* ── ⑤ 펼쳐지는 CTA ──
  * --tm-landing-v4-k 가 0 이면 여백·둥근 모서리가 있는 카드, 1 이면 화면 가득. 초깃값 1 이 최종 상태다.
- * 모션 켜짐이면 view()(지원 시) 또는 JS(landing-v4-cta.tsx, 같은 범위 문자열)가 0→1 로 민다. */
+ * 모션 켜짐이면 view()(지원 시) 또는 JS(landing-v4-cta.tsx, 같은 범위 문자열)가 0→1 로 민다.
+ * 768+ 는 높이를 내용 + 여백으로 둔다 — 화면 높이로 늘리면 끝까지 내렸을 때 푸터 위에 남는 부분보다
+ * 커져서 문구가 위로 쏠리고 아래가 빈다. 일러스트는 여백 안(bottom/top ≥ 24px)에 둬야 잘리지 않는다. */
 .tm-landing-v4-cta-box {
   --tm-landing-v4-open: calc(1 - var(--tm-landing-v4-k, 1));
   position: relative;
@@ -2445,7 +2455,7 @@
 
 .tm-landing-v4-cta-illu[data-pos='l'] {
   left: 50%;
-  bottom: -16px;
+  bottom: 24px;
   width: 140px;
   margin-left: -152px;
   transform: rotate(-8deg);
@@ -2453,7 +2463,7 @@
 
 .tm-landing-v4-cta-illu[data-pos='r'] {
   right: 50%;
-  bottom: 20px;
+  bottom: 24px;
   width: 112px;
   margin-right: -152px;
   transform: rotate(8deg);
@@ -2545,13 +2555,14 @@
 }
 
 @media (min-width: 768px) {
-  .tm-landing-v4-cta-box { padding: 120px 32px; }
+  .tm-landing-v4-cta-box { min-height: 0; padding: 136px 32px; }
   .tm-landing-v4-cta-title { font-size: 44px; }
   .tm-landing-v4-cta-actions > * { flex: 0 0 auto; }
-  .tm-landing-v4-cta-illu[data-pos='l'] { left: 40px; bottom: -20px; width: 180px; margin-left: 0; }
-  .tm-landing-v4-cta-illu[data-pos='r'] { right: 40px; top: 28px; bottom: auto; width: 152px; margin-right: 0; }
+  .tm-landing-v4-cta-illu[data-pos='l'] { left: max(40px, 50% - 520px); bottom: 32px; width: 180px; margin-left: 0; }
+  .tm-landing-v4-cta-illu[data-pos='r'] { right: max(40px, 50% - 500px); top: 32px; bottom: auto; width: 152px; margin-right: 0; }
 }
 
 @media (min-width: 1024px) {
+  .tm-landing-v4-cta-box { padding: 160px 32px; }
   .tm-landing-v4-cta-title { font-size: 52px; }
 }

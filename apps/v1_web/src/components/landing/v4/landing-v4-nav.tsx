@@ -11,8 +11,7 @@ import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { LandingCtaLink } from '../landing-cta-link';
 import { LandingMotionToggle, LandingThemeToggle } from '../landing-nav-controls';
 
-/* 이 페이지 자체 경로가 아니라 정본(/landing)을 currentPath 로 둔다 — 로고·활성 표시 규약은
- * A안 LandingNav 와 같다. 매치/대회/팀·이용 안내 링크는 이 페이지와 겹치지 않아 항상 비활성이다. */
+/* 매치/대회/팀·이용 안내 링크는 이 페이지(/landing)와 겹치지 않아 항상 비활성이다. */
 const LANDING_PATH = '/landing';
 
 export function LandingV4Nav() {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CursorPage, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
-import { formatLandingCount, sportChips, summarizeLandingData } from './landing-v4-data';
+import { formatLandingCount, idleSportsText, sportChips, summarizeLandingData } from './landing-v4-data';
 
 const NOW = new Date('2026-09-28T00:00:00.000Z');
 const FUTURE = '2026-10-01T09:00:00.000Z';
@@ -183,21 +183,35 @@ describe('summarizeLandingData', () => {
   });
 });
 
-describe('sportChips', () => {
-  it('지표가 있는 종목만 많은 순으로 칩을 만들고, 0건 운영 종목은 한 줄로 묶는다', () => {
-    const bySport = {
-      축구: { teamMatches: 11, tournaments: 0, teams: 3 },
-      풋살: { teamMatches: 74, tournaments: 2, teams: 0 },
-    };
-    expect(sportChips(bySport, 'teamMatches')).toEqual({
-      chips: [{ name: '풋살', count: 74 }, { name: '축구', count: 11 }],
-      soon: '러닝·수영 준비 중',
-    });
-    expect(sportChips(bySport, 'teams')).toEqual({ chips: [{ name: '축구', count: 3 }], soon: '풋살·러닝·수영 준비 중' });
+describe('sportChips · idleSportsText', () => {
+  const counted = { value: 1, more: false };
+  const counts = { teamMatches: counted, tournaments: counted, tournamentsOpen: counted, teams: counted };
+  const bySport = {
+    축구: { teamMatches: 11, tournaments: 0, teams: 3 },
+    풋살: { teamMatches: 74, tournaments: 2, teams: 0 },
+    러닝: { teamMatches: 0, tournaments: 0, teams: 1 },
+    수영: { teamMatches: 0, tournaments: 0, teams: 0 },
+  };
+
+  it('각 지표 칩은 그 수치가 1 이상인 종목만 많은 순으로 보인다', () => {
+    expect(sportChips(bySport, 'teamMatches')).toEqual([{ name: '풋살', count: 74 }, { name: '축구', count: 11 }]);
+    expect(sportChips(bySport, 'tournaments')).toEqual([{ name: '풋살', count: 2 }]);
+    expect(sportChips(bySport, 'teams')).toEqual([{ name: '축구', count: 3 }, { name: '러닝', count: 1 }]);
   });
 
-  it('운영 종목이 전부 있으면 준비 중 줄이 없다', () => {
-    const one = { teamMatches: 1, tournaments: 0, teams: 0 };
-    expect(sportChips({ 풋살: one, 축구: one, 러닝: one, 수영: one }, 'teamMatches').soon).toBeNull();
+  it('준비 중은 모든 수치가 0 인 종목만이다 — 한 지표라도 있으면 빠진다', () => {
+    // 축구는 대회 0·풋살은 팀 0·러닝은 팀만 1 이지만 다른 수치가 있어 준비 중이 아니다
+    expect(idleSportsText({ bySport, counts })).toBe('수영 준비 중');
+    // bySport 에 아예 없는 운영 종목도 전부 0 이다
+    expect(idleSportsText({ bySport: { 풋살: bySport.풋살 }, counts })).toBe('축구·러닝·수영 준비 중');
+  });
+
+  it('운영 종목이 전부 무언가 있으면 준비 중이 없다', () => {
+    const one = { teamMatches: 0, tournaments: 1, teams: 0 };
+    expect(idleSportsText({ bySport: { 풋살: one, 축구: one, 러닝: one, 수영: one }, counts })).toBeNull();
+  });
+
+  it('목록을 하나라도 못 받았으면 0 을 단정하지 않는다', () => {
+    expect(idleSportsText({ bySport, counts: { ...counts, teams: null } })).toBeNull();
   });
 });

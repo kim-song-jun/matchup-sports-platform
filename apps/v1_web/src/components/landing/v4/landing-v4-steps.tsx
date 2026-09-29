@@ -51,7 +51,7 @@ export function LandingV4Steps() {
       <div className="tm-landing-section-inner">
         <div className="tm-landing-section-header" data-reveal>
           <p className="tm-landing-section-kw">이용 방법</p>
-          <h2 id="how-heading" className="tm-landing-section-title">세 단계면<br />바로 뛸 수 있어요</h2>
+          <h2 id="how-heading" className="tm-landing-section-title">가입부터<br />첫 경기까지 3단계</h2>
         </div>
         <ol ref={listRef} className="tm-landing-v4-steps" data-scroll={motionOn ? 'on' : undefined}>
           {STEPS.map((step, i) => (

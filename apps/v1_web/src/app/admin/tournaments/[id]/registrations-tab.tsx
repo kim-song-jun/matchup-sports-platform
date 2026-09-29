@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff } from 'lucide-react';
+import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { AdminRegistrationGameRosters } from '@/components/game-roster/admin-registration-game-rosters';
 import { formatDate } from './tournament-admin-shared';
 import {
   ADMIN_CANCELLABLE,
@@ -379,6 +380,8 @@ export function RegistrationsTab({
   const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
+  // 경기별 명단 펼침(Task 176) — 한 번에 한 팀만 연다.
+  const [gameRostersRegistrationId, setGameRostersRegistrationId] = useState<string | null>(null);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
   // 거부 사유 모달 — 대상이 있으면 열려 있다.
   const [cancelTarget, setCancelTarget] = useState<V1AdminTournamentRegistration | null>(null);
@@ -760,6 +763,16 @@ export function RegistrationsTab({
         empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
         skeletonCards={8}
         minCardWidth="360px"
+        renderExpanded={(reg) =>
+          reg.status === 'confirmed' && gameRostersRegistrationId === reg.id ? (
+            <AdminRegistrationGameRosters
+              tournamentId={tournamentId}
+              registrationId={reg.id}
+              teamName={reg.teamName ?? reg.teamId}
+              correctionHref={`/admin/live/${encodeURIComponent(tournamentId)}/records/corrections`}
+            />
+          ) : null
+        }
         renderActions={(reg) => {
           const isLocked = !!reg.rosterLockedAt;
           return (
@@ -867,6 +880,16 @@ export function RegistrationsTab({
                 label="명단 검토"
                 tone="gray"
               />
+              {/* 경기별 출전 명단 — 참가 명단이 경기 명단의 기준이 되는 확정 신청만. */}
+              {reg.status === 'confirmed' && (
+                <ActionButton
+                  onClick={() => setGameRostersRegistrationId((current) => (current === reg.id ? null : reg.id))}
+                  icon={<ListChecks size={13} />}
+                  label={gameRostersRegistrationId === reg.id ? '경기별 명단 접기' : '경기별 명단'}
+                  tone="gray"
+                  expanded={gameRostersRegistrationId === reg.id}
+                />
+              )}
               <ExportCsvButton registrationId={reg.id} showToast={showToast} />
               {canWrite && ADMIN_CANCELLABLE.has(reg.status) && (
                 <ActionButton

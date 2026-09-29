@@ -204,7 +204,7 @@ describe('팀 C 결장 기간', () => {
 
     const created = await act(() => result.current.create.mutateAsync(payload));
 
-    expect(created.syncedSides).toBe(1);
+    expect(created.unavailability).toMatchObject({ userId: 'player-3', reason: 'INJURY', revokedAt: null });
     expect(mock.requests.find((r) => r.method === 'POST')).toEqual({
       method: 'POST',
       path: `/api/v1/teams/${teamId}/members/player-3/unavailability`,

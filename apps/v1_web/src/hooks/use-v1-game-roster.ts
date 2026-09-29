@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type { GameRosterAdjustmentReason, MemberUnavailabilityReason } from '@/lib/v1-status-labels';
@@ -174,11 +174,8 @@ export type V1MemberUnavailability = {
 
 export type V1MemberUnavailabilityList = { teamId: string; userId: string; items: V1MemberUnavailability[] };
 
-export type V1MemberUnavailabilityWriteResult = {
-  unavailability: V1MemberUnavailability;
-  /** 다시 계산한 경기 사이드 수. */
-  syncedSides: number;
-};
+/** 기간 안 경기 명단(라인업)은 서버 워커가 이어서 맞춘다 — 명단 조회는 볼 때 계산하므로 바로 반영된다. */
+export type V1MemberUnavailabilityWriteResult = { unavailability: V1MemberUnavailability };
 
 export type V1MemberUnavailabilityRevokeResult = V1MemberUnavailabilityWriteResult & { alreadyApplied: boolean };
 
@@ -191,9 +188,9 @@ export type V1CreateMemberUnavailabilityPayload = {
 };
 
 // ── 캐시 무효화 규칙 ─────────────────────────────────────────────────────────
-// 조정·결장·일괄 저장은 서버가 같은 트랜잭션에서 경기 명단(라인업 리비전)을 다시 계산한다.
-// 그래서 명단·변경 기록뿐 아니라 그 경기 라인업, 팀 다가오는 경기 요약, 팀 표, 어드민 펼침 표가
-// 전부 낡는다. 어드민 표는 신청 id 를 여기서 모르므로 접두사로 통째 무효화한다.
+// 조정·일괄 저장은 서버가 같은 트랜잭션에서 경기 명단(라인업 리비전)을 다시 계산하고, 결장 기간은
+// 워커가 이어서 맞춘다. 어느 쪽이든 명단·변경 기록뿐 아니라 그 경기 라인업, 팀 다가오는 경기 요약,
+// 팀 표, 어드민 펼침 표가 전부 낡는다. 어드민 표는 신청 id 를 여기서 모르므로 접두사로 통째 무효화한다.
 
 function invalidateTeamRosterViews(queryClient: QueryClient, teamId: string) {
   void queryClient.invalidateQueries({ queryKey: v1Keys.teamUpcomingGames(teamId) });
@@ -363,5 +360,22 @@ export function useV1AdminRegistrationGameRosters(
     },
     enabled: (options?.enabled ?? true) && Boolean(tournamentId) && Boolean(registrationId),
     retry: false,
+  });
+}
+
+/**
+ * 운영 보드 — 보이는 시작 전 경기의 참가 신청 여러 개를 한 번에. 경기마다 명단을 부르지 않고
+ * 팀(신청)마다 한 번씩 표를 받는다(표 한 장이 그 팀의 시작 전 경기 전부를 싣는다).
+ */
+export function useV1AdminRegistrationGameRosterList(tournamentId: string, registrationIds: readonly string[]) {
+  return useQueries({
+    queries: registrationIds.map((registrationId) => ({
+      queryKey: v1Keys.adminRegistrationGameRosters(tournamentId, registrationId),
+      queryFn: () =>
+        v1Get<V1AdminRegistrationRosterMatrix>(
+          `/admin/tournaments/${tournamentId}/registrations/${registrationId}/game-rosters`,
+        ),
+      retry: false,
+    })),
   });
 }

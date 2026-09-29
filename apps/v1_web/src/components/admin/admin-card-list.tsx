@@ -47,6 +47,8 @@ interface AdminCardListProps<T> {
   minCardWidth?: string;
   /** 목록 하단 페이지네이션. 표와 같은 바를 쓴다 — 카드라고 위치 감각이 덜 필요하진 않다. */
   pagination?: AdminTablePagination;
+  /** 카드 펼침 영역. null 이 아니면 그 카드가 그리드 한 줄을 다 쓰고 액션 아래에 내용을 그린다. */
+  renderExpanded?: (row: T) => ReactNode | null;
 }
 
 // ── tone → class (AdminDataTable 과 동일 매핑) ──────────────────────────────
@@ -71,6 +73,7 @@ export function AdminCardList<T>({
   skeletonCards = 6,
   minCardWidth = '280px',
   pagination,
+  renderExpanded,
 }: AdminCardListProps<T>) {
   const gridStyle = { gridTemplateColumns: `repeat(auto-fill,minmax(${minCardWidth},1fr))` };
 
@@ -138,12 +141,14 @@ export function AdminCardList<T>({
       {rows.map((row) => {
         const model = card(row);
         const tone = model.tone;
+        const expanded = renderExpanded?.(row) ?? null;
         return (
           <li
             key={keyExtractor(row)}
             className={[
               'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-4 flex flex-col transition-colors hover:border-[var(--border-strong)]',
               tone ? TONE_CARD[tone] : '',
+              expanded === null ? '' : 'col-span-full min-w-0',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -205,6 +210,7 @@ export function AdminCardList<T>({
                 {renderActions!(row)}
               </div>
             )}
+            {expanded !== null ? <div className="mt-4 border-t border-[var(--border)] pt-4">{expanded}</div> : null}
           </li>
         );
       })}

@@ -287,12 +287,15 @@ export function ActionButton({
   icon,
   label,
   tone,
+  expanded,
 }: {
   onClick: () => void;
   disabled?: boolean;
   icon: React.ReactNode;
   label: string;
   tone: 'blue' | 'gray' | 'red';
+  /** 펼침 토글 버튼이면 현재 펼침 여부(aria-expanded). */
+  expanded?: boolean;
 }) {
   const toneClass =
     tone === 'blue'
@@ -306,6 +309,7 @@ export function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-expanded={expanded}
       className={[
         'inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',

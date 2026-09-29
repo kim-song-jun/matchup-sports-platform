@@ -73,6 +73,8 @@ export function createV1GameRosterMswHandlers() {
     requests: [] as GameRosterMswRequest[],
     seq: 0,
     viewerRole: 'TEAM_MANAGER' as V1GameRosterViewerRole,
+    /** false = 보기만 하는 운영자(지원 계정·명단 권한 없는 스태프) — 서버의 `canWrite`/`writeRole null`. */
+    canWrite: true,
     /** 출전정지(규정 있는 대회) — userId → 사유·남은 경기. 모든 경기에 같이 건다. */
     suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
     /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
@@ -91,6 +93,7 @@ export function createV1GameRosterMswHandlers() {
     );
   const actor = (userId: string, role: string | null) => ({ userId, displayName: NAMES[userId] ?? '알 수 없음', role });
   const person = (p: (typeof GAME_ROSTER_MSW.players)[number]) => ({ ...p, accountLinked: true });
+  const canWrite = () => state.viewerRole !== 'TEAM_MEMBER' && state.canWrite;
 
   async function record(request: Request, path: string) {
     const text = request.method === 'GET' ? '' : await request.text();
@@ -135,7 +138,7 @@ export function createV1GameRosterMswHandlers() {
       competitionKind: 'TOURNAMENT',
       gameState,
       deadline: game.startAt,
-      editable: gameState === 'SCHEDULED' && state.viewerRole !== 'TEAM_MEMBER',
+      editable: gameState === 'SCHEDULED' && canWrite(),
       viewerRole: state.viewerRole,
       baseSource: 'REGISTRATION',
       base,
@@ -192,7 +195,10 @@ export function createV1GameRosterMswHandlers() {
     return { games, players };
   }
 
-  function exclude(gameId: string, userId: string, reason: string | null): boolean {
+  // 기록의 역할은 쓴 사람의 권한 — 운영자(어드민·스태프)가 빼면 "운영자"로 남는다.
+  const writerRole = () => (state.viewerRole === 'ADMIN' || state.viewerRole === 'STAFF' ? state.viewerRole : 'TEAM_MANAGER');
+
+  function exclude(gameId: string, userId: string, reason: string | null, actorRole: string = writerRole()): boolean {
     if (activeAdjustment(gameId, userId)) return true;
     state.adjustments.push({
       id: nextId('adjustment'),
@@ -200,7 +206,7 @@ export function createV1GameRosterMswHandlers() {
       userId,
       reason,
       actorUserId: GAME_ROSTER_MSW.viewerUserId,
-      actorRole: 'TEAM_MANAGER',
+      actorRole,
       createdAt: at(),
       revokedAt: null,
       revokedByUserId: null,
@@ -283,6 +289,7 @@ export function createV1GameRosterMswHandlers() {
       const { changes } = state.requests.at(-1)!.body as {
         changes: { gameId: string; userId: string; op: 'EXCLUDE' | 'REVOKE'; reason?: string }[];
       };
+      if (!canWrite()) return forbidden('팀장·매니저만 경기 명단을 바꿀 수 있어요.');
       const started = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.gameStates.get(id) !== 'SCHEDULED');
       if (started.length > 0) return deadlinePassed(started);
       const results = changes.map((c) => {
@@ -303,7 +310,8 @@ export function createV1GameRosterMswHandlers() {
     http.post(`${api}/teams/:teamId/members/:userId/unavailability`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
       const body = state.requests.at(-1)!.body as { startsAt: string; endsAt: string; reason?: string };
-      if (state.viewerRole === 'TEAM_MEMBER') return forbidden('팀장·매니저만 결장 기간을 등록할 수 있어요.');
+      // 결장 기간은 팀 단위 권한 — 대회 스태프는 열지 않는다(서버 team-roster-access).
+      if (!canWrite() || state.viewerRole === 'STAFF') return forbidden('팀장·매니저만 결장 기간을 등록할 수 있어요.');
       if (params.userId === GAME_ROSTER_MSW.viewerUserId) return forbidden('내 결장 기간은 다른 팀장·매니저가 등록해요.');
       const created: Unavailability = {
         id: nextId('unavailability'),
@@ -313,14 +321,13 @@ export function createV1GameRosterMswHandlers() {
         endsAt: new Date(body.endsAt).toISOString(),
         reason: body.reason ?? null,
         actorUserId: GAME_ROSTER_MSW.viewerUserId,
-        actorRole: 'TEAM_MANAGER',
+        actorRole: writerRole(),
         createdAt: at(),
         revokedAt: null,
       };
       state.unavailabilities.push(created);
-      const syncedSides = GAME_ROSTER_MSW.games.filter((g) => created.startsAt <= g.startAt && g.startAt < created.endsAt).length;
       return HttpResponse.json(
-        { status: 'success', data: { unavailability: unavailabilityView(created), syncedSides }, timestamp: NOW },
+        { status: 'success', data: { unavailability: unavailabilityView(created) }, timestamp: NOW },
         { status: 201 },
       );
     }),
@@ -330,7 +337,7 @@ export function createV1GameRosterMswHandlers() {
       if (!row) return fail(404, 'UNAVAILABILITY_NOT_FOUND', '결장 기간을 찾을 수 없어요.');
       const alreadyApplied = row.revokedAt !== null;
       if (!alreadyApplied) row.revokedAt = at();
-      return ok({ alreadyApplied, unavailability: unavailabilityView(row), syncedSides: alreadyApplied ? 0 : 1 });
+      return ok({ alreadyApplied, unavailability: unavailabilityView(row) });
     }),
     http.get(`${api}/admin/tournaments/:tournamentId/registrations/:registrationId/game-rosters`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
@@ -338,7 +345,7 @@ export function createV1GameRosterMswHandlers() {
         registrationId: String(params.registrationId),
         teamId: GAME_ROSTER_MSW.teamId,
         competitionId: String(params.tournamentId),
-        viewerRole: 'ADMIN',
+        viewerRole: state.viewerRole === 'STAFF' ? 'STAFF' : 'ADMIN',
         ...matrix(),
       };
       return ok(result);
@@ -353,6 +360,10 @@ export function createV1GameRosterMswHandlers() {
     },
     setViewerRole(role: V1GameRosterViewerRole) {
       state.viewerRole = role;
+    },
+    /** 보기만 하는 운영자로 — 표의 `editable` 이 전부 false, 쓰기는 403. */
+    setCanWrite(value: boolean) {
+      state.canWrite = value;
     },
     suspend(userId: string, reason: string, remainingMatches: number) {
       state.suspensions.set(userId, { reason, remainingMatches });
@@ -376,7 +387,7 @@ export function createV1GameRosterMswHandlers() {
     },
     /** 다른 운영진이 먼저 뺀 것처럼 서버 상태만 바꾼다. */
     excludeAsTeamManager(gameId: string, userId: string, reason: string | null) {
-      exclude(gameId, userId, reason);
+      exclude(gameId, userId, reason, 'TEAM_MANAGER');
     },
   };
 }

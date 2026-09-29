@@ -39,6 +39,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminRosterEligibleMembers: vi.fn(),
 }));
 
+// 펼침 안의 표는 자기 테스트가 있다(admin-registration-game-rosters.test.tsx) — 여기선 어느 신청에 무엇을 넘기는지만 본다.
+vi.mock('@/components/game-roster/admin-registration-game-rosters', () => ({
+  AdminRegistrationGameRosters: (props: { registrationId: string; teamName: string; correctionHref: string }) => (
+    <div data-testid="game-rosters-panel" data-registration-id={props.registrationId} data-correction-href={props.correctionHref}>
+      {props.teamName}
+    </div>
+  ),
+}));
+
 const useV1AdminTournamentRegistrationsMock = vi.mocked(useV1AdminTournamentRegistrations);
 const useV1AdminAddPlayerMock = vi.mocked(useV1AdminAddPlayer);
 const useV1AdminRemovePlayerMock = vi.mocked(useV1AdminRemovePlayer);
@@ -441,5 +450,69 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     arrange({ rosterAutoConfirmedAt: null });
     render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
     expect(screen.queryByText(/자동 확정/)).not.toBeInTheDocument();
+  });
+});
+
+describe('RegistrationsTab — 경기별 명단 펼침 (Task 176)', () => {
+  const showToast = vi.fn();
+
+  afterEach(() => vi.clearAllMocks());
+
+  function arrange(items: V1AdminTournamentRegistration[]) {
+    for (const hook of [
+      useV1ConfirmPaymentMock,
+      useV1ConfirmRegistrationMock,
+      useV1CancelRegistrationAdminMock,
+      useV1RejectCancelRequestMock,
+      useV1RosterLockMock,
+      useV1RosterUnlockMock,
+      useV1ExportRosterCsvMock,
+      useV1RosterDeadlineOverrideGrantMock,
+      useV1RosterDeadlineOverrideRevokeMock,
+      useV1UpdatePlayerEligibilityMock,
+      useV1AdminAddPlayerMock,
+      useV1AdminRemovePlayerMock,
+    ] as const) {
+      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue(noopMutationHook());
+    }
+    useV1AdminTournamentPlayersMock.mockReturnValue({
+      data: { players: [], belowMinimum: false },
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: { items },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+  }
+
+  it('확정 신청에만 버튼이 있고, 한 번에 한 팀만 펼치며 리그도 같은 결과 정정 경로를 넘긴다', () => {
+    arrange([
+      baseRegistration({ id: 'reg-1', teamName: '성수 FC' }),
+      baseRegistration({ id: 'reg-2', teamId: 'team-2', teamName: '마포 FC' }),
+      baseRegistration({ id: 'reg-3', teamId: 'team-3', teamName: '대기 FC', status: 'awaiting_payment', confirmedAt: null }),
+    ]);
+    render(<RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />);
+
+    const toggles = screen.getAllByRole('button', { name: '경기별 명단' });
+    expect(toggles).toHaveLength(2);
+    expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(toggles[0]);
+    const panel = screen.getByTestId('game-rosters-panel');
+    expect(panel).toHaveAttribute('data-registration-id', 'reg-1');
+    expect(panel).toHaveAttribute('data-correction-href', '/admin/live/league-1/records/corrections');
+    expect(screen.getByRole('button', { name: '경기별 명단 접기' })).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '경기별 명단' }));
+    expect(screen.getAllByTestId('game-rosters-panel')).toHaveLength(1);
+    expect(screen.getByTestId('game-rosters-panel')).toHaveAttribute('data-registration-id', 'reg-2');
+
+    fireEvent.click(screen.getByRole('button', { name: '경기별 명단 접기' }));
+    expect(screen.queryByTestId('game-rosters-panel')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '경기별 명단' })).toHaveLength(2);
   });
 });

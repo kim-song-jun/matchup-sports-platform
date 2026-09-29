@@ -12,7 +12,12 @@ const mocks = vi.hoisted(() => ({
   assignFixtureField: vi.fn(),
   clearFixtureField: vi.fn(),
   useGameResultRevisions: vi.fn(),
+  useRosterList: vi.fn(),
   pathname: { value: '/tournament-ops/tournaments/t-1/operations' },
+}));
+
+vi.mock('@/hooks/use-v1-game-roster', () => ({
+  useV1AdminRegistrationGameRosterList: (...args: unknown[]) => mocks.useRosterList(...args),
 }));
 
 // 런타임에는 `_gate.tsx` 가 이 화면을 항상 TournamentOpsRoleProvider 로 감싼다(셸 분기).
@@ -129,6 +134,8 @@ describe('OperationsBoardClient', () => {
     mocks.clearFixtureField.mockReset();
     mocks.useGameResultRevisions.mockReset();
     mocks.useGameResultRevisions.mockReturnValue({ data: [], isPending: false, isError: false });
+    mocks.useRosterList.mockReset();
+    mocks.useRosterList.mockReturnValue([]);
     mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
     mocks.pathname.value = '/tournament-ops/tournaments/t-1/operations';
     mocks.useV1TournamentOperationsBoard.mockReturnValue({
@@ -148,6 +155,79 @@ describe('OperationsBoardClient', () => {
     // MISSING_SCORER 는 "골에 득점자가 안 적힘"이지 기록 담당 스태프 부재가 아니다.
     // 결과 검토 화면과 같은 라벨을 쓴다.
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
+  });
+
+  describe('경기 명단 요약(Task 176)', () => {
+    const SCHEDULED_ITEM: V1TournamentOperationsBoardItem = {
+      ...ITEM_A,
+      gameState: 'SCHEDULED',
+      currentRevisionState: null,
+    };
+    const matrixFor = (registrationId: string, teamId: string, opponentName: string, summary: { excluded: number; unavailable: number; suspended: number }) => ({
+      data: {
+        registrationId,
+        teamId,
+        competitionId: 't-1',
+        viewerRole: 'STAFF',
+        players: [],
+        games: [
+          {
+            gameId: 'game-1',
+            sideId: `side-${teamId}`,
+            teamMatchId: 'tm-1',
+            competitionId: 't-1',
+            competitionKind: 'TOURNAMENT',
+            competitionTitle: '가을 풋살 대회',
+            opponentName,
+            scheduledAt: SCHEDULED_ITEM.scheduledAt,
+            gameState: 'SCHEDULED',
+            editable: true,
+            summary: { participating: 8, ...summary },
+          },
+        ],
+      },
+      isError: false,
+    });
+
+    it('시작 전 경기의 양 팀 신청만 한 번씩 조회하고, 빠짐(빠짐+결장)·정지와 팀별 명단 링크를 보인다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [SCHEDULED_ITEM, { ...ENDED_PENALTY_ITEM, homeRegistrationId: 'reg-ended', awayRegistrationId: 'reg-ended-2' }] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      mocks.useRosterList.mockReturnValue([
+        matrixFor('reg-home', 'team-red', '블루팀', { excluded: 1, unavailable: 1, suspended: 1 }),
+        matrixFor('reg-away', 'team-blue', '레드팀', { excluded: 0, unavailable: 0, suspended: 0 }),
+      ]);
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      // 끝난 경기의 신청은 부르지 않는다 — 조정은 시작 전에만 한다.
+      expect(mocks.useRosterList).toHaveBeenLastCalledWith('t-1', ['reg-home', 'reg-away']);
+      expect(screen.getAllByText('레드팀 · 빠짐 2 · 정지 1').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('블루팀 · 빠짐 0 · 정지 0').length).toBeGreaterThan(0);
+      const redLinks = screen.getAllByRole('link', { name: '레드팀 경기 명단' });
+      expect(redLinks[0]).toHaveAttribute('href', '/teams/team-red/games/game-1/roster');
+      expect(screen.getAllByRole('link', { name: '블루팀 경기 명단' })[0]).toHaveAttribute('href', '/teams/team-blue/games/game-1/roster');
+    });
+
+    it('진행 중 경기에는 명단 요약·버튼을 보이지 않고, 조회 실패는 실패라고 말한다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [SCHEDULED_ITEM, { ...ITEM_A, fixtureId: 'fixture-live', gameId: 'game-live', homeRegistrationId: 'reg-live' }] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      mocks.useRosterList.mockReturnValue([{ data: undefined, isError: true }, matrixFor('reg-away', 'team-blue', '레드팀', { excluded: 0, unavailable: 0, suspended: 2 })]);
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(mocks.useRosterList).toHaveBeenLastCalledWith('t-1', ['reg-home', 'reg-away']);
+      expect(screen.getAllByText('레드팀 명단 요약을 불러오지 못했어요').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('블루팀 · 빠짐 0 · 정지 2').length).toBeGreaterThan(0);
+      expect(screen.queryAllByRole('link', { name: '레드팀 경기 명단' })).toHaveLength(0);
+    });
   });
 
   it('expands the selected game row with its stable game id and closes it without changing the route', async () => {

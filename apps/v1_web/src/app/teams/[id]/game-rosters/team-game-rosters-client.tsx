@@ -24,9 +24,10 @@ import {
   dropGamesFromDraft,
   effectiveStatus,
   isToggleable,
+  startedGameIds,
   toggleCell,
   type TeamRosterDraft,
-} from './team-game-rosters-draft';
+} from '@/components/game-roster/game-roster-matrix-draft';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -235,12 +236,6 @@ function chipAriaLabel(label: string, status: string, remaining: number | null, 
   const now = gameRosterStatusLabel(status, remaining);
   const hint = !toggleable ? '' : status === 'PARTICIPATING' ? ', 누르면 빠져요' : ', 누르면 출전으로 돌아가요';
   return `${label} ${now}${changed ? '(저장 전)' : ''}${hint}`;
-}
-
-function startedGameIds(error: unknown): string[] {
-  if (!(error instanceof V1ApiError)) return [];
-  const details = error.details as { gameIds?: unknown } | null | undefined;
-  return Array.isArray(details?.gameIds) ? details.gameIds.filter((id): id is string => typeof id === 'string') : [];
 }
 
 function MatrixLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {

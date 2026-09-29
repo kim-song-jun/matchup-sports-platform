@@ -1,3 +1,4 @@
+import { V1ApiError } from '@/lib/api-client';
 import type {
   V1GameRosterBatchChange,
   V1TeamRosterCell,
@@ -6,7 +7,9 @@ import type {
   V1TeamRosterMatrixGame,
 } from '@/hooks/use-v1-game-roster';
 
-/** 저장 전 칩 변경 — 키는 `gameId:userId`. */
+// 선수 × 경기 표(팀 B 경기 명단 관리 · 어드민 참가 신청 펼침)의 저장 전 초안.
+
+/** 저장 전 칸 변경 — 키는 `gameId:userId`. */
 export type TeamRosterDraft = Readonly<Record<string, 'EXCLUDE' | 'REVOKE'>>;
 
 export function cellKey(gameId: string, userId: string): string {
@@ -40,7 +43,10 @@ export function toggleCell(draft: TeamRosterDraft, cell: V1TeamRosterCell, userI
  * 초안 → 일괄 저장 요청. 지금 표와 안 맞는 항목(다른 운영진이 먼저 바꿨거나, 경기가 시작됐거나,
  * 참가 명단에서 빠진 선수)은 버린다 — 그대로 보내면 서버가 저장 전체를 거절한다.
  */
-export function draftToBatchChanges(draft: TeamRosterDraft, matrix: V1TeamRosterMatrix): V1GameRosterBatchChange[] {
+export function draftToBatchChanges(
+  draft: TeamRosterDraft,
+  matrix: Pick<V1TeamRosterMatrix, 'games' | 'players'>,
+): V1GameRosterBatchChange[] {
   return matrix.players.flatMap((player) =>
     matrix.games.flatMap((game, index): V1GameRosterBatchChange[] => {
       const cell = player.cells[index];
@@ -61,4 +67,11 @@ export function draftToBatchChanges(draft: TeamRosterDraft, matrix: V1TeamRoster
 export function dropGamesFromDraft(draft: TeamRosterDraft, gameIds: readonly string[]): TeamRosterDraft {
   const blocked = new Set(gameIds);
   return Object.fromEntries(Object.entries(draft).filter(([key]) => !blocked.has(key.split(':')[0] ?? '')));
+}
+
+/** 일괄 저장 409(`LINEUP_DEADLINE_PASSED`)가 알려 준 시작된 경기 id. */
+export function startedGameIds(error: unknown): string[] {
+  if (!(error instanceof V1ApiError)) return [];
+  const details = error.details as { gameIds?: unknown } | null | undefined;
+  return Array.isArray(details?.gameIds) ? details.gameIds.filter((id): id is string => typeof id === 'string') : [];
 }

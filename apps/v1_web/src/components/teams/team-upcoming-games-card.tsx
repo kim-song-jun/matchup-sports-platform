@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { useV1TeamUpcomingGames, type V1GameRosterSummary, type V1TeamUpcomingGame } from '@/hooks/use-v1-api';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 
 /**
  * 팀 상세의 "다가오는 경기" — 경기마다 명단 상태와 명단·전술 입구(Task 176 팀 A).
@@ -144,7 +145,7 @@ function rosterHref(teamId: string, game: V1TeamUpcomingGame): { href: string; l
   }
   // 기준 명단이 없으면 경기 명단 화면이 404(GAME_ROSTER_NOT_AVAILABLE)라 버튼을 내지 않는다.
   if (game.rosterSummary === null) return null;
-  return { href: `/teams/${teamId}/games/${game.gameId}/roster`, label: '명단' };
+  return { href: gameRosterScreenPath(teamId, game.gameId), label: '명단' };
 }
 
 const rowLineStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };

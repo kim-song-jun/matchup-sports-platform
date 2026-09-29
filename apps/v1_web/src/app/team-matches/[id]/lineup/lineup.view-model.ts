@@ -1,5 +1,6 @@
 import { GOALKEEPER_SLOT_CODE, type FormationSlot } from '@/components/lineup/formation-slots';
 import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1TeamMatchLineup,
@@ -67,6 +68,30 @@ export function resolveOwnTeamId(
     (team) => candidateTeamIds.includes(team.teamId) && (team.role === 'owner' || team.role === 'manager'),
   );
   return match?.teamId ?? null;
+}
+
+/**
+ * 이 참석명단 화면이 대회·리그 경기로 열렸는가(옛 알림 링크 등). 그 경기 명단은 참가 명단에서
+ * 계산돼 여기서의 저장·제출이 409 `ROSTER_MANAGED_BY_ADJUSTMENTS` 다(Task 176).
+ * 팀매치 상세는 대회 경기를 `NOT_FOUND_OR_ARCHIVED` 로 숨기고 명단 조회만 성공시킨다.
+ */
+export function isCompetitionLineupRoute(input: {
+  league: object | null | undefined;
+  teamMatchErrorCode: string | null;
+  lineupLoaded: boolean;
+}): boolean {
+  return Boolean(input.league) || (input.lineupLoaded && input.teamMatchErrorCode === 'NOT_FOUND_OR_ARCHIVED');
+}
+
+/** 대회·리그 경기 명단 화면 경로. 팀매치 상세가 없는 대회 경기는 명단 응답의 사이드로 팀을 찾는다. */
+export function competitionRosterHref(
+  ownTeamId: string | null,
+  lineup: { gameId: string; sideId: string } | undefined,
+  gameSides: ReadonlyArray<{ id: string; teamId: string | null }> | undefined,
+): string | null {
+  if (lineup === undefined) return null;
+  const teamId = ownTeamId ?? gameSides?.find((side) => side.id === lineup.sideId)?.teamId ?? null;
+  return teamId === null ? null : gameRosterScreenPath(teamId, lineup.gameId);
 }
 
 /** 편집기 안에서 다루는 한 명분 엔트리. `userId`가 없으면 비연동 게스트(D-03) —

@@ -13,6 +13,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { MatchTeamRosterCard } from '@/components/game-roster/match-team-roster-card';
 import { useMyMatchRosterSide } from '@/components/game-roster/use-my-match-roster-side';
 import { extractErrorMessage } from '@/lib/error-message';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
@@ -100,7 +101,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const router = useRouter();
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
-  // 참가팀 여부(채팅·라인업 통로)만을 위해 쓴다 — 실패해도 관전 화면은 그대로 뜬다.
+  // 참가팀 여부(채팅·경기 명단 통로)만을 위해 쓴다 — 실패해도 관전 화면은 그대로 뜬다.
   const teamMatchQuery = useV1TeamMatch(fixtureId);
   // 대회 경기 상세와 동일한 게임 프로젝션(스코어·득점/카드 타임라인·라인업·승부차기·
   // 몰수 사유·MVP·정정 이력·라이브 폴링). 404(게임 미공개/숨김)면 아래 자체 요약
@@ -371,7 +372,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
             {/* 리그 경기는 친선 참석명단이 아니라 경기 명단(참가 명단 기준 조정)으로 간다(Task 176). */}
             {rosterSide.status === 'resolved' ? (
               <Link
-                href={withFromPath(`/teams/${rosterSide.teamId}/games/${rosterSide.gameId}/roster`, selfHref)}
+                href={withFromPath(gameRosterScreenPath(rosterSide.teamId, rosterSide.gameId), selfHref)}
                 className="tm-btn tm-btn-lg tm-btn-neutral"
               >
                 경기 명단

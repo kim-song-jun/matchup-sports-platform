@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { V1AdminRegistrationRosterMatrix } from '@/hooks/use-v1-game-roster';
 import type { V1GameRosterSummary } from '@/hooks/use-v1-api';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import type { V1TournamentOperationsBoardItem } from '@/types/api';
 
 /** 운영 보드 한 경기·한 팀의 명단 요약. `opponentName` 은 그 팀 입장의 상대 — 리그 행의 팀명 대체로 쓴다. */
@@ -68,7 +69,7 @@ export function BoardRosterSummary({
                 {fallbackName} · {summaryText(state.side.summary)}
               </span>
               <Link
-                href={`/teams/${encodeURIComponent(state.side.teamId)}/games/${encodeURIComponent(gameId)}/roster`}
+                href={gameRosterScreenPath(state.side.teamId, gameId)}
                 aria-label={`${fallbackName} 경기 명단`}
                 className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border)] px-3 font-medium whitespace-nowrap text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >

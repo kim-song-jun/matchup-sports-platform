@@ -28,6 +28,7 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import type { CursorListSeed } from '@/lib/public-list-seed';
 import { extractErrorMessage } from '@/lib/error-message';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 // 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
@@ -401,7 +402,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }
       : undefined,
     onShare: () => shareTeamMatch(query.data),
-    lineupHref: ownTeamId ? withFromPath(`/team-matches/${teamMatchId}/lineup`, chainFrom) : undefined,
+    lineupAction: buildLineupAction(teamMatchId, ownTeamId, query.data.gameId ?? null, isLeagueFixture, chainFrom),
     onApply: seeding ? undefined : getApplyAction({
       viewerState,
       status: getStatus(query.data),
@@ -690,6 +691,22 @@ function buildHostActions({
     return isLeagueFixture ? [] : [cancelAction];
   }
   return [];
+}
+
+function buildLineupAction(
+  teamMatchId: string,
+  ownTeamId: string | null,
+  gameId: string | null,
+  isLeagueFixture: boolean,
+  chainFrom: string | null,
+): TeamMatchDetailViewModel['lineupAction'] {
+  if (ownTeamId === null) return undefined;
+  if (!isLeagueFixture) {
+    return { kind: 'attendance', href: withFromPath(`/team-matches/${teamMatchId}/lineup`, chainFrom) };
+  }
+  // 리그 대진의 참석명단 저장은 서버가 409(ROSTER_MANAGED_BY_ADJUSTMENTS)로 막는다.
+  if (gameId === null) return undefined;
+  return { kind: 'match-roster', href: withFromPath(gameRosterScreenPath(ownTeamId, gameId), chainFrom) };
 }
 
 // Task 17: entry point into /team-matches/:id/result(/approval). 친선 팀매치에서만

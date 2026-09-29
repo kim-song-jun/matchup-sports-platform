@@ -8,6 +8,7 @@ import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1ApplyGameRosterBatch, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
 import { extractErrorCode } from '@/lib/error-message';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import type { GameRosterAdjustmentReason } from '@/lib/v1-status-labels';
 import { draftToChanges, type GameRosterDraft } from './game-roster-draft';
 import { GameRosterPlayerRow } from './game-roster-player-row';
@@ -162,7 +163,7 @@ export function GameRosterQuickSheet({
           <p className="tm-text-caption" style={{ margin: '12px 0 0' }}>
             전체 명단은{' '}
             <Link
-              href={`/teams/${teamId}/games/${roster.gameId}/roster`}
+              href={gameRosterScreenPath(teamId, roster.gameId)}
               style={{ color: 'var(--blue700)', fontWeight: 700, textDecoration: 'underline' }}
             >
               경기 명단

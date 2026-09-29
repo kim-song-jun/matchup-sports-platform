@@ -8,7 +8,7 @@ import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { findInListCache } from '@/lib/list-cache-seed';
 import { randomUuid } from '@/lib/uuid';
-import type { GameLineup, GameLineupState } from '@/types/game-operations';
+import type { GameLineup } from '@/types/game-operations';
 import type { CompetitionKind } from '@/components/v1-ui/competition-kind-segment';
 import type {
   V1ChatRoomTeamContact,
@@ -2139,14 +2139,12 @@ export function useV1DeleteLineupPreset(teamId: string | null) {
   });
 }
 
-/** 아직 라인업을 넣지 않은 다가오는 경기 — 홈·마이 페이지의 "할 일" 카드가 쓴다. */
+/** 참석명단을 아직 내지 않은 다가오는 친선 경기 — 홈 "할 일" 카드. 대회·리그는 오지 않는다(Task 176 R1). */
 export type V1LineupTodo = {
-  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  source: 'TEAM_MATCH';
   teamId: string;
   teamName: string;
   gameId: string;
-  tournamentId: string | null;
-  tournamentTitle: string | null;
   title: string;
   opponentName: string | null;
   scheduledAt: string | null;
@@ -2298,7 +2296,6 @@ export type V1MyTournamentFixture = {
   status: string;
   isHome: boolean;
   opponentTeamName: string | null;
-  lineupState: GameLineupState | null;
 };
 
 export type V1MyTournamentFixtures = {

@@ -299,9 +299,8 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
 });
 
 /**
- * 팀장이 이 화면에 들어왔을 때 "우리 팀 경기가 어느 것이고 라인업이 남았는지"를 바로
- * 알아야 한다. 예전에는 공개 일정만 있어서, 자기 팀 경기를 눈으로 찾아 하나씩 눌러
- * 들어가야 라인업 진입점을 만날 수 있었다.
+ * 팀장이 이 화면에 들어왔을 때 "우리 팀 경기가 어느 것인지"를 바로 알아야 한다.
+ * 예전에는 공개 일정만 있어서, 자기 팀 경기를 눈으로 찾아 하나씩 눌러 들어가야 했다.
  */
 describe('ScheduleContent — 우리 팀 경기 강조', () => {
   const myFixtures = {
@@ -322,41 +321,29 @@ describe('ScheduleContent — 우리 팀 경기 강조', () => {
             status: 'scheduled',
             isHome: true,
             opponentTeamName: '원정팀',
-            lineupState: null,
           },
         ],
       },
     ],
   };
 
-  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태가 붙는다 (리그)', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-
-    render(<ScheduleContent tournamentId="lg-1" data={data} myFixtures={myFixtures} isRegularLeague />);
-
-    expect(screen.getByText('우리 팀')).toBeInTheDocument();
-    // 색만으로 상태를 전달하지 않는다 — 문구가 함께 있어야 한다.
-    expect(screen.getAllByText('라인업 미작성').length).toBeGreaterThan(0);
-    // [P1-d] '라인업 짜기' 링크 단언은 뺐다(경기별 라인업 화면 제거). **강조와 상태
-    // 표시 계약은 그대로 남긴다** — 링크가 사라졌다고 함께 지우면 "우리 팀 경기가
-    // 눈에 띄어야 한다"는 별개의 계약까지 커버리지가 없어진다.
-    expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
-  });
-
   /**
-   * 대회 축엔 라인업 제출 단계가 없다 — 대진 생성 때 등록 명단이 참가자로 복사된다.
-   * 그런데도 이 뱃지가 떠서 팀장에게 **할 수 없는 일을 안 했다고** 말했고, 이미 끝난
-   * 경기 위에도 그대로 남았다(alpha 실측). "우리 팀" 강조는 대회에서도 그대로 둔다.
+   * 대회·리그 경기 명단은 참가 명단에서 계산된다 — 제출 단계가 없으니 "라인업 미작성" 류
+   * 뱃지는 팀장에게 할 수 없는 일을 안 했다고 말한다(Task 176). "우리 팀" 강조는 그대로 둔다.
    */
-  it('대회 경기에는 라인업 상태 뱃지를 붙이지 않는다', () => {
+  it.each([
+    ['리그', 'lg-1', true],
+    ['대회', 'tour-1', false],
+  ])('%s 경기의 우리 팀 행은 강조만 하고 라인업 상태 뱃지를 붙이지 않는다', (_kind, tournamentId, isRegularLeague) => {
     const data = { ...makeData(), items: [fixtureEntry()] };
 
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
+    render(
+      <ScheduleContent tournamentId={tournamentId} data={data} myFixtures={myFixtures} isRegularLeague={isRegularLeague} />,
+    );
 
     expect(screen.getByText('우리 팀')).toBeInTheDocument();
-    expect(screen.queryByText('라인업 미작성')).not.toBeInTheDocument();
-    expect(screen.queryByText('라인업 제출 완료')).not.toBeInTheDocument();
-    expect(screen.queryByText('라인업 작성 중')).not.toBeInTheDocument();
+    expect(screen.queryByText(/라인업/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
   });
 
   /**
@@ -471,7 +458,7 @@ describe('ScheduleContent — 우리 팀 행에서도 스코어가 배경에 묻
           teamId: 'team-1',
           teamName: '우리팀',
           fixtures: [
-            { fixtureId: 'fixture-1', lineupState: 'SUBMITTED', scheduledAt: null, opponentTeamName: '상대팀' },
+            { fixtureId: 'fixture-1', scheduledAt: null, opponentTeamName: '상대팀' },
           ],
         },
       ],

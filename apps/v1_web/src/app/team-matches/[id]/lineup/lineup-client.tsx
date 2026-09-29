@@ -20,9 +20,10 @@ import {
   useV1TeamLineupHistory,
   useV1TeamLineupPresets,
   useV1UpdateLineupPreset,
+  useV1Game,
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { josa } from '@/lib/korean';
 import { randomUuid } from '@/lib/uuid';
@@ -31,11 +32,13 @@ import {
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
+  competitionRosterHref,
   deriveLineupCounts,
   describeLineupPhase,
   describePublicationCountdown,
   extractConflictCurrentVersion,
   hydrateLineupEditorState,
+  isCompetitionLineupRoute,
   isRosterMemberPlaced,
   addGuestToLineup,
   addRosterMemberToLineup,
@@ -57,7 +60,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     () => resolveOwnTeamId(teamMatchQuery.data, myTeamsQuery.data),
     [teamMatchQuery.data, myTeamsQuery.data],
   );
-  const rosterQuery = useV1TeamMembers(ownTeamId, { limit: 100 }, { enabled: Boolean(ownTeamId) });
+  const isCompetition = isCompetitionLineupRoute({
+    league: teamMatchQuery.data?.league,
+    teamMatchErrorCode: extractErrorCode(teamMatchQuery.error),
+    lineupLoaded: lineupQuery.isSuccess,
+  });
+  const competitionGameQuery = useV1Game(lineupQuery.data?.gameId, { enabled: isCompetition && ownTeamId === null });
+  const rosterQuery = useV1TeamMembers(ownTeamId, { limit: 100 }, { enabled: Boolean(ownTeamId) && !isCompetition });
   const rosterPool: RosterOption[] = useMemo(
     () => (rosterQuery.data?.items ?? []).map((member) => ({ userId: member.userId, displayName: member.displayName, role: member.role })),
     [rosterQuery.data],
@@ -308,6 +317,15 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   if (teamMatchQuery.isLoading || lineupQuery.isLoading || myTeamsQuery.isLoading) {
     return <PageSkeleton variant="detail" />;
+  }
+
+  if (isCompetition) {
+    if (competitionGameQuery.isLoading) return <PageSkeleton variant="detail" />;
+    return (
+      <CompetitionRosterNotice
+        href={competitionRosterHref(ownTeamId, lineupQuery.data, competitionGameQuery.data?.sides)}
+      />
+    );
   }
 
   if (lineupQuery.isError) {
@@ -883,5 +901,23 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         onSave={(name) => void handleSavePreset(name)}
       />
     </>
+  );
+}
+
+/** 대회·리그 경기로 열렸을 때 편집기 대신 경기 명단 화면을 안내한다. 자동 이동은 하지 않는다. */
+function CompetitionRosterNotice({ href }: { href: string | null }) {
+  return (
+    <div style={{ padding: '40px 20px' }}>
+      <EmptyState
+        title="대회·리그 경기는 경기 명단에서 관리해요"
+        sub={
+          href === null
+            ? '경기 명단은 참가 명단에서 정해져요. 빠지는 선수는 팀 상세의 다가오는 경기에서 명단을 열어 빼 주세요.'
+            : '경기 명단은 참가 명단에서 정해져요. 이번 경기에 빠지는 선수만 경기 명단에서 빼 주세요.'
+        }
+        cta={href === null ? undefined : '경기 명단 열기'}
+        ctaHref={href ?? undefined}
+      />
+    </div>
   );
 }

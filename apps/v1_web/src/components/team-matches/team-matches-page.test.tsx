@@ -1089,6 +1089,34 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
   });
 });
 
+describe('TeamMatchDetailPageView — 매치 관리 명단 행 (Task 176)', () => {
+  it('친선은 참석명단 관리가 첫 할 일(primary)이다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const link = screen.getByRole('link', { name: '참석명단 관리' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/lineup');
+    expect(link).toHaveClass('tm-btn-primary');
+  });
+
+  it('리그 경기 명단은 제출 문구 없이 조정 입구만 두고, 결과 행에 primary 를 양보한다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.lineupAction = { kind: 'match-roster', href: '/teams/team-host/games/game-1/roster' };
+    model.resultAction = { label: '경기 결과 보기', href: '/team-matches/team-match-1/result' };
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const link = screen.getByRole('link', { name: '명단 조정' });
+    expect(link).toHaveAttribute('href', '/teams/team-host/games/game-1/roster');
+    expect(link).toHaveClass('tm-btn-outline');
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveClass('tm-btn-primary');
+    expect(screen.queryByText(/제출하세요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참석명단 관리' })).not.toBeInTheDocument();
+  });
+});
+
 describe('TeamMatchDetailPageView — 히어로 액션', () => {
   it('이미지 우측 상단에는 공유만 노출한다', () => {
     renderPage(<TeamMatchDetailPageView model={getTeamMatchDetailViewModel('default')} />);

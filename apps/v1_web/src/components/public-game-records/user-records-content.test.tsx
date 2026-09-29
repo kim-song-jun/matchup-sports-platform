@@ -1,7 +1,15 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { UserRecordsContent } from './user-records-content';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
+
+// 개인 탭 자체의 데이터 조회(useV1MyMatchesInfinite)는 personal-match-records-section.test.tsx가
+// 전담한다 — 여기서는 탭 노출 조건과 탭 전환만 검증하므로 내용은 자리표시자로 대체한다.
+vi.mock('./personal-match-records-section', () => ({
+  PersonalMatchRecordsSection: ({ fromHref }: { fromHref: string }) => (
+    <div data-testid="personal-match-records-section">개인매치 기록: {fromHref}</div>
+  ),
+}));
 
 function item(overrides: Partial<PublicUserRecordItem> = {}): PublicUserRecordItem {
   return {
@@ -128,5 +136,45 @@ describe('UserRecordsContent match links', () => {
     );
 
     expect(screen.getByRole('link')).toHaveAttribute('href', selfHref);
+  });
+});
+
+describe('UserRecordsContent — "개인" 탭(본인 전용)', () => {
+  it('본인 페이지에서만 개인 탭이 보이고, 고르면 개인매치 기록 패널로 바뀐다', () => {
+    const onChangeType = vi.fn();
+    const { rerender } = render(
+      <UserRecordsContent
+        data={{ ...data([]), viewerIsOwner: true }}
+        activeType="all"
+        onChangeType={onChangeType}
+      />,
+    );
+
+    const personalTab = screen.getByRole('tab', { name: '개인' });
+    fireEvent.click(personalTab);
+    expect(onChangeType).toHaveBeenCalledWith('personal');
+
+    rerender(
+      <UserRecordsContent
+        data={{ ...data([]), viewerIsOwner: true }}
+        activeType="personal"
+        onChangeType={onChangeType}
+      />,
+    );
+    expect(screen.getByTestId('personal-match-records-section')).toHaveTextContent('/users/user-1/records');
+    // 개인 탭에서는 팀 전적용 엔트리/골 KPI를 보여주지 않는다.
+    expect(screen.queryByText('엔트리')).not.toBeInTheDocument();
+  });
+
+  it('타인이 보는 페이지에는 개인 탭 자체가 없다', () => {
+    render(
+      <UserRecordsContent
+        data={{ ...data([]), viewerIsOwner: false }}
+        activeType="all"
+        onChangeType={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('tab', { name: '개인' })).not.toBeInTheDocument();
   });
 });

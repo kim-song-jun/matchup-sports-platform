@@ -64,13 +64,35 @@ describe('개인 매치 신청 관리', () => {
   function confirmedApplication(overrides = {}) {
     mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
     mocks.applications.mockReturnValue({ data: { pages: [{ items: [{
-      applicationId: 'a1', participantId: 'p1', displayName: '참가자', status: 'approved',
+      applicationId: 'a1', participantId: 'p1', applicantUserId: 'u1', displayName: '참가자', status: 'approved',
       participantStatus: 'active', mannerScore: null, reviewCount: 0,
       canCancelApproval: true, canMarkCancelled: false, ...overrides,
     }] }] } });
     render(<MatchApplicationsPageClient matchId="m1" />);
     fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
   }
+
+  it('신청자 프로필을 클릭하면 개인 프로필 페이지로 이동한다', () => {
+    confirmedApplication({ applicantUserId: 'user-77' });
+    expect(screen.getByRole('link', { name: '참가자 프로필 보기' })).toHaveAttribute(
+      'href',
+      '/users/user-77?from=%2Fmatches%2Fm1%2Fapplications%3Ftab%3Dapproved',
+    );
+  });
+
+  it('신청자 프로필 링크가 신청자 목록이 받은 원래 출처까지 이어서 보존한다', () => {
+    navigation.search = `from=${encodeURIComponent('/matches/m1?from=%2Fmy%2Fmatches%2Fcreated')}`;
+    confirmedApplication({ applicantUserId: 'user-77' });
+    const profileHref = screen.getByRole('link', { name: '참가자 프로필 보기' }).getAttribute('href');
+    expect(profileHref).not.toBeNull();
+    const applicationsFrom = new URL(profileHref!, 'https://teameet.test').searchParams.get('from');
+    expect(applicationsFrom).toBe(
+      '/matches/m1/applications?tab=approved&from=%2Fmatches%2Fm1%3Ffrom%3D%252Fmy%252Fmatches%252Fcreated',
+    );
+    expect(new URL(applicationsFrom!, 'https://teameet.test').searchParams.get('from')).toBe(
+      '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated',
+    );
+  });
 
   it('승인 취소는 사유와 확인을 거쳐 실제 참가자 ID로 요청한다', async () => {
     confirmedApplication();

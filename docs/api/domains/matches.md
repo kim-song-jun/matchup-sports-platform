@@ -152,7 +152,10 @@
 - 신청자는 `requested` 신청을 철회할 수 있다. `approved` 신청도 매치 시작 전에는 철회할 수 있으며,
   같은 트랜잭션에서 연결 참가자를 `cancelled`로 바꿔 정원, 채팅 권한, 완료 집계에서 즉시 제외한다.
   시작 이후 또는 완료/취소 상태에서는 승인 참가 철회를 `409 STATE_CONFLICT`로 거절한다.
-- `GET /me/matches`는 `mode=joined|created`, `cursor`, `limit`을 지원한다. 화면은 `pageInfo`를 따라
+- `GET /me/matches`는 `mode=joined|created`, `cursor`, `limit`을 지원한다. 각 항목의 `viewer`에는
+  현재 사용자의 `participantId`와 `participantStatus(active|completed|no_show|null)`가 포함되어
+  완료 경기의 실제 참여와 불참을 구분할 수 있다. 공개 목록·상세의 참가자 집계에는 `no_show`를
+  포함하지 않는다. 화면은 `pageInfo`를 따라
   다음 페이지를 누적하며 50건 이후 이력도 조회한다.
 
 ## Idempotency / Duplicate Behavior

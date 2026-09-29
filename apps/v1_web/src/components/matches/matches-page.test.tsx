@@ -428,6 +428,76 @@ describe('MatchCreatePageView — 주최자 참가 선택', () => {
     expect(screen.getByText('참가하지 않아요')).toBeInTheDocument();
     expect(screen.getByText('용병만 모집하고 주최자는 운영만 해요')).toBeInTheDocument();
   });
+
+  it('나도 참가해요가 켜져 있으면 최대 인원은 2명 아래로 내려가지 않는다', () => {
+    const model = getMatchCreateViewModel('info');
+    const onFieldChange = vi.fn();
+    model.draft = { ...model.draft, capacity: 2, hostParticipates: true };
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectSport: vi.fn(),
+      onFieldChange,
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+    };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByLabelText('최대 인원 선택')).toHaveValue('2');
+    expect(screen.queryByRole('option', { name: '1명' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '인원 줄이기' }));
+    expect(onFieldChange).toHaveBeenCalledWith('capacity', 2);
+  });
+
+  it('나도 참가해요를 켜는 순간 정원이 1명이면 2명으로 자동 조정한다', () => {
+    const model = getMatchCreateViewModel('info');
+    const onFieldChange = vi.fn();
+    model.draft = { ...model.draft, capacity: 1, hostParticipates: false };
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectSport: vi.fn(),
+      onFieldChange,
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+    };
+
+    render(<MatchCreatePageView model={model} />);
+
+    fireEvent.click(screen.getByRole('switch', { name: '나도 참가해요' }));
+    expect(onFieldChange).toHaveBeenCalledWith('hostParticipates', true);
+    expect(onFieldChange).toHaveBeenCalledWith('capacity', 2);
+  });
+
+  it('나도 참가해요를 켜도 정원이 이미 2명 이상이면 정원은 건드리지 않는다', () => {
+    const model = getMatchCreateViewModel('info');
+    const onFieldChange = vi.fn();
+    model.draft = { ...model.draft, capacity: 5, hostParticipates: false };
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectSport: vi.fn(),
+      onFieldChange,
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+    };
+
+    render(<MatchCreatePageView model={model} />);
+
+    fireEvent.click(screen.getByRole('switch', { name: '나도 참가해요' }));
+    expect(onFieldChange).toHaveBeenCalledWith('hostParticipates', true);
+    expect(onFieldChange).not.toHaveBeenCalledWith('capacity', expect.anything());
+  });
 });
 
 describe('MatchCreatePageView — confirm 단계 일시 표기 (종료 시간 미입력 시 하이픈 매달림 방지)', () => {
@@ -497,10 +567,10 @@ describe('MatchCreatePageView — 매치 수정 등록 화면 일치', () => {
     expect(screen.queryByLabelText('제목')).toBeNull();
   });
 
-  it('최대 인원은 1명까지 선택할 수 있고 감소 버튼도 1명 아래로 내리지 않는다', () => {
+  it('주최자가 참가하지 않으면 최대 인원은 1명까지 선택할 수 있고 감소 버튼도 1명 아래로 내리지 않는다', () => {
     const model = getMatchCreateViewModel('info');
     const onFieldChange = vi.fn();
-    model.draft = { ...model.draft, capacity: 1 };
+    model.draft = { ...model.draft, capacity: 1, hostParticipates: false };
     model.form = {
       selectedSportId: 'sport-futsal',
       regionId: 'region-gangnam',

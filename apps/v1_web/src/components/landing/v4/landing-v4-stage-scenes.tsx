@@ -194,7 +194,7 @@ export function SceneLive() {
   );
 }
 
-/** 선수 카드는 A안 카드 화면을 그대로 쓰고, 등장 때 뒤집기만 얹는다(CSS). */
+/** 선수 카드는 공용 카드 화면(landing-competition-screens)을 그대로 쓰고, 등장 때 뒤집기만 얹는다(CSS). */
 export function SceneRecord() {
   return <CardScreenBody />;
 }

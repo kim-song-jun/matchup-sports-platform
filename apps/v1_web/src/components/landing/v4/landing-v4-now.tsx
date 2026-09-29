@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react';
 import { ArrowRight } from 'lucide-react';
 import {
+  idleSportsText,
   sportChips,
   type LandingCount,
   type LandingLiveTournament,
-  type LandingSportChips,
+  type LandingSportChip,
   type LandingV4Data,
 } from '@/lib/landing/landing-v4-data';
 import { LandingCtaLink } from '../landing-cta-link';
@@ -16,7 +17,7 @@ const MARQUEE_MIN_SOURCE = 3;
 
 const stagger = (i: number) => ({ '--i': i }) as CSSProperties;
 
-type Stat = { key: string; label: string; count: NonNullable<LandingCount>; unit: string; chips: LandingSportChips };
+type Stat = { key: string; label: string; count: NonNullable<LandingCount>; unit: string; chips: LandingSportChip[] };
 
 function StatBlock({ stat, order }: { stat: Stat; order: number }) {
   return (
@@ -26,10 +27,11 @@ function StatBlock({ stat, order }: { stat: Stat; order: number }) {
         <LandingV4Count value={stat.count.value} order={order} />
         <small>{stat.count.more ? `${stat.unit} 이상` : stat.unit}</small>
       </p>
-      <ul className="tm-landing-v4-stat-sub">
-        {stat.chips.chips.map((chip) => <li key={chip.name}>{`${chip.name} ${chip.count}`}</li>)}
-        {stat.chips.soon ? <li data-soon="true">{stat.chips.soon}</li> : null}
-      </ul>
+      {stat.chips.length > 0 ? (
+        <ul className="tm-landing-v4-stat-sub">
+          {stat.chips.map((chip) => <li key={chip.name}>{`${chip.name} ${chip.count}`}</li>)}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -128,6 +130,7 @@ export function LandingV4Now({ data }: { data: LandingV4Data }) {
     { key: 'teams', label: '활동 중인 팀', count: data.counts.teams, unit: '팀', chips: sportChips(data.bySport, 'teams') },
   ];
   const stats = candidates.filter((s): s is Stat => s.count !== null);
+  const idle = idleSportsText(data);
   const [big, ...side] = data.tournaments;
 
   return (
@@ -141,6 +144,7 @@ export function LandingV4Now({ data }: { data: LandingV4Data }) {
         {stats.length > 0 ? (
           <div className="tm-landing-v4-stats">{stats.map((stat, i) => <StatBlock key={stat.key} stat={stat} order={i} />)}</div>
         ) : null}
+        {idle ? <p className="tm-landing-v4-soon" data-reveal>{idle}</p> : null}
         {big ? (
           <div className="tm-landing-v4-tgrid" data-side={side.length > 0 ? 'true' : 'false'}>
             <div data-reveal><BigCard card={big} /></div>

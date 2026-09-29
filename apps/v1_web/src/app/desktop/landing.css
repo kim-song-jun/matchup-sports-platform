@@ -33,14 +33,6 @@ html:has(.tm-landing) {
   }
 }
 
-/* 부드러운 스크롤은 내비 앵커를 누른 동안에만 켠다(컨트롤러가 data-landing-smooth 를 단다).
-   html 에 상시로 걸면 뒤로가기 위치 복원·라우트 전환 스크롤까지 애니메이션이 된다. */
-@media (prefers-reduced-motion: no-preference) {
-  html[data-landing-smooth] {
-    scroll-behavior: smooth;
-  }
-}
-
 /* ── 내비 ── */
 .tm-landing-nav {
   position: sticky;
@@ -170,20 +162,11 @@ html:has(.tm-landing) {
   transition: transform var(--duration-base) var(--ease-out);
 }
 
-.tm-landing-btn-on-ink {
-  background: transparent;
-  color: var(--static-white);
-  box-shadow: inset 0 0 0 1px var(--overlay-white-35);
-}
-
 @media (hover: hover) {
   .tm-btn:hover .tm-landing-btn-arrow {
     transform: translateX(3px);
   }
 
-  .tm-landing-btn-on-ink:hover {
-    background: var(--overlay-white-08);
-  }
 }
 
 /* 움직임 멈추기 — 모션 감소 설정이면 멈출 것이 없다 */
@@ -257,11 +240,6 @@ html:has(.tm-landing) {
   background: linear-gradient(180deg, var(--blue50) 0%, var(--bg) 62%);
 }
 
-.tm-landing-hero-grid {
-  display: grid;
-  gap: 36px;
-}
-
 .tm-landing-hero-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -278,13 +256,6 @@ html:has(.tm-landing) {
   color: var(--text-strong);
 }
 
-.tm-landing-hero-eyebrow-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-circle);
-  background: var(--green500);
-}
-
 .tm-landing-hero-heading {
   margin: 20px 0 0;
   font-size: 34px;
@@ -292,10 +263,6 @@ html:has(.tm-landing) {
   font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--text-strong);
-}
-
-.tm-landing-hero-line {
-  display: block;
 }
 
 .tm-landing-hero-sub {
@@ -320,152 +287,6 @@ html:has(.tm-landing) {
   color: var(--text);
 }
 
-/* aside: 첫 자식 = 그래픽, 둘째 = 사실 스트립 */
-.tm-landing-hero-aside {
-  display: grid;
-  gap: 20px;
-  justify-items: center;
-}
-
-/* --hero-dw/dh 는 폰 크기, --illust-* 는 에셋 배치. 에셋은 폰 오른쪽 위 모서리를 기준으로 잡아
- * 어느 폭에서든 인사말(화면 왼쪽 위)·LIVE 카드 제목(가운데)을 비껴 상태바·알림 종 위에만 걸친다. */
-.tm-landing-hero-graphic {
-  --hero-dw: 256;
-  --hero-dh: 520;
-  --illust-w: 112px;
-  --illust-in: 72px;
-  --illust-top: -12px;
-  --illust-bleed: 16px;
-  position: relative;
-  width: 100%;
-  display: grid;
-  place-items: center;
-  padding: 8px 0 12px;
-}
-
-.tm-landing-hero-graphic .tm-landing-device {
-  --dw: var(--hero-dw, 256);
-  --dh: var(--hero-dh, 520);
-}
-
-/* 폰(z 2)보다 앞, 카드(z 4)보다 뒤. left 는 "폰 오른쪽 끝 - 겹칠 폭"이고, 좁은 폰에서
- * 거터(--illust-bleed) 밖으로 잘리지 않게 min() 으로 막는다. */
-.tm-landing-hero-illust {
-  position: absolute;
-  top: var(--illust-top, -12px);
-  left: min(
-    calc(50% + (var(--hero-dw, 256) * 1px + 16px) / 2 - var(--illust-in, 72px)),
-    calc(100% + var(--illust-bleed, 16px) - var(--illust-w, 112px))
-  );
-  z-index: 3;
-  width: var(--illust-w, 112px);
-  pointer-events: none;
-}
-
-.tm-landing-hero-illust-img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.tm-landing-float {
-  position: absolute;
-  z-index: 4;
-}
-
-/* 390: 에셋이 오른쪽 위를 쓰므로 카드는 둘 다 아래로 — a 는 탭바, b 는 추천 매치 아래 빈 줄 위 */
-.tm-landing-float[data-pos='a'] {
-  left: 0;
-  bottom: 4%;
-}
-
-.tm-landing-float[data-pos='b'] {
-  right: 0;
-  bottom: 16%;
-}
-
-.tm-landing-float-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 168px;
-  padding: 8px 12px 8px 8px;
-  border-radius: var(--radius-container);
-  background: var(--card-surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-dropdown);
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--text-strong);
-}
-
-.tm-landing-float-card small {
-  display: block;
-  font-size: var(--font-size-micro);
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.tm-landing-float-ic {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-control);
-}
-
-.tm-landing-float-ic[data-tone='green'] {
-  background: var(--green50);
-  color: var(--green700);
-}
-
-.tm-landing-float-ic[data-tone='red'] {
-  background: var(--red50);
-  color: var(--red700);
-}
-
-/* 사실 스트립 — 숫자를 싣지 않는다(page.test.tsx 계약). dl 순서는 dt → dd 지만 값을 위에 보인다 */
-.tm-landing-hero-facts {
-  width: 100%;
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-radius: var(--radius-field);
-  background: var(--card-surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-}
-
-.tm-landing-fact {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 12px 8px;
-  text-align: center;
-}
-
-.tm-landing-fact + .tm-landing-fact {
-  border-left: 1px solid var(--border);
-}
-
-.tm-landing-fact dd {
-  order: -1;
-  margin: 0;
-  font-size: var(--font-size-body-sm);
-  font-weight: 800;
-  line-height: 1.35;
-  color: var(--text-strong);
-  text-wrap: balance;
-}
-
-.tm-landing-fact dt {
-  font-size: var(--font-size-caption);
-  color: var(--text-muted);
-}
-
 /* ── 폰 목업 ──
  * 안쪽(.lpm-vp)은 실제 앱 폭 375px 로 그리고 통째로 축소한다. --dw/--dh 는 단위 없는 px 값. */
 .tm-landing-device {
@@ -478,17 +299,6 @@ html:has(.tm-landing) {
   border-radius: var(--radius-hero);
   background: var(--static-ink);
   box-shadow: var(--shadow-modal);
-}
-
-.tm-landing-device[data-size='stage'] {
-  --dw: 228;
-  --dh: 464;
-}
-
-.tm-landing-device[data-size='mini'] {
-  --dw: 280;
-  --dh: 380;
-  margin: 0 auto;
 }
 
 .tm-landing-device-screen {
@@ -1114,48 +924,6 @@ html:has(.tm-landing) {
   color: var(--blue700);
 }
 
-.lpm-bracket {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.lpm-bracket .ln {
-  fill: none;
-  stroke: var(--grey300);
-  stroke-width: 2;
-}
-
-.lpm-bracket .win {
-  fill: none;
-  stroke: var(--blue500);
-  stroke-width: 2.5;
-  stroke-dasharray: 220;
-  stroke-dashoffset: 0;
-}
-
-.lpm-bracket rect {
-  fill: var(--card-surface);
-  stroke: var(--border);
-}
-
-.lpm-bracket rect.champ {
-  fill: var(--blue50);
-  stroke: var(--blue500);
-}
-
-.lpm-bracket text {
-  font-family: var(--font);
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  fill: var(--text-strong);
-}
-
-.lpm-bracket text.s {
-  font-weight: 800;
-  fill: var(--text-muted);
-}
-
 .lpm-fixture {
   padding: 12px 16px;
   border-radius: var(--radius-container);
@@ -1202,7 +970,7 @@ html:has(.tm-landing) {
   font-variant-numeric: tabular-nums;
 }
 
-/* 라이브 스코어 — 서버 HTML 은 골이 들어간 최종 장면 */
+/* 라이브 스코어 */
 .lpm-live {
   padding: 16px;
   text-align: center;
@@ -1294,10 +1062,6 @@ html:has(.tm-landing) {
   font-size: var(--font-size-label);
   font-weight: 500;
   color: var(--text-muted);
-}
-
-.lpm-event[data-state='pending'] {
-  display: none;
 }
 
 /* 선수 카드 — 색은 실제 카드의 골드 티어 토큰(.tm-player-card[data-tier='gold'])을 쓴다 */
@@ -1407,660 +1171,7 @@ html:has(.tm-landing) {
   letter-spacing: 0.02em;
 }
 
-/* ── 왜 팀밋: 예전엔 / 이제는 ── */
-.tm-landing-ba-switch {
-  display: inline-grid;
-  grid-auto-flow: column;
-  gap: 4px;
-  margin-bottom: 20px;
-  padding: 4px;
-  border-radius: var(--radius-field);
-  background: var(--grey100);
-}
-
-.tm-landing-ba-option {
-  min-width: 88px;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  font-size: var(--font-size-body-sm);
-  font-weight: 700;
-  color: var(--text);
-  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
-}
-
-.tm-landing-ba-option[aria-pressed='true'] {
-  background: var(--bg);
-  color: var(--blue700);
-  font-weight: 800;
-  box-shadow: inset 0 0 0 1px var(--blue700), var(--shadow-card);
-}
-
-.tm-landing-pains {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-pain {
-  display: grid;
-  align-content: start;
-  gap: 16px;
-  padding: 24px 20px;
-  border-radius: var(--radius-hero);
-  border: 1px solid var(--border);
-  background: var(--card-surface-muted);
-}
-
-.tm-landing-pain-before {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.tm-landing-pain-label {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  color: var(--text);
-}
-
-/* 여러 줄로 감겨도 이어서 그어지도록 인라인 배경으로 취소선을 긋는다 */
-.tm-landing-pain-strike {
-  background: linear-gradient(var(--red500), var(--red500)) 0 58% / 100% 2px no-repeat;
-}
-
-.tm-landing-pain-after {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 0;
-  font-size: var(--font-size-body-lg);
-  font-weight: 800;
-  line-height: 1.45;
-  letter-spacing: -0.02em;
-  color: var(--text-strong);
-}
-
-.tm-landing-pain-check {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  margin-top: 1px;
-  border-radius: var(--radius-chip);
-  background: var(--blue500);
-  color: var(--static-white);
-}
-
-/* "예전엔" 보기: 예전 문장을 크게, 취소선 없이 */
-.tm-landing-ba[data-view='before'] .tm-landing-pain-after {
-  display: none;
-}
-
-.tm-landing-ba[data-view='before'] .tm-landing-pain-before {
-  font-size: var(--font-size-body-lg);
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.tm-landing-ba[data-view='before'] .tm-landing-pain-strike {
-  background-size: 0% 2px;
-}
-
-/* 역할별 목적지 — 탭 없이 서버가 그리는 링크 셋 */
-.tm-landing-roles {
-  margin-top: 36px;
-}
-
-.tm-landing-roles-title {
-  margin: 0 0 12px;
-  font-size: var(--font-size-body);
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.tm-landing-role-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-role-link {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  column-gap: 12px;
-  min-height: 64px;
-  padding: 12px 16px 12px 20px;
-  border-radius: var(--radius-field);
-  border: 1px solid var(--border);
-  background: var(--card-surface);
-  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
-}
-
-.tm-landing-role-who {
-  grid-column: 1;
-  font-size: var(--font-size-label);
-  color: var(--text);
-}
-
-.tm-landing-role-label {
-  grid-column: 1;
-  font-size: var(--font-size-body-lg);
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.tm-landing-role-arrow {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  color: var(--blue500);
-  transition: transform var(--duration-base) var(--ease-out);
-}
-
-@media (hover: hover) {
-  .tm-landing-role-link:hover {
-    border-color: var(--blue500);
-    background: var(--blue50);
-  }
-
-  .tm-landing-role-link:hover .tm-landing-role-arrow {
-    transform: translateX(3px);
-  }
-
-  .tm-landing-ba-option:hover {
-    color: var(--text-strong);
-  }
-}
-
-/* ── 제품 투어 ──
- * 모바일: sticky 폰을 끄고 스텝마다 인라인 미니 화면. 768+(높이 600+): 왼쪽 스텝 / 오른쪽 sticky 폰. */
-.tm-landing-tour {
-  position: relative;
-}
-
-.tm-landing-tour-stage {
-  display: none;
-}
-
-.tm-landing-tour-steps {
-  display: grid;
-  gap: 56px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-tour-num {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: var(--font-size-label);
-  font-weight: 800;
-  color: var(--blue700);
-}
-
-.tm-landing-tour-num b {
-  min-width: 28px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0 4px;
-  border-radius: var(--radius-tight);
-  background: var(--blue50);
-  font-variant-numeric: tabular-nums;
-}
-
-.tm-landing-tour-title {
-  margin: 12px 0 0;
-  font-size: var(--font-size-heading);
-  font-weight: 800;
-  line-height: 1.32;
-  letter-spacing: -0.03em;
-  color: var(--text-strong);
-}
-
-.tm-landing-tour-body {
-  margin: 12px 0 0;
-  font-size: var(--font-size-body);
-  line-height: 1.65;
-  color: var(--text-muted);
-}
-
-.tm-landing-tour-points {
-  display: grid;
-  gap: 8px;
-  margin: 16px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-tour-points li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: var(--font-size-body-sm);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.tm-landing-tour-points svg {
-  flex: none;
-  margin-top: 2px;
-  color: var(--blue500);
-}
-
-.tm-landing-tour-mini {
-  margin-top: 24px;
-  padding: 20px 0;
-  border-radius: var(--radius-hero);
-  background: var(--tint-blue);
-}
-
-.tm-landing-tour-dots {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-tour-dots li {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--grey300);
-  transition: height var(--duration-slow) var(--ease-standard), background-color var(--duration-slow) var(--ease-standard);
-}
-
-.tm-landing-tour-dots li[data-on='true'] {
-  height: 28px;
-  background: var(--blue500);
-}
-
-/* ── 경기 밖에서도: 벤토 ── */
-.tm-landing-bento {
-  display: grid;
-  gap: 12px;
-}
-
-.tm-landing-bento-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 248px;
-  padding: 24px 20px;
-  overflow: hidden;
-  border-radius: var(--radius-hero);
-  border: 1px solid var(--border);
-  background: var(--card-surface-muted);
-}
-
-.tm-landing-bento-card h3 {
-  margin: 0;
-  font-size: var(--font-size-subhead);
-  font-weight: 800;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
-  color: var(--text-strong);
-}
-
-.tm-landing-bento-card p {
-  margin: 0;
-  font-size: var(--font-size-body-sm);
-  line-height: 1.6;
-  color: var(--text);
-}
-
-.tm-landing-bento-vis {
-  margin-top: auto;
-  padding-top: 16px;
-}
-
-.tm-landing-noti {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-noti li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px 12px 12px;
-  border-radius: var(--radius-container);
-  border: 1px solid var(--border);
-  background: var(--card-surface);
-  box-shadow: var(--shadow-card);
-}
-
-.tm-landing-noti li[data-extra] {
-  display: none;
-}
-
-.tm-landing-noti-app {
-  flex: none;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-}
-
-.tm-landing-noti-text {
-  font-size: var(--font-size-body-sm);
-  font-weight: 700;
-  line-height: 1.4;
-  color: var(--text-strong);
-}
-
-.tm-landing-noti-text small {
-  display: block;
-  font-size: var(--font-size-caption);
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.tm-landing-noti-time {
-  align-self: flex-start;
-  margin-left: auto;
-  font-size: var(--font-size-caption);
-  white-space: nowrap;
-  color: var(--text-muted);
-}
-
-.tm-landing-rate {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-rate li {
-  display: grid;
-  grid-template-columns: 64px 1fr;
-  align-items: center;
-  gap: 12px;
-  font-size: var(--font-size-label);
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.tm-landing-rate-track {
-  height: 8px;
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: var(--grey200);
-}
-
-.tm-landing-rate-track i {
-  display: block;
-  width: 78%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--blue500);
-  transform-origin: 0 50%;
-}
-
-.tm-landing-rate li[data-level='top'] .tm-landing-rate-track i {
-  width: 92%;
-}
-
-.tm-landing-flow {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-flow li {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  font-size: var(--font-size-body-sm);
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.tm-landing-flow li + li::before {
-  content: '';
-  position: absolute;
-  left: 13px;
-  top: -8px;
-  width: 2px;
-  height: 16px;
-  background: var(--blue500);
-}
-
-.tm-landing-flow-node {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-circle);
-  background: var(--blue500);
-  color: var(--static-white);
-}
-
-.tm-landing-homescreen {
-  display: grid;
-  grid-template-columns: repeat(4, 52px);
-  justify-content: center;
-  gap: 16px;
-  padding: 20px;
-  border-radius: var(--radius-hero);
-  background: linear-gradient(160deg, var(--blue100), var(--blue50));
-}
-
-.tm-landing-homescreen i {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--radius-field);
-  background: color-mix(in srgb, var(--card-surface) 70%, transparent);
-}
-
-.tm-landing-homescreen-me {
-  overflow: hidden;
-  border-radius: var(--radius-field);
-  box-shadow: var(--shadow-dropdown);
-}
-
-/* ── 종목 ── */
-.tm-landing-sports {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tm-landing-sport {
-  display: grid;
-  gap: 2px;
-  padding: 12px 12px 20px;
-  overflow: hidden;
-  border-radius: var(--radius-hero);
-  border: 1px solid var(--border);
-  background: var(--card-surface-muted);
-}
-
-.tm-landing-sport-img {
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-}
-
-.tm-landing-sport-img img {
-  width: 88%;
-  height: auto;
-  transition: transform var(--duration-slower) var(--ease-out);
-}
-
-.tm-landing-sport h3 {
-  margin: 0;
-  font-size: var(--font-size-body-lg);
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.tm-landing-sport p {
-  margin: 0;
-  font-size: var(--font-size-label);
-  color: var(--text);
-}
-
-@media (hover: hover) {
-  .tm-landing-sport:hover .tm-landing-sport-img img {
-    transform: translateY(-4px) scale(1.04) rotate(-2deg);
-  }
-}
-
-/* ── 이용 방법 ── */
-.tm-landing-how {
-  display: grid;
-  align-items: center;
-  gap: 28px;
-}
-
-.tm-landing-steps {
-  position: relative;
-  display: grid;
-  gap: 24px;
-  margin: 0;
-  padding: 0 0 0 4px;
-  list-style: none;
-}
-
-/* 세로 진행선: 회색 트랙 위에 파란 선이 위에서 아래로 그려진다(최종 상태 = 다 그려짐) */
-.tm-landing-steps::before,
-.tm-landing-steps::after {
-  content: '';
-  position: absolute;
-  left: 21px;
-  top: 20px;
-  bottom: 20px;
-  width: 2px;
-}
-
-.tm-landing-steps::before {
-  background: var(--grey200);
-}
-
-.tm-landing-steps::after {
-  background: var(--blue500);
-  transform-origin: 50% 0;
-}
-
-.tm-landing-step {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 36px 1fr;
-  gap: 16px;
-}
-
-.tm-landing-step-num {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-circle);
-  background: var(--static-blue);
-  box-shadow: 0 0 0 4px var(--bg);
-  font-size: var(--font-size-body-sm);
-  font-weight: 800;
-  color: var(--static-white);
-}
-
-.tm-landing-step h3 {
-  margin: 4px 0 0;
-  font-size: var(--font-size-body-lg);
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.tm-landing-step p {
-  margin: 4px 0 0;
-  font-size: var(--font-size-body-sm);
-  line-height: 1.6;
-  color: var(--text-muted);
-}
-
-.tm-landing-how-graphic {
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  border-radius: var(--radius-hero);
-  background: var(--grey50);
-}
-
-.tm-landing-how-graphic img {
-  width: min(240px, 72%);
-  height: auto;
-}
-
-/* ── CTA 배너 + 푸터: 테마와 무관하게 늘 어두운 지면(--static-ink) ── */
-.tm-landing-cta-banner {
-  position: relative;
-  overflow: clip;
-  padding: 72px 0;
-  text-align: center;
-  background: var(--static-ink);
-  color: var(--static-white);
-}
-
-.tm-landing-cta-banner::before {
-  content: '';
-  position: absolute;
-  top: -260px;
-  right: -180px;
-  width: 520px;
-  height: 520px;
-  border-radius: var(--radius-circle);
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--blue500) 32%, transparent), transparent);
-  pointer-events: none;
-}
-
-.tm-landing-cta-banner .tm-landing-section-inner {
-  position: relative;
-}
-
-.tm-landing-cta-heading {
-  margin: 0;
-  font-size: 28px;
-  line-height: 1.3;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--static-white);
-}
-
-.tm-landing-cta-sub {
-  margin: 12px 0 0;
-  font-size: var(--font-size-body);
-  color: var(--overlay-white-72);
-}
-
-.tm-landing-cta-banner .tm-landing-hero-actions {
-  justify-content: center;
-}
-
-/* ── 모바일 하단 고정 CTA 바(<768). 히어로 CTA·마지막 배너·푸터가 보이면 숨는다 ── */
+/* ── 모바일 하단 고정 CTA 바(<768). 히어로 CTA·마지막 CTA·푸터가 보이면 숨는다 ── */
 .tm-landing-mobile-cta {
   position: fixed;
   left: 0;
@@ -2084,13 +1195,6 @@ html:has(.tm-landing) {
   transition: transform var(--duration-slow) var(--ease-out), visibility 0s linear 0s;
 }
 
-/* 투어: 지금 폰에 떠 있는 스텝은 번호 배지를 채운다(흐리게 하면 설명 대비가 무너진다).
-   흰 글씨라 --blue500(3.71:1)이 아니라 테마와 무관한 --static-blue(5.41:1)를 깐다. */
-.tm-landing-tour[data-sync='on'] .tm-landing-tour-step[data-on='true'] .tm-landing-tour-num b {
-  background: var(--static-blue);
-  color: var(--static-white);
-}
-
 /* ── 모션 ── */
 @keyframes tmLandingRise {
   from { opacity: 0; transform: translateY(20px); }
@@ -2099,22 +1203,6 @@ html:has(.tm-landing) {
 @keyframes tmLandingDeviceIn {
   from { opacity: 0; transform: translateY(40px) rotate(-2deg) scale(0.96); }
   to { opacity: 1; transform: none; }
-}
-@keyframes tmLandingIllustIn {
-  from { opacity: 0; transform: translate(-24px, 24px) scale(0.6) rotate(-12deg); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes tmLandingToastIn {
-  from { opacity: 0; transform: translateY(16px) scale(0.94); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes tmLandingFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-@keyframes tmLandingPulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green500) 50%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 8px transparent; }
 }
 @keyframes tmLandingBlink {
   50% { opacity: 0.25; }
@@ -2143,30 +1231,14 @@ html:has(.tm-landing) {
 /* 히어로 첫 등장 — JS 가 켜진 환경(scripting)에서만. 지원하지 않거나 스크립트가 없으면 그냥 보인다 */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   .tm-landing-hero-eyebrow,
-  .tm-landing-hero-line,
   .tm-landing-hero-sub,
   .tm-landing-hero-actions,
   .tm-landing-hero-disclaimer {
     animation: tmLandingRise 800ms var(--ease-out) both;
   }
-  .tm-landing-hero-line:nth-child(1) { animation-delay: 80ms; }
-  .tm-landing-hero-line:nth-child(2) { animation-delay: 180ms; }
   .tm-landing-hero-sub { animation-delay: 320ms; }
   .tm-landing-hero-actions { animation-delay: 420ms; }
   .tm-landing-hero-disclaimer { animation-delay: 500ms; }
-  .tm-landing-hero-graphic .tm-landing-device {
-    animation: tmLandingDeviceIn 1000ms var(--ease-out) 240ms both;
-  }
-  /* 폰(240ms~) → 에셋이 폰 모서리에서 튀어나오고(680ms~) → 카드 두 장(1000·1400ms) */
-  .tm-landing-hero-illust-img {
-    animation: tmLandingIllustIn 800ms var(--ease-spring) 680ms both;
-  }
-  .tm-landing-float-card {
-    animation: tmLandingToastIn 700ms var(--ease-out) 1000ms both;
-  }
-  .tm-landing-float[data-pos='b'] .tm-landing-float-card {
-    animation-delay: 1400ms;
-  }
 }
 
 /* 반복 모션 — 5초를 넘으므로 멈추기 버튼과 뷰포트 밖 정지를 함께 건다.
@@ -2179,13 +1251,8 @@ html:has(.tm-landing) {
   --tm-landing-play: paused;
 }
 
-.tm-landing[data-motion='on'] .tm-landing-float[data-pos='a'] { animation: tmLandingFloat 7s ease-in-out 1.6s infinite; animation-play-state: var(--tm-landing-play, running); }
-.tm-landing[data-motion='on'] .tm-landing-float[data-pos='b'] { animation: tmLandingFloat 8s ease-in-out 2s infinite; animation-play-state: var(--tm-landing-play, running); }
-.tm-landing[data-motion='on'] .tm-landing-hero-illust { animation: tmLandingFloat 6s ease-in-out 1.5s infinite; animation-play-state: var(--tm-landing-play, running); }
-.tm-landing[data-motion='on'] .tm-landing-hero-eyebrow-dot { animation: tmLandingPulse 2.4s var(--ease-standard) infinite; animation-play-state: var(--tm-landing-play, running); }
 .tm-landing[data-motion='on'] .lpm-badge[data-tone='live']::before { animation: tmLandingBlink 1.2s steps(2, jump-none) infinite; animation-play-state: var(--tm-landing-play, running); }
 .tm-landing[data-motion='on'] .lpm-pcard-face::after { animation: tmCardSweep 5.6s ease-in-out infinite; animation-play-state: var(--tm-landing-play, running); }
-.tm-landing[data-motion='on'] .tm-landing-how-graphic img { animation: tmLandingFloat 7s ease-in-out infinite; animation-play-state: var(--tm-landing-play, running); }
 
 /* 스크롤 reveal — 컨트롤러가 보이는 순간 .is-in 을 붙인다(1회) */
 .tm-landing[data-motion='on'] [data-reveal] {
@@ -2198,95 +1265,12 @@ html:has(.tm-landing) {
   transform: translateY(24px);
 }
 
-.tm-landing[data-motion='on'] [data-reveal='scale']:not(.is-in) {
-  transform: translateY(16px) scale(0.96);
-}
-
-/* 취소선이 그어진다 — "예전엔" 보기로 바꾸면 거꾸로 지워진다 */
-.tm-landing[data-motion='on'] .tm-landing-pain-strike {
-  transition: background-size 700ms var(--ease-out) 450ms;
-}
-
-.tm-landing[data-motion='on'] .tm-landing-pain:not(.is-in) .tm-landing-pain-strike {
-  background-size: 0% 2px;
-}
-
-/* 벤토: 알림 순차 도착 · 평가 막대 채움 · 결과 확정 단계 점등 · 홈 화면 아이콘 팝 */
-.tm-landing[data-motion='on'] .tm-landing-noti li {
-  transition: opacity 500ms var(--ease-standard), transform 600ms var(--ease-out);
-}
-
-.tm-landing[data-motion='on'] .tm-landing-bento-card:not(.is-in) .tm-landing-noti li {
-  opacity: 0;
-  transform: translateY(12px) scale(0.98);
-}
-
-.tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(2) { transition-delay: 350ms; }
-.tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(3) { transition-delay: 700ms; }
-.tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(4) { transition-delay: 1050ms; }
-.tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(5) { transition-delay: 1400ms; }
-
-.tm-landing[data-motion='on'] .tm-landing-rate-track i {
-  transition: transform 1000ms var(--ease-out) 200ms;
-}
-
-.tm-landing[data-motion='on'] .tm-landing-bento-card:not(.is-in) .tm-landing-rate-track i {
-  transform: scaleX(0);
-}
-
-.tm-landing[data-motion='on'] .tm-landing-rate li:nth-child(2) .tm-landing-rate-track i { transition-delay: 350ms; }
-.tm-landing[data-motion='on'] .tm-landing-rate li:nth-child(3) .tm-landing-rate-track i { transition-delay: 500ms; }
-
-.tm-landing[data-motion='on'] .tm-landing-flow-node {
-  transition: background-color var(--duration-slow) var(--ease-standard);
-}
-
-.tm-landing[data-motion='on'] .tm-landing-bento-card:not(.is-in) .tm-landing-flow-node {
-  background: var(--grey300);
-}
-
-.tm-landing[data-motion='on'] .tm-landing-flow li:nth-child(1) .tm-landing-flow-node { transition-delay: 300ms; }
-.tm-landing[data-motion='on'] .tm-landing-flow li:nth-child(2) .tm-landing-flow-node { transition-delay: 600ms; }
-.tm-landing[data-motion='on'] .tm-landing-flow li:nth-child(3) .tm-landing-flow-node { transition-delay: 900ms; }
-.tm-landing[data-motion='on'] .tm-landing-flow li:nth-child(4) .tm-landing-flow-node { transition-delay: 1200ms; }
-
-.tm-landing[data-motion='on'] .tm-landing-bento-card.is-in .tm-landing-homescreen-me {
-  animation: tmLandingPop 700ms var(--ease-spring) 400ms both;
-}
-
-/* 이용 방법: 세로 진행선이 위에서 아래로 */
-.tm-landing[data-motion='on'] .tm-landing-steps::after {
-  transition: transform 1400ms var(--ease-out) 200ms;
-}
-
-.tm-landing[data-motion='on'] .tm-landing-steps:not(.is-in)::after {
-  transform: scaleY(0);
-}
-
 /* 목업 화면 장면 — 화면이 켜지고 그 구역이 보일 때 재생된다(다시 보이면 다시 재생) */
 .tm-landing[data-motion='on'] [data-loop='on'] .lpm-screen[data-on='true'] .lpm-bar i {
   animation: tmLandingGrow 900ms var(--ease-out) 200ms both;
 }
 
-.tm-landing[data-motion='on'] .lpm-bracket .win {
-  stroke-dashoffset: 220;
-  transition: stroke-dashoffset 1100ms var(--ease-out) 350ms;
-}
-
-.tm-landing[data-motion='on'] [data-loop='on'] .lpm-screen[data-on='true'] .lpm-bracket .win {
-  stroke-dashoffset: 0;
-}
-
-.tm-landing[data-motion='on'] .lpm-live-score b.is-bump {
-  color: var(--blue500);
-  animation: tmLandingBump 600ms var(--ease-spring);
-}
-
-.tm-landing[data-motion='on'] .lpm-event[data-state='shown'] {
-  animation: tmLandingRowIn 520ms var(--ease-out) both;
-}
-
-/* ─── 태블릿 (768+) — 히어로·투어 좌우 분할로 예전 "오른쪽 공백"을 없앤다 ─── */
+/* ─── 태블릿 (768+) ─── */
 @media (min-width: 768px) {
   .tm-landing-nav-inner { padding: 0 24px 0 32px; }
   .tm-landing-nav-login,
@@ -2299,95 +1283,17 @@ html:has(.tm-landing) {
   .tm-landing-section-sub { font-size: var(--font-size-body-lg); }
 
   .tm-landing-hero { padding: 48px 0 72px; }
-  .tm-landing-hero-grid {
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    align-items: center;
-    gap: 24px;
-  }
   .tm-landing-hero-heading { font-size: 38px; }
   .tm-landing-hero-actions { grid-auto-flow: column; justify-content: start; }
-  .tm-landing-hero-graphic {
-    --hero-dw: 232;
-    --hero-dh: 470;
-    --illust-w: 120px;
-    --illust-top: -20px;
-    --illust-bleed: 28px;
-  }
-  .tm-landing-float-card { max-width: 200px; }
-  .tm-landing-float[data-pos='a'] { left: -8px; bottom: 16%; }
-  .tm-landing-float[data-pos='b'] { right: -8px; top: 28%; bottom: auto; }
-
-  .tm-landing-pains,
-  .tm-landing-role-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-  .tm-landing-tour-title { font-size: 28px; }
-
-  .tm-landing-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tm-landing-bento-card[data-size='tall'],
-  .tm-landing-bento-card[data-size='wide'] { grid-column: span 2; }
-
-  .tm-landing-sports { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .tm-landing-how { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; }
-
-  .tm-landing-cta-banner { padding: 96px 0; }
-  .tm-landing-cta-heading { font-size: 36px; }
 
   .tm-landing-mobile-cta { display: none; }
-}
-
-/* 768–1023: aside 칸이 좁아 사실 스트립을 세 칸 대신 행으로 쌓는다 */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .tm-landing-hero-facts { grid-template-columns: 1fr; }
-  .tm-landing-fact {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
-    padding: 12px 16px;
-    text-align: left;
-  }
-  .tm-landing-fact + .tm-landing-fact {
-    border-left: 0;
-    border-top: 1px solid var(--border);
-  }
-}
-
-/* ─── 투어 sticky 폰(768+ 이면서 폰이 세로로 다 들어갈 때) ───
- * 폰(464+16px)이 top 84 에서 잘리지 않는 높이만 sticky 로 둔다. 그보다 낮은 창(가로 폰 등)은
- * 모바일처럼 스텝별 미니 화면을 쓴다. 이 조건은 landing-motion.ts TOUR_STAGE_QUERY 와 같아야 한다. */
-@media (min-width: 768px) and (min-height: 600px) {
-  .tm-landing-tour {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 40px;
-  }
-  .tm-landing-tour-stage {
-    position: sticky;
-    top: max(84px, calc(50vh - 240px));
-    grid-column: 2;
-    grid-row: 1;
-    align-self: start;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-  }
-  .tm-landing-tour-steps { grid-column: 1; grid-row: 1; gap: 0; }
-  .tm-landing-tour-step {
-    min-height: 78vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 28px 0;
-  }
-  .tm-landing-tour-mini { display: none; }
 }
 
 /* ─── 데스크톱 (1024+) ─── */
 @media (min-width: 1024px) {
   .tm-landing-nav-inner { height: 64px; }
   .tm-landing-nav-links { display: flex; gap: 4px; }
-  /* 페이지 안 앵커와 다른 페이지로 가는 링크를 세로 선으로 가른다 */
+  /* 서비스 링크와 이용 안내 드롭다운을 세로 선으로 가른다 */
   .tm-landing-nav-site {
     display: flex;
     align-items: center;
@@ -2402,51 +1308,8 @@ html:has(.tm-landing) {
   .tm-landing-section-title { font-size: 42px; line-height: 1.24; }
 
   .tm-landing-hero { padding: 64px 0 104px; }
-  .tm-landing-hero-grid { gap: 48px; }
   .tm-landing-hero-heading { font-size: 52px; line-height: 1.14; }
   .tm-landing-hero-sub { font-size: var(--font-size-subhead); }
-  .tm-landing-hero-graphic {
-    --hero-dw: 282;
-    --hero-dh: 580;
-    --illust-w: 176px;
-    --illust-in: 96px;
-    --illust-top: -28px;
-  }
-  .tm-landing-float-card { max-width: 240px; font-size: var(--font-size-body-sm); }
-  .tm-landing-float[data-pos='a'] { left: -4%; }
-  .tm-landing-hero-facts { max-width: 480px; }
-
-  .tm-landing-pain { padding: 28px; }
-
-  .tm-landing-tour-title { font-size: 36px; line-height: 1.25; }
-  .tm-landing-tour-body { font-size: var(--font-size-body-lg); }
-  .tm-landing-tour-points li { font-size: var(--font-size-body); }
-
-  .tm-landing-bento {
-    grid-template-columns: 1.25fr 1fr 1fr;
-    grid-auto-rows: minmax(272px, auto);
-  }
-  .tm-landing-bento-card { padding: 28px; }
-  .tm-landing-bento-card[data-size='tall'] { grid-column: 1; grid-row: span 2; }
-  .tm-landing-noti li[data-extra] { display: flex; }
-  .tm-landing-bento-card[data-size='wide'] { grid-column: 2 / span 2; }
-
-  .tm-landing-sport { padding: 16px 16px 24px; }
-  .tm-landing-how { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 80px; }
-
-  .tm-landing-cta-banner { padding: 120px 0; }
-  .tm-landing-cta-heading { font-size: 44px; }
-}
-
-@media (min-width: 1024px) and (min-height: 600px) {
-  .tm-landing-tour { column-gap: 64px; }
-  .tm-landing-tour-step { min-height: 92vh; }
-}
-
-/* 큰 투어 폰(612+16px)은 84+628=712px 가 들어가는 창에서만 — 1366×768 노트북은 작은 폰을 쓴다 */
-@media (min-width: 1024px) and (min-height: 760px) {
-  .tm-landing-tour-stage { top: max(84px, calc(50vh - 316px)); }
-  .tm-landing-tour-stage .tm-landing-device { --dw: 300; --dh: 612; }
 }
 
 /* ─── 와이드 (1440+) ─── */

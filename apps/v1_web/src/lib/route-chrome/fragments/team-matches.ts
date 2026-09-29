@@ -76,13 +76,16 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
   // /team-matches/:id/lineup 등에 걸리지 않고 아예 매치되는 표 행이 없어 resolveRouteChrome이
   // null을 반환한다 — 앱 셸(뒤로가기·홈·알림·하단 내비) 전체가 빠지는 것도 그래서다
   // (2026-09-26 alpha 감사, /team-matches/new/team·/matches/new와 같은 결함 클래스).
+  // backHref는 반드시 `?view=detail`을 실어야 한다 — 그게 없으면 참가자 + live/official 조건에서
+  // 매치 상세(TeamMatchRecordEntry)가 이 화면으로 즉시 되튕겨, `?from=` 없이(직접 진입·공유 링크)
+  // 도착한 사용자가 뒤로가기를 눌러도 아무 반응이 없어 보인다(2026-09-29 실사고).
   {
     pattern: '/team-matches/:id/record',
     chrome: {
       title: '경기 기록',
       activeTab: 'matches',
       bottomNav: false,
-      backHref: (p) => `/team-matches/${p.id}`,
+      backHref: (p) => `/team-matches/${p.id}?view=detail`,
       desktopHead: true,
     },
   },

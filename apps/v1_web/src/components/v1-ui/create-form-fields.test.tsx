@@ -85,6 +85,21 @@ describe('CreateField', () => {
     expect(button.closest('label')).toBeNull();
     expect(container.querySelector('label')?.tagName).toBe('LABEL');
   });
+
+  // max 가 없으면 네이티브 date 입력이 연도를 6자리까지 받아 `202609-03-01` 같은 값이 나간다.
+  it('날짜 입력만 연도 4자리 상한(max)을 걸고, 다른 입력에는 max 를 붙이지 않는다', () => {
+    render(
+      <>
+        <CreateField id="field-date" label="날짜" type="date" value="" onChange={() => {}} />
+        <CreateField id="field-time" label="시간" type="time" value="" onChange={() => {}} />
+        <CreateField id="field-name" label="이름" value="" onChange={() => {}} />
+      </>,
+    );
+
+    expect(screen.getByLabelText('날짜')).toHaveAttribute('max', '9999-12-31');
+    expect(screen.getByLabelText('시간')).not.toHaveAttribute('max');
+    expect(screen.getByLabelText('이름')).not.toHaveAttribute('max');
+  });
 });
 
 /** 실제 부모(team-matches-page.tsx ConditionFields)처럼 onChange가 values를 갱신하는

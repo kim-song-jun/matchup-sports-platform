@@ -330,6 +330,16 @@ describe('경기 명단 관리 — 결장 기간 시트 등록·취소 뒤 상�
     await dialog.findByText(message);
   }
 
+  it('시작일·마지막 날 입력은 연도를 4자리로 제한하면서 마지막 날 min(시작일)을 유지한다', async () => {
+    const dialog = await openSheet();
+
+    expect(dialog.getByLabelText('시작일')).toHaveAttribute('max', '9999-12-31');
+    const end = dialog.getByLabelText('마지막 날');
+    expect(end).toHaveAttribute('max', '9999-12-31');
+    fireEvent.change(dialog.getByLabelText('시작일'), { target: { value: '2026-10-03' } });
+    expect(end).toHaveAttribute('min', '2026-10-03');
+  });
+
   it('등록에 성공하면 사유·날짜가 초기값으로 돌아와 방금 등록한 기간이 폼에 남지 않는다', async () => {
     const dialog = await openSheet();
     const defaultStart = (dialog.getByLabelText('시작일') as HTMLInputElement).value;

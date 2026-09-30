@@ -16,6 +16,9 @@
 export const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** `<input type="date">` 의 max. 없으면 브라우저가 연도를 6자리까지 받아 `202609-03-01` 같은 값이 만들어진다. */
+export const DATE_INPUT_MAX = '9999-12-31';
+
 /** UTC 인스턴트를 KST 달력 날짜 `'YYYY-MM-DD'` 로. */
 export function toKstDateString(instant: Date): string {
   return new Date(instant.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAdminErrorLogs } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
+import { DATE_INPUT_MAX } from '@/lib/kst-calendar';
 import {
   AdminDataTable,
   AdminEmpty,
@@ -312,6 +313,7 @@ export function ErrorLogsClient() {
             시작일
             <input
               type="date"
+              max={DATE_INPUT_MAX}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
               className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
@@ -321,6 +323,7 @@ export function ErrorLogsClient() {
             종료일
             <input
               type="date"
+              max={DATE_INPUT_MAX}
               value={to}
               onChange={(e) => setTo(e.target.value)}
               className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"

@@ -13,7 +13,7 @@ import {
   type V1TeamRosterMatrix,
 } from '@/hooks/use-v1-game-roster';
 import { formatExclusiveEndRangeShort } from '@/lib/date-utils';
-import { DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
+import { DATE_INPUT_MAX, DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import {
   MEMBER_UNAVAILABILITY_REASON_OPTIONS,
@@ -199,6 +199,7 @@ export function MemberUnavailabilitySheet({
                 id={startId}
                 className="tm-input"
                 type="date"
+                max={DATE_INPUT_MAX}
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
               />
@@ -213,6 +214,7 @@ export function MemberUnavailabilitySheet({
                 type="date"
                 value={endDate}
                 min={startDate || undefined}
+                max={DATE_INPUT_MAX}
                 onChange={(event) => setEndDate(event.target.value)}
               />
             </div>

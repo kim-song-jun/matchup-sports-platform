@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangleIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Card } from '@/components/v1-ui/primitives';
+import { DATE_INPUT_MAX } from '@/lib/kst-calendar';
 
 /**
  * matches-page.tsx / team-matches-page.tsx 생성 위저드에서 공유하는 필드 컴포넌트.
@@ -86,6 +87,7 @@ export function CreateField({
               id={fieldId}
               className="tm-create-native-input"
               type={type}
+              max={type === 'date' ? DATE_INPUT_MAX : undefined}
               lang={isDateLike ? 'ko' : undefined}
               value={value ?? ''}
               placeholder={placeholder}

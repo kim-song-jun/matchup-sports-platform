@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthFrame } from './auth-page';
 
 vi.mock('next/link', () => ({
@@ -60,5 +60,45 @@ describe('AuthFrame 데스크톱 스테이지', () => {
     const { container } = render(<AuthFrame topTitle="약관 동의">본문</AuthFrame>);
     expect(container.querySelector('aside.tm-auth-stage')).toBeNull();
     expect(container.querySelector('.tm-auth-frame')).not.toHaveClass('tm-auth-frame-staged');
+  });
+});
+
+// 안내 줄이 붙어 하단 버튼 영역이 커지면 스크롤 영역이 그 위에서 끝나야 마지막 입력칸이 안 가려진다.
+// jsdom 에는 레이아웃이 없어 높이와 ResizeObserver 만 대신한다(브라우저 API).
+describe('AuthFrame 하단 고정 버튼 높이', () => {
+  const CTA_HEIGHT_VAR = '--tm-auth-cta-height';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('버튼 영역의 실제 높이를 프레임에 알리고, 크기가 바뀌면 갱신하고, 떠나면 지운다', () => {
+    let height = 91;
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => height);
+    const resizeCallbacks: Array<() => void> = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resizeCallbacks.push(callback); }
+      observe() {}
+      disconnect() {}
+    });
+
+    const { container, unmount } = render(<AuthFrame fixedAction={<button type="button">계속</button>}>본문</AuthFrame>);
+    const frame = container.querySelector<HTMLElement>('.tm-auth-frame')!;
+    expect(frame.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('91px');
+
+    // 안내 줄이 붙어 영역이 커진다.
+    height = 119;
+    act(() => resizeCallbacks.forEach((callback) => callback()));
+    expect(frame.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('119px');
+
+    unmount();
+    expect(frame.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('');
+  });
+
+  it('고정 버튼이 없는 화면은 높이 변수를 만들지 않는다', () => {
+    const { container } = render(<AuthFrame topTitle="약관">본문</AuthFrame>);
+
+    expect(container.querySelector<HTMLElement>('.tm-auth-frame')!.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('');
   });
 });

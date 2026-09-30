@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { AuthBackButton } from './auth-back-button';
+import { AuthFixedCta } from './auth-fixed-cta';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { AppleLoginButton } from './apple-login-button';
@@ -234,7 +235,7 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
       <main className={`tm-auth-scroll ${fixedAction ? 'tm-auth-scroll-with-cta' : ''} ${topTitle || hasBack || skipHref ? '' : 'tm-auth-scroll-full'}`}>
         {children}
       </main>
-      {fixedAction ? <div className="tm-auth-fixed-cta">{fixedAction}</div> : null}
+      {fixedAction ? <AuthFixedCta>{fixedAction}</AuthFixedCta> : null}
       </div>
     </div>
   );

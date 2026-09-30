@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, FormEvent, ReactNode } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
-import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
+import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
+import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
+import { usePhoneVerificationRequests } from '@/components/auth/phone-verification/use-phone-verification-requests';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
@@ -25,11 +27,13 @@ import {
   readSignupTermsDocumentIds,
 } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
+import { useDuplicateCheck, type DuplicateCheckStatus } from './use-duplicate-check';
 import {
   formatBirthDate,
   formatPhone,
   getSignupProfileIssue,
   isCompleteSignupProfile,
+  isPlausibleEmail,
   isSignupAgeEligible,
   normalizeSeparatedDigits,
   normalizeSignupDisplayName,
@@ -37,22 +41,21 @@ import {
 } from './signup-profile-validation';
 
 type WizardStep = 'account' | 'verify' | 'profile';
-type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
 
 const STEP_ORDER: WizardStep[] = ['account', 'verify', 'profile'];
 
-const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
+const STEP_COPY: Record<WizardStep, { title: string; sub?: string }> = {
   account: {
     title: '가입 정보를\n확인해 주세요',
-    sub: '닉네임과 이메일은 먼저 중복 확인이 필요해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
+    sub: '닉네임과 이메일은 입력하면 중복을 바로 확인해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
   },
   verify: {
-    title: '본인인증을\n먼저 해주세요',
-    sub: '이 단계만 통과하면 나머지는 실패 없이 끝나요. 인증이 끝나면 자동으로 다음으로 넘어가요.',
+    title: '휴대폰 번호를 인증해 주세요',
+    sub: '인증이 끝나면 자동으로 다음 단계로 넘어가요.',
   },
+  // 부제가 없다: 생년월일 칸까지 첫 화면 안에 들어오게 하려고 제목만 둔다.
   profile: {
-    title: '프로필을\n완성해 주세요',
-    sub: <>대회 참여 시 이름과 생년월일이 <span style={{ whiteSpace: 'nowrap' }}>본인 확인에 쓰여요.</span></>,
+    title: '프로필을 완성해 주세요',
   },
 };
 
@@ -93,7 +96,6 @@ export function SignupClient() {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
-  const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [realName, setRealName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -102,12 +104,22 @@ export function SignupClient() {
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [acceptedTermsDocumentIds, setAcceptedTermsDocumentIds] = useState<string[]>([]);
   const [termsReady, setTermsReady] = useState(false);
-  const [nicknameError, setNicknameError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
-  const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
+  const nicknameHelperId = useId();
+  const emailHelperId = useId();
+  const normalizedNickname = nickname.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+  const nicknameCheck = useDuplicateCheck({
+    value: normalizedNickname,
+    isCheckable: (value) => value.length >= 2,
+    check: checkNickname.mutateAsync,
+  });
+  const emailCheck = useDuplicateCheck({
+    value: normalizedEmail,
+    isCheckable: isPlausibleEmail,
+    check: checkEmail.mutateAsync,
+  });
   /** 인증 완료 → 다음 단계 자동 이동 타이머. 언마운트 시 정리해 사라진 화면에 setState 하지 않는다. */
   const advanceTimerRef = useRef<number | null>(null);
 
@@ -117,6 +129,26 @@ export function SignupClient() {
     },
     [],
   );
+
+  /**
+   * 인증이 끝나면 사용자가 버튼을 한 번 더 누르지 않아도 다음 단계로 넘어간다.
+   * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
+   * 완료 상태를 잠깐 보여준 뒤 이동한다.
+   */
+  const handlePhoneVerified = (token?: string) => {
+    setPhoneProofToken(token ?? null);
+    setProfileError(null);
+    if (!token) return;
+    if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = window.setTimeout(() => {
+      advanceTimerRef.current = null;
+      setStep('profile');
+    }, VERIFY_ADVANCE_DELAY_MS);
+  };
+
+  const otpIdPrefix = useId();
+  const phoneRequests = usePhoneVerificationRequests({ mode: 'public', phone: phoneDigits, onVerified: handlePhoneVerified });
+  const otp = useOtpVerification(phoneRequests);
 
   useEffect(() => {
     const documentIds = readSignupTermsDocumentIds();
@@ -132,63 +164,25 @@ export function SignupClient() {
 
   const stepIndex = STEP_ORDER.indexOf(step);
   const copy = STEP_COPY[step];
-  const normalizedNickname = nickname.trim();
-  const normalizedEmail = email.trim().toLowerCase();
-  const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname;
-  const emailVerified = emailCheck.status === 'available' && emailCheck.value === normalizedEmail;
+  const nicknameError = duplicateFieldError(nicknameCheck.status, {
+    taken: '이미 사용 중인 닉네임이에요.',
+    invalid: '닉네임은 2자 이상 입력해 주세요.',
+  });
+  const emailError = duplicateFieldError(emailCheck.status, {
+    taken: '이미 가입된 이메일이에요.',
+    invalid: '이메일 형식을 확인해 주세요.',
+  });
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
-  const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
+  const accountReady = nicknameCheck.verified && emailCheck.verified && passwordLongEnough && passwordMatch;
   // normalizeSeparatedDigits 는 하이픈·공백만 걷어내므로 'ROLLING10ab' 같은 값도 길이 11이 된다.
   // 길이만 보고 인증을 열면 문자가 섞인 값으로 유료 SMS 발송을 시도하게 되므로 숫자 11자리만 허용한다.
   const isSendablePhone = /^\d{11}$/.test(phoneDigits);
   const profileDraft = { displayName: realName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
   const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
-
-  const runNicknameCheck = () => {
-    setNicknameError(null);
-    setError(null);
-    if (normalizedNickname.length < 2) {
-      setNicknameError('닉네임은 2자 이상 입력해 주세요.');
-      setNicknameCheck({ status: 'idle', value: '' });
-      return;
-    }
-
-    checkNickname.mutate(normalizedNickname, {
-      onSuccess: (result) => {
-        setNicknameCheck({ status: result.available ? 'available' : 'taken', value: normalizedNickname });
-        setNicknameError(result.available ? null : '이미 사용 중인 닉네임이에요.');
-      },
-      onError: () => {
-        setNicknameCheck({ status: 'error', value: normalizedNickname });
-        setNicknameError('중복 확인에 실패했어요. 다시 시도해 주세요.');
-      },
-    });
-  };
-
-  const runEmailCheck = () => {
-    setEmailError(null);
-    setError(null);
-    if (!normalizedEmail.includes('@')) {
-      setEmailError('이메일 형식을 확인해 주세요.');
-      setEmailCheck({ status: 'idle', value: '' });
-      return;
-    }
-
-    checkEmail.mutate(normalizedEmail, {
-      onSuccess: (result) => {
-        setEmailCheck({ status: result.available ? 'available' : 'taken', value: normalizedEmail });
-        setEmailError(result.available ? null : '이미 가입된 이메일이에요.');
-      },
-      onError: () => {
-        setEmailCheck({ status: 'error', value: normalizedEmail });
-        setEmailError('중복 확인에 실패했어요. 다시 시도해 주세요.');
-      },
-    });
-  };
 
   const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -209,7 +203,6 @@ export function SignupClient() {
     reader.onload = () => {
       setProfileImageUrl(typeof reader.result === 'string' ? reader.result : '');
       setProfileImageFile(file);
-      setProfileImageName(file.name);
       setUploadingProfileImage(false);
     };
     reader.onerror = () => {
@@ -223,15 +216,11 @@ export function SignupClient() {
   const goBack = () => {
     setError(null);
     setProfileError(null);
-    // 인증 직후 900ms 안에 '이전'을 누르면, 예약된 자동 이동이 나중에 발동해 사용자가
+    // 인증 직후 900ms 안에 뒤로가기를 누르면, 예약된 자동 이동이 나중에 발동해 사용자가
     // 되돌아온 단계를 덮어쓴다. 단계를 바꾸기 전에 예약을 취소한다.
     if (advanceTimerRef.current !== null) {
       window.clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = null;
-    }
-    if (step === 'account') {
-      router.push('/terms?mode=signup');
-      return;
     }
     // 인증 단계로 되돌아와도 이미 받은 증명은 유지한다 — 되돌아왔다는 이유로 재인증을 시키면
     // 유료 SMS 를 한 번 더 쓰게 되고 쿨다운에도 걸린다.
@@ -250,22 +239,6 @@ export function SignupClient() {
     setError(null);
     setProfileError(null);
     setStep('profile');
-  };
-
-  /**
-   * 인증이 끝나면 사용자가 버튼을 한 번 더 누르지 않아도 다음 단계로 넘어간다.
-   * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
-   * 완료 상태를 잠깐 보여준 뒤 이동한다.
-   */
-  const handlePhoneVerified = (token?: string) => {
-    setPhoneProofToken(token ?? null);
-    setProfileError(null);
-    if (!token) return;
-    if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
-    advanceTimerRef.current = window.setTimeout(() => {
-      advanceTimerRef.current = null;
-      setStep('profile');
-    }, VERIFY_ADVANCE_DELAY_MS);
   };
 
   const submitAccount = async () => {
@@ -330,18 +303,16 @@ export function SignupClient() {
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
         if (nextError.code === 'NICKNAME_CONFLICT') {
-          setNicknameCheck({ status: 'taken', value: normalizedNickname });
+          nicknameCheck.markTaken(normalizedNickname);
           setStep('account');
-          setNicknameError('이미 사용 중인 닉네임이에요.');
           return;
         }
         if (nextError.code === 'PHONE_CONFLICT') {
           setProfileError('이미 가입된 휴대폰 번호예요.');
           return;
         }
-        setEmailCheck({ status: 'taken', value: normalizedEmail });
+        emailCheck.markTaken(normalizedEmail);
         setStep('account');
-        setEmailError('이미 가입된 이메일이에요.');
         return;
       }
       if (nextError instanceof V1ApiError && nextError.code === 'PHONE_NOT_VERIFIED') {
@@ -364,35 +335,54 @@ export function SignupClient() {
     step === 'account'
       ? {
           label: '본인인증 하기',
-          disabled: checkNickname.isPending || checkEmail.isPending || !accountReady,
+          disabled: !accountReady,
+          loading: false,
           onClick: goVerify,
         }
       : step === 'verify'
-      ? {
-          // 인증 성공 시 자동으로 넘어가므로 이 버튼은 되돌아온 사용자를 위한 경로다.
-          label: '다음',
-          disabled: !phoneProofToken,
-          onClick: goProfile,
-        }
+      ? phoneProofToken
+        ? {
+            // 인증 성공 시 자동으로 넘어가므로 이 버튼은 되돌아온 사용자를 위한 경로다.
+            label: '다음',
+            disabled: false,
+            loading: false,
+            onClick: goProfile,
+          }
+        : otp.phase === 'idle' || otp.expired
+        ? {
+            label: otp.expired ? '인증번호 다시 받기' : '인증번호 받기',
+            disabled: !isSendablePhone || phoneRequests.issuing,
+            loading: phoneRequests.issuing,
+            onClick: () => { void otp.requestCode(); },
+          }
+        : {
+            label: '인증번호 확인',
+            disabled: otp.code.length !== OTP_CODE_LENGTH || phoneRequests.verifying,
+            loading: phoneRequests.verifying,
+            onClick: () => { void otp.submitCode(); },
+          }
       : {
           label: register.isPending ? '가입하는 중...' : '가입하고 계속',
           disabled: profileBlocked,
+          loading: false,
           onClick: () => { void submitAccount(); },
         };
 
   const disabledHint: string | null = primary.disabled
     ? step === 'account'
-      ? !nicknameVerified
-        ? '닉네임 중복 확인 후 다음으로 넘어갈 수 있어요.'
-        : !emailVerified
-          ? '이메일 중복 확인 후 다음으로 넘어갈 수 있어요.'
+      ? !nicknameCheck.verified
+        ? duplicateHint('닉네임', nicknameCheck.waiting)
+        : !emailCheck.verified
+          ? duplicateHint('이메일', emailCheck.waiting)
           : !passwordLongEnough
             ? '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
       : step === 'verify'
-        ? isSendablePhone
-          ? '인증번호 확인까지 마치면 다음으로 넘어가요.'
-          : '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
+        ? !isSendablePhone
+          ? '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
+          : otp.phase === 'sent' && !otp.expired && otp.code.length !== OTP_CODE_LENGTH
+            ? '인증번호 6자리를 입력해 주세요.'
+            : null
         : profileIssue
           ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue]
           : uploadingProfileImage
@@ -403,12 +393,11 @@ export function SignupClient() {
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
-      // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
-      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms?mode=signup'
-      // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어
-      // /signup → /terms → /login 으로 로그인 화면까지 이어진다.
+      // 뒤로가기는 상단 하나뿐이고 목적지는 늘 바로 앞 단계다: 첫 단계는 약관(거기서 다시 /login
+      // 으로 나갈 수 있다), 이후 단계는 이전 입력 단계.
       topTitle="회원가입"
-      backHref="/terms?mode=signup"
+      backHref={step === 'account' ? '/terms?mode=signup' : undefined}
+      onBack={step === 'account' ? undefined : goBack}
       fixedAction={
         <>
           <button
@@ -417,6 +406,7 @@ export function SignupClient() {
             type="button"
             onClick={primary.onClick}
           >
+            {primary.loading ? <span className="tm-spinner" aria-hidden="true" /> : null}
             {primary.label}
           </button>
           {disabledHint ? (
@@ -444,16 +434,9 @@ export function SignupClient() {
             <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
           ))}
         </div>
-        {/* 첫 단계에서 goBack() 은 상단 뒤로가기와 똑같이 /terms 로 나간다 — 같은 동작을 두 번
-            보여주지 않도록, 이 인라인 버튼은 의미가 갈리는 두 번째 단계(프로필 → 계정)에서만 낸다. */}
-        {step !== 'account' ? (
-          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계">
-            <ChevronLeftIcon size={18} strokeWidth={2.2} />이전
-          </button>
-        ) : null}
-        <div className="tm-signup-hero">
+        <div className={`tm-signup-hero${copy.sub ? '' : ' tm-signup-hero-title-only'}`}>
           <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
-          <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
+          {copy.sub ? <p className="tm-text-body tm-auth-sub">{copy.sub}</p> : null}
         </div>
 
         {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
@@ -468,67 +451,35 @@ export function SignupClient() {
             <>
               <label className="tm-auth-field">
                 <span className="tm-text-label">닉네임<RequiredMark /></span>
-                <span className="tm-auth-field-with-action">
-                  <input
-                    className={`tm-input tm-auth-input ${nicknameError ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
-                    minLength={2}
-                    maxLength={40}
-                    autoFocus
-                    onChange={(event) => {
-                      setNickname(event.target.value);
-                      setNicknameCheck({ status: 'idle', value: '' });
-                      setNicknameError(null);
-                    }}
-                    placeholder="활동 닉네임"
-                    type="text"
-                    value={nickname}
-                    aria-invalid={nicknameError ? true : undefined}
-                    aria-describedby={nicknameError || nicknameVerified ? 'signup-nickname-helper' : undefined}
-                  />
-                  <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button">
-                    {checkNickname.isPending ? '확인 중' : '중복 확인'}
-                  </button>
-                </span>
-                {nicknameError || nicknameVerified ? (
-                  <span
-                    id="signup-nickname-helper"
-                    role={nicknameError ? 'alert' : undefined}
-                    className={`tm-text-caption tm-auth-field-helper ${nicknameError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-                  >
-                    {nicknameError ?? '사용 가능한 닉네임이에요.'}
-                  </span>
-                ) : null}
+                <input
+                  className={`tm-input tm-auth-input ${nicknameError ? 'tm-auth-input-error' : nicknameCheck.verified ? 'tm-auth-input-success' : ''}`}
+                  minLength={2}
+                  maxLength={40}
+                  autoFocus
+                  onChange={(event) => setNickname(event.target.value)}
+                  onBlur={nicknameCheck.onBlur}
+                  placeholder="활동 닉네임"
+                  type="text"
+                  value={nickname}
+                  aria-invalid={nicknameError ? true : undefined}
+                  aria-describedby={nicknameError || nicknameCheck.status === 'checking' || nicknameCheck.verified ? nicknameHelperId : undefined}
+                />
+                <DuplicateHelper id={nicknameHelperId} status={nicknameCheck.status} error={nicknameError} availableMessage="사용 가능한 닉네임이에요." />
               </label>
 
               <label className="tm-auth-field">
                 <span className="tm-text-label">이메일<RequiredMark /></span>
-                <span className="tm-auth-field-with-action">
-                  <input
-                    className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailVerified ? 'tm-auth-input-success' : ''}`}
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      setEmailCheck({ status: 'idle', value: '' });
-                      setEmailError(null);
-                    }}
-                    placeholder="예: name@email.com"
-                    type="email"
-                    value={email}
-                    aria-invalid={emailError ? true : undefined}
-                    aria-describedby={emailError || emailVerified ? 'signup-email-helper' : undefined}
-                  />
-                  <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button">
-                    {checkEmail.isPending ? '확인 중' : '중복 확인'}
-                  </button>
-                </span>
-                {emailError || emailVerified ? (
-                  <span
-                    id="signup-email-helper"
-                    role={emailError ? 'alert' : undefined}
-                    className={`tm-text-caption tm-auth-field-helper ${emailError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-                  >
-                    {emailError ?? '사용 가능한 이메일이에요.'}
-                  </span>
-                ) : null}
+                <input
+                  className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailCheck.verified ? 'tm-auth-input-success' : ''}`}
+                  onChange={(event) => setEmail(event.target.value)}
+                  onBlur={emailCheck.onBlur}
+                  placeholder="예: name@email.com"
+                  type="email"
+                  value={email}
+                  aria-invalid={emailError ? true : undefined}
+                  aria-describedby={emailError || emailCheck.status === 'checking' || emailCheck.verified ? emailHelperId : undefined}
+                />
+                <DuplicateHelper id={emailHelperId} status={emailCheck.status} error={emailError} availableMessage="사용 가능한 이메일이에요." />
               </label>
 
               <label className="tm-auth-field">
@@ -601,12 +552,17 @@ export function SignupClient() {
               </label>
 
               {isSendablePhone && !phoneProofToken ? (
-                <PhoneVerificationCard
-                  mode="public"
-                  phone={phoneDigits}
-                  onVerified={handlePhoneVerified}
-                  surface="inset"
-                />
+                <>
+                  {otp.phase === 'sent' ? (
+                    <OtpCodeInput idPrefix={otpIdPrefix} otp={otp} verifying={phoneRequests.verifying} />
+                  ) : null}
+                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} />
+                  {otp.phase === 'sent' ? (
+                    <div style={{ marginTop: -4 }}>
+                      <OtpRemainingRow idPrefix={otpIdPrefix} otp={otp} issuing={phoneRequests.issuing} />
+                    </div>
+                  ) : null}
+                </>
               ) : null}
 
               {phoneProofToken ? (
@@ -629,35 +585,37 @@ export function SignupClient() {
 
           {step === 'profile' ? (
             <>
-              <section className="tm-auth-profile-upload">
-                <label className="tm-auth-profile-preview-trigger" aria-label="프로필 사진 선택">
-                  <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-                    {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
-                  </div>
-                  {profileImageUrl ? null : (
-                    <span className="tm-auth-profile-preview-badge" aria-hidden="true">
-                      <Camera size={13} strokeWidth={2.4} />
+              <div className="tm-auth-profile-upload">
+                {/* 행 전체가 파일 선택 라벨이다 — 아바타·문구·버튼이 각자 같은 일을 하지 않는다. */}
+                <label className="tm-auth-profile-upload-main tm-pressable">
+                  <span className="tm-auth-profile-preview-trigger">
+                    <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
+                      {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
                     </span>
-                  )}
-                  <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
+                    {profileImageUrl ? null : (
+                      <span className="tm-auth-profile-preview-badge" aria-hidden="true">
+                        <Camera size={13} strokeWidth={2.4} />
+                      </span>
+                    )}
+                    <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
+                  </span>
+                  <span>
+                    <span className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택 입력</em></span>
+                    <span className="tm-text-caption tm-auth-profile-upload-hint">
+                      {uploadingProfileImage
+                        ? '사진을 읽고 있어요.'
+                        : profileImageUrl
+                          ? '눌러서 다른 사진으로 바꿀 수 있어요.'
+                          : '눌러서 사진을 올려요. 큰 사진은 자동으로 줄여요.'}
+                    </span>
+                  </span>
                 </label>
-                <div>
-                  <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
-                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
-                    <label className="tm-btn tm-btn-md tm-btn-neutral">
-                      {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
-                      <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
-                    </label>
-                    {profileImageUrl ? (
-                      <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageFile(null); setProfileImageName(''); }}>
-                        제거
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="tm-text-caption" style={{ marginTop: 8 }}>{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</div>
-                </div>
-              </section>
-
+                {profileImageUrl ? (
+                  <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageFile(null); }}>
+                    제거
+                  </button>
+                ) : null}
+              </div>
 
               <div className="tm-auth-field">
                 {/* radiogroup 은 label 로 감싸지지 않으므로 aria-labelledby 로 라벨을 직접 물린다 —
@@ -742,6 +700,41 @@ export function SignupClient() {
       </div>
     </AuthFrame>
   );
+}
+
+const DUPLICATE_CHECK_FAILED_MESSAGE = '중복 확인에 실패했어요. 다시 시도해 주세요.';
+
+function duplicateFieldError(
+  status: DuplicateCheckStatus,
+  messages: { taken: string; invalid: string },
+): string | null {
+  if (status === 'taken') return messages.taken;
+  if (status === 'invalid') return messages.invalid;
+  if (status === 'error') return DUPLICATE_CHECK_FAILED_MESSAGE;
+  return null;
+}
+
+/** 자동 확인이라 "결과를 기다리는 중"과 "다른 값을 넣어야 함"이 갈린다. */
+function duplicateHint(label: string, waiting: boolean) {
+  return waiting ? `${label}을 확인하고 있어요.` : `사용할 수 있는 ${label}을 입력해 주세요.`;
+}
+
+function DuplicateHelper({ id, status, error, availableMessage }: {
+  id: string;
+  status: DuplicateCheckStatus;
+  error: string | null;
+  availableMessage: string;
+}) {
+  if (error) {
+    return <span id={id} role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">{error}</span>;
+  }
+  if (status === 'checking') {
+    return <span id={id} role="status" className="tm-text-caption tm-auth-field-helper">확인하고 있어요.</span>;
+  }
+  if (status === 'available') {
+    return <span id={id} className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">{availableMessage}</span>;
+  }
+  return null;
 }
 
 function initials(value: string) {

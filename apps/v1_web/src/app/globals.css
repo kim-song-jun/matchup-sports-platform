@@ -850,8 +850,9 @@ button:disabled {
   top: 0;
 }
 
+/* 90px 는 안내 줄 없는 버튼 하나짜리 영역의 높이 — AuthFixedCta 가 실제 높이를 재서 덮어쓴다. */
 .tm-auth-scroll-with-cta {
-  bottom: 90px;
+  bottom: var(--tm-auth-cta-height, 90px);
 }
 
 .tm-auth-login {
@@ -1073,6 +1074,20 @@ button:disabled {
 
 .tm-auth-heading {
   margin-top: 12px;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* 한글은 어절 중간에서 끊기면 한 어절이 두 줄로 찢어진다 — 가입·온보딩 문구는 어절 단위로만 줄바꿈한다. */
+.tm-auth-heading,
+.tm-auth-sub,
+.tm-auth-agree-all,
+.tm-auth-agreement-main {
+  word-break: keep-all;
+}
+
+.tm-auth-sub {
+  text-wrap: pretty;
 }
 
 .tm-auth-stack {
@@ -1131,7 +1146,7 @@ button:disabled {
 }
 
 .tm-auth-segment {
-  min-height: 40px;
+  min-height: 44px;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -1171,15 +1186,26 @@ button:disabled {
   background: var(--grey50);
 }
 
+/* 사진 올리기 한 줄: 행 전체가 파일 선택 라벨이고, 사진을 고르면 옆에 제거 버튼이 붙는다. */
 .tm-auth-profile-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-auth-profile-upload-main {
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  padding: 16px;
-  border: 1px solid var(--grey200);
-  border-radius: var(--radius-container);
-  background: var(--grey50);
+  cursor: pointer;
+}
+
+.tm-auth-profile-upload-hint {
+  display: block;
+  margin-top: 4px;
 }
 
 /* 아바타를 감싸는 클릭 가능한 트리거 — 원형 미리보기를 눌러도 파일 선택이 열린다 */
@@ -1231,7 +1257,7 @@ button:disabled {
   border-radius: var(--radius-circle);
   background: var(--blue500);
   color: var(--static-white);
-  border: 2px solid var(--grey50);
+  border: 2px solid var(--bg);
 }
 
 .tm-auth-profile-upload-body {
@@ -1478,6 +1504,11 @@ button:disabled {
   justify-content: flex-start;
 }
 
+/* 완료 화면은 자식을 왼쪽 정렬로 쌓는다 — 카드 묶음은 폭 100% 로 늘려야 카드가 글 폭으로 오그라들지 않는다. */
+.tm-auth-complete > .tm-auth-stack {
+  width: 100%;
+}
+
 .tm-auth-step-card {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
@@ -1506,6 +1537,14 @@ button:disabled {
   margin-top: 8px;
   display: flex;
   justify-content: flex-end;
+}
+
+/* 온보딩 확인 단계의 알림 한 줄: 제목·설명은 왼쪽, 켜기 버튼은 오른쪽 끝. */
+.tm-onboarding-push-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .tm-auth-progress {
@@ -6551,13 +6590,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--blue500);
 }
 
-.tm-signup-back {
-  align-self: flex-start;
-  margin-bottom: 16px;
-  padding-inline: 0;
-  color: var(--text-muted);
-}
-
 .tm-signup-hero {
   margin-bottom: 32px;
 }
@@ -6570,6 +6602,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-signup-hero .tm-auth-sub {
   margin-top: 12px;
+}
+
+/* 제목만 있는 단계는 아래 입력이 바로 이어지므로 간격을 좁힌다. */
+.tm-signup-hero-title-only {
+  margin-bottom: 20px;
 }
 
 @media (min-width: 1024px) {

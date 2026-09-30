@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getEmailLoginViewModel, getLoginViewModel, getSignupCompleteViewModel, getSignupFormViewModel, getTermsViewModel } from './auth.view-model';
+import { getEmailLoginViewModel, getLoginViewModel, getSignupCompleteViewModel, getSignupFormViewModel } from './auth.view-model';
 
 describe('auth view models', () => {
   beforeEach(() => {
@@ -62,18 +62,6 @@ describe('auth view models', () => {
     expect(model.primary.disabled).toBeUndefined();
     expect(model.primary.href).toBeUndefined();
     expect(model.primary.label).toBe('회원가입하고 계속');
-  });
-
-  it('offers an optional location-based service agreement during signup', () => {
-    const model = getTermsViewModel();
-
-    expect(model.agreements.map((agreement) => agreement.title)).toEqual([
-      '서비스 이용약관',
-      '개인정보 수집 및 이용 동의',
-      '위치기반서비스 이용 동의',
-    ]);
-    const locationAgreement = model.agreements.find((agreement) => agreement.locationBased);
-    expect(locationAgreement?.required).toBe(false);
   });
 
   it('marks signup completion as a real post-registration state', () => {

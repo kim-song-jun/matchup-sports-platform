@@ -18,6 +18,11 @@ export const SIGNUP_PROFILE_ERROR_MESSAGES: Readonly<Record<SignupProfileField, 
   gender: '성별을 선택해 주세요.',
 };
 
+/** 자동 중복 확인을 보낼 만한 최소 이메일 형식 — `kim@` 같은 입력으로 확인 요청(분당 한도)을 쓰지 않게 한다. */
+export function isPlausibleEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 export function getSignupProfileIssue(profile: SignupProfileDraft): SignupProfileField | null {
   if (!normalizeSignupDisplayName(profile.displayName)) return 'displayName';
   if (!/^\d{11}$/.test(profile.phone)) return 'phone';

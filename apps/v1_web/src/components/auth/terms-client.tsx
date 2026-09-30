@@ -239,12 +239,12 @@ export function TermsClient() {
       }
     >
       <div className="tm-auth-body" style={{ paddingBottom: 112 }}>
-        <h1 className="tm-text-heading tm-auth-heading" style={{ overflowWrap: 'break-word', textWrap: 'balance' }}>
+        <h1 className="tm-text-heading tm-auth-heading">
           {isRenewalMode ? '새 필수 약관을 확인해 주세요' : model.title}
         </h1>
-        <p className="tm-text-body tm-auth-sub" style={{ whiteSpace: 'pre-line' }}>
+        <p className="tm-text-body tm-auth-sub">
           {isRenewalMode
-            ? '기존에 동의한 약관은 그대로 유지돼요. 새로 추가되거나 재동의가 필요한 항목만 확인하면 됩니다.'
+            ? '기존에 동의한 약관은 그대로 유지돼요. 새로 추가되거나 재동의가 필요한 항목만 확인하면 돼요.'
             : model.sub}
         </p>
         {currentTerms.isPending ? (
@@ -272,7 +272,7 @@ export function TermsClient() {
           <TermsCheck checked={allChecked} />
           <span style={{ display: 'grid', gap: 3 }}>
             <span className="tm-text-body-lg">전체 동의</span>
-            <span className="tm-text-caption">선택 항목을 포함한 모든 약관에 동의합니다. 선택 항목은 따로 해제할 수 있어요.</span>
+            <span className="tm-text-caption">선택 항목을 포함해 모두 동의해요. 선택 항목은 따로 해제할 수 있어요.</span>
           </span>
         </button>
         <div className="tm-auth-stack">
@@ -284,6 +284,7 @@ export function TermsClient() {
               <div key={item.documentId} className="tm-card tm-auth-agreement-card">
                 <div className="tm-auth-agreement">
                   <button
+                    aria-label={`${item.title} 체크`}
                     aria-pressed={checked}
                     className="tm-auth-check-button tm-pressable"
                     disabled={item.accepted}
@@ -1079,6 +1080,11 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
   );
 }
 
+// 체크 표시는 동의했을 때만 그린다 — 미동의 원 안에 회색 ✓ 가 남으면 이미 동의한 것으로 읽힌다.
 function TermsCheck({ checked }: { checked: boolean }) {
-  return <span className={`tm-auth-check ${checked ? 'tm-auth-check-on' : ''}`}>✓</span>;
+  return (
+    <span className={`tm-auth-check ${checked ? 'tm-auth-check-on' : ''}`} aria-hidden="true">
+      {checked ? '✓' : null}
+    </span>
+  );
 }

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { v1Get, v1Put } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
-import type { PublicUserRecordsResponse } from '@/components/public-game-records/types';
+import { ownerRecordsResponse } from '@/components/public-game-records/user-records.fixtures';
 import { useRecordConsentNudge } from './use-record-consent-nudge';
 
 vi.mock('@/lib/api-client', async () => {
@@ -21,36 +21,12 @@ function consentResponse(overrides: Record<string, unknown> = {}) {
   return { granted: false, effectiveAt: null, hasResponded: false, pendingRecordCount: 1, ...overrides };
 }
 
-function recordsResponse(): PublicUserRecordsResponse {
-  const zero = { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 };
-  return {
-    userId: USER,
-    nickname: '골잡이',
-    viewerIsOwner: true,
-    consentGranted: false,
-    summary: {
-      appearances: 1, goals: 1, assists: 1, yellowCards: 0, redCards: 0, mvpCount: 0, matchMvpCount: 0, tournamentAwardCount: 0,
-      byType: { league: { ...zero, appearances: 1, goals: 1, assists: 1 }, tournament: zero, friendly: zero },
-    },
-    tournamentAwards: [],
-    items: [
-      {
-        id: 'record-1', gameId: 'game-1', teamMatchId: 'match-1', type: 'league', matchType: 'team_match', tournamentId: null,
-        tournamentTitle: null, leagueId: 'league-1', leagueTitle: '마포 주말 리그', round: null, teamId: 'team-1', teamName: '마포 FC',
-        opponentTeamId: 'team-2', opponentTeamName: '합정 유나이티드', result: 'WON', goals: 1, assists: 1, cards: { yellow: 0, red: 0 },
-        minutesPlayed: 90, started: true, goalkeeper: false, mvp: false, officialAt: '2026-09-30T01:10:00.000Z',
-      },
-    ],
-    nextCursor: null,
-  };
-}
-
 /** 기본: 동의 응답 한 번(고정) + 내 기록 한 번. 테스트가 필요하면 함수로 바꿔 끼운다. */
 function stubNetwork(options: { consent?: () => unknown; records?: () => Promise<unknown> } = {}) {
   v1GetMock.mockImplementation(async (path: string) => {
     if (path === '/me/record-consent') return (options.consent ?? (() => consentResponse()))() as never;
     if (path.startsWith('/users/') && path.endsWith('/records')) {
-      return (options.records ? await options.records() : recordsResponse()) as never;
+      return (options.records ? await options.records() : ownerRecordsResponse()) as never;
     }
     throw new Error(`예상하지 못한 요청: ${path}`);
   });

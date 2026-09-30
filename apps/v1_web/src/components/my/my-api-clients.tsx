@@ -81,6 +81,7 @@ import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinAp
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
+import { RecordConsentFirstAnswer } from './record-consent-first-answer';
 import { WithdrawalErrorCard } from './withdrawal-error-card';
 import { WITHDRAWAL_GRACE_NOTICE } from './withdrawal-guidance';
 
@@ -1655,14 +1656,29 @@ export function RecordConsentSettingsPageClient() {
     );
   }
 
+  // 응답이 오기 전에는 토글을 그리지 않는다 -- 처음 답하는 화면으로 바뀔 사람에게 OFF 토글이 먼저
+  // 깜빡였다가 사라지게 된다.
+  if (consent.isLoading) {
+    return (
+      <div className="tm-my-shell">
+        <div className="tm-skeleton" style={{ height: 96, borderRadius: 'var(--radius-control)' }} />
+      </div>
+    );
+  }
+
   const granted = Boolean(consent.data?.granted);
-  const toggle = () => {
+  const answer = (nextGranted: boolean) => {
     setToggleError(false);
     update.mutate(
-      { granted: !granted, policyHash: RECORD_CONSENT_POLICY_HASH },
+      { granted: nextGranted, policyHash: RECORD_CONSENT_POLICY_HASH },
       { onError: () => setToggleError(true) },
     );
   };
+  const toggle = () => answer(!granted);
+  // 아직 한 번도 답하지 않았고 공개를 기다리는 기록이 있으면 토글 대신 "무엇이 공개되는지 보고 답하는"
+  // 화면이다. 기록이 없으면 보여 줄 게 없으니 예전 토글 화면 그대로다.
+  const pendingCount = consent.data?.pendingRecordCount ?? 0;
+  const firstAnswer = consent.data?.hasResponded === false && pendingCount > 0;
 
   return (
       <div className="tm-my-shell tm-content-enter">
@@ -1674,62 +1690,73 @@ export function RecordConsentSettingsPageClient() {
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
           <RecordConsentTournamentContext />
-          <section>
-            <div className="tm-my-section-label">공개</div>
-            {toggleError ? (
-              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-              </Card>
-            ) : null}
-            <div className="tm-card" style={{ padding: 0 }}>
-              <button
-                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                onClick={toggle}
-                type="button"
-                disabled={consent.isLoading || update.isPending}
-                role="switch"
-                aria-checked={granted}
-                aria-label="경기 기록 공개"
-                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="tm-text-body">경기 기록 공개</div>
-                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
-                    {update.isPending
-                      ? '저장하는 중이에요…'
-                      : granted
-                        ? '지금 공개돼 있어요. 끄면 바로 모두 비공개로 돌아가요.'
-                        : '지금은 비공개예요.'}
-                  </div>
+          {firstAnswer ? (
+            <RecordConsentFirstAnswer
+              pendingCount={pendingCount}
+              saving={update.isPending}
+              error={toggleError}
+              onAnswer={answer}
+            />
+          ) : (
+            <>
+              <section>
+                <div className="tm-my-section-label">공개</div>
+                {toggleError ? (
+                  <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                    <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                    <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+                  </Card>
+                ) : null}
+                <div className="tm-card" style={{ padding: 0 }}>
+                  <button
+                    className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                    onClick={toggle}
+                    type="button"
+                    disabled={consent.isLoading || update.isPending}
+                    role="switch"
+                    aria-checked={granted}
+                    aria-label="경기 기록 공개"
+                    style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="tm-text-body">경기 기록 공개</div>
+                      <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                        {update.isPending
+                          ? '저장하는 중이에요…'
+                          : granted
+                            ? '지금 공개돼 있어요. 끄면 바로 모두 비공개로 돌아가요.'
+                            : '지금은 비공개예요.'}
+                      </div>
+                    </div>
+                    <span
+                      className="tm-text-caption"
+                      style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
+                      aria-hidden="true"
+                    >
+                      {granted ? 'ON' : 'OFF'}
+                    </span>
+                    <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+                  </button>
                 </div>
-                <span
-                  className="tm-text-caption"
-                  style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
-                  aria-hidden="true"
-                >
-                  {granted ? 'ON' : 'OFF'}
-                </span>
-                <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-              </button>
-            </div>
-            {/* 이 각주는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
-                맥락 배너가, "지금 켜져 있는지"는 위 토글 서브텍스트가 각각 맡는다 --
-                셋이 같은 말을 반복하면(실측: 알림에서 들어온 화면에 "켜면 공개돼요"가
-                세 번 나왔다) 정작 무엇이 공개되는지는 아무도 말해주지 않는다. */}
-            <div className="tm-text-caption tm-my-settings-footnote">
-              내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
-              팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
-              {/* 소급 공개는 켜기 전에 반드시 알아야 하는 조건(사용자 명시 결정)이라
-                  여기 둔다 -- 토글 서브텍스트는 현재 상태만 말한다. */}
-              {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
-            </div>
-          </section>
-          {granted && consent.data?.effectiveAt ? (
-            <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
-              {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
-            </div>
-          ) : null}
+                {/* 이 각주는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
+                    맥락 배너가, "지금 켜져 있는지"는 위 토글 서브텍스트가 각각 맡는다 --
+                    셋이 같은 말을 반복하면(실측: 알림에서 들어온 화면에 "켜면 공개돼요"가
+                    세 번 나왔다) 정작 무엇이 공개되는지는 아무도 말해주지 않는다. */}
+                <div className="tm-text-caption tm-my-settings-footnote">
+                  내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
+                  팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
+                  {/* 소급 공개는 켜기 전에 반드시 알아야 하는 조건(사용자 명시 결정)이라
+                      여기 둔다 -- 토글 서브텍스트는 현재 상태만 말한다. */}
+                  {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
+                </div>
+              </section>
+              {granted && consent.data?.effectiveAt ? (
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
   );

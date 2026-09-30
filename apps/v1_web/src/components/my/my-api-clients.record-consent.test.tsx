@@ -112,6 +112,16 @@ describe('RecordConsentSettingsPageClient', () => {
     expect(screen.queryByRole('switch', { name: '경기 기록 공개' })).not.toBeInTheDocument();
   });
 
+  it('응답이 오기 전에는 OFF 토글을 그리지 않는다 (처음 답하는 화면으로 바뀔 때 깜빡이지 않게)', () => {
+    hooks.consent.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    renderWithClient(<RecordConsentSettingsPageClient />);
+
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByText('OFF')).not.toBeInTheDocument();
+  });
+
   it('데스크톱 뒤로가기는 ?from= 이 없으면 /my/settings 로 떨어진다', () => {
     hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
     hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });

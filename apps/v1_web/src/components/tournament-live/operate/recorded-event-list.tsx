@@ -77,6 +77,7 @@ export function RecordedEventList({
   onReverseSubstitution,
   resultOfficialized,
   disabled = false,
+  order = 'chronological',
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -101,6 +102,12 @@ export function RecordedEventList({
    * (호출부가 아직 반영 전이면) 기존 동작 그대로 항상 노출한다 — back-compat.
    */
   readonly resultOfficialized?: boolean;
+  /**
+   * 콘솔은 방금 한 일이 맨 위에 있어야 한다(`newest-first`) — 경기 중 방금 넣은 골의 어시스트를
+   * 이벤트가 쌓인 목록의 맨 아래에서 찾게 하지 않는다. 결과 검토·공개 화면은 경기 흐름대로 읽는
+   * 시간순(`chronological`, 기본값)을 유지한다. 순서는 서버가 준 `sequence` 순서를 뒤집기만 한다.
+   */
+  readonly order?: 'chronological' | 'newest-first';
 }) {
   if (events.length === 0) {
     return (
@@ -141,9 +148,11 @@ export function RecordedEventList({
     events.flatMap((event) => (typeof event.reversesEventId === 'string' ? [event.reversesEventId] : [])),
   );
 
+  const orderedEvents = order === 'newest-first' ? [...events].reverse() : events;
+
   return (
     <ul className="flex flex-col gap-2" aria-label="기록된 이벤트 목록">
-      {events.map((event) => {
+      {orderedEvents.map((event) => {
         const canAttachAssist =
           onAttachAssist !== undefined &&
           resultOfficialized !== true &&

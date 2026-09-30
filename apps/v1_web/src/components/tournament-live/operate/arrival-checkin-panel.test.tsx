@@ -231,4 +231,102 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
     expect(screen.getByRole('switch', { name: /홍길동/ })).toBeDisabled();
     expect(screen.getByRole('switch', { name: /김철수/ })).not.toBeDisabled();
   });
+  // Task 180 G6(F56) — 19명을 18번 누르던 검인을 팀 단위 한 번으로. 기본값(전원 미확인)은 그대로다.
+  describe('팀별 "전원 도착"', () => {
+    const TWO_SIDES = [side('side-home', '홈팀'), side('side-away', '원정팀')];
+
+    function twoTeamLineups(homeArrived: boolean) {
+      return [
+        lineup(
+          [
+            participant({ id: 'h-1', displayNameSnapshot: '홈1', arrivedAt: homeArrived ? '2026-08-23T01:00:00.000Z' : null }),
+            participant({ id: 'h-2', displayNameSnapshot: '홈2', arrivedAt: homeArrived ? '2026-08-23T01:00:00.000Z' : null }),
+          ],
+        ),
+        lineup(
+          [participant({ id: 'a-1', sideId: 'side-away', lineupId: 'lineup-away', displayNameSnapshot: '원정1' })],
+          { id: 'lineup-away', sideId: 'side-away' },
+        ),
+      ];
+    }
+
+    it('팀마다 버튼이 있고, 누르면 그 팀의 sideId 하나로만 호출한다', () => {
+      const onConfirmSide = vi.fn();
+      render(
+        <ArrivalCheckinPanel
+          sides={TWO_SIDES}
+          lineups={twoTeamLineups(false)}
+          onToggleArrival={vi.fn()}
+          onConfirmSide={onConfirmSide}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: '원정팀 전원 도착 확인' }));
+      expect(onConfirmSide).toHaveBeenCalledTimes(1);
+      expect(onConfirmSide).toHaveBeenCalledWith('side-away');
+      expect(screen.getByRole('button', { name: '홈팀 전원 도착 확인' })).toBeEnabled();
+    });
+
+    it('기본값은 전원 미확인이다 — 버튼을 누르기 전에는 아무도 도착으로 그려지지 않는다', () => {
+      render(
+        <ArrivalCheckinPanel
+          sides={TWO_SIDES}
+          lineups={twoTeamLineups(false)}
+          onToggleArrival={vi.fn()}
+          onConfirmSide={vi.fn()}
+        />,
+      );
+
+      for (const name of [/홈1/, /홈2/, /원정1/]) {
+        expect(screen.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'false');
+      }
+    });
+
+    it('이미 전원 도착한 팀은 버튼 대신 확인됨 표시만 보이고, 다른 팀 버튼은 그대로다', () => {
+      render(
+        <ArrivalCheckinPanel
+          sides={TWO_SIDES}
+          lineups={twoTeamLineups(true)}
+          onToggleArrival={vi.fn()}
+          onConfirmSide={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole('button', { name: '홈팀 전원 도착 확인' })).toBeNull();
+      expect(screen.getByText('전원 도착 확인됨')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '원정팀 전원 도착 확인' })).toBeInTheDocument();
+    });
+
+    it('보내는 중인 팀의 버튼만 잠그고, 권한이 없어 잠긴 콘솔에서는 전부 잠근다', () => {
+      const { rerender } = render(
+        <ArrivalCheckinPanel
+          sides={TWO_SIDES}
+          lineups={twoTeamLineups(false)}
+          onToggleArrival={vi.fn()}
+          onConfirmSide={vi.fn()}
+          pendingSideId="side-home"
+        />,
+      );
+      expect(screen.getByRole('button', { name: '홈팀 전원 도착 확인' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '원정팀 전원 도착 확인' })).toBeEnabled();
+
+      rerender(
+        <ArrivalCheckinPanel
+          sides={TWO_SIDES}
+          lineups={twoTeamLineups(false)}
+          onToggleArrival={vi.fn()}
+          onConfirmSide={vi.fn()}
+          disabled
+        />,
+      );
+      expect(screen.getByRole('button', { name: '홈팀 전원 도착 확인' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '원정팀 전원 도착 확인' })).toBeDisabled();
+    });
+
+    it('일괄 동작을 연결하지 않은 곳(onConfirmSide 없음)에는 버튼을 만들지 않는다', () => {
+      render(<ArrivalCheckinPanel sides={TWO_SIDES} lineups={twoTeamLineups(false)} onToggleArrival={vi.fn()} />);
+
+      expect(screen.queryByRole('button', { name: /전원 도착/ })).toBeNull();
+    });
+  });
 });

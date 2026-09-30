@@ -1011,3 +1011,73 @@ describe('GamesService.createFromSourceInTransaction — 대회 경로 회귀 �
     expect(state.linkEvents.every((event) => event.action === 'ROSTER_ASSERTED')).toBe(true);
   });
 });
+
+// Task 180 G6 — 어드민 "지금 할 일" 카드는 결과 단계와 별개로 경기가 뛰는 중인지를 알아야 한다.
+describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
+  const START = new Date('2026-09-30T01:10:00.000Z');
+
+  function fixtureRow(id: string, game: { state: string } | null) {
+    return {
+      id,
+      title: `${id} 제목`,
+      hostTeamId: 'team-a',
+      approvedApplicantTeamId: 'team-b',
+      startAt: START,
+      placeName: '장소',
+      placeAddress: null,
+      status: 'matched',
+      game: game === null ? null : { id: `game-${id}`, state: game.state, currentOfficialRevisionId: null, resultRevisions: [] },
+    };
+  }
+
+  async function detailWith(fixtures: ReturnType<typeof fixtureRow>[]) {
+    const prisma = {
+      v1TeamMatch: { findMany: jest.fn().mockResolvedValue(fixtures) },
+      v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const module = await Test.createTestingModule({
+      providers: [
+        LeagueMatchAdminService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: GamesService, useValue: {} },
+        { provide: AdminContextService, useValue: { getActiveAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }) } },
+        { provide: NotificationsService, useValue: {} },
+      ],
+    }).compile();
+    const service = module.get(LeagueMatchAdminService);
+    jest.spyOn(service as never, 'loadLeague' as never).mockResolvedValue({
+      id: 'league-1',
+      title: '리그',
+      status: 'in_progress',
+      sportId: 'sport-1',
+      registrations: [],
+      teams: [],
+      startsOn: START,
+      registrationDeadlineAt: null,
+      registrationOpen: false,
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
+    } as never);
+    return service.detail(adminUser, 'league-1');
+  }
+
+  it('경기의 진행 상태를 대진마다 그대로 내려준다 (진행 중과 시작 전을 구분한다)', async () => {
+    const result = await detailWith([
+      fixtureRow('live', { state: 'LIVE' }),
+      fixtureRow('scheduled', { state: 'SCHEDULED' }),
+      fixtureRow('ended', { state: 'ENDED' }),
+    ]);
+
+    expect(result.fixtures.map((fixture) => [fixture.teamMatchId, fixture.gameState])).toEqual([
+      ['live', 'LIVE'],
+      ['scheduled', 'SCHEDULED'],
+      ['ended', 'ENDED'],
+    ]);
+  });
+
+  it('경기가 아직 없는 대진은 null 이다 — 진행 중으로 지어내지 않는다', async () => {
+    const result = await detailWith([fixtureRow('no-game', null)]);
+
+    expect(result.fixtures[0].gameState).toBeNull();
+  });
+});

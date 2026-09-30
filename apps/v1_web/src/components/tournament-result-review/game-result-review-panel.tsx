@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   useGameResultRevisions,
@@ -21,6 +21,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
+import { ConsoleResultCard } from './console-result-card';
 import { ResultEditModal, type ResultEditSubmitInput } from './result-edit-modal';
 import {
   canActOnResultReview,
@@ -49,12 +50,22 @@ export function GameResultReviewPanel({
   correctionsHref,
   inline = false,
   onSaved,
+  variant = 'page',
+  confirmedFooter,
 }: {
   gameId: string;
   tournamentId?: string;
   correctionsHref?: string;
   inline?: boolean;
   onSaved?: () => void;
+  /**
+   * `console` 은 운영 콘솔이 경기 종료 직후 그 자리에 끼우는 압축판이다 — 스코어를 맨
+   * 위에 둔 확정 카드만 그리고, 세부 기록·처리 이력은 콘솔 자신의 화면이 이미 갖고 있다.
+   * 확정·재제출 로직은 `page` 와 같은 것을 그대로 쓴다.
+   */
+  variant?: 'page' | 'console';
+  /** `console` 에서 확정된 뒤 카드 옆에 이어 붙일 이동 링크(순위표·다음 경기). */
+  confirmedFooter?: ReactNode;
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
@@ -185,6 +196,96 @@ export function GameResultReviewPanel({
   const outcomeReason = toDisplayableOutcomeReason(outcomeSource?.outcomeReason);
   const outcomeNotice =
     outcomeReason !== null ? { reason: outcomeReason, note: outcomeSource?.outcomeNote?.trim() ?? '' } : null;
+  const resubmitModal = resubmitTarget ? (
+    <ResultEditModal
+      open
+      title="결과를 다시 제출할까요?"
+      message="점수와 참가자 기록을 확인하고 다시 제출해 주세요. 새로운 검토 절차가 시작돼요."
+      confirmLabel="다시 제출"
+      reasonLabel="재제출 사유"
+      base={{
+        score: resubmitTarget.score,
+        goalEvents: deriveEditableGoalEvents(
+          resubmitTarget.goalEvents,
+          eventsQuery.data?.events ?? [],
+        ),
+        participants: resubmitTarget.resultParticipants,
+        mvpParticipantId: resubmitTarget.mvpParticipantId,
+      }}
+      sides={game.sides}
+      lineups={lineupsQuery.data ?? []}
+      periods={game.periods}
+      // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --
+      // 그래서 같은 값을 내려준다: 폼이 기존 승부차기 점수를 이어서 보낼지 판정하고,
+      // 못 보내는 상태를 저장 전에 알린다(`game-result-correction-panel.tsx` 주석 참고).
+      isKnockoutFixture={game.isKnockoutFixture}
+      presentation={inline ? 'inline' : 'modal'}
+      submitting={supersedeAndSubmit.isPending}
+      errorMessage={
+        supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null
+      }
+      onCancel={() => {
+        setResubmitTarget(null);
+        setResubmitExpectedVersion(null);
+        supersedeAndSubmit.reset();
+      }}
+      onConfirm={(input: ResultEditSubmitInput) => {
+        if (resubmitExpectedVersion === null) return;
+        supersedeAndSubmit.mutate(
+          {
+            revisionId: resubmitTarget.id,
+            expectedVersion: resubmitExpectedVersion,
+            score: input.score,
+            goalEvents: input.goalEvents,
+            actualParticipants: input.actualParticipants,
+            eventsHash: resubmitTarget.eventsHash,
+            mvpParticipantId: input.mvpParticipantId,
+            reason: input.reason,
+          },
+          {
+            onSuccess: () => {
+              setResubmitTarget(null);
+              setResubmitExpectedVersion(null);
+              onSaved?.();
+            },
+          },
+        );
+      }}
+    />
+  ) : null;
+
+  // 운영 콘솔 압축판 — 스코어가 맨 위인 확정 카드 하나만 그린다.
+  if (variant === 'console') {
+    return (
+      <>
+        <ConsoleResultCard
+          game={game}
+          latest={latest}
+          readOnly={readOnly}
+          missingAssists={missingAssists}
+          officializeVisible={showOfficializeCta}
+          officializeGateClosed={!officializeAlwaysVisible && directorGateStatus === 'disabled'}
+          officializing={officialize.isPending}
+          errorMessage={
+            officialize.isError && !isDirectorOfficializeDisabledError(officialize.error)
+              ? describeResultReviewError(officialize.error)
+              : null
+          }
+          onOfficialize={() => latest && void handleOfficialize(latest)}
+          onResubmit={() => {
+            if (latest === null) return;
+            setResubmitTarget(latest);
+            setResubmitExpectedVersion(game.version);
+          }}
+          onRetryGate={() => setDirectorGateStatus('unknown')}
+          confirmedFooter={confirmedFooter}
+        />
+        {officializeConfirmModal}
+        {resubmitModal}
+      </>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <GameSummaryHeader game={game} currentRevision={currentOfficial ?? null} />
@@ -311,63 +412,7 @@ export function GameResultReviewPanel({
 
       {officializeConfirmModal}
 
-      {resubmitTarget ? (
-        <ResultEditModal
-          open
-          title="결과를 다시 제출할까요?"
-          message="점수와 참가자 기록을 확인하고 다시 제출해 주세요. 새로운 검토 절차가 시작돼요."
-          confirmLabel="다시 제출"
-          reasonLabel="재제출 사유"
-          base={{
-            score: resubmitTarget.score,
-            goalEvents: deriveEditableGoalEvents(
-              resubmitTarget.goalEvents,
-              eventsQuery.data?.events ?? [],
-            ),
-            participants: resubmitTarget.resultParticipants,
-            mvpParticipantId: resubmitTarget.mvpParticipantId,
-          }}
-          sides={game.sides}
-          lineups={lineupsQuery.data ?? []}
-          periods={game.periods}
-          // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --
-          // 그래서 같은 값을 내려준다: 폼이 기존 승부차기 점수를 이어서 보낼지 판정하고,
-          // 못 보내는 상태를 저장 전에 알린다(`game-result-correction-panel.tsx` 주석 참고).
-          isKnockoutFixture={game.isKnockoutFixture}
-          presentation={inline ? 'inline' : 'modal'}
-          submitting={supersedeAndSubmit.isPending}
-          errorMessage={
-            supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null
-          }
-          onCancel={() => {
-            setResubmitTarget(null);
-            setResubmitExpectedVersion(null);
-            supersedeAndSubmit.reset();
-          }}
-          onConfirm={(input: ResultEditSubmitInput) => {
-            if (resubmitExpectedVersion === null) return;
-            supersedeAndSubmit.mutate(
-              {
-                revisionId: resubmitTarget.id,
-                expectedVersion: resubmitExpectedVersion,
-                score: input.score,
-                goalEvents: input.goalEvents,
-                actualParticipants: input.actualParticipants,
-                eventsHash: resubmitTarget.eventsHash,
-                mvpParticipantId: input.mvpParticipantId,
-                reason: input.reason,
-              },
-              {
-                onSuccess: () => {
-                  setResubmitTarget(null);
-                  setResubmitExpectedVersion(null);
-                  onSaved?.();
-                },
-              },
-            );
-          }}
-        />
-      ) : null}
+      {resubmitModal}
     </div>
   );
 }

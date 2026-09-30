@@ -51,14 +51,6 @@ export type TermsViewModel = {
   backHref: string;
   title: string;
   sub: string;
-  agreements: Array<{
-    title: string;
-    meta: string;
-    required: boolean;
-    checked: boolean;
-    detail: string;
-    locationBased?: boolean;
-  }>;
   primary: AuthAction;
 };
 

@@ -205,12 +205,50 @@ describe('TermsClient GA events (email signup)', () => {
     ]);
   });
 
-  it('renders the agree-all summary copy', () => {
+  it('renders the agree-all summary copy in 해요체', () => {
     render(<TermsClient />);
 
     expect(screen.getByText(
-      '선택 항목을 포함한 모든 약관에 동의합니다. 선택 항목은 따로 해제할 수 있어요.',
+      '선택 항목을 포함해 모두 동의해요. 선택 항목은 따로 해제할 수 있어요.',
     )).toHaveClass('tm-text-caption');
+  });
+
+  // 제목과 안내 문장이 같은 말을 되풀이하면 첫 화면이 "확인해 주세요"로 두 번 시작한다.
+  it('states the title and the required-consent rule once each', () => {
+    render(<TermsClient />);
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('약관에 동의해 주세요');
+    expect(screen.getByText('필수 약관에 동의해야 다음 단계로 넘어갈 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/가입 전에/)).not.toBeInTheDocument();
+  });
+
+  // 미동의 원 안의 회색 ✓ 는 이미 동의한 것처럼 읽힌다 — 체크 표시는 동의한 항목에만 있다.
+  it('draws the check mark only on agreed items', () => {
+    render(<TermsClient />);
+    const checkOf = (title: RegExp) => screen.getByText(title)
+      .closest('.tm-auth-agreement-card')!.querySelector('.tm-auth-check')!;
+
+    expect(checkOf(/위치기반서비스 이용 동의/)).toBeEmptyDOMElement();
+    expect(checkOf(/신규 필수 약관/)).toBeEmptyDOMElement();
+    expect(document.querySelector('.tm-auth-agree-all .tm-auth-check')).toBeEmptyDOMElement();
+
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
+
+    expect(checkOf(/위치기반서비스 이용 동의/)).toHaveTextContent('✓');
+    expect(checkOf(/신규 필수 약관/)).toHaveTextContent('✓');
+    expect(document.querySelector('.tm-auth-agree-all .tm-auth-check')).toHaveTextContent('✓');
+
+    fireEvent.click(screen.getByText(/위치기반서비스 이용 동의/));
+
+    expect(checkOf(/위치기반서비스 이용 동의/)).toBeEmptyDOMElement();
+  });
+
+  // ✓ 글자가 빠진 뒤에도 체크 버튼이 이름을 가져야 스크린리더가 무엇을 누르는지 안다.
+  it('names every check button by its agreement title', () => {
+    render(<TermsClient />);
+
+    expect(screen.getByRole('button', { name: '위치기반서비스 이용 동의 체크' }))
+      .toHaveAttribute('aria-pressed', 'false');
   });
 
   // 전체 동의가 필수만 켜면 선택 항목을 일일이 눌러야 해 "전체"라는 이름과 어긋난다.

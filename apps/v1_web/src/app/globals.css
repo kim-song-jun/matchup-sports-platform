@@ -1073,6 +1073,20 @@ button:disabled {
 
 .tm-auth-heading {
   margin-top: 12px;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* 한글은 어절 중간에서 끊기면 한 어절이 두 줄로 찢어진다 — 가입·온보딩 문구는 어절 단위로만 줄바꿈한다. */
+.tm-auth-heading,
+.tm-auth-sub,
+.tm-auth-agree-all,
+.tm-auth-agreement-main {
+  word-break: keep-all;
+}
+
+.tm-auth-sub {
+  text-wrap: pretty;
 }
 
 .tm-auth-stack {

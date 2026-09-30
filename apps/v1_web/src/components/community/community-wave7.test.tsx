@@ -106,9 +106,24 @@ describe('채팅방 입력 — Enter 전송', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('모바일 키보드 엔터 키를 "전송"으로 표시한다', () => {
-    const { input } = renderRoom();
-    expect(input).toHaveAttribute('enterkeyhint', 'send');
+  it('여러 줄 입력칸이고 Shift+Enter 는 줄바꿈으로 남긴다(기본 동작을 막지 않는다)', () => {
+    const { onSend, input } = renderRoom();
+    expect(input.tagName).toBe('TEXTAREA');
+    // fireEvent 는 preventDefault 되면 false 를 돌려준다 — true 여야 브라우저가 줄바꿈을 넣는다.
+    expect(fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })).toBe(true);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('터치 기기에서는 Enter 가 줄바꿈이다 — 모바일 키보드엔 Shift 가 없어 Enter 가 유일한 줄바꿈', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(pointer: coarse)' })) as typeof window.matchMedia;
+    try {
+      const { onSend, input } = renderRoom();
+      expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(true);
+      expect(onSend).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 

@@ -110,6 +110,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
   /* [P2 마이크로인터랙션] 전송 완료 순간 체크 애니메이션 — sending true→false 전환 감지 */
   const prevSendingRef = useRef(model.sending);
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [justSent, setJustSent] = useState(false);
   const lastMessageId = model.messages.at(-1)?.id;
 
@@ -130,6 +131,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
     observer.observe(thread);
     return () => observer.disconnect();
   }, []);
+
+  // 입력칸은 내용만큼 자란다(최대 높이는 CSS 가 막고 그 뒤로는 스크롤). 보내서 비면 한 줄로 돌아온다.
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    // 숨겨진 채로 재면 0 이 나온다 — 그때 0px 로 박으면 다시 보일 때 입력칸이 사라진다.
+    if (input.scrollHeight > 0) input.style.height = `${input.scrollHeight}px`;
+  }, [model.draft]);
 
   useEffect(() => {
     if (prevSendingRef.current && !model.sending && !model.sendError) {
@@ -255,20 +265,23 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
         <div className="tm-chat-inputbar">
           <button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button>
-          <input
+          <textarea
+            ref={inputRef}
+            rows={1}
             className="tm-chat-input-placeholder tm-create-native-input"
             value={model.draft ?? ''}
             onChange={(event) => model.onDraftChange?.(event.target.value)}
             placeholder={model.inputLockedMessage ?? '메시지 입력'}
             aria-label="메시지 입력"
             disabled={model.status !== 'ready' || Boolean(model.inputLockedMessage)}
-            // 모바일 키보드의 엔터 키를 "전송"으로 보여 준다.
-            enterKeyHint="send"
             onKeyDown={(event) => {
-              // 입력칸이 form 밖이라 Enter 가 아무 일도 안 했다. 한글 조합 중 Enter(isComposing,
+              // Enter 전송 · Shift+Enter 줄바꿈(카카오톡 PC 와 같다). 한글 조합 중 Enter(isComposing,
               // Safari 는 조합 직후 keyCode 229)는 글자 확정이라 보내지 않는다 — 보내면 마지막 글자가
               // 입력칸에 남거나 두 번 전송된다. 빈 내용·전송 중 차단은 onSend 가 한다.
               if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
+              // 터치 기기(모바일 웹·앱)는 키보드에 Shift 가 없어 Enter 가 유일한 줄바꿈이다 — 카카오톡
+              // 모바일처럼 Enter 는 줄바꿈, 전송은 버튼으로 한다.
+              if (window.matchMedia?.('(pointer: coarse)').matches) return;
               event.preventDefault();
               model.onSend?.();
             }}

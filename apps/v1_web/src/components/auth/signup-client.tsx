@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
-import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
+import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
+import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
+import { usePhoneVerificationRequests } from '@/components/auth/phone-verification/use-phone-verification-requests';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
@@ -47,8 +49,8 @@ const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
     sub: '닉네임과 이메일은 입력하면 중복을 바로 확인해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
   },
   verify: {
-    title: '본인인증을\n먼저 해주세요',
-    sub: '이 단계만 통과하면 나머지는 실패 없이 끝나요. 인증이 끝나면 자동으로 다음으로 넘어가요.',
+    title: '휴대폰 번호를 인증해 주세요',
+    sub: '인증이 끝나면 자동으로 다음 단계로 넘어가요.',
   },
   profile: {
     title: '프로필을\n완성해 주세요',
@@ -128,6 +130,26 @@ export function SignupClient() {
     [],
   );
 
+  /**
+   * 인증이 끝나면 사용자가 버튼을 한 번 더 누르지 않아도 다음 단계로 넘어간다.
+   * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
+   * 완료 상태를 잠깐 보여준 뒤 이동한다.
+   */
+  const handlePhoneVerified = (token?: string) => {
+    setPhoneProofToken(token ?? null);
+    setProfileError(null);
+    if (!token) return;
+    if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = window.setTimeout(() => {
+      advanceTimerRef.current = null;
+      setStep('profile');
+    }, VERIFY_ADVANCE_DELAY_MS);
+  };
+
+  const otpIdPrefix = useId();
+  const phoneRequests = usePhoneVerificationRequests({ mode: 'public', phone: phoneDigits, onVerified: handlePhoneVerified });
+  const otp = useOtpVerification(phoneRequests);
+
   useEffect(() => {
     const documentIds = readSignupTermsDocumentIds();
     if (documentIds.length === 0) {
@@ -195,15 +217,11 @@ export function SignupClient() {
   const goBack = () => {
     setError(null);
     setProfileError(null);
-    // 인증 직후 900ms 안에 '이전'을 누르면, 예약된 자동 이동이 나중에 발동해 사용자가
+    // 인증 직후 900ms 안에 뒤로가기를 누르면, 예약된 자동 이동이 나중에 발동해 사용자가
     // 되돌아온 단계를 덮어쓴다. 단계를 바꾸기 전에 예약을 취소한다.
     if (advanceTimerRef.current !== null) {
       window.clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = null;
-    }
-    if (step === 'account') {
-      router.push('/terms?mode=signup');
-      return;
     }
     // 인증 단계로 되돌아와도 이미 받은 증명은 유지한다 — 되돌아왔다는 이유로 재인증을 시키면
     // 유료 SMS 를 한 번 더 쓰게 되고 쿨다운에도 걸린다.
@@ -222,22 +240,6 @@ export function SignupClient() {
     setError(null);
     setProfileError(null);
     setStep('profile');
-  };
-
-  /**
-   * 인증이 끝나면 사용자가 버튼을 한 번 더 누르지 않아도 다음 단계로 넘어간다.
-   * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
-   * 완료 상태를 잠깐 보여준 뒤 이동한다.
-   */
-  const handlePhoneVerified = (token?: string) => {
-    setPhoneProofToken(token ?? null);
-    setProfileError(null);
-    if (!token) return;
-    if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
-    advanceTimerRef.current = window.setTimeout(() => {
-      advanceTimerRef.current = null;
-      setStep('profile');
-    }, VERIFY_ADVANCE_DELAY_MS);
   };
 
   const submitAccount = async () => {
@@ -335,18 +337,35 @@ export function SignupClient() {
       ? {
           label: '본인인증 하기',
           disabled: !accountReady,
+          loading: false,
           onClick: goVerify,
         }
       : step === 'verify'
-      ? {
-          // 인증 성공 시 자동으로 넘어가므로 이 버튼은 되돌아온 사용자를 위한 경로다.
-          label: '다음',
-          disabled: !phoneProofToken,
-          onClick: goProfile,
-        }
+      ? phoneProofToken
+        ? {
+            // 인증 성공 시 자동으로 넘어가므로 이 버튼은 되돌아온 사용자를 위한 경로다.
+            label: '다음',
+            disabled: false,
+            loading: false,
+            onClick: goProfile,
+          }
+        : otp.phase === 'idle' || otp.expired
+        ? {
+            label: otp.expired ? '인증번호 다시 받기' : '인증번호 받기',
+            disabled: !isSendablePhone || phoneRequests.issuing,
+            loading: phoneRequests.issuing,
+            onClick: () => { void otp.requestCode(); },
+          }
+        : {
+            label: '인증번호 확인',
+            disabled: otp.code.length !== OTP_CODE_LENGTH || phoneRequests.verifying,
+            loading: phoneRequests.verifying,
+            onClick: () => { void otp.submitCode(); },
+          }
       : {
           label: register.isPending ? '가입하는 중...' : '가입하고 계속',
           disabled: profileBlocked,
+          loading: false,
           onClick: () => { void submitAccount(); },
         };
 
@@ -360,9 +379,11 @@ export function SignupClient() {
             ? '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
       : step === 'verify'
-        ? isSendablePhone
-          ? '인증번호 확인까지 마치면 다음으로 넘어가요.'
-          : '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
+        ? !isSendablePhone
+          ? '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
+          : otp.phase === 'sent' && !otp.expired && otp.code.length !== OTP_CODE_LENGTH
+            ? '인증번호 6자리를 입력해 주세요.'
+            : null
         : profileIssue
           ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue]
           : uploadingProfileImage
@@ -373,12 +394,11 @@ export function SignupClient() {
   return (
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
-      // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
-      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms?mode=signup'
-      // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어
-      // /signup → /terms → /login 으로 로그인 화면까지 이어진다.
+      // 뒤로가기는 상단 하나뿐이고 목적지는 늘 바로 앞 단계다: 첫 단계는 약관(거기서 다시 /login
+      // 으로 나갈 수 있다), 이후 단계는 이전 입력 단계.
       topTitle="회원가입"
-      backHref="/terms?mode=signup"
+      backHref={step === 'account' ? '/terms?mode=signup' : undefined}
+      onBack={step === 'account' ? undefined : goBack}
       fixedAction={
         <>
           <button
@@ -387,6 +407,7 @@ export function SignupClient() {
             type="button"
             onClick={primary.onClick}
           >
+            {primary.loading ? <span className="tm-spinner" aria-hidden="true" /> : null}
             {primary.label}
           </button>
           {disabledHint ? (
@@ -414,13 +435,6 @@ export function SignupClient() {
             <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
           ))}
         </div>
-        {/* 첫 단계에서 goBack() 은 상단 뒤로가기와 똑같이 /terms 로 나간다 — 같은 동작을 두 번
-            보여주지 않도록, 이 인라인 버튼은 의미가 갈리는 두 번째 단계(프로필 → 계정)에서만 낸다. */}
-        {step !== 'account' ? (
-          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계">
-            <ChevronLeftIcon size={18} strokeWidth={2.2} />이전
-          </button>
-        ) : null}
         <div className="tm-signup-hero">
           <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
           <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
@@ -539,12 +553,17 @@ export function SignupClient() {
               </label>
 
               {isSendablePhone && !phoneProofToken ? (
-                <PhoneVerificationCard
-                  mode="public"
-                  phone={phoneDigits}
-                  onVerified={handlePhoneVerified}
-                  surface="inset"
-                />
+                <>
+                  {otp.phase === 'sent' ? (
+                    <OtpCodeInput idPrefix={otpIdPrefix} otp={otp} verifying={phoneRequests.verifying} />
+                  ) : null}
+                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} />
+                  {otp.phase === 'sent' ? (
+                    <div style={{ marginTop: -4 }}>
+                      <OtpRemainingRow idPrefix={otpIdPrefix} otp={otp} issuing={phoneRequests.issuing} />
+                    </div>
+                  ) : null}
+                </>
               ) : null}
 
               {phoneProofToken ? (

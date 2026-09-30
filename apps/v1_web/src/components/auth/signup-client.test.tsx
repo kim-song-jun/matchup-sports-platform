@@ -49,18 +49,11 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));
 
-// 부모(회원가입 폼)는 register 게이트만 검증한다. 카드 내부(자동 발급·폴링)와 디커플하기 위해
-// PhoneVerificationCard를 stub으로 대체하고 onVerified만 직접 트리거한다.
-vi.mock('@/components/auth/phone-verification/phone-verification-card', () => ({
-  PhoneVerificationCard: ({ onVerified }: { onVerified: (proofToken?: string) => void }) => (
-    <button type="button" onClick={() => onVerified('PROOF-TOKEN')}>
-      __stub_verify__
-    </button>
-  ),
-}));
-
+/** 하단 큰 버튼으로 인증번호를 받고, 6자리를 넣어 확인한다. */
 async function completePhoneVerification(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: '__stub_verify__' }));
+  fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
+  fireEvent.change(await screen.findByLabelText('인증번호 6자리'), { target: { value: '123456' } });
+  fireEvent.click(screen.getByRole('button', { name: '인증번호 확인' }));
 }
 
 /** 1단계(계정)를 채우고 두 칸을 벗어나 중복 확인까지 마친다. 라벨은 필수 표시(*·(필수))가 붙어 부분 일치로 찾는다. */
@@ -187,18 +180,18 @@ describe('SignupClient required profile contract', () => {
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'email' }));
   });
 
-  it('인증을 마치기 전에는 프로필 단계로 넘어갈 수 없다', async () => {
+  it('인증번호를 받아도 확인하기 전에는 프로필 단계로 넘어갈 수 없다', async () => {
     // Given
     render(<SignupClient />);
     await advanceToVerify();
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
 
-    // When — 인증하지 않은 채 다음을 누른다
-    const next = screen.getByRole('button', { name: '다음' });
-    expect(next).toBeDisabled();
-    fireEvent.click(next);
+    // When — 인증번호만 받고 확인하지 않는다
+    fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
 
-    // Then — 프로필 필드는 나타나지 않는다(가입 자체가 시작되지 않는다)
+    // Then — 확인 버튼은 6자리를 넣기 전까지 잠겨 있고, 프로필 필드는 나타나지 않는다
+    expect(await screen.findByLabelText('인증번호 6자리')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증번호 확인' })).toBeDisabled();
     expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
     expect(hooks.registerMutateAsync).not.toHaveBeenCalled();
   });
@@ -228,7 +221,7 @@ describe('SignupClient required profile contract', () => {
     }
   });
 
-  it('인증 직후 이전을 누르면 예약된 자동 이동이 취소된다', async () => {
+  it('인증 직후 뒤로가기를 누르면 예약된 자동 이동이 취소된다', async () => {
     // Given — 인증 성공 ~ 자동 이동 사이(900ms)에 사용자가 되돌아가는 경우.
     // 실시간 대기 대신 예약된 타이머만 앞당긴다. shouldAdvanceTime 을 켜서 waitFor 같은
     // 기존 비동기 유틸이 그대로 동작하게 한다.
@@ -239,8 +232,8 @@ describe('SignupClient required profile contract', () => {
       fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
       await completePhoneVerification();
 
-      // When — 자동 이동이 발동하기 전에 '이전'
-      fireEvent.click(screen.getByRole('button', { name: '이전 단계' }));
+      // When — 자동 이동이 발동하기 전에 뒤로가기
+      fireEvent.click(screen.getAllByRole('button', { name: '뒤로가기' })[0]);
 
       // Then — 예약이 남아 있으면 잠시 뒤 프로필로 끌려간다. 그러면 안 된다.
       await act(async () => {
@@ -267,7 +260,7 @@ describe('SignupClient required profile contract', () => {
   it.each([
     ['010123456789'],
     ['0101234abcd'],
-  ] as const)('휴대폰 원시 입력이 %s 이면 인증 카드가 열리지 않는다', async (rawValue) => {
+  ] as const)('휴대폰 원시 입력이 %s 이면 인증번호를 받을 수 없다', async (rawValue) => {
     // Given
     render(<SignupClient />);
     await advanceToVerify();
@@ -275,9 +268,9 @@ describe('SignupClient required profile contract', () => {
     // When
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: rawValue } });
 
-    // Then — 11자리 정상 번호가 아니면 인증을 시작할 수 없다
-    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    // Then — 11자리 정상 번호가 아니면 인증번호를 받을 수 없다
+    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeDisabled();
+    expect(hooks.phoneIssueMutateAsync).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -299,21 +292,23 @@ describe('SignupClient required profile contract', () => {
     expect(hooks.registerMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('휴대폰에 한 자리를 더 치면 값은 남고 인증 카드는 닫힌다', async () => {
+  it('인증번호를 받은 뒤 휴대폰에 한 자리를 더 치면 값은 남고 인증은 처음으로 돌아간다', async () => {
     // Given
     const user = userEvent.setup();
     render(<SignupClient />);
     await advanceToVerify();
     const input = screen.getByLabelText(/^휴대폰 번호/);
     fireEvent.change(input, { target: { value: '01012345678' } });
-    expect(await screen.findByRole('button', { name: '__stub_verify__' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    expect(await screen.findByLabelText('인증번호 6자리')).toBeInTheDocument();
 
     // When
     await user.type(input, '9');
 
-    // Then
+    // Then — 이전 번호로 받은 인증번호로는 확인할 수 없다
     expect(input).toHaveValue('010-1234-56789');
-    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('인증번호 6자리')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeDisabled();
   });
 
   it.each([
@@ -506,5 +501,106 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('이미 사용 중인 닉네임이에요.');
     expect(screen.getByLabelText(/^닉네임/)).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+describe('SignupClient 본인인증 단계', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.sessionStorage.setItem(
+      'teameet.v1.signupTermsDocumentIds',
+      JSON.stringify(['11111111-1111-4111-8111-111111111111']),
+    );
+    hooks.checkNicknameMutateAsync.mockResolvedValue({ available: true });
+    hooks.checkEmailMutateAsync.mockResolvedValue({ available: true });
+    hooks.phoneIssueMutateAsync.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });
+  });
+
+  it('제목은 인증할 일만 말하고, 하단 버튼 하나가 인증번호 받기에서 인증번호 확인으로 바뀐다', async () => {
+    render(<SignupClient />);
+    await advanceToVerify();
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('휴대폰 번호를 인증해 주세요');
+    expect(screen.queryByText(/먼저/)).not.toBeInTheDocument();
+
+    // 번호 전: 하단 버튼이 잠겨 있고 이유를 말한다.
+    const cta = screen.getByRole('button', { name: '인증번호 받기' });
+    expect(cta).toBeDisabled();
+    expect(screen.getByText('휴대폰 번호를 숫자 11자리로 입력해 주세요.')).toBeInTheDocument();
+
+    // 번호 뒤: 받기 버튼은 화면에 하나뿐이다(카드 안에 따로 없다).
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    expect(cta).toBeEnabled();
+    expect(screen.getAllByRole('button', { name: /인증번호 (받기|확인)/ })).toHaveLength(1);
+    fireEvent.click(cta);
+
+    expect(hooks.phoneIssueMutateAsync).toHaveBeenCalledWith({ phone: '01012345678' });
+    // 받은 뒤: 같은 자리의 버튼이 확인으로 바뀌고, 6자리를 채워야 열린다.
+    const confirm = await screen.findByRole('button', { name: '인증번호 확인' });
+    expect(confirm).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '인증번호 받기' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('인증번호 6자리'), { target: { value: '123456' } });
+    expect(confirm).toBeEnabled();
+
+    fireEvent.click(confirm);
+    await waitFor(() => expect(hooks.phoneVerifyMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '01012345678', code: '123456' }),
+    ));
+    expect(await screen.findByText('휴대폰 본인인증이 완료됐어요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
+  });
+
+  it('인증번호 발송이 실패하면 알리고 받기 버튼은 그대로 남는다', async () => {
+    hooks.phoneIssueMutateAsync.mockRejectedValue(new Error('sms down'));
+    render(<SignupClient />);
+    await advanceToVerify();
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+
+    expect(await screen.findByText('sms down')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeEnabled();
+    expect(screen.queryByLabelText('인증번호 6자리')).not.toBeInTheDocument();
+  });
+
+  it('인증번호가 만료되면 하단 버튼이 다시 받기로 바뀐다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      hooks.phoneIssueMutateAsync.mockResolvedValue({ expiresAt: new Date(Date.now() + 2000).toISOString() });
+      render(<SignupClient />);
+      await advanceToVerify();
+      fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+      fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+      await screen.findByRole('button', { name: '인증번호 확인' });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+      expect(screen.getByRole('button', { name: '인증번호 다시 받기' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // 목적지가 다른 뒤로가기 둘이 한 화면에 있으면 어느 쪽이 "바로 앞"인지 알 수 없다.
+  it('뒤로가기는 상단 하나뿐이고 늘 바로 앞 단계로 간다', async () => {
+    render(<SignupClient />);
+    await advanceToProfile();
+    expect(screen.queryByRole('button', { name: '이전 단계' })).not.toBeInTheDocument();
+
+    // 프로필 → 본인인증: 받아 둔 증명은 유지되어 다시 인증하지 않는다.
+    fireEvent.click(screen.getAllByRole('button', { name: '뒤로가기' })[0]);
+    expect(await screen.findByText('휴대폰 본인인증이 완료됐어요')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+
+    // 본인인증 → 가입 정보
+    fireEvent.click(screen.getAllByRole('button', { name: '뒤로가기' })[0]);
+    expect(await screen.findByLabelText(/^닉네임/)).toBeInTheDocument();
+
+    // 가입 정보 → 약관(링크)
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', '/terms?mode=signup');
   });
 });

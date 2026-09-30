@@ -6565,13 +6565,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--blue500);
 }
 
-.tm-signup-back {
-  align-self: flex-start;
-  margin-bottom: 16px;
-  padding-inline: 0;
-  color: var(--text-muted);
-}
-
 .tm-signup-hero {
   margin-bottom: 32px;
 }

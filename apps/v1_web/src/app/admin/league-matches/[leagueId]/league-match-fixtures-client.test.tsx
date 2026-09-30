@@ -183,6 +183,8 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     expect(screen.queryByText('결과 미입력')).not.toBeInTheDocument();
+    // 대회 상세의 "대회 목록으로"와 같은 복귀 링크.
+    expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', '/admin/league-matches');
   });
 
   it('일시 입력 칸에 표시되는 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {

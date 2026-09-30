@@ -32,6 +32,30 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) expect(link).toHaveAttribute('href', '/home');
   });
+
+  it('리그에서 온 어드민은 리그 관리로 돌아간다 — 대회 관리 상세는 리그 id 를 못 연다', () => {
+    pathnameMock.value = '/admin/live/league-1/operations';
+    render(
+      <TournamentOpsShell tournamentId="league-1" role="PLATFORM_OPS" origin="admin" tournamentKind="regular_league">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(screen.queryByRole('link', { name: '대회 관리로 돌아가기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '리그 관리로 돌아가기' })).toHaveAttribute('href', '/admin/league-matches/league-1');
+  });
+
+  it('복귀 링크는 본문 맨 위 한 곳뿐이다 — 사이드바 하단에 같은 링크를 또 두지 않는다', () => {
+    render(
+      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin">
+        <div data-testid="content">content</div>
+      </TournamentOpsShell>,
+    );
+    const [link] = screen.getAllByRole('link', { name: '대회 관리로 돌아가기' });
+    expect(screen.getAllByRole('link', { name: '대회 관리로 돌아가기' })).toHaveLength(1);
+    expect(link.closest('main')).not.toBeNull();
+    // 본문보다 앞에 있어야 화면 맨 위에 보인다.
+    expect(link.compareDocumentPosition(screen.getByTestId('content')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
 
 describe('TournamentOpsShell nav 항목 (T6-5, D-16)', () => {

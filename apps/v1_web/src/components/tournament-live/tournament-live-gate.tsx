@@ -259,6 +259,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
           tournamentTitle={tournament.data?.title}
           tournamentCoverImageUrl={tournament.data?.coverImageUrl}
           origin={origin}
+          tournamentKind={tournament.data?.kind}
         >
           {children}
         </TournamentOpsShell>
@@ -294,6 +295,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
         tournamentTitle={tournament.data?.title}
         tournamentCoverImageUrl={tournament.data?.coverImageUrl}
         origin={origin}
+        tournamentKind={tournament.data?.kind}
       >
         {children}
       </TournamentOpsShell>

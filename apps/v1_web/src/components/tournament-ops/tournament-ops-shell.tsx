@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import type { V1TournamentStaffRole } from '@/types/api';
+import type { V1CompetitionKind, V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { staffRoleLabel } from './badges';
@@ -191,13 +191,23 @@ interface TournamentOpsShellProps {
   role: V1TournamentStaffRole;
   /** T6-2 — admin에서 들어왔으면 복귀 링크가 그리로 향한다(`_gate.tsx`가 계산해 내려준다). */
   origin: TournamentOpsOrigin;
+  /** 리그면 어드민 복귀가 리그 관리로 간다. 모르면(공개 상세 조회 전·실패) 대회 관리로 본다. */
+  tournamentKind?: V1CompetitionKind | null;
 }
 
-/** T6-2 — 진입 출처별 복귀 목적지. `_gate.tsx`가 계산한 `origin`을 그대로 받는다. */
-const RETURN_TARGET: Record<TournamentOpsOrigin, (tournamentId: string) => { href: string; label: string }> = {
-  admin: (tournamentId) => ({ href: `/admin/tournaments/${encodeURIComponent(tournamentId)}`, label: '대회 관리로 돌아가기' }),
-  home: () => ({ href: '/home', label: '서비스로 돌아가기' }),
-};
+/**
+ * T6-2 — 진입 출처별 복귀 목적지. `_gate.tsx`가 계산한 `origin`을 그대로 받는다.
+ *
+ * 리그도 같은 콘솔(`/admin/live/<리그id>`)을 쓰는데 예전엔 무조건 `/admin/tournaments/<id>` 로
+ * 보냈다 — 그 화면의 어드민 상세 API 는 대회 종류만 받아 리그면 "대회 정보를 불러오지 못했어요"가 떴다.
+ */
+function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: V1CompetitionKind | null) {
+  if (origin === 'home') return { href: '/home', label: '서비스로 돌아가기' };
+  const id = encodeURIComponent(tournamentId);
+  return kind === 'regular_league'
+    ? { href: `/admin/league-matches/${id}`, label: '리그 관리로 돌아가기' }
+    : { href: `/admin/tournaments/${id}`, label: '대회 관리로 돌아가기' };
+}
 
 // ── Mobile drawer ─────────────────────────────────────────────────────────
 interface DrawerProps {
@@ -211,11 +221,9 @@ interface DrawerProps {
   /** 지금 표면(스태프/어드민)의 nav base — 경로를 하드코딩하면 다른 표면으로 튕긴다. */
   basePath: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
-  returnHref: string;
-  returnLabel: string;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, basePath, triggerRef, returnHref, returnLabel }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, basePath, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
   const navItems = buildNavItems(basePath, role);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -351,16 +359,6 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
             );
           })}
         </nav>
-
-        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
-          <Link
-            href={returnHref}
-            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-          >
-            <ChevronLeft size={14} aria-hidden="true" />
-            {returnLabel}
-          </Link>
-        </div>
       </div>
     </>
   );
@@ -373,14 +371,14 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
  * `/admin`과 완전히 분리된 별도 인증 경로다 — admin이 아닌 tournament_director/
  * support_readonly/platform_ops(대회 스코프)가 대상이다.
  */
-export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, origin }: TournamentOpsShellProps) {
+export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, origin, tournamentKind }: TournamentOpsShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
   const basePath = resolveTournamentLiveBase(pathname, tournamentId);
   const navItems = buildNavItems(basePath, role);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
-  const returnTarget = RETURN_TARGET[origin](tournamentId);
+  const back = returnTarget(origin, tournamentId, tournamentKind);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -439,16 +437,6 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
             );
           })}
         </nav>
-
-        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
-          <Link
-            href={returnTarget.href}
-            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-          >
-            <ChevronLeft size={14} aria-hidden="true" />
-            {returnTarget.label}
-          </Link>
-        </div>
       </aside>
 
       {/* ── Mobile off-canvas drawer (<lg) ──────────────────────────────── */}
@@ -463,8 +451,6 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           role={role}
           pathname={pathname}
           triggerRef={hamburgerRef}
-          returnHref={returnTarget.href}
-          returnLabel={returnTarget.label}
         />
       </div>
 
@@ -488,7 +474,20 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         </header>
 
         <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8">
-          <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">{children}</div>
+          <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">
+            {/* 복귀 링크는 본문 맨 위 한 곳 — 예전엔 사이드바 맨 아래·모바일 메뉴 안에만 있어 "뒤로가기가
+                없다"는 제보가 나왔다. 대회 관리 상세의 "대회 목록으로"와 같은 자리·같은 모양이다. */}
+            <div className="mb-4">
+              <Link
+                href={back.href}
+                className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+              >
+                <ChevronLeft size={14} aria-hidden="true" />
+                {back.label}
+              </Link>
+            </div>
+            {children}
+          </div>
         </main>
       </div>
     </div>

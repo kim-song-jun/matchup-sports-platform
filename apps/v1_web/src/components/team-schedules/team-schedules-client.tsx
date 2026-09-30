@@ -472,6 +472,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       pending: setAttendance.isPending,
       error: attendanceError,
       onSetStatus,
+      friendlyMatch: Boolean(schedule?.linkedMatch) && schedule?.linkedMatch?.tournamentId === null && schedule.linkedMatch.leagueId === null,
     },
     attendees: {
       visible: Boolean(schedule?.attendees),
@@ -515,7 +516,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
             onEdit: onOpenRecruitmentEdit,
             pending: createRecruitment.isPending || updateRecruitment.isPending,
             exists: Boolean(recruitment),
-            canCreate: schedule?.state === 'SCHEDULED',
+            scheduleActive: schedule?.state === 'SCHEDULED',
             editPanel: recruitmentEditOpen
               ? {
                   open: true,

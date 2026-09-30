@@ -140,10 +140,26 @@ export function teamMatchApplicationStatusLabel(status: string, options?: { auto
 
 /** 친선 팀매치 공동 기록 상태와 변경 이력. */
 const phaseLabel: Record<string, string> = { scheduled: '경기 시작 전', live: '진행 중', official: '경기 종료 · 결과 확정', cancelled: '취소된 경기', legacy: '기존 경기 결과', managed: '운영자 기록 경기' };
-const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소', submatch_add: '서브매치 추가', submatch_edit: '서브매치 이름 수정', submatch_delete: '서브매치 삭제' };
+const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소', submatch_add: '서브매치 추가', submatch_edit: '서브매치 이름 수정', submatch_delete: '서브매치 삭제', participant_add: '늦게 온 선수 추가' };
 
 export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
 export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }
+
+/**
+ * 친선 경기 일정의 응답(RSVP) — 참석명단과 이름이 겹치지 않게 "올 수 있어요?"로 부른다(H5 결정 A).
+ * 훈련·모임 일정의 "참석/미정/불참"은 그대로다. 일정 화면의 응답 버튼과 참석명단 후보 칩이 같이 쓴다.
+ */
+const FRIENDLY_RSVP_LABEL: Record<string, string> = {
+  GOING: '올 수 있어요',
+  MAYBE: '미정',
+  NOT_GOING: '못 가요',
+  WAITLISTED: '대기',
+  NO_RESPONSE: '미응답',
+};
+
+export function friendlyRsvpLabel(status: string): string {
+  return FRIENDLY_RSVP_LABEL[status] ?? status;
+}
 
 /** 개인 매치가 시작된 뒤의 표시 상태(displayState) 라벨. 시작 전·완료 상태는 null — 호출부의 기존 라벨을 쓴다. */
 export function personalMatchLifecycleLabel(displayState: string | null | undefined, isHost: boolean): string | null {

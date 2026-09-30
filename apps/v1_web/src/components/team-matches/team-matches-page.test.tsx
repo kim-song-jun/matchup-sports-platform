@@ -1196,6 +1196,28 @@ describe('TeamMatchDetailPageView — 진행 체크리스트의 명단 행 (Task
     expect(screen.queryByText('매치 관리')).not.toBeInTheDocument();
   });
 
+  // H5 D-1 의 "참석명단" 카드는 이 칸 안으로 들어왔다 — 우리 제출은 칸 한 줄, 상대 명단은 그 아래 한 줄.
+  it('참석명단 칸이 우리 인원과 상대 명단 상태를 함께 말하고, 공개된 상대 명단만 [보기]로 연다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    const opponent = { name: '합정 유나이티드', badge: { tone: 'blue' as const, label: '공개됨 · 6명' }, note: '오후 8:00에 공개됐어요', viewHref: '/team-matches/team-match-1/lineup/opponent' };
+    model.progress = { ...progress, lineupSubmitted: true, attendance: { ownCount: 7, opponent } };
+    model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
+
+    const { unmount } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByRole('link', { name: /참석명단 제출/ })).toHaveTextContent('제출 완료 · 7명');
+    expect(screen.getByText('공개됨 · 6명')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '상대 참석명단 보기' })).toHaveAttribute('href', '/team-matches/team-match-1/lineup/opponent');
+    // 우리 제출 상태는 칸 한 곳에서만 말한다.
+    expect(screen.getAllByText(/제출 완료/)).toHaveLength(1);
+
+    model.progress = { ...model.progress, attendance: { ownCount: 7, opponent: { ...opponent, badge: { tone: 'green', label: '제출 완료' }, note: '명단은 오후 8:00에 서로 공개돼요 · 지금은 제출 여부만 보여요', viewHref: null } } };
+    unmount();
+    renderPage(<TeamMatchDetailPageView model={model} />);
+    expect(screen.getByText('명단은 오후 8:00에 서로 공개돼요 · 지금은 제출 여부만 보여요')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '상대 참석명단 보기' })).not.toBeInTheDocument();
+  });
+
   it('리그 경기 명단은 제출 문구 없이 참가 명단 기준으로 두고, 조정 화면으로만 간다', () => {
     const model = getTeamMatchDetailViewModel('mine');
     model.progress = { ...progress, lineupSubmitted: null };

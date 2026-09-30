@@ -210,6 +210,18 @@ export type TeamMatchDetailViewModel = {
     lineupSubmitted: boolean | null;
     /** 호스트에게만 — 상대가 정해져 수정이 잠긴 이유. */
     lockNote: string | null;
+    /** 친선 참석명단 칸의 우리 인원·상대 명단 상태(H5 D-1). 명단을 못 읽었으면 null. */
+    attendance?: {
+      /** 제출했을 때의 인원. 제출 전이면 null. */
+      ownCount: number | null;
+      opponent: {
+        name: string;
+        badge: { tone: 'blue' | 'green' | 'grey'; label: string };
+        note: string;
+        /** 공개된 상대 명단(읽기 전용) — 공개 전이면 null. */
+        viewHref: string | null;
+      } | null;
+    } | null;
   };
   /** 승인 대기 중인 신청 팀(히어로 "우리 팀" 자리). */
   myApplicationTeam?: { teamId: string; name: string } | null;

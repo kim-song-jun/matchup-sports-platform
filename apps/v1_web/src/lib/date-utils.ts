@@ -190,11 +190,20 @@ export function formatTournamentDateTimeLong(dateStr: string | null | undefined)
   // 화면이라 기기 타임존이 다르면 마감 시각을 잘못 읽는다.
   const parts = getTournamentKstParts(dateStr);
   if (!parts) return '일정 미정';
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 (${parts.weekday}) ${meridiemTime(parts)}`;
+}
 
+function meridiemTime(parts: TournamentKstParts): string {
   const hour = Number(parts.hour);
   const period = hour < 12 ? '오전' : '오후';
-  const displayHour = hour % 12 || 12;
-  return `${parts.year}년 ${parts.month}월 ${parts.day}일 (${parts.weekday}) ${period} ${displayHour}:${parts.minute}`;
+  return `${period} ${hour % 12 || 12}:${parts.minute}`;
+}
+
+/** 시각만 '오후 8:00' — 같은 날 안의 공개 시각처럼 날짜가 이미 보이는 자리. KST 고정. invalid 면 null. */
+export function formatKstMeridiemTime(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const parts = getTournamentKstParts(dateStr);
+  return parts ? meridiemTime(parts) : null;
 }
 
 export function formatTournamentDateRangeLong(

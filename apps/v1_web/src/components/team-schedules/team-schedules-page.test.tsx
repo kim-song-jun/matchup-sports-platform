@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ function renderPage(ui: ReactElement) {
 function buildModel(
   overrides: Partial<ScheduleDetailViewModel['manage']>,
   attendeesOverrides: Partial<ScheduleDetailViewModel['attendees']> = {},
+  attendanceOverrides: Partial<ScheduleDetailViewModel['attendance']> = {},
 ): ScheduleDetailViewModel {
   return {
     teamId: 'team-1',
@@ -50,6 +51,8 @@ function buildModel(
       pending: false,
       error: null,
       onSetStatus: () => undefined,
+      friendlyMatch: false,
+      ...attendanceOverrides,
     },
     attendees: {
       visible: false,
@@ -307,32 +310,118 @@ describe('일정 상세 — 참석명단 요약 (H9 D-1)', () => {
 });
 
 describe('일정 상세 — 용병 모집 열기', () => {
-  function withRecruitment(canCreate: boolean) {
+  function withRecruitment(scheduleActive: boolean, recruitment: Partial<ScheduleDetailViewModel['guestRecruitment']> = {}) {
     const base = buildModel({});
+    const exists = recruitment.visible ?? false;
     return {
       ...base,
       guestRecruitment: {
         ...base.guestRecruitment,
+        ...recruitment,
         manage: {
           onCreate: () => undefined,
           onToggleOpen: () => undefined,
           onEdit: () => undefined,
           pending: false,
-          exists: false,
-          canCreate,
+          exists,
+          scheduleActive,
           applications: { items: [], loading: false, error: null, onApprove: () => undefined, onReject: () => undefined, pendingApplicationId: null },
         },
       },
     };
   }
+  const closedRecruitment = { visible: true, slots: 3, applicantCount: 1, approvedCount: 0, stateLabel: '마감', closesAtLabel: '10월 7일 20:00 마감' };
 
   it('예정된 일정에서만 모집을 열 수 있다', () => {
     renderPage(<ScheduleDetailPageView model={withRecruitment(true)} />);
+    expect(screen.getByText('아직 용병 모집이 열려 있지 않아요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '용병 모집 열기' })).toBeInTheDocument();
   });
 
-  it('취소·종료된 일정에는 모집 열기를 내지 않는다', () => {
+  // W2-V4 — 취소된 일정에 "아직 … 열려 있지 않아요"만 남으면 앞으로 열릴 것처럼 읽혔다.
+  it('취소·종료된 일정에 열린 적 없는 모집은 칸째 없다', () => {
     renderPage(<ScheduleDetailPageView model={withRecruitment(false)} />);
+    expect(screen.queryByText('용병 모집')).not.toBeInTheDocument();
+    expect(screen.queryByText(/아직 용병 모집이/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '용병 모집 열기' })).not.toBeInTheDocument();
+    // 칸이 빠진 자리에 구분선만 남지 않는다 — 운영 관리 칸이 마지막이다.
+    expect(screen.getByText('운영 관리').closest('.tm-card')?.lastElementChild).toHaveTextContent('운영 관리');
+  });
+
+  it('취소된 일정의 모집 기록은 읽기만 남고, 서버가 거절할 수정·마감 버튼은 없다', () => {
+    renderPage(<ScheduleDetailPageView model={withRecruitment(false, closedRecruitment)} />);
+    expect(screen.getByText('용병 모집')).toBeInTheDocument();
+    expect(screen.getByText(/1\/3명 신청 · 승인 0명 · 마감/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '모집 정보 수정' })).not.toBeInTheDocument();
+
+    cleanup();
+    renderPage(<ScheduleDetailPageView model={withRecruitment(true, closedRecruitment)} />);
+    expect(screen.getByRole('button', { name: '모집 정보 수정' })).toBeInTheDocument();
+  });
+});
+
+// H5 결정 6 — 친선 경기 일정의 응답은 "올 수 있어요? (팀장 참고용)"으로 참석명단과 이름을 나눈다.
+describe('일정 상세 — 친선 경기 응답 이름 (H5 A-3)', () => {
+  const attendees = {
+    visible: true,
+    items: [
+      { userId: 'u-1', nickname: '선수01', profileImageUrl: null, status: 'GOING' as const },
+      { userId: 'u-2', nickname: '선수02', profileImageUrl: null, status: 'NOT_GOING' as const },
+      { userId: 'u-3', nickname: '선수03', profileImageUrl: null, status: 'NO_RESPONSE' as const },
+    ],
+    counts: { all: 3, going: 1, noResponse: 1 },
+    canProxy: true,
+    viewerUserId: 'u-me',
+  };
+  const attendance = { visible: true, disabled: false, myStatus: 'GOING' as const, counts: { going: 7, waitlisted: 0 } };
+
+  it('친선 경기면 응답을 "올 수 있어요? (팀장 참고용)"으로 부르고 출전은 참석명단이 정한다고 적는다', () => {
+    renderPage(<ScheduleDetailPageView model={buildModel({ visible: false }, attendees, { ...attendance, friendlyMatch: true })} />);
+
+    expect(screen.getByText('올 수 있어요?')).toBeInTheDocument();
+    expect(screen.getByText('(팀장 참고용)')).toBeInTheDocument();
+    expect(screen.queryByText('내 참석')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '올 수 있어요', pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '못 가요', pressed: false })).toBeInTheDocument();
+    expect(screen.getByText('이 응답은 출전을 정하지 않아요. 출전 선수는 팀장·매니저가 참석명단으로 정해요.')).toBeInTheDocument();
+    expect(screen.getByText('올 수 있어요 7명')).toBeInTheDocument();
+    expect(screen.getByText('응답 현황')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '올 수 있어요 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '선수03 올 수 있어요로 대신 표시' })).toBeInTheDocument();
+    expect(screen.queryByText(/^참석/)).not.toBeInTheDocument();
+  });
+
+  // H9 D-1 요약과 함께 설 때 — "나가는 사람은 명단이 정한다"를 요약 한 곳에서만 말한다.
+  it('참석명단 요약이 있으면 응답 칸은 이름만 나누고 같은 설명을 되풀이하지 않는다', () => {
+    const model = { ...buildModel({ visible: false }, attendees, { ...attendance, friendlyMatch: true }), roster: { count: 8, viewerIncluded: true, href: null } };
+    renderPage(<ScheduleDetailPageView model={model} />);
+
+    expect(screen.getByText('경기에 나가는 사람은 이 명단으로 정해져요.')).toBeInTheDocument();
+    expect(screen.getByText('(팀장 참고용)')).toBeInTheDocument();
+    expect(screen.queryByText(/출전을 정하지 않아요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '올 수 있어요', pressed: true })).toBeInTheDocument();
+  });
+
+  it('대조군 — 훈련·모임·대회·리그 일정은 "내 참석 · 참석/미정/불참" 그대로다', () => {
+    renderPage(<ScheduleDetailPageView model={buildModel({ visible: false }, attendees, { ...attendance, friendlyMatch: false })} />);
+
+    expect(screen.getByText('내 참석')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '참석', pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '불참', pressed: false })).toBeInTheDocument();
+    expect(screen.getByText('참석 현황')).toBeInTheDocument();
+    expect(screen.queryByText(/올 수 있어요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/출전을 정하지 않아요/)).not.toBeInTheDocument();
+  });
+
+  // W2-V3 — 잠긴(취소) 일정은 비활성 배경이 선택 색을 덮어 내 응답이 세 버튼 중 어느 것인지 안 보였다.
+  it('잠긴 일정에서도 내 응답은 색이 아니라 체크 표시로 구분된다', () => {
+    renderPage(<ScheduleDetailPageView model={buildModel({ visible: false }, {}, { ...attendance, disabled: true, friendlyMatch: false })} />);
+
+    const mine = screen.getByRole('button', { name: '참석', pressed: true });
+    expect(mine).toBeDisabled();
+    expect(mine.querySelector('svg')).not.toBeNull();
+    for (const other of ['미정', '불참']) {
+      expect(screen.getByRole('button', { name: other }).querySelector('svg')).toBeNull();
+    }
   });
 });

@@ -49,7 +49,7 @@ const myTeamsRef = vi.hoisted(() => ({ current: undefined as { items: Array<{ te
 const applicationsRef = vi.hoisted(() => ({ current: undefined as { items: unknown[] } | undefined }));
 const applicationsFailedRef = vi.hoisted(() => ({ current: false }));
 const refetchApplications = vi.hoisted(() => vi.fn());
-const lineupRef = vi.hoisted(() => ({ current: undefined as { state: string } | undefined }));
+const lineupRef = vi.hoisted(() => ({ current: undefined as Record<string, unknown> | undefined }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
@@ -1555,11 +1555,20 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     });
     myTeamsRef.current = { items: [{ teamId: 'team-host', role: 'owner' }] };
     applicationsRef.current = { items: [application('a', 'approved'), application('b', 'rejected', { reviewedAt: '2026-09-30T10:00:00.050Z' })] };
-    lineupRef.current = { state: 'SUBMITTED' };
+    const starter = (id: string) => ({ id, userId: id, displayName: id, jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null });
+    lineupRef.current = {
+      state: 'SUBMITTED', revision: 2, publicLineupAt: null, starters: [starter('p1'), starter('p2')], bench: [],
+      opponent: { teamName: 'a팀', submitted: true, published: true, participantCount: 5 },
+    };
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
     const progress = json('team-match-progress');
     expect(progress).toMatchObject({ opponentName: 'a팀', lineupSubmitted: true });
+    // 참석명단 칸이 우리 인원과 상대 명단 입구를 함께 싣는다(H5 D-1 을 체크리스트 안으로).
+    expect(progress.attendance).toMatchObject({
+      ownCount: 2,
+      opponent: { name: 'a팀', badge: { label: '공개됨 · 5명' }, viewHref: '/team-matches/tm-h6/lineup/opponent' },
+    });
     expect(progress.confirmedAtLabel).toMatch(/19:00$/);
     expect(progress.lockNote).toContain('상대팀이 정해진 뒤에는 바꿀 수 없어요');
     expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('참석명단 관리');

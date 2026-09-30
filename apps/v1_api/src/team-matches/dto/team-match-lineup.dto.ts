@@ -115,6 +115,32 @@ export class SaveTeamMatchLineupDto {
   bench?: TeamMatchLineupParticipantDto[];
 }
 
+/**
+ * 첫 기록 뒤 결과 확정 전까지 받는 "늦게 온 선수" 한 명. 현재 제출본에 행만 붙인다 — 저장처럼
+ * 새 리비전을 만들면 기존 참가자 행 id 가 바뀌어 이미 달린 득점이 끊긴다(H5 결정 A).
+ */
+export class AddLateTeamMatchLineupParticipantDto {
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  displayName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  jerseyNumber?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  goalkeeper?: boolean;
+}
+
 export class SubmitTeamMatchLineupDto {
   @Type(() => Number)
   @IsInt()

@@ -160,6 +160,9 @@ import type {
   V1TeamMatchLineupSavePayload,
   V1TeamMatchLineupSaveResult,
   V1TeamMatchLineupSubmitResult,
+  V1TeamMatchLateAdditionPayload,
+  V1TeamMatchLateAdditionResult,
+  V1TeamMatchOpponentLineup,
   V1TeamMatchMutationPayload,
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
@@ -1800,6 +1803,31 @@ export function useV1TeamMatchLineup(teamMatchId: string, options?: { enabled?: 
     queryFn: () => v1Get<V1TeamMatchLineup>(`/team-matches/${teamMatchId}/lineup`),
     enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
     retry: false,
+  });
+}
+
+/** 상대 참석명단(공개 뒤 번호·이름만). 공개 전 403·미제출 404 는 재시도해도 같은 답이다. */
+export function useV1TeamMatchOpponentLineup(teamMatchId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup', 'opponent'] as const,
+    queryFn: () => v1Get<V1TeamMatchOpponentLineup>(`/team-matches/${teamMatchId}/lineup/opponent`),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+/** 첫 기록 뒤 늦게 온 선수 추가 — 성공하면 참석명단과 공동 기록(변경 이력)을 다시 읽는다. */
+export function useV1AddLateTeamMatchLineupParticipant(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; payload: V1TeamMatchLateAdditionPayload }) =>
+      v1Post<V1TeamMatchLateAdditionResult>(`/team-matches/${teamMatchId}/lineup/late-additions`, vars.payload, {
+        headers: { 'Idempotency-Key': vars.idempotencyKey },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+      void queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'shared-record'] });
+    },
   });
 }
 

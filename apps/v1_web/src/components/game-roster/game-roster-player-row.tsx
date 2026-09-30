@@ -42,7 +42,7 @@ export function GameRosterStatusBadge({
 }
 
 /** 누가 이 상태를 만들었나. 출전정지는 계산 결과라 "자동", 출전·명단 밖은 주체가 없다. */
-function actorCaption(status: V1TeamRosterCellStatus, actorRole: string | null | undefined): string | null {
+function actorCaption(status: V1TeamRosterCellStatus | undefined, actorRole: string | null | undefined): string | null {
   if (status === 'SUSPENDED') return `${GAME_ROSTER_AUTO_ACTOR_LABEL} 처리`;
   if (status !== 'EXCLUDED' && status !== 'UNAVAILABLE') return null;
   const label = gameRosterActorRoleLabel(actorRole);
@@ -54,7 +54,10 @@ export interface GameRosterPlayerRowProps {
   displayName: string;
   /** false = 리그 폴백 팀원 — 경기 기록에 계정 없이 들어간다. */
   accountLinked: boolean;
-  status: V1TeamRosterCellStatus;
+  /** 없으면 상태 배지를 그리지 않는다 — 친선 참석명단처럼 "있으면 출전"인 목록(H5). */
+  status?: V1TeamRosterCellStatus;
+  /** 상태 배지 뒤에 붙는 읽기 전용 칩(예: 팀 일정 응답). */
+  extraBadges?: ReactNode;
   reason?: string | null;
   remainingMatches?: number | null;
   actorRole?: string | null;
@@ -72,6 +75,7 @@ export function GameRosterPlayerRow({
   displayName,
   accountLinked,
   status,
+  extraBadges,
   reason,
   remainingMatches,
   actorRole,
@@ -126,7 +130,10 @@ export function GameRosterPlayerRow({
           <span className="tm-text-label" style={{ overflowWrap: 'anywhere' }}>
             {displayName}
           </span>
-          <GameRosterStatusBadge status={status} reason={reason} remainingMatches={remainingMatches} />
+          {status === undefined ? null : (
+            <GameRosterStatusBadge status={status} reason={reason} remainingMatches={remainingMatches} />
+          )}
+          {extraBadges}
         </div>
         {captions.length > 0 ? (
           <div className="tm-text-caption" style={{ marginTop: 4 }}>

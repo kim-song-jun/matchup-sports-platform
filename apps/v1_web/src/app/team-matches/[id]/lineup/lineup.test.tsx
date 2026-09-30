@@ -10,10 +10,13 @@ import {
   applyVersionConflictReload,
   buildSavePayload,
   createEmptyLineupEditorState,
-  deriveLineupCounts,
   describeLineupPhase,
+  addAllRosterMembersToLineup,
+  compareByJersey,
+  describeGoalkeeperNotice,
+  describeLineupSizeNotice,
   describePublicationCountdown,
-  extractConflictCurrentVersion,
+  describePublicationNotice,
   findJerseyHolder,
   hydrateLineupEditorState,
   isRosterMemberPlaced,
@@ -220,13 +223,6 @@ describe('lineup.view-model', () => {
     expect(state.participants[1].goalkeeper).toBe(true);
   });
 
-  it('derives participant/waiting counts from one merged view', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToLineup(state, rosterMember);
-    const counts = deriveLineupCounts(state, [rosterMember, rosterMember2]);
-    expect(counts).toEqual({ participantCount: 1, waitingCount: 1, totalRoster: 2 });
-  });
-
   it('빈 명단·중복 등번호·빈 이름만 막는다 — 인원수와 GK 개수는 검사하지 않는다', () => {
     expect(validateLineupForSubmit(createEmptyLineupEditorState(0))).toContain(
       '참석명단을 최소 한 명 이상 등록해 주세요.',
@@ -310,25 +306,29 @@ describe('lineup.view-model', () => {
     expect(reloaded.dirty).toBe(false);
   });
 
-  it('reads currentVersion out of the 409 details payload (and tolerates a flat legacy shape)', () => {
-    expect(extractConflictCurrentVersion({ expectedVersion: 0, currentVersion: 3 })).toBe(3);
-    expect(extractConflictCurrentVersion(null)).toBeNull();
-    expect(extractConflictCurrentVersion({ currentVersion: 'not-a-number' })).toBeNull();
-  });
-
   it('describes the publication countdown relative to now', () => {
     const now = new Date('2026-08-10T10:00:00.000Z').getTime();
     expect(describePublicationCountdown(null, now)).toBeNull();
-    expect(describePublicationCountdown('2026-08-10T10:30:00.000Z', now)).toBe('30분 후 공개돼요.');
-    expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('참석명단이 공개됐어요.');
+    expect(describePublicationCountdown('2026-08-10T10:30:00.000Z', now)).toBe('공개까지 30분 남았어요.');
+    expect(describePublicationCountdown('2026-08-11T09:59:00.000Z', now)).toBe('공개까지 23시간 59분 남았어요.');
+    // W2-V10 — 하루가 넘으면 "163시간 38분"이 아니라 날짜로 말한다(KST).
+    expect(describePublicationCountdown('2026-08-17T11:00:00.000Z', now)).toBe('8/17 (월) 오후 8:00에 공개돼요.');
+    expect(describePublicationCountdown('2026-08-11T10:00:00.000Z', now)).toBe('8/11 (화) 오후 7:00에 공개돼요.');
+    expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('상대 팀에게 공개됐어요.');
   });
 
   it('describes the server-computed editability and lock reason', () => {
     expect(describeLineupPhase('DRAFT', true, null).editable).toBe(true);
     expect(describeLineupPhase('SUBMITTED', true, null)).toMatchObject({
       editable: true,
-      label: '제출됨 · 수정 가능',
+      label: '제출 완료',
     });
+    // H5 결정 A — 첫 기록 뒤 결과 확정 전은 "추가만". 취소된 경기는 그래도 취소로 잠긴다(대조군).
+    expect(describeLineupPhase('SUBMITTED', false, 'records_exist', false, true)).toMatchObject({
+      editable: false,
+      label: '경기 중 · 추가만',
+    });
+    expect(describeLineupPhase('SUBMITTED', false, 'terminal', true, true).label).toBe('취소됨 · 잠김');
     expect(describeLineupPhase('DRAFT', false, 'records_exist')).toMatchObject({
       editable: false,
       label: '기록 시작 · 잠김',
@@ -371,7 +371,7 @@ describe('lineup.view-model', () => {
     expect(resolveOwnTeamId(teamMatch, { items: [] })).toBeNull();
   });
 
-  it('isRosterMemberPlaced matches deriveLineupCounts waiting logic', () => {
+  it('isRosterMemberPlaced tells placed members from waiting ones', () => {
     let state = createEmptyLineupEditorState(0);
     state = addRosterMemberToLineup(state, rosterMember);
     expect(isRosterMemberPlaced(state, rosterMember)).toBe(true);
@@ -400,7 +400,7 @@ describe('lineup.view-model', () => {
     expect(state.participants[0].userId).toBe(rosterMember.userId);
 
     expect(isRosterMemberPlaced(state, rosterMember)).toBe(true);
-    expect(deriveLineupCounts(state, [rosterMember, rosterMember2]).waitingCount).toBe(1);
+    expect(isRosterMemberPlaced(state, rosterMember2)).toBe(false);
 
     const afterAttempt = addRosterMemberToLineup(state, rosterMember);
     expect(afterAttempt).toBe(state);
@@ -433,6 +433,11 @@ const hoisted = vi.hoisted(() => ({
   refetchUnavailability: vi.fn(),
   saveMutate: vi.fn(),
   submitMutate: vi.fn(),
+  changeJerseyMutate: vi.fn(),
+  useV1TeamLineupHistoryMock: vi.fn(
+    (..._args: unknown[]): { data: { items: unknown[] } | undefined; isLoading: boolean } => ({ data: undefined, isLoading: false }),
+  ),
+  lateAddMutate: vi.fn(),
   refetchLineup: vi.fn(),
 }));
 
@@ -450,12 +455,14 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Game: hoisted.useV1GameMock,
   // "이전 라인업 불러오기"/"프리셋으로 저장"이 쓰는 훅. 시트를 열기 전에는 조회하지
   // 않지만(enabled:false) 훅 자체는 매 렌더 호출되므로 모듈 모킹에 반드시 있어야 한다.
-  useV1TeamLineupHistory: () => ({ data: undefined, isLoading: false }),
+  useV1TeamLineupHistory: (...args: unknown[]) => hoisted.useV1TeamLineupHistoryMock(...args),
   useV1TeamLineupPresets: () => ({ data: undefined, isLoading: false }),
   useV1CreateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
   useV1UpdateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
   useV1SaveTeamMatchLineup: () => ({ mutate: hoisted.saveMutate, isPending: false }),
   useV1SubmitTeamMatchLineup: () => ({ mutate: hoisted.submitMutate, isPending: false }),
+  useV1ChangeMembershipJersey: () => ({ mutate: hoisted.changeJerseyMutate, isPending: false }),
+  useV1AddLateTeamMatchLineupParticipant: () => ({ mutate: hoisted.lateAddMutate, isPending: false, isError: false, error: null }),
   // AppChrome 헤더/데스크톱 nav의 알림 벨이 호출한다 — 라인업 화면과 무관하지만 모듈 전체를
   // 모킹하는 이상 실제로 렌더되는 하위 트리가 쓰는 훅도 채워줘야 한다.
   useV1NotificationUnreadSummary: () => ({ data: undefined }),
@@ -483,6 +490,9 @@ function baseTeamMatch() {
     approvedOpponentTeam: { teamId: 'team-away', name: '상대팀', applicationId: 'app-1' },
   };
 }
+
+/** 명단에 한 명(게스트)이 있으면 "추가할 팀원" 목록이 보인다 — 빈 명단은 시작 카드만 보인다(A-1). */
+const GUEST_STARTER = { id: 'p-guest', userId: null, displayName: '용병', jerseyNumber: 50, position: null, goalkeeper: false, positionX: null, positionY: null };
 
 function baseLineup(overrides: Partial<V1TeamMatchLineup> = {}): V1TeamMatchLineup {
   return {
@@ -583,14 +593,14 @@ describe('TeamMatchLineupPageClient', () => {
 
       expect(screen.getByText('취소됨 · 잠김')).toBeInTheDocument();
       expect(screen.queryByText('경기 종료 · 잠김')).not.toBeInTheDocument();
-      expect(screen.queryByText(/후 공개돼요/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/공개까지|공개돼요/)).not.toBeInTheDocument();
     });
 
     it('대조군 — 같은 잠금이라도 끝난 경기는 종료 배지와 카운트다운을 그대로 보인다', () => {
       renderWith('completed');
 
       expect(screen.getByText('경기 종료 · 잠김')).toBeInTheDocument();
-      expect(screen.getByText(/후 공개돼요/)).toBeInTheDocument();
+      expect(screen.getByText(/^공개까지 \d+시간( \d+분)? 남았어요\.$/)).toBeInTheDocument();
     });
   });
 
@@ -657,7 +667,8 @@ describe('TeamMatchLineupPageClient', () => {
     expect(notDesignated.querySelector('svg')).toBeNull();
   });
 
-  it('친선 매치도 참석 응답 없이 직접 등록한다고 안내한다', () => {
+  // H5 A-1 — 빈 목록에서 한 명씩 누르지 않게, 전원 넣기와 지난 경기 명단이 먼저 보인다.
+  it('빈 참석명단은 "팀원 N명 모두 넣기"와 "지난 경기 명단으로 채우기"로 시작하고, 후보 목록은 그 뒤에 보인다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup(),
       isLoading: false,
@@ -667,8 +678,16 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText(/팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText('참석명단이 비어 있어요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '지난 경기 명단으로 채우기' })).toBeInTheDocument();
+    expect(screen.queryByText(/추가할 팀원/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /팀 일정에서 참석을 먼저 확인/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '팀원 1명 모두 넣기' }));
+
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.queryByText('참석명단이 비어 있어요')).not.toBeInTheDocument();
+    expect(screen.getByText('추가할 팀원 (0)')).toBeInTheDocument();
   });
 
   it('상대팀 승인 전에도 호스트 매니저는 참석명단을 작성할 수 있다', () => {
@@ -690,8 +709,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByRole('button', { name: '명단 추가' })).toBeEnabled();
-    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '팀원 1명 모두 넣기' })).toBeEnabled();
   });
 
   it('owner/manager: lets a manager add a waiting roster member to the appearance roster', async () => {
@@ -707,9 +725,8 @@ describe('TeamMatchLineupPageClient', () => {
 
     expect(screen.getByText('초안')).toBeInTheDocument();
     expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
-    expect(screen.getByText('추가 가능한 팀원 (1)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '팀원 1명 모두 넣기' }));
 
     expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '이전 참석명단 불러오기' })).toBeInTheDocument();
@@ -717,9 +734,9 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
   });
 
-  it('멤버 관리에서 지정한 팀 등번호가 "명단 추가" 때 등번호 칸에 채워진다', () => {
+  it('멤버 관리에서 지정한 팀 등번호가 "추가" 때 번호 칩에 채워진다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: baseLineup(),
+      data: baseLineup({ starters: [GUEST_STARTER] }),
       isLoading: false,
       isError: false,
       error: null,
@@ -731,16 +748,14 @@ describe('TeamMatchLineupPageClient', () => {
     });
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에 추가' }));
 
-    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
-    // L7 — 좁은 칸에서 두 자리 번호가 잘리던 결함은 스핀 버튼을 없앤 전용 클래스로 고친다(compact-number-input.test.ts).
-    expect(screen.getByLabelText('홍길동 등번호')).toHaveClass('tm-input-compact-number');
+    expect(screen.getByRole('button', { name: '홍길동 등번호 8번 바꾸기' })).toHaveTextContent('8');
   });
 
   it('팀 번호가 명단의 다른 행과 겹치면 비워 두고 누구와 겹치는지 알린다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: baseLineup(),
+      data: baseLineup({ starters: [GUEST_STARTER] }),
       isLoading: false,
       isError: false,
       error: null,
@@ -758,25 +773,50 @@ describe('TeamMatchLineupPageClient', () => {
     });
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
-    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
-    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
-    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에 추가' }));
+    expect(screen.getByRole('button', { name: '홍길동 등번호 8번 바꾸기' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에 추가' }));
 
-    expect(screen.getByLabelText('김철수 등번호')).toHaveValue(null);
+    expect(screen.getByRole('button', { name: '김철수 등번호 넣기' })).toBeInTheDocument();
     expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
 
     // 겹치지 않는 사람을 이어서 넣어도 떠 있던 안내는 남는다.
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
-    expect(screen.getByLabelText('이영희 등번호')).toHaveValue(9);
+    fireEvent.click(screen.getByRole('button', { name: '이영희 참석명단에 추가' }));
+    expect(screen.getByRole('button', { name: '이영희 등번호 9번 바꾸기' })).toBeInTheDocument();
     expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
   });
 
-  it('팀장·운영진은 참석 응답이 없는 활성 팀원도 참석명단에 직접 추가할 수 있다', () => {
+  it('"팀원 N명 모두 넣기"는 번호순으로 넣고, 팀 번호가 겹친 사람은 비워 두고 알린다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: baseLineup(), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 8 },
+          { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active', jerseyNumber: 8 },
+          { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: 3 },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '팀원 3명 모두 넣기' }));
+
+    const rows = screen.getAllByRole('listitem').map((row) => row.textContent);
+    expect(rows[0]).toContain('이영희');
+    expect(screen.getByRole('button', { name: '김철수 등번호 8번 바꾸기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동 등번호 넣기' })).toBeInTheDocument();
+    expect(screen.getByText(/홍길동님은 팀 등번호가 다른 선수와 겹쳐 비워 뒀어요/)).toBeInTheDocument();
+  });
+
+  // H5 A-3 — 팀 일정 응답은 후보 행의 읽기 전용 칩일 뿐, 명단 자격을 바꾸지 않는다.
+  it('팀장·매니저는 "못 가요"·미응답 팀원도 직접 넣고, 응답은 후보 행의 읽기 전용 칩으로만 보인다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
+        starters: [GUEST_STARTER],
         eligibleMembers: [
-          { userId: 'user-1', displayName: '홍길동', jerseyNumber: null, attending: true },
-          { userId: 'user-2', displayName: '김철수', jerseyNumber: null, attending: false },
+          { userId: 'user-1', displayName: '홍길동', jerseyNumber: null, attending: true, rsvpStatus: 'NO_RESPONSE' },
+          { userId: 'user-2', displayName: '김철수', jerseyNumber: null, attending: true, rsvpStatus: 'NOT_GOING' },
         ],
       }),
       isLoading: false,
@@ -796,15 +836,15 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText('추가 가능한 팀원 (2)')).toBeInTheDocument();
-    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText('추가할 팀원 (2)')).toBeInTheDocument();
+    expect(screen.getByText('미응답')).toHaveClass('tm-badge-orange');
+    expect(screen.getByText('못 가요')).toHaveClass('tm-badge-grey');
     expect(screen.queryByText(/참석 미확정/)).not.toBeInTheDocument();
 
-    const addButtons = screen.getAllByRole('button', { name: '명단 추가' });
-    expect(addButtons).toHaveLength(2);
-    fireEvent.click(addButtons[1]);
-    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
-    expect(screen.getByText('김철수')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에 추가' }));
+    expect(screen.getByText('참석명단 (2)')).toBeInTheDocument();
+    // 명단에 들어간 행에는 응답 칩이 따라가지 않는다 — 명단이 곧 출전이다.
+    expect(screen.queryByText('못 가요')).not.toBeInTheDocument();
   });
 
   it('member (non-manager): shows a permission-denied state instead of the editor', () => {
@@ -869,7 +909,7 @@ describe('TeamMatchLineupPageClient', () => {
 
   it('network loss: going offline blocks editing and surfaces an offline banner', async () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: baseLineup(),
+      data: baseLineup({ starters: [GUEST_STARTER] }),
       isLoading: false,
       isError: false,
       error: null,
@@ -911,7 +951,7 @@ describe('TeamMatchLineupPageClient', () => {
     vi.useFakeTimers();
     try {
       hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-        data: baseLineup(),
+        data: baseLineup({ starters: [GUEST_STARTER] }),
         isLoading: false,
         isError: false,
         error: null,
@@ -929,7 +969,7 @@ describe('TeamMatchLineupPageClient', () => {
 
       render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
+      fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에 추가' }));
       // 예전 자동저장 디바운스(900ms)를 훌쩍 넘겨도 아무것도 나가지 않아야 한다.
       act(() => {
         vi.advanceTimersByTime(5_000);
@@ -947,7 +987,7 @@ describe('TeamMatchLineupPageClient', () => {
   it('저장이 나가 있는 동안에는 저장 버튼이 잠겨 두 번째 저장이 겹치지 않는다', () => {
     Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: baseLineup(),
+      data: baseLineup({ starters: [GUEST_STARTER] }),
       isLoading: false,
       isError: false,
       error: null,
@@ -965,14 +1005,14 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에 추가' }));
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled();
 
     // 저장이 서버에 나가 있는 동안 편집을 이어가도, 사용자가 누르지 않은 저장이 자동으로
     // 뒤따라 나가지는 않는다 — 명시적 저장 정책의 핵심.
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에 추가' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -1016,8 +1056,8 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    // 대기 팀원을 선발로 추가 → dirty=true. 자동저장 디바운스(900ms)는 아직 돌지 않았다.
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    // 대기 팀원을 명단에 추가 → dirty=true. 저장은 아직 나가지 않았다.
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에 추가' }));
 
     // 곧바로 제출 버튼을 누른다 — 디바운스를 기다리지 않고 저장이 먼저 나가야 한다.
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
@@ -1055,7 +1095,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에 추가' }));
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
 
@@ -1100,17 +1140,17 @@ describe('TeamMatchLineupPageClient', () => {
 
     expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에서 제거' }));
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에서 빼기' }));
 
     expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
-    expect(screen.getByText('홍길동 선수를 명단에서 제거했어요.')).toBeInTheDocument();
+    expect(screen.getByText('홍길동 선수를 명단에서 뺐어요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
 
     expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
-    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
+    expect(screen.getByRole('button', { name: '홍길동 등번호 9번 바꾸기' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동, 골키퍼 지정 해제' })).toBeInTheDocument();
-    expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('홍길동 선수를 명단에서 뺐어요.')).not.toBeInTheDocument();
   });
 });
 
@@ -1142,7 +1182,7 @@ describe('TeamMatchLineupPageClient — 프리셋 저장 (L9)', () => {
 
   function openPresetDialog() {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '팀원 1명 모두 넣기' }));
     fireEvent.click(screen.getByRole('button', { name: '프리셋으로 저장' }));
     return screen.getByRole('dialog', { name: '프리셋으로 저장' });
   }
@@ -1370,7 +1410,7 @@ describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)',
     hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: members }, isLoading: false });
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: baseLineup(),
+      data: baseLineup({ starters: [GUEST_STARTER] }),
       isLoading: false,
       isError: false,
       error: null,
@@ -1393,10 +1433,10 @@ describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)',
     expect(within(candidateRow('박영희')).queryByText(/결장/)).toBeNull();
 
     // 자동으로 빼지 않는다 — 결장 중이어도 팀장이 고르면 들어간다.
-    fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '명단 추가' }));
-    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '김철수 참석명단에 추가' }));
+    expect(screen.getByText('참석명단 (2)')).toBeInTheDocument();
     // 명단에 넣은 뒤에도 그 행에 결장 배지가 남아 제출 전에 다시 볼 수 있다.
-    const placedRow = screen.getByLabelText('김철수 등번호').parentElement?.parentElement as HTMLElement;
+    const placedRow = screen.getByRole('button', { name: '김철수 등번호 넣기' }).closest('li') as HTMLElement;
     expect(within(placedRow).getByText('결장 · 부상')).toBeInTheDocument();
   });
 
@@ -1405,7 +1445,7 @@ describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)',
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     expect(hoisted.useV1TeamUnavailabilityMock).toHaveBeenLastCalledWith('team-host', null, { enabled: true });
-    expect(screen.getAllByRole('button', { name: '명단 추가' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /참석명단에 추가$/ })).toHaveLength(3);
   });
 
   it('결장 조회가 실패하면 표시 없이 편집기가 동작하고, 안내와 다시 불러오기를 보여 준다', () => {
@@ -1418,8 +1458,8 @@ describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)',
 
     expect(screen.getByText('결장 정보를 불러오지 못해 결장 표시 없이 보여요.')).toBeInTheDocument();
     expect(screen.queryByText(/^결장/, { selector: '.tm-badge' })).toBeNull();
-    fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '명단 추가' }));
-    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    fireEvent.click(within(candidateRow('김철수')).getByRole('button', { name: '김철수 참석명단에 추가' }));
+    expect(screen.getByText('참석명단 (2)')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '결장 정보 다시 불러오기' }));
     expect(hoisted.refetchUnavailability).toHaveBeenCalledTimes(1);
@@ -1436,6 +1476,226 @@ describe('TeamMatchLineupPageClient — 결장 중인 팀원 표시 (Task 179)',
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     expect(hoisted.useV1TeamUnavailabilityMock).toHaveBeenLastCalledWith('team-host', KICKOFF, { enabled: false });
-    expect(screen.queryByRole('button', { name: '명단 추가' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /참석명단에 추가$/ })).toBeNull();
+  });
+});
+
+describe('lineup.view-model — H5 안내·순서', () => {
+  const config = { positions: [], formations: [], minPlayers: 3, maxPlayers: 6 };
+
+  it('인원 안내(L28)는 기준 밖일 때만, 모자람은 경고·넘침은 참고 톤이다 — 경계 포함', () => {
+    expect(describeLineupSizeNotice(2, config)).toMatchObject({ tone: 'warn', emphasis: '지금 2명', before: '이 경기 기준 인원은 3~6명이에요 · ' });
+    expect(describeLineupSizeNotice(3, config)).toBeNull();
+    expect(describeLineupSizeNotice(6, config)).toBeNull();
+    const over = describeLineupSizeNotice(7, config);
+    expect(over).toMatchObject({ tone: 'info', emphasis: '지금 7명' });
+    // 최대치는 한 번에 뛰는 인원일 수 있다 — 넘쳐도 제출할 수 있다고, 교체 선수 얘기로 오해를 막는다.
+    expect(over?.after).toContain('그대로 제출할 수 있어요');
+    expect(describeLineupSizeNotice(0, config)).toBeNull();
+    expect(describeLineupSizeNotice(9, undefined)).toBeNull();
+    expect(describeLineupSizeNotice(1, { positions: [], formations: [], minPlayers: 5, maxPlayers: 5 })?.before).toContain('5명이에요');
+  });
+
+  it('GK 안내는 두 명 이상일 때만', () => {
+    expect(describeGoalkeeperNotice(1)).toBeNull();
+    expect(describeGoalkeeperNotice(2)).toMatchObject({ emphasis: '2명' });
+  });
+
+  it('공개 안내(L10)는 누구에게·언제를 말하고, 기본 공개 시각이면 "킥오프 1시간 전"을 붙인다', () => {
+    const now = new Date('2026-09-30T06:00:00.000Z').getTime(); // KST 15:00
+    expect(describePublicationNotice('2026-09-30T11:00:00.000Z', '2026-09-30T12:00:00.000Z', now)).toBe(
+      '킥오프 1시간 전(오후 8:00)에 상대 팀에게 이 명단이 공개돼요. 그 전까지 상대는 제출했는지만 볼 수 있어요.',
+    );
+    expect(describePublicationNotice('2026-09-30T10:00:00.000Z', '2026-09-30T12:00:00.000Z', now)).toMatch(/^오후 7:00에 상대 팀에게/);
+    expect(describePublicationNotice('2026-10-07T11:00:00.000Z', '2026-10-07T12:00:00.000Z', now)).toMatch(/^킥오프 1시간 전\(10\/7 \(수\) 오후 8:00\)/);
+  });
+
+  it('명단·후보는 번호순, 번호 없는 사람은 뒤, 같은 번호면 이름순이다', () => {
+    const rows = [
+      { displayName: '홍', jerseyNumber: null },
+      { displayName: '나', jerseyNumber: 10 },
+      { displayName: '가', jerseyNumber: 2 },
+      { displayName: '다', jerseyNumber: 10 },
+    ].sort(compareByJersey);
+    expect(rows.map((row) => row.displayName)).toEqual(['가', '나', '다', '홍']);
+  });
+
+  it('전원 추가는 이미 있는 사람을 건너뛰고, 팀 번호가 겹친 사람을 알려 준다', () => {
+    const start = addRosterMemberToLineup(createEmptyLineupEditorState(1), { userId: 'u-1', displayName: '가', role: 'member', jerseyNumber: 5 });
+    const { state, clearedJersey } = addAllRosterMembersToLineup(start, [
+      { userId: 'u-1', displayName: '가', role: 'member', jerseyNumber: 5 },
+      { userId: 'u-2', displayName: '나', role: 'member', jerseyNumber: 5 },
+      { userId: 'u-3', displayName: '다', role: 'member', jerseyNumber: null },
+    ]);
+    expect(state.participants.map((entry) => [entry.displayName, entry.jerseyNumber])).toEqual([
+      ['가', 5],
+      ['나', null],
+      ['다', null],
+    ]);
+    expect(clearedJersey).toEqual(['나']);
+  });
+});
+
+describe('TeamMatchLineupPageClient — H5 참석명단', () => {
+  const members = [
+    { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 7 },
+    { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active', jerseyNumber: 9 },
+  ];
+  const starter = (userId: string | null, displayName: string, jerseyNumber: number | null, goalkeeper = false) => ({
+    id: `p-${displayName}`, userId, displayName, jerseyNumber, position: null, goalkeeper, positionX: null, positionY: null,
+  });
+
+  function renderLineup(overrides: Partial<V1TeamMatchLineup>) {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: baseLineup(overrides), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: baseTeamMatch(), isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: members }, isLoading: false });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
+    hoisted.useV1TeamLineupHistoryMock.mockReturnValue({ data: undefined, isLoading: false });
+  });
+
+  it('D-5 번호 시트: "이 경기만"은 초안만, "팀 번호도 함께"는 팀 번호를 저장한 뒤 초안까지 바꾼다', () => {
+    hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onSuccess: () => void }) => options.onSuccess());
+    renderLineup({ starters: [starter('user-1', '홍길동', 7)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 등번호 7번 바꾸기' }));
+    const sheet = screen.getByRole('dialog', { name: '홍길동 등번호' });
+    expect(within(sheet).getByLabelText('등번호')).toHaveAttribute('type', 'text');
+    expect(within(sheet).getByText(/지금 팀 번호는 7번이에요/)).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: '저장할 변경이 없어요' })).toBeDisabled();
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '10' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '10번으로 저장' }));
+    expect(hoisted.changeJerseyMutate).not.toHaveBeenCalled();
+    // L7 — 두 자리 번호가 칩에 온전히 보인다(좁은 숫자 칸·스핀 버튼이 없는 텍스트 입력이라 잘리지 않는다).
+    expect(screen.getByRole('button', { name: '홍길동 등번호 10번 바꾸기' })).toHaveTextContent(/^10$/);
+
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 등번호 10번 바꾸기' }));
+    const again = screen.getByRole('dialog', { name: '홍길동 등번호' });
+    fireEvent.click(within(again).getByLabelText('팀 번호도 함께 바꿔요'));
+    fireEvent.change(within(again).getByLabelText('등번호'), { target: { value: '11' } });
+    fireEvent.click(within(again).getByRole('button', { name: '11번으로 저장' }));
+    expect(hoisted.changeJerseyMutate).toHaveBeenCalledWith({ membershipId: 'm-1', jerseyNumber: 11 }, expect.anything());
+    expect(screen.getByRole('button', { name: '홍길동 등번호 11번 바꾸기' })).toBeInTheDocument();
+  });
+
+  it('D-5 번호 시트: 팀 번호 저장이 실패하면 초안도 그대로 두고 이유를 보인다', () => {
+    hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onError: (error: Error) => void }) =>
+      options.onError(new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_JERSEY_NUMBER_TAKEN', message: '이미 같은 등번호를 쓰는 팀원이 있어요.', timestamp: '2026-09-30T00:00:00.000Z' })),
+    );
+    renderLineup({ starters: [starter('user-1', '홍길동', 7)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 등번호 7번 바꾸기' }));
+    const sheet = screen.getByRole('dialog', { name: '홍길동 등번호' });
+    fireEvent.click(within(sheet).getByLabelText('팀 번호도 함께 바꿔요'));
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '9' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '9번으로 저장' }));
+
+    expect(within(sheet).getByText('이미 같은 등번호를 쓰는 팀원이 있어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '홍길동 등번호 9번 바꾸기' })).not.toBeInTheDocument();
+  });
+
+  it('D-5 번호 시트: 게스트는 팀 번호 선택지가 없고, 명단의 다른 번호와 겹치면 저장을 막는다', () => {
+    renderLineup({ starters: [starter(null, '용병', 5), starter('user-1', '홍길동', 7)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '용병 등번호 5번 바꾸기' }));
+    const sheet = screen.getByRole('dialog', { name: '용병 등번호' });
+    expect(within(sheet).queryByLabelText('팀 번호도 함께 바꿔요')).not.toBeInTheDocument();
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '7' } });
+    expect(within(sheet).getByText('7번은 홍길동이 쓰고 있어요. 다른 번호를 넣어 주세요.')).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: '7번으로 저장' })).toBeDisabled();
+  });
+
+  it('L28: 기준 인원을 넘어도 막지 않고 한 줄로 알린다 — 제출 버튼은 그대로 열려 있다', () => {
+    renderLineup({
+      lineupConfig: { positions: [], formations: [], minPlayers: 3, maxPlayers: 6 },
+      starters: Array.from({ length: 7 }, (_, index) => starter(null, `선수${index + 1}`, index + 1, index < 2)),
+    });
+
+    expect(screen.getByText('지금 7명')).toBeInTheDocument();
+    expect(screen.getByText('2명')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeEnabled();
+  });
+
+  it('L10: 공개 전 명단은 누구에게·언제 공개되는지와 남은 시간을 말한다', () => {
+    // 시각 문구가 KST 날짜 경계를 넘지 않게 지금을 고정한다(오후 3시, 킥오프 오후 6시).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-09-30T06:00:00.000Z'));
+      hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), startsAt: '2026-09-30T09:00:00.000Z' }, isLoading: false, isError: false });
+      renderLineup({ starters: [starter('user-1', '홍길동', 7)], publicLineupAt: null });
+
+      expect(screen.getByText('킥오프 1시간 전(오후 5:00)에 상대 팀에게 이 명단이 공개돼요. 그 전까지 상대는 제출했는지만 볼 수 있어요.')).toBeInTheDocument();
+      expect(screen.getByText('공개까지 2시간 남았어요.')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('H5 결정 A: 첫 기록 뒤에는 "추가만" — 빼기·번호 칩·GK 토글이 닫히고 늦게 온 선수 시트가 열린다', () => {
+    renderLineup({
+      state: 'SUBMITTED',
+      revision: 2,
+      editable: false,
+      lockReason: 'records_exist',
+      lateAdditionAllowed: true,
+      starters: [starter('user-1', '홍길동', 7)],
+    });
+
+    expect(screen.getByText('경기 중 · 추가만')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /빼기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '홍길동 등번호 7번 바꾸기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '늦게 온 선수 추가' }));
+    const sheet = screen.getByRole('dialog', { name: '늦게 온 선수 추가' });
+    expect(within(sheet).queryByRole('button', { name: '홍길동 명단에 추가' })).not.toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: '김철수 명단에 추가' }));
+    expect(hoisted.lateAddMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { userId: 'user-2', jerseyNumber: 9 } }),
+      expect.anything(),
+    );
+  });
+
+  it('대조군 — 같은 기록 잠금이라도 추가가 닫혀 있으면(결과 확정 등) 추가 입구가 없다', () => {
+    renderLineup({
+      state: 'SUBMITTED',
+      revision: 2,
+      editable: false,
+      lockReason: 'records_exist',
+      lateAdditionAllowed: false,
+      starters: [starter('user-1', '홍길동', 7)],
+    });
+
+    expect(screen.getByText('기록 시작 · 잠김')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '늦게 온 선수 추가' })).not.toBeInTheDocument();
+  });
+
+  it('L8: 불러오기 목록은 "날짜 vs 상대 · N명"이고 편집 중인 이 경기는 빠진다', () => {
+    hoisted.useV1TeamLineupHistoryMock.mockReturnValue({
+      data: {
+        items: [
+          { lineupId: 'l-self', gameId: 'game-1', source: 'TEAM_MATCH', sourceLabel: '팀 매치', opponentName: '상대팀', playedAt: '2026-09-30T12:00:00.000Z', sportName: null, formation: null, starterCount: 3, benchCount: 0, participants: [] },
+          { lineupId: 'l-old', gameId: 'game-0', source: 'TEAM_MATCH', sourceLabel: '팀 매치', opponentName: '합정 유나이티드', playedAt: '2026-09-23T12:00:00.000Z', sportName: null, formation: null, starterCount: 2, benchCount: 0,
+            participants: [
+              { userId: 'user-1', displayName: '홍길동', jerseyNumber: 7, position: null, positionX: null, positionY: null, started: true, goalkeeper: false },
+              { userId: 'user-2', displayName: '김철수', jerseyNumber: 9, position: null, positionX: null, positionY: null, started: true, goalkeeper: false },
+            ] },
+        ],
+      },
+      isLoading: false,
+    });
+    renderLineup({ starters: [] });
+
+    fireEvent.click(screen.getByRole('button', { name: '지난 경기 명단으로 채우기' }));
+    const sheet = screen.getByRole('dialog', { name: '이전 참석명단 불러오기' });
+    expect(within(sheet).getByText('9/23 (수) vs 합정 유나이티드 · 2명')).toBeInTheDocument();
+    expect(within(sheet).queryByText(/상대팀/)).not.toBeInTheDocument();
+    expect(within(sheet).queryByText(/선발/)).not.toBeInTheDocument();
   });
 });

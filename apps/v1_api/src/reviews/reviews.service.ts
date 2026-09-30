@@ -473,6 +473,7 @@ export class ReviewsService {
       const review = await tx.v1PostEventReview.create({
         data: {
           reviewerUserId: user.id, sourceType: 'platform_team_match', sourceId: dto.sourceId,
+          platformReviewKey: `${dto.sourceId}:${dto.targetType}:${target.targetUserId ?? target.targetTeamId}`,
           targetType: dto.targetType, targetUserId: target.targetUserId, targetTeamId: target.targetTeamId,
           rating: dto.rating, sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },

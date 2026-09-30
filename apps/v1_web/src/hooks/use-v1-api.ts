@@ -144,6 +144,10 @@ import type {
   V1Sport,
   V1Team,
   V1TeamDetail,
+  V1TeamDissolutionPreview,
+  V1DissolveTeamResult,
+  V1RestoreTeamResult,
+  V1MyDissolvedTeams,
   V1TeamJoinApplicationResult,
   V1TeamJoinApplicationsPage,
   V1TeamJoinEligibility,
@@ -1252,6 +1256,49 @@ export function useV1LeaveTeam(teamId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
+  });
+}
+
+// ── Team dissolution (Task 180 H3) — 팀장 전용 해체(보관)·30일 복구 ─────────────
+export function useV1TeamDissolutionPreview(teamId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamDissolutionPreview(teamId),
+    queryFn: () => v1Get<V1TeamDissolutionPreview>(`/teams/${teamId}/dissolution-preview`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+  });
+}
+
+/** 해체·복구 뒤 팀이 목록·내 팀·해체한 팀·팀매치(자동 취소)·채팅방(보관/재개)에서 바뀐다. */
+function invalidateTeamLifecycleCaches(queryClient: QueryClient) {
+  // teamsAll 이 이 팀의 상세·멤버·해체 점검까지 덮는다.
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamsAll() });
+  queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
+  queryClient.invalidateQueries({ queryKey: v1Keys.myDissolvedTeams() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamMatchesAll() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+}
+
+export function useV1DissolveTeam(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { confirmTeamName: string }) => v1Post<V1DissolveTeamResult>(`/teams/${teamId}/dissolve`, body),
+    onSuccess: () => invalidateTeamLifecycleCaches(queryClient),
+  });
+}
+
+export function useV1RestoreTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId }: { teamId: string }) => v1Post<V1RestoreTeamResult>(`/teams/${teamId}/restore`, {}),
+    onSuccess: () => invalidateTeamLifecycleCaches(queryClient),
+  });
+}
+
+export function useV1MyDissolvedTeams(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.myDissolvedTeams(),
+    queryFn: () => v1Get<V1MyDissolvedTeams>('/me/dissolved-teams'),
+    enabled: options?.enabled ?? true,
   });
 }
 

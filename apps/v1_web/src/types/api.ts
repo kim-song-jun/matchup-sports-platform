@@ -720,6 +720,79 @@ export type V1TeamDetail = {
     disabledReason: string | null;
     manageRoute: string | null;
   };
+  /**
+   * 해체(보관)된 팀일 때만 채워진다(Task 180 H3). 이때 `status` 는 'archived' 이고 viewer 는
+   * 누구에게나 비회원 형태라 운영 화면이 닫힌다. `canRestore` 는 팀장이 해체한 팀의 팀장에게 30일 안만 true.
+   */
+  dissolution?: V1TeamDissolutionInfo | null;
+};
+
+export type V1TeamDissolutionInfo = {
+  dissolvedAt: string | null;
+  /** 팀장 해체(owner)만 셀프 복구 대상이고 운영팀 보관(admin)은 운영팀만 푼다. 팀장이 아닌 viewer 에게는 null. */
+  archivedBy: 'owner' | 'admin' | null;
+  /** 셀프 복구 기한. 운영팀 보관이면 null. */
+  restoreDeadlineAt: string | null;
+  canRestore: boolean;
+};
+
+export type V1TeamDissolutionBlockerKind = 'live_game' | 'matched_team_match' | 'league_entry' | 'tournament_entry';
+
+export type V1TeamDissolutionBlocker = {
+  kind: V1TeamDissolutionBlockerKind;
+  items: Array<{
+    id: string;
+    title: string;
+    opponentName: string | null;
+    startAt: string | null;
+    placeName: string | null;
+    /** 대회·리그 참가 항목에만 있다. */
+    registrationStatus: V1TournamentRegistrationStatus | null;
+    /** 정리하러 갈 화면. 갈 곳이 없으면 null. */
+    route: string | null;
+  }>;
+};
+
+/** `GET /teams/:teamId/dissolution-preview` — 팀장 전용 해체 사전 점검. */
+export type V1TeamDissolutionPreview = {
+  teamId: string;
+  teamName: string;
+  canDissolve: boolean;
+  blockers: V1TeamDissolutionBlocker[];
+  cleanup: {
+    recruitingTeamMatchCount: number;
+    outgoingApplicationCount: number;
+    joinApplicationCount: number;
+    invitationCount: number;
+    upcomingSchedules: Array<{ scheduleId: string; title: string; startAt: string }>;
+    notifyMemberCount: number;
+  };
+  restoreWindowDays: number;
+};
+
+export type V1DissolveTeamResult = V1TeamDissolutionInfo & {
+  teamId: string;
+  status: 'archived';
+  cancelledTeamMatchCount: number;
+  cancelledScheduleCount: number;
+  notifiedMemberCount: number;
+  detailRoute: string;
+};
+
+/** `POST /teams/:teamId/restore` — 30일 안이면 팀과 팀 채팅방만 다시 연다. */
+export type V1RestoreTeamResult = { teamId: string; status: 'active'; detailRoute: string };
+
+/** `GET /me/dissolved-teams` — 내가 팀장인 보관 팀. 기간이 지났거나 운영팀이 보관한 팀도 canRestore=false 로 온다. */
+export type V1MyDissolvedTeams = {
+  items: Array<V1TeamDissolutionInfo & {
+    teamId: string;
+    name: string;
+    logoUrl: string | null;
+    sportName: string;
+    memberCount: number;
+    detailRoute: string;
+  }>;
+  restoreWindowDays: number;
 };
 
 export type V1TeamMutationPayload = {

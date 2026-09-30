@@ -10,6 +10,7 @@ import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toTeamRegionOptions } from '@/lib/v1-regions';
@@ -237,6 +238,16 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   }
   if (!query.data) {
     return <TeamDetailPageSkeleton />;
+  }
+  // 저장은 서버가 403 으로 막지만, 폼을 채우게 둔 뒤 거절하면 헛수고다.
+  if (!isTeamOperatorRole(query.data.viewer?.role)) {
+    return (
+      <ErrorState
+        title="팀장·매니저만 고칠 수 있어요"
+        message="팀 정보 수정은 팀장·매니저가 해요. 바꾸고 싶은 게 있으면 팀장에게 알려 주세요."
+        back={{ href: `/teams/${teamId}`, label: '팀 상세로 돌아가기' }}
+      />
+    );
   }
 
   const model = buildModel({

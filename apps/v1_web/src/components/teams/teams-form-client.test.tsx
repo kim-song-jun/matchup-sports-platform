@@ -117,6 +117,7 @@ describe('Team form client contracts', () => {
         memberCount: 12,
         membersVisibilityEnabled: false,
         version: 'version-1',
+        viewer: { role: 'owner' },
       },
       isError: false,
       isLoading: false,
@@ -238,6 +239,31 @@ describe('Team form client contracts', () => {
     fireEvent.click(submit);
 
     expect(updateTeamMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  describe('수정 권한', () => {
+    function viewAs(role: string) {
+      const current = useV1TeamDetailMock();
+      useV1TeamDetailMock.mockReturnValue({ ...current, data: { ...current.data, teamId: 'team-futsal', viewer: { role } } });
+    }
+
+    it.each(['member', 'none'])('%s 는 수정 폼 대신 권한 안내와 돌아갈 길을 본다', (role) => {
+      viewAs(role);
+      render(<TeamEditPageClient teamId="team-futsal" />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent('팀장·매니저만 고칠 수 있어요');
+      expect(screen.getByRole('alert')).toHaveTextContent('팀장에게');
+      expect(screen.getByRole('link', { name: '팀 상세로 돌아가기' })).toHaveAttribute('href', '/teams/team-futsal');
+      expect(screen.queryByLabelText('팀 이름')).not.toBeInTheDocument();
+    });
+
+    it.each(['owner', 'manager'])('%s 는 수정 폼을 본다', (role) => {
+      viewAs(role);
+      render(<TeamEditPageClient teamId="team-futsal" />);
+
+      expect(screen.getByLabelText('팀 이름')).toBeInTheDocument();
+      expect(screen.queryByText('팀장·매니저만 고칠 수 있어요')).not.toBeInTheDocument();
+    });
   });
 
   describe('profile-completion leave', () => {

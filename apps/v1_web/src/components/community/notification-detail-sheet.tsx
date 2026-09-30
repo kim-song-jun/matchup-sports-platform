@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { useDelayedUnmount } from '@/components/v1-ui/use-delayed-unmount';
 import type { NotificationModel } from './community.types';
-import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
+import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
@@ -131,14 +131,14 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
 
         <div className="tm-notification-sheet-head">
           <div className="tm-notification-icon" aria-hidden="true">
-            <NotificationTypeIcon type={shown.type} size={18} />
+            <NotificationTypeIcon type={notificationVisualType(shown.type, shown.href)} size={18} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 id={titleId} className="tm-text-body-lg" style={{ margin: 0 }}>
               {shown.title}
             </h2>
             <div className="tm-notification-meta">
-              {notificationTypeLabel(shown.type)} · {shown.time}
+              {notificationTypeLabel(notificationVisualType(shown.type, shown.href))} · {shown.time}
             </div>
           </div>
         </div>

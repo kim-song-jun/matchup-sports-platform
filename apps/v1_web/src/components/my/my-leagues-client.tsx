@@ -7,7 +7,8 @@ import { useV1MyLeagues } from '@/hooks/use-v1-api';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
+import { leagueStateChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import { withFromPath } from '@/lib/session-storage';
 
 /**
@@ -63,7 +64,6 @@ export function MyLeaguesPageClient() {
         ) : (
           <ul className="tm-my-list-stack" role="list" aria-label="내 리그 목록">
             {items.map((item) => {
-              const stateMeta = LEAGUE_STATE_META[item.state];
               const accent = getSportAccent(item.sport.code);
               return (
                 <li key={item.leagueId} className="tm-card tm-my-league-card">
@@ -75,7 +75,7 @@ export function MyLeaguesPageClient() {
                     <div className="tm-my-league-title-line">
                       <span className="tm-text-body-lg">{item.title}</span>
                       {item.tierLabel != null ? <span className="tm-badge tm-badge-sm tm-badge-blue">{item.tierLabel}</span> : null}
-                      <span className={`tm-badge tm-badge-sm ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
+                      <StatusChip chip={leagueStateChip(item.state)} />
                     </div>
                     {item.seriesTitle != null ? (
                       <div className="tm-text-caption">

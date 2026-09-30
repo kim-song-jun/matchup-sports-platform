@@ -2245,6 +2245,36 @@ export type V1HomeShortcut = {
   disabledReason: string | null;
 };
 
+/** 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 앞으로의 경기 중 가장 가까운 하나이고, 출전 여부는 서버가 판정한다. */
+export type V1HomeNextGame = {
+  gameId: string;
+  teamMatchId: string | null;
+  competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
+  /** 대회면 대회 id, 리그면 리그 id. */
+  competitionId: string | null;
+  title: string;
+  opponentName: string | null;
+  scheduledAt: string;
+  placeName: string | null;
+  teamId: string;
+  teamName: string;
+  /** 팀장·매니저. 카드의 주 버튼이 "명단 확인"이 된다. */
+  viewerCanManage: boolean;
+  viewerParticipating: boolean;
+  /** 대회·리그의 계산된 출전 인원. 친선·확정 명단 없는 팀은 null. */
+  participantCount: number | null;
+};
+
+export type V1HomeTeamActivity = {
+  /** 활성 팀이 하나라도 있는지. false 면 다음 경기 자리가 "먼저 해 볼 일" 빈 상태다. */
+  hasTeam: boolean;
+  nextGame: V1HomeNextGame | null;
+  /** 내가 받은 대기 중인 팀 초대(초대함과 같은 조건). 없으면 null. */
+  pendingInvitations: { count: number; latestTeamName: string } | null;
+  /** 내가 팀장·매니저인 팀들의 대기 가입 신청. `teamId` 는 가장 많이 쌓인 팀. 없으면 null. */
+  pendingJoinRequests: { count: number; teamId: string; teamName: string; otherTeamCount: number } | null;
+};
+
 export type V1Home = {
   viewer?: {
     authenticated: boolean;
@@ -2257,6 +2287,8 @@ export type V1Home = {
     trustState: string;
     pendingLabel: string | null;
   };
+  /** null 은 "팀이 없다"가 아니라 서버가 계산하지 못했다는 뜻이다 — 이 영역을 그리지 않는다. */
+  teamActivity?: V1HomeTeamActivity | null;
   featuredMatch?: {
     matchId: string;
     title: string;

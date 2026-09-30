@@ -9,7 +9,7 @@ import {
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
-  AdminStatusPill,
+  AdminLeagueStatePill,
 } from '@/components/admin';
 import { useV1AdminLeagueMatchList, useV1AdminLeagueSeriesList } from '@/hooks/use-v1-api';
 import type { V1AdminLeagueListItem } from '@/types/league-match';
@@ -235,7 +235,7 @@ function LeagueListTable({
               </span>
             ),
         },
-        { key: 'state', header: '상태', render: (row) => <AdminStatusPill status={row.state} /> },
+        { key: 'state', header: '상태', render: (row) => <AdminLeagueStatePill state={row.state} /> },
         { key: 'teamCount', header: '참가 팀', render: (row) => `${row.teamCount}팀` },
         { key: 'fixtureCount', header: '대진 수', render: (row) => `${row.fixtureCount}경기` },
       ]}

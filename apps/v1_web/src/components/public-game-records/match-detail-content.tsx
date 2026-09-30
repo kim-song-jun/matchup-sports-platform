@@ -337,11 +337,14 @@ export function MatchDetailContent({
   data,
   from,
   afterHeader,
+  showInlineStatus = true,
 }: {
   data: PublicMatchDetail;
   from?: string;
   /** 헤더(스코어 카드) 바로 아래 자리 — 참가팀 전용 카드(우리 팀 출전)가 쓴다. */
   afterHeader?: ReactNode;
+  /** false 면 일시 줄의 " · 예정" 을 뺀다 — 화면 위에 경기 상태 칩이 이미 있을 때(리그 경기 상세). */
+  showInlineStatus?: boolean;
 }) {
   const isStatusOnly = data.visibilityMode === 'status_only';
   return (
@@ -411,7 +414,7 @@ export function MatchDetailContent({
           >
             <span>
               {data.scheduledAt ? formatTournamentDateTimeLong(data.scheduledAt) : '일정 미정'}
-              {data.status !== 'live' ? ` · ${fixtureStatusLabel(data.status)}` : ''}
+              {showInlineStatus && data.status !== 'live' ? ` · ${fixtureStatusLabel(data.status)}` : ''}
               {data.venue ? ` · ${data.venue}` : ''}
               {data.fieldName ? ` (${data.fieldName})` : ''}
             </span>

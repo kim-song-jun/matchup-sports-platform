@@ -19,6 +19,6 @@ import { TeamUpcomingGamesService } from './team-upcoming-games.service';
     TeamTacticsBoardService,
     TeamUpcomingGamesService,
   ],
-  exports: [LineupTodoService],
+  exports: [LineupTodoService, TeamUpcomingGamesService],
 })
 export class TeamLineupsModule {}

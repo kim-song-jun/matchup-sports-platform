@@ -608,6 +608,8 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     // StateCard 는 tone 표(STATE_CARD_TONE)로 --tint-grey/green/orange 를 까서 태그에서 잡히는 것은
     // `background: color.background` 다. 이 파일의 틴트 Card 는 넷이고 전부 표시가 붙어야 한다.
     ['src/components/team-matches/team-matches-page.tsx', 'Card', /var\(--(?:grey50|orange50)\)|background: color\.background/, 4],
+    // 팀매치 상세 "지금 할 일" 카드(H6) — tone 표(TONE)로 --tint-blue/orange/green/grey 를 깐다.
+    ['src/components/team-matches/team-match-now-card.tsx', 'section', /background: color\.background/, 1],
   ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
     const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);

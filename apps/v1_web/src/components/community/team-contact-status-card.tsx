@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { Ban, CheckCircle2, Clock3, MinusCircle, XCircle } from 'lucide-react';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
@@ -82,6 +83,7 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
   const withdrawContact = useV1WithdrawTeamContact(contactId);
   const createBlock = useV1CreateTeamContactBlock(myTeam.id);
   const reportContact = useV1CreateInquiry();
+  const { confirm, ConfirmModal: acceptConfirmModal } = useConfirm();
 
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
@@ -96,7 +98,14 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
 
   const actionsPending = acceptContact.isPending || declineContact.isPending || withdrawContact.isPending;
 
-  function handleAccept() {
+  // 수락은 되돌릴 API 가 없고 같은 팀쌍의 새 컨택을 막는다 — 한 번 더 묻는다. 거절은 사유 패널이 그 단계다.
+  async function handleAccept() {
+    const confirmed = await confirm({
+      title: `${counterpart.name}의 컨택을 수락할까요?`,
+      message: `수락하면 이 방에서 두 팀이 바로 대화할 수 있고, ${counterpart.name} 팀장·매니저에게도 알림이 가요. 수락한 컨택은 되돌릴 수 없어요.`,
+      confirmLabel: '수락하기',
+    });
+    if (!confirmed) return;
     setActionError(null);
     acceptContact.mutate(undefined, {
       onError: (err) => setActionError(extractErrorMessage(err, '수락하지 못했어요. 잠시 후 다시 시도해 주세요.')),
@@ -213,7 +222,7 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
               <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" style={{ flex: 1, minHeight: 44 }} onClick={() => setDeclineOpen(true)} disabled={actionsPending}>
                 거절
               </button>
-              <button type="button" className="tm-btn tm-btn-lg tm-btn-primary" style={{ flex: 1, minHeight: 44 }} onClick={handleAccept} disabled={actionsPending}>
+              <button type="button" className="tm-btn tm-btn-lg tm-btn-primary" style={{ flex: 1, minHeight: 44 }} onClick={() => void handleAccept()} disabled={actionsPending}>
                 {acceptContact.isPending ? '수락하는 중' : '수락'}
               </button>
             </div>
@@ -274,6 +283,7 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
         }}
         onSubmit={handleReportSubmit}
       />
+      {acceptConfirmModal}
     </>
   );
 }
@@ -309,7 +319,7 @@ function ReportContactDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'rgba(25,31,40,0.45)' }}
+      style={{ background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)' }}
       onClick={onBackdropClick}
     >
       <div
@@ -318,7 +328,7 @@ function ReportContactDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         className="w-full max-w-[360px] rounded-2xl overflow-hidden"
-        style={{ background: 'var(--card-surface, #fff)', boxShadow: '0 8px 32px rgba(20,28,45,0.14)' }}
+        style={{ background: 'var(--card-surface)', boxShadow: 'var(--shadow-modal)' }}
         onClick={(event) => event.stopPropagation()}
       >
         <div style={{ padding: '24px 20px 16px', display: 'grid', gap: 12 }}>

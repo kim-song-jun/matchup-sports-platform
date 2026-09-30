@@ -137,12 +137,19 @@ describe('MatchDetailPageView — 참가비(costNote)', () => {
   it('참가비와 규칙이 둘 다 있어도 서로 다른 텍스트로 각자 한 번씩만 노출된다 (중복 노출 방지)', () => {
     const model = getMatchDetailViewModel('default');
     model.match.costNote = '10,000원/1인';
-    model.match.rules = ['풋살화 착용, 지각 시 미리 연락'];
+    const rulesText = '풋살화 착용\n\n지각 시 미리 연락';
+    model.match.rules = [rulesText];
     render(<MatchDetailPageView model={model} />);
 
     // 참가비 행: 데스크톱·모바일 각 1회 = 2회. 규칙 카드에 새어 나왔다면 3회 이상이 된다.
     expect(screen.getAllByText('10,000원/1인').length).toBe(2);
-    expect(screen.getAllByText('풋살화 착용, 지각 시 미리 연락').length).toBeGreaterThan(0);
+    const rules = screen.getAllByText((_, element) =>
+      element?.textContent === rulesText && element.children.length === 0,
+    );
+    expect(rules).toHaveLength(2);
+    for (const rule of rules) {
+      expect(rule).toHaveStyle({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' });
+    }
   });
 });
 

@@ -37,7 +37,7 @@ vi.mock('@/components/public-game-records/claim-my-record', () => ({ ClaimMyReco
 vi.mock('@/components/tournaments/tournament-inquiry-section', () => ({ TournamentInquirySection: () => null }));
 // 우리 팀 판별·카드 내부는 match-team-roster-card.test.tsx 가 실제 훅으로 검증한다.
 vi.mock('@/components/game-roster/use-my-match-roster-team', () => ({
-  useMyMatchRosterTeam: vi.fn(() => ({ status: 'resolved', teamId: 'team-a', gameId: 'g1' })),
+  useMyMatchRosterTeam: vi.fn(() => ({ status: 'resolved', teamId: 'team-a', gameId: 'g1', viewerUserId: 'user-me' })),
 }));
 vi.mock('@/components/game-roster/match-team-roster-card', () => ({
   MatchTeamRosterCard: ({ team }: { team: { status: string } }) => <div data-testid="roster-card">{team.status}</div>,

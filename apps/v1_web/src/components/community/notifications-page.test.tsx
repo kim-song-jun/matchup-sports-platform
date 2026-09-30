@@ -106,4 +106,36 @@ describe('NotificationsPageView — 상세 시트', () => {
 
     expect(screen.getByRole('dialog')).toHaveTextContent('추가 안내 내용이 없어요.');
   });
+
+  it('F44: 한 리그의 대진·명단 알림은 서버 종류가 달라도 같은 아이콘·"리그 알림"이다 (대조군: 리그 아닌 팀매치·대회 알림은 그대로)', () => {
+    const make = (id: string, type: string, title: string, href: string): NotificationModel => ({
+      ...notification, id, type, title, href, body: '',
+    });
+    renderWithClient(
+      <NotificationsPageView
+        model={makeModel({
+          notifications: [
+            make('n-fixtures', 'team_match', '리그 대진이 확정됐어요', '/league-matches/l-1?from=%2Fnotifications'),
+            make('n-roster', 'tournament', '리그 명단이 자동 확정됐어요', '/leagues/l-1?from=%2Fnotifications'),
+            make('n-friendly', 'team_match', '팀매치 신청이 왔어요', '/team-matches/tm-1?from=%2Fnotifications'),
+            make('n-cup', 'tournament', '대회 참가가 승인됐어요', '/tournaments/t-1?from=%2Fnotifications'),
+          ],
+          onOpen: vi.fn(),
+          onNavigate: vi.fn(),
+        })}
+      />,
+    );
+
+    const card = (title: string) => screen.getByRole('button', { name: new RegExp(title) });
+    const icon = (title: string) => card(title).querySelector('.tm-notification-icon')?.innerHTML;
+    expect(card('리그 대진이 확정됐어요')).toHaveAccessibleName(/^리그 알림/);
+    expect(card('리그 명단이 자동 확정됐어요')).toHaveAccessibleName(/^리그 알림/);
+    expect(icon('리그 대진이 확정됐어요')).toBe(icon('리그 명단이 자동 확정됐어요'));
+    expect(card('팀매치 신청이 왔어요')).toHaveAccessibleName(/^팀매치 알림/);
+    expect(card('대회 참가가 승인됐어요')).toHaveAccessibleName(/^대회 알림/);
+    expect(icon('팀매치 신청이 왔어요')).not.toBe(icon('리그 대진이 확정됐어요'));
+
+    fireEvent.click(card('리그 명단이 자동 확정됐어요'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('리그 알림 · 7월 26일 02:10');
+  });
 });

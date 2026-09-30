@@ -3,6 +3,8 @@ import { decideHomeBanners, MAX_NUDGES, NUDGE_PRIORITY, type HomeBannerAvailabil
 
 const none: HomeBannerAvailability = {
   phoneVerify: false,
+  teamInvitation: false,
+  joinRequests: false,
   recordConsent: false,
   pendingReviews: false,
 };
@@ -20,12 +22,12 @@ describe('홈 배너 표시 정책 (A안)', () => {
   // 모른 채 이탈한다(조회는 되므로 화면상 정상으로 보인다). 상한을 도입하면서 이걸
   // 깨뜨리는 게 가장 쉬운 실수라 여기서 못 박는다.
   it('유도 배너가 전부 걸려 있어도 차단성 배너는 절대 밀리지 않는다', () => {
-    const d = decideHomeBanners({ phoneVerify: true, recordConsent: true, pendingReviews: true });
+    const d = decideHomeBanners({ phoneVerify: true, teamInvitation: true, joinRequests: true, recordConsent: true, pendingReviews: true });
     expect(d.showPhoneVerify).toBe(true);
   });
 
   it('유도 배너가 여럿이면 우선순위 첫 번째 하나만 보여준다', () => {
-    const d = decideHomeBanners({ phoneVerify: false, recordConsent: true, pendingReviews: true });
+    const d = decideHomeBanners({ ...none, recordConsent: true, pendingReviews: true });
     expect(d.nudge).toBe('recordConsent');
     expect(d.deferred).toEqual(['pendingReviews']);
   });
@@ -35,17 +37,19 @@ describe('홈 배너 표시 정책 (A안)', () => {
   });
 
   it('차단성 배너가 유도 배너의 자리를 빼앗지 않는다 (둘은 별개 예산)', () => {
-    const d = decideHomeBanners({ phoneVerify: true, recordConsent: true, pendingReviews: false });
+    const d = decideHomeBanners({ ...none, phoneVerify: true, recordConsent: true });
     expect(d.showPhoneVerify).toBe(true);
     expect(d.nudge).toBe('recordConsent');
   });
 
   it('어떤 조합에서도 유도 배너는 MAX_NUDGES 를 넘지 않는다', () => {
-    for (let mask = 0; mask < 8; mask += 1) {
+    for (let mask = 0; mask < 32; mask += 1) {
       const a: HomeBannerAvailability = {
         phoneVerify: Boolean(mask & 1),
-        recordConsent: Boolean(mask & 2),
-        pendingReviews: Boolean(mask & 4),
+        teamInvitation: Boolean(mask & 2),
+        joinRequests: Boolean(mask & 4),
+        recordConsent: Boolean(mask & 8),
+        pendingReviews: Boolean(mask & 16),
       };
       const d = decideHomeBanners(a);
       const shownCount = d.nudge === null ? 0 : 1;
@@ -55,6 +59,16 @@ describe('홈 배너 표시 정책 (A안)', () => {
       const eligible = NUDGE_PRIORITY.filter((k) => a[k]);
       expect([...(d.nudge ? [d.nudge] : []), ...d.deferred]).toEqual(eligible);
     }
+  });
+
+  // Task 180 G7: 남이 내 응답을 기다리는 일(팀 초대 → 가입 신청)이 공개 동의·남은 후기보다 앞선다.
+  it('우선순위는 팀 초대 → 가입 신청 → 공개 동의 → 남은 후기이고, 동시에 여럿이어도 하나만 보인다', () => {
+    const all = decideHomeBanners({ ...none, teamInvitation: true, joinRequests: true, recordConsent: true, pendingReviews: true });
+    expect(all.nudge).toBe('teamInvitation');
+    expect(all.deferred).toEqual(['joinRequests', 'recordConsent', 'pendingReviews']);
+
+    expect(decideHomeBanners({ ...none, joinRequests: true, recordConsent: true, pendingReviews: true }).nudge).toBe('joinRequests');
+    expect(decideHomeBanners({ ...none, teamInvitation: true, pendingReviews: true }).nudge).toBe('teamInvitation');
   });
 
   it('밀린 배너는 조건이 유지되면 다음 방문에 자리를 얻는다 (앞의 것이 해소된 뒤)', () => {

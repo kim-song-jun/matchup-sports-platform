@@ -48,6 +48,10 @@ import type {
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
+// 대진 표의 구장·주소 입력: 데스크톱에서는 열 폭에 맞춰 줄어들고(`lg:w-full`), 잘린 값은
+// 말줄임 + title 로 읽는다. 모바일 카드에서는 기존 고유 폭을 유지한다.
+const FIT_TEXT_INPUT_CLASS = 'min-w-0 text-ellipsis lg:w-full';
+
 const WEEKDAY_OPTIONS = [
   { value: 0, label: '일요일' },
   { value: 1, label: '월요일' },
@@ -908,6 +912,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             rowTone={(row) => (row.status === 'cancelled' ? 'danger' : undefined)}
             actionsHeader="관리"
             stickyActions
+            // 기본 캡(max-w-[900px])이 카드를 898px 로 묶어 1440 에서도 열이 스크롤 밖으로 밀렸다.
+            // 캡을 풀고 표를 카드 폭에 맞춘다 — 구장·주소·경기 열이 min-w 까지 줄어든다.
+            tableMaxWidth="max-w-none"
+            fitContainer
+            dense
             renderActions={(row) =>
               row.status === 'cancelled' ? (
                 <span className="text-xs text-[var(--text-muted)]">취소됨</span>
@@ -975,6 +984,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               {
                 key: 'title',
                 header: '경기',
+                className: 'min-w-[8rem]',
                 render: (row) => {
                   // 감사 결함 1: title은 "N주차" 자동 생성이라 리그 전체가 똑같이 보인다 —
                   // teamNameById로 실제 매치업을 보여주고, 원래 title(주차 라벨)은 보조
@@ -985,7 +995,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                     : `${homeName} 부전승`;
                   return (
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-[var(--text-strong)]">{matchupLabel}</span>
+                      <span className="break-keep text-sm font-medium text-[var(--text-strong)]">{matchupLabel}</span>
                       <span className="text-xs text-[var(--text-muted)]">{row.title}</span>
                     </div>
                   );
@@ -1061,6 +1071,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               {
                 key: 'placeName',
                 header: '구장',
+                className: 'min-w-[7.5rem]',
                 render: (row) => {
                   const invalid = failedFields[row.teamMatchId]?.has('placeName') ?? false;
                   const errorId = `${row.teamMatchId}-placeName-error`;
@@ -1070,13 +1081,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                         aria-label={`${row.title} 구장`}
                         aria-invalid={invalid}
                         aria-describedby={invalid ? errorId : undefined}
+                        title={row.placeName}
                         defaultValue={row.placeName}
                         disabled={row.status === 'cancelled'}
                         onBlur={(e) => {
                           if (e.target.value === row.placeName) return;
                           onFieldBlur(row, 'placeName', { placeName: e.target.value });
                         }}
-                        className={`${inputClass} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
+                        className={`${inputClass} ${FIT_TEXT_INPUT_CLASS} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
                       />
                       {invalid ? (
                         <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
@@ -1091,6 +1103,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               {
                 key: 'placeAddress',
                 header: '주소',
+                className: 'min-w-[8.5rem]',
                 render: (row) => {
                   const invalid = failedFields[row.teamMatchId]?.has('placeAddress') ?? false;
                   const errorId = `${row.teamMatchId}-placeAddress-error`;
@@ -1101,13 +1114,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                         aria-invalid={invalid}
                         aria-describedby={invalid ? errorId : undefined}
                         placeholder="상세 주소 (선택)"
+                        title={row.placeAddress ?? undefined}
                         defaultValue={row.placeAddress ?? ''}
                         disabled={row.status === 'cancelled'}
                         onBlur={(e) => {
                           if (e.target.value === (row.placeAddress ?? '')) return;
                           onFieldBlur(row, 'placeAddress', { placeAddress: e.target.value });
                         }}
-                        className={`${inputClass} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
+                        className={`${inputClass} ${FIT_TEXT_INPUT_CLASS} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
                       />
                       {invalid ? (
                         <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">

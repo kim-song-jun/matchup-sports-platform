@@ -53,6 +53,15 @@ interface AdminDataTableProps<T> {
    */
   tableMaxWidth?: string;
   /**
+   * 데스크톱 표를 콘텐츠 폭이 아니라 카드 폭에 맞춘다(`w-full`). 기본은 `w-max` 라 열이
+   * 콘텐츠만큼 벌어져 카드보다 넓어지면 가로 스크롤이 생긴다. 켜면 열이 각자의
+   * `min-w-*` 까지 줄어들고, 그래도 넘칠 때만 스크롤이 생긴다 — 줄어들 열(입력 칸·
+   * 긴 텍스트)에는 `min-w-*` 를 함께 지정해야 뭉개지지 않는다.
+   */
+  fitContainer?: boolean;
+  /** 데스크톱 표 셀 좌우 여백을 `px-4` → `px-3` 로 줄인다. 열이 많아 폭이 모자랄 때 쓴다. */
+  dense?: boolean;
+  /**
    * 폭이 넓어 가로 스크롤이 생기는 표에서 관리(actions) 열을 오른쪽에 고정한다.
    * 핵심 액션 버튼이 스크롤해야만 보이는 것을 막는다(2026-08-25 사용자 확정 — 리그 대진 표).
    * 고정 셀은 스크롤 콘텐츠가 비쳐 보이지 않도록 카드 배경을 불투명하게 깐다 —
@@ -110,6 +119,8 @@ export function AdminDataTable<T>({
   skeletonRows = 5,
   scrollOnMobile = false,
   tableMaxWidth,
+  fitContainer = false,
+  dense = false,
   stickyActions = false,
   rowTone,
   onRowClick,
@@ -159,13 +170,13 @@ export function AdminDataTable<T>({
   // smaller text, no forced tableMaxWidth (the table sizes to its content
   // inside a horizontally scrollable wrapper instead).
   function renderTable(compact: boolean) {
-    const cellPad = compact ? 'px-3 py-3' : 'px-4 py-3';
+    const cellPad = compact || dense ? 'px-3 py-3' : 'px-4 py-3';
     // tableMaxWidth는 데스크톱 래퍼(아래 hidden lg:block div)에만 적용한다 —
     // 여기 <table> 자체에 같이 걸면 w-max로 콘텐츠 폭까지 자라야 할 테이블이
     // 그 cap에 눌려 overflow-x-auto 스크롤 대신 다시 컬럼 압축이 재발한다.
     const tableClassName = compact
       ? 'w-max min-w-full text-[length:var(--font-size-label)] text-[var(--text-body)]'
-      : 'w-max min-w-full text-sm text-[var(--text-body)]';
+      : [fitContainer ? 'w-full' : 'w-max min-w-full', 'text-sm text-[var(--text-body)]'].join(' ');
 
     return (
       <table className={tableClassName}>

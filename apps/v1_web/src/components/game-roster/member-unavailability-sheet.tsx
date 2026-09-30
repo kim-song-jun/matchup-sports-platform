@@ -226,7 +226,7 @@ export function MemberUnavailabilitySheet({
             ) : (
               <AlertBanner
                 tone="info"
-                message={`${affected === null ? '이 기간 대회·리그 경기에서' : `이 기간 대회·리그 경기 ${affected}개에서`} 빠져요. 나중에 잡히는 경기도 자동으로 빠져요.`}
+                message={`${affected === null ? '이 기간 대회·리그 경기에서' : `이 기간 대회·리그 경기 ${affected}개에서`} 빠져요. 나중에 잡히는 경기도 자동으로 빠져요. 친선 경기는 자동으로 빠지지 않고, 참석명단에 결장 배지만 붙어요.`}
               />
             )}
           </div>

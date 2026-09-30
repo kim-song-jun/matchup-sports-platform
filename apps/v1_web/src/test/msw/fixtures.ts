@@ -679,10 +679,10 @@ export const v1ChatMessagesByRoomFixture: Record<string, CursorPage<V1ChatMessag
     items: [
       {
         messageId: 'chat-match-1-join-1',
-        sender: { userId: 'user-3', displayName: 'New member', profileImageUrl: null },
+        sender: { userId: 'user-3', displayName: '새멤버', profileImageUrl: null },
         messageType: 'system',
         systemEventType: 'joined',
-        content: 'New member joined the room',
+        content: '새멤버님이 들어왔어요',
         status: 'sent',
         sentAt: '2026-05-18T09:04:00.000Z',
         mine: false,

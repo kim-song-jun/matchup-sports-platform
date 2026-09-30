@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { appendChatSystemLine } from '../chat/chat-system-line';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -823,6 +824,26 @@ export class TeamsService {
     };
   }
 
+  /** 스스로 나간 멤버를 발송 시점의 팀장·매니저에게 알린다(나간 본인 제외) — 멤버 탭으로 착지. */
+  private notifyMemberLeft(teamId: string, teamName: string, leftUserId: string, memberCount: number): void {
+    void (async () => {
+      const [managers, leftUser] = await Promise.all([
+        this.prisma.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        }),
+        this.prisma.v1User.findUnique({
+          where: { id: leftUserId },
+          select: { profile: { select: { nickname: true, displayName: true } } },
+        }),
+      ]);
+      const recipients = managers.map((membership) => membership.userId).filter((userId) => userId !== leftUserId);
+      await this.notifications.emitNotificationToMany(recipients, 'team_member_left', teamId, undefined, {
+        vars: { team: teamName, name: notificationDisplayName(leftUser?.profile), count: String(memberCount) },
+      });
+    })().catch((err: unknown) => this.logger.warn(`member left notification failed team=${teamId}: ${String(err)}`));
+  }
+
   /**
    * 팀장 넘기기 뒤: 새 팀장에게 '팀장이 되었어요', 나머지 매니저에게 '팀장이 바뀌었어요'. 넘긴 사람은 방금
    * 매니저가 됐지만 자기가 한 일이라 받지 않는다. 수신자는 발송 시점의 매니저 명단이다.
@@ -951,7 +972,7 @@ export class TeamsService {
   // 호출자 본인의 active membership만 조회한다. 상태는 'removed'가 아닌 'left'로 구분한다.
   async leaveTeam(user: V1AuthUser, teamId: string, dto: LeaveTeamDto) {
     this.assertActiveAccount(user);
-    const { membership } = await this.getActiveTeamMembership(user, teamId);
+    const { team, membership } = await this.getActiveTeamMembership(user, teamId);
 
     const leftAt = new Date();
     const reason = dto.reason ?? 'team_membership_self_leave';
@@ -1024,6 +1045,7 @@ export class TeamsService {
         `roster cleanup on self leave team=${teamId} user=${user.id} rosters=${result.removedRosterCount}`,
       );
     }
+    this.notifyMemberLeft(teamId, team.name, user.id, result.team.memberCount);
 
     return {
       membershipId: result.updated.id,
@@ -1894,29 +1916,7 @@ export class TeamsService {
       data: { visibleFromAt: joinedChatAt },
     });
     if (activated.count > 0 && announceJoin) {
-      const joinedUser = await tx.v1User.findUnique({
-        where: { id: userId },
-        select: { profile: { select: { displayName: true, nickname: true } } },
-      });
-      const displayName =
-        joinedUser?.profile?.nickname ?? joinedUser?.profile?.displayName ??
-        '참여자';
-      const notice = await tx.v1ChatMessage.create({
-        data: {
-          chatRoomId: room.id,
-          senderUserId: userId,
-          body: `${displayName}님이 들어왔습니다`,
-          status: 'sent',
-          messageType: 'system',
-          systemEventType: 'joined',
-          sentAt: joinedChatAt,
-        },
-        select: { sentAt: true },
-      });
-      await tx.v1ChatRoom.update({
-        where: { id: room.id },
-        data: { lastMessageAt: notice.sentAt },
-      });
+      await appendChatSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: joinedChatAt });
     }
 
     if (!existingParticipant || existingParticipant.status !== 'active') {
@@ -1957,6 +1957,7 @@ export class TeamsService {
       data: { status: 'left', leftAt },
       select: { id: true },
     });
+    await appendChatSystemLine(tx, { chatRoomId: room.id, userId, event: 'left', at: leftAt });
     await tx.v1StatusChangeLog.create({
       data: {
         targetType: 'chat_room_participant',

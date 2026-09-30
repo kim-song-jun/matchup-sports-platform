@@ -23,6 +23,7 @@ import {
   SendChatMessageDto,
   UpdateMyChatRoomDto,
 } from './dto/chat.dto';
+import { appendChatSystemLine } from './chat-system-line';
 
 type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
   include: {
@@ -655,21 +656,7 @@ export class ChatService {
         data: { visibleFromAt },
       });
       if (entered.count === 0) return;
-      const notice = await tx.v1ChatMessage.create({
-        data: {
-          chatRoomId: room.id,
-          senderUserId: userId,
-          body: `${displayName}님이 들어왔습니다`,
-          status: 'sent',
-          messageType: 'system',
-          systemEventType: 'joined',
-          sentAt: enteredAt,
-        },
-      });
-      await tx.v1ChatRoom.update({
-        where: { id: room.id },
-        data: { lastMessageAt: notice.sentAt },
-      });
+      await appendChatSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: enteredAt, displayName });
     });
 
     const current = await this.prisma.v1ChatRoomParticipant.findUnique({

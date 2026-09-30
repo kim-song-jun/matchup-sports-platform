@@ -53,6 +53,8 @@ export type NotificationEventType =
   | 'team_owner_changed'
   // 내보내진 본인에게(이유는 싣지 않는다) — Task 180 H1-removed.
   | 'team_membership_removed'
+  // 스스로 나간 멤버를 팀장·매니저에게(H1-left). 팀 채팅의 '나갔어요' 줄은 chat-system-line.ts 가 쓴다.
+  | 'team_member_left'
   | 'team_contact_received'
   | 'team_contact_accepted'
   | 'team_contact_declined'
@@ -157,6 +159,7 @@ const TEAM_MEMBERSHIP_EVENTS: ReadonlySet<NotificationEventType> = new Set([
   'team_owner_received',
   'team_owner_changed',
   'team_membership_removed',
+  'team_member_left',
 ]);
 
 /** targetId 가 "${teamId}:${scheduleId}" 인 일정 알림 — 야간 예외 판정에 일정 시작 시각을 읽는다. */
@@ -406,8 +409,8 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
-  // 새 팀장은 바로 멤버 관리로 — 나머지 역할 알림은 기본 팀 상세로 간다.
-  if (type === 'team_owner_received' && targetId) {
+  // 새 팀장·나간 멤버 알림은 멤버 관리(멤버 탭)로 — 나머지 역할 알림은 기본 팀 상세로 간다.
+  if ((type === 'team_owner_received' || type === 'team_member_left') && targetId) {
     return `/teams/${targetId}/members`;
   }
   // 초대받은 사람이 수락·거절하는 곳은 팀 상세가 아니라 내 초대함이다. targetId 는 팀 id 그대로다.
@@ -551,6 +554,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_owner_received: '팀장이 되었어요',
   team_owner_changed: '팀장이 바뀌었어요',
   team_membership_removed: '팀에서 제외됐어요',
+  team_member_left: '{name}님이 팀을 나갔어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -619,6 +623,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_owner_changed: '"{team}" · 새 팀장은 {name}님이에요.',
   // 착지는 권한이 없어도 열리는 공개 팀 상세(기본 경로) — 다시 가입 신청할 수 있다.
   team_membership_removed: '"{team}" · 이 팀의 일정과 채팅은 더 볼 수 없어요.',
+  team_member_left: '"{team}" · 지금 멤버는 {count}명이에요.',
   inquiry_answered: '답변 내용을 확인해 주세요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',

@@ -144,7 +144,7 @@ export class TeamContactsService {
         data: { fromTeamId: dto.fromTeamId, toTeamId, requestedByUserId: user.id, message: dto.message, expiresAt },
       });
       // 컨택 = 채팅방. 요청 시점에 방을 열고 양 팀 운영진 전원을 참가자로 넣는다(스펙 §3.2).
-      // visibleFromAt 을 now 로 두어 "들어왔습니다" 시스템 메시지 없이 첫 메시지가 바로 보이고,
+      // visibleFromAt 을 now 로 두어 "들어왔어요" 시스템 메시지 없이 첫 메시지가 바로 보이고,
       // 수신자에게 미읽음 1 로 잡힌다.
       const room = await tx.v1ChatRoom.create({ data: { teamContactId: contact.id, status: 'active' } });
       const operatorIds = await this.operatorUserIds(tx, [dto.fromTeamId, toTeamId]);

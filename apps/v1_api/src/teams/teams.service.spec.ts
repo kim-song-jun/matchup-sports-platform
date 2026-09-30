@@ -1229,8 +1229,25 @@ describe('TeamsService', () => {
       status: 'left',
     });
     prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+    prisma.v1TeamMembership.findMany.mockResolvedValueOnce([{ userId: owner.id }, { userId: manager.id }, { userId: member.id }]);
 
     const result = await service.leaveTeam(member, 'team-1', {});
+    await new Promise(setImmediate);
+
+    // 팀 채팅에 '나갔어요' 한 줄(H1-left) — 방의 마지막 메시지 시각도 옮긴다.
+    expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ chatRoomId: 'room-1', body: '새멤버님이 나갔어요', messageType: 'system', systemEventType: 'left' }),
+      }),
+    );
+    expect(prisma.v1ChatRoom.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'room-1' } }));
+    // 팀장·매니저에게만, 나간 본인은 빼고 — 지금 멤버 수를 싣는다.
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith([owner.id, manager.id], 'team_member_left', 'team-1', undefined, {
+      vars: { team: '테스트팀', name: '새멤버', count: '4' },
+    });
+    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { teamId: 'team-1', status: 'active', role: { in: ['owner', 'manager'] } } }),
+    );
 
     // owner-only 확인 경로(count/row lock)는 member에게는 호출되지 않는다
     expect(prisma.v1TeamMembership.count).not.toHaveBeenCalled();
@@ -1605,7 +1622,7 @@ describe('TeamsService', () => {
       data: expect.objectContaining({
         chatRoomId: 'team-room-1',
         senderUserId: application.applicantUserId,
-        body: '새멤버님이 들어왔습니다',
+        body: '새멤버님이 들어왔어요',
         messageType: 'system',
         systemEventType: 'joined',
       }),
@@ -1940,6 +1957,28 @@ describe('TeamsService', () => {
     });
   });
 
+  it('removeMembership: 팀 채팅에는 탈퇴와 같은 "나갔어요" 줄만 남는다 — 내보냈다는 사실을 드러내지 않는다', async () => {
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(membershipRow({ role: 'member', userId: 'target-user' }))
+      .mockResolvedValueOnce({ role: 'owner' });
+    prisma.v1TeamMembership.update.mockResolvedValue({ id: 'mem-1', teamId: 'team-1', status: 'removed' });
+    prisma.v1Team.update.mockResolvedValue({ memberCount: 4 });
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue({ id: 'participant-t', status: 'active' });
+    prisma.v1ChatRoomParticipant.update.mockResolvedValue({ id: 'participant-t' });
+    prisma.v1User.findUnique.mockResolvedValue({ profile: { nickname: '선수14', displayName: null } });
+
+    await service.removeMembership(owner, 'mem-1', {});
+
+    expect(prisma.v1ChatMessage.create).toHaveBeenCalledTimes(1);
+    expect(prisma.v1ChatMessage.create.mock.calls[0][0].data).toMatchObject({
+      chatRoomId: 'room-1',
+      senderUserId: 'target-user',
+      body: '선수14님이 나갔어요',
+      systemEventType: 'left',
+    });
+  });
+
   it('removeMembership: manager는 다른 manager를 추방할 수 없다 → 403 PERMISSION_DENIED', async () => {
     const managerTarget = membershipRow({
       role: 'manager',
@@ -2232,7 +2271,7 @@ describe('TeamsService', () => {
         data: expect.objectContaining({
           chatRoomId: 'room-1',
           senderUserId: invitee.id,
-          body: '새멤버님이 들어왔습니다',
+          body: '새멤버님이 들어왔어요',
           messageType: 'system',
           systemEventType: 'joined',
         }),

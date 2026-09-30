@@ -67,7 +67,8 @@
 
 ## `GET /api/v1/home` — `teamActivity` (Task 180 G7)
 
-로그인 사용자에게 홈 맨 위 "다음 경기" 카드의 재료를 싣는다. 비로그인은 `{ hasTeam: false, nextGame: null }`.
+로그인 사용자에게 홈 맨 위 "다음 경기" 카드와 팀 유도 배너의 재료를 싣는다. 비로그인은
+`{ hasTeam: false, nextGame: null, pendingInvitations: null, pendingJoinRequests: null }`.
 계산이 실패하면 홈 전체를 죽이지 않고 `teamActivity: null` 을 준다 — `null` 은 "팀이 없다"가 아니라
 "계산하지 못했다"이므로 클라이언트는 그 영역을 그리지 않는다.
 
@@ -81,6 +82,11 @@
     출전자, 친선은 그 사이드의 가장 최근 제출본(SUBMITTED·LOCKED) 참석명단. 제출 뒤 다시 연 초안은 직전 제출본을
     밀어내지 않는다. 빠진 선수는 `false` 일 뿐 "빠졌다"는 별도 값은 없다.
   - `participantCount`: 대회·리그의 계산된 출전 인원. 친선과 기준 명단이 없는 팀은 `null`.
+- `pendingInvitations`: 내가 받은 대기 초대 `{ count, latestTeamName }` — 초대함 `GET /me/invitations` 와 같은 조건
+  (`invitedUserId = 나`, `status = pending`). 팀이 없어도 실린다. 없으면 `null`.
+- `pendingJoinRequests`: 내가 **팀장·매니저**인 활성 팀들의 대기(`requested`) 가입 신청
+  `{ count(합계), teamId·teamName(가장 많이 쌓인 팀), otherTeamCount }`. 팀원으로만 있는 팀의 신청은 세지 않는다.
+  없으면 `null`. 웹은 홈 유도 배너(상한 1, 팀 초대 → 가입 신청 → 공개 동의 → 남은 후기)로 그린다.
 
 ## 통합 검색은 아직 없다
 

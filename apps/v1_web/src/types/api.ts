@@ -2264,6 +2264,10 @@ export type V1HomeTeamActivity = {
   /** 활성 팀이 하나라도 있는지. false 면 다음 경기 자리가 "먼저 해 볼 일" 빈 상태다. */
   hasTeam: boolean;
   nextGame: V1HomeNextGame | null;
+  /** 내가 받은 대기 중인 팀 초대(초대함과 같은 조건). 없으면 null. */
+  pendingInvitations: { count: number; latestTeamName: string } | null;
+  /** 내가 팀장·매니저인 팀들의 대기 가입 신청. `teamId` 는 가장 많이 쌓인 팀. 없으면 null. */
+  pendingJoinRequests: { count: number; teamId: string; teamName: string; otherTeamCount: number } | null;
 };
 
 export type V1Home = {

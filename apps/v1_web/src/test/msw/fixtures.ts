@@ -855,6 +855,8 @@ export const v1HomeFixture: V1Home = {
       viewerParticipating: true,
       participantCount: 10,
     },
+    pendingInvitations: { count: 1, latestTeamName: '한강 FC' },
+    pendingJoinRequests: null,
   },
   recommendedMatches: v1MatchesFixture,
   recommendedTeamMatches: v1TeamMatchesFixture,

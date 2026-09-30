@@ -59,12 +59,14 @@ export default function AdminTeamsPage() {
     buildPagination,
   } = useAdminListQuery({ pageSize: PAGE_SIZE });
 
-  // URL searchParam pre-selection on mount
+  // URL searchParam pre-selection on mount (`?status=`, `?q=`)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, [setActiveStatus]);
+    const q = params.get('q')?.trim() ?? '';
+    if (q) setSearch(q);
+  }, [setActiveStatus, setSearch]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
   const rows = data?.items ?? [];

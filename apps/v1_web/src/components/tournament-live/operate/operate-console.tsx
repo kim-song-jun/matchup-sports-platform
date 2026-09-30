@@ -14,7 +14,9 @@ import {
   Square,
   Target,
   Timer,
+  Ellipsis,
 } from 'lucide-react';
+import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
@@ -22,6 +24,7 @@ import {
   useV1FixtureLineup,
   useV1Game,
   useV1SetParticipantArrival,
+  useV1ConfirmSideArrival,
   postV1GameCommand,
 } from '@/hooks/use-v1-game-operations';
 import { readGameResultScore } from '@/lib/game-result-score';
@@ -42,7 +45,12 @@ import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
-import { ArrivalCheckinPanel } from './arrival-checkin-panel';
+import { arrivalProgress } from './arrival-checkin-panel';
+import { KickoffChecklist } from './kickoff-checklist';
+import { MatchProgressStrip } from './match-progress-strip';
+import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
+import { ConsoleNextSteps } from './console-next-steps';
+import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { RestTimer } from './rest-timer';
 import { PenaltyShootoutPanel } from './penalty-shootout-panel';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
@@ -216,6 +224,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     tournamentId,
     fixtureId,
   });
+  const confirmSideArrival = useV1ConfirmSideArrival(fixtureLineup.data?.gameId ?? null, {
+    tournamentId,
+    fixtureId,
+  });
   const gameId = fixtureLineup.data?.gameId ?? null;
 
   const gameDetail = useV1Game(gameId);
@@ -236,14 +248,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const commandBlocked = commandPending || pendingCommandRetry !== null;
   // 몰수·중단 종료 다이얼로그. 사유 자유 텍스트를 받아야 해서 useConfirm(boolean)으로는 안 된다.
   const [abnormalEndOpen, setAbnormalEndOpen] = useState(false);
-  // "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구. 명령 왕복
-  // 지연은 커맨드마다 눈에 띄게 다를 수 있고(네트워크/DB 락 경합), 평소엔
-  // 보이지 않던 값이라 ms 단위로 보여줄 가치가 있다 — `formatMatchClock`이
-  // 초 단위로 고정한 매치 클록/이벤트 목록과는 다른 결의 숫자라 여기서만 ms를 쓴다.
-  const [lastCommandFeedback, setLastCommandFeedback] = useState<{
-    readonly label: string;
-    readonly durationMs: number;
-  } | null>(null);
+  // ⋯ 더보기 시트 — 조기 정상 종료·몰수/중단 종료가 여기 들어 있다.
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
@@ -760,14 +766,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       if (pendingCommandRetry !== null && replayBody === undefined) return false;
       setCommandPending(true);
       setCommandError(null);
-      setLastCommandFeedback(null);
       // 라벨은 실행 "전" currentPeriod/halftimePeriod 기준으로 미리 굳혀둔다 —
       // end-period/start-period 명령이 성공하면 refetch 후 currentPeriod·
       // halftimePeriod가 곧장 바뀌어서(하프타임 진입/탈출), 완료 후에 다시
       // 계산하면 "방금 무엇을 끝냈는지"가 아니라 "다음에 뭘 할 수 있는지"로
       // 라벨이 뒤바뀐다.
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
-      const startedAtMs = performance.now();
       const commandBody: GameCommandRequest = replayBody ?? {
         expectedVersion: gameVersionRef.current,
         clientCommandId: randomUuid(),
@@ -823,7 +827,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           }
         }
         if (!ownsAttempt()) return false;
-        setLastCommandFeedback({ label, durationMs: Math.round(performance.now() - startedAtMs) });
         // 이슈 #375 — 기존 골/교체 되돌리기(findRecentGoalEvent /
         // ops.reverseEvent)와 같은 토스트 패턴을 따른다: end-period 직후
         // "방금 실수로 눌렀다"를 바로 되돌릴 수 있는 액션을 붙인다. 골/교체
@@ -883,6 +886,30 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       await handleRunCommand(command);
     },
     [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand],
+  );
+
+  // "전원 도착"은 도착 시각을 여러 명에게 한꺼번에 남기고, 일괄로 되돌리는 경로가 없다(시각은 분쟁 시 근거다).
+  // 그래서 몇 명이 표시되는지 보여 주는 확인 한 단계를 거친다. 안 온 선수는 표시한 뒤 개별로 풀 수 있다.
+  const handleConfirmSideArrival = useCallback(
+    async (sideId: string) => {
+      const section = arrivalProgress(gameDetail.data?.sides ?? [], fixtureLineup.data?.lineups ?? []).sections.find(
+        (candidate) => candidate.side.id === sideId,
+      );
+      if (section === undefined) return;
+      const pendingCount = section.participants.filter((participant) => participant.arrivedAt === null).length;
+      if (pendingCount === 0) return;
+      const teamName = section.side.displayNameSnapshot;
+      const ok = await confirm({
+        title: `${teamName} ${pendingCount}명을 도착으로 표시할까요?`,
+        message: '표시한 시각이 도착 기록으로 남아요. 안 온 선수가 있으면 표시한 뒤 그 선수만 눌러 풀어 주세요.',
+        confirmLabel: '전원 도착',
+      });
+      if (!ok) return;
+      confirmSideArrival.mutate(sideId, {
+        onError: (err) => showToast(extractErrorMessage(err, '전원 도착을 저장하지 못했어요.')),
+      });
+    },
+    [confirm, confirmSideArrival, fixtureLineup.data?.lineups, gameDetail.data?.sides, showToast],
   );
 
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
@@ -1053,6 +1080,87 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
   const lineups = fixtureLineup.data?.lineups ?? [];
 
+  // 진행 조작 줄. "다음 걸음"은 진행 방향 명령 하나(시작·후반 시작·재개·전반/후반 종료)이고
+  // 일시 중지·되돌리기는 그 곁의 보조다. 정규 시간 종료 뒤에는 "경기 종료"(동점 결선이면
+  // "승부차기 시작")가 다음 걸음이 된다.
+  // 헤더의 진행 단계 스트립. 뛰는 동안은 전반 · 하프타임 · 후반 · 종료, 끝난 뒤에는 예정 · 진행 · 결과 확인 ·
+  // 확정. 시작 전에는 스트립 대신 "킥오프 준비"가 그 자리의 안내다.
+  const progressSteps =
+    gameState === 'LIVE' || gameState === 'PAUSED'
+      ? periodProgressSteps({
+          periods: (gameDetail.data?.periods ?? []).map((period) => ({
+            number: period.number,
+            label: periodLabel(period.number),
+          })),
+          livePeriodNumber: currentPeriod?.number ?? null,
+          halftimePeriodNumber: halftimePeriod?.number ?? null,
+          regulationEnded,
+        })
+      : gameState === 'ENDED'
+        ? resultProgressSteps({ official: resultOfficialized })
+        : [];
+
+  const stepCommands = availableCommands.filter((command) => command !== 'end');
+  const secondaryCommands = stepCommands.filter((command) => command === 'pause' || command === 'revert-period');
+  const nextStepCommand = stepCommands.find((command) => command !== 'pause' && command !== 'revert-period') ?? null;
+  const commandBarVisible = availableCommands.length > 0;
+
+  // 정규 시간이 끝나기 전에도 눌리는 "경기 종료"(조기 정상 종료)와 몰수·중단 종료는
+  // 주 조작 줄이 아니라 ⋯ 시트 안에 둔다. 정규 시간 종료 뒤의 "경기 종료"만 주 버튼이다.
+  const endAvailable = availableCommands.includes('end');
+  const moreActions: ActionSheetAction[] = [];
+  if (endAvailable && !regulationEnded) {
+    moreActions.push({
+      key: 'early-end',
+      label: '경기 종료',
+      description: '정규 시간이 끝나기 전에 경기를 마쳐요. 되돌릴 수 없어요.',
+      destructive: true,
+      disabled: !canOperate || commandBlocked || endBlockedReason !== null,
+      disabledReason: endBlockedReason,
+      onSelect: () => {
+        setMoreOpen(false);
+        void confirmAndRunCommand('end');
+      },
+    });
+  }
+  if (endAvailable && !penaltyShootoutEligible) {
+    moreActions.push({
+      key: 'abnormal-end',
+      label: '몰수·중단으로 종료',
+      description: '사유를 남기고 지금 기록된 점수로 마쳐요.',
+      destructive: true,
+      disabled: !canOperate || commandBlocked,
+      onSelect: () => {
+        setMoreOpen(false);
+        setAbnormalEndOpen(true);
+      },
+    });
+  }
+
+  const renderCommandButton = (command: GameCommandName, primary: boolean) => {
+    const Icon = COMMAND_ICON[command];
+    return (
+      <Button
+        key={command}
+        size="md"
+        variant={primary ? 'primary' : 'outline'}
+        className={[
+          'whitespace-nowrap max-sm:!min-h-12',
+          primary ? 'flex-1 enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 sm:flex-none' : '',
+        ].join(' ')}
+        // 라인업 미제출은 시작을 막지 않는다(경고 배너만) — 참가자는 대회 명단에서 경기 생성
+        // 시점에 이미 만들어져 있어 제출 여부와 무관하게 항상 있다.
+        disabled={!canOperate || commandBlocked || (command === 'start' && startBlockedByTeams)}
+        loading={commandPending}
+        // 확인 없이 실행하는 명령은 `revert-period` 하나뿐이다 — 그 자체가 되돌리기다.
+        onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
+      >
+        {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
+        {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
+      </Button>
+    );
+  };
+
   return (
     <div className="tm-content-enter mx-auto flex max-w-3xl flex-col gap-4 pb-24 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6">
       {/* tm-content-enter: 로딩(944)→콘텐츠(이 반환문) 전환 시 1회만 페이드인한다
@@ -1080,7 +1188,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           hidden on desktop, so the console can return to the viewport top at lg. */}
       <header
         className={[
-          'sticky z-10 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/95',
+          'sticky z-10 border-b border-[var(--border)] bg-white/95 px-4 py-3 sm:backdrop-blur-sm dark:bg-gray-900/95',
           tournamentOpsRole === 'FIELD_OPERATOR' ? 'top-[52px]' : 'top-[52px] lg:top-0',
         ].join(' ')}
       >
@@ -1121,126 +1229,65 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               </span>
             </div>
           </div>
-          <div className="flex w-full flex-col items-stretch gap-1 sm:w-auto sm:shrink-0 sm:items-end">
-            {/* UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 나머지 명령과
-                6px 간격으로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
-                명령들과 별도 그룹으로 묶고 구분선을 둬 시각적·물리적으로
-                떼어낸다.
-                R-K5 CTA 위계 재설계 — LIVE + 다음 피리어드가 있는 상태에서는
-                이 그룹에 "일시 중지"·"전반 종료" 둘 다 들어오는데, 예전엔
-                둘 다 variant="primary"(파란 배경)라 동급 CTA 2개가 나란히
-                있었다("주요 CTA는 화면당 최대 1개"). 이 그룹의 첫 명령만
-                주요(파란 배경)로 두고 — 실사용에서 더 자주 누르는 건
-                "일시 중지"다(피리어드 종료는 절반의 경기 시간에 한 번뿐,
-                일시 중지는 파울·부상 등으로 언제든 필요) — 나머지는 보조
-                (outline)로 후퇴시킨다. */}
-            <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
-              {availableCommands
-                .filter((command) => command !== 'end')
-                .map((command, index) => {
-                  const Icon = COMMAND_ICON[command];
-                  return (
-                    <Button
-                      key={command}
-                      size="sm"
-                      variant={index === 0 ? 'primary' : 'outline'}
-                      className={index === 0 ? 'enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95' : undefined}
-                      disabled={
-                        !canOperate ||
-                        commandBlocked ||
-                        (command === 'start' && startBlockedByTeams)
-                        // [P1-c] 예전에는 라인업 미제출이면 시작 버튼을 비활성화했다.
-                        // 그 근거는 "시작하면 기록할 참가자가 없어 막다른 길"이었는데,
-                        // 이제 참가자는 대회 등록 명단에서 경기 생성 시점에 이미
-                        // 만들어진다 — 제출 여부와 무관하게 항상 있다. 반대로 현장에서
-                        // 한 팀이 명단을 못 낸 것만으로 경기를 못 여는 쪽이 실제 문제였다.
-                        // 아래 배너는 남긴다: 차단이 아니라 **경고**로 바뀐 것이다.
-                      }
-                      loading={commandPending}
-                      // 사용자 결정("예외 없이 전부") 예외는 `revert-period`
-                      // 하나뿐 — 그 자체가 이미 되돌리기라 확인이 없다.
-                      onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
-                    >
-                      {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
-                      {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
-                    </Button>
-                  );
-                })}
-              {availableCommands.includes('end') ? (
-                <>
-                  {/* 구분선은 왼쪽에 실제로 버튼이 있을 때만 그린다 — 정규 시간 종료 상태에서는
-                      availableCommands 가 ['end'] 하나뿐이라, 조건 없이 그리면 세로선이 첫 버튼
-                      왼쪽에 홀로 매달린다. */}
-                  {availableCommands.some((command) => command !== 'end') ? (
-                    <span aria-hidden="true" className="mx-0.5 hidden h-6 w-px shrink-0 bg-[var(--border)] sm:block" />
-                  ) : null}
-                  {/* 과제 2 — 정규시간(+연장) 종료 시 동점인 대회 knockout
-                      경기에서는 "경기 종료"를 바로 누르는 대신 승부차기
-                      입력으로 먼저 보낸다(`penaltyShootoutEligible` 계산
-                      참고). tone을 danger(빨강)가 아니라 primary(파랑)로
-                      두는 이유 — 이 버튼 자체는 아직 되돌릴 수 없는 일을
-                      하지 않는다(패널을 여는 로컬 전환일 뿐), 진짜
-                      되돌릴 수 없는 지점은 패널 안의 "승부차기 종료"다. */}
-                  {penaltyShootoutEligible ? (
-                    <Button
-                      key="penalty-start"
-                      size="sm"
-                      variant="primary"
-                      className="enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95"
-                      disabled={!canOperate || commandBlocked}
-                      onClick={() => void handleStartPenaltyShootout()}
-                    >
-                      <Target size={14} aria-hidden="true" />
-                      승부차기 시작
-                    </Button>
-                  ) : (
-                    <Button
-                      key="end"
-                      size="sm"
-                      variant="danger"
-                      className="enabled:!bg-[var(--red700)] enabled:!text-white enabled:hover:brightness-95"
-                      // 요구사항 4 — 결선 무승부인데 승부차기가 없으면 누를
-                      // 수 없다. 숨기지 않고 비활성 + 아래 배너로 사유를
-                      // 설명한다(이 화면의 반복 패턴 ①: 라인업 미제출 시
-                      // "경기 시작"을 다루는 방식과 동일).
-                      disabled={!canOperate || commandBlocked || endBlockedReason !== null}
-                      loading={commandPending}
-                      onClick={() => void confirmAndRunCommand('end')}
-                    >
-                      {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
-                      {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
-                    </Button>
-                  )}
-                  {/* 몰수·중단 종료. 정상 종료 버튼과 **같은 위계로 두지 않는다** — 거의
-                      쓰이지 않는 예외 경로인데 danger 버튼 둘이 나란히 있으면 현장에서
-                      잘못 누른다. outline 보조 버튼으로 한 단 낮추고, 되돌릴 수 없는
-                      확정은 다이얼로그 안 "이대로 종료"에서만 일어난다.
-                      승부차기 대기 중에는 숨긴다 — 그 상태의 다음 행동은 승부차기 입력이지
-                      몰수가 아니고, 둘을 동시에 노출하면 무엇을 눌러야 하는지 흐려진다. */}
-                  {!penaltyShootoutEligible ? (
-                    <Button
-                      key="abnormal-end"
-                      size="sm"
-                      variant="outline"
-                      disabled={!canOperate || commandBlocked}
-                      onClick={() => setAbnormalEndOpen(true)}
-                    >
-                      몰수·중단으로 종료
-                    </Button>
-                  ) : null}
-                </>
+          {/* 진행 조작 줄 — 폰(sm 미만)에서는 화면 아래에 고정하고, sm 부터는 헤더 오른쪽에
+              그대로 둔다(같은 노드가 breakpoint 로 자리만 바꾼다). 헤더의 backdrop-blur 는
+              자손 fixed 의 기준 상자를 헤더로 바꾸므로 sm 미만에서는 꺼 둔다.
+              가운데(넓은 칸)는 지금 누를 "다음 걸음" 하나, 일시 중지·되돌리기는 옆의 보조,
+              되돌릴 수 없는 종료 계열은 ⋯ 시트 안으로 뺐다 — 자주 누르는 "전반 종료" 곁에
+              가장 위험한 버튼이 있던 배치(오탭) 자체를 없앤 것이다. */}
+          {commandBarVisible ? (
+            <div
+              role="group"
+              aria-label="경기 진행 조작"
+              className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-[var(--border)] bg-[var(--card-surface)] px-4 pt-3 pb-[calc(1rem+var(--v1-shell-safe-bottom))] sm:static sm:z-auto sm:w-auto sm:shrink-0 sm:justify-end sm:border-0 sm:bg-transparent sm:p-0"
+            >
+              {secondaryCommands.map((command) => renderCommandButton(command, false))}
+              {nextStepCommand !== null ? renderCommandButton(nextStepCommand, true) : null}
+              {/* 정규 시간 종료 뒤: 다음 걸음이 "경기 종료"(동점 결선이면 "승부차기 시작")다. */}
+              {nextStepCommand === null && regulationEnded ? (
+                penaltyShootoutEligible ? (
+                  <Button
+                    key="penalty-start"
+                    size="md"
+                    variant="primary"
+                    className="flex-1 whitespace-nowrap enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
+                    disabled={!canOperate || commandBlocked}
+                    onClick={() => void handleStartPenaltyShootout()}
+                  >
+                    <Target size={14} aria-hidden="true" />
+                    승부차기 시작
+                  </Button>
+                ) : (
+                  <Button
+                    key="end"
+                    size="md"
+                    variant="danger"
+                    className="flex-1 whitespace-nowrap enabled:!bg-[var(--red700)] enabled:!text-white enabled:hover:brightness-95 max-sm:!min-h-12 sm:flex-none"
+                    disabled={!canOperate || commandBlocked || endBlockedReason !== null}
+                    loading={commandPending}
+                    onClick={() => void confirmAndRunCommand('end')}
+                  >
+                    {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
+                    {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
+                  </Button>
+                )
+              ) : null}
+              {moreActions.length > 0 ? (
+                <button
+                  type="button"
+                  aria-label="더보기"
+                  aria-haspopup="dialog"
+                  disabled={!canOperate || commandBlocked}
+                  onClick={() => setMoreOpen(true)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 max-sm:h-12 max-sm:w-12"
+                >
+                  <Ellipsis size={18} aria-hidden="true" />
+                </button>
               ) : null}
             </div>
-            {/* "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구.
-                방금 실행한 명령에만 붙는 일회성 피드백이라 다음 명령을 누르는
-                순간(`setLastCommandFeedback(null)`) 사라진다. */}
-            {lastCommandFeedback ? (
-              <p className="text-xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
-                {lastCommandFeedback.label} 완료 · {lastCommandFeedback.durationMs}ms
-              </p>
-            ) : null}
-          </div>
+          ) : null}
         </div>
+        <MatchProgressStrip steps={progressSteps} label="경기 진행 단계" />
         {/* UX 감사 item 6 — 경기장에서 가장 먼저 봐야 할 정보 중 하나인데 헤더에
             점수가 아예 없었다. 경과시간과 같은 위계(text-2xl font-bold)로,
             같은 행에 나란히 둔다. sides 배열 순서를 그대로 써서 위 제목
@@ -1381,7 +1428,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             안내로 갈라낸다. */}
         {halftimePeriod !== null && gameState === 'LIVE' && (
           <Banner tone="info">
-            하프타임이에요. 준비되면 위 &lsquo;{startPeriodCommandLabel(halftimePeriod.number)}&rsquo;을 눌러주세요.
+            하프타임이에요. 준비되면 &lsquo;{startPeriodCommandLabel(halftimePeriod.number)}&rsquo;을 눌러주세요.
           </Banner>
         )}
         {/* 종료 흐름 개편 — 하프타임과 똑같은 함정이 정규 시간 종료
@@ -1393,8 +1440,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {regulationEnded && (
           <Banner tone="info">
             {penaltyShootoutEligible
-              ? '정규 시간이 무승부로 끝났어요. 위 ‘승부차기 시작’으로 결과를 입력해주세요.'
-              : '정규 시간이 끝났어요. 기록을 확인한 뒤 위 ‘경기 종료’를 눌러주세요.'}
+              ? '정규 시간이 무승부로 끝났어요. ‘승부차기 시작’으로 결과를 입력해주세요.'
+              : '정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.'}
           </Banner>
         )}
         {/* 요구사항 4 — 결선 무승부인데 승부차기가 없어 "경기 종료"를 막았을
@@ -1446,6 +1493,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           </div>
         )}
       </div>
+
+      {/* 경기가 끝나면 콘솔이 그 자리에서 결과 확정 카드로 이어진다 — 종료 뒤 "다음에 뭘 해야 하는지"가
+          화면에 없던 막다른 길을 없앤다. 확정 권한이 없는 역할의 안내와 서버 권한 검사는 패널이 맡는다. */}
+      {gameEnded ? (
+        <div className="px-4">
+          <GameResultReviewPanel
+            key={gameId}
+            variant="console"
+            gameId={gameId}
+            tournamentId={tournamentId}
+            confirmedFooter={<ConsoleNextSteps tournamentId={tournamentId} fixtureId={fixtureId} />}
+          />
+        </div>
+      ) : null}
 
       {/* 휴식 타이머(하프타임·부상 중단) — 경기가 SCHEDULED 이전(아직 시작 전)이나
           이미 ENDED/CANCELLED된 뒤에는 의미가 없으므로 LIVE/PAUSED에서만 보여준다.
@@ -1515,6 +1576,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
           높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
           부풀어 보인다. */}
+      <ActionSheet
+        open={moreOpen && moreActions.length > 0}
+        title="경기 더보기"
+        actions={moreActions}
+        onClose={() => setMoreOpen(false)}
+      />
       <AbnormalEndDialog
         open={abnormalEndOpen}
         submitting={commandBlocked}
@@ -1531,11 +1598,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           차지해야 하고, 그때까지도 안 온 사람은 애초에 라인업에서 빠졌어야 한다.
           takeover 를 쥔 운영자만 조작할 수 있게 하는 것도 다른 액션과 동일하다. */}
       {gameState === 'SCHEDULED' && (
-        <ArrivalCheckinPanel
+        <KickoffChecklist
+          gameId={gameId}
           sides={sides}
           lineups={lineups}
           disabled={!canOperate || commandBlocked}
           pendingParticipantId={setArrival.isPending ? setArrival.variables?.participantId ?? null : null}
+          pendingSideId={confirmSideArrival.isPending ? confirmSideArrival.variables ?? null : null}
+          onConfirmSide={(sideId) => void handleConfirmSideArrival(sideId)}
           onToggleArrival={({ participantId, arrived }) => {
             setArrival.mutate(
               { participantId, arrived },
@@ -1561,8 +1631,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           부정하는 상태다. 서버에 확정된 이벤트 로그를 먼저 보여주고, 큐는 아직 전송되지
           않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
       <section className="px-4">
-        <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">기록된 이벤트</h3>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">
+          기록된 이벤트 <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
+        </h3>
         <RecordedEventList
+          order="newest-first"
           events={ops.liveEvents}
           sides={sides}
           lineups={lineups}
@@ -1631,7 +1704,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           finishing={commandBlocked}
         />
       ) : null}
-      <EventToasts toasts={toasts} onDismiss={dismiss} />
+      <EventToasts toasts={toasts} onDismiss={dismiss} aboveBottomBar={commandBarVisible} />
       {confirmModal}
     </div>
   );

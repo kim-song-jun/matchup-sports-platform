@@ -160,11 +160,8 @@ export default function AdminTeamDetailPage() {
               <AdminDetailRow label="팀 ID" value={team.teamId} />
               <AdminDetailRow label="종목" value={team.sportName} />
               <AdminDetailRow label="지역" value={team.regionName} />
-              <AdminDetailRow label="상태" value={team.status} />
               <AdminDetailRow label="팀장" value={team.ownerName} />
               <AdminDetailRow label="팀장 ID" value={team.ownerUserId} />
-              <AdminDetailRow label="멤버 수" value={team.memberCount} />
-              <AdminDetailRow label="매니저 수" value={team.managerCount} />
               <AdminDetailRow label="생성일" value={formatAdminDateTime(team.createdAt)} />
             </dl>
           </article>

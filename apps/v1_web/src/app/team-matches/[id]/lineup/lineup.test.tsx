@@ -14,6 +14,7 @@ import {
   describeLineupPhase,
   describePublicationCountdown,
   extractConflictCurrentVersion,
+  findJerseyHolder,
   hydrateLineupEditorState,
   isRosterMemberPlaced,
   removeEntry,
@@ -156,6 +157,29 @@ describe('lineup.view-model', () => {
     const again = addRosterMemberToLineup(state, rosterMember);
     expect(again).toBe(state); // 참조 동일 — 아무 것도 바뀌지 않았다
     expect(again.participants).toHaveLength(1);
+  });
+
+  // L20 — 멤버 관리의 "팀에서 계속 쓰는 번호" 가 명단에 넣을 때 버려져 칸이 비어 있었다.
+  it('팀 등번호를 지정한 팀원은 그 번호로 명단에 들어간다', () => {
+    const state = addRosterMemberToLineup(createEmptyLineupEditorState(0), { ...rosterMember, jerseyNumber: 8 });
+    expect(state.participants[0].jerseyNumber).toBe(8);
+  });
+
+  it('팀 번호를 지정하지 않은 팀원은 빈칸으로 들어간다', () => {
+    expect(addRosterMemberToLineup(createEmptyLineupEditorState(0), rosterMember).participants[0].jerseyNumber).toBeNull();
+    expect(
+      addRosterMemberToLineup(createEmptyLineupEditorState(0), { ...rosterMember, jerseyNumber: null }).participants[0]
+        .jerseyNumber,
+    ).toBeNull();
+  });
+
+  it('그 번호를 명단의 다른 행이 이미 쓰면 빈칸으로 둔다 — 중복 번호로 제출이 막히지 않게', () => {
+    let state = addRosterMemberToLineup(createEmptyLineupEditorState(0), { ...rosterMember, jerseyNumber: 8 });
+    state = addRosterMemberToLineup(state, { ...rosterMember2, jerseyNumber: 8 });
+    expect(state.participants.map((entry) => entry.jerseyNumber)).toEqual([8, null]);
+    expect(validateLineupForSubmit(state)).toEqual([]);
+    expect(findJerseyHolder(state, 8)).toBe('홍길동');
+    expect(findJerseyHolder(state, 9)).toBeNull();
   });
 
   it('ignores a blank guest name and adds a trimmed one', () => {
@@ -318,6 +342,18 @@ describe('lineup.view-model', () => {
       label: '경기 종료 · 잠김',
     });
     expect(describeLineupPhase('DRAFT', false, null).editable).toBe(false);
+  });
+
+  // L30 — 서버 lockReason 'terminal' 은 종료와 취소를 구분하지 않는다. 취소는 매치 상태로 가른다.
+  it('취소된 경기는 "경기 종료" 가 아니라 취소로 잠긴다', () => {
+    expect(describeLineupPhase('LOCKED', false, 'terminal', true)).toMatchObject({
+      editable: false,
+      label: '취소됨 · 잠김',
+      helperText: '취소된 경기의 참석명단은 수정할 수 없어요.',
+    });
+    // 대조군 — 끝난 경기는 그대로 종료로 잠긴다.
+    expect(describeLineupPhase('LOCKED', false, 'terminal', false).label).toBe('경기 종료 · 잠김');
+    expect(describeLineupPhase('LOCKED', false, 'terminal').label).toBe('경기 종료 · 잠김');
   });
 
   it('resolves which team is "mine" for this match from host/opponent + my memberships', () => {
@@ -518,6 +554,46 @@ describe('TeamMatchLineupPageClient', () => {
     expect(hoisted.saveMutate).not.toHaveBeenCalled();
   });
 
+  // L30 — 취소된 경기에서 "N시간 후 공개돼요" 카운트다운이 남고 배지가 "경기 종료"로 읽혔다.
+  describe('취소된 경기의 참석명단 (L30)', () => {
+    const lockedLineup = () => baseLineup({
+      state: 'SUBMITTED',
+      editable: false,
+      lockReason: 'terminal',
+      publicLineupAt: futureIso(200),
+    });
+
+    function renderWith(matchStatus: string) {
+      hoisted.useV1TeamMatchMock.mockReturnValue({
+        data: { ...baseTeamMatch(), status: matchStatus, displayState: matchStatus },
+        isLoading: false,
+        isError: false,
+      });
+      hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+        data: lockedLineup(),
+        isLoading: false,
+        isError: false,
+        refetch: hoisted.refetchLineup,
+      });
+      render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    }
+
+    it('배지는 취소로 잠기고 공개 카운트다운은 숨긴다', () => {
+      renderWith('cancelled');
+
+      expect(screen.getByText('취소됨 · 잠김')).toBeInTheDocument();
+      expect(screen.queryByText('경기 종료 · 잠김')).not.toBeInTheDocument();
+      expect(screen.queryByText(/후 공개돼요/)).not.toBeInTheDocument();
+    });
+
+    it('대조군 — 같은 잠금이라도 끝난 경기는 종료 배지와 카운트다운을 그대로 보인다', () => {
+      renderWith('completed');
+
+      expect(screen.getByText('경기 종료 · 잠김')).toBeInTheDocument();
+      expect(screen.getByText(/후 공개돼요/)).toBeInTheDocument();
+    });
+  });
+
   /**
    * **라벨을 지우면 못 찾고, 항상 띄우면 값으로 읽힌다.**
    *
@@ -639,6 +715,60 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByRole('button', { name: '이전 참석명단 불러오기' })).toBeInTheDocument();
     // 배치되고 나면 대기 목록에서 사라진다 — 같은 사람을 두 번 추가할 방법 자체가 없다.
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
+  });
+
+  it('멤버 관리에서 지정한 팀 등번호가 "명단 추가" 때 등번호 칸에 채워진다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 8 }] },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
+    // L7 — 좁은 칸에서 두 자리 번호가 잘리던 결함은 스핀 버튼을 없앤 전용 클래스로 고친다(compact-number-input.test.ts).
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveClass('tm-input-compact-number');
+  });
+
+  it('팀 번호가 명단의 다른 행과 겹치면 비워 두고 누구와 겹치는지 알린다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 8 },
+          { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active', jerseyNumber: 8 },
+          { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: 9 },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
+    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
+
+    expect(screen.getByLabelText('김철수 등번호')).toHaveValue(null);
+    expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
+
+    // 겹치지 않는 사람을 이어서 넣어도 떠 있던 안내는 남는다.
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    expect(screen.getByLabelText('이영희 등번호')).toHaveValue(9);
+    expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
   });
 
   it('팀장·운영진은 참석 응답이 없는 활성 팀원도 참석명단에 직접 추가할 수 있다', () => {
@@ -981,6 +1111,73 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
     expect(screen.getByRole('button', { name: '홍길동, 골키퍼 지정 해제' })).toBeInTheDocument();
     expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
+  });
+});
+
+// L9 — 풋살 5:5 매치에서 프리셋 이름 예시가 "주전 4-4-2"(11인제)였고, 제출한 뒤에도
+// "'…' 프리셋으로 저장했어요." 안내가 화면에 남았다.
+describe('TeamMatchLineupPageClient — 프리셋 저장 (L9)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), sport: { sportId: 'sport-futsal', name: '풋살' } },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' }] },
+      isLoading: false,
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({ revision: 3 }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+  });
+
+  function openPresetDialog() {
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '프리셋으로 저장' }));
+    return screen.getByRole('dialog', { name: '프리셋으로 저장' });
+  }
+
+  it('이름 예시가 이 매치의 종목에 맞다 — 풋살이면 11인제 표기를 보이지 않는다', () => {
+    const dialog = openPresetDialog();
+
+    expect(within(dialog).getByLabelText('프리셋 이름')).toHaveAttribute('placeholder', '예: 5:5 기본 멤버');
+  });
+
+  it('제출이 끝나면 제출 전 프리셋 저장 안내가 사라진다', async () => {
+    const dialog = openPresetDialog();
+    fireEvent.change(within(dialog).getByLabelText('프리셋 이름'), { target: { value: '평일 멤버' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText("'평일 멤버' 프리셋으로 저장했어요.")).toBeInTheDocument();
+
+    // 변경 없이 곧바로 제출하면 저장 없이 제출로 이어진다 — 저장이 먼저 필요하면 그 ack 뒤에 제출된다.
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 4 }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+
+    expect(screen.queryByText("'평일 멤버' 프리셋으로 저장했어요.")).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 제출이 실패하면 안내는 그대로 남는다', async () => {
+    const dialog = openPresetDialog();
+    fireEvent.change(within(dialog).getByLabelText('프리셋 이름'), { target: { value: '평일 멤버' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText("'평일 멤버' 프리셋으로 저장했어요.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 4 }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onError(new Error('boom')));
+
+    expect(screen.getByText("'평일 멤버' 프리셋으로 저장했어요.")).toBeInTheDocument();
   });
 });
 

@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AlertTriangle, ChevronLeft, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
+import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AddLeagueTeam,
@@ -25,12 +27,14 @@ import {
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
+import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
+import { LeagueNextActionCard } from './league-next-action-card';
+import { pickLeagueNextAction } from '@/lib/league-next-action';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
-import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import {
   computeDailyPlan,
@@ -45,12 +49,12 @@ import type {
   V1PreviewLeagueFixturesResult,
 } from '@/types/league-match';
 
+function consoleHref(leagueId: string, teamMatchId: string): string {
+  return `/admin/live/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/operate`;
+}
+
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
-
-// 대진 표의 구장·주소 입력: 데스크톱에서는 열 폭에 맞춰 줄어들고(`lg:w-full`), 잘린 값은
-// 말줄임 + title 로 읽는다. 모바일 카드에서는 기존 고유 폭을 유지한다.
-const FIT_TEXT_INPUT_CLASS = 'min-w-0 text-ellipsis lg:w-full';
 
 const WEEKDAY_OPTIONS = [
   { value: 0, label: '일요일' },
@@ -75,6 +79,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
   const { toasts, showToast } = useAdminToast();
+  const { confirm, ConfirmModal: confirmModal } = useConfirm();
+  // 대진이 이미 있을 때의 "대진 관리"(재생성) 접이식. 거의 안 쓰는 파괴적 조작이라 기본은 접혀 있다.
+  const [manageOpen, setManageOpen] = useState(false);
 
   // 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거.
   const addTeam = useV1AddLeagueTeam(leagueId);
@@ -135,10 +142,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 수동 대진은 홈·어웨이 **둘 다** 골라야 만들 수 있다. 로딩 중(`teamsData === undefined`)도
   // 같은 취급이다 — 그때 열면 피커가 비어 있어 운영자는 "팀이 없는 리그" 로 오해한다.
   const canAddManualFixture = (teamsData?.teams.length ?? 0) >= 2;
-  // 감사 결함 4: 인라인 편집(일시/구장/주소) 실패가 토스트에만 뜨고 필드에는 안 남아,
-  // 토스트를 놓치면 실패를 알 방법이 없다. teamMatchId -> 실패한 필드 key 집합으로
-  // 추적해 해당 입력에 aria-invalid + 시각 표시(테두리 + 아이콘, 컬러 단독 아님)를 남긴다.
-  const [failedFields, setFailedFields] = useState<Record<string, Set<'startAt' | 'placeName' | 'placeAddress'>>>({});
+  // 대진 표 행의 ⋯ 시트와 일정 수정 모달이 각각 어느 대진을 대상으로 하는지. 표는 읽기 전용이다.
+  const [menuFixture, setMenuFixture] = useState<V1LeagueFixture | null>(null);
+  const [scheduleFixture, setScheduleFixture] = useState<V1LeagueFixture | null>(null);
 
   if (isPending) {
     return (
@@ -225,6 +231,69 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   // 대진**이 실제로 생성된다(서버는 과거만 거부한다). 응답에 이 필드가 없는 건 서버가
   // 구버전일 때뿐이므로, 만들지 못하게 막고 새로고침을 안내하는 쪽이 맞다. 표·참가팀·취소는
   // 그대로 쓸 수 있다 — 잠그는 건 생성·미리보기·재생성 세 버튼뿐이다.
+  const matchupLabelOf = (fixture: V1LeagueFixture) => {
+    const homeName = teamNameById.get(fixture.homeTeamId) ?? '홈팀';
+    return fixture.awayTeamId
+      ? `${homeName} vs ${teamNameById.get(fixture.awayTeamId) ?? '원정팀'}`
+      : `${homeName} 부전승`;
+  };
+  const nextAction = pickLeagueNextAction(series.fixtures);
+
+  /**
+   * 행의 ⋯ 시트 항목. 일정 수정·몰수패·취소는 표에서 물러나 여기 모였다. 결과 항목은 **결과가 있는
+   * 경기에만** 둔다(F55) — 안 치른 경기에 "결과 정정"을 두면 빈 화면으로 가는 헛걸음이다. 확정된 경기는
+   * 정정 화면, 확정 전(제출·초안·정정 요청·무효)은 결과 검토 화면으로 간다.
+   */
+  const rowActions = (row: V1LeagueFixture): ActionSheetAction[] => {
+    const actions: ActionSheetAction[] = [
+      {
+        key: 'schedule',
+        label: '일정 수정',
+        description: '일시·구장·주소를 바꿔요',
+        onSelect: () => {
+          setMenuFixture(null);
+          setScheduleFixture(row);
+        },
+      },
+    ];
+    const stage = row.resultStage ?? 'not_entered';
+    if (row.awayTeamId !== null && stage !== 'not_entered') {
+      const officialStage = stage === 'official';
+      actions.push({
+        key: 'result',
+        label: officialStage ? '결과 정정' : '결과 검토',
+        description: officialStage ? '확정된 결과를 고쳐요' : '제출된 결과를 확인하고 확정해요',
+        href: officialStage
+          ? `/admin/live/${encodeURIComponent(leagueId)}/records/corrections?fixtureId=${encodeURIComponent(row.teamMatchId)}`
+          : `/admin/live/${encodeURIComponent(leagueId)}/result-review?fixtureId=${encodeURIComponent(row.teamMatchId)}`,
+      });
+    }
+    // R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다.
+    if (row.status === 'matched' && row.awayTeamId !== null) {
+      actions.push({
+        key: 'forfeit',
+        label: '몰수패 처리',
+        description: '불참한 팀과 사유를 남기고 결과를 확정해요',
+        destructive: true,
+        onSelect: () => {
+          setMenuFixture(null);
+          setForfeitFixture(row);
+        },
+      });
+    }
+    actions.push({
+      key: 'cancel',
+      label: '대진 취소',
+      description: '이 경기를 순위 집계에서 빼요. 되돌릴 수 없어요',
+      destructive: true,
+      onSelect: () => {
+        setMenuFixture(null);
+        setCancelTarget(row);
+      },
+    });
+    return actions;
+  };
+
   const leagueStartsOnAt = series.startsOn === undefined ? null : new Date(series.startsOn);
   const hasLeagueStartsOn = leagueStartsOnAt !== null && !Number.isNaN(leagueStartsOnAt.getTime());
 
@@ -308,6 +377,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       return;
     }
     if (!validateTimingInputs()) return;
+    // 만든 대진은 삭제할 수 없다(경기에 게임·감사 기록이 바로 붙는다). 바로잡으려면 취소하고 다시
+    // 만들어야 하므로, 잘못 눌러도 되돌릴 수 있는 척하지 않고 미리 알린다.
+    const ok = await confirm({
+      title: '라운드로빈 대진을 만들까요?',
+      message: '만든 대진은 지울 수 없고 취소만 할 수 있어요. 주차·요일·시각을 한 번 더 확인해 주세요.',
+      confirmLabel: '대진 만들기',
+    });
+    if (!ok) return;
     try {
       const result = await generateFixtures.mutateAsync(buildFixtureFormPayload());
       showToast(appendFixtureWarnings(`대진 ${result.createdCount}경기를 만들었어요.`, result.warnings), 'success');
@@ -362,7 +439,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               ? `${item.label}을(를) 추가했어요.`
               : leagueHasOfficialResult
                 ? `${item.label}을(를) 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
-                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 "대진 재생성"을 눌러 주세요.`,
+                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.`,
             'success',
           );
         },
@@ -393,37 +470,20 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     });
   };
 
-  // 감사 결함 4: 필드별 실패 표시를 지우거나(성공) 남기는(실패) 헬퍼. teamMatchId 하나에
-  // 여러 필드가 동시에 실패해 있을 수 있어 Set으로 관리한다.
-  const setFieldFailed = (teamMatchId: string, field: 'startAt' | 'placeName' | 'placeAddress', failed: boolean) => {
-    setFailedFields((prev) => {
-      const next = new Set(prev[teamMatchId]);
-      if (failed) next.add(field);
-      else next.delete(field);
-      if (next.size === 0) {
-        const { [teamMatchId]: _removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [teamMatchId]: next };
-    });
-  };
-
-  const onFieldBlur = (
-    fixture: V1LeagueFixture,
-    field: 'startAt' | 'placeName' | 'placeAddress',
-    patch: { startsAt?: string; placeName?: string; placeAddress?: string },
-  ) => {
-    updateFixture.mutate(
-      { teamMatchId: fixture.teamMatchId, body: patch },
-      {
-        onSuccess: () => setFieldFailed(fixture.teamMatchId, field, false),
-        onError: (error) => {
-          setFieldFailed(fixture.teamMatchId, field, true);
-          showToast(extractErrorMessage(error, '경기 정보를 저장하지 못했어요.'), 'error');
+  // 일정 수정 모달의 저장. 실패는 모달 안에 남고(입력을 잃지 않는다) 성공하면 토스트로 알린다.
+  const onScheduleSubmit = (fixture: V1LeagueFixture) => (patch: LeagueFixtureSchedulePatch) =>
+    new Promise<void>((resolve, reject) => {
+      updateFixture.mutate(
+        { teamMatchId: fixture.teamMatchId, body: patch },
+        {
+          onSuccess: () => {
+            showToast('일정을 저장했어요.', 'success');
+            resolve();
+          },
+          onError: (error) => reject(error),
         },
-      },
-    );
-  };
+      );
+    });
 
   // R11(C-6): AdminReasonModal의 "상태" 선택을 "어느 팀이 불참했는지" 선택으로 재사용한다
   // (컴포넌트 재사용 원칙 — 새 모달을 만들지 않는다).
@@ -572,6 +632,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         }
       />
 
+{series.fixtures.length === 0 ? (
+<>
       {/* 참가 신청 관리 — 사용자 A안(FE-3). BE 는 진작에 `open-registration` 을 갖고
           있었는데 **부르는 화면이 없어** 리그는 신청을 열 방법이 API 직접 호출뿐이었다.
           목록은 대회 `RegistrationsTab` 을 그대로 재사용한다 — 어드민 신청 API 는 이미
@@ -591,7 +653,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
         <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">참가팀 관리</p>
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          팀을 추가하거나 뺄 수 있어요. 대진이 이미 있으면 재생성해야 새 구성이 반영돼요.
+          팀을 추가하거나 뺄 수 있어요. 대진이 이미 있으면 표 아래 "대진 관리"에서 재생성해야 새 구성이 반영돼요.
         </p>
         <ul className="mb-3 flex flex-wrap gap-2">
           {(teamsData?.teams ?? []).map((team) => (
@@ -648,6 +710,18 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
             : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
         </span>
       </div>
+</>
+) : (
+<>
+{nextAction ? (
+<LeagueNextActionCard
+  action={nextAction}
+  leagueId={leagueId}
+  matchupLabel={matchupLabelOf(nextAction.fixture)}
+/>
+) : null}
+</>
+)}
       {manualFixtureOpen && (
         <LeagueManualFixtureModal
           teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
@@ -805,181 +879,49 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {/* R13: 대진 재생성 — 기존 대진을 전부 취소하고 같은 팀 로스터로 새로 만드는
-              파괴적 조작이라, 위 생성 폼과 시각 구분되게 amber 톤 카드에 담는다. */}
-          <div className="tm-on-tint rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
-            <p className="mb-2 text-sm font-semibold text-[var(--orange700)]">대진 재생성</p>
-            <p className="mb-3 text-xs text-[var(--text-muted)]">
-              팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
-              취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
-            </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label htmlFor="regen-weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
-                <input
-                  id="regen-weeks-count"
-                  type="number"
-                  min={1}
-                  max={52}
-                  value={weeksCount}
-                  onChange={(e) => setWeeksCount(Number(e.target.value))}
-                  className={`${inputClass} w-24`}
-                />
-              </div>
-              <div>
-                <label htmlFor="regen-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
-                <select
-                  id="regen-day-of-week"
-                  value={dayOfWeek}
-                  onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
-                  className={`${inputClass} w-40`}
-                >
-                  <option value="">시작일 그대로</option>
-                  {WEEKDAY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작 시각</label>
-                <input
-                  id="regen-time"
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  disabled={dayOfWeek === ''}
-                  className={`${inputClass} w-36 disabled:opacity-50`}
-                />
-              </div>
-              <FixtureTimingFields
-                idPrefix="regen"
-                dayOfWeekUnset={dayOfWeek === ''}
-                endTime={endTime}
-                onEndTimeChange={setEndTime}
-                gameDurationMinutes={gameDurationMinutes}
-                onGameDurationChange={setGameDurationMinutes}
-                breakMinutes={breakMinutes}
-                onBreakMinutesChange={setBreakMinutes}
-                gamesPerTeamPerDay={gamesPerTeamPerDay}
-                onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
-              />
-              <div>
-                <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
-                <input
-                  id="regen-place-name"
-                  type="text"
-                  placeholder="장소 미정"
-                  value={placeName}
-                  onChange={(e) => setPlaceName(e.target.value)}
-                  className={`${inputClass} w-48`}
-                />
-              </div>
-              {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
-                  대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
-                  전에 먼저 보여준다. */}
-              <button
-                type="button"
-                onClick={onPreview}
-                disabled={previewFixtures.isPending || !hasLeagueStartsOn}
-                className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
-              >
-                미리보기
-              </button>
-              <button
-                type="button"
-                onClick={() => setRegenerateModalOpen(true)}
-                disabled={!hasLeagueStartsOn}
-                className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
-              >
-                대진 재생성
-              </button>
-            </div>
-            {!hasLeagueStartsOn && <MissingStartsOnNotice />}
-            <div className="mt-3 flex flex-col gap-3">
-              <TimingSuggestionRow
-                suggestion={timingSuggestion}
-                showNoFit={showTimingNoFit}
-                onApply={(games) => setGamesPerTeamPerDay(String(games))}
-              />
-              {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
-            </div>
-            <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
-          </div>
-
           <AdminDataTable<V1LeagueFixture>
             rows={series.fixtures}
             keyExtractor={(row) => row.teamMatchId}
             rowTone={(row) => (row.status === 'cancelled' ? 'danger' : undefined)}
-            actionsHeader="관리"
+            actionsHeader="운영"
             stickyActions
             // 기본 캡(max-w-[900px])이 카드를 898px 로 묶어 1440 에서도 열이 스크롤 밖으로 밀렸다.
-            // 캡을 풀고 표를 카드 폭에 맞춘다 — 구장·주소·경기 열이 min-w 까지 줄어든다.
+            // 캡을 풀고 표를 카드 폭에 맞춘다. 표는 읽기 전용 일정이라(수정은 행의 ⋯) 열이 넷뿐이다.
             tableMaxWidth="max-w-none"
             fitContainer
             dense
-            renderActions={(row) =>
-              row.status === 'cancelled' ? (
-                <span className="text-xs text-[var(--text-muted)]">취소됨</span>
-              ) : (
-                <div className="flex items-center gap-2">
-                  {/* U1(A안): 상대팀이 확정된(awayTeamId not null) 대진만 결과 처리 대상이다.
-                      resultStage 미확정 4단계(not_entered/draft/change_requested/voided)는
-                      신규 입력, official 은 정정 — awaiting_approval(상대팀 승인 대기 중)만
-                      운영자 직접 입력 대상이 아니라 링크를 내지 않는다.
-                      voided(무효화된 결과)도 재입력 대상이라 포함한다 — 여기서 빼면
-                      무효화된 경기로 들어갈 입구가 사라진다.
-
-                      Task 165 BE-3: 이 자리는 이제 **콘솔 딥링크**다. 리그 전용 결과 입력
-                      모달·엔드포인트는 지웠고, 운영자는 대회와 같은 결과 검토 화면
-                      (`/admin/live/:leagueId/result-review?fixtureId=`)에서 입력·정정한다.
-                      그 화면이 리그를 볼 수 있는 것은 #985(콘솔 목록)와 #982(결과 명령
-                      경계)가 거울을 지원하기 때문이다. */}
-                  {row.awayTeamId !== null &&
-                  (row.resultStage === undefined ||
-                    row.resultStage === 'not_entered' ||
-                    row.resultStage === 'draft' ||
-                    row.resultStage === 'change_requested' ||
-                    row.resultStage === 'voided' ||
-                    row.resultStage === 'official') ? (
+            renderActions={(row) => {
+              const canOpenConsole = row.status !== 'cancelled' && row.awayTeamId !== null;
+              return (
+                <div className="flex items-center justify-end gap-2">
+                  {/* 주 조작은 콘솔 열기 하나다. 콘솔이 종료·결과 확정까지 이어 주므로(Task 180 G6)
+                      예전 "결과 입력" 링크(빈 검토 화면으로 가던 헛걸음)는 ⋯ 로 물러났다.
+                      취소된 대진과 상대 없는 부전승은 열 콘솔이 없다. */}
+                  {canOpenConsole ? (
                     <Link
-                      // 확정된 경기는 **정정 화면**으로 보낸다. `result-review` 는 *검토
-                      // 대기* 목록이라 확정된 경기가 거기 없다 — 라벨은 "결과 정정" 인데
-                      // 열리는 화면은 "검토할 결과가 없어요" 인 데드엔드였다(alpha 실측).
-                      // 두 화면 다 `?fixtureId=` 로 딥링크를 받는다.
-                      href={
-                        row.resultStage === 'official'
-                          ? `/admin/live/${encodeURIComponent(leagueId)}/records/corrections?fixtureId=${encodeURIComponent(row.teamMatchId)}`
-                          : `/admin/live/${encodeURIComponent(leagueId)}/result-review?fixtureId=${encodeURIComponent(row.teamMatchId)}`
-                      }
-                      aria-label={`${row.title} ${row.resultStage === 'official' ? '결과 정정' : '결과 입력'}`}
-                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-sm font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      href={consoleHref(leagueId, row.teamMatchId)}
+                      aria-label={`${row.title} 콘솔 열기`}
+                      className="tm-btn tm-btn-sm tm-btn-outline whitespace-nowrap"
                     >
-                      {row.resultStage === 'official' ? '결과 정정' : '결과 입력'}
+                      콘솔 열기
                     </Link>
                   ) : null}
-                  {/* R11(C-6): 상대팀이 확정된(matched) 대진만 몰수 처리 대상이다 — 아직 상대가
-                      없거나(awayTeamId null) 이미 완료된 대진은 버튼을 숨긴다. */}
-                  {row.status === 'matched' && row.awayTeamId !== null ? (
+                  {row.status === 'cancelled' ? (
+                    <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">취소됨</span>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => setForfeitFixture(row)}
-                      aria-label={`${row.title} 몰수패 처리`}
-                      className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--red50)] px-3 text-sm font-medium text-[var(--red700)] transition-colors hover:bg-[var(--red100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      aria-label={`${row.title} 더보기`}
+                      aria-haspopup="dialog"
+                      onClick={() => setMenuFixture(row)}
+                      className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
-                      몰수패 처리
+                      <Ellipsis size={18} aria-hidden="true" />
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setCancelTarget(row)}
-                    aria-label={`${row.title} 취소`}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--red50)] px-3 text-sm font-medium text-[var(--red700)] transition-colors hover:bg-[var(--red100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                  >
-                    취소
-                  </button>
+                  )}
                 </div>
-              )
-            }
+              );
+            }}
             columns={[
               {
                 key: 'title',
@@ -987,39 +929,26 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 className: 'min-w-[8rem]',
                 render: (row) => {
                   // 감사 결함 1: title은 "N주차" 자동 생성이라 리그 전체가 똑같이 보인다 —
-                  // teamNameById로 실제 매치업을 보여주고, 원래 title(주차 라벨)은 보조
-                  // 텍스트로 남겨 어느 주차인지도 함께 알 수 있게 한다.
-                  const homeName = teamNameById.get(row.homeTeamId) ?? '홈팀';
-                  const matchupLabel = row.awayTeamId
-                    ? `${homeName} vs ${teamNameById.get(row.awayTeamId) ?? '원정팀'}`
-                    : `${homeName} 부전승`;
+                  // teamNameById로 실제 매치업을 보여주고, 원래 title(주차 라벨)은 구장과 함께
+                  // 보조 텍스트로 남겨 어느 주차·어디인지도 알 수 있게 한다.
                   return (
                     <div className="flex flex-col gap-0.5">
-                      <span className="break-keep text-sm font-medium text-[var(--text-strong)]">{matchupLabel}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{row.title}</span>
+                      <span className="break-keep text-sm font-medium text-[var(--text-strong)]">{matchupLabelOf(row)}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]" title={row.placeAddress ?? undefined}>
+                        {row.title} · {row.placeName}
+                      </span>
                     </div>
                   );
                 },
               },
-              // 열 순서: '경기' 바로 뒤. 처음엔 '상태' 뒤(맨 끝)에 뒀는데 alpha 1440 실측에서
-              // 표 스크롤러가 clientWidth 898 / scrollWidth 1201 이라 결과 열의 오른쪽 끝이
-              // x=1394 — 보이는 영역(1171) 밖이었다. **가로로 스크롤해야 보이는 결과 열**은
-              // 이 기능의 목적(운영자가 막힌 경기를 한눈에)을 달성하지 못한다.
-              //
-              // D6(2026-08-24 확정): '상태' 열은 그대로 두고 '결과' 열을 따로 둔다.
-              // 두 값은 다른 축이다 — status 는 "대진이 성사됐는가", resultStage 는
-              // "결과가 어디까지 왔는가". 합치면 취소·매칭 같은 대진 자체의 상태가
-              // 결과 단계에 가려진다. 이 열이 없던 동안 운영자는 어느 경기가 미입력인지,
-              // 어느 경기가 상대팀 승인을 기다리는지 화면에서 알 방법이 없었다.
+              // D6(2026-08-24 확정): '결과' 열은 대진 상태와 다른 축이다 — status 는 "대진이 성사됐는가",
+              // resultStage 는 "결과가 어디까지 왔는가". 합치면 취소·매칭 같은 대진 자체의 상태가 결과
+              // 단계에 가려진다. 그래서 취소된 대진은 결과 단계 대신 취소 상태를 이 자리에 그린다.
               {
                 key: 'result',
                 header: '결과',
                 render: (row) => {
-                  // 취소된 대진에 결과 단계를 붙이면 "미입력"이 영원히 처리해야 할 일처럼
-                  // 보인다 — 취소는 결과를 기다리지 않으므로 단계 자체를 그리지 않는다.
-                  if (row.status === 'cancelled') {
-                    return <span className="text-xs text-[var(--text-muted)]">—</span>;
-                  }
+                  if (row.status === 'cancelled') return <AdminStatusPill status={row.status} />;
                   const stage = row.resultStage ?? 'not_entered';
                   const hasScore = row.homeScore !== null && row.homeScore !== undefined;
                   return (
@@ -1037,105 +966,223 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               {
                 key: 'startAt',
                 header: '일시',
-                render: (row) => {
-                  const invalid = failedFields[row.teamMatchId]?.has('startAt') ?? false;
-                  const errorId = `${row.teamMatchId}-startAt-error`;
-                  return (
-                    <div className="relative">
-                      <input
-                        type="datetime-local"
-                        aria-label={`${row.title} 일시`}
-                        aria-invalid={invalid}
-                        aria-describedby={invalid ? errorId : undefined}
-                        defaultValue={toDatetimeLocalValue(row.startAt)}
-                        disabled={row.status === 'cancelled'}
-                        onBlur={(e) => {
-                          // 값이 그대로면 PATCH를 보내지 않는다 — 표를 탭으로 지나가기만 해도 쓰기가 발생하는 것 방지.
-                          if (e.target.value === toDatetimeLocalValue(row.startAt)) return;
-                          const startsAt = fromDatetimeLocalValue(e.target.value);
-                          if (!startsAt) return;
-                          onFieldBlur(row, 'startAt', { startsAt });
-                        }}
-                        className={`${inputClass} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
-                      />
-                      {invalid ? (
-                        <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
-                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                          <span className="sr-only">저장하지 못했어요. 다시 시도해 주세요.</span>
-                        </span>
-                      ) : null}
-                    </div>
-                  );
-                },
+                render: (row) => (
+                  <span className="whitespace-nowrap text-[length:var(--font-size-body-sm)] tabular-nums">
+                    {formatKstDateShort(row.startAt)} {formatKstTime(row.startAt)}
+                  </span>
+                ),
               },
-              {
-                key: 'placeName',
-                header: '구장',
-                className: 'min-w-[7.5rem]',
-                render: (row) => {
-                  const invalid = failedFields[row.teamMatchId]?.has('placeName') ?? false;
-                  const errorId = `${row.teamMatchId}-placeName-error`;
-                  return (
-                    <div className="relative">
-                      <input
-                        aria-label={`${row.title} 구장`}
-                        aria-invalid={invalid}
-                        aria-describedby={invalid ? errorId : undefined}
-                        title={row.placeName}
-                        defaultValue={row.placeName}
-                        disabled={row.status === 'cancelled'}
-                        onBlur={(e) => {
-                          if (e.target.value === row.placeName) return;
-                          onFieldBlur(row, 'placeName', { placeName: e.target.value });
-                        }}
-                        className={`${inputClass} ${FIT_TEXT_INPUT_CLASS} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
-                      />
-                      {invalid ? (
-                        <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
-                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                          <span className="sr-only">저장하지 못했어요. 다시 시도해 주세요.</span>
-                        </span>
-                      ) : null}
-                    </div>
-                  );
-                },
-              },
-              {
-                key: 'placeAddress',
-                header: '주소',
-                className: 'min-w-[8.5rem]',
-                render: (row) => {
-                  const invalid = failedFields[row.teamMatchId]?.has('placeAddress') ?? false;
-                  const errorId = `${row.teamMatchId}-placeAddress-error`;
-                  return (
-                    <div className="relative">
-                      <input
-                        aria-label={`${row.title} 주소`}
-                        aria-invalid={invalid}
-                        aria-describedby={invalid ? errorId : undefined}
-                        placeholder="상세 주소 (선택)"
-                        title={row.placeAddress ?? undefined}
-                        defaultValue={row.placeAddress ?? ''}
-                        disabled={row.status === 'cancelled'}
-                        onBlur={(e) => {
-                          if (e.target.value === (row.placeAddress ?? '')) return;
-                          onFieldBlur(row, 'placeAddress', { placeAddress: e.target.value });
-                        }}
-                        className={`${inputClass} ${FIT_TEXT_INPUT_CLASS} disabled:opacity-50 ${invalid ? 'border-[var(--red700)] pr-9 focus:border-[var(--red700)]' : ''}`}
-                      />
-                      {invalid ? (
-                        <span id={errorId} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--red700)]">
-                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                          <span className="sr-only">저장하지 못했어요. 다시 시도해 주세요.</span>
-                        </span>
-                      ) : null}
-                    </div>
-                  );
-                },
-              },
-              { key: 'status', header: '상태', render: (row) => <AdminStatusPill status={row.status} /> },
             ]}
           />
+
+          {/* 참가 신청 · 참가팀 · 대진 관리 — 리그를 만들 때와 팀 구성이 바뀔 때만 여는 것들을 표 아래
+              접이식 한 곳에 모았다. 예전엔 이것들이 대진 표 위에 펼쳐져(재생성은 주황 채움 상자로) 평소 할 일
+              (콘솔 열기·결과 확정)보다 눈에 띄었다. */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+            <button
+              type="button"
+              onClick={() => setManageOpen((open) => !open)}
+              aria-expanded={manageOpen}
+              aria-controls="fixture-manage-panel"
+              className="flex min-h-[60px] w-full items-center justify-between gap-3 rounded-2xl px-4 py-2 text-left focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <span className="min-w-0">
+                <span className="block text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">참가 신청 · 참가팀 · 대진 관리</span>
+                <span className="block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                  리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.
+                </span>
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
+                {manageOpen ? '닫기' : '열기'}
+                <ChevronDown
+                  size={18}
+                  aria-hidden="true"
+                  className={['text-[var(--text-muted)] transition-transform', manageOpen ? 'rotate-180' : ''].join(' ')}
+                />
+              </span>
+            </button>
+            {manageOpen ? (
+              <div id="fixture-manage-panel" className="px-4 pb-4">
+          {/* 참가 신청 관리 — 사용자 A안(FE-3). BE 는 진작에 `open-registration` 을 갖고
+              있었는데 **부르는 화면이 없어** 리그는 신청을 열 방법이 API 직접 호출뿐이었다.
+              목록은 대회 `RegistrationsTab` 을 그대로 재사용한다 — 어드민 신청 API 는 이미
+              리그를 받으므로(`ALL_COMPETITION_KINDS`) 리그 id 를 그대로 넘기면 된다.
+              A안 범위는 "신청 열기 + 목록" 이다. 그 밖의 화면을 새로 만들지 않는다. */}
+          <LeagueRegistrationSummary
+            leagueId={leagueId}
+            state={series.state}
+            registrationOpen={series?.registrationOpen ?? false}
+            registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
+          />
+
+          {/* 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거. 대진이 이미 있어도 로스터 자체는
+              바꿀 수 있다 — 대진표에 반영하려면 아래 "대진 재생성"이 필요하다는 걸 추가 성공
+              토스트로 안내한다(onAddTeam). 최소 2팀 규칙은 서버가 최종 판정하지만, 남은 팀이
+              2개일 때 제거 버튼을 미리 비활성화해 뻔한 실패 요청을 걸러낸다. */}
+          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">참가팀 관리</p>
+            <p className="mb-3 text-xs text-[var(--text-muted)]">
+              팀을 추가하거나 뺄 수 있어요. 대진이 이미 있으면 표 아래 "대진 관리"에서 재생성해야 새 구성이 반영돼요.
+            </p>
+            <ul className="mb-3 flex flex-wrap gap-2">
+              {(teamsData?.teams ?? []).map((team) => (
+                <li
+                  key={team.teamId}
+                  className="flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--blue50)] px-3 text-sm text-[var(--blue700)]"
+                >
+                  {team.name}
+                  <button
+                    type="button"
+                    aria-label={`${team.name} 제외`}
+                    disabled={removeTeam.isPending || (teamsData?.teams.length ?? 0) <= 2}
+                    title={(teamsData?.teams.length ?? 0) <= 2 ? '리그는 팀이 2개 이상이어야 해요' : undefined}
+                    onClick={() => setRemoveTarget({ teamId: team.teamId, teamName: team.name })}
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center disabled:opacity-40"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <label htmlFor="league-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+              팀 추가
+            </label>
+            <EntityPicker
+              id="league-team-picker"
+              value={teamPickerValue}
+              onChange={onAddTeam}
+              items={addTeamCandidates}
+              onSearch={setTeamSearch}
+              showResultsWithoutQuery
+              loading={addTeamCandidatesQuery.isFetching || addTeam.isPending}
+              placeholder="팀 이름으로 검색"
+              emptyText="검색 결과가 없어요"
+            />
+          </div>
+
+          {/* 우천 순연 재편성·대체 경기는 대진이 **이미 있는** 리그에서 필요하므로 분기 밖에 둔다. */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setManualFixtureOpen(true)}
+              // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
+              // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
+              // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
+              disabled={!canAddManualFixture}
+              className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+            >
+              경기 하나 추가
+            </button>
+            <span className="text-xs text-[var(--text-muted)]">
+              {canAddManualFixture
+                ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
+                : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.'}
+            </span>
+          </div>
+
+              {/* R13: 대진 재생성 — 기존 대진을 전부 취소하고 같은 팀 로스터로 새로 만드는
+                  파괴적 조작이라, 위 생성 폼과 시각 구분되게 amber 톤 카드에 담는다. */}
+              <div className="tm-on-tint rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
+                <p className="mb-2 text-sm font-semibold text-[var(--orange700)]">대진 재생성</p>
+                <p className="mb-3 text-xs text-[var(--text-muted)]">
+                  팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
+                  취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label htmlFor="regen-weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
+                    <input
+                      id="regen-weeks-count"
+                      type="number"
+                      min={1}
+                      max={52}
+                      value={weeksCount}
+                      onChange={(e) => setWeeksCount(Number(e.target.value))}
+                      className={`${inputClass} w-24`}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="regen-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
+                    <select
+                      id="regen-day-of-week"
+                      value={dayOfWeek}
+                      onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
+                      className={`${inputClass} w-40`}
+                    >
+                      <option value="">시작일 그대로</option>
+                      {WEEKDAY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작 시각</label>
+                    <input
+                      id="regen-time"
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      disabled={dayOfWeek === ''}
+                      className={`${inputClass} w-36 disabled:opacity-50`}
+                    />
+                  </div>
+                  <FixtureTimingFields
+                    idPrefix="regen"
+                    dayOfWeekUnset={dayOfWeek === ''}
+                    endTime={endTime}
+                    onEndTimeChange={setEndTime}
+                    gameDurationMinutes={gameDurationMinutes}
+                    onGameDurationChange={setGameDurationMinutes}
+                    breakMinutes={breakMinutes}
+                    onBreakMinutesChange={setBreakMinutes}
+                    gamesPerTeamPerDay={gamesPerTeamPerDay}
+                    onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+                  />
+                  <div>
+                    <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
+                    <input
+                      id="regen-place-name"
+                      type="text"
+                      placeholder="장소 미정"
+                      value={placeName}
+                      onChange={(e) => setPlaceName(e.target.value)}
+                      className={`${inputClass} w-48`}
+                    />
+                  </div>
+                  {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
+                      대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
+                      전에 먼저 보여준다. */}
+                  <button
+                    type="button"
+                    onClick={onPreview}
+                    disabled={previewFixtures.isPending || !hasLeagueStartsOn}
+                    className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+                  >
+                    미리보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegenerateModalOpen(true)}
+                    disabled={!hasLeagueStartsOn}
+                    className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
+                  >
+                    대진 재생성
+                  </button>
+                </div>
+                {!hasLeagueStartsOn && <MissingStartsOnNotice />}
+                <div className="mt-3 flex flex-col gap-3">
+                  <TimingSuggestionRow
+                    suggestion={timingSuggestion}
+                    showNoFit={showTimingNoFit}
+                    onApply={(games) => setGamesPerTeamPerDay(String(games))}
+                  />
+                  {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
+                </div>
+                <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
+              </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
 
@@ -1158,7 +1205,25 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         pending={recordForfeit.isPending}
       />
 
+      <ActionSheet
+        open={menuFixture !== null}
+        title={menuFixture ? `${matchupLabelOf(menuFixture)} · ${menuFixture.title}` : '경기 더보기'}
+        actions={menuFixture ? rowActions(menuFixture) : []}
+        onClose={() => setMenuFixture(null)}
+      />
+      {scheduleFixture ? (
+        <LeagueFixtureScheduleModal
+          key={scheduleFixture.teamMatchId}
+          fixture={scheduleFixture}
+          matchupLabel={matchupLabelOf(scheduleFixture)}
+          isSubmitting={updateFixture.isPending}
+          onSubmit={onScheduleSubmit(scheduleFixture)}
+          onClose={() => setScheduleFixture(null)}
+        />
+      ) : null}
+
       <AdminToasts toasts={toasts} />
+      {confirmModal}
 
       {/* R12: 대진 취소 확인 — 되돌릴 수 없으므로 사유를 필수로 받는다. */}
       {/* R6/D-3: 종료 역전이 확인. 취소·재생성과 달리 되돌릴 수 있는 조작이라

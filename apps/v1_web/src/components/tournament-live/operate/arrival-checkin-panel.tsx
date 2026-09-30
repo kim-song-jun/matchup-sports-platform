@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
 import { latestLineupForDisplay } from './lineup-grid';
@@ -27,26 +28,13 @@ import { latestLineupForDisplay } from './lineup-grid';
  * 사람은 "명단에 있는데 안 온 사람" 이고, 그건 이 축 하나로 표현된다.
  */
 
-export interface ArrivalCheckinPanelProps {
-  readonly sides: readonly GameSide[];
-  readonly lineups: readonly GameLineup[];
-  readonly onToggleArrival: (input: { participantId: string; arrived: boolean }) => void;
-  readonly disabled?: boolean;
-  /** 낙관적 표시 없이 서버 응답을 기다리는 동안 그 행만 잠근다. */
-  readonly pendingParticipantId?: string | null;
-}
-
-export function ArrivalCheckinPanel({
-  sides,
-  lineups,
-  onToggleArrival,
-  disabled = false,
-  pendingParticipantId = null,
-}: ArrivalCheckinPanelProps) {
+/**
+ * 검인 대상과 도착 수 — 패널과 "킥오프 준비" 체크리스트가 같은 수를 말해야 하므로 한 곳에서 센다.
+ * 폴백(제출본이 없으면 초안)을 쓰는 이유는 패널 안 주석을 따른다.
+ */
+export function arrivalProgress(sides: readonly GameSide[], lineups: readonly GameLineup[]) {
   const sections = sides.map((side) => ({
     side,
-    // 폴백을 써야 한다 -- 제출본만 보면 미제출 상태로 시작한 경기에서 **검인할 대상이
-    // 통째로 비고**, 그러면 P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수가 없다.
     participants: latestLineupForDisplay(lineups, side.id)?.participants ?? [],
   }));
   const total = sections.reduce((sum, section) => sum + section.participants.length, 0);
@@ -54,6 +42,44 @@ export function ArrivalCheckinPanel({
     (sum, section) => sum + section.participants.filter((p) => p.arrivedAt !== null).length,
     0,
   );
+  return { sections, total, arrived };
+}
+
+export interface ArrivalCheckinPanelProps {
+  /** 제목. 킥오프 준비 체크리스트 안에서는 "킥오프 준비"로 바꿔 쓴다. */
+  readonly title?: string;
+  /** 팀 이름 줄 아래에 붙는 부가 정보(예: 그 팀의 명단 요약). */
+  readonly sideAccessory?: (side: GameSide) => ReactNode;
+  readonly sides: readonly GameSide[];
+  readonly lineups: readonly GameLineup[];
+  readonly onToggleArrival: (input: { participantId: string; arrived: boolean }) => void;
+  /**
+   * 한 팀을 통째로 도착 처리한다("전원 도착"). 기본값이 전원 미확인인 이유는 검인이 "확인한
+   * 것"이어야 하기 때문이다 — 그래서 기본을 뒤집지 않고, 다 온 팀만 한 번에 채우는 버튼을 준다.
+   * 개별 탭은 그대로 남는다(안 온 사람 예외 처리용).
+   */
+  readonly onConfirmSide?: (sideId: string) => void;
+  readonly disabled?: boolean;
+  /** 낙관적 표시 없이 서버 응답을 기다리는 동안 그 행만 잠근다. */
+  readonly pendingParticipantId?: string | null;
+  /** "전원 도착"을 서버에 보낸 팀 — 응답 전까지 그 버튼만 잠근다. */
+  readonly pendingSideId?: string | null;
+}
+
+export function ArrivalCheckinPanel({
+  title = '명단 검인',
+  sideAccessory,
+  sides,
+  lineups,
+  onToggleArrival,
+  onConfirmSide,
+  disabled = false,
+  pendingParticipantId = null,
+  pendingSideId = null,
+}: ArrivalCheckinPanelProps) {
+  // 폴백을 써야 한다 -- 제출본만 보면 미제출 상태로 시작한 경기에서 **검인할 대상이
+  // 통째로 비고**, 그러면 P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수가 없다.
+  const { sections, total, arrived } = arrivalProgress(sides, lineups);
 
   if (total === 0) {
     return (
@@ -66,9 +92,9 @@ export function ArrivalCheckinPanel({
   }
 
   return (
-    <section className="flex flex-col gap-3 px-4" aria-label="명단 검인">
+    <section className="flex flex-col gap-3 px-4" aria-label={title}>
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold">명단 검인</h3>
+        <h3 className="text-sm font-semibold">{title}</h3>
         {/* 진행 상황을 숫자로 먼저 보여준다 — 스태프가 알고 싶은 건 개별 이름이 아니라
             "몇 명 남았나"이고, 그게 다음 행동(더 기다릴지 시작할지)을 결정한다. */}
         <p className="text-xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
@@ -78,7 +104,25 @@ export function ArrivalCheckinPanel({
 
       {sections.map(({ side, participants }) => (
         <div key={side.id} className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
+            {onConfirmSide && participants.length > 0 ? (
+              participants.every((participant) => participant.arrivedAt !== null) ? (
+                <p className="shrink-0 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">전원 도착 확인됨</p>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`${side.displayNameSnapshot} 전원 도착 확인`}
+                  disabled={disabled || pendingSideId === side.id}
+                  onClick={() => onConfirmSide(side.id)}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-[var(--border)] px-3 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  전원 도착
+                </button>
+              )
+            ) : null}
+          </div>
+          {sideAccessory ? sideAccessory(side) : null}
           {participants.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">제출된 명단이 없어요.</p>
           ) : (

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { isAccessDeniedError } from '@/lib/access-denied-error';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
 import { withFromPath } from '@/lib/session-storage';
@@ -167,6 +168,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         : undefined
     : undefined;
   const isError = room.isError || messages.isError;
+  // 팀에서 내보내진 뒤 옛 팀 채팅 주소로 들어온 경우 — 다시 불러와도 같으니 재시도 대신 나갈 길을 준다.
+  const accessDenied = isAccessDeniedError(room.error) || isAccessDeniedError(messages.error);
   const isLoading = room.isPending || messages.isPending;
   // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
   // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
@@ -189,12 +192,20 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     inputLockedMessage,
     messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',
-    emptyTitle: isError ? '채팅방을 불러오지 못했어요' : messages.data && items.length === 0 ? '아직 메시지가 없어요' : undefined,
-    emptyBody: isError
-      ? '네트워크 상태를 확인하고 다시 시도해 주세요.'
-      : messages.data && items.length === 0
-        ? inputLockedMessage ?? '먼저 말을 걸어 대화를 시작해 보세요'
-        : undefined,
+    emptyTitle: accessDenied
+      ? '참여 중인 멤버만 볼 수 있어요'
+      : isError
+        ? '채팅방을 불러오지 못했어요'
+        : messages.data && items.length === 0
+          ? '아직 메시지가 없어요'
+          : undefined,
+    emptyBody: accessDenied
+      ? '팀에서 빠졌거나 채팅방에서 나가면 이 대화를 볼 수 없어요. 다시 함께하려면 팀에 새로 신청해 주세요.'
+      : isError
+        ? '네트워크 상태를 확인하고 다시 시도해 주세요.'
+        : messages.data && items.length === 0
+          ? inputLockedMessage ?? '먼저 말을 걸어 대화를 시작해 보세요'
+          : undefined,
     draft,
     sending: send.isPending,
     sendError: send.isError,
@@ -212,7 +223,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         },
       );
     },
-    onRetry: isError
+    errorBack: accessDenied ? { href: '/chat', label: '채팅 목록으로' } : undefined,
+    onRetry: isError && !accessDenied
       ? () => {
           room.refetch();
           messages.refetch();

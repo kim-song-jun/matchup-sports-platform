@@ -70,6 +70,25 @@ const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { parti
 const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
 const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
 
+/** 만든 대진은 지울 수 없어 생성은 확인 창을 거친다(F42) — 누르고 확인까지 한 번에. */
+/** 표와 모바일 카드가 같은 행을 둘 다 그려 ⋯ 가 두 벌이다 — 첫 번째로 시트를 열고 dialog 를 돌려준다. */
+function openRowMenu(fixtureTitle = '가을 풋살 리그 1주차') {
+  fireEvent.click(screen.getAllByRole('button', { name: `${fixtureTitle} 더보기` })[0]);
+  return screen.getByRole('dialog');
+}
+
+async function generateAndConfirm() {
+  fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+  const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: '대진 만들기' }));
+}
+
+/** 대진이 이미 있는 리그의 "참가 신청 · 참가팀 · 대진 관리" 접이식을 연다(F51) — 기본은 접혀 있다. */
+function openFixtureManage() {
+  const trigger = screen.getByRole('button', { name: /^참가 신청 · 참가팀 · 대진 관리/ });
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+}
+
 describe('LeagueMatchFixturesClient', () => {
   // datetime-local 표시값 검증은 UTC와 오프셋이 있는 타임존에서만 회귀를 잡는다
   // (예: CI가 UTC로 돌면 slice(0,16) 버그가 우연히 통과함) — 그래서 TZ를 명시 고정한다.
@@ -134,8 +153,14 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     expect(screen.getByRole('columnheader', { name: '결과' })).toBeInTheDocument();
-    // 상태 열이 사라지지 않았는지도 함께 고정한다 — 합치는 회귀를 잡는 게 이 테스트의 목적이다.
-    expect(screen.getByRole('columnheader', { name: '상태' })).toBeInTheDocument();
+    // 표는 일정 위주로 줄었다 — 경기 · 결과 · 일시 · 운영. 구장·주소는 '경기' 열의 보조 줄로,
+    // 수정은 행의 ⋯ 로 물러났다. 상태(취소)는 결과 열이 대신 그린다(아래 취소 대진 테스트).
+    expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent?.trim())).toEqual([
+      '경기',
+      '결과',
+      '일시',
+      '운영',
+    ]);
 
     // 열 **순서**까지 고정한다. 처음엔 결과를 맨 끝(관리 앞)에 뒀는데, alpha 1440 실측에서
     // 표 스크롤러가 clientWidth 898 / scrollWidth 1201 이라 결과 열이 보이는 영역 밖으로
@@ -154,7 +179,7 @@ describe('LeagueMatchFixturesClient', () => {
 
   // alpha 1440 실측: AdminDataTable 의 기본 캡(max-w-[900px])이 카드를 898px 로 묶어 구장·주소·
   // 상태 열이 가로 스크롤 밖으로 밀렸다. 캡이 다시 살아나면 카드가 위 카드들보다 좁아진다.
-  it('대진 표 카드는 기본 폭 캡에 묶이지 않고, 구장·주소는 잘려도 title 로 전체 값을 읽을 수 있다', () => {
+  it('대진 표 카드는 기본 폭 캡에 묶이지 않고, 구장은 경기 열 보조 줄에 주소는 title 로 읽힌다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -190,12 +215,9 @@ describe('LeagueMatchFixturesClient', () => {
     expect(card).toHaveClass('max-w-none');
     expect(card).not.toHaveClass('max-w-[900px]');
 
-    const scoped = within(table);
-    expect(scoped.getByLabelText('가을 풋살 리그 1주차 구장')).toHaveAttribute('title', '탄천종합운동장 보조구장');
-    expect(scoped.getByLabelText('가을 풋살 리그 1주차 주소')).toHaveAttribute(
-      'title',
-      '경기 성남시 수정구 탄천로 215 보조구장 옆 주차장 입구',
-    );
+    const venueLine = within(table).getByText(/탄천종합운동장 보조구장/);
+    expect(venueLine).toHaveTextContent('가을 풋살 리그 1주차 · 탄천종합운동장 보조구장');
+    expect(venueLine).toHaveAttribute('title', '경기 성남시 수정구 탄천로 215 보조구장 옆 주차장 입구');
   });
 
   // 취소된 대진은 결과를 기다리지 않는다 — '미입력'으로 그리면 영원히 처리해야 할 일처럼 보인다.
@@ -229,11 +251,15 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     expect(screen.queryByText('결과 미입력')).not.toBeInTheDocument();
+    // 결과 열은 결과 단계 대신 취소 상태를 그리고, 열 수 있는 콘솔도 ⋯ 도 없다.
+    expect(within(screen.getByRole('table')).getAllByText('취소됨').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: /콘솔 열기/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
     // 대회 상세의 "대회 목록으로"와 같은 복귀 링크.
     expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', '/admin/league-matches');
   });
 
-  it('일시 입력 칸에 표시되는 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {
+  it('일정 수정 모달의 일시 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -257,14 +283,15 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    const [startInput] = screen.getAllByLabelText('가을 풋살 리그 1주차 일시') as HTMLInputElement[];
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
+    const startInput = within(screen.getByRole('dialog', { name: '일정 수정' })).getByLabelText('일시') as HTMLInputElement;
     // 표시값을 다시 Date로 파싱했을 때(브라우저가 datetime-local을 해석하는 방식과 동일)
     // 원본 UTC instant와 정확히 같은 시각이어야 한다. slice(0,16)로 만든 값은
     // KST(+9)에서 이 값과 9시간 어긋난다.
     expect(new Date(startInput.value).getTime()).toBe(new Date('2026-09-01T20:00:00.000Z').getTime());
   });
 
-  it('일시 입력 칸을 blur하면 시작 시각을 ISO로 변환해 PATCH mutation을 호출한다', async () => {
+  it('일정 수정 모달에서 일시를 바꿔 저장하면 시작 시각을 ISO로 변환해 바뀐 필드만 PATCH mutation으로 보낸다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -291,11 +318,11 @@ describe('LeagueMatchFixturesClient', () => {
 
     // AdminDataTable renders both a desktop <table> and a stacked mobile <ul>
     // for the same rows (CSS-only breakpoint hiding — both exist in jsdom at
-    // once), so every cell's aria-label matches twice. They wrap the same
-    // underlying fixture, so acting on the first match is representative.
-    const [startInput] = screen.getAllByLabelText('가을 풋살 리그 1주차 일시');
-    fireEvent.change(startInput, { target: { value: '2026-09-01T21:00' } });
-    fireEvent.blur(startInput);
+    // once), so the ⋯ button exists twice. They wrap the same fixture.
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
+    const modal = screen.getByRole('dialog', { name: '일정 수정' });
+    fireEvent.change(within(modal).getByLabelText('일시'), { target: { value: '2026-09-01T21:00' } });
+    fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
 
     await waitFor(() => expect(mutate).toHaveBeenCalledWith(
       { teamMatchId: 'tm-1', body: { startsAt: new Date('2026-09-01T21:00').toISOString() } },
@@ -361,7 +388,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 7 }));
   });
@@ -422,7 +449,7 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '19:30' } });
     fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     // **서버는 요일을 모른다** — 화면이 날짜 목록으로 전개해 보내야 한다(Task 164 BE-2).
     // 정확한 날짜 계산은 시계를 주입하는 `lib/league-fixture-dates.test.ts` 가 고정하고,
@@ -484,9 +511,9 @@ describe('LeagueMatchFixturesClient', () => {
 
       // 같은 날 20:00 KST — 18:00 이 지났다. 폼 값은 아무것도 바꾸지 않아 재렌더도 없다.
       vi.setSystemTime(new Date('2026-09-04T11:00:00.000Z'));
-      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+      await generateAndConfirm();
 
-      expect(mutateAsync).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
       const payload = mutateAsync.mock.calls[0][0] as { schedule: { dates: string[] } };
       expect(payload.schedule.dates).toEqual(['2026-09-11']);
     } finally {
@@ -543,7 +570,7 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '잠실 종합운동장' }));
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
       weeksCount: 7,
@@ -591,7 +618,7 @@ describe('LeagueMatchFixturesClient', () => {
     expect(container.querySelector('.animate-pulse')).not.toBeNull();
   });
 
-  it('일시·구장 입력을 값 변경 없이 blur만 하면 PATCH를 호출하지 않는다', () => {
+  it('일정 수정 모달은 값이 그대로면 저장을 막아 불필요한 PATCH를 보내지 않는다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -616,13 +643,75 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    // 표를 탭으로 지나가는 상황: 값은 그대로인데 blur 만 발생 → 쓰기(PATCH)가 발생하면 안 된다.
-    const [startInput] = screen.getAllByLabelText('가을 풋살 리그 1주차 일시');
-    fireEvent.blur(startInput);
-    const [placeInput] = screen.getAllByLabelText('가을 풋살 리그 1주차 구장');
-    fireEvent.blur(placeInput);
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
+    const modal = screen.getByRole('dialog', { name: '일정 수정' });
+    const save = within(modal).getByRole('button', { name: '저장' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
 
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  describe('일정 수정 모달', () => {
+    function renderOneFixture(mutate: ReturnType<typeof vi.fn>) {
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: {
+          leagueId: 'league-1', title: '가을 풋살 리그', state: 'active', teamIds: ['t1', 't2'],
+          startsOn: '2026-09-01T00:00:00.000Z',
+          fixtures: [
+            { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천 보조구장', placeAddress: '성남시 탄천로 1', status: 'matched' },
+          ],
+        },
+        isPending: false,
+      } as never);
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate, isPending: false } as never);
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+      fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^일정 수정/ }));
+      return screen.getByRole('dialog', { name: '일정 수정' });
+    }
+
+    it('현재 구장·주소를 채워 열고, 구장만 바꾸면 그 필드만 보낸다', async () => {
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate);
+
+      expect(within(modal).getByLabelText('구장')).toHaveValue('탄천 보조구장');
+      expect(within(modal).getByLabelText(/^주소/)).toHaveValue('성남시 탄천로 1');
+      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() =>
+        expect(mutate).toHaveBeenCalledWith({ teamMatchId: 'tm-1', body: { placeName: '잠실 보조구장' } }, expect.anything()),
+      );
+    });
+
+    it('저장에 성공하면 닫히고 토스트로 알린다', async () => {
+      const mutate = vi.fn((_vars, opts) => opts.onSuccess({}));
+      const modal = renderOneFixture(mutate);
+
+      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      expect(await screen.findByText('일정을 저장했어요.')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '일정 수정' })).toBeNull());
+    });
+
+    it('저장에 실패하면 모달이 열린 채 서버 메시지를 보여주고 입력을 잃지 않는다', async () => {
+      const mutate = vi.fn((_vars, opts) => opts.onError(new Error('서버가 거부했어요')));
+      const modal = renderOneFixture(mutate);
+
+      fireEvent.change(within(modal).getByLabelText('구장'), { target: { value: '잠실 보조구장' } });
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      expect(await within(modal).findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: '일정 수정' })).toBeInTheDocument();
+      expect(within(modal).getByLabelText('구장')).toHaveValue('잠실 보조구장');
+    });
   });
 
   it('최근 사용한 장소가 없으면 칩 영역을 렌더링하지 않는다', () => {
@@ -672,7 +761,7 @@ describe('LeagueMatchFixturesClient', () => {
 
     // AdminDataTable은 데스크톱 표 + 모바일 카드 리스트를 동시에 렌더한다(CSS로만 숨김) —
     // 같은 행이라 첫 번째 매치를 눌러도 대표성이 있다(기존 테스트 주석과 동일한 전제).
-    fireEvent.click(screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 취소' })[0]);
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^대진 취소/ }));
     expect(screen.getByText('대진을 취소할까요?')).toBeInTheDocument();
     expect(cancelMutate).not.toHaveBeenCalled();
 
@@ -717,7 +806,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    fireEvent.click(screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 취소' })[0]);
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^대진 취소/ }));
     fireEvent.click(screen.getByRole('button', { name: '대진 취소' }));
 
     expect(cancelMutate).not.toHaveBeenCalled();
@@ -759,6 +848,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
+    openFixtureManage();
     fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
     expect(screen.getByText('대진을 다시 만들까요?')).toBeInTheDocument();
     expect(screen.getByText('A팀, B팀', { exact: false })).toBeInTheDocument();
@@ -778,6 +868,112 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() =>
       expect(regenMutate).toHaveBeenCalledWith({ weeksCount: 7, reason: '팀 로스터 변경으로 재생성' }, expect.anything()),
     );
+  });
+
+  // Task 180 G6(F42) — 만든 대진은 지울 수 없다(FIXTURE_NOT_DELETABLE). 확인 없이 만들지 않는다.
+  describe('라운드로빈 대진 생성 확인', () => {
+    function renderEmptyLeague() {
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+        isPending: false,
+      } as never);
+      const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [], warnings: [] });
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+      return mutateAsync;
+    }
+
+    it('누르면 확인 창이 먼저 뜨고, 지울 수 없다는 사실을 알리며, 확인 전에는 아무것도 만들지 않는다', async () => {
+      const mutateAsync = renderEmptyLeague();
+
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+      const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
+      expect(dialog).toHaveTextContent('지울 수 없고 취소만 할 수 있어요');
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('확인 창에서 취소하면 대진을 만들지 않는다', async () => {
+      const mutateAsync = renderEmptyLeague();
+
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+      const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('입력이 잘못됐으면 확인 창을 띄우지 않고 검증 안내를 먼저 보인다', async () => {
+      const mutateAsync = renderEmptyLeague();
+
+      fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+      expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // Task 180 G6(F51) — 거의 안 쓰는 파괴적 조작(재생성)이 대진 목록 위에서 가장 눈에 띄던 것을
+  // 표 아래 접이식으로 내렸다.
+  describe('참가 신청 · 참가팀 · 대진 관리 접이식', () => {
+    function renderWithFixtures() {
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: {
+          leagueId: 'league-1', title: '가을 풋살 리그', state: 'active', teamIds: ['t1', 't2'],
+          startsOn: '2026-09-01T00:00:00.000Z',
+          fixtures: [
+            { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+          ],
+        },
+        isPending: false,
+      } as never);
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+    }
+
+    it('기본은 접혀 있어 재생성 버튼이 화면에 없고, 열면 나타난다', () => {
+      renderWithFixtures();
+
+      const trigger = screen.getByRole('button', { name: /^참가 신청 · 참가팀 · 대진 관리/ });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      // 접혀 있는 동안은 재생성뿐 아니라 참가팀 관리·경기 하나 추가도 화면에 없다.
+      expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
+      expect(screen.queryByLabelText('주차 수')).toBeNull();
+      expect(screen.queryByText('참가팀 관리')).toBeNull();
+      expect(screen.queryByRole('button', { name: '경기 하나 추가' })).toBeNull();
+
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: '대진 재생성' })).toBeInTheDocument();
+      expect(screen.getByText('참가팀 관리')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
+
+      fireEvent.click(trigger);
+      expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
+    });
+
+    it('접이식은 대진 표 아래에 있다', () => {
+      renderWithFixtures();
+
+      const table = screen.getAllByRole('table')[0];
+      const trigger = screen.getByRole('button', { name: /^참가 신청 · 참가팀 · 대진 관리/ });
+      expect(table.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 
   // R13
@@ -838,8 +1034,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    const [forfeitButton] = screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 몰수패 처리' });
-    fireEvent.click(forfeitButton);
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^몰수패 처리/ }));
 
     expect(await screen.findByText('원정팀FC 불참')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('변경할 상태'), { target: { value: 't2' } });
@@ -900,8 +1095,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    const [forfeitButton] = screen.getAllByRole('button', { name: '가을 풋살 리그 1주차 몰수패 처리' });
-    fireEvent.click(forfeitButton);
+    fireEvent.click(within(openRowMenu()).getByRole('button', { name: /^몰수패 처리/ }));
     expect(await screen.findByText('원정팀FC 불참')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('변경할 상태'), { target: { value: 't2' } });
     fireEvent.change(screen.getByLabelText(/^사유/), { target: { value: '반대 팀으로 정정 시도' } });
@@ -962,11 +1156,11 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() => expect(revertMutate).toHaveBeenCalledWith({ reason: '오심 정정' }, expect.anything()));
   });
 
-  // U1(A안 "확정 다이얼로그") — '관리' 열 버튼은 결과 진행 단계에 따라 갈린다.
+  // U1(A안 "확정 다이얼로그") — 행 ⋯ 시트의 결과 항목은 결과 진행 단계에 따라 갈린다.
   // 감사 확인(A-league-void-stage): voided(무효화된 결과)도 백엔드가 신규 입력을 이미
   // 허용하므로 '결과 입력' 버튼이 떠야 한다 — 여기서 빠지면 무효 대진은 재입력 버튼
   // 자체가 사라져 그 시즌 승강 확정이 영구히 막힌다.
-  it('결과 진행 단계에 따라 관리 버튼 레이블이 바뀐다 — 미확정 4단계(voided 포함)는 결과 입력, 확정이면 결과 정정, 승인대기 단계는 버튼이 없다', () => {
+  it('결과 진행 단계에 따라 ⋯ 시트의 결과 항목이 갈린다 — 결과 없음은 항목 없음, 확정은 결과 정정, 그 밖에는 결과 검토', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
@@ -995,29 +1189,32 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    // Task 165 BE-3: 모달 버튼이 아니라 **콘솔 딥링크**다. 레이블 규칙은 그대로 두되
-    // 링크가 어디로 가는지까지 본다 — 레이블만 보면 href 가 깨져도 통과한다.
-    expect(screen.getAllByRole('link', { name: '1주차 결과 입력' })[0]).toHaveAttribute(
-      'href',
-      '/admin/live/league-1/result-review?fixtureId=tm-not-entered',
-    );
-    // 확정된 경기는 **정정 화면**으로 간다. `result-review` 는 *검토 대기* 목록이라
-    // 확정된 경기가 거기 없어, 라벨은 "결과 정정" 인데 "검토할 결과가 없어요" 가 열리는
-    // 데드엔드였다(alpha 실측). 라벨이 아니라 **href** 로 잰다 — 라벨만 보면 이 결함이
-    // 그대로 통과한다.
-    expect(screen.getAllByRole('link', { name: '4주차 결과 정정' })[0]).toHaveAttribute(
-      'href',
-      '/admin/live/league-1/records/corrections?fixtureId=tm-official',
-    );
-    expect(screen.getAllByRole('link', { name: '2주차 결과 입력' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: '3주차 결과 입력' }).length).toBeGreaterThan(0);
-    // 승인대기(awaiting_approval)는 운영자 직접 입력 대상이 아니라 링크가 없다.
-    expect(screen.queryAllByRole('link', { name: '5주차 결과 입력' })).toHaveLength(0);
-    expect(screen.queryAllByRole('link', { name: '5주차 결과 정정' })).toHaveLength(0);
-    // voided 는 '결과 정정'이 아니라 '결과 입력'으로 떠야 한다 — 무효화된 결과는 재입력
-    // 대상이고, 정정 레이블이 뜨면 백엔드의 재입력 흐름과 어긋난다.
-    expect(screen.getAllByRole('link', { name: '6주차 결과 입력' }).length).toBeGreaterThan(0);
-    expect(screen.queryAllByRole('link', { name: '6주차 결과 정정' })).toHaveLength(0);
+    // 결과 항목은 ⋯ 시트 안에 있고, **결과가 있는 경기에만** 둔다(F55). 링크가 어디로 가는지까지 본다 —
+    // 레이블만 보면 href 가 깨져도 통과한다.
+    const sheetFor = (title: string) => {
+      const sheet = openRowMenu(title);
+      const close = () => fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+      return { sheet, close };
+    };
+    const results = new Map<string, { label: string; href: string } | null>();
+    for (const title of ['1주차', '2주차', '3주차', '4주차', '5주차', '6주차']) {
+      const { sheet, close } = sheetFor(title);
+      const link = within(sheet).queryByRole('link', { name: /^결과 (정정|검토)/ });
+      results.set(title, link === null ? null : { label: link.textContent ?? '', href: link.getAttribute('href') ?? '' });
+      close();
+    }
+    // 아직 결과가 없는 경기에는 항목이 없다 — 눌러도 빈 화면인 "결과 정정"을 두지 않는다.
+    expect(results.get('1주차')).toBeNull();
+    // 제출·초안·정정 요청·무효는 결과 검토 화면으로 간다.
+    for (const title of ['2주차', '3주차', '5주차', '6주차']) {
+      expect(results.get(title)?.label).toMatch(/^결과 검토/);
+      expect(results.get(title)?.href).toMatch(/^\/admin\/live\/league-1\/result-review\?fixtureId=tm-/);
+    }
+    // 확정된 경기는 **정정 화면**으로 간다. `result-review` 는 *검토 대기* 목록이라 확정된 경기가 거기
+    // 없어, 라벨은 "결과 정정" 인데 "검토할 결과가 없어요" 가 열리는 데드엔드였다(alpha 실측).
+    // 라벨이 아니라 **href** 로 잰다.
+    expect(results.get('4주차')?.label).toMatch(/^결과 정정/);
+    expect(results.get('4주차')?.href).toBe('/admin/live/league-1/records/corrections?fixtureId=tm-official');
   });
 
   // U1: 요구사항 3 — 정정 모드는 확정 전 "전 → 후" 비교를 보여준다. 이게 이 안의 존재 이유라
@@ -1076,7 +1273,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
     fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
@@ -1225,6 +1422,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       </Providers>,
     );
 
+    openFixtureManage();
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
     fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
     fireEvent.change(
@@ -1396,7 +1594,7 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
     fireEvent.click(await screen.findByLabelText('2026-09-12'));
     fireEvent.click(screen.getByLabelText('2026-09-19'));
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(
@@ -1482,7 +1680,7 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     );
   }
 
-  it('대진이 이미 있어도 보인다 — 우천 순연·대체 경기가 바로 이 경우다', async () => {
+  it('대진이 이미 있어도 접이식을 열면 보인다 — 우천 순연·대체 경기가 바로 이 경우다', async () => {
     renderWithFixtures([
       {
         teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
@@ -1490,6 +1688,8 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
         resultStage: 'official', homeScore: 3, awayScore: 1,
       },
     ]);
+    // 대진이 있는 리그에서는 "참가 신청 · 참가팀 · 대진 관리" 접이식 안에 있다(F51).
+    openFixtureManage();
     expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeInTheDocument();
   });
 
@@ -1521,5 +1721,133 @@ describe('수동 대진 추가 입구 — 대진 유무와 무관하게 보인�
     useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
     renderWithFixtures([]);
     expect(await screen.findByRole('button', { name: '경기 하나 추가' })).toBeDisabled();
+  });
+});
+
+// Task 180 G6(C안) — 리그 상세 맨 위 "지금 할 일" 한 장과 콘솔 열기 + ⋯ 로 줄인 대진 표.
+describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기', () => {
+  type Fixture = Record<string, unknown>;
+  const base = {
+    homeTeamId: 't1', awayTeamId: 't2', placeName: '망원 유수지', status: 'matched',
+    resultStage: 'not_entered', gameState: 'SCHEDULED', homeScore: null, awayScore: null,
+  };
+  const W1 = '2026-09-30T01:10:00.000Z';
+  const W2 = '2026-10-07T01:10:00.000Z';
+
+  function renderLeague(fixtures: Fixture[]) {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '마포 주말 리그', state: 'active', teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z', recentVenues: [], fixtures,
+      },
+      isPending: false,
+    } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        teams: [
+          { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null },
+          { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null },
+        ],
+      },
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+    return screen.queryByRole('region', { name: '지금 할 일' });
+  }
+
+  it('결과 확정을 기다리는 경기가 있으면 그 경기의 콘솔로 보내는 확정 카드가 뜬다', () => {
+    const card = renderLeague([
+      { ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1, resultStage: 'awaiting_approval', gameState: 'ENDED' },
+      { ...base, teamMatchId: 'tm-2', title: '2주차', startAt: W2 },
+    ]);
+
+    expect(card).not.toBeNull();
+    expect(within(card as HTMLElement).getByText(/마포 FC vs 합정 유나이티드 경기가 끝났어요/)).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole('link', { name: /콘솔에서 확정하기/ })).toHaveAttribute(
+      'href',
+      '/admin/live/league-1/fixtures/tm-1/operate',
+    );
+  });
+
+  it('확정 대기는 없고 뛰는 경기가 있으면 진행 중 카드로 그 콘솔을 연다', () => {
+    const card = renderLeague([
+      { ...base, teamMatchId: 'tm-live', title: '1주차', startAt: W1, gameState: 'LIVE' },
+      { ...base, teamMatchId: 'tm-2', title: '2주차', startAt: W2 },
+    ]);
+
+    expect(within(card as HTMLElement).getByText(/경기가 진행 중이에요/)).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole('link', { name: '콘솔 열기' })).toHaveAttribute(
+      'href',
+      '/admin/live/league-1/fixtures/tm-live/operate',
+    );
+  });
+
+  it('둘 다 없으면 다음 경기 준비 카드가 가장 이른 미진행 경기의 콘솔을 연다', () => {
+    const card = renderLeague([
+      { ...base, teamMatchId: 'tm-done', title: '1주차', startAt: W1, resultStage: 'official', gameState: 'ENDED', homeScore: 2, awayScore: 1 },
+      { ...base, teamMatchId: 'tm-next', title: '2주차', startAt: W2 },
+    ]);
+
+    expect(within(card as HTMLElement).getByText(/다음 경기는 마포 FC vs 합정 유나이티드예요/)).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText(/2주차/)).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole('link', { name: /다음 경기 콘솔 열기/ })).toHaveAttribute(
+      'href',
+      '/admin/live/league-1/fixtures/tm-next/operate',
+    );
+  });
+
+  it('모든 경기가 끝났으면 카드가 없다', () => {
+    const card = renderLeague([
+      { ...base, teamMatchId: 'tm-done', title: '1주차', startAt: W1, resultStage: 'official', gameState: 'ENDED' },
+    ]);
+
+    expect(card).toBeNull();
+  });
+
+  it('대진이 아직 없는 리그에는 카드가 없다 (대진을 만드는 폼이 그 자리를 채운다)', () => {
+    expect(renderLeague([])).toBeNull();
+  });
+
+  it('표의 행마다 콘솔 열기 링크가 하나 있고, 취소된 대진과 부전승 행에는 없다', () => {
+    renderLeague([
+      { ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1 },
+      { ...base, teamMatchId: 'tm-cancelled', title: '2주차', startAt: W2, status: 'cancelled' },
+      { ...base, teamMatchId: 'tm-bye', title: '3주차', startAt: W2, awayTeamId: null },
+    ]);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('link', { name: '1주차 콘솔 열기' })).toHaveAttribute(
+      'href',
+      '/admin/live/league-1/fixtures/tm-1/operate',
+    );
+    expect(within(table).queryByRole('link', { name: '2주차 콘솔 열기' })).toBeNull();
+    expect(within(table).queryByRole('link', { name: '3주차 콘솔 열기' })).toBeNull();
+    // 예전 행 안의 버튼들은 표에서 물러났다.
+    expect(within(table).queryByRole('button', { name: /몰수패 처리|취소$/ })).toBeNull();
+    expect(within(table).queryByRole('link', { name: /결과 입력/ })).toBeNull();
+  });
+
+  it('⋯ 시트에는 일정 수정·몰수패·대진 취소가 있고, 부전승 행에는 몰수패가 없다', () => {
+    renderLeague([
+      { ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1 },
+      { ...base, teamMatchId: 'tm-bye', title: '3주차', startAt: W2, awayTeamId: null },
+    ]);
+
+    const sheet = openRowMenu('1주차');
+    for (const name of [/^일정 수정/, /^몰수패 처리/, /^대진 취소/]) {
+      expect(within(sheet).getByRole('button', { name })).toBeInTheDocument();
+    }
+    fireEvent.click(within(sheet).getByRole('button', { name: '닫기' }));
+
+    const byeSheet = openRowMenu('3주차');
+    expect(within(byeSheet).getByRole('button', { name: /^일정 수정/ })).toBeInTheDocument();
+    expect(within(byeSheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
   });
 });

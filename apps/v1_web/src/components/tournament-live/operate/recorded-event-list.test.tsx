@@ -87,6 +87,36 @@ const LINEUPS = [
   lineup(AWAY_SIDE_ID, [{ id: 'p-cho', name: '조현우', jersey: 9 }]),
 ];
 
+describe('RecordedEventList — 정렬 (Task 180 G6 F76)', () => {
+  const EVENTS = [
+    goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000),
+    goal(2, AWAY_SIDE_ID, 'p-cho', 11 * 60000),
+    goal(3, HOME_SIDE_ID, 'p-jung', 15 * 60000),
+  ];
+
+  function renderedClocks(order?: 'chronological' | 'newest-first') {
+    render(<RecordedEventList events={EVENTS} sides={SIDES} lineups={LINEUPS} order={order} />);
+    return within(screen.getByRole('list', { name: '기록된 이벤트 목록' }))
+      .getAllByRole('listitem')
+      .map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1]);
+  }
+
+  it('기본은 시간순 — 결과 검토·공개 화면이 이 순서를 쓴다', () => {
+    expect(renderedClocks()).toEqual(['6', '11', '15']);
+  });
+
+  it('newest-first 는 받은 순서를 뒤집어 방금 한 일을 맨 위에 둔다', () => {
+    expect(renderedClocks('newest-first')).toEqual(['15', '11', '6']);
+  });
+
+  it('뒤집는 것이 입력 배열을 바꾸지 않는다 (콘솔의 스코어 파생 등 다른 소비처가 같은 배열을 쓴다)', () => {
+    const events = [...EVENTS];
+    render(<RecordedEventList events={events} sides={SIDES} lineups={LINEUPS} order="newest-first" />);
+
+    expect(events.map((event) => event.id)).toEqual(['event-1', 'event-2', 'event-3']);
+  });
+});
+
 describe('RecordedEventList', () => {
   it('renders each server-confirmed event with its clock, scorer and side', () => {
     render(

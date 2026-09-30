@@ -461,6 +461,8 @@ type ErrorStateProps = {
   message: string;
   onRetry?: () => void;
   retryLabel?: string;
+  /** 다시 해도 소용없는 막힘(권한 없음 등)에서 돌아갈 곳. `onRetry` 와 함께 쓰지 않는다. */
+  back?: { href: string; label: string };
 };
 
 export function ErrorState({
@@ -468,6 +470,7 @@ export function ErrorState({
   message,
   onRetry,
   retryLabel = '다시 시도하기',
+  back,
 }: ErrorStateProps) {
   return (
     <div className="tm-empty-state" role="alert">
@@ -491,6 +494,11 @@ export function ErrorState({
         >
           {retryLabel}
         </button>
+      ) : null}
+      {back ? (
+        <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={back.href} style={{ marginTop: 24 }}>
+          {back.label}
+        </Link>
       ) : null}
     </div>
   );

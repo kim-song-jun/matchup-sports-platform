@@ -38,7 +38,7 @@ describe('AdminShell nav', () => {
         <div>content</div>
       </AdminShell>,
     );
-    const links = screen.getAllByRole('link', { name: /대회 현장 운영/ });
+    const links = screen.getAllByRole('link', { name: /대회·리그 현장 운영/ });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) expect(link).toHaveAttribute('href', '/admin/ops/tournaments');
   });

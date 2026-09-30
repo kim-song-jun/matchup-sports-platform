@@ -190,6 +190,13 @@ export function scheduleRsvpDeadlineLabel(rsvpDeadlineAt: string | null): string
   return `${formatTournamentDateTimeLong(rsvpDeadlineAt)} 마감`;
 }
 
+/** 참석 응답을 바꿀 수 없는 이유. 취소와 종료는 다른 사실이라 문구를 따로 둔다. */
+export function attendanceLockedReason(state: V1ScheduleState, rsvpDeadlinePassed: boolean): string | null {
+  if (state === 'CANCELLED') return '취소된 일정이라 참석 여부를 바꿀 수 없어요.';
+  if (state !== 'SCHEDULED') return '이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.';
+  return rsvpDeadlinePassed ? '참석 신청 마감 시간이 지났어요.' : null;
+}
+
 export function isDeadlinePassed(deadline: string | null): boolean {
   if (!deadline) return false;
   const d = new Date(deadline);

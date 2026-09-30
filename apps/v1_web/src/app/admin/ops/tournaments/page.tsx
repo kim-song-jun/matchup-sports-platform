@@ -8,8 +8,8 @@ export default function AdminTournamentOpsPickerPage() {
     <>
       <AdminPageHeader
         eyebrow="운영"
-        title="대회 현장 운영"
-        description="진행 중인 대회를 골라 스태프 배정·운영 보드로 바로 들어가요."
+        title="대회·리그 현장 운영"
+        description="진행 중인 대회나 리그를 골라 스태프 배정·운영 보드로 바로 들어가요."
       />
       <TournamentOpsPickerClient />
     </>

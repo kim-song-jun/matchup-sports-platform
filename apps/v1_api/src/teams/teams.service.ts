@@ -142,6 +142,7 @@ export class TeamsService {
     const team = await this.getPublicTeam(teamId, user);
     const viewer = this.getViewer(team, user);
     const canViewMembers = this.canViewMembers(team, viewer);
+    const canSendContact = await this.canSendContactTo(user, team, viewer);
 
     return {
       id: team.id,
@@ -165,6 +166,8 @@ export class TeamsService {
       // 운영진 한정 노출로 화면 요구사항은 그대로 충족된다.
       contactPolicy:
         viewer.role === 'owner' || viewer.role === 'manager' ? team.contactPolicy : undefined,
+      // 컨택 보내기 버튼용 합산값 — 차단 / closed / 모집 중 아님을 한 값으로 합쳐 사유를 드러내지 않는다.
+      canSendContact,
       trustState: team.trustScore?.trustState ?? 'none',
       version: team.updatedAt.toISOString(),
       profile: {
@@ -756,7 +759,7 @@ export class TeamsService {
       });
     }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
-      throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
+      throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -768,7 +771,7 @@ export class TeamsService {
           data: { managerCount: { increment: 1 } },
         });
         if (capGuard.count !== 1) {
-          throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
+          throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
         }
       }
       const updated = await tx.v1TeamMembership.update({
@@ -1472,7 +1475,7 @@ export class TeamsService {
 
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
       where: { id: invitationId },
-      select: { id: true, teamId: true, status: true },
+      select: { id: true, teamId: true, invitedUserId: true, status: true, team: { select: { name: true } } },
     });
     if (!invitation) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
@@ -1496,6 +1499,7 @@ export class TeamsService {
       data: { status: 'cancelled' },
       select: { id: true, status: true },
     });
+    void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name);
 
     return { invitationId: updated.id, status: updated.status, alreadyCancelled: false };
   }
@@ -1730,6 +1734,7 @@ export class TeamsService {
       return { updatedInvitation, membership, team };
     });
 
+    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
     // 알림: 초대한 사람에게 수락 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       invitation.invitedByUserId,
@@ -1775,6 +1780,7 @@ export class TeamsService {
       data: { status: 'declined', respondedAt: new Date() },
       select: { id: true, status: true },
     });
+    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
 
     return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };
   }
@@ -1956,7 +1962,7 @@ export class TeamsService {
     if (membership.role !== 'owner' && membership.role !== 'manager') {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Only team owners or managers can manage this team',
+        message: '팀장·매니저만 팀을 관리할 수 있어요.',
       });
     }
 
@@ -2018,7 +2024,7 @@ export class TeamsService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Only team owners or managers can perform this action',
+        message: '팀장·매니저만 할 수 있어요.',
       });
     }
     return membership.role as 'owner' | 'manager';
@@ -2035,7 +2041,7 @@ export class TeamsService {
 
   private assertMemberGoalFitsCurrentMembers(memberGoalCount: number | null | undefined, memberCount: number) {
     if (memberGoalCount != null && memberGoalCount < memberCount) {
-      throw validationError('memberGoalCount cannot be lower than the current member count', 'memberGoalCount');
+      throw validationError('정원은 지금 팀원 수보다 적게 정할 수 없어요.', 'memberGoalCount');
     }
   }
 
@@ -2240,6 +2246,54 @@ export class TeamsService {
       disabledReason: team.joinPolicy !== 'approval_required' ? 'JOIN_CLOSED' : full ? 'TEAM_FULL' : null,
       manageRoute: null,
     };
+  }
+
+  /**
+   * 내 팀 중 하나라도 이 팀에 컨택을 보낼 수 있는가. 보낼 수 없는 사유 셋(차단·closed·모집 중 아님)을
+   * 한 값으로 합치므로 발신자가 컨택 거절 뒤 알게 되는 것과 정보량이 같다(스펙 §8(b)) — 원시
+   * contactPolicy 는 여전히 운영진에게만 내려간다. 조회는 사유와 무관하게 같은 횟수로 돌린다.
+   * 보낼 팀이 없는 비로그인·팀원 viewer 에게는 undefined 라 버튼 자체가 없다.
+   */
+  private async canSendContactTo(
+    user: V1AuthUser | null,
+    team: TeamWithRelations,
+    viewer: ReturnType<TeamsService['getViewer']>,
+  ): Promise<boolean | undefined> {
+    if (!user || viewer.role !== 'none') return undefined;
+    const senders = await this.prisma.v1TeamMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+        teamId: { not: team.id },
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { teamId: true },
+    });
+    if (senders.length === 0) return undefined;
+
+    const senderIds = senders.map((sender) => sender.teamId);
+    const [blocks, recruiting] = await Promise.all([
+      this.prisma.v1TeamContactBlock.findMany({
+        where: {
+          OR: [
+            { teamId: team.id, blockedTeamId: { in: senderIds } },
+            { teamId: { in: senderIds }, blockedTeamId: team.id },
+          ],
+        },
+        select: { teamId: true, blockedTeamId: true },
+      }),
+      this.prisma.v1TeamMatch.findFirst({
+        where: { hostTeamId: team.id, status: 'recruiting' },
+        select: { id: true },
+      }),
+    ]);
+
+    const policyAccepts =
+      team.contactPolicy === 'open' || (team.contactPolicy === 'recruiting_only' && recruiting !== null);
+    if (!policyAccepts) return false;
+    const blockedSenders = new Set(blocks.flatMap((block) => [block.teamId, block.blockedTeamId]));
+    return senderIds.some((senderId) => !blockedSenders.has(senderId));
   }
 
   private canViewMembers(

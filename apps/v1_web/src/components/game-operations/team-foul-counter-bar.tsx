@@ -42,12 +42,14 @@ export function TeamFoulCounterBar({
             key={side.id}
             className={
               warning
-                ? 'flex items-center justify-between bg-orange-50 px-3 py-2 dark:bg-orange-500/10'
-                : 'flex items-center justify-between px-3 py-2'
+                ? 'flex flex-wrap items-center justify-between gap-x-2 bg-orange-50 px-3 py-2 dark:bg-orange-500/10'
+                : 'flex flex-wrap items-center justify-between gap-x-2 px-3 py-2'
             }
           >
-            <span className="truncate text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</span>
-            <span className="flex items-center gap-1">
+            {/* 팀 이름이 길면 이름을 자르고 숫자는 지킨다 — 390px 에서 "파울 / 0" 으로 꺾이던 자리다
+                (F91). 이름은 남는 폭에서만 줄고, 숫자 묶음은 줄어들지도 꺾이지도 않는다. */}
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</span>
+            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
               {warning ? <AlertTriangle size={12} aria-hidden="true" className="text-orange-500" /> : null}
               <span
                 className={
@@ -58,8 +60,11 @@ export function TeamFoulCounterBar({
               >
                 파울 {count}
               </span>
-              {warning ? <span className="text-xs font-semibold text-orange-700 dark:text-orange-300">· 다음부터 10m 프리킥</span> : null}
             </span>
+            {/* 경고 안내는 이름·숫자 줄 아래 한 줄을 통째로 쓴다 — 같은 줄에 두면 이름이 밀려 사라진다. */}
+            {warning ? (
+              <span className="basis-full text-xs font-semibold text-orange-700 dark:text-orange-300">다음부터 10m 프리킥</span>
+            ) : null}
           </div>
         );
       })}

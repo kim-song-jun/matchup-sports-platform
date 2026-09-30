@@ -15,6 +15,7 @@ import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { cssUrl } from '@/lib/assets';
 import { formatAmountNumber } from '@/lib/date-utils';
+import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 // 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
 // 세 곳의 복사본을 하나로 모았다). 같은 종목이면 어느 화면에서든 같은 그래픽이 나온다.
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
@@ -144,6 +145,7 @@ function TeamMatchCreateFloatingButton() {
  * 여기서 함께 봐야 완료된 리그 경기를 열어도 "모집 중"이 뜨지 않는다(alpha 실측 C-1).
  */
 function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']) {
+  if (mode === 'cancelled') return match.applicantTeams.find((team) => team.status === '승인 완료')?.name ?? '미정';
   if (mode === 'pending') return '검토 중';
   if (mode === 'approved') {
     // 일반 팀매치는 신청 승인 시 applicantTeams에 실제 상대팀이 담기지만, 관리자 생성
@@ -170,6 +172,7 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
 }
 
 function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], statusLabel?: string) {
+  if (mode === 'cancelled') return statusLabel ?? TEAM_MATCH_CANCELLED_LABEL;
   if (mode === 'pending') return '홈팀 검토 중';
   if (mode === 'approved') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
@@ -252,13 +255,13 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       : model.reviewAction
         ? 'review'
         : null;
-  const locked = mode === 'pending' || mode === 'approved';
+  const locked = mode === 'pending' || mode === 'approved' || mode === 'cancelled';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   // [P2] 신청한 적 없는 뷰어(mode==='default')가 이미 닫힌(상대 확정·종료·취소·마감) 팀매치를
   // 볼 때 model.statusLabel 이 히어로의 상대팀 sub 문구(teamMatchOpponentSub)와 하단 바
   // 값에 그대로 두 번 나온다 — 히어로가 이미 상대(사실)와 사유를 함께 말했으니 하단 바
   // 캡션+값은 다시 말하지 않는다(버튼만 남는다).
-  const isClosedGuestStatusDuplicate = mode === 'default' && match.status === 'closed';
+  const isClosedGuestStatusDuplicate = (mode === 'default' && match.status === 'closed') || mode === 'cancelled';
   const canRunAction = Boolean(model.onApply);
   /* ctaTone: 행동 불가(신청 불가 등 onApply=undefined + 리다이렉트도 없는 상태)는
    * neutral+disabled 조합으로 표시 — primary 파란 버튼처럼 보여 클릭 오인 방지(T1). */
@@ -604,6 +607,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
               {/* P2: 능동형 카피 적용 */}
               {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
+              {mode === 'cancelled' ? <StateCard tone="grey" title="취소된 팀매치예요" body="이 팀매치는 취소되어 진행되지 않아요." /> : null}
               {match.description ? (
                 <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">설명</div>
@@ -1443,9 +1447,16 @@ function InfoRow({ label, value, sub }: { label: string; value: string; sub?: st
   return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label" style={filled ? undefined : { color: 'var(--text-caption)', fontWeight: 400 }}>{filled ? value : '미정'}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
 }
 
-function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
+const STATE_CARD_TONE = {
+  orange: { background: 'var(--tint-orange)', title: 'var(--orange700)' },
+  green: { background: 'var(--tint-green)', title: 'var(--green700)' },
+  grey: { background: 'var(--tint-grey)', title: 'var(--text-muted)' },
+} as const;
+
+function StateCard({ tone, title, body }: { tone: keyof typeof STATE_CARD_TONE; title: string; body: string }) {
   /* 배경색은 디자인 토큰 사용 — raw rgba 금지(v1-coding-patterns §2) */
-  return <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green700)' : 'var(--orange700)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{body}</div></Card>;
+  const color = STATE_CARD_TONE[tone];
+  return <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: color.background }}><div className="tm-text-label" style={{ color: color.title }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{body}</div></Card>;
 }
 
 function ImageUploadField({ image, onChange, onUpload }: { image: string; onChange?: (value: string) => void; onUpload?: (file: File) => Promise<string> }) {

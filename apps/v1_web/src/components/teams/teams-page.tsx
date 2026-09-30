@@ -626,6 +626,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-team-detail-desktop-layout tm-show-desktop">
         {/* LEFT: hero + info */}
         <div className="tm-team-detail-desktop-main">
+          {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
           <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
             <button
               className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
@@ -646,6 +647,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               </div>
             </div>
           </Card>
+          {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
           {/* 전술보드 입구 — 히어로 바로 아래. 팀 일정(V1TeamSchedule)에는 대회 경기가
               들어오지 않아 별도 목록이 필요하다(컴포넌트 주석 참고).
               위치를 여기로 올린 이유: 처음엔 기본 정보 위에 뒀는데, 그 자리는 "열린 매치"와
@@ -723,17 +725,15 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           ) : null}
           <div className="tm-team-detail-sidebar-divider" />
+          {/* 이미 소속된 사람에게는 안내 문구를 쓰지 않는다 — 팀원에겐 관리 권한이 없고(F33),
+              버튼이 이미 "팀 채팅"이라 다른 일을 말하게 된다(F24). */}
           {mode === 'pending' ? (
             <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
-          ) : (
+          ) : mode === 'mine' ? null : (
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {/* 이미 소속된 멤버·운영진에게 "신청 전에…" 라고 말하면 안 된다 — 본문은 운영
-                  메뉴를 보여주는데 사이드바만 비멤버 문구를 유지해 역할이 어긋나 있었다. */}
-              {mode === 'mine'
-                ? '이미 이 팀의 멤버예요. 운영 메뉴에서 팀을 관리해요.'
-                : locked
-                  ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.'
-                  : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+              {locked
+                ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.'
+                : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
             </div>
           )}
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
@@ -766,6 +766,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 
       {/* Mobile layout (unchanged) */}
       <article ref={mobileBodyRef} className="tm-team-detail-body tm-hide-desktop tm-content-enter">
+        {model.justCreated && model.manageShortcuts ? <TeamCreatedNotice inviteHref={model.manageShortcuts.inviteHref} /> : null}
         <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
@@ -786,6 +787,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           </div>
         </Card>
+        {model.manageShortcuts ? <TeamManageShortcuts shortcuts={model.manageShortcuts} /> : null}
         {mode === 'pending' ? (
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
@@ -830,17 +832,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
       </article>
       <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
-        {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
-        {mode === 'pending' ? null : (
+        {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하고, 이미 소속된 사람에게는
+            버튼("팀 채팅")과 다른 일을 말하는 안내가 없어야 한다(F24·F33). */}
+        {mode === 'pending' || mode === 'mine' ? null : (
           <div className="tm-text-caption" style={{ marginBottom: 8 }}>
-            {/* mode==='mine' 은 이미 이 팀 소속(CTA 가 "팀 관리")인데, 예전에는 locked 여부로만
-                문구를 갈라서 팀장·매니저에게도 "신청 전 ... 확인해 주세요" 라는 비회원 안내가
-                그대로 나갔다. 이미 들어와 있는 사람에게 가입 안내를 하지 않는다. */}
-            {mode === 'mine'
-              ? '팀 정보와 멤버를 관리할 수 있어요.'
-              : locked
-                ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.'
-                : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+            {locked
+              ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.'
+              : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
           </div>
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
@@ -858,6 +856,36 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         )}
       </div>
     </>
+  );
+}
+
+/** 팀을 막 만든 팀장에게 — 성공했다는 사실과 다음 할 일(첫 멤버 초대)을 한 줄로(G12 F25). */
+function TeamCreatedNotice({ inviteHref }: { inviteHref: string }) {
+  return (
+    <div className="tm-card tm-on-tint tm-team-created-card">
+      <span aria-hidden="true" className="tm-team-created-icon"><Check size={18} strokeWidth={3} /></span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>팀을 만들었어요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>첫 멤버를 초대하면 팀이 시작돼요.</div>
+      </div>
+      <Link className="tm-btn tm-btn-sm tm-btn-primary" style={{ minHeight: 44, flex: 'none' }} href={inviteHref}>멤버 초대</Link>
+    </div>
+  );
+}
+
+/** 팀장·매니저 바로가기 두 칸 — 두 화면 아래 운영 메뉴까지 내려가지 않게(G12 F26). */
+function TeamManageShortcuts({ shortcuts }: { shortcuts: NonNullable<TeamDetailViewModel['manageShortcuts']> }) {
+  return (
+    <div className="tm-team-shortcut-grid">
+      <Link className="tm-card tm-pressable tm-team-shortcut" href={shortcuts.membersHref}>
+        <span className="tm-text-label">멤버 관리</span>
+        <span className="tm-text-caption">초대·가입 신청·역할</span>
+      </Link>
+      <Link className="tm-card tm-pressable tm-team-shortcut" href={shortcuts.editHref}>
+        <span className="tm-text-label">팀 정보 수정</span>
+        <span className="tm-text-caption">소개·로고·공개 범위</span>
+      </Link>
+    </div>
   );
 }
 

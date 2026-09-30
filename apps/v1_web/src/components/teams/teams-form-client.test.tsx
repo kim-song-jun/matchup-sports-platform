@@ -418,7 +418,7 @@ describe('Team form client contracts', () => {
       render(<TeamCreatePageClient />);
       fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '작성 중인 팀' } });
       fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
-      await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/teams/team-futsal'));
+      await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/teams/team-futsal?created=1'));
       expect(confirmMock).not.toHaveBeenCalled();
     });
 

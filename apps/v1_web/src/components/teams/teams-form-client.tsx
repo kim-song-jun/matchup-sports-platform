@@ -135,7 +135,7 @@ export function TeamCreatePageClient() {
         .then((result) => {
           const sportType = sports.data?.find((sport) => sport.id === selectedSportId)?.code ?? selectedSportId;
           trackEvent('team_create_complete', { sportType });
-          router.push(result.detailRoute || `/teams/${result.teamId}`);
+          router.push(withCreatedFlag(result.detailRoute || `/teams/${result.teamId}`));
         })
         .catch((err) => {
           const prompt = getCreatorProfilePrompt(err, '팀');
@@ -316,6 +316,13 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       {UnsavedChangesModal}
     </>
   );
+}
+
+/** 팀 상세가 "막 만든 팀" 안내를 한 번 보이도록 표시를 붙인다(서버가 준 경로의 쿼리는 보존). */
+function withCreatedFlag(path: string) {
+  const url = new URL(path, 'https://teameet.internal');
+  url.searchParams.set('created', '1');
+  return `${url.pathname}${url.search}`;
 }
 
 /** 사용자가 바꾼 입력만 표시한다 — 서버 값·기본값을 채우는 effect 는 원래 setter 를 쓴다. */

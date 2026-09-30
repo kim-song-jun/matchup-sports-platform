@@ -118,6 +118,10 @@ export type TeamDetailViewModel = {
    */
   joinRequest?: { requestedAtLabel?: string };
   operations?: Array<{ label: string; sub: string; href: string; badge?: number; badgeLabel?: string }>;
+  /** 팀을 막 만든 팀장에게만 — 성공 안내와 다음 할 일(G12 F25). */
+  justCreated?: boolean;
+  /** 팀장·매니저 바로가기 — 운영 메뉴 맨 아래에 묻혀 있던 두 가지를 히어로 바로 아래로(G12 F26). */
+  manageShortcuts?: { membersHref: string; editHref: string; inviteHref: string };
   /** 팀장·매니저 — 다가오는 경기의 명단·참석명단 버튼(Task 179 팀 A). */
   canManageGameRosters?: boolean;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */

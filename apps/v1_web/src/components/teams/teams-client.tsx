@@ -205,7 +205,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // 내 팀 목록 등 특정 화면에서 들어왔으면 뒤로가기를 그 화면으로 되돌린다(`?from=`).
   // route-chrome 테이블의 backHref(fragments/teams.ts)는 검색 파라미터를 못 받아
   // 기본값 '/teams'로 고정돼 있었다 — public-profile-client.tsx와 동일한 ShellOverride로 메운다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const searchParams = useSearchParams();
+  const fromPath = sanitizeRedirectPath(searchParams.get('from'));
+  // 팀 만들기가 성공 뒤 붙여 보낸다 — 만든 직후 첫 화면에만 성공·다음 할 일을 보인다.
+  const justCreatedParam = searchParams.get('created') === '1';
   // 이 화면에서 나가는 링크의 출처 — 받은 출처까지 담아야 하위 화면에서 돌아와도 처음 출처가 남는다.
   const selfHref = withFromPath(`/teams/${teamId}`, fromPath);
   // The current /auth/me result is the only authority for protected actions. A
@@ -404,7 +407,16 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
     canManageGameRosters: authVerified && isTeamOperatorRole(query.data.viewer.role),
-    operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, fromPath ? selfHref : null, selfHref) : undefined,
+    operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, selfHref) : undefined,
+    justCreated: authVerified && justCreatedParam && query.data.viewer.role === 'owner',
+    manageShortcuts:
+      authVerified && isTeamOperatorRole(query.data.viewer.role)
+        ? {
+            membersHref: withFromPath(`/teams/${teamId}/members`, fromPath ? selfHref : null),
+            editHref: withFromPath(`/teams/${teamId}/edit`, selfHref),
+            inviteHref: `/teams/${teamId}/members?tab=invitations`,
+          }
+        : undefined,
     onShare: () => shareTeam(query.data),
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
@@ -998,25 +1010,15 @@ function teamDetailCtaAction({
   return undefined;
 }
 
+/** 팀 정보 수정·멤버 관리는 히어로 아래 바로가기(manageShortcuts)로 올라갔다 — 여기엔 나머지만. */
 function buildTeamOperations(
   team: V1TeamDetail,
   pendingInboundContacts = 0,
-  subPageFrom: string | null = null,
   // 팀매치 만들기의 자연스러운 뒤로가기는 (팀 상세로 들어온 출처가 아니라) 이 팀 상세 자신이다.
   selfHref?: string,
 ): TeamDetailViewModel['operations'] {
   if (!isTeamOperatorRole(team.viewer.role)) return undefined;
   return [
-    {
-      label: '팀 정보 수정',
-      sub: '소개, 조건, 로고와 공개 범위를 수정해요.',
-      href: `/teams/${team.teamId}/edit`,
-    },
-    {
-      label: '멤버 관리',
-      sub: '멤버 역할, 가입 신청, 초대를 관리해요.',
-      href: withFromPath(`/teams/${team.teamId}/members`, subPageFrom),
-    },
     {
       label: '경기 명단 관리',
       sub: '다가오는 대회·리그 경기에서 빠질 선수와 결장 기간을 한 번에 관리해요.',

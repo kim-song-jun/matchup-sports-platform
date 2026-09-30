@@ -495,6 +495,64 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     expect(link).toHaveAttribute('href', '/team-matches/new/team?from=%2Fteams%2Fteam-1%3Ffrom%3D%252Fmy%252Fteams');
   });
 
+  // G12(F25·F26·F24·F33): 만든 직후 성공·다음 할 일, 운영 바로가기는 히어로 아래, 팀원에게 관리 안내 없음.
+  describe('만든 직후와 운영 바로가기', () => {
+    const ownerAuth = { data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false };
+    function viewAs(role: 'owner' | 'manager' | 'member') {
+      teamApiMocks.useV1AuthMe.mockReturnValue(ownerAuth);
+      teamApiMocks.useV1TeamDetail.mockReturnValue({
+        data: baseTeamDetail({ viewer: { role, membershipId: 'mem-me', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+        isError: false,
+      });
+      teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+    }
+
+    it('팀을 막 만든 팀장에게 성공 안내와 멤버 초대 바로가기를 보인다', () => {
+      navigationMocks.searchParams = new URLSearchParams('created=1');
+      viewAs('owner');
+      render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
+      screen.getAllByRole('link', { name: '멤버 초대' }).forEach((link) =>
+        expect(link).toHaveAttribute('href', '/teams/team-1/members?tab=invitations'),
+      );
+    });
+
+    it('표시가 없거나 팀장이 아니면 성공 안내를 보이지 않는다', () => {
+      viewAs('owner');
+      const view = render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByText('팀을 만들었어요')).toBeNull();
+      view.unmount();
+
+      navigationMocks.searchParams = new URLSearchParams('created=1');
+      viewAs('member');
+      render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByText('팀을 만들었어요')).toBeNull();
+    });
+
+    it('팀장·매니저는 히어로 아래에서 멤버 관리·팀 정보 수정으로 바로 가고, 팀원에겐 없다', () => {
+      viewAs('manager');
+      const view = render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.getAllByRole('link', { name: /^멤버 관리/ })[0]).toHaveAttribute('href', '/teams/team-1/members');
+      expect(screen.getAllByRole('link', { name: /^팀 정보 수정/ })[0]).toHaveAttribute('href', '/teams/team-1/edit?from=%2Fteams%2Fteam-1');
+      view.unmount();
+
+      viewAs('member');
+      render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByRole('link', { name: /^멤버 관리/ })).toBeNull();
+      expect(screen.queryByRole('link', { name: /^팀 정보 수정/ })).toBeNull();
+    });
+
+    it('소속된 사람에게 "관리할 수 있어요" 안내를 붙이지 않는다', () => {
+      viewAs('member');
+      render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(screen.queryByText('팀 정보와 멤버를 관리할 수 있어요.')).toBeNull();
+      expect(screen.queryByText(/운영 메뉴에서 팀을 관리해요/)).toBeNull();
+      expect(screen.getAllByRole('button', { name: '팀 채팅' }).length).toBeGreaterThan(0);
+    });
+  });
+
   it('cached verified owner keeps management, member CTA, and protected queries during auth background fetching', () => {
     teamApiMocks.useV1AuthMe.mockReturnValue({
       data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } },

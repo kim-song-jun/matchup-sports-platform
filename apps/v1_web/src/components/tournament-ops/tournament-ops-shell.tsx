@@ -16,6 +16,7 @@ import {
 import type { V1CompetitionKind, V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { displayInitials } from '@/lib/display-initials';
 import { staffRoleLabel } from './badges';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
@@ -68,7 +69,7 @@ function TournamentEmblem({
     );
   }
   const palette = IDENTITY_PALETTE[hashToIndex(tournamentId, IDENTITY_PALETTE.length)];
-  const initial = title?.trim()?.[0] ?? '대';
+  const initial = displayInitials(title, { fallback: '대' });
   return (
     <span
       aria-hidden="true"

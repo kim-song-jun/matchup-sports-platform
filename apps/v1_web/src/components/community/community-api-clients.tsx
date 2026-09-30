@@ -26,6 +26,7 @@ import { formatChatListTimestamp } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 import { getChatRoomViewModel } from './community.view-model';
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
+import { displayInitials } from '@/lib/display-initials';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -311,7 +312,7 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
     pinned: room.pinned,
     muted: room.muted,
     mutedUntil: room.mutedUntil ?? null,
-    initials: room.title.slice(0, 1) || '채',
+    initials: displayInitials(room.title, { fallback: '채' }),
     avatarUrl: CHAT_AVATARS[type],
   };
 }

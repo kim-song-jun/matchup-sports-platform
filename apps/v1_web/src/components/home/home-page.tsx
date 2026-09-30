@@ -127,7 +127,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
              */}
             <div className="tm-home-stats">
               <div>
-                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
+                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 경기</div>
                 {/* 로딩 중엔 '-'(값이 없다는 뜻)와 구분되게 스켈레톤을 그린다 — 레이블은
                     그대로 둬서 데이터가 도착해도 줄 높이가 바뀌지 않는다. */}
                 {model.statsLoading ? (

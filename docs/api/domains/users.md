@@ -63,6 +63,9 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
 ## 활동·공개 프로필
 
 - `GET /me/activity-summary`는 `totals: { activityCount, teamCount, mannerScore }`와 `monthly: { matchCount, mannerScore, winRate }`를 반환한다.
+  `monthly.matchCount`(이번 UTC 달에 끝난 개인 매치 참가 + 현재 공식 리비전의 팀매치 출전)는 홈 `GET /home` 의
+  `summary.monthlyMatches` 와 같은 함수(`profile/activity-counts.ts` `countMonthlyGames`)로 센다 — 두 화면의 "이번 달 경기"가
+  갈리지 않게 한다(Task 180 F85). 홈의 신청 대기는 숫자에 더하지 않고 `summary.pendingLabel`("대기 중인 신청 N건")로 싣는다.
 - `GET /users/:userId/public-profile`은 optional auth이며 active/non-deleted 사용자만 반환한다.
 - 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`만 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다. `displayName`은 공개 닉네임에서만 파생되며 `realName`에서 파생되지 않는다.
 - `reputation`은 `mannerScore`, `reviewCount`, `trustState`에 더해 `highlight`(`tagCode`, `label`, `rate`

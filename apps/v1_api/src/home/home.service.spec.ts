@@ -1,3 +1,4 @@
+import { ProfileService } from '../profile/profile.service';
 import { HomeService } from './home.service';
 
 const teamActivityService = {
@@ -108,31 +109,94 @@ describe('HomeService', () => {
     ]);
   });
 
-  // 2026-09-07: 취소한 매치가 "이번 달 활동"에 계속 잡혔다. cancel() 이 참가자 row 를
-  // `role: 'participant'` 인 것만 cancelled 로 바꿔 **호스트 자신의 row 는 active 로 남는데**,
-  // 이 집계가 참가자 상태만 보고 매치 상태를 안 봤기 때문이다.
-  it('이번 달 활동 집계는 취소·삭제된 매치를 빼고 센다', async () => {
-    const prisma = {
-      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
-      v1MatchApplication: { count: jest.fn().mockResolvedValue(0) },
-      v1Match: { findMany: jest.fn().mockResolvedValue([]) },
-      v1Notice: { findMany: jest.fn().mockResolvedValue([]) },
-      v1Notification: { count: jest.fn().mockResolvedValue(0) },
-      v1TeamMembership: { findFirst: jest.fn().mockResolvedValue(null) },
-      v1UserProfile: { findUnique: jest.fn().mockResolvedValue(null) },
-    };
-    const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
-    const service = new HomeService(prisma as never, popupsService as never, teamActivityService);
+  // F85: 홈 "이번 달 경기"와 마이 "이번 달 경기"가 같은 데이터에서 같은 숫자여야 한다. 대조군으로 신청만 한
+  // 매치·취소된 매치(호스트 row 는 active 로 남는다)·지난달 경기를 섞어, 예전 홈 집계(신청·참가 합산)로는
+  // 3 이 나오고 마이 집계로는 2 가 나오게 둔다.
+  it('이번 달 경기는 마이 활동 요약과 같은 값이다 — 끝난 개인 매치 + 공식 경기 출전', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-20T03:00:00.000Z'));
+    try {
+      const prisma = monthlyCountPrisma();
+      const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
+      const home = await new HomeService(prisma as never, popupsService as never, teamActivityService).getHome(
+        { id: 'user-1' } as never,
+        {} as never,
+      );
+      const my = await new ProfileService(prisma as never).activitySummary({ id: 'user-1' } as never);
 
-    await service.getHome({ id: 'user-1' } as never, {} as never);
-
-    const where = prisma.v1MatchParticipant.count.mock.calls[0][0].where;
-    expect(where.match).toEqual(
-      expect.objectContaining({
-        status: { not: 'cancelled' },
-        deletedAt: null,
-      }),
-    );
+      expect(my.monthly.matchCount).toBe(2);
+      expect(home.summary.monthlyMatches).toBe(my.monthly.matchCount);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
+
+type Range = { gte?: Date; lt?: Date };
+type ParticipantWhere = {
+  userId: string;
+  status: string | { in: string[] };
+  match: { status: string | { not: string }; deletedAt: null; startAt?: Range };
+};
+
+function monthlyCountPrisma() {
+  const participant = (status: string, matchStatus: string, startAt: string) => ({
+    userId: 'user-1',
+    status,
+    match: { status: matchStatus, deletedAt: null, startAt: new Date(startAt) },
+  });
+  const participants = [
+    participant('completed', 'completed', '2026-09-05T10:00:00.000Z'),
+    participant('active', 'recruiting', '2026-09-25T10:00:00.000Z'),
+    participant('active', 'recruiting', '2026-09-28T10:00:00.000Z'),
+    participant('active', 'cancelled', '2026-09-10T10:00:00.000Z'),
+    participant('completed', 'completed', '2026-08-20T10:00:00.000Z'),
+  ];
+  const matches = (value: string, rule: string | { in?: string[]; not?: string }) =>
+    typeof rule === 'string' ? value === rule : rule.in !== undefined ? rule.in.includes(value) : value !== rule.not;
+  const inRange = (value: Date, range: Range) =>
+    (range.gte === undefined || value >= range.gte) && (range.lt === undefined || value < range.lt);
+  const officialRow = (gameId: string, officialAt: string) => ({
+    resultRevision: {
+      id: `rev-${gameId}`,
+      gameId,
+      officialAt: new Date(officialAt),
+      game: {
+        currentOfficialRevisionId: `rev-${gameId}`,
+        sourceType: 'TEAM_MATCH',
+        teamMatch: { id: `tm-${gameId}`, leagueId: 'league-1', tournamentId: null, tournament: null, tournamentDetails: null },
+      },
+    },
+  });
+
+  return {
+    v1MatchParticipant: {
+      count: jest.fn(({ where }: { where: ParticipantWhere }) =>
+        Promise.resolve(
+          participants.filter(
+            (row) =>
+              row.userId === where.userId &&
+              matches(row.status, where.status) &&
+              matches(row.match.status, where.match.status) &&
+              inRange(row.match.startAt, where.match.startAt ?? {}),
+          ).length,
+        ),
+      ),
+    },
+    v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]) },
+    v1GameResultParticipant: {
+      findMany: jest.fn().mockResolvedValue([
+        officialRow('game-this-month', '2026-09-12T12:00:00.000Z'),
+        officialRow('game-last-month', '2026-08-30T12:00:00.000Z'),
+      ]),
+    },
+    v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+    v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
+    v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
+    v1MatchApplication: { count: jest.fn().mockResolvedValue(0) },
+    v1Match: { findMany: jest.fn().mockResolvedValue([]) },
+    v1Notice: { findMany: jest.fn().mockResolvedValue([]) },
+    v1Notification: { count: jest.fn().mockResolvedValue(0) },
+    v1UserProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+  };
+}

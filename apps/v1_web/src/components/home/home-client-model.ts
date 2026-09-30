@@ -121,7 +121,8 @@ function normalizeStats(home: V1Home): HomeStats {
 
   return {
     monthlyActivity: monthlyMatches,
-    monthlyActivitySub: summary.pendingLabel ?? '신청·참가 합산',
+    // 숫자는 마이 "이번 달 경기"와 같은 서버 집계다. 대기 중인 신청은 경기가 아니라 부제로만 알린다.
+    monthlyActivitySub: summary.pendingLabel ?? '매치·팀 경기·대회 합산',
     mannerScore: mannerScore === null ? '-' : mannerScore.toFixed(1),
     mannerScoreSub: trustStateLabel(summary.trustState),
     joined: monthlyMatches,

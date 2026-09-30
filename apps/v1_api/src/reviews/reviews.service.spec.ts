@@ -10,11 +10,8 @@ const user = {
 
 const sourceId = '00000000-0000-4000-8000-000000000010';
 const targetUserId = '00000000-0000-4000-8000-000000000002';
-const submittedAt = new Date('2026-06-02T12:00:00.000Z');
-// team_match 는 completedAt 기준 마감(review-deadline.ts, 기간은 어드민 설정)이 실제 시각(Date.now())으로
-// 판정된다(Task 4). submittedAt 은 하드코딩된 과거 날짜라 이 게이트가 생기면서 저절로 마감을
-// 넘겨버린다 — 마감 판정과 무관한 시나리오(멤버십/역할/대상 로직)의 팀매치 completedAt 픽스처는
-// 별도로 "방금 완료"를 뜻하는 이 상대값을 쓴다. 마감 자체를 테스트하는 케이스만 옛 날짜를 그대로 쓴다.
+const submittedAt = new Date(Date.now() - 60 * 60 * 1000);
+// 권한/대상 테스트의 완료 시각은 최근으로 유지하고, 마감 테스트만 별도 시각을 주입한다.
 const teamMatchCompletedAt = new Date(Date.now() - 60 * 60 * 1000);
 
 const teamSourceId = '00000000-0000-4000-8000-000000000030';
@@ -33,6 +30,42 @@ function reviewPolicyStub(windowHours = 168) {
 }
 
 describe('ReviewsService', () => {
+  it.each([
+    [168 * 60 * 60 * 1000 - 1, false, true],
+    [168 * 60 * 60 * 1000, false, true],
+    [168 * 60 * 60 * 1000 + 1, false, false],
+    [168 * 60 * 60 * 1000 + 1, true, false],
+  ])('personal review age=%i fallback=%s allowed=%s: source and pending agree', async (age, fallback, allowed) => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-30T12:00:00Z'));
+    try {
+      const anchor = new Date(Date.now() - age);
+      const match = {
+        id: sourceId, title: 'Personal match', status: 'completed', hostUserId: user.id,
+        completedAt: fallback ? null : anchor,
+        startAt: fallback ? anchor : new Date('2020-01-01T00:00:00Z'),
+        participants: [{ userId: targetUserId, user: { id: targetUserId, profile: null } }],
+      };
+      const prisma = {
+        v1Match: { findUnique: jest.fn().mockResolvedValue(match), findMany: jest.fn().mockResolvedValue([match]) },
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+      };
+      const service = new ReviewsService(prisma as never, {} as never, adminContextStub(), reviewPolicyStub(1));
+      const source = service.source(user, { sourceType: 'match', sourceId });
+      if (allowed) await expect(source).resolves.toMatchObject({ targets: [expect.objectContaining({ targetUserId })] });
+      else await expect(source).rejects.toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+      const pending = await service['pendingPersonalReviews'](user, 20);
+      expect(pending.map((item) => item.sourceId)).toEqual(allowed ? [sourceId] : []);
+      expect(prisma.v1Match.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ AND: expect.arrayContaining([{
+          OR: [
+            { completedAt: { gte: new Date('2026-09-23T12:00:00Z') } },
+            { completedAt: null, startAt: { gte: new Date('2026-09-23T12:00:00Z') } },
+          ],
+        }]) }),
+      }));
+    } finally { jest.useRealTimers(); }
+  });
+
   it('tournamentId pending 필터는 해당 대회의 fixture 후기만 조회한다', async () => {
     const tournamentId = '00000000-0000-4000-8000-000000000099';
     const tournamentFixtureReviews = {
@@ -404,10 +437,7 @@ describe('ReviewsService', () => {
     expect(recalculatedUserIds).toEqual(expect.arrayContaining([targetUserId, user.id]));
   });
 
-  it('match 소스는 마감 없이 무기한 제출 가능하다(D-12, 완료 플로우 부재)', async () => {
-    // V1Match.completedAt 을 채우는 write 경로가 이 저장소에 없다(스펙 §1.2.2) — 앵커가 항상
-    // 비어 있으므로 match 소스에는 review-deadline.ts 를 아예 호출하지 않는다. 100일 전 완료로
-    // 세팅해도(=team_match 였다면 진작 마감) 제출이 막히지 않는지를 회귀로 고정한다.
+  it('match: 7일이 지난 리뷰는 조회와 제출 모두 410으로 차단한다', async () => {
     const veryOldCompletedAt = new Date('2020-01-01T00:00:00.000Z');
     const createMock = jest.fn().mockResolvedValue({
       id: 'review-unlimited',
@@ -471,8 +501,10 @@ describe('ReviewsService', () => {
       targetUserId,
       rating: 5,
       tagCodes: ['manner'],
-    })).resolves.toMatchObject({ alreadySubmitted: false });
-    expect(createMock).toHaveBeenCalled();
+    })).rejects.toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    await expect(service.source(user, { sourceType: 'match', sourceId }))
+      .rejects.toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it('team_match: 결과가 무효(VOID)로 뒤집혔으면 평가를 열지 않는다', async () => {

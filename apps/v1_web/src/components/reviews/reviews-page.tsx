@@ -157,7 +157,7 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
     <div style={{ marginTop: 24 }}>
       {/* 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 제거했다. 작성자도 공개한다. */}
       <div className="tm-my-section-label">경기에서 받은 리뷰</div>
-      <div className="tm-text-caption" style={{ marginBottom: 12 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
+      <div className="tm-text-caption" style={{ marginBottom: 12 }}>상호 작성이 끝나거나 72시간이 지나면 보여요. 운영 평가는 바로 공개되며 참가자 평점과 별도예요.</div>
       {model.userGroups.length > 0 ? <ReceivedGroupSection groups={model.userGroups} title="내가 받은 리뷰" /> : null}
       {model.teamGroups.length > 0 ? (
         <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.teamGroups} title="내 팀이 받은 리뷰" /></div>
@@ -193,7 +193,9 @@ export function ReviewSourcePageView({
   onUpdateRating,
   openKey,
   submitting,
+  admin = false,
 }: QueryStateProps & DraftHandlers & {
+  admin?: boolean;
   drafts: Record<string, ReviewTargetDraft>;
   message: string | null;
   model: ReviewSourcePageModel | null;
@@ -251,7 +253,7 @@ export function ReviewSourcePageView({
           </>
         ) : null}
       </div>
-      <div className="tm-fixed-cta">
+      <div className={admin ? 'mt-6' : 'tm-fixed-cta'}>
         {/* 서버 계약(SubmitReviewDto 의 `@ArrayMinSize(1)`)이 별점과 태그를 모두 요구해서 버튼을
             풀어줄 수는 없다 — 왜 못 보내는지, 누가 덜 끝났는지를 말해준다.
             `aria-describedby` 로 버튼에 묶어 스크린리더도 비활성 이유를 읽게 한다. */}

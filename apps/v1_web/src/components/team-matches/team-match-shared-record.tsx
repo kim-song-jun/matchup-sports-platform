@@ -175,7 +175,7 @@ function GoalEventsAccordion({ data }: { data: SharedRecord }) {
   );
 }
 
-export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) {
+export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatchId: string; admin?: boolean }) {
   const query = useTeamMatchRecord(teamMatchId);
   const mutation = useMutateTeamMatchRecord(teamMatchId);
   const [editing, setEditing] = useState<{ goal: SharedGoal | null; version: number; subMatchId: string | null } | null>(null);
@@ -188,7 +188,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   // 공동 기록 이전 경기는 이 화면에 보여줄 기록이 없다 — 목록에서 곧장 들어와도 매치 상세로 넘기고
   // 출처를 이어 실어 뒤로가기가 목록으로 돌아가게 한다. view=detail 은 참가자 자동 진입을 막는다.
-  const handoffHref = data?.phase === 'legacy' || data?.phase === 'managed'
+  const handoffHref = !admin && (data?.phase === 'legacy' || data?.phase === 'managed')
     ? withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromPath)
     : null;
   useEffect(() => {
@@ -227,6 +227,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
   const controlsOpen = !!editing || !!subMatchForm;
 
   return <main className={styles.page}>
+    {admin && <Link className={styles.openLink} href={`/admin/team-matches/${teamMatchId}`}>팀매치 운영 상세로</Link>}
     <header className={styles.header}>
       <div>
         <h1>함께 쓰는 경기 기록</h1>
@@ -252,7 +253,9 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
       {data.canEdit && subMatches.length === 0 && <Button block onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: null }); }} disabled={disabled || controlsOpen}>득점 추가</Button>}
       {data.phase === 'official' && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
-      {!data.participant && <p className={styles.muted}>기록 편집은 양 팀의 제출된 참석명단에 등록된 참가자에게 열려 있어요.</p>}
+      {data.operator && <p className={styles.muted}>Teameet 운영으로 양 팀과 함께 기록해요. 수정하면 기존 종료 확인이 초기화되며, 최종 확인은 양 팀이 직접 진행해요.</p>}
+      {!data.participant && !data.operator && <p className={styles.muted}>기록 편집은 양 팀의 제출된 참석명단 참가자와 플랫폼 주관 경기의 운영자에게 열려 있어요.</p>}
+      {admin && (data.phase === 'legacy' || data.phase === 'managed') && <p className={styles.muted}>이 경기는 공동 기록 대상이 아니에요. 기존 경기 운영 화면을 이용해 주세요.</p>}
       {data.phase === 'scheduled' && <p className={styles.muted}>상대팀 확정 후 경기 시작 시간이 되면 기록할 수 있어요.</p>}
     </section>
 
@@ -388,7 +391,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
             : <Button block disabled={disabled || controlsOpen} variant={ownConfirmed ? 'outline' : 'primary'} onClick={() => ownConfirmed ? void command({ action: 'reopen' }) : setEndPrompt(data.version)}>{ownConfirmed ? '종료 확인 취소' : '우리 팀 종료 확인'}</Button>)}
         </section>}
 
-        {data.participant && <details className={styles.section}>
+        {(data.participant || data.operator) && <details className={styles.section}>
           <summary className={styles.historyTitle}>변경 이력 · {data.history.length}건</summary>
           <p className={styles.muted}>최근 100건 · 누가 바꿨는지 함께 확인해요.</p>
           <ul className={styles.history}>

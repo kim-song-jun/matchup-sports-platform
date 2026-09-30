@@ -1754,11 +1754,11 @@ export type V1TeamMatchLineupChangeRequestResult = {
   replayed: boolean;
 };
 
-export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture';
+export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture' | 'platform_team_match';
 export type V1ReviewTargetType = 'user' | 'team';
 
 export type V1ReviewActorUser = {
-  userId: string;
+  userId: string | null;
   name: string;
   imageUrl: string | null;
 };

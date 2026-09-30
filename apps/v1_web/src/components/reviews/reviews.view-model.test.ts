@@ -54,6 +54,23 @@ describe('reviews view model — 태그 옵션 계약', () => {
 });
 
 describe('reviews view model — 대회 경기 리뷰 계약', () => {
+  it('운영 리뷰는 별도 그룹에 표시하고 참가자 평균에서 제외한다', () => {
+    const common = {
+      sourceId: 'match-1', targetType: 'user' as const, targetUser: { userId: 'me', name: '나', imageUrl: null },
+      targetTeam: null, reviewerTeam: null, status: 'submitted' as const, submittedAt: null,
+      anonymous: false, tags: [], source: null,
+    };
+    const model = toReviewsReceivedPageModel({
+      items: [
+        { ...common, reviewId: 'peer', sourceType: 'team_match', rating: 5, reviewerUser: { userId: 'player', name: '참가자', imageUrl: null } },
+        { ...common, reviewId: 'ops', sourceType: 'platform_team_match', rating: 1, reviewerUser: { userId: null, name: 'Teameet 운영', imageUrl: null } },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+    expect(model.stats.find((stat) => stat.label === '참가자 평균')?.value).toBe('5');
+    expect(model.userGroups).toHaveLength(2);
+    expect(model.userGroups.find((group) => group.sourceType === 'platform_team_match')?.meta).toContain('운영 평가');
+  });
   it('대회 경기 source를 사용자에게 별도 경기 유형으로 표시한다', () => {
     expect(sourceTypeLabel('tournament_fixture')).toBe('대회 경기');
   });

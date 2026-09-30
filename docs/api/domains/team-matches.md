@@ -1,5 +1,14 @@
 # Domain Contract - Team Matches
 
+## 플랫폼 주관 공동 운영 (Task 149, 2026-09-30)
+
+- 기존 `GET/POST /team-matches/:id/record` 계약에 `operator: boolean`을 추가한다. `participant`는 계속 실제 최신 제출 라인업 선수만 뜻한다.
+- 독립 플랫폼 주관 경기(`platformManaged=true`, league/tournament 없음)의 active·미회수 owner/ops는 라인업 등록 없이 득점/서브매치를 공동 편집할 수 있다. 연결 계정도 active여야 한다. 일반 팀매치·support·회수/정지 계정에는 이 권한을 주지 않는다.
+- 참가자가 아닌 운영자는 `confirm/reopen` 불가(403 `TEAM_CONFIRMATION_REQUIRED`). 운영자가 실제 선수이면 기존 선수 권한을 유지한다.
+- 경기 시작, 양 팀 명단 준비, 공식 결과 잠금, `expectedVersion` 충돌, `commandId` 재실행 규칙은 기존과 같다. 운영자의 수정도 양 팀의 이전 확인을 초기화한다.
+- 기록 이력에는 `Teameet 운영`과 실제 actorUserId를 저장하고, 운영자 감사 로그를 같은 트랜잭션에 기록한다. 참가자에게 실제 운영자 계정을 리뷰 대상으로 추가하지 않는다.
+- 관리자 진입은 `/admin/team-matches/:id/record`. 완료 후 운영 리뷰는 `/admin/team-matches/:id/reviews`; 일반 사용자 shell로 이동하지 않는다.
+
 ## V1 친선 팀매치 공동 경기 기록 (Task 172)
 
 이 절은 `apps/v1_api/src/team-matches/team-match-record.controller.ts` / service / DTO와

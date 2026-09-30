@@ -16,6 +16,7 @@ export type RecordChange = { id: string; version: number; action: string; actorN
 export type SharedRecord = {
   teamMatchId: string; title: string; startsAt: string | null; phase: 'scheduled' | 'live' | 'official' | 'cancelled' | 'legacy' | 'managed';
   version: number; serverTime: string; canEdit: boolean; participant: boolean; ownSideId: string | null;
+  operator: boolean;
   lineupReady: boolean;
   missingSides: { sideId: string; sideKey: 'HOME' | 'AWAY'; teamName: string }[];
   sides: { id: string; key: 'HOME' | 'AWAY'; name: string; score: number | null }[];

@@ -319,7 +319,10 @@ export function PitchFormationEditor({
         : waiting.length > 0
           ? { text: `대기 선수를 고른 뒤 ${courtNoun}를 누르면 그 자리에 놓여요. 놓은 선수는 끌어서 옮겨요.`, live: false }
           : null;
-  const footnote = guidance?.text ?? summary;
+  // 지금 반응해야 하는 안내(live)는 코트 **위**에 둔다 — 코트 아래는 390 에서 하단 고정 저장 바에
+  // 가려져, 꽉 찬 코트에 칩을 눌러도 아무 일도 없는 것처럼 보였다(W3-V2). 설명·요약은 아래에 남는다.
+  const liveGuidance = guidance?.live ? guidance.text : null;
+  const footnote = guidance !== null && !guidance.live ? guidance.text : summary;
 
   // 모바일 진입점에 지금 무엇이 골라져 있는지 시트 안 목록과 **같은 문구**로 보여준다.
   const mobileFormationLabel =
@@ -395,6 +398,25 @@ export function PitchFormationEditor({
         </button>
       </div>
 
+      {liveGuidance !== null ? (
+        <div
+          role="status"
+          className="tm-text-caption"
+          style={{ color: 'var(--blue700)', fontWeight: 700, lineHeight: 1.5 }}
+        >
+          {liveGuidance}
+          {selectedWaitingEntry !== null ? (
+            <button
+              type="button"
+              onClick={() => setSelectedWaitingKey(null)}
+              className="tm-btn tm-btn-ghost tm-inline-action"
+            >
+              선택 취소
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap' }}>
         {court === 'futsal' ? (
           <div style={{ display: 'flex', gap: 8, flex: '1 1 0', minWidth: 0, justifyContent: 'center' }}>
@@ -415,25 +437,8 @@ export function PitchFormationEditor({
       </div>
 
       {footnote !== null ? (
-        <div
-          role={guidance?.live ? 'status' : undefined}
-          className="tm-text-caption"
-          style={{
-            color: guidance?.live ? 'var(--blue700)' : 'var(--text-muted)',
-            fontWeight: guidance?.live ? 700 : 400,
-            lineHeight: 1.5,
-          }}
-        >
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
           {footnote}
-          {selectedWaitingEntry !== null ? (
-            <button
-              type="button"
-              onClick={() => setSelectedWaitingKey(null)}
-              className="tm-btn tm-btn-ghost tm-inline-action"
-            >
-              선택 취소
-            </button>
-          ) : null}
         </div>
       ) : null}
 

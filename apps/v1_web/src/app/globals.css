@@ -2112,6 +2112,22 @@ label.tm-btn:focus-within {
   opacity: 1; /* 브라우저 기본 opacity 오버라이드 */
 }
 
+/* 등번호처럼 두 자리 안팎의 좁은 숫자 입력. 데스크톱 브라우저의 스핀 버튼이 좁은 칸의
+   글자 폭을 먹어 10 이 "1" 로만 보이던 결함이 있어 스핀 버튼을 없애고 폭·패딩을 토큰으로 잡는다. */
+.tm-input-compact-number {
+  width: var(--size-input-compact-number);
+  padding: 0 var(--spacing-2);
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.tm-input-compact-number::-webkit-inner-spin-button,
+.tm-input-compact-number::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .tm-date-picker-text-input {
   display: flex;
   align-items: center;

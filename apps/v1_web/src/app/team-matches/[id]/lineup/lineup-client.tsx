@@ -670,7 +670,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                 </span>
                 <span
                   className="tm-text-micro"
-                  style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
+                  style={{ width: 'var(--size-input-compact-number)', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
                 >
                   등번호
                 </span>
@@ -759,8 +759,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       type="number"
                       inputMode="numeric"
                       aria-label={`${entry.displayName} 등번호`}
-                      className="tm-input"
-                      style={{ width: 56, textAlign: 'center' }}
+                      className="tm-input tm-input-compact-number"
                       value={entry.jerseyNumber ?? ''}
                       disabled={!editable}
                       onChange={(event) =>

@@ -734,6 +734,8 @@ describe('TeamMatchLineupPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
 
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
+    // L7 — 좁은 칸에서 두 자리 번호가 잘리던 결함은 스핀 버튼을 없앤 전용 클래스로 고친다(compact-number-input.test.ts).
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveClass('tm-input-compact-number');
   });
 
   it('팀 번호가 명단의 다른 행과 겹치면 비워 두고 누구와 겹치는지 알린다', () => {

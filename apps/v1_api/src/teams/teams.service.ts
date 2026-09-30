@@ -1472,7 +1472,7 @@ export class TeamsService {
 
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
       where: { id: invitationId },
-      select: { id: true, teamId: true, status: true },
+      select: { id: true, teamId: true, invitedUserId: true, status: true, team: { select: { name: true } } },
     });
     if (!invitation) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
@@ -1496,6 +1496,7 @@ export class TeamsService {
       data: { status: 'cancelled' },
       select: { id: true, status: true },
     });
+    void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name);
 
     return { invitationId: updated.id, status: updated.status, alreadyCancelled: false };
   }
@@ -1730,6 +1731,7 @@ export class TeamsService {
       return { updatedInvitation, membership, team };
     });
 
+    void this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
     // 알림: 초대한 사람에게 수락 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       invitation.invitedByUserId,
@@ -1775,6 +1777,7 @@ export class TeamsService {
       data: { status: 'declined', respondedAt: new Date() },
       select: { id: true, status: true },
     });
+    void this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
 
     return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };
   }

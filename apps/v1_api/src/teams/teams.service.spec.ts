@@ -135,7 +135,12 @@ describe('TeamsService', () => {
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
-  let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
+  let notifications: {
+    emitNotification: jest.Mock;
+    emitToManyDeferred: jest.Mock;
+    markTeamInvitationHandled: jest.Mock;
+    markTeamInvitationCancelled: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -198,6 +203,8 @@ describe('TeamsService', () => {
     notifications = {
       emitNotification: jest.fn().mockResolvedValue(undefined),
       emitToManyDeferred: jest.fn(),
+      markTeamInvitationHandled: jest.fn().mockResolvedValue(undefined),
+      markTeamInvitationCancelled: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -2040,6 +2047,7 @@ describe('TeamsService', () => {
       expect(result.status).toBe('accepted');
       expect(result.alreadyProcessed).toBe(false);
       expect(result.membershipId).toBe('mem-new');
+      expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith(invitee.id, 'team-1');
       // memberCount increment 가 호출됐어야 함
       expect(prisma.v1Team.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2153,6 +2161,15 @@ describe('TeamsService', () => {
           data: expect.objectContaining({ status: 'declined' }),
         }),
       );
+      expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith(invitee.id, 'team-1');
+    });
+
+    it('본인 아닌 유저의 거절 시도는 초대 알림을 건드리지 않는다', async () => {
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(invitationRow({ invitedUserId: invitee.id, status: 'pending' }));
+
+      await expect(service.declineInvitation(member, 'inv-1')).rejects.toBeDefined();
+
+      expect(notifications.markTeamInvitationHandled).not.toHaveBeenCalled();
     });
 
     it('본인 아닌 유저가 거절 시도 → 403 PERMISSION_DENIED', async () => {
@@ -2188,7 +2205,9 @@ describe('TeamsService', () => {
       prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
         id: 'inv-1',
         teamId: 'team-1',
+        invitedUserId: invitee.id,
         status: 'pending',
+        team: { name: '테스트팀' },
       });
       prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'cancelled' });
 
@@ -2201,6 +2220,7 @@ describe('TeamsService', () => {
           data: { status: 'cancelled' },
         }),
       );
+      expect(notifications.markTeamInvitationCancelled).toHaveBeenCalledWith(invitee.id, 'team-1', '테스트팀');
     });
 
     it('이미 cancelled 인 초대 취소 → alreadyCancelled=true (update skip)', async () => {
@@ -2216,6 +2236,7 @@ describe('TeamsService', () => {
       expect(result.alreadyCancelled).toBe(true);
       expect(result.status).toBe('cancelled');
       expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+      expect(notifications.markTeamInvitationCancelled).not.toHaveBeenCalled();
     });
 
     it('일반 멤버는 초대 취소 불가 → 403 PERMISSION_DENIED', async () => {

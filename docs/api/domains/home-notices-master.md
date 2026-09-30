@@ -78,8 +78,6 @@
   서비스 계층의 멤버십 조회이며, 내 팀이 아닌 팀의 경기는 더 가까워도 나오지 않는다.
   `{ gameId, teamMatchId, competitionKind, competitionId(대회 id 또는 리그 id), title, opponentName, scheduledAt,
   placeName, teamId, teamName, viewerCanManage(owner·manager), viewerParticipating, participantCount }`.
-  - `title`: 팀 상세 다가오는 경기와 같은 라벨 — 대회 `<대회명> · <라운드>`, 리그 `<리그명> N주차`, 친선은 팀매치
-    제목(공백뿐이면 `팀 매치`).
   - `viewerParticipating` 은 서버 판정이다: 대회·리그는 계산된 경기 명단(참가 명단 − 조정 − 결장 − 출전정지)의
     출전자, 친선은 그 사이드의 가장 최근 제출본(SUBMITTED·LOCKED) 참석명단. 제출 뒤 다시 연 초안은 직전 제출본을
     밀어내지 않는다. 빠진 선수는 `false` 일 뿐 "빠졌다"는 별도 값은 없다.

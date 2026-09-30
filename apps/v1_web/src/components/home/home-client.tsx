@@ -56,8 +56,11 @@ export function HomePageClient() {
   // 자리를 내주면 그 방문엔 유도 배너가 하나도 안 보이므로, 같은 훅으로 총계를 먼저
   // 확인한다(React Query 가 dedupe 하므로 요청은 늘지 않는다).
   const pendingReviews = usePendingReviewsSummary();
+  const teamActivity = query.data?.teamActivity ?? null;
   const bannerDecision = decideHomeBanners({
     phoneVerify: phoneVerifyNudge !== undefined,
+    teamInvitation: Boolean(teamActivity?.pendingInvitations),
+    joinRequests: Boolean(teamActivity?.pendingJoinRequests),
     recordConsent: recordConsentNudge !== undefined,
     pendingReviews: pendingReviews.total > 0,
   });

@@ -3,6 +3,27 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineupTodoService, loadRosterSummaries } from './lineup-todo.service';
 import { assertTeamLineupMember } from './team-lineup-access';
+import { loadViewerParticipation } from './viewer-game-participation';
+
+/** 홈 맨 위 "다음 경기" 카드가 그리는 경기 하나. 출전 여부는 서버가 판정해 내려 준다. */
+export interface NextTeamGame {
+  gameId: string;
+  teamMatchId: string | null;
+  competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
+  /** 대회면 대회 id, 리그면 리그 id — 경기 상세 경로가 종류마다 다르다. */
+  competitionId: string | null;
+  title: string;
+  opponentName: string | null;
+  scheduledAt: Date;
+  placeName: string | null;
+  teamId: string;
+  teamName: string;
+  /** 팀장·매니저면 카드가 "명단 확인"으로 바뀐다. */
+  viewerCanManage: boolean;
+  viewerParticipating: boolean;
+  /** 대회·리그의 계산된 출전 인원. 친선과 확정 명단 없는 팀은 null. */
+  participantCount: number | null;
+}
 
 /**
  * 팀 화면의 "다가오는 경기" — 전술보드로 들어가는 입구.
@@ -19,12 +40,13 @@ export class TeamUpcomingGamesService {
     private readonly lineupTodos: LineupTodoService,
   ) {}
 
-  async listForTeam(user: V1AuthUser, teamId: string) {
+  async listForTeam(user: V1AuthUser, teamId: string, now: Date = new Date()) {
     // 전술보드 읽기와 같은 선 — 활성 팀원이면 본다. 팀이 없으면 404, 팀원이 아니면 403.
     await assertTeamLineupMember(this.prisma, teamId, user.id);
-    const games = await this.lineupTodos.listUpcomingForTeam(teamId, new Date());
+    const games = await this.lineupTodos.listUpcomingForTeam(teamId, now);
     // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
     const rosters = await loadRosterSummaries(this.prisma, teamId, games);
+    const participating = await loadViewerParticipation(this.prisma, { userId: user.id, games, rosters });
     return {
       items: games.map((game) => ({
         gameId: game.gameId,
@@ -42,7 +64,52 @@ export class TeamUpcomingGamesService {
         lineupState: game.lineupState,
         // 대회·리그만. 친선과 기준 명단이 없는 팀(확정 신청 없는 대회)은 null.
         rosterSummary: rosters.get(game.gameId)?.summary ?? null,
+        // "내 출전" 칩의 근거. 빠진 경기는 false 일 뿐 "빠졌다"는 값을 따로 두지 않는다.
+        viewerParticipating: participating.has(game.gameId),
       })),
+    };
+  }
+
+  /**
+   * 내 팀들의 경기 중 **가장 가까운 앞으로의 경기** 하나. 팀원이 아니면 애초에 이 팀들에 들지 않으므로
+   * 남의 팀 경기는 나오지 않는다 — `memberships` 는 호출자가 활성 멤버십으로 조회한 값이다.
+   * 킥오프 시각이 지나면 그 경기는 빠지고 다음 경기로 넘어간다(진행 중 경기를 붙잡아 두지 않는다).
+   */
+  async nextForMemberships(
+    userId: string,
+    memberships: readonly { teamId: string; role: string }[],
+    now: Date,
+  ): Promise<NextTeamGame | null> {
+    const games = await this.lineupTodos.listUpcomingForTeams(
+      memberships.map((membership) => membership.teamId),
+      now,
+    );
+    const next = games.find((game) => game.scheduledAt !== null);
+    if (next === undefined || next.scheduledAt === null) return null;
+
+    const rosters = await loadRosterSummaries(this.prisma, next.teamId, [next]);
+    const roster = rosters.get(next.gameId);
+    const participating = await loadViewerParticipation(this.prisma, { userId, games: [next], rosters });
+    const place =
+      roster?.teamMatchId == null
+        ? null
+        : await this.prisma.v1TeamMatch.findUnique({ where: { id: roster.teamMatchId }, select: { placeName: true } });
+    const role = memberships.find((membership) => membership.teamId === next.teamId)?.role;
+
+    return {
+      gameId: next.gameId,
+      teamMatchId: roster?.teamMatchId ?? null,
+      competitionKind: next.competitionKind,
+      competitionId: next.tournamentId,
+      title: next.title,
+      opponentName: next.opponentName,
+      scheduledAt: next.scheduledAt,
+      placeName: place?.placeName ?? null,
+      teamId: next.teamId,
+      teamName: next.teamName,
+      viewerCanManage: role === 'owner' || role === 'manager',
+      viewerParticipating: participating.has(next.gameId),
+      participantCount: roster?.summary?.participating ?? null,
     };
   }
 }

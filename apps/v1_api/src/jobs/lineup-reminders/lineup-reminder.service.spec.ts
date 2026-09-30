@@ -119,20 +119,46 @@ describe('LineupReminderService', () => {
     };
   }
 
+  type StartAtFilter = { gt?: Date; gte?: Date; lt?: Date; lte?: Date };
+  const inWindow = (at: Date, filter: StartAtFilter) =>
+    (filter.gt === undefined || at > filter.gt) &&
+    (filter.gte === undefined || at >= filter.gte) &&
+    (filter.lt === undefined || at < filter.lt) &&
+    (filter.lte === undefined || at <= filter.lte);
+
   function fakeTx(
     options: {
+      /** 팀 운영 알림(owner·manager 조회) — `where.teamId` 가 문자열인 조회. */
       memberships?: Array<{ userId: string }> | Record<string, Array<{ userId: string }>>;
-      preferences?: Array<{ userId: string; teamEnabled: boolean }>;
+      /** 경기 알림 수신자 계산 — `where.teamId.in` 조회. */
+      teamMembers?: Array<{ teamId: string; userId: string; role: string }>;
+      teamMatches?: Array<{ startAt: Date } & Record<string, unknown>>;
+      lineups?: Array<{ id: string; sideId: string; state: string }>;
+      participants?: Array<{ lineupId: string; sideId: string; userId: string | null }>;
+      preferences?: Array<{ userId: string; teamEnabled?: boolean; teamMatchEnabled?: boolean }>;
       alreadyDelivered?: string[];
     } = {},
   ) {
     const createMany = jest.fn().mockResolvedValue({ count: 0 });
     return {
       v1TeamMembership: {
-        findMany: jest.fn(({ where }: { where: { teamId: string } }) =>
+        findMany: jest.fn(({ where }: { where: { teamId: string | { in: string[] } } }) =>
           Promise.resolve(
-            Array.isArray(options.memberships) ? options.memberships : (options.memberships?.[where.teamId] ?? []),
+            typeof where.teamId !== 'string'
+              ? (options.teamMembers ?? []).filter((row) => (where.teamId as { in: string[] }).in.includes(row.teamId))
+              : Array.isArray(options.memberships) ? options.memberships : (options.memberships?.[where.teamId] ?? []),
           ),
+        ),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn(({ where }: { where: { startAt: StartAtFilter } }) =>
+          Promise.resolve((options.teamMatches ?? []).filter((row) => inWindow(row.startAt, where.startAt))),
+        ),
+      },
+      v1GameLineup: { findMany: jest.fn().mockResolvedValue(options.lineups ?? []) },
+      v1GameParticipant: {
+        findMany: jest.fn(({ where }: { where: { lineupId: { in: string[] } } }) =>
+          Promise.resolve((options.participants ?? []).filter((row) => where.lineupId.in.includes(row.lineupId) && row.userId !== null)),
         ),
       },
       v1NotificationPreference: { findMany: jest.fn().mockResolvedValue(options.preferences ?? []) },
@@ -290,6 +316,92 @@ describe('LineupReminderService', () => {
       await service.scanHandler(fakeClaim() as never, tx as never);
 
       expect(todoService.listCompetitionRosterChecks).not.toHaveBeenCalled();
+      expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Task 180 G7: 킥오프 2시간 전 — 친선은 제출된 참석명단이 출전자', () => {
+    // 지금 = KST 11:00, 킥오프 = KST 13:00 → 2시간 전 창 안이고 2시간 전 시각도 낮이다.
+    const friendlyMatch = {
+      id: 'tm-f',
+      startAt: new Date('2026-08-27T04:00:00Z'),
+      placeName: '망원 풋살장',
+      leagueId: null,
+      tournamentId: null,
+      hostTeamId: 'team-home',
+      hostTeam: { name: '성수 FC' },
+      approvedApplicantTeam: { name: '망원 FC' },
+      game: { id: 'game-f', sides: [{ id: 'side-home', teamId: 'team-home' }, { id: 'side-away', teamId: 'team-away' }] },
+    };
+    const scenario = {
+      teamMatches: [friendlyMatch],
+      teamMembers: [
+        { teamId: 'team-home', userId: 'home-owner', role: 'owner' }, // 참석명단 밖 팀장
+        { teamId: 'team-home', userId: 'home-p1', role: 'member' }, // 출전자
+        { teamId: 'team-home', userId: 'home-p2', role: 'member' }, // 명단 밖 팀원
+        { teamId: 'team-away', userId: 'away-owner', role: 'owner' },
+      ],
+      lineups: [
+        { id: 'lineup-h', sideId: 'side-home', state: 'SUBMITTED' },
+        { id: 'lineup-a', sideId: 'side-away', state: 'DRAFT' }, // 원정은 아직 제출 전
+      ],
+      participants: [
+        { lineupId: 'lineup-h', sideId: 'side-home', userId: 'home-p1' },
+        { lineupId: 'lineup-h', sideId: 'side-home', userId: 'ex-member' }, // 명단에 남은 탈퇴자
+        { lineupId: 'lineup-a', sideId: 'side-away', userId: 'away-owner' },
+      ],
+    };
+    function serviceWithPush() {
+      const todoService = { listAllPending: jest.fn().mockResolvedValue([]), listCompetitionRosterChecks: jest.fn().mockResolvedValue([]) };
+      const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+      return { service: new LineupReminderService(todoService as never, fakePrisma().prisma as never, webPush as never), webPush };
+    }
+    const sentRows = (tx: ReturnType<typeof fakeTx>) =>
+      tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data) as Array<{ recipientUserId: string; body: string; businessKey: string }>;
+
+    it('제출된 참석명단의 활성 팀원과 팀장·매니저가 받고, 명단 밖·탈퇴자·미제출 사이드는 받지 않는다', async () => {
+      const { service } = serviceWithPush();
+      const tx = fakeTx(scenario);
+      await service.scanHandler(fakeClaim() as never, tx as never);
+
+      expect(sentRows(tx).map((row) => [row.recipientUserId, row.businessKey, row.body])).toEqual([
+        ['home-p1', `game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-p1`, '13:00 vs 망원 FC · 망원 풋살장. 지금 출전 명단에 있어요.'],
+        ['home-owner', `game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-owner`, '13:00 vs 망원 FC · 망원 풋살장.'],
+      ]);
+    });
+
+    it('경기·대회 알림(teamMatchEnabled)을 끈 사람은 빠지고, 팀 활동 알림만 끈 사람은 받는다', async () => {
+      const { service } = serviceWithPush();
+      const tx = fakeTx({
+        ...scenario,
+        preferences: [
+          { userId: 'home-p1', teamEnabled: true, teamMatchEnabled: false },
+          { userId: 'home-owner', teamEnabled: false, teamMatchEnabled: true },
+        ],
+      });
+      await service.scanHandler(fakeClaim() as never, tx as never);
+
+      expect(sentRows(tx).map((row) => row.recipientUserId)).toEqual(['home-owner']);
+    });
+
+    it('두 번째 스캔에서 이미 받은 사람에게는 푸시를 다시 보내지 않는다', async () => {
+      const { service, webPush } = serviceWithPush();
+      const tx = fakeTx({ ...scenario, alreadyDelivered: [`game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-p1`, `game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-owner`] });
+      const afterCommit: Array<() => void | Promise<void>> = [];
+      await service.scanHandler(fakeClaim({ afterCommit }) as never, tx as never);
+
+      expect(tx.v1Notification.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }));
+      expect(afterCommit).toHaveLength(0);
+      expect(webPush.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('야간(KST 21~9시) 스캔은 경기를 조회하지도 않는다', async () => {
+      jest.setSystemTime(new Date('2026-08-27T13:00:00Z')); // KST 22:00
+      const { service } = serviceWithPush();
+      const tx = fakeTx({ ...scenario, teamMatches: [{ ...friendlyMatch, startAt: new Date('2026-08-27T15:00:00Z') }] });
+      await service.scanHandler(fakeClaim() as never, tx as never);
+
+      expect(tx.v1TeamMatch.findMany).not.toHaveBeenCalled();
       expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
     });
   });

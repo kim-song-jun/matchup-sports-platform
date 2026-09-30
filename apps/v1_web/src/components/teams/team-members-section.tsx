@@ -106,7 +106,7 @@ function TeamMemberRow({ member, onOpen }: { member: TeamMemberRowModel; onOpen:
     </>
   );
   return (
-    <div className="tm-member-row">
+    <div className={member.highlighted ? 'tm-member-row tm-member-row-highlight' : 'tm-member-row'}>
       <span aria-hidden="true" className="tm-member-initial">{Array.from(member.name)[0] ?? '?'}</span>
       {member.profileHref ? (
         <Link className="tm-member-row-main tm-pressable" href={member.profileHref}>{body}</Link>

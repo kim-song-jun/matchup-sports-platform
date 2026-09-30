@@ -214,6 +214,8 @@ export type TeamMemberRowModel = {
   profileHref?: string;
   actions: TeamMemberAction[];
   actionPending?: boolean;
+  /** 확인 창 뒤 방금 바뀐 행 — 토스트와 함께 잠깐 강조한다(H2 A-3). */
+  highlighted?: boolean;
 };
 
 export type TeamMembersViewModel = {

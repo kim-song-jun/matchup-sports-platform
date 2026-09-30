@@ -46,6 +46,7 @@ import { teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { TOAST_DURATION_MS, useToast } from '@/components/v1-ui/toast';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
 import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
@@ -472,6 +473,10 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const invitationsQuery = useV1TeamInvitations(teamId, { enabled: canManageInvitations });
   const leaveTeam = useV1LeaveTeam(teamId);
   const { confirm, ConfirmModal } = useConfirm();
+  const { showToast, toast } = useToast();
+  // 확인 창 뒤 방금 바뀐 행 — 토스트와 같은 시간만 강조한다(H2 A-3).
+  const [highlightedMembershipId, setHighlightedMembershipId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallback = getTeamMembersViewModel();
 
   // 초대 폼 로컬 상태
@@ -512,20 +517,39 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     );
   }
 
+  useEffect(() => () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, []);
+
+  function highlightRow(membershipId: string) {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightedMembershipId(membershipId);
+    highlightTimerRef.current = setTimeout(() => setHighlightedMembershipId(null), TOAST_DURATION_MS);
+  }
+
   // 승격·강등·위임·내보내기는 확인 창 뒤에 조용히 실패하기 쉬워 — 서버가 거절하면 이유를 화면에 올린다.
-  function changeRoleTo(membershipId: string, role: 'owner' | 'manager' | 'member') {
+  function changeRoleTo(membershipId: string, role: 'owner' | 'manager' | 'member', doneMessage: string) {
     setActionError(null);
     changeRole.mutate(
       { membershipId, role },
-      { onError: (err) => setActionError(teamErrorMessage(err, '역할을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')) },
+      {
+        onSuccess: () => {
+          showToast(doneMessage);
+          highlightRow(membershipId);
+        },
+        onError: (err) => setActionError(teamErrorMessage(err, '역할을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
     );
   }
 
-  function removeMembership(membershipId: string) {
+  function removeMembership(membershipId: string, displayName: string) {
     setActionError(null);
     removeMember.mutate(
       { membershipId, reason: 'removed_from_v1_web_member_page' },
-      { onError: (err) => setActionError(teamErrorMessage(err, '멤버를 내보내지 못했어요. 잠시 후 다시 시도해 주세요.')) },
+      {
+        onSuccess: () => showToast(`${displayName}님을 팀에서 내보냈어요`),
+        onError: (err) => setActionError(teamErrorMessage(err, '멤버를 내보내지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
     );
   }
 
@@ -570,6 +594,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     }
     setApprovedApplications((current) => [...current, ...approved]);
     setApprovingAll(false);
+    if (approved.length > 0) showToast(`${approved.length}명을 승인했어요`);
     if (failures.length > 0) {
       setActionError(`${failures.length}명은 승인하지 못했어요. ${teamErrorMessage(failures[0], '잠시 후 다시 시도해 주세요.')}`);
     }
@@ -645,11 +670,12 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         canManageMembers,
         canDelegateOwner,
         isSelf: member.membershipId === viewerMembershipId,
+        highlighted: member.membershipId === highlightedMembershipId,
         promote: () => confirmAction(confirm, {
           title: '매니저로 지정',
           message: `${member.displayName}님이 매니저가 돼요. 가입 신청·초대·일정을 함께 관리할 수 있어요.`,
           confirmLabel: '매니저로 지정',
-        }, () => changeRoleTo(member.membershipId, 'manager')),
+        }, () => changeRoleTo(member.membershipId, 'manager', `${member.displayName}님을 매니저로 지정했어요`)),
         promoteDisabledReason: (team.data?.managerCount ?? 0) >= TEAM_MANAGER_LIMIT ? `매니저는 최대 ${TEAM_MANAGER_LIMIT}명이에요.` : undefined,
         delegateOwner: () => confirmAction(confirm, {
           title: '팀장 넘기기',
@@ -658,12 +684,12 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           tone: 'danger',
           // 나 혼자서는 되돌릴 수 없어 단순 확인보다 한 단계 무겁게(H2 확인 강도).
           acknowledgement: '이해했어요',
-        }, () => changeRoleTo(member.membershipId, 'owner')),
+        }, () => changeRoleTo(member.membershipId, 'owner', `${member.displayName}님에게 팀장을 넘겼어요`)),
         demote: () => confirmAction(confirm, {
           title: '멤버로 내리기',
           message: `${member.displayName}님의 매니저 권한이 없어지고 멤버가 돼요.`,
           confirmLabel: '멤버로 내리기',
-        }, () => changeRoleTo(member.membershipId, 'member')),
+        }, () => changeRoleTo(member.membershipId, 'member', `${member.displayName}님을 멤버로 내렸어요`)),
         openUnavailability:
           canManageMembers && member.status === 'active' && member.membershipId !== viewerMembershipId
             ? () => {
@@ -681,7 +707,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           message: `${member.displayName}님이 팀에서 빠져요. 팀에 남긴 활동 기록은 그대로이고, 다시 초대할 수 있어요.`,
           confirmLabel: '내보내기',
           tone: 'danger',
-        }, () => removeMembership(member.membershipId)),
+        }, () => removeMembership(member.membershipId, member.displayName)),
         leave: {
           activeOwnerCount: members.data?.summary.ownerCount,
           activeMemberCount: members.data?.summary.memberCount,
@@ -709,7 +735,10 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         }, () => rejectApplication.mutate(
           { applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' },
           {
-            onSuccess: () => trackEvent('team_application_reject', { teamId }),
+            onSuccess: () => {
+              trackEvent('team_application_reject', { teamId });
+              showToast(`${application.applicant.displayName}님의 가입 신청을 거절했어요`);
+            },
             onError: (err) => setActionError(teamErrorMessage(err, '가입 신청을 거절하지 못했어요. 잠시 후 다시 시도해 주세요.')),
           },
         )),
@@ -748,9 +777,14 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
                 { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '초대 취소', tone: 'danger' },
                 () => {
                   cancellingInvitations.start(inv.invitationId);
+                  setActionError(null);
                   cancelInvitation.mutate(
                     { invitationId: inv.invitationId },
-                    { onSettled: () => cancellingInvitations.finish(inv.invitationId) },
+                    {
+                      onSuccess: () => showToast(`${inv.invitedUser.displayName}님에 대한 초대를 취소했어요`),
+                      onError: (err) => setActionError(teamErrorMessage(err, '초대를 취소하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+                      onSettled: () => cancellingInvitations.finish(inv.invitationId),
+                    },
                   );
                 },
               ),
@@ -771,6 +805,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
       <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
+      {toast}
       {unavailabilityTarget !== null ? (
         <MemberUnavailabilitySheet
           open={unavailabilityOpen}
@@ -1129,6 +1164,7 @@ function toMemberModel(
     canManageMembers: boolean;
     canDelegateOwner: boolean;
     isSelf: boolean;
+    highlighted: boolean;
     promote: () => void;
     /** 매니저가 한도까지 찼을 때 "매니저로 지정"을 막는 이유. 서버가 최종 판정한다. */
     promoteDisabledReason?: string;
@@ -1195,6 +1231,7 @@ function toMemberModel(
     profileHref: withFromPath(`/users/${member.userId}`, membersHref),
     actions: itemActions,
     actionPending: actions.actionPending,
+    highlighted: actions.highlighted,
   };
 }
 

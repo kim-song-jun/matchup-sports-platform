@@ -4727,6 +4727,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   min-width: 0;
 }
 
+/* 확인 창 뒤 방금 바뀐 행(H2 A-3) — 내용 자리는 그대로 두고 바탕만 양옆으로 8px 넓힌다. */
+.tm-member-row-highlight {
+  margin-inline: -8px;
+  padding-inline: 8px;
+  border-radius: var(--radius-control);
+  border-bottom-color: transparent;
+  background: var(--blue50);
+}
+
 /* 가입 신청 목록 — 모바일에서 카드 사이가 0 이던 것(F95)을 목록 자체의 간격으로 준다. */
 .tm-member-request-list {
   display: grid;

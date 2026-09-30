@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
-import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
@@ -1721,5 +1721,56 @@ describe('TeamMembersPageClient — 확인 강도 (H2)', () => {
     expect(within(dialog).queryByRole('checkbox')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: '내보내기' }));
     await waitFor(() => expect(removeMutate).toHaveBeenCalledWith(expect.objectContaining({ membershipId: 'membership-member' }), expect.anything()));
+  });
+
+  describe('완료 안내 (A-3)', () => {
+    const rowOf = (name: string) => screen.getByRole('button', { name: `${name} 관리` }).closest('.tm-member-row');
+
+    it('역할을 바꾸면 토스트로 알리고 바뀐 행만 3초 강조한다', async () => {
+      changeRoleMutate.mockImplementation((_vars, options) => options?.onSuccess?.());
+      render(<TeamMembersPageClient teamId="team-1" />);
+      chooseFromSheet('이멤버', '매니저로 지정');
+      const dialog = await screen.findByRole('dialog', { name: '매니저로 지정' });
+      vi.useFakeTimers();
+      try {
+        fireEvent.click(within(dialog).getByRole('button', { name: '매니저로 지정' }));
+        await act(async () => {
+          await Promise.resolve();
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(screen.getByText('이멤버님을 매니저로 지정했어요').closest('[role="status"]')).toHaveAttribute('aria-live', 'polite');
+        expect(rowOf('이멤버')).toHaveClass('tm-member-row-highlight');
+        expect(rowOf('박매니')).not.toHaveClass('tm-member-row-highlight');
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+        expect(screen.queryByText('이멤버님을 매니저로 지정했어요')).toBeNull();
+        expect(rowOf('이멤버')).not.toHaveClass('tm-member-row-highlight');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('서버가 거절하면 완료 안내 없이 이유만 보인다', async () => {
+      removeMutate.mockImplementation((_vars, options) => options?.onError?.(new Error('이미 팀을 나간 멤버예요.')));
+      render(<TeamMembersPageClient teamId="team-1" />);
+      chooseFromSheet('이멤버', '팀에서 내보내기');
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '팀에서 내보내기' })).getByRole('button', { name: '내보내기' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('이미 팀을 나간 멤버예요.');
+      expect(screen.queryByText('이멤버님을 팀에서 내보냈어요')).toBeNull();
+    });
+
+    it('내보내기가 끝나면 누구를 내보냈는지 알린다', async () => {
+      removeMutate.mockImplementation((_vars, options) => options?.onSuccess?.());
+      render(<TeamMembersPageClient teamId="team-1" />);
+      chooseFromSheet('이멤버', '팀에서 내보내기');
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '팀에서 내보내기' })).getByRole('button', { name: '내보내기' }));
+
+      expect(await screen.findByText('이멤버님을 팀에서 내보냈어요')).toBeInTheDocument();
+    });
   });
 });

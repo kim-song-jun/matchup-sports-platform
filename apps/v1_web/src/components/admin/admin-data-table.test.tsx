@@ -85,3 +85,18 @@ describe('AdminDataTable onRowClick', () => {
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();
   });
 });
+
+describe('AdminDataTable 데스크톱 표 폭', () => {
+  // 기본값을 바꾸면 이 표를 쓰는 어드민 화면 전부의 열 배치가 함께 바뀐다.
+  it('기본은 콘텐츠 폭(w-max)이고, fitContainer 를 켜면 카드 폭(w-full)에 맞춘다', () => {
+    const { rerender } = render(
+      <AdminDataTable<Row> columns={columns} rows={rows} keyExtractor={(row) => row.id} />,
+    );
+    expect(screen.getByRole('table')).toHaveClass('w-max');
+    expect(screen.getByRole('table')).not.toHaveClass('w-full');
+
+    rerender(<AdminDataTable<Row> columns={columns} rows={rows} keyExtractor={(row) => row.id} fitContainer />);
+    expect(screen.getByRole('table')).toHaveClass('w-full');
+    expect(screen.getByRole('table')).not.toHaveClass('w-max');
+  });
+});

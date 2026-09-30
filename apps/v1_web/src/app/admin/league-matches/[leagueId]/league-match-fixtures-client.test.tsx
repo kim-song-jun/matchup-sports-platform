@@ -152,6 +152,52 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.getAllByText('결과 미입력').length).toBeGreaterThan(0);
   });
 
+  // alpha 1440 실측: AdminDataTable 의 기본 캡(max-w-[900px])이 카드를 898px 로 묶어 구장·주소·
+  // 상태 열이 가로 스크롤 밖으로 밀렸다. 캡이 다시 살아나면 카드가 위 카드들보다 좁아진다.
+  it('대진 표 카드는 기본 폭 캡에 묶이지 않고, 구장·주소는 잘려도 title 로 전체 값을 읽을 수 있다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
+        recentVenues: [],
+        fixtures: [
+          {
+            teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-01T20:00:00.000Z', placeName: '탄천종합운동장 보조구장',
+            placeAddress: '경기 성남시 수정구 탄천로 215 보조구장 옆 주차장 입구', status: 'matched',
+            resultStage: 'not_entered', homeScore: null, awayScore: null,
+          },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    const table = screen.getByRole('table');
+    // 표 → 스크롤 상자 → 카드. 카드가 캡을 갖지 않아야 메인 폭을 다 쓴다.
+    const card = table.parentElement?.parentElement;
+    expect(card).toHaveClass('max-w-none');
+    expect(card).not.toHaveClass('max-w-[900px]');
+
+    const scoped = within(table);
+    expect(scoped.getByLabelText('가을 풋살 리그 1주차 구장')).toHaveAttribute('title', '탄천종합운동장 보조구장');
+    expect(scoped.getByLabelText('가을 풋살 리그 1주차 주소')).toHaveAttribute(
+      'title',
+      '경기 성남시 수정구 탄천로 215 보조구장 옆 주차장 입구',
+    );
+  });
+
   // 취소된 대진은 결과를 기다리지 않는다 — '미입력'으로 그리면 영원히 처리해야 할 일처럼 보인다.
   it('취소된 대진에는 결과 단계를 그리지 않는다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);

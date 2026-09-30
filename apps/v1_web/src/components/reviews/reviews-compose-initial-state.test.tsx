@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender } from '@testing-library/react';
+import { render as rtlRender, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ReviewSourcePageView } from './reviews-page';
 import { DEFAULT_REVIEW_RATING } from './reviews.types';
@@ -78,7 +79,8 @@ describe('리뷰 작성 화면 — 아직 손대지 않은 대상의 별점 초�
 
     const stars = container.querySelector('.tm-review-stars');
     expect(stars).not.toBeNull();
-    expect(stars).toHaveAttribute('aria-label', `${DEFAULT_REVIEW_RATING}점`);
+    // 선택된 점수는 시각(★)만이 아니라 aria-checked 로도 하나만 노출돼야 한다.
+    expect(within(stars as HTMLElement).getByRole('radio', { checked: true })).toHaveAccessibleName(`${DEFAULT_REVIEW_RATING}점`);
     // 별 5개가 전부 채워진 상태여야 한다 — 빈 별이 하나라도 남으면 초기값이 5가 아니다.
     expect(stars!.querySelectorAll('[data-active="true"]')).toHaveLength(5);
     expect(stars!.querySelectorAll('[data-active="false"]')).toHaveLength(0);
@@ -143,5 +145,127 @@ describe('리뷰 작성 화면 — 보내기 버튼이 잠긴 이유 안내', ()
     const submit = container.querySelector('.tm-fixed-cta button') as HTMLButtonElement;
     expect(submit.disabled).toBe(false);
     expect(submit.getAttribute('aria-describedby')).toBeNull();
+  });
+});
+
+/**
+ * 별점 버튼은 예전에 "N점" 라벨만 있고 선택 상태가 없어서 스크린리더가 몇 점이 골라졌는지
+ * 알 수 없었다. 별 5개를 radiogroup 으로 묶고 선택된 점수 하나만 aria-checked 로 알린다.
+ */
+describe('리뷰 작성 화면 — 별점은 radiogroup 이다', () => {
+  function makeUserModel(): ReviewSourcePageModel {
+    const base = makeModel();
+    return {
+      ...base,
+      targets: [
+        {
+          ...base.targets[0],
+          targetType: 'user',
+          targetUserId: 'user-1',
+          targetTeamId: null,
+          name: '김선수',
+          subtitle: '풋살 · 미드필더',
+        },
+      ],
+    } as ReviewSourcePageModel;
+  }
+
+  function renderView(overrides: { onUpdateRating?: (key: string, rating: number) => void; onUpdateMetricScore?: (key: string, metric: string, score: number) => void } = {}) {
+    render(
+      <ReviewSourcePageView
+        drafts={{
+          'user:user-1': {
+            rating: 3,
+            tagCodes: [],
+            metricScores: { skill: 4, manner: 2, punctuality: 5, safety: 1 },
+          },
+        }}
+        errorMessage={null}
+        loading={false}
+        message={null}
+        model={makeUserModel()}
+        onRetry={() => {}}
+        onSubmit={() => {}}
+        onToggleTag={() => {}}
+        onUpdateMetricScore={overrides.onUpdateMetricScore ?? (() => {})}
+        onUpdateRating={overrides.onUpdateRating ?? (() => {})}
+        submitting={false}
+      />,
+    );
+  }
+
+  it('총점과 4개 세부 항목이 각자 이름 붙은 radiogroup 이고, 각 그룹에서 고른 점수 하나만 checked 다', () => {
+    renderView();
+
+    const expected: Array<[string, string]> = [
+      ['김선수 총점', '3점'],
+      ['김선수 실력', '4점'],
+      ['김선수 매너', '2점'],
+      ['김선수 시간약속', '5점'],
+      ['김선수 안전', '1점'],
+    ];
+    for (const [groupName, checkedName] of expected) {
+      const group = screen.getByRole('radiogroup', { name: groupName });
+      expect(within(group).getAllByRole('radio')).toHaveLength(5);
+      const checked = within(group).getAllByRole('radio', { checked: true });
+      expect(checked).toHaveLength(1);
+      expect(checked[0]).toHaveAccessibleName(checkedName);
+    }
+  });
+
+  it('선택된 별만 탭 정지점이라 그룹 하나가 탭 한 번으로 지나간다', () => {
+    renderView();
+
+    const group = screen.getByRole('radiogroup', { name: '김선수 총점' });
+    const tabbable = within(group).getAllByRole('radio').filter((radio) => radio.tabIndex === 0);
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0]).toHaveAccessibleName('3점');
+  });
+
+  it('오른쪽·왼쪽 화살표가 점수를 바꾸고 포커스가 그 별로 따라간다', async () => {
+    const user = userEvent.setup();
+    const onUpdateRating = vi.fn();
+    renderView({ onUpdateRating });
+
+    const group = screen.getByRole('radiogroup', { name: '김선수 총점' });
+    within(group).getByRole('radio', { name: '3점' }).focus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(onUpdateRating).toHaveBeenLastCalledWith('user:user-1', 4);
+    expect(within(group).getByRole('radio', { name: '4점' })).toHaveFocus();
+
+    await user.keyboard('{ArrowLeft}');
+    // 부모가 draft 를 바꾸지 않는 이 렌더에서는 checked 는 3점 그대로다 — 방향키는 포커스 별 기준으로 이동한다.
+    expect(onUpdateRating).toHaveBeenLastCalledWith('user:user-1', 3);
+    expect(within(group).getByRole('radio', { name: '3점' })).toHaveFocus();
+  });
+
+  it('양 끝에서는 반대편으로 순환하고, Home·End 는 양 끝으로 간다', async () => {
+    const user = userEvent.setup();
+    const onUpdateMetricScore = vi.fn();
+    renderView({ onUpdateMetricScore });
+
+    const group = screen.getByRole('radiogroup', { name: '김선수 시간약속' });
+    within(group).getByRole('radio', { name: '5점' }).focus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(onUpdateMetricScore).toHaveBeenLastCalledWith('user:user-1', 'punctuality', 1);
+    expect(within(group).getByRole('radio', { name: '1점' })).toHaveFocus();
+
+    await user.keyboard('{End}');
+    expect(onUpdateMetricScore).toHaveBeenLastCalledWith('user:user-1', 'punctuality', 5);
+    expect(within(group).getByRole('radio', { name: '5점' })).toHaveFocus();
+
+    await user.keyboard('{Home}');
+    expect(onUpdateMetricScore).toHaveBeenLastCalledWith('user:user-1', 'punctuality', 1);
+  });
+
+  it('별을 클릭하면 그 점수로 바뀐다', async () => {
+    const user = userEvent.setup();
+    const onUpdateRating = vi.fn();
+    renderView({ onUpdateRating });
+
+    await user.click(within(screen.getByRole('radiogroup', { name: '김선수 총점' })).getByRole('radio', { name: '5점' }));
+    expect(onUpdateRating).toHaveBeenCalledWith('user:user-1', 5);
   });
 });

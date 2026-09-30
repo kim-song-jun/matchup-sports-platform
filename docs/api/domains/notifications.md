@@ -142,6 +142,10 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 아니라 수락·거절을 하는 `/my/invitations`다. 딥링크는 알림 생성 시 `V1Notification.deepLink`에 저장되므로
 이미 만들어진 알림은 바뀌지 않는다.
 
+팀이 해체(보관)되면 `team_dissolved`(targetType `team`, targetId 팀 id, 딥링크 `/teams/:teamId` = 해체된 팀 읽기 전용
+화면, `teamEnabled` 게이팅)를 팀원(해체한 본인 제외)과 대기 중이던 가입 신청자에게 한 번 보낸다. 제목 "팀이 해체됐어요",
+팀원 본문 `"팀명" · 지난 기록은 그대로 남아요.` — 자세한 범위는 [Teams](./teams.md) "팀 해체(보관)·복구".
+
 초대를 수락·거절하면 그 팀에서 온 미열람 `team_invitation_received` 알림(딥링크 `/my/invitations`)을 읽음 처리한다.
 초대가 취소되면 같은 알림을 읽음 처리하고 제목·본문을 "팀 초대가 취소됐어요"로 바꾸며 딥링크를 팀 상세
 `/teams/:teamId`로 옮긴다. 두 경우 모두 알림 갱신 실패는 로그만 남기고 수락·거절·취소 응답을 바꾸지 않는다.

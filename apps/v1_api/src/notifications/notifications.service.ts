@@ -49,6 +49,8 @@ export type NotificationEventType =
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
+  // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
+  | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
   // once the reminder's outbox row (inserted by TeamSchedulesService.triggerReminder) is claimed.
   // (P1-4 fix: 'schedule_guest_application_received' — the interactive, GuestRecruitmentService-
@@ -136,6 +138,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
   if (type === 'inquiry_answered') {
     return 'importantEnabled';
   }
+  if (type === 'team_dissolved') {
+    return 'teamEnabled';
+  }
   if (
     type === 'match_application_received' ||
     type === 'match_application_approved' ||
@@ -215,6 +220,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
 function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetType {
   if (type === 'inquiry_answered') {
     return 'inquiry';
+  }
+  if (type === 'team_dissolved') {
+    return 'team';
   }
   if (
     type === 'match_application_received' ||
@@ -472,6 +480,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
+  team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
   league_fixture_scheduled: '리그 대진이 확정됐어요',
@@ -530,6 +539,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_invitation_received: '팀 초대를 확인해 보세요.',
   team_invitation_accepted: '팀 초대를 수락했어요.',
   inquiry_answered: '답변 내용을 확인해 주세요.',
+  team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
   league_fixture_scheduled: '리그 대진 일정을 확인해 주세요.',

@@ -40,6 +40,7 @@ import {
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
 import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+import { buildDissolutionInfo } from './team-dissolution';
 
 /**
  * 정원 마감 안내 문구.
@@ -139,10 +140,15 @@ export class TeamsService {
   }
 
   async detail(user: V1AuthUser | null, teamId: string) {
-    const team = await this.getPublicTeam(teamId, user);
-    const viewer = this.getViewer(team, user);
-    const canViewMembers = this.canViewMembers(team, viewer);
-    const canSendContact = await this.canSendContactTo(user, team, viewer);
+    const team = await this.getPublicTeam(teamId, user, { includeDissolved: true });
+    // 해체된 팀은 지난 경기의 팀 링크가 끊기지 않도록 읽기 전용으로 보여 준다. 누구에게나
+    // 비회원 viewer 를 주어 기존 운영 화면(수정·멤버 관리·컨택)이 전부 닫히게 하고, 팀장에게만
+    // 복구 가능 여부를 dissolution 으로 알린다.
+    const dissolved = team.status === 'archived';
+    const actualViewer = this.getViewer(team, user);
+    const viewer = dissolved ? dissolvedTeamViewer() : actualViewer;
+    const canViewMembers = !dissolved && this.canViewMembers(team, viewer);
+    const canSendContact = dissolved ? undefined : await this.canSendContactTo(user, team, viewer);
 
     return {
       id: team.id,
@@ -219,6 +225,7 @@ export class TeamsService {
         score: team.trustScore?.mannerScore ? Number(team.trustScore.mannerScore) : null,
       },
       viewer,
+      dissolution: dissolved ? buildDissolutionInfo(team.deletedAt, actualViewer.role === 'owner', new Date()) : null,
     };
   }
 
@@ -1787,9 +1794,11 @@ export class TeamsService {
 
   // ── 팀 초대 끝 ──────────────────────────────────────────────────────
 
-  private async getPublicTeam(teamId: string, user: V1AuthUser | null) {
+  private async getPublicTeam(teamId: string, user: V1AuthUser | null, options?: { includeDissolved?: boolean }) {
     const team = await this.prisma.v1Team.findFirst({
-      where: { id: teamId, status: 'active', deletedAt: null },
+      where: options?.includeDissolved
+        ? { id: teamId, OR: [{ status: 'active', deletedAt: null }, { status: 'archived' }] }
+        : { id: teamId, status: 'active', deletedAt: null },
       include: this.teamInclude(user),
     });
 
@@ -2458,6 +2467,17 @@ function teamLevelCodeWhere(levelCodes: ReturnType<typeof parseLevelCodes>): Pri
         };
       }),
     },
+  };
+}
+
+function dissolvedTeamViewer() {
+  return {
+    role: 'none',
+    membershipId: null,
+    joinState: 'none',
+    canRequestJoin: false,
+    disabledReason: 'TEAM_DISSOLVED',
+    manageRoute: null,
   };
 }
 

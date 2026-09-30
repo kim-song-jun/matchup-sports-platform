@@ -227,7 +227,7 @@ Public tournament list/detail responses include both `confirmedCount` and `pendi
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
-| `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member (owner/manager also get personal info) | path ids | roster players, `belowMinimum`, `personalInfoVisible` — see Roster Read Contract |
+| `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member (owner/manager, and a member's own row, also get personal info) | path ids | roster players (each with `personalInfoVisible`) and `belowMinimum` — see Roster Read Contract |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
@@ -254,14 +254,15 @@ The stored roster snapshot uses the server-side member profile values for `realN
 
 ## Roster Read Contract
 
-`GET /tournaments/:tournamentId/registrations/:registrationId/players` is open to every active member of the registration team, but the response depends on the caller's team role:
+`GET /tournaments/:tournamentId/registrations/:registrationId/players` is open to every active member of the registration team, but what each row carries depends on the caller's team role. The rule is evaluated per row and each player carries `personalInfoVisible` (there is no top-level flag):
 
-| Caller | `realName` / `birthDateSnapshot` / `genderSnapshot` / `eligibilityNote` | `personalInfoVisible` |
-|---|---|---|
-| team `owner`, team `manager` | stored snapshot values | `true` |
-| team `member` | `null` (keys stay in the response) | `false` |
+| Caller | Row | `realName` / `birthDateSnapshot` / `genderSnapshot` | `eligibilityNote` | `personalInfoVisible` |
+|---|---|---|---|---|
+| team `owner`, team `manager` | every row | stored snapshot values | stored value | `true` |
+| team `member` | the caller's own row | stored snapshot values | `null` | `true` |
+| team `member` | any other row | `null` (keys stay in the response) | `null` | `false` |
 
-`eligibilityNote` is the admin review memo, so it follows the same rule as the personal info. Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `addedAt` and `removedAt`. Clients must use `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". A non-member of the team gets `403 PERMISSION_DENIED`.
+The own-row exception matches `GET /teams/:teamId/members`, which also shows a member their own details. `eligibilityNote` is the admin review memo, so a member never gets it, even on their own row. Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `addedAt` and `removedAt` on every row. Clients must use the row's `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". The caller's role is read with an active membership of an active, non-deleted registration team; a non-member, a former (`left`/`removed`) manager, or a manager of a suspended/deleted team gets `403 PERMISSION_DENIED` and no roster is read.
 
 Endpoints that return a team's real names or birth dates and who can call them: `POST`/`PATCH`/`DELETE` under the same prefix are team manager+ only; every `/admin/...` player endpoint (list, export, tournament export, eligible-players, eligibility, add, remove) requires an active admin; `GET /teams/:teamId/members` already returns `realName`, `phone`, `birthDate`, `gender` as `null` to a plain member (except their own row). The public tournament detail roster carries `jerseyNumber` and `nickname` only.
 

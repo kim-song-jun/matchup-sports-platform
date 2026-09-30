@@ -179,7 +179,7 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
 
     myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(), isLoading: false });
     myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
-    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false, personalInfoVisible: true } });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
     myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
@@ -364,7 +364,7 @@ describe('MyRegistrationPageClient — 대회 상세·재신청 CTA 는 from 을
   beforeEach(() => {
     vi.clearAllMocks();
     myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
-    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false, personalInfoVisible: true } });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
     myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });

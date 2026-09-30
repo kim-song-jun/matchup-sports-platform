@@ -861,7 +861,6 @@ function rosterPlayerName(player: Pick<V1TournamentRosterPlayer, 'realName' | 'n
 
 function PlayerRow({
   player,
-  personalInfoVisible,
   onUpdate,
   onRemove,
   isUpdating,
@@ -873,8 +872,6 @@ function PlayerRow({
   onUpdateJersey,
 }: {
   player: V1TournamentRosterPlayer;
-  /** false 면 생년월일 줄을 그리지 않는다 — "미입력"이 아니라 서버가 가린 값이다. */
-  personalInfoVisible: boolean;
   onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
   onRemove: (playerId: string) => void;
   isUpdating: boolean;
@@ -1005,7 +1002,9 @@ function PlayerRow({
               {eligibilityLabel(player.eligibilityStatus)}
             </span>
           </div>
-          {personalInfoVisible ? (
+          {/* 행마다 서버가 정한다 — 가려진 행은 "미입력"이 아니라 줄 자체를 그리지 않는다.
+              필드가 없으면(배포 중 구버전 서버) 가린 쪽이다. */}
+          {player.personalInfoVisible ? (
             <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
               {formatRosterBirthDate(player.birthDateSnapshot)}
             </div>
@@ -1638,8 +1637,6 @@ export function TournamentRosterPageClient({
               <PlayerRow
                 key={player.id}
                 player={player}
-                // 응답에 필드가 없으면(배포 중 구버전 서버) 가린 쪽으로 — 실패해도 개인정보를 그리지 않는다.
-                personalInfoVisible={rosterData?.personalInfoVisible ?? false}
                 onUpdate={handleUpdatePlayer}
                 onUpdateJersey={handleUpdatePlayerJersey}
                 onRemove={handleRemovePlayer}

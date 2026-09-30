@@ -195,14 +195,15 @@ export class TournamentPlayersService {
   // ─── 명단 조회 ────────────────────────────────────────────────────────────────
 
   /**
-   * 팀 명단 조회. 활성 팀원이면 누구나 부르지만 **실명·생년월일·성별은 팀장·매니저에게만**
-   * 실린다 — 일반 팀원에게는 같은 키를 `null` 로 두고 표시 이름(`nickname`)을 준다.
-   * 화면이 "숨김"과 "미입력"을 가르도록 `personalInfoVisible` 을 함께 내려준다.
+   * 팀 명단 조회. 활성 팀원이면 누구나 부르지만 **실명·생년월일·성별은 팀장·매니저와 본인 행에만**
+   * 실린다(팀원 목록이 본인 행만 예외로 여는 것과 같다). 그 밖의 행은 같은 키를 `null` 로 두고
+   * 표시 이름(`nickname`)을 준다. 화면이 "숨김"과 "미입력"을 가르도록 행마다 `personalInfoVisible`
+   * 을 내려준다. 어드민 심사 메모는 본인 행이어도 팀장·매니저에게만 실린다.
    */
   async listPlayers(user: V1AuthUser, tournamentId: string, registrationId: string) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     const viewerRole = await this.requireTeamMemberRole(registration.teamId, user.id);
-    const personalInfoVisible = ROSTER_MANAGEMENT_ROLES.includes(viewerRole);
+    const isManagement = ROSTER_MANAGEMENT_ROLES.includes(viewerRole);
 
     // 리그도 최소 인원(`minPlayers`)으로 미달 여부를 판정한다.
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
@@ -229,11 +230,10 @@ export class TournamentPlayersService {
           player,
           jerseyByPlayerId.get(player.id) ?? null,
           playerUser.profile?.nickname ?? null,
-          personalInfoVisible,
+          { personalInfo: isManagement || player.userId === user.id, reviewNote: isManagement },
         ),
       ),
       belowMinimum: players.length < tournament.minPlayers,
-      personalInfoVisible,
     };
   }
 
@@ -1058,25 +1058,24 @@ export class TournamentPlayersService {
   }
 
   /**
-   * 팀 명단 조회용 직렬화. 숨길 때는 개인정보 세 키와 어드민 심사 메모(`eligibilityNote`)의 값만
-   * `null` 로 둔다(같은 화면이 두 응답을 한 타입으로 읽는다). `nickname` 은 공개 명단이 이미
-   * 쓰는 표시 이름이라 어느 쪽에나 싣는다.
+   * 팀 명단 조회용 직렬화. 숨길 때는 값만 `null` 로 둔다(같은 화면이 여러 응답을 한 타입으로
+   * 읽는다). `nickname` 은 공개 명단이 이미 쓰는 표시 이름이라 항상 싣는다.
    */
   private serializeRosterPlayer(
     row: V1TournamentPlayer,
     jerseyNumber: number | null,
     nickname: string | null,
-    personalInfoVisible: boolean,
+    access: { personalInfo: boolean; reviewNote: boolean },
   ) {
     const player = this.serializePlayer(row, jerseyNumber);
-    if (personalInfoVisible) return { ...player, nickname };
     return {
       ...player,
-      realName: null,
-      birthDateSnapshot: null,
-      genderSnapshot: null,
-      eligibilityNote: null,
+      ...(access.personalInfo
+        ? {}
+        : { realName: null, birthDateSnapshot: null, genderSnapshot: null }),
+      ...(access.reviewNote ? {} : { eligibilityNote: null }),
       nickname,
+      personalInfoVisible: access.personalInfo,
     };
   }
 

@@ -801,7 +801,7 @@ describe('TournamentPlayersService', () => {
     expect(result.belowMinimum).toBe(false);
   });
 
-  // ─── 8-1. 명단 조회의 개인정보 — 팀장·매니저만 실명·생년월일·성별을 본다 ─────────────
+  // ─── 8-1. 명단 조회의 개인정보 — 팀장·매니저와 본인 행만 실명·생년월일·성별을 본다 ────
   //
   // 한 팀에 owner·manager·member 를 모두 두고 **같은 명단**을 조회한다. 좁히는 변경이라
   // 대조군이 없으면 "member 가 못 받는다" 단언이 게이트를 과하게 좁혀도(팀장까지 가려도)
@@ -810,52 +810,101 @@ describe('TournamentPlayersService', () => {
     const owner = { ...manager, id: 'owner-user-id' };
     const plainMember = { ...nonManager, id: 'member-user-id' };
     const outsider = { ...nonManager, id: 'outsider-user-id' };
-    const roleByUserId: Record<string, string> = {
-      'owner-user-id': 'owner',
-      'manager-user-id': 'manager',
-      'member-user-id': 'member',
+
+    const MEMO = '2018 프로 등록 이력 확인 필요';
+    const OWN_MEMO = '본인 이력 재확인 필요';
+    // 명단은 두 명: 남(홍길동)과 member 본인(김본인).
+    const otherRow = () =>
+      playerRow({ id: 'player-other', userId: 'other-user-id', eligibilityNote: MEMO });
+    const ownRow = () =>
+      playerRow({
+        id: 'player-own',
+        userId: 'member-user-id',
+        realName: '김본인',
+        birthDateSnapshot: '1990-01-02',
+        genderSnapshot: 'female',
+        eligibilityNote: OWN_MEMO,
+        user: { profile: { nickname: '본인이' } },
+      });
+    const rowOf = (result: { players: Array<{ id: string }> }, id: string) =>
+      result.players.find((player) => player.id === id);
+
+    // 팀원 조회 mock 이 **where 를 실제로 평가**한다. `userId` 만 보는 mock 이면
+    // `status`·`team.status`·`team.deletedAt` 조건이 빠져도 초록이라, 탈퇴한 전 매니저나
+    // 비활성 팀의 매니저가 개인정보를 받는 회귀를 못 잡는다.
+    type MembershipRow = {
+      teamId: string;
+      userId: string;
+      role: string;
+      status: string;
+      team: { status: string; deletedAt: Date | null };
     };
+    const activeTeam = { status: 'active', deletedAt: null };
+    const membership = (userId: string, role: string, overrides: Partial<MembershipRow> = {}): MembershipRow => ({
+      teamId: 'team-1',
+      userId,
+      role,
+      status: 'active',
+      team: activeTeam,
+      ...overrides,
+    });
+    const matchesWhere = (row: Record<string, unknown>, where: Record<string, unknown>): boolean =>
+      Object.entries(where).every(([key, condition]) => {
+        if (condition !== null && typeof condition === 'object' && !(condition instanceof Date)) {
+          return matchesWhere((row[key] ?? {}) as Record<string, unknown>, condition as Record<string, unknown>);
+        }
+        return row[key] === condition;
+      });
+    const seedMemberships = (rows: MembershipRow[]) =>
+      prisma.v1TeamMembership.findFirst.mockImplementation(
+        ({ where }: { where: Record<string, unknown> }) =>
+          Promise.resolve(rows.find((row) => matchesWhere(row as unknown as Record<string, unknown>, where)) ?? null),
+      );
 
     beforeEach(() => {
       prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
-      // 실제 쿼리처럼 where.userId 로 팀원을 가른다 — 팀원이 아니면 null.
-      prisma.v1TeamMembership.findFirst.mockImplementation(
-        ({ where }: { where: { userId: string } }) => {
-          const role = roleByUserId[where.userId];
-          return Promise.resolve(role ? { id: `mem-${where.userId}`, role } : null);
-        },
-      );
-      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 1 }));
-      // 어드민이 남긴 심사 메모 — 팀장·매니저에게만 보여야 한다.
-      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
-        playerRow({ eligibilityNote: '2018 프로 등록 이력 확인 필요' }),
+      seedMemberships([
+        membership('owner-user-id', 'owner'),
+        membership('manager-user-id', 'manager'),
+        membership('member-user-id', 'member'),
       ]);
-      prisma.$queryRaw.mockResolvedValue([{ id: 'player-1', jersey_number: 7 }]);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 1 }));
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([otherRow(), ownRow()]);
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'player-other', jersey_number: 7 },
+        { id: 'player-own', jersey_number: 9 },
+      ]);
     });
 
     it.each([
       ['owner', owner],
       ['manager', manager],
-    ])('%s 는 실명·생년월일·성별·심사 메모를 그대로 받는다', async (_role, viewer) => {
+    ])('%s 는 모든 행의 실명·생년월일·성별·심사 메모를 그대로 받는다', async (_role, viewer) => {
       const result = await service.listPlayers(viewer, 'tournament-1', 'reg-1');
 
-      expect(result.personalInfoVisible).toBe(true);
-      expect(result.players[0]).toMatchObject({
+      expect(rowOf(result, 'player-other')).toMatchObject({
         realName: '홍길동',
         birthDateSnapshot: '1995-03-15',
         genderSnapshot: 'male',
-        eligibilityNote: '2018 프로 등록 이력 확인 필요',
+        eligibilityNote: MEMO,
         nickname: '길동이',
         jerseyNumber: 7,
         eligibilityStatus: 'needs_review',
+        personalInfoVisible: true,
+      });
+      expect(rowOf(result, 'player-own')).toMatchObject({
+        realName: '김본인',
+        birthDateSnapshot: '1990-01-02',
+        genderSnapshot: 'female',
+        eligibilityNote: OWN_MEMO,
+        personalInfoVisible: true,
       });
     });
 
-    it('일반 팀원은 개인정보 세 필드와 심사 메모를 받지 못하고 닉네임·등번호·자격 상태·userId 는 받는다', async () => {
+    it('일반 팀원은 남의 행에서 개인정보 세 필드와 심사 메모를 받지 못하고 닉네임·등번호·자격 상태·userId 는 받는다', async () => {
       const result = await service.listPlayers(plainMember, 'tournament-1', 'reg-1');
 
-      expect(result.personalInfoVisible).toBe(false);
-      expect(result.players[0]).toMatchObject({
+      expect(rowOf(result, 'player-other')).toMatchObject({
         realName: null,
         birthDateSnapshot: null,
         genderSnapshot: null,
@@ -863,16 +912,32 @@ describe('TournamentPlayersService', () => {
         nickname: '길동이',
         jerseyNumber: 7,
         eligibilityStatus: 'needs_review',
-        userId: 'player-user-id',
+        userId: 'other-user-id',
+        personalInfoVisible: false,
       });
-      // 다른 키로 새는 경로까지 막는다 — 응답 전체에 원본 값이 한 번도 나오면 안 된다.
+      // 다른 키로 새는 경로까지 막는다 — 남의 행 값은 응답 어디에도 나오면 안 된다.
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('홍길동');
       expect(serialized).not.toContain('1995-03-15');
       expect(serialized).not.toContain('프로 등록 이력');
     });
 
-    it('일반 팀원에게 프로필이 없는 선수의 닉네임은 실명으로 대체하지 않고 null 이다', async () => {
+    it('일반 팀원은 본인 행의 실명·생년월일·성별은 그대로 받지만 심사 메모는 받지 못한다', async () => {
+      const result = await service.listPlayers(plainMember, 'tournament-1', 'reg-1');
+
+      expect(rowOf(result, 'player-own')).toMatchObject({
+        realName: '김본인',
+        birthDateSnapshot: '1990-01-02',
+        genderSnapshot: 'female',
+        eligibilityNote: null,
+        nickname: '본인이',
+        jerseyNumber: 9,
+        personalInfoVisible: true,
+      });
+      expect(JSON.stringify(result)).not.toContain(OWN_MEMO);
+    });
+
+    it('일반 팀원에게 프로필이 없는 남의 행의 닉네임은 실명으로 대체하지 않고 null 이다', async () => {
       prisma.v1TournamentPlayer.findMany.mockResolvedValue([
         playerRow({ user: { profile: null } }),
       ]);
@@ -883,11 +948,53 @@ describe('TournamentPlayersService', () => {
       expect(JSON.stringify(result)).not.toContain('홍길동');
     });
 
-    it('팀원이 아니면 403 이고 명단을 읽지 않는다', async () => {
-      await expect(
-        service.listPlayers(outsider, 'tournament-1', 'reg-1'),
-      ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    // ── 역할 판정 쿼리의 조건 ── 각 케이스는 조건 하나만 어긋난 팀원이다.
+    it.each([
+      ['팀원이 아닌 사용자', outsider, []],
+      [
+        '탈퇴한(status=left) 전 매니저',
+        { ...manager, id: 'ex-manager-user-id' },
+        [membership('ex-manager-user-id', 'manager', { status: 'left' })],
+      ],
+      [
+        '내보내진(status=removed) 전 매니저',
+        { ...manager, id: 'ex-manager-user-id' },
+        [membership('ex-manager-user-id', 'manager', { status: 'removed' })],
+      ],
+      [
+        '정지된 팀(team.status=suspended)의 매니저',
+        { ...manager, id: 'suspended-manager-user-id' },
+        [membership('suspended-manager-user-id', 'manager', { team: { status: 'suspended', deletedAt: null } })],
+      ],
+      [
+        '삭제된 팀(team.deletedAt)의 매니저',
+        { ...manager, id: 'deleted-team-manager-user-id' },
+        [membership('deleted-team-manager-user-id', 'manager', { team: { status: 'active', deletedAt: new Date() } })],
+      ],
+      [
+        '다른 팀의 매니저',
+        { ...manager, id: 'other-team-manager-user-id' },
+        [membership('other-team-manager-user-id', 'manager', { teamId: 'team-2' })],
+      ],
+    ])('%s 는 403 이고 명단을 읽지 않는다', async (_label, viewer, rows) => {
+      // 기본 팀원(owner·manager·member)은 그대로 두고 이 사용자의 행만 더한다 — 사용자를 잘못 매칭하면 안 된다.
+      seedMemberships([
+        membership('owner-user-id', 'owner'),
+        membership('manager-user-id', 'manager'),
+        membership('member-user-id', 'member'),
+        ...rows,
+      ]);
+
+      await expect(service.listPlayers(viewer, 'tournament-1', 'reg-1')).rejects.toMatchObject({
+        response: { code: 'PERMISSION_DENIED' },
+      });
       expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+    });
+
+    it('대조군: 위 조건을 모두 만족하는 매니저는 그대로 받는다', async () => {
+      const result = await service.listPlayers(manager, 'tournament-1', 'reg-1');
+
+      expect(rowOf(result, 'player-other')).toMatchObject({ realName: '홍길동', personalInfoVisible: true });
     });
   });
 

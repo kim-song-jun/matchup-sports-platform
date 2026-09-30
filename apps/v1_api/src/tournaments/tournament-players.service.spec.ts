@@ -95,6 +95,7 @@ function playerRow(overrides: Record<string, unknown> = {}) {
     realName: '홍길동',
     birthDateSnapshot: '1995-03-15',
     genderSnapshot: 'male',
+    jerseyNumber: null,
     eligibilityStatus: 'needs_review',
     eligibilityNote: null,
     addedAt: new Date('2026-06-14T00:00:00Z'),
@@ -1158,6 +1159,27 @@ describe('TournamentPlayersService', () => {
       '홍길동,1995-03-15,male,needs_review,번개맨,7',
       '김철수,1995-03-15,male,needs_review,,',
     ]);
+    // 명단(PII) 내려받기는 감사 로그에 남는다 — 개인정보 없이 행 수만.
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'player.export',
+        targetType: 'tournament_registration',
+        targetId: 'reg-1',
+        afterJson: { rowCount: 2 },
+      }),
+    });
+  });
+
+  it('exportCsv: 탭·CR 로 시작하는 값도 수식으로 안 읽히게, CR 이 든 값은 따옴표로 감싼다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '테스트팀' } });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ realName: '\t=1+1' }), user: { profile: { nickname: 'a\rb' } } },
+    ]);
+
+    const { csv } = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",`);
   });
 
   // ─── 전체 명단 CSV (대회·리그 단위) ─────────────────────────────────────────
@@ -1211,6 +1233,14 @@ describe('TournamentPlayersService', () => {
           },
         }),
       );
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'player.export',
+          targetType: 'tournament',
+          targetId: 'tournament-1',
+          afterJson: { rowCount: 2 },
+        }),
+      });
     });
   });
 

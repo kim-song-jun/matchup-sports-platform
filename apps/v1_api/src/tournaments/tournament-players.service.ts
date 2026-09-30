@@ -633,7 +633,7 @@ export class TournamentPlayersService {
    */
   async exportCsv(user: V1AuthUser, registrationId: string) {
     // 어드민 게이트(getActiveAdmin: support도 조회 허용)
-    await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getActiveAdmin(user.id);
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -656,6 +656,7 @@ export class TournamentPlayersService {
     const teamName = registration.team.name;
     const filename = `players_${teamName.replace(/\s+/g, '_')}_${registrationId.slice(0, 8)}.csv`;
 
+    await this.logRosterExport(admin, 'tournament_registration', registrationId, players.length);
     return { filename, csv };
   }
 
@@ -668,7 +669,7 @@ export class TournamentPlayersService {
    * 신청 상태 열로 거를 수 있게 한다.
    */
   async exportTournamentCsv(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getActiveAdmin(user.id);
 
     // 신청 탭은 대회·리그가 함께 쓴다(리그는 tournamentId = leagueId).
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
@@ -689,6 +690,8 @@ export class TournamentPlayersService {
         registration: { select: { status: true, team: { select: { name: true } } } },
       },
       // 신청 순 → 팀 안에서는 팀별 CSV 와 같은 추가 순. 같은 시각 신청은 id 로 묶어 팀이 섞이지 않게.
+      // ponytail: 상한 없이 한 번에 읽는다 — 대회 수십 팀 × 팀당 수십 명(수천 행, 수백 KB)이 현실 규모다.
+      // 신청 탭 상한(1,000건)까지 차도 수만 행·수 MB 라 한 응답으로 충분하다. 그 이상이 오면 cursor 배치로.
       orderBy: [{ registration: { createdAt: 'asc' } }, { registrationId: 'asc' }, { addedAt: 'asc' }],
     });
 
@@ -702,7 +705,27 @@ export class TournamentPlayersService {
     const csv = [`teamName,registrationStatus,${PLAYER_CSV_HEADER}`, ...rows].join('\n');
     const filename = `players_${tournament.title.replace(/\s+/g, '_')}_all_${tournamentId.slice(0, 8)}.csv`;
 
+    await this.logRosterExport(admin, 'tournament', tournamentId, players.length);
     return { filename, csv };
+  }
+
+  /**
+   * 명단 CSV(실명·생년월일·성별) 내려받기를 감사 로그에 남긴다 — 누가 언제 어느 명단을 받았는지.
+   * 팀별·전체 **둘 다** 남긴다: 전체만 남기면 팀별을 팀 수만큼 눌러 같은 걸 기록 없이 받을 수 있다.
+   * 개인정보 자체는 적지 않고 행 수만 적는다. 기록이 실패하면 내려받기도 실패한다(PII 는 기록 우선).
+   */
+  private logRosterExport(
+    admin: V1ActiveAdmin,
+    targetType: 'tournament' | 'tournament_registration',
+    targetId: string,
+    rowCount: number,
+  ) {
+    return this.adminContext.logAdminAction(admin, {
+      action: 'player.export',
+      targetType,
+      targetId,
+      afterJson: { rowCount },
+    });
   }
 
   private playerCsvColumns(p: {
@@ -720,7 +743,7 @@ export class TournamentPlayersService {
       this.escapeCsvField(p.eligibilityStatus),
       this.escapeCsvField(p.user.profile?.nickname ?? ''),
       // 정본 §3 "명단은 등번호와 이름" — 뒤에 붙여 기존 열 위치는 그대로 둔다.
-      p.jerseyNumber === null ? '' : String(p.jerseyNumber),
+      String(p.jerseyNumber ?? ''),
     ];
   }
 
@@ -1106,13 +1129,13 @@ export class TournamentPlayersService {
   }
 
   private escapeCsvField(value: string): string {
-    // ROSTER-002: CSV 수식 인젝션 차단 — =·+·-·@ 로 시작하는 값에 작은따옴표 prefix 삽입
+    // ROSTER-002: CSV 수식 인젝션 차단 — =·+·-·@·탭·CR 로 시작하는 값에 작은따옴표 prefix 삽입(OWASP 목록)
     let sanitized = value;
-    if (/^[=+\-@]/.test(sanitized)) {
+    if (/^[=+\-@\t\r]/.test(sanitized)) {
       sanitized = `'${sanitized}`;
     }
-    // RFC 4180: 콤마·쌍따옴표·줄바꿈 포함 시 쌍따옴표로 감싸기
-    if (sanitized.includes(',') || sanitized.includes('"') || sanitized.includes('\n')) {
+    // RFC 4180: 콤마·쌍따옴표·줄바꿈(CR 포함) 포함 시 쌍따옴표로 감싸기 — CR 만 있어도 행이 갈라진다
+    if (/[,"\r\n]/.test(sanitized)) {
       return `"${sanitized.replace(/"/g, '""')}"`;
     }
     return sanitized;

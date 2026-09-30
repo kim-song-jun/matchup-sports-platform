@@ -547,7 +547,7 @@ export const gameSchemaSourceManifest = {
   // 2026-09-29: task renumbered 178 -> 179 (dev took 178 as well); schema.prisma comments only.
   // 2026-09-30 Task 149: additive platform review source and nullable unique scope key.
   // Existing game models and bound historical migration remain unchanged.
-  schema: '012d273c8134f51226375dfc97aa2e60d28483d1d3076b8ae6486fdf1396d012',
+  schema: 'c36582466894f4373136a9cddfd0c4c0c9d353e853c530ea2c97fa84a46cfef9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

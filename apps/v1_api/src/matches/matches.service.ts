@@ -235,7 +235,7 @@ export class MatchesService {
       capacity: match.maxParticipants,
       participantCount: this.getParticipantCount(match),
       hostParticipates: this.getHostParticipates(match),
-      status: this.getApiStatus(match, this.getParticipantCount(match), this.getHostParticipates(match) ? 1 : 0),
+      status: this.getApiStatus(match, this.getParticipantCount(match, true), this.getHostParticipates(match) ? 1 : 0),
       displayState: this.getDisplayState(match),
       lifecycle: {
         canEdit: ['recruiting', 'closed'].includes(match.status) && !['in_progress', 'completion_pending'].includes(this.getDisplayState(match)),
@@ -457,7 +457,7 @@ export class MatchesService {
         throw stateConflict('Match cannot be completed before it starts', 'MATCH_NOT_STARTED');
       }
 
-      if (this.getApiStatus(match, this.getParticipantCount(match), this.getHostParticipates(match) ? 1 : 0) === 'on_hold') {
+      if (this.getApiStatus(match, this.getParticipantCount(match, true), this.getHostParticipates(match) ? 1 : 0) === 'on_hold') {
         throw stateConflict('보류 중인 매치는 진행을 확정한 뒤 완료할 수 있어요.');
       }
 
@@ -579,7 +579,7 @@ export class MatchesService {
   async edit(user: V1AuthUser, matchId: string) {
     const match = await this.getHostMatch(user, matchId);
     const [participantCount, activeHostParticipantCount] = await Promise.all([
-      this.getActiveParticipantCount(match.id),
+      this.getActiveParticipantCount(match.id, this.prisma, true),
       this.getActiveHostParticipantCount(match.id, user.id),
     ]);
     const editable =
@@ -652,7 +652,7 @@ export class MatchesService {
       ]);
       const nextParticipantCount =
         participantCount - activeHostParticipantCount + (hostParticipates ? 1 : 0);
-      if (['in_progress', 'completion_pending'].includes(this.getApiStatus(current, participantCount, activeHostParticipantCount))) throw stateConflict('Match is already proceeding');
+      if (['in_progress', 'completion_pending'].includes(this.getApiStatus(current, current.startAt <= new Date() ? await this.getActiveParticipantCount(match.id, tx, true) : participantCount, activeHostParticipantCount))) throw stateConflict('Match is already proceeding');
       if (dto.capacity < nextParticipantCount && !requiresReconfirmation) {
         throw stateConflict('Capacity cannot be lower than active participants');
       }
@@ -1458,7 +1458,7 @@ export class MatchesService {
       capacity: match.maxParticipants,
       participantCount: this.getParticipantCount(match),
       hostParticipates: this.getHostParticipates(match),
-      status: this.getApiStatus(match, this.getParticipantCount(match), this.getHostParticipates(match) ? 1 : 0),
+      status: this.getApiStatus(match, this.getParticipantCount(match, true), this.getHostParticipates(match) ? 1 : 0),
       displayState: this.getDisplayState(match),
       lifecycle: {
         canEdit: ['recruiting', 'closed'].includes(match.status) && !['in_progress', 'completion_pending'].includes(this.getDisplayState(match)),
@@ -1580,8 +1580,8 @@ export class MatchesService {
     return 'OK';
   }
 
-  private getParticipantCount(match: { participants: Array<Pick<MatchWithRelations['participants'][number], 'status' | 'role'>> }) {
-    return match.participants.filter((participant) => participant.status === 'active' || participant.status === 'completed').length;
+  private getParticipantCount(match: { participants: Array<Pick<MatchWithRelations['participants'][number], 'status' | 'role'>> }, includeNoShow = false) {
+    return match.participants.filter((participant) => participant.status === 'active' || participant.status === 'completed' || (includeNoShow && participant.status === 'no_show')).length;
   }
 
   private getHostParticipates(match: { participants: Array<Pick<MatchWithRelations['participants'][number], 'status' | 'role'>> }) {
@@ -1594,7 +1594,7 @@ export class MatchesService {
   private getApiStatus(match: V1Match, participantCount: number, hostParticipantCount = 0) {
     if (!['recruiting', 'closed'].includes(match.status)) return match.status;
     const count = participantCount;
-    const canProceed = count > hostParticipantCount && (Boolean(match.proceedConfirmedAt) || count >= match.maxParticipants);
+    const canProceed = (Boolean(match.proceedConfirmedAt) && match.startAt <= new Date()) || count > hostParticipantCount && (Boolean(match.proceedConfirmedAt) || count >= match.maxParticipants);
     if (match.startAt <= new Date()) return canProceed ? ((match.endAt ?? match.startAt) <= new Date() ? 'completion_pending' : 'in_progress') : 'on_hold';
     if (match.proceedConfirmedAt && count > hostParticipantCount) return 'scheduled';
     if ((match.deadlineAt && match.deadlineAt <= new Date()) && !canProceed) return 'on_hold';
@@ -1602,7 +1602,7 @@ export class MatchesService {
   }
 
   private getDisplayState(match: MatchWithRelations) {
-    const status = this.getApiStatus(match, this.getParticipantCount(match), this.getHostParticipates(match) ? 1 : 0);
+    const status = this.getApiStatus(match, this.getParticipantCount(match, true), this.getHostParticipates(match) ? 1 : 0);
     if (status !== 'recruiting') return status;
     if (this.getParticipantCount(match) >= match.maxParticipants) return 'full';
     if (match.deadlineAt && match.deadlineAt <= new Date()) return 'closed';
@@ -1715,9 +1715,10 @@ export class MatchesService {
   private getActiveParticipantCount(
     matchId: string,
     client: Prisma.TransactionClient | PrismaService = this.prisma,
+    includeNoShow = false,
   ) {
     return client.v1MatchParticipant.count({
-      where: { matchId, status: 'active' },
+      where: { matchId, status: includeNoShow ? { in: ['active', 'no_show'] } : 'active' },
     });
   }
 

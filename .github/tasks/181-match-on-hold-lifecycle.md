@@ -56,3 +56,9 @@ Root agent only. 기존 shared-tree WIP 보존. 2026-10-01 사용자 dev 배포 
 - 최종 API 139/139 PASS(보류 complete 우회 차단 포함). 최종 Web client/panel 34/34 PASS, 앞선 관련 102/102 PASS. 웹 타입 PASS 및 radius token 수정 후 pattern PASS. 최신 dev API surface PASS.
 
 - 최종 후속: 실제 신고 매치와 같은 0/1 모집의 보류·진행 차단·삭제와 주최자 불참 + 확정 참가자 1명의 진행 선택을 회귀 테스트로 추가. API 141/141 PASS. 리그/대회 매치 주최팀 삭제 우회 차단. PR #1388(base dev), CI 및 Copilot 검토 진행 중.
+
+## CI reconciliation
+- 첫 CI RED: final schema binding, game-schema snapshot, personal completion integration 및 2개 Web expectation. 신규 nullable 컬럼의 현재 digest만 정확히 재바인딩하고 과거 alpha manifest digest 허용을 보존. schema binding 7/7 PASS.
+- 실제 HTTP/DB 참여 이력 시나리오는 시간 fixture 후 주최자 confirm-proceed HTTP를 수행하도록 수정. 0/1 보류 조회/완료 차단/권한/soft delete 및 일정 변경·승인 초기화·이력 삭제 차단 시나리오 추가. CI 실제 Postgres 재검증 대기.
+- 진행 확정 뒤 불참(no_show) 처리로 보류에 역전하지 않도록 기존 완료 흐름 보존. 참가 집계에서는 불참을 계속 제외.
+- Web 가입 대기 상태는 진행중보다 우선 유지하고 보류만 공통 우선. 관리 링크 fixture는 실제 manageHref를 명시. 관련 Web 98/98 PASS; 개인 API 67/67 PASS(팀 API 74/74 이전 PASS).

@@ -87,6 +87,7 @@ describe('취소된 팀매치 상세 (L31)', () => {
 
   it('대조군 — 취소가 아닌 호스트 화면은 "매치 관리" 링크와 채팅을 그대로 가진다', () => {
     const model = getTeamMatchDetailViewModel('mine');
+    model.match.manageHref = '/team-matches/team-match-1/manage';
     model.applyLabel = '매치 관리';
     model.onChat = vi.fn();
     renderPage(<TeamMatchDetailPageView model={model} />);

@@ -233,8 +233,9 @@ function getViewerState(match: V1Match) {
 function toPersonalStatus(match: V1Match): MyMatchStatus {
   const state = getViewerState(match);
   const display = match.displayState ?? match.status;
-  if (display === 'on_hold' || display === 'scheduled' || display === 'in_progress') return display;
+  if (display === 'on_hold') return 'on_hold';
   if (state === 'requested') return 'pending';
+  if (display === 'scheduled' || display === 'in_progress') return display;
   if (display === 'completed' || display === 'expired' || display === 'closed' || display === 'cancelled') return 'ended';
   if (state === 'approved' || state === 'participant') return 'approved';
   return 'recruiting';

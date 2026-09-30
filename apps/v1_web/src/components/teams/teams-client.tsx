@@ -47,6 +47,7 @@ import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
+import { DissolvedTeamView } from './dissolved-team-view';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
 import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -201,6 +202,16 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
  * 의존하는 것(가입 CTA·컨택 CTA)만 잠그고, 팀 이름·로고·소개·지역·멤버는 바로 보여준다.
  */
 export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
+  const query = useV1TeamDetail(teamId, { seed });
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  // 해체된 팀은 읽기 전용 — 가입 자격·채팅 자동 연결 같은 활동 팀 조회를 아예 부르지 않는다.
+  if (query.data?.dissolution) {
+    return <DissolvedTeamView team={query.data} selfHref={withFromPath(`/teams/${teamId}`, fromPath)} />;
+  }
+  return <ActiveTeamDetailPageClient teamId={teamId} seed={seed} />;
+}
+
+function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
   // 내 팀 목록 등 특정 화면에서 들어왔으면 뒤로가기를 그 화면으로 되돌린다(`?from=`).
   // route-chrome 테이블의 backHref(fragments/teams.ts)는 검색 파라미터를 못 받아
@@ -580,6 +591,10 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       pending: requestItems.length,
     },
     actionError,
+    soloOwner:
+      viewerRole === 'owner' && members.data && members.data.summary.memberCount <= 1
+        ? { onInvite: () => setActiveTab('invitations'), dissolveHref: withFromPath(`/teams/${teamId}/dissolve`, membersHref) }
+        : undefined,
     selfNotice:
       !canManageMembers && viewerUserId !== null ? <MyUnavailabilityNotice teamId={teamId} userId={viewerUserId} /> : undefined,
     members: memberItems.length

@@ -7,9 +7,14 @@ import {
   useV1AdminTeams,
   useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
-import type { V1AdminTeamRow } from '@/types/api';
+import type { V1AdminTeamRow, V1TeamDissolutionBlocker } from '@/types/api';
 import { formatAdminDate } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import {
+  dissolutionBlockerItemSummary,
+  dissolutionBlockerTitle,
+  dissolutionBlockersFromError,
+} from '@/lib/team-dissolution-blockers';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
@@ -40,6 +45,29 @@ const REASON_MODAL_STATUS_OPTIONS = [
 ];
 
 const PAGE_SIZE = 20;
+
+type ArchiveBlocked = { message: string; blockers: V1TeamDissolutionBlocker[] };
+
+/** 보관(archived)을 막는 항목 — 토스트로는 다 못 읽어 상태 변경 모달 안에 남긴다. */
+function ArchiveBlockedNotice({ message, blockers }: ArchiveBlocked) {
+  return (
+    <>
+      <p className="font-semibold">{message}</p>
+      <ul className="mt-2 flex flex-col gap-2" aria-label="보관을 막는 항목">
+        {blockers.map((blocker) => (
+          <li key={blocker.kind}>
+            <p className="font-semibold">{dissolutionBlockerTitle(blocker.kind, blocker.items.length)}</p>
+            <ul className="mt-1 list-disc pl-4">
+              {blocker.items.map((item) => (
+                <li key={item.id} className="break-words">{dissolutionBlockerItemSummary(item)}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────
 
@@ -79,22 +107,33 @@ export default function AdminTeamsPage() {
 
   // ── Moderation modal ───────────────────────────────────────────────
   const [modalRow, setModalRow] = useState<V1AdminTeamRow | null>(null);
+  const [archiveBlocked, setArchiveBlocked] = useState<ArchiveBlocked | null>(null);
   const mutation = useV1ChangeTeamStatus();
+  const setModalTarget = (row: V1AdminTeamRow | null) => {
+    setArchiveBlocked(null);
+    setModalRow(row);
+  };
 
   // ── Toast ──────────────────────────────────────────────────────────
   const { toasts, showToast } = useAdminToast();
 
   const handleModalSubmit = (status: string, reason: string) => {
     if (!modalRow) return;
+    setArchiveBlocked(null);
     mutation.mutate(
       { id: modalRow.teamId, status, reason },
       {
         onSuccess: () => {
-          setModalRow(null);
+          setModalTarget(null);
           showToast('팀 상태를 변경했어요.', 'success');
           resetToFirstPage();
         },
         onError: (err) => {
+          const blockers = dissolutionBlockersFromError(err);
+          if (blockers) {
+            setArchiveBlocked({ message: extractErrorMessage(err, '보관을 막는 항목이 있어요. 먼저 정리해 주세요.'), blockers });
+            return;
+          }
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
         },
       },
@@ -206,7 +245,7 @@ export default function AdminTeamsPage() {
               {canWrite ? (
                   <button
                     type="button"
-                    onClick={() => setModalRow(row)}
+                    onClick={() => setModalTarget(row)}
                     aria-label={`${row.name} 상태 변경`}
                     className={[
                       'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
@@ -244,8 +283,9 @@ export default function AdminTeamsPage() {
         currentStatus={modalRow?.status}
         statusOptions={REASON_MODAL_STATUS_OPTIONS}
         onSubmit={handleModalSubmit}
-        onClose={() => setModalRow(null)}
+        onClose={() => setModalTarget(null)}
         pending={mutation.isPending}
+        error={archiveBlocked ? <ArchiveBlockedNotice {...archiveBlocked} /> : null}
       />
 
       {/* Toasts */}

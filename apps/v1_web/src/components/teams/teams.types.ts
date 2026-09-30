@@ -147,6 +147,8 @@ export type TeamFormMode = 'create' | 'edit';
 
 export type TeamFormViewModel = {
   mode: TeamFormMode;
+  /** 수정 화면 맨 아래 "팀 관리" — 팀장에게만 채운다(Task 180 H3). */
+  dissolveHref?: string;
   team: {
     name: string;
     logoUrl: string | null;
@@ -198,6 +200,8 @@ export type TeamMembersViewModel = {
   selfNotice?: ReactNode;
   /** 역할 변경·내보내기가 서버에서 거절됐을 때의 이유. 목록 위에 뜨고 화면으로 끌어온다. */
   actionError?: string | null;
+  /** 팀장 혼자 남은 팀에서만(Task 180 H3 A-1) — 멤버 초대·팀 해체 입구. */
+  soloOwner?: { onInvite: () => void; dissolveHref: string };
   members: Array<{
     name: string;
     role: string;

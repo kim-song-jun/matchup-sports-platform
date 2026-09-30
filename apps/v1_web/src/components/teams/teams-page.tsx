@@ -20,6 +20,7 @@ import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
+import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -1026,6 +1027,7 @@ export function TeamFormPageView({
           <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
           <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
           <TeamActivityFields team={team} form={form} />
+          {edit && model.dissolveHref ? <TeamManageDissolveEntry dissolveHref={model.dissolveHref} /> : null}
         </div>
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
@@ -1510,6 +1512,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         ) : model.invitations ? (
           <InvitationSection invitations={model.invitations} />
         ) : null}
+        {model.soloOwner && model.activeTab === 'members' ? <SoloOwnerCard {...model.soloOwner} /> : null}
       </div>
     </>
   );

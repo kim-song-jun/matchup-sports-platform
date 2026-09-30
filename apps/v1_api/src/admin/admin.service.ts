@@ -15,6 +15,8 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TeamDissolutionOutcome, dissolveTeamInTx, restoreTeamInTx } from '../teams/team-dissolution-tx';
+import { emitTeamDissolutionNotifications } from '../teams/team-dissolution.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -520,15 +522,29 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeTeamStatus(user: V1AuthUser, teamId: string, dto: ChangeTeamStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    return this.prisma.$transaction(async (tx) => {
+    const { response, dissolution } = await this.prisma.$transaction(async (tx) => {
       // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
       // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
       // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
       await tx.$queryRaw`SELECT id FROM "v1_teams" WHERE id = ${teamId} FOR UPDATE`;
       const target = await tx.v1Team.findUnique({ where: { id: teamId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
+      // 보관은 팀장의 해체와 같은 경로다 — 막는 조건을 보고, 예정 경기·신청·일정·채팅을 정리한다.
+      // 보관을 푸는 쪽도 해체 시각을 지우고 채팅방을 다시 연다(취소된 것은 되살리지 않는다).
+      let dissolution: TeamDissolutionOutcome | null = null;
+      if (dto.status === 'archived' && target.status !== 'archived') {
+        dissolution = await dissolveTeamInTx(tx, {
+          teamId,
+          actor: { type: 'admin', adminUserId: admin.id },
+          reason: dto.reason,
+          now: new Date(),
+          logTeamTransition: false,
+        });
+      } else if (target.status === 'archived' && dto.status !== 'archived') {
+        await restoreTeamInTx(tx, { teamId, toStatus: dto.status });
+      }
       const updated = await tx.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
-      return this.writeAdminStatusLogs(
+      const logged = await this.writeAdminStatusLogs(
         admin,
         {
           action: 'team.status.update',
@@ -543,7 +559,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         tx,
       );
+      return { response: logged, dissolution };
     });
+    if (dissolution && this.notifications) {
+      emitTeamDissolutionNotifications(this.notifications, this.prisma, dissolution);
+    }
+    return response;
   }
 
   async changeTeamMatchStatus(user: V1AuthUser, teamMatchId: string, dto: ChangeTeamMatchStatusDto) {

@@ -177,7 +177,17 @@ type AdminListSummary = {
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
 - 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`
   참가자도 `completed` 처리한다. 완료된 매치는 `archived` 외의 비종료 상태로 되돌릴 수 없다.
-- 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
+- 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500). `archived` 로 바꾸면 팀장의
+  해체와 같은 경로다.
+  - 진행 중 경기·상대가 정해진 친선 팀매치·끝나지 않은 대회/리그 참가 신청이 있으면 **의도적으로** 거절한다(보관이
+    대진·상대 팀 일정을 깨지 않게) — `409 TEAM_DISSOLVE_BLOCKED`, `details.blockers` 는 팀장 해체 미리보기와 같은
+    `[{ kind, items[{ id, title, opponentName, startAt, placeName, registrationStatus, route }] }]`. 이때 상태·정리·감사
+    로그는 하나도 바뀌지 않는다. 어드민 팀 관리 화면은 이 목록을 상태 변경 모달 안에 항목별로 보여 준다.
+  - 막는 조건이 없으면 예정 팀매치·신청·초대·일정·채팅을 정리하고 `deletedAt` 에 해체 시각을 남기며 팀원 전원에게
+    `team_dissolved` 를 보낸다. 팀 전이 status log 는 `actorType=admin` 한 벌이고, 이렇게 보관한 팀은 팀장이 30일 안에도
+    직접 복구할 수 없다(`403 TEAM_RESTORE_ADMIN_ONLY`).
+  - `archived` 에서 벗어나면 `deletedAt` 을 지우고 팀 채팅방을 다시 연다(취소된 것은 되살리지 않음). 자세한 계약은
+    [Teams](./teams.md) "팀 해체(보관)·복구".
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.
 

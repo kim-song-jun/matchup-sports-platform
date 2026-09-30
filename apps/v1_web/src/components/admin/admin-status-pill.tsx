@@ -11,6 +11,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { leagueStateLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
 
 // ── Tone → classes ────────────────────────────────────────────────────────
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
@@ -233,4 +234,19 @@ export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
       {displayLabel}
     </span>
   );
+}
+
+/**
+ * 리그 상태 알약. 말은 G13 상태 모델(`leagueStateLabel` — 준비 중·진행 중·종료)을 쓰고, 모양은 같은
+ * 사실의 대회 상태 알약을 빌린다 — 대회·리그가 한 표에 섞이는 현장 운영 목록에서 "진행 중" 리그가
+ * 계정 상태 말("활성")로 읽혔다(G6-V1).
+ */
+const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
+  draft: 'draft',
+  active: 'in_progress',
+  completed: 'completed',
+};
+
+export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {
+  return <AdminStatusPill status={LEAGUE_STATE_PILL_KEY[state]} label={leagueStateLabel(state)} />;
 }

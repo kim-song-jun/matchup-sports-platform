@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { rosterPermissionHint } from '@/lib/competition-status';
 import { Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { useV1TeamUpcomingGames, type V1GameRosterSummary, type V1TeamUpcomingGame } from '@/hooks/use-v1-api';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -30,7 +31,7 @@ export function TeamUpcomingGamesCard({ teamId, canManageRosters }: { teamId: st
 
   return (
     <>
-      <SectionTitle id={TEAM_UPCOMING_GAMES_ANCHOR} title="다가오는 경기" sub="팀장·매니저만 명단을 바꿀 수 있어요." />
+      <SectionTitle id={TEAM_UPCOMING_GAMES_ANCHOR} title="다가오는 경기" sub={rosterPermissionHint(canManageRosters) ?? undefined} />
       <Card pad={16} style={{ paddingTop: 4, paddingBottom: 4 }}>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {items.map((game, index) => (

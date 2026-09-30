@@ -233,3 +233,83 @@ export function gameRosterStatusLabel(status: string, remainingMatches?: number 
       return '확인 필요';
   }
 }
+
+// ── Task 180 G13 상태 모델 — 리그·경기·종류 ─────────────────────────────────────
+// 문구만 여기 둔다. 칩 톤·아이콘·노출 조건은 `lib/competition-status.ts` 가 이 라벨로 만든다.
+
+export type LeagueStateKey = 'draft' | 'active' | 'completed';
+
+const LEAGUE_STATE_LABEL: Record<LeagueStateKey, string> = {
+  draft: '준비 중',
+  active: '진행 중',
+  completed: '종료',
+};
+
+/** 리그(시즌) 자체의 상태. 경기 상태와 한 화면에 함께 나오면 `LEAGUE_SUBJECT_LABEL` 을 앞에 붙인다. */
+export function leagueStateLabel(state: LeagueStateKey): string {
+  return LEAGUE_STATE_LABEL[state];
+}
+
+/** 경기 하나의 단계. 공개 화면의 리그 대진·운영 콘솔·결과 검토가 같은 말을 쓴다. */
+export type MatchPhase = 'scheduled' | 'awaiting_result' | 'live' | 'paused' | 'ended' | 'cancelled';
+
+const MATCH_PHASE_LABEL: Record<MatchPhase, string> = {
+  scheduled: '예정',
+  awaiting_result: '결과 대기',
+  live: '진행 중',
+  paused: '일시 중지',
+  ended: '종료',
+  cancelled: '취소됨',
+};
+
+export function matchPhaseLabel(phase: MatchPhase): string {
+  return MATCH_PHASE_LABEL[phase];
+}
+
+/** 경기 운영 상태(GameState)는 경기 단계의 부분집합이다 — 킥오프 전·후를 가르는 '결과 대기'는 운영 상태에 없다. */
+export const GAME_STATE_MATCH_PHASE: Readonly<Record<string, MatchPhase>> = {
+  SCHEDULED: 'scheduled',
+  LIVE: 'live',
+  PAUSED: 'paused',
+  ENDED: 'ended',
+  CANCELLED: 'cancelled',
+};
+
+export function gameStateLabel(state: string): string {
+  const phase = GAME_STATE_MATCH_PHASE[state];
+  return phase === undefined ? '확인 필요' : MATCH_PHASE_LABEL[phase];
+}
+
+export type CompetitionKindKey = 'LEAGUE' | 'TOURNAMENT' | 'FRIENDLY';
+
+const COMPETITION_KIND_LABEL: Record<CompetitionKindKey, string> = {
+  LEAGUE: '리그',
+  TOURNAMENT: '대회',
+  FRIENDLY: '친선',
+};
+
+export function competitionKindLabel(kind: CompetitionKindKey): string {
+  return COMPETITION_KIND_LABEL[kind];
+}
+
+/** 한 화면에 리그 상태와 경기 상태가 같이 보일 때 칩 앞에 붙이는 대상 이름("리그 · 진행 중", "경기 · 예정"). */
+export const LEAGUE_SUBJECT_LABEL = COMPETITION_KIND_LABEL.LEAGUE;
+export const MATCH_SUBJECT_LABEL = '경기';
+
+/** 리그 순위표 자리의 시즌 단계. */
+export type LeagueSeasonStage = 'preseason' | 'in_progress' | 'awaiting_result' | 'completed';
+
+const LEAGUE_SEASON_STAGE_LABEL: Record<LeagueSeasonStage, string> = {
+  preseason: '시즌 시작 전',
+  in_progress: '시즌 진행 중',
+  awaiting_result: MATCH_PHASE_LABEL.awaiting_result,
+  completed: '시즌 종료',
+};
+
+export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
+  return LEAGUE_SEASON_STAGE_LABEL[stage];
+}
+
+/** 운영 콘솔 도착 확인(검인)을 한 경기에서, 아직 도착 확인이 안 된 선수. */
+export const ARRIVAL_PENDING_LABEL = '도착 전';
+export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';

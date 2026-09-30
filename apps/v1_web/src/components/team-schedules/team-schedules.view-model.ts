@@ -102,7 +102,12 @@ export function guestRecruitmentStateLabel(state: V1GuestRecruitmentState): stri
   return GUEST_RECRUITMENT_STATE_LABELS[state] ?? state;
 }
 
-export function attendanceSummaryText(goingCount: number, waitlistedCount: number, capacity: number | null): string {
+/**
+ * 목록 행의 참석 요약. 아무도 답하지 않은 일정(정원 없음)은 요약이 없다 — 리그 경기처럼 참석 체크를
+ * 안 쓰는 일정이 "참석 0명"으로 읽혀 경기 명단(출전 N명)과 엇갈렸다(F67).
+ */
+export function attendanceSummaryText(goingCount: number, waitlistedCount: number, capacity: number | null): string | null {
+  if (goingCount === 0 && waitlistedCount === 0 && capacity === null) return null;
   const capacityPart = capacity !== null ? `/${capacity}` : '';
   const base = `참석 ${goingCount}${capacityPart}명`;
   return waitlistedCount > 0 ? `${base} · 대기 ${waitlistedCount}명` : base;

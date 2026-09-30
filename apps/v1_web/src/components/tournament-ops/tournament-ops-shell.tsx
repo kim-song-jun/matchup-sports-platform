@@ -21,6 +21,7 @@ import { staffRoleLabel } from './badges';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
+import { displayInitials } from '@/lib/display-initials';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -69,7 +70,7 @@ function TournamentEmblem({
     );
   }
   const palette = IDENTITY_PALETTE[hashToIndex(tournamentId, IDENTITY_PALETTE.length)];
-  const initial = title?.trim()?.[0] ?? '대';
+  const initial = displayInitials(title, { fallback: '대' });
   return (
     <span
       aria-hidden="true"

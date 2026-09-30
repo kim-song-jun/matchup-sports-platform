@@ -106,7 +106,7 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
                 key={item.id}
                 href={item.href}
                 title={item.title}
-                sub={`${item.typeLabel} · ${item.dateTimeLabel} · ${item.attendanceSummary}`}
+                sub={[item.typeLabel, item.dateTimeLabel, item.attendanceSummary].filter((part) => part !== null).join(' · ')}
                 // 컬러만으로 상태를 구분하지 않도록 텍스트(stateLabel)를 유지한 채 배지로 감싼다 —
                 // 상세 페이지(line 257 부근)와 동일하게 stateTone(색 계산은 이미 view-model에 있었음)을 소비.
                 trailing={

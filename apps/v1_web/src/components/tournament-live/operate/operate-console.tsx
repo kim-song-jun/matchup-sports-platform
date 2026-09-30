@@ -40,6 +40,7 @@ import { randomUuid } from '@/lib/uuid';
 import { V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
+import { MatchupTitle } from './matchup-title';
 import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
@@ -1266,9 +1267,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             모바일 줄바꿈까지 검증된 자리다. */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-[var(--text-strong)]">
-              {sides.map((side) => side.displayNameSnapshot).join(' vs ') || '경기 운영'}
-            </p>
+            <MatchupTitle sides={sides} />
             <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 font-semibold text-[var(--blue700)]">
                 {gameState ? STATE_LABEL[gameState] : '-'}

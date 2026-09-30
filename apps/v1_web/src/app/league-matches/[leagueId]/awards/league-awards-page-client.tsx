@@ -8,7 +8,8 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
+import { leagueStateChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 // tournaments/[id]/awards/awards-page-client.tsx 의 구조(포디움 히어로 → 개인 어워드 →
@@ -267,9 +268,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
       <p className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
         {series.tierLabel != null && <span className="tm-badge tm-badge-sm tm-badge-blue">{series.tierLabel}</span>}
         <span>{series.title}</span>
-        <span className={`tm-badge tm-badge-sm ${LEAGUE_STATE_META[series.state].badgeClass}`}>
-          {LEAGUE_STATE_META[series.state].label}
-        </span>
+        <StatusChip chip={leagueStateChip(series.state)} />
       </p>
 
       {standingsQuery.isError ? (

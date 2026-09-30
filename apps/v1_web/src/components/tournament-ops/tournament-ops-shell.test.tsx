@@ -76,6 +76,19 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
   });
 });
 
+describe('TournamentOpsShell 대회 아바타 (Task 180 G13 F54)', () => {
+  it('이름이 괄호로 시작해도 아바타는 첫 글자("Q")를 보여 준다', () => {
+    const { container } = render(
+      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin" tournamentTitle="(QA0929) 마포 주말 리그">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    const avatars = [...container.querySelectorAll('span[aria-hidden="true"]')].filter((node) => node.children.length === 0);
+    expect(avatars.some((node) => node.textContent === 'Q')).toBe(true);
+    expect(avatars.some((node) => node.textContent === '(')).toBe(false);
+  });
+});
+
 describe('TournamentOpsShell nav 항목 (T6-5, D-16)', () => {
   it('SUPPORT_READONLY도 결과 검토/정정이 보인다 — 숨기지 않고 비활성 + 사유', () => {
     render(

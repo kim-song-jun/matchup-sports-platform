@@ -21,7 +21,7 @@ export type ScheduleListItemModel = {
   /** 캘린더 그루핑용 로컬 날짜 키 (YYYY-MM-DD) */
   dateKey: string;
   dateTimeLabel: string;
-  attendanceSummary: string;
+  attendanceSummary: string | null;
   visibilityLabel: string;
   href: string;
 };

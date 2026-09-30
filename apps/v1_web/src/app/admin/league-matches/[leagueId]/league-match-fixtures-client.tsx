@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
-import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
@@ -34,6 +34,8 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
+import { LeagueWeeksPlanField } from './league-weeks-plan-field';
+import { resolveWeeksCount, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import {
@@ -114,7 +116,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [forfeitFixture, setForfeitFixture] = useState<V1LeagueFixture | null>(null);
   const forfeitHostTeam = useV1AdminTeam(forfeitFixture?.homeTeamId ?? '');
   const forfeitAwayTeam = useV1AdminTeam(forfeitFixture?.awayTeamId ?? '');
-  const [weeksCount, setWeeksCount] = useState(7);
+  // 기본은 팀 수로 계산한 단일 라운드로빈(F40) — 옛 고정값 7은 2팀 리그에 같은 대진 7번을 만들었다.
+  const [weeksPlan, setWeeksPlan] = useState<WeeksPlan>({ kind: 'single' });
+  const timeHintId = useId();
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   // **날짜 목록이 정본이다.** 요일은 그것을 채우는 편의일 뿐 — 서버는 요일을 모른다.
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -189,6 +193,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const breakValue = parseOptionalInt(breakMinutes);
   const gamesPerDayValue = parseOptionalInt(gamesPerTeamPerDay);
   const teamCount = series.teamIds.length;
+  const weeksCount = resolveWeeksCount(weeksPlan, teamCount, gamesPerDayValue ?? 1);
 
   // C안: 시간창(시작~종료)과 경기 시간이 다 있으면 팀당 하루 경기 수를 역산해 제안한다.
   // 정수가 아닌 입력이 하나라도 있으면 제안·계산 카드를 아예 숨긴다 — ?? 폴백(휴식 0·팀당 1)으로
@@ -610,7 +615,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <AdminStatusPill status={series.state} />
+            <AdminLeagueStatePill state={series.state} />
             {/* 경기 영상 관리 — 대회 운영 콘솔의 영상 화면과 같은 역할의 리그 판.
                 대진이 없으면 그 화면이 빈 상태 안내를 대신한다. */}
             <Link
@@ -745,18 +750,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       {series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label htmlFor="weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
-              <input
-                id="weeks-count"
-                type="number"
-                min={1}
-                max={52}
-                value={weeksCount}
-                onChange={(e) => setWeeksCount(Number(e.target.value))}
-                className={`${inputClass} w-24`}
-              />
-            </div>
+            <LeagueWeeksPlanField
+              inputId="weeks-count"
+              inputClassName={inputClass}
+              teamCount={teamCount}
+              gamesPerTeamPerDay={gamesPerDayValue ?? 1}
+              plan={weeksPlan}
+              weeksCount={weeksCount}
+              onPlanChange={setWeeksPlan}
+            />
             <div>
               <label htmlFor="fixture-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
               <select
@@ -782,8 +784,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 // 예전엔 요일 전용 입력이라 `dayOfWeek === ''` 이면 잠갔는데, 달력 경로에서는
                 // 그러면 날짜는 있는데 시각을 넣을 방법이 없어 **영영 제출할 수 없다.**
                 disabled={dayOfWeek === '' && selectedDates.length === 0}
+                aria-describedby={dayOfWeek === '' && selectedDates.length === 0 ? timeHintId : undefined}
                 className={`${inputClass} w-36 disabled:opacity-50`}
               />
+              {/* 잠긴 칸의 회색 시각이 자리표시처럼 보여 왜 못 바꾸는지 몰랐다(F41) — 여는 방법을 적는다. */}
+              {dayOfWeek === '' && selectedDates.length === 0 ? (
+                <p id={timeHintId} className="mt-1 w-36 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                  요일이나 경기 날짜를 먼저 고르면 바꿀 수 있어요.
+                </p>
+              ) : null}
             </div>
             <div className="w-full">
               <p className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 날짜</p>
@@ -1092,18 +1101,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
                 </p>
                 <div className="flex flex-wrap items-end gap-3">
-                  <div>
-                    <label htmlFor="regen-weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
-                    <input
-                      id="regen-weeks-count"
-                      type="number"
-                      min={1}
-                      max={52}
-                      value={weeksCount}
-                      onChange={(e) => setWeeksCount(Number(e.target.value))}
-                      className={`${inputClass} w-24`}
-                    />
-                  </div>
+                  <LeagueWeeksPlanField
+                    inputId="regen-weeks-count"
+                    inputClassName={inputClass}
+                    teamCount={teamCount}
+                    gamesPerTeamPerDay={gamesPerDayValue ?? 1}
+                    plan={weeksPlan}
+                    weeksCount={weeksCount}
+                    onPlanChange={setWeeksPlan}
+                  />
                   <div>
                     <label htmlFor="regen-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
                     <select
@@ -1126,8 +1132,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       value={time}
                       onChange={(e) => setTime(e.target.value)}
                       disabled={dayOfWeek === ''}
+                      aria-describedby={dayOfWeek === '' ? `${timeHintId}-regen` : undefined}
                       className={`${inputClass} w-36 disabled:opacity-50`}
                     />
+                    {dayOfWeek === '' ? (
+                      <p id={`${timeHintId}-regen`} className="mt-1 w-36 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                        요일을 먼저 고르면 바꿀 수 있어요.
+                      </p>
+                    ) : null}
                   </div>
                   <FixtureTimingFields
                     idPrefix="regen"
@@ -1526,8 +1538,14 @@ function FixtureTimingFields({
           value={endTime}
           onChange={(e) => onEndTimeChange(e.target.value)}
           disabled={dayOfWeekUnset}
+          aria-describedby={dayOfWeekUnset ? `${idPrefix}-end-time-hint` : undefined}
           className={`${inputClass} w-28 disabled:opacity-50`}
         />
+        {dayOfWeekUnset ? (
+          <p id={`${idPrefix}-end-time-hint`} className="mt-1 w-28 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+            요일을 먼저 고르면 바꿀 수 있어요.
+          </p>
+        ) : null}
       </div>
       <div>
         <label htmlFor={`${idPrefix}-game-duration`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 시간(분)</label>

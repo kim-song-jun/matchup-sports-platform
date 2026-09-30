@@ -10,10 +10,11 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 가입 신청은 팀·팀장마다 한 줄로 모이고, 초대 취소는 그 초대가 보내진 뒤의 도착 알림만 바꾼다.
  */
 const prisma = new PrismaService();
+const pushedTo: string[] = [];
 const service = new NotificationsService(
   prisma,
   { emitToUser: () => undefined } as unknown as RealtimeNotifierPort,
-  { sendToUser: async () => undefined } as unknown as WebPushService,
+  { sendToUser: async (userId: string) => void pushedTo.push(userId) } as unknown as WebPushService,
   { warn: () => undefined } as unknown as PinoLogger,
 );
 
@@ -23,13 +24,14 @@ const ids = {
   owner: randomUUID(),
   applicants: [randomUUID(), randomUUID(), randomUUID()],
   invitee: randomUUID(),
+  acceptors: [randomUUID(), randomUUID()],
 };
 
 describe('Task 180 H1 — 팀 알림 한 줄·초대 알림 범위(실제 DB)', () => {
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required for team notification line integration verification');
     await prisma.$connect();
-    const people = [ids.owner, ...ids.applicants, ids.invitee];
+    const people = [ids.owner, ...ids.applicants, ids.invitee, ...ids.acceptors];
     await prisma.v1User.createMany({ data: people.map((id) => ({ id, email: `${id}@example.test`, accountStatus: 'active', onboardingStatus: 'completed' })) });
     await prisma.v1UserProfile.createMany({ data: people.map((userId, index) => ({ userId, nickname: `알림${index}` })) });
     const sport = await prisma.v1Sport.upsert({ where: { code: 'football' }, update: {}, create: { code: 'football', name: 'H1 football' }, select: { id: true } });
@@ -68,5 +70,31 @@ describe('Task 180 H1 — 팀 알림 한 줄·초대 알림 범위(실제 DB)', 
 
     expect(await prisma.v1Notification.findUniqueOrThrow({ where: { id: current.id } })).toMatchObject({ title: '팀 초대가 취소됐어요', deepLink: `/teams/${ids.team}` });
     expect(await prisma.v1Notification.findUniqueOrThrow({ where: { id: older.id } })).toMatchObject({ title: '팀 초대가 도착했어요', readAt: null });
+  });
+
+  it('서로 다른 초대 두 건이 동시에 수락돼도 초대한 사람에게는 "초대 수락" 한 줄·푸시 1회다', async () => {
+    // 밤이면 푸시를 보류한다 — 실행 시각과 무관하게 횟수를 보려고 야간 판정만 낮으로 고정한다.
+    const nightCheck = jest.spyOn(service as unknown as { pushAllowedNow: () => Promise<boolean> }, 'pushAllowedNow').mockResolvedValue(true);
+    const respondedAt = new Date();
+    const accepted = await Promise.all(
+      ids.acceptors.map((invitedUserId) =>
+        prisma.v1TeamInvitation.create({ data: { teamId: ids.team, invitedUserId, invitedByUserId: ids.owner, status: 'accepted', respondedAt } }),
+      ),
+    );
+    pushedTo.length = 0;
+
+    await Promise.all(
+      accepted.map((invitation) =>
+        service.recordTeamInvitationAccepted({ inviterUserId: ids.owner, teamId: ids.team, invitationId: invitation.id, acceptedAt: respondedAt }),
+      ),
+    );
+    nightCheck.mockRestore();
+
+    const lines = await prisma.v1Notification.findMany({
+      where: { recipientUserId: ids.owner, businessKey: { startsWith: `team-invite-accepted:${ids.team}:${ids.owner}:` } },
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0].title).toMatch(/님 외 1명이 초대를 수락했어요$/);
+    expect(pushedTo).toEqual([ids.owner]);
   });
 });

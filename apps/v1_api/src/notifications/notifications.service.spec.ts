@@ -59,6 +59,7 @@ function whereMatches(row: Record<string, unknown>, where: Record<string, unknow
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let prisma: {
+    $transaction: jest.Mock;
     v1NotificationPreference: { findUnique: jest.Mock; upsert: jest.Mock };
     v1Notification: {
       create: jest.Mock;
@@ -83,6 +84,7 @@ describe('NotificationsService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       v1NotificationPreference: {
         findUnique: jest.fn(),
         upsert: jest.fn(),
@@ -680,6 +682,8 @@ describe('NotificationsService', () => {
   describe('가입 신청·초대 수락 몰림 줄', () => {
     type Row = Record<string, unknown> & { id: string; businessKey: string | null; readAt: Date | null; createdAt: Date };
     let rows: Row[];
+    let committed: Set<string>;
+    let sentBeforeCommit: string[];
     const matches = whereMatches;
 
     beforeEach(() => {
@@ -707,6 +711,53 @@ describe('NotificationsService', () => {
         return { count: hit.length };
       });
       prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }]);
+
+      // Postgres 흉내: 같은 키의 pg_advisory_xact_lock 은 앞 트랜잭션이 끝날 때까지 기다리고, 트랜잭션이 쓴 줄은
+      // 콜백이 끝나야 커밋된다. 커밋 전에 실시간 알림·푸시로 나간 줄은 sentBeforeCommit 에 남긴다.
+      committed = new Set();
+      sentBeforeCommit = [];
+      const locks = new Map<string, Promise<void>>();
+      prisma.$transaction.mockImplementation(async (work: (tx: unknown) => Promise<unknown>) => {
+        const written: string[] = [];
+        let release = () => {};
+        const track = <T extends { id: string }>(row: T) => {
+          written.push(row.id);
+          return row;
+        };
+        const tx = {
+          ...prisma,
+          $executeRaw: async (_sql: TemplateStringsArray, key: string) => {
+            const held = new Promise<void>((resolve) => (release = resolve));
+            const before = locks.get(key) ?? Promise.resolve();
+            locks.set(key, before.then(() => held));
+            await before;
+          },
+          v1Notification: {
+            ...prisma.v1Notification,
+            create: async (args: unknown) => track(await prisma.v1Notification.create(args)),
+            update: async (args: unknown) => track(await prisma.v1Notification.update(args)),
+          },
+        };
+        try {
+          const result = await work(tx);
+          written.forEach((id) => committed.add(id));
+          return result;
+        } finally {
+          release();
+        }
+      });
+      realtimeNotifier.emitToUser.mockImplementation((_userId: string, _event: string, notification: { id: string }) => {
+        if (!committed.has(notification.id)) sentBeforeCommit.push(notification.id);
+      });
+      webPushService.sendToUser.mockImplementation(async (_userId: string, payload: { notificationId: string }) => {
+        if (!committed.has(payload.notificationId)) sentBeforeCommit.push(payload.notificationId);
+      });
+    });
+
+    afterEach(() => {
+      realtimeNotifier.emitToUser.mockReset();
+      webPushService.sendToUser.mockReset();
+      webPushService.sendToUser.mockResolvedValue(undefined);
     });
 
     const pending = (count: number, latestName: string) => {
@@ -811,6 +862,73 @@ describe('NotificationsService', () => {
       expect(rows).toHaveLength(2);
       expect(rows[1]).toMatchObject({ title: '선수12님이 초대를 수락했어요', readAt: null });
       expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
+    });
+
+    describe('동시에 온 요청', () => {
+      const acceptances = (list: Array<{ id: string; name: string; at: string }>) => {
+        prisma.v1TeamInvitation.count.mockImplementation(async ({ where }) =>
+          list.filter((invitation) => new Date(invitation.at) >= where.respondedAt.gte).length,
+        );
+        prisma.v1TeamInvitation.findUnique.mockImplementation(async ({ where }) => {
+          const nickname = list.find((invitation) => invitation.id === where.id)?.name ?? null;
+          return { invitedUser: { profile: { nickname, displayName: null } } };
+        });
+        return (id: string) => {
+          const acceptedAt = new Date(list.find((invitation) => invitation.id === id)!.at);
+          return service.recordTeamInvitationAccepted({ inviterUserId: 'owner-1', teamId: 'team-1', invitationId: id, acceptedAt });
+        };
+      };
+
+      it('초대 수락 두 건이 거의 동시에 와도 초대한 사람에게는 한 줄·푸시 1회이고 두 사람을 모두 센다', async () => {
+        const accept = acceptances([
+          { id: 'inv-a', name: '선수10', at: '2026-06-14T03:00:00.000Z' },
+          { id: 'inv-b', name: '선수11', at: '2026-06-14T03:00:00.004Z' },
+        ]);
+        await Promise.all([accept('inv-a'), accept('inv-b')]);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].title).toMatch(/^선수1[01]님 외 1명이 초대를 수락했어요$/);
+        expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+      });
+
+      it('잠금을 먼저 잡은 쪽이 더 늦게 수락한 사람이어도 먼저 수락한 사람까지 센다', async () => {
+        const accept = acceptances([
+          { id: 'inv-early', name: '선수10', at: '2026-06-14T02:59:59.000Z' },
+          { id: 'inv-late', name: '선수11', at: '2026-06-14T03:00:00.000Z' },
+        ]);
+        await accept('inv-late');
+        await accept('inv-early');
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].title).toBe('선수10님 외 1명이 초대를 수락했어요');
+      });
+
+      it('읽은 가입 신청 줄에 신청 두 건이 동시에 와도 줄을 다시 여는 푸시는 1회다', async () => {
+        pending(1, '첫째');
+        await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+        rows[0].readAt = new Date();
+        webPushService.sendToUser.mockClear();
+
+        pending(3, '셋째');
+        await Promise.all([
+          service.refreshTeamJoinApplicationsLine('team-1', 'arrival'),
+          service.refreshTeamJoinApplicationsLine('team-1', 'arrival'),
+        ]);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ title: '가입 신청 3건이 기다려요', readAt: null });
+        expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+      });
+
+      it('줄의 실시간 알림·푸시는 그 줄을 쓴 트랜잭션이 커밋된 뒤에 나간다', async () => {
+        pending(1, '첫째');
+        const accept = acceptances([{ id: 'inv-a', name: '선수10', at: '2026-06-14T03:00:00.000Z' }]);
+        await Promise.all([service.refreshTeamJoinApplicationsLine('team-1', 'arrival'), accept('inv-a')]);
+
+        expect(realtimeNotifier.emitToUser).toHaveBeenCalledTimes(2);
+        expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
+        expect(sentBeforeCommit).toEqual([]);
+      });
     });
   });
 

@@ -697,6 +697,24 @@ function burstCopy(type: BurstEvent, count: number, team: string, name: string):
 const joinLineKey = (teamId: string, userId: string) => `team-join-pending:${teamId}:${userId}`;
 const acceptedLinePrefix = (teamId: string, inviterUserId: string) => `team-invite-accepted:${teamId}:${inviterUserId}:`;
 
+/**
+ * 같은 줄을 고치는 요청을 트랜잭션 끝까지 한 줄로 세운다. 줄 키가 요청마다 다를 수 있어(초대 수락) 유니크 제약만으로는
+ * 두 요청이 모두 "열린 줄 없음"·"읽은 줄"을 보고 줄이나 푸시를 두 번 만든다. 푸시는 커밋 뒤에 보낸다.
+ */
+function lockNotificationLine(tx: Prisma.TransactionClient, key: string) {
+  return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+}
+
+type DeliveredNotification = {
+  id: string;
+  targetType: V1NotificationTargetType;
+  targetId: string | null;
+  title: string;
+  body: string | null;
+  deepLink: string | null;
+};
+type LineDelivery = { userId: string; notification: DeliveredNotification; push: boolean };
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -823,51 +841,48 @@ export class NotificationsService {
    */
   async refreshTeamJoinApplicationsLine(teamId: string, trigger: 'arrival' | 'recount'): Promise<void> {
     try {
-      const [team, pendingCount, latest] = await Promise.all([
-        this.prisma.v1Team.findUnique({ where: { id: teamId }, select: { name: true } }),
-        this.prisma.v1TeamJoinApplication.count({ where: { teamId, status: 'requested' } }),
-        this.prisma.v1TeamJoinApplication.findFirst({
+      const pushAllowed = trigger === 'arrival' && (await this.pushAllowedNow('team_join_application_received', 'team', teamId));
+      const deliveries = await this.prisma.$transaction(async (tx) => {
+        await lockNotificationLine(tx, joinLineKey(teamId, ''));
+        const team = await tx.v1Team.findUnique({ where: { id: teamId }, select: { name: true } });
+        const pendingCount = await tx.v1TeamJoinApplication.count({ where: { teamId, status: 'requested' } });
+        const latest = await tx.v1TeamJoinApplication.findFirst({
           where: { teamId, status: 'requested' },
           orderBy: [{ updatedAt: 'desc' }],
           select: { applicantUser: { select: { profile: { select: { nickname: true, displayName: true } } } } },
-        }),
-      ]);
-      if (team === null) return;
-      const lineWhere = { targetType: 'team' as const, targetId: teamId, businessKey: { startsWith: joinLineKey(teamId, '') } };
-      if (pendingCount === 0 || latest === null) {
-        await this.prisma.v1Notification.updateMany({ where: { ...lineWhere, readAt: null }, data: { readAt: new Date() } });
-        return;
-      }
-      const copy = burstCopy('team_join_application_received', pendingCount, team.name, notificationPersonName(latest.applicantUser.profile));
-      const managers = await this.prisma.v1TeamMembership.findMany({
-        where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
-        select: { userId: true },
-      });
-      if (trigger === 'recount') {
-        // 지금 팀장·매니저의 줄만 고친다 — 역할을 잃은 사람의 옛 줄에 새 신청자 이름을 싣지 않는다.
-        const recipientUserId = { in: managers.map((manager) => manager.userId) };
-        await this.prisma.v1Notification.updateMany({ where: { ...lineWhere, recipientUserId }, data: copy });
-        return;
-      }
-      const pushAllowed = await this.pushAllowedNow('team_join_application_received', 'team', teamId);
-      const deepLink = deepLinkForEvent('team_join_application_received', 'team', teamId);
-      for (const { userId } of managers) {
-        if (!(await this.preferenceEnabled(userId, 'teamEnabled'))) continue;
-        const businessKey = joinLineKey(teamId, userId);
-        const existing = await this.prisma.v1Notification.findUnique({ where: { businessKey }, select: { id: true, readAt: true } });
-        if (existing !== null) {
-          const reopened = await this.prisma.v1Notification.update({
-            where: { id: existing.id },
-            data: { ...copy, deepLink, readAt: null, createdAt: new Date() },
-          });
-          this.deliver(userId, reopened, existing.readAt !== null && pushAllowed);
-          continue;
+        });
+        const lines: LineDelivery[] = [];
+        if (team === null) return lines;
+        const lineWhere = { targetType: 'team' as const, targetId: teamId, businessKey: { startsWith: joinLineKey(teamId, '') } };
+        if (pendingCount === 0 || latest === null) {
+          await tx.v1Notification.updateMany({ where: { ...lineWhere, readAt: null }, data: { readAt: new Date() } });
+          return lines;
         }
-        const created = await this.createLineOrNull({ businessKey, recipientUserId: userId, targetType: 'team', targetId: teamId, deepLink, ...copy });
-        // 동시에 들어온 다른 신청이 방금 줄을 만들었다 — 그 줄의 건수만 맞춘다(푸시는 그쪽이 했다).
-        if (created === null) await this.prisma.v1Notification.update({ where: { businessKey }, data: copy });
-        else this.deliver(userId, created, pushAllowed);
-      }
+        const copy = burstCopy('team_join_application_received', pendingCount, team.name, notificationPersonName(latest.applicantUser.profile));
+        const managers = await tx.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        });
+        if (trigger === 'recount') {
+          // 지금 팀장·매니저의 줄만 고친다 — 역할을 잃은 사람의 옛 줄에 새 신청자 이름을 싣지 않는다.
+          const recipientUserId = { in: managers.map((manager) => manager.userId) };
+          await tx.v1Notification.updateMany({ where: { ...lineWhere, recipientUserId }, data: copy });
+          return lines;
+        }
+        const deepLink = deepLinkForEvent('team_join_application_received', 'team', teamId);
+        for (const { userId } of managers) {
+          if (!(await this.preferenceEnabled(userId, 'teamEnabled', tx))) continue;
+          const businessKey = joinLineKey(teamId, userId);
+          const existing = await tx.v1Notification.findUnique({ where: { businessKey }, select: { id: true, readAt: true } });
+          const notification = existing === null
+            ? await tx.v1Notification.create({ data: { businessKey, recipientUserId: userId, targetType: 'team', targetId: teamId, deepLink, ...copy } })
+            : await tx.v1Notification.update({ where: { id: existing.id }, data: { ...copy, deepLink, readAt: null, createdAt: new Date() } });
+          // 안 읽은 줄에 더해진 신청은 푸시하지 않는다 — 새 줄이거나 읽은 줄을 다시 열 때만.
+          lines.push({ userId, notification, push: pushAllowed && existing?.readAt !== null });
+        }
+        return lines;
+      });
+      for (const { userId, notification, push } of deliveries) this.deliver(userId, notification, push);
     } catch (err) {
       this.logger.warn({ teamId, trigger, err }, '가입 신청 알림 줄 갱신 실패');
     }
@@ -886,51 +901,44 @@ export class NotificationsService {
     const { inviterUserId, teamId, invitationId, acceptedAt } = input;
     try {
       if (!(await this.preferenceEnabled(inviterUserId, 'teamEnabled'))) return;
+      const pushAllowed = await this.pushAllowedNow('team_invitation_accepted', 'team', teamId);
       const prefix = acceptedLinePrefix(teamId, inviterUserId);
-      const [team, open, invitation] = await Promise.all([
-        this.prisma.v1Team.findUnique({ where: { id: teamId }, select: { name: true } }),
-        this.prisma.v1Notification.findFirst({
+      const delivery = await this.prisma.$transaction(async (tx): Promise<LineDelivery | null> => {
+        await lockNotificationLine(tx, prefix);
+        const team = await tx.v1Team.findUnique({ where: { id: teamId }, select: { name: true } });
+        if (team === null) return null;
+        const open = await tx.v1Notification.findFirst({
           where: { recipientUserId: inviterUserId, readAt: null, targetType: 'team', targetId: teamId, businessKey: { startsWith: prefix } },
           orderBy: [{ createdAt: 'desc' }],
           select: { id: true, businessKey: true },
-        }),
-        this.prisma.v1TeamInvitation.findUnique({
+        });
+        const invitation = await tx.v1TeamInvitation.findUnique({
           where: { id: invitationId },
           select: { invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } } },
-        }),
-      ]);
-      if (team === null) return;
-      const windowStartMs = open?.businessKey ? Number(open.businessKey.slice(prefix.length).split(':')[0]) : acceptedAt.getTime();
-      const count = await this.prisma.v1TeamInvitation.count({
-        where: { teamId, invitedByUserId: inviterUserId, status: 'accepted', respondedAt: { gte: new Date(windowStartMs) } },
+        });
+        // 잠금을 먼저 잡은 쪽이 더 늦게 수락했을 수 있다 — 줄을 연 시각보다 이른 이 수락도 창에 넣는다.
+        const openedAtMs = open?.businessKey ? Number(open.businessKey.slice(prefix.length).split(':')[0]) : Infinity;
+        const count = await tx.v1TeamInvitation.count({
+          where: { teamId, invitedByUserId: inviterUserId, status: 'accepted', respondedAt: { gte: new Date(Math.min(openedAtMs, acceptedAt.getTime())) } },
+        });
+        const copy = burstCopy('team_invitation_accepted', Math.max(count, 1), team.name, notificationPersonName(invitation?.invitedUser.profile));
+        if (open !== null) {
+          const notification = await tx.v1Notification.update({ where: { id: open.id }, data: { ...copy, createdAt: new Date() } });
+          return { userId: inviterUserId, notification, push: false };
+        }
+        const notification = await tx.v1Notification.create({ data: {
+          businessKey: `${prefix}${acceptedAt.getTime()}:${invitationId}`,
+          recipientUserId: inviterUserId,
+          targetType: 'team',
+          targetId: teamId,
+          deepLink: deepLinkForEvent('team_invitation_accepted', 'team', teamId),
+          ...copy,
+        } });
+        return { userId: inviterUserId, notification, push: pushAllowed };
       });
-      const copy = burstCopy('team_invitation_accepted', Math.max(count, 1), team.name, notificationPersonName(invitation?.invitedUser.profile));
-      if (open !== null) {
-        const updated = await this.prisma.v1Notification.update({ where: { id: open.id }, data: { ...copy, createdAt: new Date() } });
-        this.deliver(inviterUserId, updated, false);
-        return;
-      }
-      const created = await this.prisma.v1Notification.create({ data: {
-        businessKey: `${prefix}${acceptedAt.getTime()}:${invitationId}`,
-        recipientUserId: inviterUserId,
-        targetType: 'team',
-        targetId: teamId,
-        deepLink: deepLinkForEvent('team_invitation_accepted', 'team', teamId),
-        ...copy,
-      } });
-      this.deliver(inviterUserId, created, await this.pushAllowedNow('team_invitation_accepted', 'team', teamId));
+      if (delivery !== null) this.deliver(delivery.userId, delivery.notification, delivery.push);
     } catch (err) {
       this.logger.warn({ teamId, inviterUserId, err }, '초대 수락 알림 줄 갱신 실패');
-    }
-  }
-
-  /** businessKey 로 새 줄을 만든다. 동시에 들어온 다른 요청이 같은 줄을 먼저 만들었으면 null. */
-  private async createLineOrNull(data: Prisma.V1NotificationUncheckedCreateInput) {
-    try {
-      return await this.prisma.v1Notification.create({ data });
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return null;
-      throw err;
     }
   }
 
@@ -1021,8 +1029,12 @@ export class NotificationsService {
   }
 
   /** 수신 설정 행이 없으면 켜진 것으로 본다. */
-  private async preferenceEnabled(userId: string, prefField: NotificationPrefField): Promise<boolean> {
-    const pref = await this.prisma.v1NotificationPreference.findUnique({
+  private async preferenceEnabled(
+    userId: string,
+    prefField: NotificationPrefField,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<boolean> {
+    const pref = await db.v1NotificationPreference.findUnique({
       where: { userId },
       select: { [prefField]: true },
     });
@@ -1034,11 +1046,7 @@ export class NotificationsService {
    * emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의 시도는 계속되어야 한다.
    * realtimeNotifier 구현체는 호출 측(HTTP 앱 vs 워커)마다 다르다 — realtime-notifier.port.ts 참조.
    */
-  private deliver(
-    userId: string,
-    notification: { id: string; targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string | null; deepLink: string | null },
-    push: boolean,
-  ): void {
+  private deliver(userId: string, notification: DeliveredNotification, push: boolean): void {
     const { targetType, targetId } = notification;
     try {
       this.realtimeNotifier.emitToUser(userId, 'notification:new', notification);

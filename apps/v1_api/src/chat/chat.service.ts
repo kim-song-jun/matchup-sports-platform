@@ -958,7 +958,6 @@ function chatRoomRoute(roomId: string) {
   return `/chat/${roomId}`;
 }
 
-/** A block is bilateral within chat, including list previews and delivery recipients. */
 async function systemLineDisplayName(tx: Prisma.TransactionClient, userId: string): Promise<string> {
   const user = await tx.v1User.findUnique({
     where: { id: userId },
@@ -967,6 +966,7 @@ async function systemLineDisplayName(tx: Prisma.TransactionClient, userId: strin
   return user?.profile?.nickname ?? user?.profile?.displayName ?? '참여자';
 }
 
+/** A block is bilateral within chat, including list previews and delivery recipients. */
 export function chatVisibleUserWhere(userId: string): Prisma.V1UserWhereInput {
   return {
     chatBlocksMade: { none: { blockedUserId: userId } },

@@ -100,10 +100,11 @@ describe('리그 결과 확정 알림 수신자·문구 (Task 180 G7)', () => {
     // 확정 전에 팀을 나간 출전자 — 결과 행은 남지만 알림은 받지 않는다.
     await prisma.v1TeamMembership.updateMany({ where: { teamId: teamH.id, userId: id('left-h') }, data: { status: 'left' } });
     const officialAt = new Date();
+    // 결과 참가자 행은 DRAFT 리비전에만 붙는다(DB 트리거) — 붙인 뒤 OFFICIAL 로 올린다.
     const revision = await prisma.v1GameResultRevision.create({
       data: {
-        gameId: game.id, revision: 1, state: 'OFFICIAL', score, eventsHash: `g7-result-${randomUUID()}`,
-        createdByActorType: 'SYSTEM', createdBySystemActor: 'G7_RESULT_NOTICE_TEST', submittedAt: officialAt, officialAt,
+        gameId: game.id, revision: 1, state: 'DRAFT', score, eventsHash: `g7-result-${randomUUID()}`,
+        createdByActorType: 'SYSTEM', createdBySystemActor: 'G7_RESULT_NOTICE_TEST',
       },
     });
     // dropped-h 는 명단에서 빠져 결과 행이 없다.
@@ -114,6 +115,7 @@ describe('리그 결과 확정 알림 수신자·문구 (Task 180 G7)', () => {
         return { resultRevisionId: revision.id, participantId: participant.id, sideId: participant.sideId, started: true, goals, assists, cards: [] };
       }),
     });
+    await prisma.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: 'OFFICIAL', submittedAt: officialAt, officialAt } });
     await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
 
     const projection = new GameResultOfficialProjectionService();

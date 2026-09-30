@@ -173,7 +173,7 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
   참석명단 최종 확인 알림을 받는다).
 - 경기 전 알림은 라인업 리마인더 워커(15분 스캔)가 보낸다. 전날 알림은 내일(KST) 경기에 대해 09시 이후 첫 스캔이, 킥오프 알림은
   킥오프 2시간 전부터 30분 안의 스캔이 보낸다. **2시간 전 시각이 21~09시(KST)면 보내지 않는다.** businessKey
-  `game-day-before:{gameId}:{userId}` · `game-kickoff:{gameId}:{userId}` 로 (경기, 수신자)당 한 번이다.
+  `game-day-before:{gameId}:{startAtMs}:{userId}` · `game-kickoff:{gameId}:{startAtMs}:{userId}` 로 (경기 일정, 수신자)당 한 번이다 — 경기를 옮기면 새 시각으로 다시 보낸다.
 - 수신 설정은 "경기·대회"(`teamMatchEnabled`)를 따른다. 기존 팀장·매니저 "명단 확인"·참석명단 알림은 `teamEnabled` 그대로다.
 - 공개 경기 상세: 대회는 `targetType=tournament`, targetId `{tournamentId}:{teamMatchId}` → `/tournaments/:id/matches/:teamMatchId`,
   리그·친선은 `targetType=team_match` → `/team-matches/:id`(리그 대진은 리그 경기 상세로 redirect).

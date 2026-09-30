@@ -196,7 +196,10 @@ export function isKickoffReminderDue(startAt: Date, now: Date): boolean {
   return !isQuietHour(new Date(startAt.getTime() - KICKOFF_REMINDER_LEAD_MS));
 }
 
-/** 킥오프 2시간 전 — 출전자와 팀장·매니저. 출전자에게만 "지금 출전 명단에 있어요."를 붙인다. */
+/**
+ * 킥오프 2시간 전 — 출전자와 팀장·매니저. 출전자에게만 "지금 출전 명단에 있어요."를 붙인다.
+ * 두 알림 모두 제목·본문에 시각이 박히므로 멱등 키에 킥오프 시각을 넣는다 — 경기를 옮기면 새 시각으로 다시 보낸다.
+ */
 export function buildKickoffReminderRows(side: ReminderGameSide, audience: SideAudience): ReminderRow[] {
   const attendees = audience.attendeeUserIds;
   if (attendees === null) return [];
@@ -210,7 +213,7 @@ export function buildKickoffReminderRows(side: ReminderGameSide, audience: SideA
     title: copy.title,
     body: attendees.has(userId) ? `${lead} ${copy.defaultBody}` : lead,
     deepLink: copy.deepLink,
-    businessKey: `game-kickoff:${side.gameId}:${userId}`,
+    businessKey: `game-kickoff:${side.gameId}:${side.startAt.getTime()}:${userId}`,
   }));
 }
 
@@ -229,7 +232,7 @@ export function buildDayBeforeAttendeeRows(side: ReminderGameSide, audience: Sid
       title: `${formatKstMonthDayTime(side.startAt)} ${copy.title}`,
       body: `${matchup(side)}. ${copy.defaultBody}`,
       deepLink: copy.deepLink,
-      businessKey: `game-day-before:${side.gameId}:${userId}`,
+      businessKey: `game-day-before:${side.gameId}:${side.startAt.getTime()}:${userId}`,
     }));
 }
 

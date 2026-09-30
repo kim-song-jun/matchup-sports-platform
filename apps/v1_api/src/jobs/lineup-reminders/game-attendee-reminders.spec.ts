@@ -62,7 +62,7 @@ describe('buildKickoffReminderRows', () => {
       targetType: 'team_match',
       targetId: 'tm-1',
       deepLink: '/team-matches/tm-1',
-      businessKey: 'game-kickoff:game-1:player-1',
+      businessKey: `game-kickoff:game-1:${side().startAt.getTime()}:player-1`,
     });
   });
 
@@ -93,7 +93,7 @@ describe('buildDayBeforeAttendeeRows', () => {
         title: '9/30 (수) 01:10 경기가 있어요',
         body: 'vs 합정 유나이티드 · 망원 유수지 풋살장. 출전 명단은 경기 전까지 바뀔 수 있어요.',
         deepLink: '/team-matches/tm-1',
-        businessKey: 'game-day-before:game-1:player-1',
+        businessKey: `game-day-before:game-1:${side().startAt.getTime()}:player-1`,
       },
     ]);
   });
@@ -140,5 +140,21 @@ describe('loadSideAudiences — 친선 참석명단', () => {
     ]);
     const [{ audience: result }] = await loadSideAudiences(tx as never, [friendly]);
     expect(result.attendeeUserIds).toBeNull();
+  });
+});
+
+describe('경기 전 알림의 멱등 키', () => {
+  it('같은 일정이면 같은 키, 경기를 옮기면 새 키라 새 시각으로 다시 보낸다', () => {
+    const moved = side({ startAt: new Date('2026-10-02T10:00:00Z') });
+    const keys = (s: ReminderGameSide) => [
+      buildKickoffReminderRows(s, audience(['player-1'], []))[0].businessKey,
+      buildDayBeforeAttendeeRows(s, audience(['player-1'], []))[0].businessKey,
+    ];
+
+    expect(keys(side())).toEqual(keys(side()));
+    const [kickoffBefore, dayBeforeBefore] = keys(side());
+    const [kickoffAfter, dayBeforeAfter] = keys(moved);
+    expect(kickoffAfter).not.toBe(kickoffBefore);
+    expect(dayBeforeAfter).not.toBe(dayBeforeBefore);
   });
 });

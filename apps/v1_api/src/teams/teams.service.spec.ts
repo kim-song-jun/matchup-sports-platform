@@ -1692,6 +1692,7 @@ describe('TeamsService', () => {
     });
 
     prisma.v1Team.findFirst.mockResolvedValueOnce(openTeam);
+    prisma.v1User.findUnique.mockResolvedValueOnce({ profile: { nickname: '새싹', displayName: '김새싹' } });
     prisma.v1TeamJoinApplication.create.mockResolvedValueOnce(createdApplication);
     prisma.v1StatusChangeLog.create.mockResolvedValueOnce({ id: 'log-1' });
 
@@ -1709,7 +1710,8 @@ describe('TeamsService', () => {
       expect.any(Function),
       'team_join_application_received',
       'team-1',
-      '"테스트팀" 팀 가입 신청을 확인해 주세요.',
+      // G12 F35: 여러 건이 쌓여도 누가 신청했는지 알림 한 줄로 구분된다.
+      '새싹님이 "테스트팀" 팀에 가입 신청했어요.',
     );
 
     prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
@@ -2123,7 +2125,10 @@ describe('TeamsService', () => {
     });
 
     it('초대받은 본인이 수락 → membership active + memberCount increment', async () => {
-      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      const inv = {
+        ...invitationRow({ invitedUserId: invitee.id, status: 'pending' }),
+        invitedUser: { profile: { nickname: null, displayName: '박초대' } },
+      };
       prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
 
       // 트랜잭션 내부
@@ -2153,6 +2158,12 @@ describe('TeamsService', () => {
       expect(result.alreadyProcessed).toBe(false);
       expect(result.membershipId).toBe('mem-new');
       expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith(invitee.id, 'team-1');
+      expect(notifications.emitNotification).toHaveBeenCalledWith(
+        inv.invitedByUserId,
+        'team_invitation_accepted',
+        'team-1',
+        '박초대님이 "테스트팀" 팀 초대를 수락했어요.',
+      );
       // memberCount increment 가 호출됐어야 함
       expect(prisma.v1Team.update).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -1006,6 +1006,8 @@ export class TeamsService {
     }
 
     const existing = team.joinApplications[0] ?? null;
+    // 알림 문구의 이름은 쓰기 전에 읽는다 — 커밋 뒤에 조회가 실패하면 신청은 됐는데 요청이 500 이 된다.
+    const applicantName = await this.userDisplayName(user.id, '신청자');
     const application = await this.prisma.$transaction(async (tx) => {
       const nextApplication = existing
         ? await tx.v1TeamJoinApplication.update({
@@ -1053,7 +1055,7 @@ export class TeamsService {
         ).map((m) => m.userId),
       'team_join_application_received',
       team.id,
-      `"${team.name}" 팀 가입 신청을 확인해 주세요.`,
+      `${applicantName}님이 "${team.name}" 팀에 가입 신청했어요.`,
     );
 
     return {
@@ -1619,6 +1621,7 @@ export class TeamsService {
         invitedUserId: true,
         invitedByUserId: true,
         status: true,
+        invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } },
         team: {
           select: {
             id: true,
@@ -1740,7 +1743,7 @@ export class TeamsService {
       invitation.invitedByUserId,
       'team_invitation_accepted',
       invitation.teamId,
-      `"${invitation.team.name}" 팀 초대를 수락했어요.`,
+      `${invitation.invitedUser?.profile?.nickname ?? invitation.invitedUser?.profile?.displayName ?? '초대받은 분'}님이 "${invitation.team.name}" 팀 초대를 수락했어요.`,
     );
 
     return {
@@ -2183,6 +2186,14 @@ export class TeamsService {
       },
       manager: this.findManager(team),
     };
+  }
+
+  private async userDisplayName(userId: string, fallback: string) {
+    const found = await this.prisma.v1User.findUnique({
+      where: { id: userId },
+      select: { profile: { select: { nickname: true, displayName: true } } },
+    });
+    return found?.profile?.nickname ?? found?.profile?.displayName ?? fallback;
   }
 
   private findManager(team: TeamWithRelations) {

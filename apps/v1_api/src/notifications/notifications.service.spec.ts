@@ -49,6 +49,8 @@ describe('NotificationsService', () => {
       updateMany: jest.Mock;
       count: jest.Mock;
     };
+    v1TeamMatch: { findUnique: jest.Mock };
+    v1TeamSchedule: { findUnique: jest.Mock };
   };
 
   const realtimeNotifier = { emitToUser: jest.fn() };
@@ -69,7 +71,11 @@ describe('NotificationsService', () => {
         updateMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1TeamSchedule: { findUnique: jest.fn().mockResolvedValue(null) },
     };
+    // 팀·팀매치 알림은 밤에 푸시를 보류한다 — 시각에 따라 결과가 갈리지 않게 한낮(KST 12시)으로 고정한다.
+    jest.useFakeTimers({ now: new Date('2026-06-14T03:00:00Z'), doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -84,7 +90,10 @@ describe('NotificationsService', () => {
     service = module.get(NotificationsService);
   });
 
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
 
   // ─── emitNotification ──────────────────────────────────────────────────────
 
@@ -589,6 +598,69 @@ describe('NotificationsService', () => {
       await new Promise(setImmediate);
 
       expect(prisma.v1Notification.create).toHaveBeenCalled();
+    });
+  });
+
+  // ─── 야간 푸시 보류(H1-night) ─────────────────────────────────────────────
+
+  describe('밤(21~9시)의 팀·팀매치 사건 알림', () => {
+    const at = (iso: string) => jest.setSystemTime(new Date(iso));
+    async function emitAndFlush(type: Parameters<NotificationsService['emitNotification']>[1], targetId: string) {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+      await service.emitNotification('user-1', type, targetId);
+      await new Promise(setImmediate);
+    }
+
+    it('밤에는 알림함 행만 만들고 푸시는 보내지 않는다 — 아침에 몰아 보내지도 않는다', async () => {
+      at('2026-06-14T14:00:00Z'); // KST 23:00
+      await emitAndFlush('team_join_application_accepted', 'team-1');
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+      expect(realtimeNotifier.emitToUser).toHaveBeenCalledTimes(1);
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('낮에는 같은 알림을 푸시한다', async () => {
+      at('2026-06-14T03:00:00Z'); // KST 12:00
+      await emitAndFlush('team_join_application_accepted', 'team-1');
+
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('그 밤이 끝나기(다음 9시) 전에 시작하는 경기 알림은 밤에도 푸시한다', async () => {
+      at('2026-06-14T14:00:00Z'); // KST 23:00
+      prisma.v1TeamMatch.findUnique.mockResolvedValue({ startAt: new Date('2026-06-14T22:00:00Z') }); // 다음 날 07:00
+      await emitAndFlush('team_match_cancelled', 'team-match-1');
+
+      expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'team-match-1' } }));
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('다음 9시 이후에 시작하는 경기 알림은 밤에 푸시하지 않는다', async () => {
+      at('2026-06-14T17:30:00Z'); // KST 02:30
+      prisma.v1TeamMatch.findUnique.mockResolvedValue({ startAt: new Date('2026-06-15T00:00:00Z') }); // KST 09:00 정각
+      await emitAndFlush('team_match_cancelled', 'team-match-1');
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('시작 시각 조회가 실패하면 푸시만 보류하고 알림함 행은 남긴다', async () => {
+      at('2026-06-14T14:00:00Z');
+      prisma.v1TeamMatch.findUnique.mockRejectedValue(new Error('db down'));
+      await emitAndFlush('team_match_cancelled', 'team-match-1');
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('팀·팀매치 밖의 알림(개인 매치)은 밤에도 지금처럼 푸시한다', async () => {
+      at('2026-06-14T14:00:00Z');
+      await emitAndFlush('match_application_received', 'match-1');
+
+      expect(prisma.v1TeamMatch.findUnique).not.toHaveBeenCalled();
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
     });
   });
 

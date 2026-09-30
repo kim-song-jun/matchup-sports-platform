@@ -5,7 +5,7 @@ import type { WebPushService } from '../../notifications/web-push.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
 import { collectAttendeeReminderRows, type ReminderRow } from './game-attendee-reminders';
-import { isQuietHour, kstMidnight, kstParts } from './quiet-hours';
+import { isQuietHour, kstMidnight, kstParts } from '../../common/quiet-hours';
 
 const deliveryLogger = new Logger('LineupReminderDelivery');
 

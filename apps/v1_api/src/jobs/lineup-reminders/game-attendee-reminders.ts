@@ -3,7 +3,7 @@ import { formatKstMonthDayTime, formatKstTime } from '../../common/kst-datetime'
 import { loadCompetitionRosterBase, loadGameRoster, type GameRosterPreload } from '../../games/roster/game-roster-loader';
 import { notificationCopyFor } from '../../notifications/notifications.service';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
-import { isQuietHour, kstMidnight } from './quiet-hours';
+import { isQuietHour, kstMidnight } from '../../common/quiet-hours';
 
 type Tx = Prisma.TransactionClient;
 

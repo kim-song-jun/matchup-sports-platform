@@ -2,6 +2,7 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { isQuietHour, quietHoursEndAfter } from '../common/quiet-hours';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   NotificationsQueryDto,
@@ -135,6 +136,23 @@ type NotificationPrefField = keyof Pick<
   },
   'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled' | 'importantEnabled'
 >;
+
+/**
+ * 밤(KST 21~9시)에는 알림함에만 쌓고 푸시를 보내지 않는 축 — 팀·팀매치 사건 알림(Task 180 H1-night).
+ * 아침에 몰아 보내지 않는다. 그 밤이 끝나기 전에 시작하는 일정·경기에 관한 알림만 예외로 밤에도 푸시한다.
+ */
+const NIGHT_HELD_PREF_FIELDS: ReadonlySet<NotificationPrefField> = new Set(['teamEnabled', 'teamMatchEnabled']);
+
+/** targetId 가 "${teamId}:${scheduleId}" 인 일정 알림 — 야간 예외 판정에 일정 시작 시각을 읽는다. */
+const SCHEDULE_TARGET_EVENTS: ReadonlySet<NotificationEventType> = new Set([
+  'schedule_rsvp_deadline_reminder',
+  'schedule_guest_recruitment_close_reminder',
+]);
+
+/** 호출부가 기본 문구 대신 넣는 값. 제목에 사람·팀 이름이 들어가는 알림이 쓴다. */
+export interface NotificationEmitOptions {
+  readonly title?: string;
+}
 
 /** Preference field in V1NotificationPreference that gates the event type. */
 function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
@@ -595,21 +613,9 @@ export class NotificationsService {
     type: NotificationEventType,
     targetId: string | null,
     body?: string,
+    options?: NotificationEmitOptions,
   ): Promise<void> {
-    const targetType = targetTypeForEvent(type);
-    const deepLink = deepLinkForEvent(type, targetType, targetId);
-    const title = EVENT_TITLES[type];
-    const prefField = preferenceFieldForEvent(type);
-
-    this.emitNotificationFireAndForget(
-      userId,
-      targetType,
-      targetId,
-      title,
-      body ?? EVENT_BODIES[type],
-      deepLink,
-      prefField,
-    );
+    this.dispatch([userId], type, targetId, body, options);
   }
 
   /** 아직 처리 전인 "팀 초대 도착" 알림 — 사용자·팀이 같고 도착지가 초대함이며 읽지 않은 것. */
@@ -666,19 +672,9 @@ export class NotificationsService {
     type: NotificationEventType,
     targetId: string | null,
     body?: string,
+    options?: NotificationEmitOptions,
   ): Promise<void> {
-    if (userIds.length === 0) return;
-    for (const userId of userIds) {
-      this.emitNotificationFireAndForget(
-        userId,
-        targetTypeForEvent(type),
-        targetId,
-        EVENT_TITLES[type],
-        body ?? EVENT_BODIES[type],
-        deepLinkForEvent(type, targetTypeForEvent(type), targetId),
-        preferenceFieldForEvent(type),
-      );
-    }
+    this.dispatch(userIds, type, targetId, body, options);
   }
 
   /**
@@ -691,38 +687,91 @@ export class NotificationsService {
     type: NotificationEventType,
     targetId: string | null,
     body?: string,
+    options?: NotificationEmitOptions,
   ): void {
     void (async () => {
       const userIds = await resolveUserIds();
-      await this.emitNotificationToMany(userIds, type, targetId, body);
+      this.dispatch(userIds, type, targetId, body, options);
     })().catch((e: unknown) => this.logger.warn({ type, err: e }, '알림 발송 실패'));
   }
 
-  private emitNotificationFireAndForget(
-    userId: string,
+  private dispatch(
+    userIds: readonly string[],
+    type: NotificationEventType,
+    targetId: string | null,
+    body: string | undefined,
+    options: NotificationEmitOptions | undefined,
+  ): void {
+    if (userIds.length === 0) return;
+    const targetType = targetTypeForEvent(type);
+    const message = {
+      targetType,
+      targetId,
+      title: options?.title ?? EVENT_TITLES[type],
+      body: body ?? EVENT_BODIES[type],
+      deepLink: deepLinkForEvent(type, targetType, targetId),
+    };
+    const prefField = preferenceFieldForEvent(type);
+    void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
+      for (const userId of userIds) {
+        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed).catch((err: unknown) => {
+          this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
+        });
+      }
+    });
+  }
+
+  /**
+   * 지금 이 알림을 푸시해도 되는가(H1-night). 밤에는 팀·팀매치 사건 알림의 푸시를 보류하되, 그 밤이
+   * 끝나기(다음 9시) 전에 시작하는 일정·경기 알림은 보낸다. 시작 시각을 못 읽으면 보류 쪽으로 둔다 —
+   * 알림함 기록은 어느 쪽이든 남는다.
+   */
+  private async pushAllowedNow(
+    type: NotificationEventType,
     targetType: V1NotificationTargetType,
     targetId: string | null,
-    title: string,
-    body: string | null,
-    deepLink: string | null,
-    prefField: NotificationPrefField,
-  ): void {
-    this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
-      (err: unknown) => {
-        this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
-      },
-    );
+  ): Promise<boolean> {
+    const now = new Date();
+    if (!NIGHT_HELD_PREF_FIELDS.has(preferenceFieldForEvent(type)) || !isQuietHour(now)) return true;
+    try {
+      const startsAt = await this.eventStartsAt(type, targetType, targetId);
+      return startsAt !== null && startsAt < quietHoursEndAfter(now);
+    } catch (err) {
+      this.logger.warn({ type, targetId, err }, '야간 푸시 판정용 시작 시각 조회 실패 — 푸시를 보류합니다');
+      return false;
+    }
+  }
+
+  /** 알림이 가리키는 일정·경기의 시작 시각. 팀매치 알림은 targetId 가 팀매치 id 다(리그 대진 알림은 리그 id 라 null). */
+  private async eventStartsAt(
+    type: NotificationEventType,
+    targetType: V1NotificationTargetType,
+    targetId: string | null,
+  ): Promise<Date | null> {
+    if (targetId === null) return null;
+    const scheduleId = SCHEDULE_TARGET_EVENTS.has(type) ? targetId.split(':')[1] : undefined;
+    if (scheduleId !== undefined) {
+      const schedule = await this.prisma.v1TeamSchedule.findUnique({ where: { id: scheduleId }, select: { startAt: true } });
+      return schedule?.startAt ?? null;
+    }
+    if (targetType !== 'team_match') return null;
+    const teamMatch = await this.prisma.v1TeamMatch.findUnique({ where: { id: targetId }, select: { startAt: true } });
+    return teamMatch?.startAt ?? null;
   }
 
   private async createNotificationWithPrefCheck(
     userId: string,
-    targetType: V1NotificationTargetType,
-    targetId: string | null,
-    title: string,
-    body: string | null,
-    deepLink: string | null,
+    message: {
+      targetType: V1NotificationTargetType;
+      targetId: string | null;
+      title: string;
+      body: string | null;
+      deepLink: string | null;
+    },
     prefField: NotificationPrefField,
+    pushAllowed: boolean,
   ): Promise<void> {
+    const { targetType, targetId, title, body, deepLink } = message;
     const pref = await this.prisma.v1NotificationPreference.findUnique({
       where: { userId },
       select: { [prefField]: true },
@@ -752,6 +801,7 @@ export class NotificationsService {
       this.logger.warn({ userId, targetType, targetId, err }, '실시간 알림 전송 실패');
     }
 
+    if (!pushAllowed) return;
     void this.webPushService
       .sendToUser(userId, {
         notificationId: notification.id,

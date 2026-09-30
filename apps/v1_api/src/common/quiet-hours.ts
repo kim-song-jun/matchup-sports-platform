@@ -1,4 +1,4 @@
-import { KST_OFFSET_MS } from '../../common/kst-datetime';
+import { KST_OFFSET_MS } from './kst-datetime';
 
 /** 알림을 보내지 않는 시간대(한국 시간). 21시부터 다음 날 9시 전까지. */
 export const QUIET_START_HOUR = 21;
@@ -32,4 +32,16 @@ export function kstMidnight(at: Date, offsetDays: number): Date {
 export function isQuietHour(at: Date): boolean {
   const { hour } = kstParts(at);
   return hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+}
+
+/** `at` 이후 처음 오는 KST 9시 — 밤이면 그 밤이 끝나는 시각, 낮이면 다음 날 아침. */
+export function quietHoursEndAfter(at: Date): Date {
+  const { hour } = kstParts(at);
+  return new Date(kstMidnight(at, hour < QUIET_END_HOUR ? 0 : 1).getTime() + QUIET_END_HOUR * 60 * 60 * 1000);
+}
+
+/** 밤이 시작되기 전 마지막 스캔 창(KST 20:45~21:00). 스캔이 15분 슬롯이라 이 창에는 한 번만 든다. */
+export function isEveningCutoffScan(at: Date): boolean {
+  const shifted = new Date(at.getTime() + KST_OFFSET_MS);
+  return shifted.getUTCHours() === QUIET_START_HOUR - 1 && shifted.getUTCMinutes() >= 45;
 }

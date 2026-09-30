@@ -63,7 +63,7 @@
 ## `GET /api/v1/home` — `summary.monthlyMatches` (Task 180 F85)
 
 "이번 달 경기" — 마이 `GET /me/activity-summary` 의 `monthly.matchCount` 와 같은 집계 함수로 센다(끝난 개인 매치
-참가 + 공식 팀매치 출전, UTC 달). 신청만 한 매치는 세지 않고 `pendingLabel`("대기 중인 신청 N건")로 따로 싣는다.
+참가 + 공식 팀매치 출전, KST 달). 신청만 한 매치는 세지 않고 `pendingLabel`("대기 중인 신청 N건")로 따로 싣는다.
 
 ## `GET /api/v1/home` — `teamActivity` (Task 180 G7)
 

@@ -5079,13 +5079,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   font-weight: 600;
 }
 
-/* 여러 줄 입력칸 — 한 줄이면 44px, 내용만큼 자라다 5줄(120px)부터 스크롤. 높이는 컴포넌트가
-   scrollHeight 로 맞춘다. 알약 모양은 여러 줄에서 타원이 되므로 필드 모서리를 쓴다. */
+/* 여러 줄 입력칸 — 한 줄이면 44px, 내용만큼 자라다 5줄이 넘으면 스크롤. 높이는 컴포넌트가
+   scrollHeight 로 맞춘다. 알약 모양은 여러 줄에서 타원이 되므로 필드 모서리를 쓴다.
+   전역 border-box 라 max-height 에 위아래 padding 이 들어간다: 5줄(20×5) + 24 = 124px. */
 textarea.tm-chat-input-placeholder {
   display: block;
   padding: 12px 16px;
   line-height: 20px;
-  max-height: 120px;
+  max-height: 124px;
   overflow-y: auto;
   border-radius: var(--radius-field);
   color: var(--text-strong);

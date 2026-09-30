@@ -1,5 +1,4 @@
 import { TeamMatchCompletionNotificationService } from './team-match-completion-notification.service';
-import { notificationCopyFor } from '../notifications/notifications.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 
 function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevisionRow {
@@ -169,64 +168,89 @@ describe('TeamMatchCompletionNotificationService', () => {
     expect(data.map((row) => row.recipientUserId).sort()).toEqual(['user-away-leader', 'user-host-in']);
   });
 
-  it('명단이 있어도 리그 알림은 결과 영수증 화면으로 가므로 명단 밖 팀장에게도 간다', async () => {
-    const { tx, createMany } = fakeTx({
-      teamMatch: { id: 'tm-league-1', title: '리그 3주차', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: 'league-1' },
-      memberships: [
-        { userId: 'user-host-in', teamId: 'team-home' },
-        { userId: 'user-host-out', teamId: 'team-home' },
-      ],
-      preferences: [],
-      alreadyDelivered: [],
-      lineups: { home: ['user-host-in'], away: [] },
+  describe('리그 결과 확정 (Task 180 G7)', () => {
+    /** 리그 경로가 읽는 표면만 흉내낸다 — 양 팀 멤버십(역할 포함), 공식 결과 참가자 행, 형제 대진 시각. */
+    function fakeLeagueTx(options: {
+      members: Array<{ userId: string; teamId: string; role: string }>;
+      resultRows: Array<{ participantId: string; sideId: string; userId: string | null; goals: number; assists: number }>;
+      preferences?: Array<{ userId: string; teamMatchEnabled: boolean }>;
+    }) {
+      const createMany = jest.fn().mockResolvedValue({ count: 0 });
+      const tx = {
+        v1Game: {
+          findUnique: jest.fn().mockResolvedValue({
+            teamMatchId: 'tm-league-1',
+            teamMatch: {
+              title: '가을 리그 2주차 1경기',
+              hostTeamId: 'team-home',
+              approvedApplicantTeamId: 'team-away',
+              leagueId: 'league-1',
+              startAt: new Date('2026-09-12T10:00:00Z'),
+              league: { title: '가을 리그' },
+            },
+          }),
+        },
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue(options.members) },
+        v1GameSide: { findMany: jest.fn().mockResolvedValue([{ id: 'side-home', teamId: 'team-home' }, { id: 'side-away', teamId: 'team-away' }]) },
+        v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(options.resultRows) },
+        v1GameParticipant: {
+          findMany: jest.fn().mockResolvedValue(
+            options.resultRows.map((row) => ({ id: row.participantId, sideId: row.sideId, userId: row.userId, displayNameSnapshot: row.participantId })),
+          ),
+        },
+        v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
+        v1ParticipantIdentityLinkEvent: { findMany: jest.fn().mockResolvedValue([]) },
+        v1Team: { findMany: jest.fn().mockResolvedValue([{ id: 'team-home', name: '성수 FC' }, { id: 'team-away', name: '망원 FC' }]) },
+        // 경기일 두 날 중 두 번째 — "2주차"(저장된 제목의 주차가 아니라 경기일 순번).
+        v1TeamMatch: { findMany: jest.fn().mockResolvedValue([{ startAt: new Date('2026-09-05T10:00:00Z') }, { startAt: new Date('2026-09-12T10:00:00Z') }]) },
+        v1NotificationPreference: { findMany: jest.fn().mockResolvedValue(options.preferences ?? []) },
+        v1Notification: { findMany: jest.fn().mockResolvedValue([]), createMany },
+      };
+      return { tx: tx as never, createMany };
+    }
+    const leagueRevision = () => revisionFixture({ teamMatchId: 'tm-league-1', leagueId: 'league-1', score: { home: 2, away: 1 } });
+    const members = [
+      { userId: 'home-owner', teamId: 'team-home', role: 'owner' }, // 출전하지 않은 팀장
+      { userId: 'home-scorer', teamId: 'team-home', role: 'member' },
+      { userId: 'home-dropped', teamId: 'team-home', role: 'member' }, // 명단에서 빠져 결과 행이 없다
+      { userId: 'away-manager', teamId: 'team-away', role: 'manager' }, // 출전한 매니저
+      { userId: 'away-bench', teamId: 'team-away', role: 'member' }, // 출전하지 않은 팀원
+    ];
+    const resultRows = [
+      { participantId: 'p-scorer', sideId: 'side-home', userId: 'home-scorer', goals: 1, assists: 1 },
+      { participantId: 'p-left', sideId: 'side-home', userId: 'home-left', goals: 1, assists: 0 }, // 그 뒤 팀을 나갔다
+      { participantId: 'p-guest', sideId: 'side-home', userId: null, goals: 0, assists: 0 }, // 계정 없는 참가자
+      { participantId: 'p-manager', sideId: 'side-away', userId: 'away-manager', goals: 0, assists: 0 },
+    ];
+
+    it('팀장·매니저와 공식 결과의 출전자가 받고, 빠진 선수·팀 나간 출전자·출전 안 한 팀원은 받지 않는다', async () => {
+      const { tx, createMany } = fakeLeagueTx({ members, resultRows });
+      const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+      await new TeamMatchCompletionNotificationService(webPush as never).project(tx, leagueRevision());
+
+      const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
+      expect(data.map((row) => [row.recipientUserId, row.body])).toEqual([
+        ['home-scorer', '가을 리그 2주차 · 성수 FC 2 : 1 망원 FC · 승리. 내 기록 1골 1도움이에요.'],
+        ['home-owner', '가을 리그 2주차 · 성수 FC 2 : 1 망원 FC · 승리.'],
+        ['away-manager', '가을 리그 2주차 · 성수 FC 2 : 1 망원 FC · 패배.'],
+      ]);
+      expect(data[0]).toMatchObject({
+        title: '경기 결과가 확정됐어요',
+        deepLink: '/team-matches/tm-league-1/result',
+        // businessKey 네임스페이스는 일반 팀매치와 같다 — 정정 리비전이 다시 확정돼도 재알림하지 않는다.
+        businessKey: 'team-match-completed:tm-league-1:home-scorer',
+      });
+      expect(data.some((row) => String(row.body).includes('문의'))).toBe(false);
+      expect(webPush.sendToUser).toHaveBeenCalledWith('away-manager', expect.objectContaining({ title: '경기 결과가 확정됐어요' }));
     });
-    const service = new TeamMatchCompletionNotificationService();
 
-    await service.project(tx, revisionFixture());
+    it('경기·대회 알림(teamMatchEnabled)을 끈 출전자는 받지 않는다', async () => {
+      const { tx, createMany } = fakeLeagueTx({ members, resultRows, preferences: [{ userId: 'home-scorer', teamMatchEnabled: false }] });
+      await new TeamMatchCompletionNotificationService().project(tx, leagueRevision());
 
-    const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
-    expect(data.map((row) => row.recipientUserId).sort()).toEqual(['user-host-in', 'user-host-out']);
-  });
-
-  it('리그 대진(leagueId 있음)은 결과 영수증 화면으로 가는 리그 전용 문구를 쓴다', async () => {
-    const { tx, createMany } = fakeTx({
-      teamMatch: {
-        id: 'tm-league-1',
-        title: '리그 3주차 A vs B',
-        hostTeamId: 'team-home',
-        approvedApplicantTeamId: 'team-away',
-        leagueId: 'league-1',
-      },
-      memberships: [{ userId: 'user-host-owner', teamId: 'team-home' }],
-      preferences: [],
-      alreadyDelivered: [],
+      const recipients = (createMany.mock.calls[0][0].data as Array<{ recipientUserId: string }>).map((row) => row.recipientUserId);
+      expect(recipients).toEqual(['home-owner', 'away-manager']);
     });
-    const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
-    const service = new TeamMatchCompletionNotificationService(webPush as never);
-
-    await service.project(tx, revisionFixture());
-
-    expect(createMany).toHaveBeenCalledTimes(1);
-    const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
-    expect(data).toHaveLength(1);
-    expect(data[0].title).toBe('리그 경기 결과가 확정됐어요');
-    // body 는 **문구 테이블의 `defaultBody` 를 단일 소스로** 조합한다. 여기에 문자열을
-    // 복사해 두면 테이블만 고쳤을 때 이 스펙이 그 드리프트를 놓친다 — 실제로 Task 166 이
-    // 테이블에 "문의는 리그 운영자에게" 를 넣었는데 발송 경로엔 빠져 두 문구가 어긋났고,
-    // 그때 이 스펙은 통과했다(Copilot 리뷰). 이제 같은 소스를 읽어 비교한다.
-    const leagueCopy = notificationCopyFor('league_team_match_completed', 'team_match', 'tm-league-1');
-    expect(data[0].body).toBe(`"리그 3주차 A vs B" ${leagueCopy.defaultBody}`);
-    // 그 문구가 이의 안내를 다시 들이지 않았는지는 값으로 따로 본다(정본 §4).
-    expect(leagueCopy.defaultBody).not.toContain('이의');
-    expect(data[0].deepLink).toBe('/team-matches/tm-league-1/result');
-    // businessKey 네임스페이스는 일반 팀매치와 동일 — 팀매치 하나는 생애주기 내내
-    // 리그 아니면 일반 중 하나로 고정이라 나눌 이유가 없다.
-    expect(data[0].businessKey).toBe('team-match-completed:tm-league-1:user-host-owner');
-
-    expect(webPush.sendToUser).toHaveBeenCalledWith(
-      'user-host-owner',
-      expect.objectContaining({ title: '리그 경기 결과가 확정됐어요', url: '/team-matches/tm-league-1/result' }),
-    );
   });
 
   it('canonical tournament TeamMatch is left to the tournament notification lane', async () => {

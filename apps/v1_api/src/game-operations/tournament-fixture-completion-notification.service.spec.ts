@@ -27,15 +27,29 @@ function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): Official
 
 /** Minimal fake of the Prisma.TransactionClient surface this service touches. */
 function fakeTx(options: {
-  memberships: Array<{ userId: string }>;
+  /** 팀을 적지 않으면 홈팀 팀장이다. */
+  memberships: Array<{ userId: string; teamId?: string; role?: string }>;
   preferences: Array<{ userId: string; activityEnabled: boolean }>;
   alreadyDelivered: string[];
+  /** 공식 결과 참가자(출전자). */
+  resultRows?: Array<{ participantId: string; sideId: string; userId: string; goals: number; assists: number }>;
 }) {
   const createMany = jest.fn().mockResolvedValue({ count: 0 });
+  const resultRows = options.resultRows ?? [];
   const tx = {
     v1TeamMembership: {
-      findMany: jest.fn().mockResolvedValue(options.memberships),
+      findMany: jest.fn().mockResolvedValue(
+        options.memberships.map((m) => ({ userId: m.userId, teamId: m.teamId ?? 'team-home', role: m.role ?? 'owner' })),
+      ),
     },
+    v1GameSide: { findMany: jest.fn().mockResolvedValue([{ id: 'side-home', teamId: 'team-home' }, { id: 'side-away', teamId: 'team-away' }]) },
+    v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(resultRows) },
+    v1GameParticipant: {
+      findMany: jest.fn().mockResolvedValue(resultRows.map((row) => ({ id: row.participantId, sideId: row.sideId, userId: row.userId, displayNameSnapshot: row.userId }))),
+    },
+    v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
+    v1ParticipantIdentityLinkEvent: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TournamentMatchDetails: { findUnique: jest.fn().mockResolvedValue({ round: 'final' }) },
     v1NotificationPreference: {
       findMany: jest.fn().mockResolvedValue(options.preferences),
     },
@@ -76,7 +90,7 @@ describe('TournamentFixtureCompletionNotificationService', () => {
 
   it('notifies both teams\' owner/manager with the scoreline and the public match deep link', async () => {
     const { tx, createMany } = fakeTx({
-      memberships: [{ userId: 'captain-home' }, { userId: 'captain-away' }],
+      memberships: [{ userId: 'captain-home' }, { userId: 'captain-away', teamId: 'team-away' }],
       preferences: [],
       alreadyDelivered: [],
     });
@@ -94,12 +108,17 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       (row: { recipientUserId: string }) => row.recipientUserId === 'captain-home',
     );
     expect(homeRow).toMatchObject({
+      title: '대회 경기 결과가 확정됐어요',
       targetType: 'tournament',
-      targetId: 'tour-1',
-      body: '테스트 대회 — 홈팀FC 2:1 원정팀FC 결과가 공식 확정됐어요.',
+      targetId: 'tour-1:fixture-1',
+      body: '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 승리.',
       deepLink: '/tournaments/tour-1/matches/fixture-1',
       businessKey: 'tournament-fixture-completed:fixture-1:captain-home',
     });
+    // 승패는 받는 사람 팀 기준이다.
+    expect(rows.find((row: { recipientUserId: string }) => row.recipientUserId === 'captain-away').body).toBe(
+      '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 패배.',
+    );
   });
 
   it('notifies a canonical tournament TeamMatch through the same tournament lane and key', async () => {
@@ -113,7 +132,7 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       revisionFixture({ teamMatchId: 'tm-1', tournamentTeamMatchId: 'tm-1' }),
     );
     const row = createMany.mock.calls[0][0].data[0];
-    expect(row).toMatchObject({ targetType: 'tournament', targetId: 'tour-1', deepLink: '/tournaments/tour-1/matches/tm-1', businessKey: 'tournament-fixture-completed:tm-1:captain-home' });
+    expect(row).toMatchObject({ targetType: 'tournament', targetId: 'tour-1:tm-1', deepLink: '/tournaments/tour-1/matches/tm-1', businessKey: 'tournament-fixture-completed:tm-1:captain-home' });
   });
 
   it('renders the penalty shoot-out score when the official score carries one', async () => {
@@ -127,9 +146,27 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       revisionFixture({ score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } }),
     );
     const rows = createMany.mock.calls[0][0].data;
-    expect(rows[0].body).toBe(
-      '테스트 대회 — 홈팀FC 1:1 (승부차기 4:3) 원정팀FC 결과가 공식 확정됐어요.',
-    );
+    expect(rows[0].body).toBe('테스트 대회 · 결승 · 홈팀FC 1 : 1 원정팀FC (승부차기 4 : 3) · 승리.');
+  });
+
+  it('공식 결과의 출전자도 받고, 골·도움이 있으면 내 기록을 붙인다 — 결과 행이 없는 팀원은 받지 않는다', async () => {
+    const { tx, createMany } = fakeTx({
+      memberships: [
+        { userId: 'captain-home' },
+        { userId: 'scorer-away', teamId: 'team-away', role: 'member' },
+        { userId: 'dropped-away', teamId: 'team-away', role: 'member' },
+      ],
+      preferences: [],
+      alreadyDelivered: [],
+      resultRows: [{ participantId: 'p-1', sideId: 'side-away', userId: 'scorer-away', goals: 1, assists: 0 }],
+    });
+    await new TournamentFixtureCompletionNotificationService().project(tx, revisionFixture());
+
+    const rows = createMany.mock.calls[0][0].data as Array<{ recipientUserId: string; body: string }>;
+    expect(rows.map((row) => [row.recipientUserId, row.body])).toEqual([
+      ['captain-home', '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 승리.'],
+      ['scorer-away', '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 패배. 내 기록 1골이에요.'],
+    ]);
   });
 
   it('drops recipients whose activityEnabled preference is false, keeping missing rows enabled', async () => {

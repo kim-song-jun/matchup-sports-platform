@@ -365,8 +365,8 @@ describe('LineupReminderService', () => {
       await service.scanHandler(fakeClaim() as never, tx as never);
 
       expect(sentRows(tx).map((row) => [row.recipientUserId, row.businessKey, row.body])).toEqual([
-        ['home-p1', 'game-kickoff:game-f:home-p1', '13:00 vs 망원 FC · 망원 풋살장. 지금 출전 명단에 있어요.'],
-        ['home-owner', 'game-kickoff:game-f:home-owner', '13:00 vs 망원 FC · 망원 풋살장.'],
+        ['home-p1', `game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-p1`, '13:00 vs 망원 FC · 망원 풋살장. 지금 출전 명단에 있어요.'],
+        ['home-owner', `game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-owner`, '13:00 vs 망원 FC · 망원 풋살장.'],
       ]);
     });
 
@@ -386,7 +386,7 @@ describe('LineupReminderService', () => {
 
     it('두 번째 스캔에서 이미 받은 사람에게는 푸시를 다시 보내지 않는다', async () => {
       const { service, webPush } = serviceWithPush();
-      const tx = fakeTx({ ...scenario, alreadyDelivered: ['game-kickoff:game-f:home-p1', 'game-kickoff:game-f:home-owner'] });
+      const tx = fakeTx({ ...scenario, alreadyDelivered: [`game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-p1`, `game-kickoff:game-f:${friendlyMatch.startAt.getTime()}:home-owner`] });
       const afterCommit: Array<() => void | Promise<void>> = [];
       await service.scanHandler(fakeClaim({ afterCommit }) as never, tx as never);
 

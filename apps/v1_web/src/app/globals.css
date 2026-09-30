@@ -8438,33 +8438,65 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   .tm-fixture-lineup-player-controls .tm-input { width: 72px; }
 }
 
-/* 후기 작성 — 선수 개별 평가는 접어 두고 원하는 사람만 펼쳐 쓴다(팀 평가가 기본). */
-.tm-review-player-summary {
-  display: flex;
-  align-items: center;
+/* 후기 작성 — 선수 개별 평가는 이름 한 줄 행으로 접어 두고 누른 선수만 펼친다(한 번에 한 명).
+   행 버튼이 펼친 카드의 머리 줄까지 겸해서, 펼쳐도 같은 요소가 남아 키보드 포커스가 유지된다. */
+.tm-review-player-list {
+  display: grid;
   gap: 8px;
-  min-height: 44px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-  list-style: none;
+  grid-template-columns: minmax(0, 1fr);
 }
-.tm-review-player-summary::-webkit-details-marker { display: none; }
-.tm-review-player-summary::after {
-  content: '';
+.tm-review-player-row {
+  min-height: 60px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.tm-review-player-row[data-state='ready'] {
+  border-color: var(--blue500);
+  background: var(--blue50);
+}
+.tm-review-player-row[data-state='incomplete'] {
+  border-color: var(--orange500);
+}
+.tm-review-player-row:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+.tm-review-player[data-open='true'] {
+  padding: 16px;
+}
+.tm-review-player[data-open='true'] > .tm-review-player-row {
+  min-height: 44px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+.tm-review-player-chevron {
+  flex: none;
   width: 7px;
   height: 7px;
+  margin: 0 4px 4px 0;
   border-right: 2px solid var(--text-muted);
   border-bottom: 2px solid var(--text-muted);
   transform: rotate(45deg);
-  transition: transform 0.15s ease;
+  transition: transform var(--duration-fast) ease;
 }
-.tm-review-player-details[open] > .tm-review-player-summary::after {
+.tm-review-player-row[aria-expanded='true'] > .tm-review-player-chevron {
   transform: rotate(-135deg);
 }
 @media (prefers-reduced-motion: reduce) {
-  .tm-review-player-summary::after { transition: none; }
+  .tm-review-player-chevron { transition: none; }
+}
+.tm-review-metric-toggle {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 0 4px;
+  text-align: left;
+}
+.tm-review-clear {
+  width: 100%;
+  margin-top: 4px;
+  color: var(--text-caption);
 }
 
 /* ── 선수 카드 (Task 155 — 티어별 형태·재질·엠블럼·뒷면) ─────────────────

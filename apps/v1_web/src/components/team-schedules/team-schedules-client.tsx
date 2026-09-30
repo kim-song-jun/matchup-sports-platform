@@ -447,6 +447,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       pending: setAttendance.isPending,
       error: attendanceError,
       onSetStatus,
+      friendlyMatch: Boolean(schedule?.linkedMatch) && schedule?.linkedMatch?.tournamentId === null && schedule.linkedMatch.leagueId === null,
     },
     attendees: {
       visible: Boolean(schedule?.attendees),

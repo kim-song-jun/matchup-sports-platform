@@ -155,6 +155,11 @@ export type ScheduleAttendanceModel = {
   pending: boolean;
   error: string | null;
   onSetStatus: (status: 'GOING' | 'MAYBE' | 'NOT_GOING') => void;
+  /**
+   * 친선 경기 일정이면 응답을 "올 수 있어요? (팀장 참고용)"으로 부른다 — 출전은 참석명단이 정하므로
+   * 둘 다 "참석"이면 겹쳐 읽혔다(H5 결정 6). 훈련·모임·대회·리그 일정은 "참석/미정/불참" 그대로다.
+   */
+  friendlyMatch: boolean;
 };
 
 export type ScheduleAttendeeItem = {

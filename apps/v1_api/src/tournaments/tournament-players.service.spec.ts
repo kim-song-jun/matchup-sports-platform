@@ -95,6 +95,7 @@ function playerRow(overrides: Record<string, unknown> = {}) {
     realName: '홍길동',
     birthDateSnapshot: '1995-03-15',
     genderSnapshot: 'male',
+    jerseyNumber: null,
     eligibilityStatus: 'needs_review',
     eligibilityNote: null,
     addedAt: new Date('2026-06-14T00:00:00Z'),
@@ -1141,6 +1142,106 @@ describe('TournamentPlayersService', () => {
 
     expect(result.csv).toContain("'-1+2");
     expect(result.csv).toContain("'@악성닉");
+  });
+
+  it('exportCsv: 등번호는 마지막 열 — 기존 열 위치를 밀지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '번개팀' } });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ jerseyNumber: 7 }), user: { profile: { nickname: '번개맨' } } },
+      { ...playerRow({ id: 'player-2', realName: '김철수', jerseyNumber: null }), user: { profile: null } },
+    ]);
+
+    const { csv } = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(csv.split('\n')).toEqual([
+      'realName,birthDate,gender,eligibility,nickname,jerseyNumber',
+      '홍길동,1995-03-15,male,needs_review,번개맨,7',
+      '김철수,1995-03-15,male,needs_review,,',
+    ]);
+    // 명단(PII) 내려받기는 감사 로그에 남는다 — 개인정보 없이 행 수만.
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'player.export',
+        targetType: 'tournament_registration',
+        targetId: 'reg-1',
+        afterJson: { rowCount: 2 },
+      }),
+    });
+  });
+
+  it('exportCsv: 탭·CR 로 시작하는 값도 수식으로 안 읽히게, CR 이 든 값은 따옴표로 감싼다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '테스트팀' } });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ realName: '\t=1+1' }), user: { profile: { nickname: 'a\rb' } } },
+    ]);
+
+    const { csv } = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(csv.split('\n')[1]).toBe(`'\t=1+1,1995-03-15,male,needs_review,"a\rb",`);
+  });
+
+  // ─── 전체 명단 CSV (대회·리그 단위) ─────────────────────────────────────────
+  describe('exportTournamentCsv', () => {
+    it('non-admin → 403', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+
+      await expect(service.exportTournamentCsv(nonManager, 'tournament-1')).rejects.toThrow(ForbiddenException);
+      expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+    });
+
+    it('없는 대회 → 404 TOURNAMENT_NOT_FOUND', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+      await expect(service.exportTournamentCsv(adminUser, 'ghost')).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_FOUND' },
+      });
+    });
+
+    it('팀명·신청 상태를 앞에 붙이고, 임시저장·취소 신청은 뺀다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({ title: '가을 풋살컵' });
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+        {
+          ...playerRow({ jerseyNumber: 10 }),
+          user: { profile: { nickname: '번개맨' } },
+          registration: { status: 'confirmed', team: { name: '번개팀' } },
+        },
+        {
+          ...playerRow({ id: 'player-2', registrationId: 'reg-2', realName: '이영희', genderSnapshot: 'female', jerseyNumber: null }),
+          user: { profile: { nickname: '영희' } },
+          registration: { status: 'payment_checking', team: { name: '=HYPERLINK("x")' } },
+        },
+      ]);
+
+      const result = await service.exportTournamentCsv(adminUser, 'tournament-1');
+
+      expect(result.filename).toBe('players_가을_풋살컵_all_tourname.csv');
+      expect(result.csv.split('\n')).toEqual([
+        'teamName,registrationStatus,realName,birthDate,gender,eligibility,nickname,jerseyNumber',
+        '번개팀,confirmed,홍길동,1995-03-15,male,needs_review,번개맨,10',
+        // 팀명도 사용자 입력이다 — 수식 인젝션 차단·RFC 4180 따옴표 규칙을 똑같이 탄다.
+        `"'=HYPERLINK(""x"")",payment_checking,이영희,1995-03-15,female,needs_review,영희,`,
+      ]);
+      expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            removedAt: null,
+            registration: { tournamentId: 'tournament-1', status: { notIn: ['draft', 'cancelled'] } },
+          },
+        }),
+      );
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: 'player.export',
+          targetType: 'tournament',
+          targetId: 'tournament-1',
+          afterJson: { rowCount: 2 },
+        }),
+      });
+    });
   });
 
   // ─── listEligiblePlayersForAdmin ────────────────────────────────────────────

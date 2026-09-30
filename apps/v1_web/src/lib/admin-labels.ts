@@ -21,6 +21,7 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'tournament.status': '대회 상태 변경',
   // 대회 — 참가 신청
   'player.eligibility': '선수 자격 변경',
+  'player.export': '명단 CSV 내려받기',
   'registration.confirm': '참가 확정',
   'registration.confirm_payment': '참가비 결제 확인',
   'registration.cancel': '참가 신청 취소',

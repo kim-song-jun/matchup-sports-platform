@@ -7,6 +7,7 @@ import {
   useV1ConfirmPayment,
   useV1ConfirmRegistration,
   useV1ExportRosterCsv,
+  useV1ExportTournamentRosterCsv,
   useV1RejectCancelRequest,
   useV1RosterDeadlineOverrideGrant,
   useV1RosterDeadlineOverrideRevoke,
@@ -31,6 +32,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1RosterDeadlineOverrideGrant: vi.fn(),
   useV1RosterDeadlineOverrideRevoke: vi.fn(),
   useV1ExportRosterCsv: vi.fn(),
+  // 탭 상단 버튼 — 기존 describe 들이 따로 세팅하지 않아도 렌더되게 기본값을 준다.
+  useV1ExportTournamentRosterCsv: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1AdminTournamentPlayers: vi.fn(),
   useV1UpdatePlayerEligibility: vi.fn(),
   // RosterModal 이 이 탭에서 렌더되므로 모달이 쓰는 훅도 함께 mock 해야 한다.
@@ -69,6 +72,7 @@ const useV1RosterUnlockMock = vi.mocked(useV1RosterUnlock);
 const useV1RosterDeadlineOverrideGrantMock = vi.mocked(useV1RosterDeadlineOverrideGrant);
 const useV1RosterDeadlineOverrideRevokeMock = vi.mocked(useV1RosterDeadlineOverrideRevoke);
 const useV1ExportRosterCsvMock = vi.mocked(useV1ExportRosterCsv);
+const useV1ExportTournamentRosterCsvMock = vi.mocked(useV1ExportTournamentRosterCsv);
 const useV1AdminTournamentPlayersMock = vi.mocked(useV1AdminTournamentPlayers);
 const useV1UpdatePlayerEligibilityMock = vi.mocked(useV1UpdatePlayerEligibility);
 
@@ -583,5 +587,89 @@ describe('RegistrationsTab — 경기별 명단 펼침 (Task 179)', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(panelId()).toBe('reg-2');
     });
+  });
+});
+
+describe('RegistrationsTab — 전체 명단 CSV', () => {
+  const showToast = vi.fn();
+
+  afterEach(() => vi.clearAllMocks());
+
+  function arrange(items: V1AdminTournamentRegistration[], mutate = vi.fn()) {
+    for (const hook of [
+      useV1ConfirmPaymentMock,
+      useV1ConfirmRegistrationMock,
+      useV1CancelRegistrationAdminMock,
+      useV1RejectCancelRequestMock,
+      useV1RosterLockMock,
+      useV1RosterUnlockMock,
+      useV1ExportRosterCsvMock,
+      useV1RosterDeadlineOverrideGrantMock,
+      useV1RosterDeadlineOverrideRevokeMock,
+      useV1UpdatePlayerEligibilityMock,
+      useV1AdminAddPlayerMock,
+      useV1AdminRemovePlayerMock,
+    ] as const) {
+      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue(noopMutationHook());
+    }
+    useV1ExportTournamentRosterCsvMock.mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1ExportTournamentRosterCsv>);
+    useV1AdminTournamentPlayersMock.mockReturnValue({
+      data: { players: [], belowMinimum: false },
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({
+      data: { items },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+  }
+
+  it('조회 전용 어드민도 받는다 — 대회 id 로 한 번 요청하고, 엑셀용 BOM 을 붙여 저장한다', async () => {
+    const mutate = vi.fn((_: undefined, opts: { onSuccess: (res: { filename: string; csv: string }) => void }) =>
+      opts.onSuccess({ filename: 'players_가을컵_all_tourname.csv', csv: 'teamName\n번개팀' }),
+    );
+    arrange([baseRegistration(), baseRegistration({ id: 'reg-2' })], mutate);
+    let saved: Blob | undefined;
+    const createObjectURL = vi.fn((blob: Blob) => {
+      saved = blob;
+      return 'blob:csv';
+    });
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite={false} />);
+    // 행마다 있는 팀별 CSV 와 별개로, 탭에 하나만 있다.
+    expect(screen.getAllByRole('button', { name: 'CSV' })).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '전체 명단 CSV' }));
+
+    expect(useV1ExportTournamentRosterCsvMock).toHaveBeenCalledWith('tournament-1');
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    // jsdom Blob 은 fetch Response 가 못 읽는다("[object Blob]" 으로 문자열화) — FileReader 로 바이트를 본다.
+    const bytes = await new Promise<Uint8Array>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+      reader.readAsArrayBuffer(saved as Blob);
+    });
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    expect(showToast).toHaveBeenCalledWith('CSV를 다운로드했어요.', 'success');
+    click.mockRestore();
+  });
+
+  it('신청이 없으면 비활성 — 헤더만 있는 빈 파일을 받지 않게', () => {
+    const mutate = vi.fn();
+    arrange([], mutate);
+
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
+    const button = screen.getByRole('button', { name: '전체 명단 CSV' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(mutate).not.toHaveBeenCalled();
   });
 });

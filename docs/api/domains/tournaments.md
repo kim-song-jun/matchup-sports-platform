@@ -232,7 +232,8 @@ Public tournament list/detail responses include both `confirmedCount` and `pendi
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
 | `GET` | `/api/v1/admin/registrations/:registrationId/players` | active admin | path id | admin roster detail including gender snapshot, current phone, `isTeamCaptain`, captain-first ordering, and minimum check |
-| `GET` | `/api/v1/admin/registrations/:registrationId/players/export` | active admin | path id | CSV roster export including gender snapshot |
+| `GET` | `/api/v1/admin/registrations/:registrationId/players/export` | active admin | path id | `{ filename, csv }` team roster export — columns `realName,birthDate,gender,eligibility,nickname,jerseyNumber`; audit `player.export` (targetType `tournament_registration`, row count only) |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/players/export` | active admin | path id (tournament or league) | `{ filename, csv }` full roster of every registration except `draft`/`cancelled`, ordered by registration then player add time — columns `teamName,registrationStatus,` + team export columns; audit `player.export` (targetType `tournament`, row count only); `404 TOURNAMENT_NOT_FOUND` |
 | `PATCH` | `/api/v1/admin/players/:playerId/eligibility` | owner/ops admin | `UpdatePlayerEligibilityDto` | updated eligibility and audit log |
 
 ## Player Add Contract

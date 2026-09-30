@@ -532,4 +532,70 @@ describe('LineupReminderService', () => {
       );
     });
   });
+
+  describe('Task 180 L35·H5: 참석명단 미제출 안내 — 밤 경기는 앞당기고, 킥오프가 지나면 한 번 더', () => {
+    const NIGHT_KICKOFF = new Date('2026-08-27T16:10:00Z'); // KST 8/28 (금) 01:10
+    function scanAt(nowIso: string, todos: LineupTodo[]) {
+      jest.setSystemTime(new Date(nowIso));
+      const todoService = { listAllPending: jest.fn().mockResolvedValue(todos), listCompetitionRosterChecks: jest.fn().mockResolvedValue([]) };
+      const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+      const tx = fakeTx({ memberships: [{ userId: 'manager-1' }] });
+      const service = new LineupReminderService(todoService as never, fakePrisma().prisma as never, webPush as never);
+      return { tx, webPush, todoService, done: service.scanHandler({ ...fakeClaim(), afterCommit: undefined } as never, tx as never) };
+    }
+    const rowsTitled = (tx: ReturnType<typeof fakeTx>, title: string) =>
+      (tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data) as Array<Record<string, string>>).filter((row) => row.title === title);
+    const FINAL = '곧 경기가 시작돼요 — 참석명단을 확인해 주세요';
+    const MISSING = '경기 시간이 됐어요 — 참석명단을 제출해 주세요';
+
+    it('2시간 전 시각이 밤인 경기는 밤이 시작되기 전 마지막 스캔(20:45~21:00)이 킥오프 일시를 붙여 앞당겨 푸시한다', async () => {
+      const cutoff = scanAt('2026-08-27T11:50:00Z', [fakeTodo({ scheduledAt: NIGHT_KICKOFF })]); // KST 20:50
+      await cutoff.done;
+      expect(rowsTitled(cutoff.tx, FINAL)).toEqual([
+        expect.objectContaining({ recipientUserId: 'manager-1', body: '8/28 (금) 01:10 팀 매치 참석명단이 아직 비어 있어요.', businessKey: 'lineup-final:game-1:team-1:manager-1' }),
+      ]);
+      expect(cutoff.webPush.sendToUser).toHaveBeenCalledWith('manager-1', expect.objectContaining({ title: FINAL }));
+
+      const earlier = scanAt('2026-08-27T11:30:00Z', [fakeTodo({ scheduledAt: NIGHT_KICKOFF })]); // KST 20:30 — 아직 마지막 스캔이 아니다
+      await earlier.done;
+      expect(rowsTitled(earlier.tx, FINAL)).toEqual([]);
+    });
+
+    it('밤이 시작된 뒤에 잡힌 경기는 2시간 창에 들면 알림함에만 남기고 푸시하지 않는다', async () => {
+      const night = scanAt('2026-08-27T15:15:00Z', [fakeTodo({ scheduledAt: NIGHT_KICKOFF })]); // KST 00:15
+      await night.done;
+
+      expect(rowsTitled(night.tx, FINAL)).toHaveLength(1);
+      expect(night.webPush.sendToUser).not.toHaveBeenCalled();
+      expect(night.todoService.listCompetitionRosterChecks).not.toHaveBeenCalled();
+    });
+
+    it('킥오프가 지났는데 미제출이면 30분 안의 스캔이 한 번 알리고(낮은 푸시), 그보다 오래된 경기는 다시 알리지 않는다', async () => {
+      const day = scanAt('2026-08-27T10:10:00Z', [
+        fakeTodo({ gameId: 'just-started', scheduledAt: new Date('2026-08-27T10:00:00Z') }), // KST 19:00 — 10분 전
+        fakeTodo({ gameId: 'long-ago', scheduledAt: new Date('2026-08-27T09:20:00Z') }), // 50분 전
+      ]);
+      await day.done;
+
+      expect(day.todoService.listAllPending).toHaveBeenCalledWith(new Date('2026-08-27T09:40:00Z'));
+      expect(rowsTitled(day.tx, MISSING)).toEqual([
+        expect.objectContaining({
+          body: '팀 매치 vs 상대팀 · 참석명단을 내야 경기 기록을 시작할 수 있어요.',
+          businessKey: `lineup-kickoff-missing:just-started:team-1:${new Date('2026-08-27T10:00:00Z').getTime()}:manager-1`,
+          deepLink: '/team-matches/tm-1',
+        }),
+      ]);
+      expect(day.webPush.sendToUser).toHaveBeenCalledWith('manager-1', expect.objectContaining({ title: MISSING }));
+      // 킥오프가 지난 경기는 매일 알림 대상이 아니다.
+      expect(rowsTitled(day.tx, '팀 매치 참석명단을 확인해 주세요')).toEqual([]);
+    });
+
+    it('밤 킥오프의 미제출 안내는 알림함에만 남는다', async () => {
+      const night = scanAt('2026-08-27T16:20:00Z', [fakeTodo({ scheduledAt: NIGHT_KICKOFF })]); // KST 01:20
+      await night.done;
+
+      expect(rowsTitled(night.tx, MISSING)).toHaveLength(1);
+      expect(night.webPush.sendToUser).not.toHaveBeenCalled();
+    });
+  });
 });

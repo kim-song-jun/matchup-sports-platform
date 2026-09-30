@@ -11,7 +11,14 @@ import {
   type ReminderRow,
 } from './game-attendee-reminders';
 import { formatKstMonthDayTime } from '../../common/kst-datetime';
-import { isQuietHour, kstMidnight, kstParts, nightPushAllowed } from '../../common/quiet-hours';
+import {
+  isEveningCutoffScan,
+  isQuietHour,
+  kstMidnight,
+  kstParts,
+  nightPushAllowed,
+  quietHoursEndAfter,
+} from '../../common/quiet-hours';
 import { notificationCopyFor } from '../../notifications/notifications.service';
 
 const deliveryLogger = new Logger('LineupReminderDelivery');
@@ -22,6 +29,9 @@ const SCAN_INTERVAL_MS = 15 * 60 * 1000;
 
 /** 최종 확인 알림을 보내는 창 — 킥오프 2시간 전부터 킥오프까지. */
 const FINAL_REMINDER_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** 킥오프가 지난 미제출 안내(Task 180 H5) 창 — 스캔이 15분 주기라 30분이면 스캔 하나를 놓쳐도 다음 스캔이 보낸다. */
+const KICKOFF_MISSING_WINDOW_MS = 30 * 60 * 1000;
 
 export const LINEUP_REMINDER_SCAN_TYPE = 'LINEUP_REMINDER_SCAN';
 
@@ -84,22 +94,30 @@ export class LineupReminderService {
   };
 
   private async runScan(tx: Prisma.TransactionClient, now: Date, claim: GameOperationClaim): Promise<void> {
-    // 야간에는 아무것도 보내지 않는다. 다음 스캔 예약은 scanHandler에서 스캔 전에 이미
-    // 커밋됐으므로 아침 9시 이후 첫 스캔이 그날치를 보낸다.
-    if (isQuietHour(now)) return;
+    const quiet = isQuietHour(now);
+    // 킥오프가 막 지난 경기까지 모은다 — 킥오프 시각 미제출 안내가 그 경기를 본다.
+    const todos = await this.todoService.listAllPending(new Date(now.getTime() - KICKOFF_MISSING_WINDOW_MS));
+    const upcoming = todos.filter((todo) => todo.scheduledAt === null || todo.scheduledAt >= now);
+    const started = todos.filter((todo) => todo.scheduledAt !== null && todo.scheduledAt < now);
 
-    const todos = await this.todoService.listAllPending(now);
-    const rosterChecks = await this.todoService.listCompetitionRosterChecks(kstMidnight(now, 1), kstMidnight(now, 2));
-
-    const { dateKey } = kstParts(now);
-    const messages = [
-      ...buildDailyMessages(todos, dateKey),
-      ...buildFinalMessages(todos, now),
-      ...buildRosterCheckMessages(rosterChecks),
+    // 킥오프가 코앞인 미제출 안내는 밤에도 알림함에 남기고 푸시만 낮에 한다(L35). 2시간 전 시각이 밤에 걸리는 경기는
+    // 밤이 시작되기 전 마지막 스캔이 앞당겨 푸시한다 — 이후 밤 스캔은 같은 키라 다시 만들지 않는다.
+    const urgent = [
+      ...buildFinalMessages(upcoming, now),
+      ...(isEveningCutoffScan(now) ? buildOvernightFinalMessages(upcoming, now) : []),
+      ...buildKickoffMissingMessages(started, now),
     ];
+    for (const message of urgent) {
+      await this.deliver(tx, message, claim, !quiet);
+    }
+    // 나머지는 야간에 보내지 않는다. 다음 스캔 예약은 scanHandler에서 스캔 전에 이미
+    // 커밋됐으므로 아침 9시 이후 첫 스캔이 그날치를 보낸다.
+    if (quiet) return;
 
-    for (const message of messages) {
-      await this.deliver(tx, message, claim);
+    const rosterChecks = await this.todoService.listCompetitionRosterChecks(kstMidnight(now, 1), kstMidnight(now, 2));
+    const { dateKey } = kstParts(now);
+    for (const message of [...buildDailyMessages(upcoming, dateKey), ...buildRosterCheckMessages(rosterChecks)]) {
+      await this.deliver(tx, message, claim, true);
     }
     // 경기 알림은 "경기·대회" 수신 설정(teamMatchEnabled)을 따른다 — 위 팀 운영 알림(teamEnabled)과 축이 다르다.
     await deliverReminderRows(tx, await collectAttendeeReminderRows(tx, now), {
@@ -114,6 +132,7 @@ export class LineupReminderService {
     tx: Prisma.TransactionClient,
     message: ReminderMessage & { teamId: string },
     claim: GameOperationClaim,
+    push: boolean,
   ): Promise<void> {
     const managers = await tx.v1TeamMembership.findMany({
       where: { teamId: message.teamId, status: 'active', role: { in: ['owner', 'manager'] } },
@@ -128,7 +147,7 @@ export class LineupReminderService {
       deepLink: message.deepLink,
       businessKey: `${message.keyPrefix}:${userId}`,
     }));
-    await deliverReminderRows(tx, rows, { prefField: 'teamEnabled', webPush: this.webPush, claim });
+    await deliverReminderRows(tx, rows, { prefField: 'teamEnabled', webPush: this.webPush, claim, push });
   }
 
   /**
@@ -313,6 +332,54 @@ export function buildFinalMessages(
       // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
       keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
     }));
+}
+
+/**
+ * 킥오프 2시간 전 시각이 밤(KST 21~9시)에 걸려 그 창에서는 푸시할 수 없는 경기 — 밤이 시작되기 전 마지막 스캔이
+ * 최종 확인을 앞당겨 보낸다(Task 180 L35). 시각이 "곧"이 아니므로 본문에 킥오프 일시를 붙인다. 키는 최종 확인과 같다.
+ */
+export function buildOvernightFinalMessages(
+  todos: LineupTodo[],
+  now: Date,
+): Array<ReminderMessage & { teamId: string }> {
+  const nightEnd = quietHoursEndAfter(now).getTime();
+  return todos.flatMap((todo) => {
+    const startAt = todo.scheduledAt;
+    if (startAt === null) return [];
+    const reminderAt = startAt.getTime() - FINAL_REMINDER_WINDOW_MS;
+    if (reminderAt <= now.getTime() || reminderAt >= nightEnd) return [];
+    return [{
+      teamId: todo.teamId,
+      targetId: todo.teamId,
+      title: '곧 경기가 시작돼요 — 참석명단을 확인해 주세요',
+      body: `${formatKstMonthDayTime(startAt)} ${todo.title} 참석명단이 ${todo.state === 'MISSING' ? '아직 비어 있어요' : '아직 제출 전이에요'}.`,
+      deepLink: todo.deepLink,
+      keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
+    }];
+  });
+}
+
+/**
+ * 킥오프 시각이 지났는데 아직 참석명단을 안 낸 팀의 팀장·매니저에게 한 번(Task 180 H5) — 양 팀 명단이 모두 제출돼야
+ * 기록을 시작할 수 있다. 경기 일정마다 한 번이라 키에 킥오프 시각을 넣는다.
+ */
+export function buildKickoffMissingMessages(
+  todos: LineupTodo[],
+  now: Date,
+): Array<ReminderMessage & { teamId: string }> {
+  return todos.flatMap((todo) => {
+    const startAt = todo.scheduledAt;
+    if (startAt === null || startAt > now || now.getTime() - startAt.getTime() >= KICKOFF_MISSING_WINDOW_MS) return [];
+    const opponent = todo.opponentName !== null ? ` vs ${todo.opponentName}` : '';
+    return [{
+      teamId: todo.teamId,
+      targetId: todo.teamId,
+      title: '경기 시간이 됐어요 — 참석명단을 제출해 주세요',
+      body: `${todo.title}${opponent} · 참석명단을 내야 경기 기록을 시작할 수 있어요.`,
+      deepLink: todo.deepLink,
+      keyPrefix: `lineup-kickoff-missing:${todo.gameId}:${todo.teamId}:${startAt.getTime()}`,
+    }];
+  });
 }
 
 /**

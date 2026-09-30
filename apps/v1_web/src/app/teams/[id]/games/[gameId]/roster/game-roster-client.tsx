@@ -14,6 +14,7 @@ import {
   GameRosterPlayingCheckbox,
 } from '@/components/game-roster/game-roster-player-row';
 import { GameRosterHistoryList } from '@/components/game-roster/game-roster-history';
+import { GameRosterJerseySheet, nextPlayerWithoutJersey } from '@/components/game-roster/game-roster-jersey-sheet';
 import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reason-chips';
 import { TEAM_UPCOMING_GAMES_ANCHOR } from '@/components/teams/team-upcoming-games-card';
 import {
@@ -45,6 +46,8 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const [draft, setDraft] = useState<GameRosterDraft>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // 등번호 시트 — 닫히는 동안에도 내용이 남도록 대상은 유지하고 열림만 끈다.
+  const [jersey, setJersey] = useState<{ userId: string; open: boolean } | null>(null);
   const historyHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const data = roster.data;
@@ -113,6 +116,13 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const historyShown = started || historyOpen;
   const pendingExcludes = changes.filter((change) => change.op === 'EXCLUDE').length;
   const pendingRevokes = changes.length - pendingExcludes;
+  // 등번호 칸은 팀장·매니저의 편집 목록에서만 버튼이다. 참가 명단이 없는 팀은 칸을 눌러도 입력 대신 이유를 안내한다.
+  // 시작한 경기는 편집 목록 자체가 없어 번호가 읽기 전용이고, 그 이유는 아래 `jerseyLocked` 가 말한다.
+  const jerseyPressable =
+    data.viewerRole === 'TEAM_MANAGER' && (data.jerseyRegistrationId !== null || data.baseSource === 'TEAM_MEMBERS');
+  const jerseyLocked = started && data.viewerRole === 'TEAM_MANAGER' && data.baseSource === 'REGISTRATION';
+  const jerseyTarget = jersey === null ? null : (data.base.find((row) => row.userId === jersey.userId) ?? null);
+  const competitionNoun = data.competitionKind === 'LEAGUE' ? '리그' : '대회';
 
   const historySection = historyShown ? (
     <Card pad={16}>
@@ -211,7 +221,21 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
 
       <RosterSection
         title={`출전 ${data.participants.length - pendingExcludes + pendingRevokes}명`}
-        sub={canEdit && data.participants.length > 0 ? GAME_ROSTER_PLAYING_HINT : undefined}
+        sub={
+          canEdit && data.participants.length > 0 ? (
+            <>
+              {GAME_ROSTER_PLAYING_HINT}
+              {data.jerseyRegistrationId !== null ? (
+                <>
+                  <br />
+                  {`번호 칸을 눌러 등번호를 넣어요. ${competitionNoun} 참가 명단에 저장돼요.`}
+                </>
+              ) : null}
+            </>
+          ) : jerseyLocked ? (
+            '경기가 시작돼 이 경기의 번호는 바꿀 수 없어요.'
+          ) : undefined
+        }
         action={
           canEdit && data.excluded.length > 0 ? (
             <Button variant="ghost" size="sm" disabled={batch.isPending} onClick={() => void resetToRegistration(data)}>
@@ -238,6 +262,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                     status={leaving ? 'EXCLUDED' : 'PARTICIPATING'}
                     reason={leaving?.reason ?? null}
                     note={leaving ? '저장하면 이번 경기에서 빠져요' : row.joinedAfterFixtureCreated ? '새로 추가' : null}
+                    onJerseyPress={jerseyPressable ? () => setJersey({ userId: row.userId, open: true }) : undefined}
                     trailing={
                       <GameRosterPlayingCheckbox
                         displayName={row.displayName}
@@ -364,6 +389,21 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           </Button>
         </div>
       ) : null}
+      {jersey !== null && jerseyTarget !== null ? (
+        <GameRosterJerseySheet
+          open={jersey.open}
+          onClose={() => setJersey({ ...jersey, open: false })}
+          teamId={teamId}
+          competitionId={data.competitionId}
+          competitionKind={data.competitionKind}
+          registrationId={data.jerseyRegistrationId}
+          player={jerseyTarget}
+          teammates={data.base}
+          next={nextPlayerWithoutJersey(data.participants, jerseyTarget.userId)}
+          onSelect={(userId) => setJersey({ userId, open: true })}
+          onStale={() => void roster.refetch()}
+        />
+      ) : null}
       {ConfirmModal}
       {UnsavedChangesModal}
     </div>
@@ -385,7 +425,7 @@ function RosterSection({
   children,
 }: {
   title: string;
-  sub?: string;
+  sub?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {

@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
-import { loadGameRoster } from './game-roster-loader';
+import { loadGameRoster, loadJerseyRegistrationId } from './game-roster-loader';
 
 // 조회가 자동 채움(쓰기·알림)을 부르는지 본다. 동기화 쓰기 경로의 호출은 game-roster-sync.spec 이 본다.
 jest.mock('../../league-matches/league-roster-autofill', () => ({
@@ -267,5 +267,39 @@ describe('loadGameRoster — 조회는 DB 를 바꾸지 않는다', () => {
     expect(loaded?.baseSource).toBe('TEAM_MEMBERS');
     expect(fillLeagueTeamRoster).not.toHaveBeenCalled();
     expect(notifyLeagueRosterFillOutcomes).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadJerseyRegistrationId — 등번호 원본 신청은 참가 명단 기준의 팀장·매니저에게만', () => {
+  const scope = { competitionId: 'cup', isLeague: false, teamId: 'team-A' };
+  const registrationTx = (id: string | null) => {
+    const findFirst = jest.fn(async () => (id === null ? null : { id }));
+    return { tx: { v1TournamentRegistration: { findFirst } } as unknown as Prisma.TransactionClient, findFirst };
+  };
+
+  it('팀장·매니저가 참가 명단 기준 경기를 보면 그 팀의 confirmed 신청 id 를 준다', async () => {
+    const { tx, findFirst } = registrationTx('reg-1');
+    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: true })).resolves.toBe('reg-1');
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { tournamentId: 'cup', teamId: 'team-A', status: 'confirmed' },
+      select: { id: true },
+    });
+  });
+
+  it('팀장이 아닌 뷰어(팀원·운영자)에게는 신청이 있어도 주지 않고 조회도 하지 않는다', async () => {
+    const { tx, findFirst } = registrationTx('reg-1');
+    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: false })).resolves.toBeNull();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it('참가 명단이 없어 팀원 전체가 기준인 팀은 고칠 원본이 없어 팀장에게도 null 이다', async () => {
+    const { tx, findFirst } = registrationTx('reg-1');
+    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'TEAM_MEMBERS', isTeamManager: true })).resolves.toBeNull();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it('confirmed 신청이 그 사이 사라졌으면 null', async () => {
+    const { tx } = registrationTx(null);
+    await expect(loadJerseyRegistrationId(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: true })).resolves.toBeNull();
   });
 });

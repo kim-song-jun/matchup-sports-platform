@@ -126,6 +126,7 @@ describe('buildGameRosterView', () => {
       computation,
       fixtureSnapshotUserIds: new Set(['u1', 'u2', 'u3', 'u4']),
       legacyLineupPending: false,
+      jerseyRegistrationId: 'reg-1',
       displayNameByUserId: new Map([
         ['mgr', '팀장'],
         ['ops', '운영자'],
@@ -184,6 +185,30 @@ describe('buildGameRosterView', () => {
     });
     const result = view({ base: [entry('m1', { accountLinked: false })], computation: fallback, fixtureSnapshotUserIds: new Set() });
     expect(result.participants).toEqual([expect.objectContaining({ userId: 'm1', joinedAfterFixtureCreated: false })]);
+  });
+
+  it('참가 명단 선수에는 등번호 저장 API 의 :playerId 를, 계정 없는 폴백 팀원에는 null 을 싣는다 — 다섯 목록 모두', () => {
+    const linked = view();
+    for (const row of [...linked.base, ...linked.participants, ...linked.excluded, ...linked.unavailable, ...linked.suspended]) {
+      expect(row.participantId).toBe(`tp-${row.userId}`);
+    }
+    // 폴백 팀원의 sourceParticipantId 는 멤버십 id 다 — 그대로 내보내면 :playerId 로 쓰다 404 가 난다.
+    const fallbackEntry = entry('m1', { accountLinked: false, sourceParticipantId: 'membership-1' });
+    const fallback = computeGameRoster({
+      base: [fallbackEntry],
+      adjustments: [],
+      unavailabilities: [],
+      gameStartAt: KICKOFF,
+      suspensionVerdicts: new Map(),
+    });
+    const result = view({ base: [fallbackEntry], computation: fallback, baseSource: 'TEAM_MEMBERS', jerseyRegistrationId: null });
+    expect(result.base[0].participantId).toBeNull();
+    expect(result.participants[0].participantId).toBeNull();
+  });
+
+  it('등번호 원본 신청 id 는 입력값 그대로 싣는다(팀원 기준 폴백·팀장이 아닌 뷰어는 null)', () => {
+    expect(view().jerseyRegistrationId).toBe('reg-1');
+    expect(view({ jerseyRegistrationId: null }).jerseyRegistrationId).toBeNull();
   });
 
   it('편집 가능 = 쓰기 권한 있음 AND 경기 시작 전', () => {

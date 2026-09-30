@@ -45,6 +45,8 @@ export interface GameRosterPersonView {
   readonly jerseyNumber: number | null;
   /** false = 리그 폴백 팀원(경기 기록에 계정 없이 들어간다). */
   readonly accountLinked: boolean;
+  /** 참가 명단 선수 id — 등번호 저장 API 의 `:playerId`. 리그 폴백 팀원은 참가 명단 행이 없어 null. */
+  readonly participantId: string | null;
 }
 
 export interface GameRosterView {
@@ -60,6 +62,11 @@ export interface GameRosterView {
   readonly editable: boolean;
   readonly viewerRole: GameRosterViewerRole;
   readonly baseSource: GameRosterBaseSource;
+  /**
+   * 등번호를 고칠 수 있는 원본 = 확정된 참가 신청 id. 참가 명단이 기준이고 뷰어가 그 팀의 팀장·매니저일 때만 채운다
+   * (등번호 저장 API 의 권한과 같다). 경기가 시작됐는지는 여기서 가르지 않는다 — 번호는 대회·리그 전체에 걸린 값이다.
+   */
+  readonly jerseyRegistrationId: string | null;
   readonly base: (GameRosterPersonView & { status: 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED' })[];
   readonly participants: (GameRosterPersonView & { joinedAfterFixtureCreated: boolean })[];
   readonly excluded: (GameRosterPersonView & {
@@ -93,6 +100,7 @@ function person(entry: GameRosterBaseEntry): GameRosterPersonView {
     displayName: entry.displayNameSnapshot,
     jerseyNumber: entry.jerseyNumber,
     accountLinked: entry.accountLinked,
+    participantId: entry.accountLinked ? entry.sourceParticipantId : null,
   };
 }
 
@@ -117,6 +125,7 @@ export interface GameRosterViewInput {
   readonly fixtureSnapshotUserIds: ReadonlySet<string> | null;
   readonly legacyLineupPending: boolean;
   readonly displayNameByUserId: ReadonlyMap<string, string>;
+  readonly jerseyRegistrationId: string | null;
 }
 
 export function buildGameRosterView(input: GameRosterViewInput): GameRosterView {
@@ -144,6 +153,7 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     editable: input.access.writeRole !== null && context.gameState === 'SCHEDULED',
     viewerRole: input.access.viewerRole,
     baseSource: input.baseSource,
+    jerseyRegistrationId: input.jerseyRegistrationId,
     base: input.base.map((entry) => ({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING' })),
     participants: computation.participants.map((entry) => ({
       ...person(entry),

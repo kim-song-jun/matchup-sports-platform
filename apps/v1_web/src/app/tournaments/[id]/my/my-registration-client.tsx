@@ -1261,6 +1261,7 @@ function TeamRegistrationHub({
   capacity,
   blockReason,
   isFreeEntry,
+  isLeague = false,
 }: {
   tournamentId: string;
   tournamentSportId: string | null;
@@ -1270,6 +1271,8 @@ function TeamRegistrationHub({
   capacity: TournamentCapacity | null;
   blockReason: TournamentRegistrationBlockReason | null;
   isFreeEntry: boolean;
+  /** 리그는 신청이 아니라 "참가"라고 말한다. 종류를 모르는 로딩 실패 화면은 대회 말투를 쓴다. */
+  isLeague?: boolean;
 }) {
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
   const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
@@ -1283,7 +1286,7 @@ function TeamRegistrationHub({
   return (
     <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
       <div style={{ marginLeft: -20, marginRight: -20 }}>
-        <SectionTitle title="팀별 대회 신청" />
+        <SectionTitle title={isLeague ? '팀별 리그 참가' : '팀별 대회 신청'} />
       </div>
       <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
         팀별로 신청하고 내역을 관리하세요.
@@ -1530,6 +1533,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           // 통합 거울의 기본값일 수 있으므로 신청 허브에서 capacity를 만들지 않는다.
           capacity={tournament.kind === 'regular_league' ? null : resolveTournamentCapacity(tournament)}
           blockReason={resolveTournamentRegistrationBlock(tournament)}
+          isLeague={tournament.kind === 'regular_league'}
         />
       );
   }

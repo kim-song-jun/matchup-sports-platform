@@ -65,7 +65,7 @@ describe('팀장 — 모아서 저장', () => {
     expect(screen.getByText('수정 가능')).toBeInTheDocument();
     const save = screen.getByRole('button', { name: '저장' });
     expect(save).toBeDisabled();
-    expect(within(section(/출전 3명/)).getByText('체크를 풀면 이번 경기에서 빠져요.')).toBeInTheDocument();
+    expect(within(section(/출전 3명/)).getByText(/^체크를 풀면 이번 경기에서 빠져요\./)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('checkbox', { name: '박서준 이번 경기 출전' }));
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();

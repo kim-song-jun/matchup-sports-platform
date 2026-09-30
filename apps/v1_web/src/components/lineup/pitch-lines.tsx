@@ -7,6 +7,7 @@
  * 팀매치 라인업 뷰모델에 의존**하게 되고, 경기별 라인업 화면을 걷어낸 방향과 어긋난다.
  *
  * 이 파일은 **순수 SVG** 다. props 도 상태도 없다 — 그래서 어디서 불러도 안전하다.
+ * 풋살 코트(`FutsalCourtLines`)도 같은 이유로 여기에 둔다.
  */
 export function PitchLines() {
   return (
@@ -57,6 +58,48 @@ export function PitchLines() {
       {/* 골대 — 골라인 바깥(우리 y>98 / 상대 y<2)에 살짝 걸치는 프레임으로 표현 */}
       <rect x={44.83} y={98} width={10.33} height={1.83} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={0.8} />
       <rect x={44.83} y={0.17} width={10.33} height={1.83} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={0.8} />
+    </svg>
+  );
+}
+
+/** 보드가 그리는 경기장. 종목 코드는 서버 설정(`sportCode`)에서 온다. */
+export type CourtKind = 'football' | 'futsal';
+
+export function courtKindForSport(sportCode: string | null | undefined): CourtKind {
+  return sportCode === 'futsal' ? 'futsal' : 'football';
+}
+
+/**
+ * 풋살 코트(40m×20m, Task 180 H7). 좌표계는 `PitchLines` 와 같다(SVG y=98 이 우리 골라인).
+ * 폭 20m·길이 40m 가 각각 96 단위라 x축 1m = 4.8, y축 1m = 2.4 — 원은 rx/ry 를 나눈 타원이다.
+ * 페널티 에어리어는 골대 기둥(중앙 ±1.5m)에서 반지름 6m 사분원 두 개를 3m 직선으로 잇고,
+ * 페널티 마크 6m·제2 페널티 마크 10m, 센터 서클 반지름 3m.
+ */
+export function FutsalCourtLines() {
+  const line = { stroke: 'rgba(255,255,255,0.85)', fill: 'none', strokeWidth: 1.5, vectorEffect: 'non-scaling-stroke' } as const;
+  const spot = 'rgba(255,255,255,0.9)';
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+    >
+      <rect x={2} y={2} width={96} height={96} rx={1} {...line} />
+      <line x1={2} y1={50} x2={98} y2={50} {...line} />
+      <ellipse cx={50} cy={50} rx={14.4} ry={7.2} {...line} />
+      <ellipse cx={50} cy={50} rx={0.9} ry={0.45} fill={spot} />
+      {/* 우리 진영(아래) — 페널티 에어리어 · 페널티 마크(6m) · 제2 페널티 마크(10m) */}
+      <path d="M 14 98 A 28.8 14.4 0 0 1 42.8 83.6 L 57.2 83.6 A 28.8 14.4 0 0 1 86 98" {...line} />
+      <ellipse cx={50} cy={83.6} rx={0.9} ry={0.45} fill={spot} />
+      <ellipse cx={50} cy={74} rx={0.9} ry={0.45} fill={spot} />
+      {/* 상대 진영(위) — 하프라인 기준 대칭 */}
+      <path d="M 14 2 A 28.8 14.4 0 0 0 42.8 16.4 L 57.2 16.4 A 28.8 14.4 0 0 0 86 2" {...line} />
+      <ellipse cx={50} cy={16.4} rx={0.9} ry={0.45} fill={spot} />
+      <ellipse cx={50} cy={26} rx={0.9} ry={0.45} fill={spot} />
+      {/* 골대(폭 3m) */}
+      <rect x={42.8} y={98} width={14.4} height={1.6} {...line} stroke="rgba(255,255,255,0.95)" strokeWidth={2} />
+      <rect x={42.8} y={0.4} width={14.4} height={1.6} {...line} stroke="rgba(255,255,255,0.95)" strokeWidth={2} />
     </svg>
   );
 }

@@ -15,7 +15,7 @@ import {
 } from '@prisma/client';
 import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { appendChatSystemLine } from '../chat/chat-system-line';
+import { ChatService, type ChatSystemLine } from '../chat/chat.service';
 import { NotificationsService, notificationPersonName } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -106,6 +106,7 @@ export class TeamsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly chat: ChatService,
   ) {}
 
   async list(user: V1AuthUser | null, query: TeamsQueryDto) {
@@ -321,10 +322,11 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, true, 'team_created_owner_joined');
+      const { joinedLine } = await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, true, 'team_created_owner_joined');
 
-      return { team, membership };
+      return { team, membership, joinedLine };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
     return {
       teamId: result.team.id,
@@ -926,7 +928,7 @@ export class TeamsService {
           reason: dto.reason ?? 'team_membership_removed',
         },
       });
-      await this.leaveTeamChatParticipant(
+      const leftLine = await this.leaveTeamChatParticipant(
         tx,
         target.teamId,
         target.userId,
@@ -944,9 +946,10 @@ export class TeamsService {
       });
       await enqueueRosterResync(tx, teamMembersTargets([target.teamId]));
 
-      return { updated, team, removedRosterCount };
+      return { updated, team, removedRosterCount, leftLine };
     });
 
+    if (result.leftLine) void this.chat.deliverSystemLine(result.leftLine);
     if (result.removedRosterCount > 0) {
       this.logger.log(
         `roster cleanup on member removal team=${target.teamId} user=${target.userId} rosters=${result.removedRosterCount}`,
@@ -1027,7 +1030,7 @@ export class TeamsService {
           reason,
         },
       });
-      await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
+      const leftLine = await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
 
       // 추방(removeMembership)과 같은 이유로 자진 이탈에서도 대회 명단을 비운다.
       const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, {
@@ -1036,9 +1039,10 @@ export class TeamsService {
       });
       await enqueueRosterResync(tx, teamMembersTargets([teamId]));
 
-      return { updated, team: updatedTeam, removedRosterCount };
+      return { updated, team: updatedTeam, removedRosterCount, leftLine };
     });
 
+    if (result.leftLine) void this.chat.deliverSystemLine(result.leftLine);
     if (result.removedRosterCount > 0) {
       this.logger.log(
         `roster cleanup on self leave team=${teamId} user=${user.id} rosters=${result.removedRosterCount}`,
@@ -1315,7 +1319,7 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(
+      const { joinedLine } = await this.ensureTeamChatParticipant(
         tx,
         application.teamId,
         application.applicantUserId,
@@ -1325,8 +1329,9 @@ export class TeamsService {
       );
       if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([application.teamId]));
 
-      return { updatedApplication, membership, team };
+      return { updatedApplication, membership, team, joinedLine };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
     void this.notifications.refreshTeamJoinApplicationsLine(application.teamId, 'recount');
     // 알림: 신청자에게 수락 안내 (fire-and-forget)
@@ -1794,7 +1799,7 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(
+      const { joinedLine } = await this.ensureTeamChatParticipant(
         tx,
         invitation.teamId,
         user.id,
@@ -1804,8 +1809,9 @@ export class TeamsService {
       );
       if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([invitation.teamId]));
 
-      return { updatedInvitation, membership, team };
+      return { updatedInvitation, membership, team, joinedLine };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
     await this.notifications.markTeamInvitationHandled({
       userId: user.id,
@@ -1946,9 +1952,10 @@ export class TeamsService {
       where: { id: participant.id, status: 'active', visibleFromAt: null },
       data: { visibleFromAt: joinedChatAt },
     });
-    if (activated.count > 0 && announceJoin) {
-      await appendChatSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: joinedChatAt });
-    }
+    const joinedLine =
+      activated.count > 0 && announceJoin
+        ? await this.chat.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: joinedChatAt })
+        : null;
 
     if (!existingParticipant || existingParticipant.status !== 'active') {
       await tx.v1StatusChangeLog.create({
@@ -1964,9 +1971,10 @@ export class TeamsService {
       });
     }
 
-    return { room, participant };
+    return { room, participant, joinedLine };
   }
 
+  /** 팀 채팅에서 내보내고 '나갔어요' 줄을 저장한다 — 커밋 뒤 반환된 줄을 deliverSystemLine 으로 알린다. */
   private async leaveTeamChatParticipant(
     tx: Prisma.TransactionClient,
     teamId: string,
@@ -1974,21 +1982,21 @@ export class TeamsService {
     actorUserId: string,
     leftAt: Date,
     reason: string,
-  ) {
+  ): Promise<ChatSystemLine | null> {
     const room = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
     if (!room) return null;
     const participant = await tx.v1ChatRoomParticipant.findUnique({
       where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
       select: { id: true, status: true },
     });
-    if (!participant || participant.status === 'left') return participant;
+    if (!participant || participant.status === 'left') return null;
 
-    const updated = await tx.v1ChatRoomParticipant.update({
+    await tx.v1ChatRoomParticipant.update({
       where: { id: participant.id },
       data: { status: 'left', leftAt },
       select: { id: true },
     });
-    await appendChatSystemLine(tx, { chatRoomId: room.id, userId, event: 'left', at: leftAt });
+    const leftLine = await this.chat.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'left', at: leftAt });
     await tx.v1StatusChangeLog.create({
       data: {
         targetType: 'chat_room_participant',
@@ -2001,7 +2009,7 @@ export class TeamsService {
       },
     });
 
-    return updated;
+    return leftLine;
   }
 
   private async getActiveTeamMembership(user: V1AuthUser, teamId: string) {

@@ -5,6 +5,7 @@ import { TeamLineupHistoryService } from '../../src/team-lineups/team-lineup-his
 import { TeamLineupPresetService } from '../../src/team-lineups/team-lineup-preset.service';
 import { TeamsService } from '../../src/teams/teams.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
+import { ChatService } from '../../src/chat/chat.service';
 
 const ids = {
   ownerA: '71000000-0000-4000-8000-000000000001',
@@ -519,7 +520,11 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
   });
 
   describe('팀 고정 등번호', () => {
-    const teams = new TeamsService(prisma, { create: async () => undefined } as unknown as NotificationsService);
+    const teams = new TeamsService(
+      prisma,
+      { create: async () => undefined } as unknown as NotificationsService,
+      {} as unknown as ChatService,
+    );
 
     afterEach(async () => {
       // updateMany로 한 번에 밀지 않는다 — 이 컬럼에는 (teamId, jerseyNumber) 부분

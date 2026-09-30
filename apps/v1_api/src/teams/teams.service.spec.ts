@@ -8,8 +8,12 @@
  */
 import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
+import { ChatService } from '../chat/chat.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { TeamsService } from './teams.service';
 
 // ─── Shared fixtures ─────────────────────────────────────────────────────────
@@ -133,12 +137,13 @@ describe('TeamsService', () => {
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
-    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
+    v1ChatRoomParticipant: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatMessage: { create: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
+  let realtime: { emitToUser: jest.Mock };
   let notifications: {
     emitNotification: jest.Mock;
     emitNotificationToMany: jest.Mock;
@@ -188,7 +193,7 @@ describe('TeamsService', () => {
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
-      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
+      v1ChatRoomParticipant: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatMessage: { create: jest.fn() },
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
@@ -203,7 +208,12 @@ describe('TeamsService', () => {
     prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'room-1' });
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
     prisma.v1ChatRoomParticipant.updateMany.mockResolvedValue({ count: 1 });
-    prisma.v1ChatMessage.create.mockResolvedValue({ sentAt: new Date('2026-06-01T10:00:00.000Z') });
+    prisma.v1ChatMessage.create.mockImplementation(async ({ data }: { data: { body: string; sentAt: Date } }) => ({
+      id: 'system-line-1',
+      body: data.body,
+      sentAt: data.sentAt,
+    }));
+    realtime = { emitToUser: jest.fn() };
     prisma.v1User.findUnique.mockResolvedValue({
       phone: '01012345678',
       profile: { realName: '새 멤버 실명', gender: 'male', displayName: '새 멤버', nickname: '새멤버' },
@@ -224,11 +234,42 @@ describe('TeamsService', () => {
         TeamsService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        // 입장·퇴장 줄은 실제 ChatService 가 저장·전달한다 — 실시간 게이트웨이만 바꿔 끼운다.
+        ChatService,
+        { provide: RealtimeGateway, useValue: realtime },
+        { provide: WebPushService, useValue: { sendToUser: jest.fn() } },
+        { provide: getLoggerToken(ChatService.name), useValue: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() } },
       ],
     }).compile();
 
     service = module.get(TeamsService);
   });
+
+  /**
+   * 팀 채팅 방 두 개(room-1 = team-1, room-2 = 다른 팀)와 참여자 행. 입장·퇴장 줄의 전달 대상 조회는
+   * chatRoomId·status·userId.not 만 흉내 낸다(조건이 빠지면 Prisma 처럼 그 조건을 걸지 않는다).
+   */
+  function seedTeamChatRooms(participants: Array<{ chatRoomId: string; userId: string; status: 'active' | 'left' }>) {
+    const rooms = [
+      { id: 'room-1', teamId: 'team-1' },
+      { id: 'room-2', teamId: 'team-2' },
+    ].map((room) => ({ ...room, matchId: null, teamMatchId: null, teamMatch: null, teamContactId: null, teamContact: null }));
+    prisma.v1ChatRoom.findUnique.mockImplementation(async ({ where }: { where: { id?: string; teamId?: string } }) =>
+      rooms.find((room) => (where.id !== undefined ? room.id === where.id : room.teamId === where.teamId)) ?? null,
+    );
+    prisma.v1ChatRoomParticipant.findMany.mockImplementation(
+      async ({ where }: { where: { chatRoomId?: string; status?: string; userId?: { not?: string } } }) =>
+        participants
+          .filter((row) => where.chatRoomId === undefined || row.chatRoomId === where.chatRoomId)
+          .filter((row) => where.status === undefined || row.status === where.status)
+          .filter((row) => where.userId?.not === undefined || row.userId !== where.userId.not)
+          .map(({ userId }) => ({ userId })),
+    );
+  }
+
+  function chatMessageEmits() {
+    return realtime.emitToUser.mock.calls.filter((call: unknown[]) => call[1] === 'chat:message');
+  }
 
   afterEach(() => jest.clearAllMocks());
 
@@ -1225,7 +1266,19 @@ describe('TeamsService', () => {
       ...teamRow(),
       memberships: [memberMembership],
     });
-    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce({ id: 'room-1' });
+    seedTeamChatRooms([
+      { chatRoomId: 'room-1', userId: owner.id, status: 'active' },
+      { chatRoomId: 'room-1', userId: manager.id, status: 'active' },
+      { chatRoomId: 'room-1', userId: member.id, status: 'left' },
+      { chatRoomId: 'room-2', userId: 'other-team-user', status: 'active' },
+    ]);
+    const order: string[] = [];
+    prisma.$transaction.mockImplementation(async (cb: (tx: typeof prisma) => Promise<unknown>) => {
+      const committed = await cb(prisma);
+      order.push('commit');
+      return committed;
+    });
+    realtime.emitToUser.mockImplementation((userId: string, event: string) => order.push(`${event}:${userId}`));
     prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce({ id: 'participant-1', status: 'active' });
     prisma.v1ChatRoomParticipant.update.mockResolvedValueOnce({ id: 'participant-1' });
     prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
@@ -1247,6 +1300,18 @@ describe('TeamsService', () => {
       }),
     );
     expect(prisma.v1ChatRoom.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'room-1' } }));
+    // 커밋 뒤에 그 방에 남은 참여자에게만 실시간으로 뜬다 — 다른 팀 방·나간 본인은 받지 않는다.
+    expect(order).toEqual(['commit', `chat:message:${owner.id}`, `chat:message:${manager.id}`]);
+    expect(chatMessageEmits()[0][2]).toEqual({
+      messageId: 'system-line-1',
+      roomId: 'room-1',
+      content: '새멤버님이 나갔어요',
+      status: 'sent',
+      sentAt: expect.any(Date),
+      senderUserId: member.id,
+      messageType: 'system',
+      systemEventType: 'left',
+    });
     // 팀장·매니저에게만, 나간 본인은 빼고 — 지금 멤버 수를 싣는다.
     expect(notifications.emitNotificationToMany).toHaveBeenCalledWith([owner.id, manager.id], 'team_member_left', 'team-1', undefined, {
       vars: { team: '테스트팀', name: '새멤버', count: '4' },
@@ -1632,7 +1697,7 @@ describe('TeamsService', () => {
         messageType: 'system',
         systemEventType: 'joined',
       }),
-      select: { sentAt: true },
+      select: { id: true, body: true, sentAt: true },
     });
     expect(notifications.emitNotification).toHaveBeenCalledWith(
       application.applicantUserId,
@@ -1954,12 +2019,18 @@ describe('TeamsService', () => {
       .mockResolvedValueOnce({ role: 'owner' });
     prisma.v1TeamMembership.update.mockResolvedValue({ id: 'mem-1', teamId: 'team-1', status: 'removed' });
     prisma.v1Team.update.mockResolvedValue({ memberCount: 4 });
-    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1' });
+    seedTeamChatRooms([
+      { chatRoomId: 'room-1', userId: owner.id, status: 'active' },
+      { chatRoomId: 'room-1', userId: member.id, status: 'active' },
+      { chatRoomId: 'room-1', userId: 'target-user', status: 'left' },
+      { chatRoomId: 'room-2', userId: 'other-team-user', status: 'active' },
+    ]);
     prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue({ id: 'participant-t', status: 'active' });
     prisma.v1ChatRoomParticipant.update.mockResolvedValue({ id: 'participant-t' });
     prisma.v1User.findUnique.mockResolvedValue({ profile: { nickname: '선수14', displayName: null } });
 
     await service.removeMembership(owner, 'mem-1', {});
+    await new Promise(setImmediate);
 
     expect(prisma.v1ChatMessage.create).toHaveBeenCalledTimes(1);
     expect(prisma.v1ChatMessage.create.mock.calls[0][0].data).toMatchObject({
@@ -1968,6 +2039,10 @@ describe('TeamsService', () => {
       body: '선수14님이 나갔어요',
       systemEventType: 'left',
     });
+    // 내보낸 팀장을 포함해 방에 남은 참여자에게 같은 줄이 실시간으로 — 다른 팀 방엔 가지 않는다.
+    const emits = chatMessageEmits();
+    expect(emits.map((call: unknown[]) => call[0])).toEqual([owner.id, member.id]);
+    expect(emits[0][2]).toMatchObject({ roomId: 'room-1', content: '선수14님이 나갔어요', systemEventType: 'left' });
   });
 
   it('removeMembership: manager는 다른 manager를 추방할 수 없다 → 403 PERMISSION_DENIED', async () => {
@@ -2241,8 +2316,14 @@ describe('TeamsService', () => {
       prisma.v1Team.update.mockResolvedValueOnce({ id: 'team-1', memberCount: 6 });
       prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 1 });
       mockMissingChatParticipant();
+      seedTeamChatRooms([
+        { chatRoomId: 'room-1', userId: manager.id, status: 'active' },
+        { chatRoomId: 'room-1', userId: invitee.id, status: 'active' },
+        { chatRoomId: 'room-2', userId: 'other-team-user', status: 'active' },
+      ]);
 
       const result = await service.acceptInvitation(invitee, 'inv-1');
+      await new Promise(setImmediate);
 
       expect(result.status).toBe('accepted');
       expect(result.alreadyProcessed).toBe(false);
@@ -2273,8 +2354,12 @@ describe('TeamsService', () => {
           messageType: 'system',
           systemEventType: 'joined',
         }),
-        select: { sentAt: true },
+        select: { id: true, body: true, sentAt: true },
       });
+      // 들어온 본인·다른 팀 방을 빼고 그 방 참여자에게 '들어왔어요'가 실시간으로 뜬다.
+      expect(chatMessageEmits()).toEqual([
+        [manager.id, 'chat:message', expect.objectContaining({ roomId: 'room-1', content: '새멤버님이 들어왔어요', systemEventType: 'joined' })],
+      ]);
       // 초대한 사람의 '초대 수락' 줄에 더한다 — 수락 시각은 저장한 respondedAt 과 같은 값이다.
       const [accepted] = notifications.recordTeamInvitationAccepted.mock.calls[0];
       expect(accepted).toMatchObject({ inviterUserId: manager.id, teamId: 'team-1', invitationId: 'inv-1' });

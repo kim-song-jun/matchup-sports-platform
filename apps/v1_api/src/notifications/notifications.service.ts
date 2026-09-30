@@ -53,7 +53,7 @@ export type NotificationEventType =
   | 'team_owner_changed'
   // 내보내진 본인에게(이유는 싣지 않는다) — Task 180 H1-removed.
   | 'team_membership_removed'
-  // 스스로 나간 멤버를 팀장·매니저에게(H1-left). 팀 채팅의 '나갔어요' 줄은 chat-system-line.ts 가 쓴다.
+  // 스스로 나간 멤버를 팀장·매니저에게(H1-left). 팀 채팅의 '나갔어요' 줄은 ChatService.recordSystemLine 이 쓴다.
   | 'team_member_left'
   // 초대한 사람에게(H1-invite-declined). 이유·다시 초대 권유는 싣지 않는다.
   | 'team_invitation_declined'

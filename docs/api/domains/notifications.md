@@ -142,6 +142,11 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 아니라 수락·거절을 하는 `/my/invitations`다. 딥링크는 알림 생성 시 `V1Notification.deepLink`에 저장되므로
 이미 만들어진 알림은 바뀌지 않는다.
 
+일반 팀매치 완료 알림 `team_match_completed`는 후기 작성 화면(`/my/reviews/team_match/:id`)으로 연결되므로 수신자를
+후기 작성 자격과 같은 판정으로 거른다 — 명단(계정 연결 참가자 1명 이상)이 있는 사이드는 명단에 있는 팀장·매니저만 받고,
+명단이 없는 사이드는 팀장·매니저 전원이 받는다. 리그 `league_team_match_completed`는 결과 영수증 화면으로 가므로
+팀장·매니저 전원이 받는다.
+
 ## Delivery Architecture
 
 ```text

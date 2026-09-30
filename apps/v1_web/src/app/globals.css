@@ -2378,6 +2378,11 @@ label.tm-btn:focus-within {
   }
 }
 
+/* 홈 맨 위의 "먼저 해 볼 일" 카드 안에서는 공용 빈 상태의 60px 세로 여백이 카드를 화면 절반으로 키운다. */
+.tm-home-starter .tm-empty-state {
+  padding: var(--spacing-3) var(--spacing-2) var(--spacing-5);
+}
+
 /* 오늘의 추천 — 세로 스택 대신 가로 캐러셀(스와이프, 다음 카드 살짝 peek). 스크롤바는 전역 숨김. */
 .tm-home-featured-carousel {
   display: flex;

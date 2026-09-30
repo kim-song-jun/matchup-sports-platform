@@ -5,6 +5,7 @@ import request = require('supertest');
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
+import { completeTeamMatchAtResultBoundary } from '../../src/games/team-match-result-boundary';
 import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-matches/league-fixture-creation';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolve-team-match-competition-config';
@@ -603,6 +604,32 @@ describe('경기 명단 조정 API (Task 179)', () => {
         'LEAGUE',
         'TEAM_MEMBER',
       ]);
+    });
+
+    // F88: 명단 조정으로 빠진 선수(rev1 → rev2)는 결과가 확정돼도 후기 의무가 없다. 같은 사이드에서 명단에
+    // 남은 선수(대조군)는 그대로 쓴다. 결과 경계(콘솔 end·결과 제출이 부르는 같은 함수)로 경기를 완료 처리한다.
+    it('명단에서 뺀 선수는 결과 확정 뒤 후기 pending 에 경기가 없고 상세가 403 NOT_ACTUAL_PARTICIPANT 이다', async () => {
+      const f = await seedLeague();
+      const [benched, played] = f.teamA.members;
+      expect((await excludeAs(f.path(f.sideA.id), f.teamA.ownerId, { userId: benched })).status).toBe(200);
+      const teamMatchId = f.game.teamMatchId!;
+      await inTx((client) => completeTeamMatchAtResultBoundary(client, teamMatchId, null, 'F88 integration'));
+
+      const pendingIds = async (userId: string) => {
+        const res = await getAs('/api/v1/reviews?tab=pending', userId);
+        expect(res.status).toBe(200);
+        return res.body.data.items.map((item: { sourceId: string }) => item.sourceId);
+      };
+      const sourcePath = `/api/v1/reviews/sources/team_match/${teamMatchId}`;
+
+      expect(await pendingIds(benched)).not.toContain(teamMatchId);
+      const benchedSource = await getAs(sourcePath, benched);
+      expect([benchedSource.status, benchedSource.body.code]).toEqual([403, 'NOT_ACTUAL_PARTICIPANT']);
+
+      expect(await pendingIds(played)).toContain(teamMatchId);
+      const playedSource = await getAs(sourcePath, played);
+      expect(playedSource.status).toBe(200);
+      expect(playedSource.body.data.targets.length).toBeGreaterThan(0);
     });
 
     it('이관 전 팀장 저장본이 최신인 사이드는 조정은 기록되지만 경기 명단은 그대로이고, 화면에 이관 대기가 보인다', async () => {

@@ -10,7 +10,7 @@ V1 session authentication and current room entitlement are required. Development
 | GET | `/chat/rooms` | `roomType`, `status`, `cursor`, `limit` (1–50); `{ items, pageInfo: { nextCursor, hasNext } }` |
 | POST | `/chat/rooms/resolve` | `{ targetType: match \| team \| team_match \| team_contact, targetId }`; checks domain membership |
 | GET | `/chat/rooms/:roomId` | room, linked target, current participant and context |
-| GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since entry |
+| GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since the participant's visibility boundary |
 | POST | `/chat/rooms/:roomId/messages` | `{ content }`, nonblank, max 2,000; text only; active room, accepted team contact if applicable |
 | PATCH | `/chat/rooms/:roomId/me` | optional `pinned`, `lastReadMessageId`, `mutedUntil` |
 | POST | `/chat/rooms/:roomId/leave` | optional `reason`, max 500 |
@@ -50,6 +50,11 @@ and therefore has no host participant row.
 - Newly created or reactivated team-chat participants set `visible_from_at` at confirmed membership
   activation; match/team-match participants start with `visible_from_at = null` and the first room
   detail/message entry sets it and creates the joined system message.
+- A `team_match` room is visible to every participant from the room's creation (`visible_from_at =
+  room.created_at`, the same invariant as `team_contact`), so messages the other team's leader sent
+  before this participant entered are listed and counted as unread. The joined system message is still
+  created at entry time. A participant whose boundary was set to an entry time earlier is pulled back to
+  `room.created_at` on the next room access (no backfill). Match and team rooms keep the entry-time boundary.
 - Team-membership activation creates one system message (`messageType = "system"`,
   `systemEventType = "joined"`); existing active-member repair does not duplicate it.
 - Message rows include `messageType`, `systemEventType`, and `unreadCount`. `unreadCount` is

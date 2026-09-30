@@ -321,6 +321,25 @@ describe('NotificationsService', () => {
     );
   });
 
+  it('team invitation received notifications deep-link to the invitation inbox, not the team page', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('invitee-1', 'team_invitation_received', 'team-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          recipientUserId: 'invitee-1',
+          targetType: 'team',
+          targetId: 'team-1',
+          deepLink: '/my/invitations',
+        }),
+      }),
+    );
+  });
+
   // 완료 알림의 본문은 "리뷰를 남겨보세요!"인데 링크는 매치 상세(/matches/:id, /team-matches/:id)로
   // 가고 있었다 — 그 화면엔 후기 작성 CTA가 없어 알림을 눌러도 후기를 쓸 수 없었다(막다른 길).
   // 세 완료/종료 알림이 각각 실제로 후기를 쓸 수 있는 화면으로 가는지 고정한다.

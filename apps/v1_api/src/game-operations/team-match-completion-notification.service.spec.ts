@@ -35,10 +35,27 @@ function fakeTx(options: {
     approvedApplicantTeamId: string | null;
     leagueId: string | null;
   } | null;
-  memberships: Array<{ userId: string }>;
+  memberships: Array<{ userId: string; teamId: string }>;
   preferences: Array<{ userId: string; teamMatchEnabled: boolean; activityEnabled?: boolean }>;
   alreadyDelivered: string[];
+  /**
+   * 사이드별 최신 라인업에 실린 계정 연결 참가자 userId. 지정하지 않으면 게임에 라인업 행이 없다.
+   * 빈 배열은 참가자 없는 빈 rev1 라인업이다(게임 생성이 사이드마다 항상 만든다).
+   */
+  lineups?: { home: string[]; away: string[] };
 }) {
+  const sides = [{ id: 'side-home', teamId: 'team-home' }, { id: 'side-away', teamId: 'team-away' }];
+  const lineupRows = options.lineups ? sides.map((side) => ({ id: `lineup-${side.id}`, sideId: side.id })) : [];
+  const participantRows = lineupRows.flatMap((lineup) =>
+    (lineup.sideId === 'side-home' ? options.lineups?.home : options.lineups?.away)?.map((userId) => ({
+      id: `participant-${lineup.sideId}-${userId}`,
+      gameId: 'game-1',
+      sideId: lineup.sideId,
+      lineupId: lineup.id,
+      userId,
+      displayNameSnapshot: userId,
+    })) ?? [],
+  );
   const createMany = jest.fn().mockResolvedValue({ count: 0 });
   const tx = {
     v1Game: {
@@ -47,7 +64,21 @@ function fakeTx(options: {
           ? { teamMatchId: null, teamMatch: null }
           : { teamMatchId: options.teamMatch.id, teamMatch: options.teamMatch },
       ),
+      findMany: jest.fn().mockResolvedValue(
+        options.lineups && options.teamMatch
+          ? [{ id: 'game-1', teamMatchId: options.teamMatch.id, sides }]
+          : [],
+      ),
     },
+    v1GameLineup: { findMany: jest.fn().mockResolvedValue(lineupRows) },
+    v1GameParticipant: {
+      findMany: jest.fn(async ({ where }: { where: { lineupId: { in: string[] } } }) =>
+        participantRows.filter((row) => where.lineupId.in.includes(row.lineupId))),
+    },
+    v1ParticipantIdentityLinkCurrent: {
+      findMany: jest.fn().mockResolvedValue(participantRows.map((row) => ({ participantId: row.id, userId: row.userId }))),
+    },
+    v1ParticipantIdentityLinkEvent: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamMembership: {
       findMany: jest.fn().mockResolvedValue(options.memberships),
     },
@@ -71,7 +102,7 @@ describe('TeamMatchCompletionNotificationService', () => {
   it('is a no-op for tournament fixtures (sourceType !== TEAM_MATCH)', async () => {
     const { tx, createMany } = fakeTx({
       teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
-      memberships: [{ userId: 'user-owner' }],
+      memberships: [{ userId: 'user-owner', teamId: 'team-home' }],
       preferences: [],
       alreadyDelivered: [],
     });
@@ -86,7 +117,7 @@ describe('TeamMatchCompletionNotificationService', () => {
   it('creates a durable notification per active owner/manager of both teams, gated by teamMatchEnabled', async () => {
     const { tx, createMany } = fakeTx({
       teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
-      memberships: [{ userId: 'user-host-owner' }, { userId: 'user-away-manager' }, { userId: 'user-opted-out' }],
+      memberships: [{ userId: 'user-host-owner', teamId: 'team-home' }, { userId: 'user-away-manager', teamId: 'team-away' }, { userId: 'user-opted-out', teamId: 'team-away' }],
       preferences: [{ userId: 'user-opted-out', teamMatchEnabled: false }],
       alreadyDelivered: [],
     });
@@ -115,6 +146,48 @@ describe('TeamMatchCompletionNotificationService', () => {
     );
   });
 
+  // 알림은 후기 작성 화면(/my/reviews/team_match/:id)으로 간다 — 후기 작성 자격(F88)과 같은 판정으로
+  // 수신자를 걸러야 명단 밖 팀장·매니저가 누르고 403 을 만나지 않는다. 대조군을 한 fixture 에 함께 둔다.
+  it('일반 팀매치 알림은 명단 안 팀장과 명단 없는 사이드 팀장에게만 가고, 명단 밖 팀장에게는 가지 않는다', async () => {
+    const { tx, createMany } = fakeTx({
+      teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
+      memberships: [
+        { userId: 'user-host-in', teamId: 'team-home' },
+        { userId: 'user-host-out', teamId: 'team-home' },
+        { userId: 'user-away-leader', teamId: 'team-away' },
+      ],
+      preferences: [],
+      alreadyDelivered: [],
+      // 홈은 계정 연결 참가자가 있는 명단, 원정은 참가자 없는 빈 rev1 라인업(명단 없음과 같다).
+      lineups: { home: ['user-host-in'], away: [] },
+    });
+    const service = new TeamMatchCompletionNotificationService();
+
+    await service.project(tx, revisionFixture());
+
+    const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
+    expect(data.map((row) => row.recipientUserId).sort()).toEqual(['user-away-leader', 'user-host-in']);
+  });
+
+  it('명단이 있어도 리그 알림은 결과 영수증 화면으로 가므로 명단 밖 팀장에게도 간다', async () => {
+    const { tx, createMany } = fakeTx({
+      teamMatch: { id: 'tm-league-1', title: '리그 3주차', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: 'league-1' },
+      memberships: [
+        { userId: 'user-host-in', teamId: 'team-home' },
+        { userId: 'user-host-out', teamId: 'team-home' },
+      ],
+      preferences: [],
+      alreadyDelivered: [],
+      lineups: { home: ['user-host-in'], away: [] },
+    });
+    const service = new TeamMatchCompletionNotificationService();
+
+    await service.project(tx, revisionFixture());
+
+    const data = createMany.mock.calls[0][0].data as Array<Record<string, unknown>>;
+    expect(data.map((row) => row.recipientUserId).sort()).toEqual(['user-host-in', 'user-host-out']);
+  });
+
   it('리그 대진(leagueId 있음)은 결과 영수증 화면으로 가는 리그 전용 문구를 쓴다', async () => {
     const { tx, createMany } = fakeTx({
       teamMatch: {
@@ -124,7 +197,7 @@ describe('TeamMatchCompletionNotificationService', () => {
         approvedApplicantTeamId: 'team-away',
         leagueId: 'league-1',
       },
-      memberships: [{ userId: 'user-host-owner' }],
+      memberships: [{ userId: 'user-host-owner', teamId: 'team-home' }],
       preferences: [],
       alreadyDelivered: [],
     });
@@ -159,7 +232,7 @@ describe('TeamMatchCompletionNotificationService', () => {
   it('canonical tournament TeamMatch is left to the tournament notification lane', async () => {
     const { tx, createMany } = fakeTx({
       teamMatch: { id: 'tm-tournament-1', title: '결승', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
-      memberships: [{ userId: 'user-host-owner' }],
+      memberships: [{ userId: 'user-host-owner', teamId: 'team-home' }],
       preferences: [{ userId: 'user-host-owner', teamMatchEnabled: false, activityEnabled: true }],
       alreadyDelivered: [],
     });
@@ -171,7 +244,7 @@ describe('TeamMatchCompletionNotificationService', () => {
   it('does not re-push to a recipient whose businessKey was already delivered (correction re-officialize)', async () => {
     const { tx, createMany } = fakeTx({
       teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
-      memberships: [{ userId: 'user-host-owner' }],
+      memberships: [{ userId: 'user-host-owner', teamId: 'team-home' }],
       preferences: [],
       alreadyDelivered: ['team-match-completed:tm-1:user-host-owner'],
     });
@@ -206,7 +279,7 @@ describe('TeamMatchCompletionNotificationService', () => {
   it('claim.afterCommit이 주어지면 push를 즉시 보내지 않고 커밋 후 실행할 effect로만 담는다', async () => {
     const { tx } = fakeTx({
       teamMatch: { id: 'tm-1', title: '테스트 팀매치', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
-      memberships: [{ userId: 'user-host-owner' }],
+      memberships: [{ userId: 'user-host-owner', teamId: 'team-home' }],
       preferences: [],
       alreadyDelivered: [],
     });

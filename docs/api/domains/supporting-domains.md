@@ -44,7 +44,10 @@
     방장이 `hostParticipates=false`로 직접 참가하지 않았더라도 방장은 참가자를 평가할 수 있고, 실제 참가자도
     방장을 평가할 수 있다. 본인과 참가자 목록에 이미 포함된 방장은 중복 대상에서 제외한다. 방장도 참가자도
     아닌 사용자는 `403 NOT_SOURCE_PARTICIPANT`다.
-  - `team_match`: 완료된 팀매치의 참가팀 active 멤버가 상대 팀(`targetType=team`)을 평가한다.
+  - `team_match`: 완료된 팀매치의 참가팀 active 멤버가 상대 팀(`targetType=team`)과 상대 선수(`targetType=user`)를 평가한다.
+    상대 선수는 상대 사이드 최신 라인업에서 계정으로 해석된 참가자이고, 등번호 오름차순(번호 없음은 뒤, 같으면 이름순)으로 나온다.
+    - 작성 자격: 작성자 사이드 최신 라인업에 계정으로 해석된 참가자가 1명 이상이면 그 명단에 있는 팀원만 작성자다. 경기별 명단 조정으로 빠진 팀원은 pending 목록(홈·마이 개수 포함)에 나오지 않고, 상세 조회와 제출(팀·선수 후기 모두)은 `403 NOT_ACTUAL_PARTICIPANT`다. 계정으로 해석된 참가자가 없으면(빈 라인업·계정 미연결 자동 명단 포함) 활성 팀원 전원이 작성자다.
+    - 양 팀 겸직자가 한쪽 사이드 명단에서만 빠지면 그 방향의 대상만 닫힌다.
   - `tournament_fixture`: 완료되고 공식 결과가 기록된 대회 경기에서 참가팀 active `owner | manager`는 상대 팀(`targetType=team`)과 상대 등록 선수(`targetType=user`)를, active `member`는 상대 등록 선수만 평가한다.
     - `sourceId`는 작성 화면으로 진입한 fixture ID다.
     - 중복 방지는 내부 `sourceGroupId=tournamentId` 기준이다. 같은 대회에서 같은 두 팀이 리그전/토너먼트로 두 번 만나도, 같은 작성자는 같은 상대 팀·선수를 한 번만 평가한다.

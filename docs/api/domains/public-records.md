@@ -134,6 +134,8 @@ Lineup revisions are immutable snapshots. The public match projection selects
 the highest `V1GameLineup.revision` independently for each side and exposes
 only participants whose `lineupId` belongs to that latest snapshot; repeated
 draft saves therefore never append older saved lineups to the visible roster.
+Each side's slots are ordered by jersey number ascending, slots without a number last, ties by displayed name
+(a name-hidden slot sorts by participant id so the hidden name's order never leaks) — never by storage order.
 
 ### Consent-gated personal identity (D-03/D-11, `public-consent.ts`)
 

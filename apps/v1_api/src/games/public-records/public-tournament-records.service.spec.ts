@@ -376,6 +376,36 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
     });
   });
 
+  // 명단을 뺐다 되돌리면 그 선수의 참가자 행이 저장 순서상 맨 뒤로 간다 — 공개 라인업이 저장 순서를
+  // 그대로 내보내면 1번이 맨 아래에 뜬다. 양 팀 모두 같은 규칙이어야 하므로 두 사이드를 함께 둔다.
+  it('공개 라인업은 저장 순서가 아니라 등번호 오름차순이고, 번호 없는 선수는 뒤로 간다', async () => {
+    const home = (id: string, jerseyNumber: number | null, displayNameSnapshot: string): FakeParticipant => ({
+      ...ELIGIBLE_PARTICIPANT, id, jerseyNumber, displayNameSnapshot, lineupId: 'lineup-home-1',
+    });
+    const away = (id: string, jerseyNumber: number | null, displayNameSnapshot: string): FakeParticipant => ({
+      ...INELIGIBLE_PARTICIPANT, id, jerseyNumber, displayNameSnapshot, lineupId: 'lineup-away-1',
+    });
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(Date.now() - 60_000),
+      consentLinks: [], consentSnapshots: [], events: [],
+      // 저장 순서: 10번, 번호 없음, 7번, 1번(뺐다 되돌려 맨 뒤) / 원정은 9번, 2번.
+      participants: [
+        home('home-10', 10, '열번'),
+        home('home-none', null, '가나다'),
+        home('home-7', 7, '일곱'),
+        home('home-1', 1, '한번'),
+        away('away-9', 9, '아홉'),
+        away('away-2', 2, '두번'),
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup?.home.map((player) => player.participantId)).toEqual(['home-1', 'home-7', 'home-10', 'home-none']);
+    expect(result.lineup?.away.map((player) => player.participantId)).toEqual(['away-2', 'away-9']);
+  });
+
   it('동의한 참가자의 골 이벤트에 participantName/jerseyNumber 가 실린다', async () => {
     const now = new Date();
     const prisma = buildFakePrisma({

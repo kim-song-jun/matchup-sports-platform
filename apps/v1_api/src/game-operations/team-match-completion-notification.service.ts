@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { canReviewFromLineup, readTeamMatchLineupUserIds } from '../games/roster/team-match-lineup-accounts';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
@@ -85,9 +86,18 @@ export class TeamMatchCompletionNotificationService {
 
     const memberships = await tx.v1TeamMembership.findMany({
       where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { userId: true },
+      select: { userId: true, teamId: true },
     });
-    const recipients = [...new Set(memberships.map((m) => m.userId))];
+    const isLeagueFixture = teamMatch.leagueId !== null;
+    // 일반 팀매치 알림의 목적지는 후기 작성 화면이다 — 후기 작성 자격과 같은 판정(canReviewFromLineup)으로
+    // 거르지 않으면 명단 밖 팀장·매니저가 눌렀을 때 403 막다른 길이다. 리그는 결과 영수증 화면이라 전원에게 간다.
+    const lineupUserIdsByTeam = isLeagueFixture
+      ? null
+      : (await readTeamMatchLineupUserIds(tx, [teamMatchId])).get(teamMatchId);
+    const eligibleMemberships = lineupUserIdsByTeam === null
+      ? memberships
+      : memberships.filter((m) => canReviewFromLineup(lineupUserIdsByTeam?.get(m.teamId) ?? [], m.userId));
+    const recipients = [...new Set(eligibleMemberships.map((m) => m.userId))];
     if (recipients.length === 0) return;
 
     // 선호도 필터: NotificationsService.createNotificationWithPrefCheck와 동일하게
@@ -97,7 +107,6 @@ export class TeamMatchCompletionNotificationService {
     const filteredRecipients = recipients.filter((userId) => preferenceEnabledByUser.get(userId) !== false);
     if (filteredRecipients.length === 0) return;
 
-    const isLeagueFixture = teamMatch.leagueId !== null;
     // 제목·딥링크는 notifications.service.ts 의 단일 소스에서 읽는다 — 처음엔 여기 주석으로
     // "그 파일이 단일 소스다"라고만 적고 문자열을 복사해 뒀는데, 적대 리뷰가 그 복사본이
     // 컴파일·테스트 어느 것으로도 결속되지 않아 조용히 갈라질 수 있음을 지적했다.

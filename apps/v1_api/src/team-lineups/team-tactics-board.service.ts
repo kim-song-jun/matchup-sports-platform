@@ -8,7 +8,10 @@ import { Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTeamLineupManager, assertTeamLineupMember } from './team-lineup-access';
-import { parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
+import {
+  parseLineupConfigForResponse,
+  parseLineupLimits,
+} from '../tournaments/competition-config/competition-config.parse';
 import type {
   SaveTeamTacticsBoardDto,
   TeamTacticsBoardEntryDto,
@@ -39,6 +42,21 @@ type BoardRow = {
   }>;
 };
 
+type GameSetup = {
+  lineupLimits: ReturnType<typeof parseLineupLimits>;
+  sportCode: string | null;
+  playersPerSide: number;
+  lineupConfig: ReturnType<typeof parseLineupConfigForResponse>;
+};
+
+/** 경기방식 "5:5" → 5. 양쪽 인원이 다르거나 형식이 아니면 null(자유 입력 칸이라 무엇이든 올 수 있다). */
+export function playersFromMatchFormat(matchFormat: string | null): number | null {
+  const match = matchFormat?.match(/^\s*(\d{1,2})\s*:\s*(\d{1,2})\s*$/);
+  if (!match || match[1] !== match[2]) return null;
+  const players = Number(match[1]);
+  return players > 0 ? players : null;
+}
+
 /**
  * 팀 전술보드 — 한 경기에서 한 팀이 짜는 배치.
  *
@@ -58,7 +76,7 @@ export class TeamTacticsBoardService {
     await assertTeamLineupMember(this.prisma, teamId, user.id);
     const side = await this.resolveSide(gameId, teamId);
     const board = await this.loadBoard(side);
-    return this.serialize(side, board, await this.resolveLineupLimits(gameId));
+    return this.serialize(side, board, await this.resolveGameSetup(gameId));
   }
 
   async save(user: V1AuthUser, teamId: string, gameId: string, dto: SaveTeamTacticsBoardDto) {
@@ -147,7 +165,7 @@ export class TeamTacticsBoardService {
       });
     });
 
-    return this.serialize(side, saved, await this.resolveLineupLimits(gameId));
+    return this.serialize(side, saved, await this.resolveGameSetup(gameId));
   }
 
   // ─── internals ───────────────────────────────────────────────────────────
@@ -234,29 +252,37 @@ export class TeamTacticsBoardService {
   }
 
   /**
-   * [P1-d] 이 경기의 **선발 인원 한도**를 읽는다. 경기별 라인업 화면이 사라지면서 그
-   * 화면이 하던 인원수 검사가 갈 곳을 잃었고, 이 보드가 그 자리를 잇는다.
-   * 설정을 못 찾으면 파서의 기본값이 쓰인다 — 한도를 모른다고 보드를 못 열게 하지 않는다.
+   * [P1-d] 선발 인원 한도 + (Task 180 H7) 보드가 코트·대형을 고르는 데 쓰는 종목·경기 인원·
+   * 포지션/대형 사전. 설정을 못 찾으면 파서의 기본값이 쓰인다 — 모른다고 보드를 못 열게 하지 않는다.
+   *
+   * `playersPerSide`: 친선은 설정이 종목 기본값(풋살 6)이라 실제 경기방식("5:5")이 따로 있다.
+   * 그 값이 "N:N" 으로 읽힐 때만 쓰고(자유 입력이다), 아니면 설정의 출전 인원을 쓴다.
    */
-  private async resolveLineupLimits(gameId: string) {
+  private async resolveGameSetup(gameId: string): Promise<GameSetup> {
     const game = await this.prisma.v1Game.findUnique({
       where: { id: gameId },
-      select: { competitionConfigVersionId: true },
+      select: { competitionConfigVersionId: true, teamMatch: { select: { matchFormat: true } } },
     });
     const config =
       game === null
         ? null
         : await this.prisma.v1CompetitionConfigVersion.findUnique({
             where: { id: game.competitionConfigVersionId },
-            select: { lineup: true },
+            select: { lineup: true, sportCode: true },
           });
-    return parseLineupLimits(config?.lineup ?? null);
+    const lineupLimits = parseLineupLimits(config?.lineup ?? null);
+    return {
+      lineupLimits,
+      sportCode: config?.sportCode ?? null,
+      playersPerSide: playersFromMatchFormat(game?.teamMatch?.matchFormat ?? null) ?? lineupLimits.maxPlayers,
+      lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
+    };
   }
 
   private serialize(
     side: { id: string; sideKey: string; displayNameSnapshot: string },
     board: BoardRow | null,
-    lineupLimits: ReturnType<typeof parseLineupLimits>,
+    setup: GameSetup,
   ) {
     return {
       gameSideId: side.id,
@@ -277,7 +303,10 @@ export class TeamTacticsBoardService {
       // 같은 경고를 띄우는 데 쓴다. 게이트로 만들지 않는 이유는 P1-c 가 지운 것이
       // 정확히 그런 게이트이기 때문이다 -- 명단이 덜 찼다고 경기를 못 여는 쪽이
       // 현장에서 더 큰 문제였다. 팀이 유효한 포메이션을 짜도록 **돕되 막지 않는다.**
-      lineupLimits,
+      lineupLimits: setup.lineupLimits,
+      sportCode: setup.sportCode,
+      playersPerSide: setup.playersPerSide,
+      lineupConfig: setup.lineupConfig,
       entries:
         board?.entries.map((entry) => ({
           userId: entry.userId,

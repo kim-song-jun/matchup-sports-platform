@@ -31,14 +31,21 @@
  * 렌더 컴포넌트가 아니라 순수 함수로 떼어 뒀다.
  */
 
-/** 유도 배너 식별자. 배열 순서가 곧 우선순위다(앞이 우선). */
-export const NUDGE_PRIORITY = ['recordConsent', 'pendingReviews'] as const;
+/**
+ * 유도 배너 식별자. 배열 순서가 곧 우선순위다(앞이 우선).
+ *
+ * Task 180 G7(F29·F34): 팀 초대·가입 신청을 맨 앞에 둔다 — **남이 내 응답을 기다리는 일**이라서다.
+ * 둘 다 처리하면 사라지므로(0건이면 조건이 꺼진다) 영구 점유 위험은 후기 배너와 같다.
+ */
+export const NUDGE_PRIORITY = ['teamInvitation', 'joinRequests', 'recordConsent', 'pendingReviews'] as const;
 
 export type HomeNudgeKey = (typeof NUDGE_PRIORITY)[number];
 
 export interface HomeBannerAvailability {
   /** 차단성 — 상한에서 제외되어 available 이면 항상 보인다. */
   readonly phoneVerify: boolean;
+  readonly teamInvitation: boolean;
+  readonly joinRequests: boolean;
   readonly recordConsent: boolean;
   readonly pendingReviews: boolean;
 }

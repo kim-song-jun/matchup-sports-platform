@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
 import type { NotificationsViewModel } from './community.types';
 import { ChatListPageClient, ChatRoomPageClient, NotificationsPageClient } from './community-api-clients';
 
@@ -187,6 +188,43 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByText('주말 풋살 매치')).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 14:00 경기 인원 확인해 주세요')).not.toBeInTheDocument();
     expect(screen.queryByText('수아님이 참가 승인됐어요')).not.toBeInTheDocument();
+  });
+
+  it('내보내진 사람의 옛 팀 채팅 주소는 네트워크 탓으로 말하지 않고 재시도 없이 채팅 목록으로 안내한다', () => {
+    const forbidden = new V1ApiError({
+      status: 'error',
+      statusCode: 403,
+      code: 'PERMISSION_DENIED',
+      message: 'Team chat requires active team membership',
+      timestamp: '2026-09-30T00:00:00.000Z',
+    });
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error: forbidden, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error: forbidden, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-team-left" />);
+
+    expect(screen.getByText('참여 중인 멤버만 볼 수 있어요')).toBeInTheDocument();
+    expect(screen.queryByText(/네트워크/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '채팅 목록으로' })).toHaveAttribute('href', '/chat');
+  });
+
+  it('서버 오류(5xx)는 여전히 다시 불러오기를 준다', () => {
+    const serverError = new V1ApiError({
+      status: 'error',
+      statusCode: 503,
+      code: 'UNAVAILABLE',
+      message: 'down',
+      timestamp: '2026-09-30T00:00:00.000Z',
+    });
+    hooks.chatRoom.mockReturnValue({ data: undefined, isPending: false, isError: true, error: serverError, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({ data: undefined, isPending: false, isError: true, error: serverError, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-503" />);
+
+    expect(screen.getAllByText('채팅방을 불러오지 못했어요').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '다시 불러오기' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: '채팅 목록으로' })).not.toBeInTheDocument();
   });
 
   it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {

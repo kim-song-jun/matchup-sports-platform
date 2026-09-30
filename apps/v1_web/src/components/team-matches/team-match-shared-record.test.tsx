@@ -18,7 +18,7 @@ beforeEach(() => {
   state.search = '';
   state.data = {
     teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
-    serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, ownSideId: 'home',
+    serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, operator: false, ownSideId: 'home',
     lineupReady: true, missingSides: [],
     sides: [{ id: 'home', key: 'HOME', name: '한강', score: 0 }, { id: 'away', key: 'AWAY', name: '마포', score: 0 }],
     participants: [

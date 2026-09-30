@@ -1144,7 +1144,7 @@ export const v1MswHandlers = [
     return ok({
       teamMatchId: match.id, title: match.title, startsAt: match.startsAt ?? null,
       phase: v1GameResultRevisions.length ? 'legacy' : 'scheduled', version: 0,
-      serverTime: new Date().toISOString(), canEdit: false, participant: false, ownSideId: null,
+      serverTime: new Date().toISOString(), canEdit: false, participant: false, operator: false, ownSideId: null,
       lineupReady: false,
       missingSides: v1GameFixture.sides.map((side) => ({ sideId: side.id, sideKey: side.sideKey, teamName: side.displayNameSnapshot })),
       sides: v1GameFixture.sides.map((side) => ({ id: side.id, key: side.sideKey, name: side.displayNameSnapshot, score: null })),
@@ -1152,7 +1152,7 @@ export const v1MswHandlers = [
     } satisfies SharedRecord);
   }),
   http.post(`${api}/team-matches/:teamMatchId/record`, () => HttpResponse.json({
-    code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자만 기록할 수 있어요.',
+    code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자와 플랫폼 주관 경기의 운영자만 기록할 수 있어요.',
   }, { status: 403 })),
 
   // ── Task 17: games / result revisions / team-match lineup ─────────────────

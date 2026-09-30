@@ -241,7 +241,7 @@ export class TeamMatchRecordService {
         throw conflict('ROSTER_INCOMPLETE', '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.');
       }
       const actor = await this.actor(tx, game, user);
-      if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자만 기록할 수 있어요.' });
+      if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자와 플랫폼 주관 경기의 운영자만 기록할 수 있어요.' });
       if (actor.operator && (dto.action === 'confirm' || dto.action === 'reopen')) {
         throw new ForbiddenException({ code: 'TEAM_CONFIRMATION_REQUIRED', message: '경기 종료 확인은 양 팀 참가자가 직접 진행해 주세요.' });
       }

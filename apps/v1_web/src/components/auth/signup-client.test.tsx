@@ -113,15 +113,41 @@ describe('SignupClient required profile contract', () => {
     expect(screen.queryByRole('heading', { name: '가입 정보를 확인해 주세요' })).not.toBeInTheDocument();
   });
 
-  it('keeps the identity-verification phrase together', async () => {
+  // 사진 영역이 라벨·버튼·아이콘 셋으로 같은 일을 세 번 말하면 첫 화면이 사진에 다 쓰인다 —
+  // 눌러서 올리는 컨트롤 하나만 남고, 사진을 고른 뒤에만 제거가 붙는다.
+  it('프로필 사진은 눌러서 올리는 컨트롤 하나이고, 고른 뒤에만 제거 버튼이 붙는다', async () => {
     // Given
     render(<SignupClient />);
+    await advanceToProfile();
+
+    // Then — 파일 입력 하나, 별도의 "사진 선택" 버튼 없음, "선택 입력" 표기
+    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /사진 선택|사진 변경/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '제거' })).not.toBeInTheDocument();
+    expect(screen.getByText('선택 입력')).toBeInTheDocument();
+    expect(screen.getByText('눌러서 사진을 올려요. 큰 사진은 자동으로 줄여요.')).toBeInTheDocument();
 
     // When
+    const file = new File(['x'], 'me.png', { type: 'image/png' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+    // Then
+    expect(await screen.findByRole('button', { name: '제거' })).toBeInTheDocument();
+    expect(screen.getByText('눌러서 다른 사진으로 바꿀 수 있어요.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '제거' }));
+    expect(screen.queryByRole('button', { name: '제거' })).not.toBeInTheDocument();
+  });
+
+  it('프로필 단계는 제목만 두어 입력칸이 첫 화면에 모이고, 성별은 필수 라디오다', async () => {
+    // Given
+    render(<SignupClient />);
     await advanceToProfile();
 
     // Then
-    expect(screen.getByText('본인 확인에 쓰여요.')).toHaveStyle({ whiteSpace: 'nowrap' });
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('프로필을 완성해 주세요');
+    expect(document.querySelector('.tm-signup-hero .tm-auth-sub')).toBeNull();
+    expect(screen.getByLabelText(/^생년월일/)).toBeInTheDocument();
   });
 
   it('does not let confirmation bypass missing display name, phone, or birth date', async () => {

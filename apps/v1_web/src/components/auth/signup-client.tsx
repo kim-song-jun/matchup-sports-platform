@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import type { ChangeEvent, FormEvent, ReactNode } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
@@ -43,7 +43,7 @@ type WizardStep = 'account' | 'verify' | 'profile';
 
 const STEP_ORDER: WizardStep[] = ['account', 'verify', 'profile'];
 
-const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
+const STEP_COPY: Record<WizardStep, { title: string; sub?: string }> = {
   account: {
     title: '가입 정보를\n확인해 주세요',
     sub: '닉네임과 이메일은 입력하면 중복을 바로 확인해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
@@ -52,9 +52,9 @@ const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
     title: '휴대폰 번호를 인증해 주세요',
     sub: '인증이 끝나면 자동으로 다음 단계로 넘어가요.',
   },
+  // 부제가 없다: 생년월일 칸까지 첫 화면 안에 들어오게 하려고 제목만 둔다.
   profile: {
-    title: '프로필을\n완성해 주세요',
-    sub: <>대회 참여 시 이름과 생년월일이 <span style={{ whiteSpace: 'nowrap' }}>본인 확인에 쓰여요.</span></>,
+    title: '프로필을 완성해 주세요',
   },
 };
 
@@ -95,7 +95,6 @@ export function SignupClient() {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
-  const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [realName, setRealName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -203,7 +202,6 @@ export function SignupClient() {
     reader.onload = () => {
       setProfileImageUrl(typeof reader.result === 'string' ? reader.result : '');
       setProfileImageFile(file);
-      setProfileImageName(file.name);
       setUploadingProfileImage(false);
     };
     reader.onerror = () => {
@@ -435,9 +433,9 @@ export function SignupClient() {
             <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
           ))}
         </div>
-        <div className="tm-signup-hero">
+        <div className={`tm-signup-hero${copy.sub ? '' : ' tm-signup-hero-title-only'}`}>
           <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
-          <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
+          {copy.sub ? <p className="tm-text-body tm-auth-sub">{copy.sub}</p> : null}
         </div>
 
         {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
@@ -586,35 +584,37 @@ export function SignupClient() {
 
           {step === 'profile' ? (
             <>
-              <section className="tm-auth-profile-upload">
-                <label className="tm-auth-profile-preview-trigger" aria-label="프로필 사진 선택">
-                  <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-                    {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
-                  </div>
-                  {profileImageUrl ? null : (
-                    <span className="tm-auth-profile-preview-badge" aria-hidden="true">
-                      <Camera size={13} strokeWidth={2.4} />
+              <div className="tm-auth-profile-upload">
+                {/* 행 전체가 파일 선택 라벨이다 — 아바타·문구·버튼이 각자 같은 일을 하지 않는다. */}
+                <label className="tm-auth-profile-upload-main tm-pressable">
+                  <span className="tm-auth-profile-preview-trigger">
+                    <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
+                      {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
                     </span>
-                  )}
-                  <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
+                    {profileImageUrl ? null : (
+                      <span className="tm-auth-profile-preview-badge" aria-hidden="true">
+                        <Camera size={13} strokeWidth={2.4} />
+                      </span>
+                    )}
+                    <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
+                  </span>
+                  <span>
+                    <span className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택 입력</em></span>
+                    <span className="tm-text-caption tm-auth-profile-upload-hint">
+                      {uploadingProfileImage
+                        ? '사진을 읽고 있어요.'
+                        : profileImageUrl
+                          ? '눌러서 다른 사진으로 바꿀 수 있어요.'
+                          : '눌러서 사진을 올려요. 큰 사진은 자동으로 줄여요.'}
+                    </span>
+                  </span>
                 </label>
-                <div>
-                  <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
-                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
-                    <label className="tm-btn tm-btn-md tm-btn-neutral">
-                      {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
-                      <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
-                    </label>
-                    {profileImageUrl ? (
-                      <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageFile(null); setProfileImageName(''); }}>
-                        제거
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="tm-text-caption" style={{ marginTop: 8 }}>{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</div>
-                </div>
-              </section>
-
+                {profileImageUrl ? (
+                  <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageFile(null); }}>
+                    제거
+                  </button>
+                ) : null}
+              </div>
 
               <div className="tm-auth-field">
                 {/* radiogroup 은 label 로 감싸지지 않으므로 aria-labelledby 로 라벨을 직접 물린다 —

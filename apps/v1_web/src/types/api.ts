@@ -53,9 +53,9 @@ export type AdminCursorPage<T> = CursorPage<T> & {
 };
 
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
-export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full' | 'in_progress' | 'completion_pending';
-export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
-export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn';
+export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full' | 'in_progress' | 'completion_pending' | 'on_hold' | 'scheduled';
+export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired' | 'on_hold';
+export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn' | 'expired' | 'cancelled_by_host';
 export type V1TeamMatchViewerState = 'none' | 'guest' | 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
 export type TrustState = 'verified' | 'estimated' | 'sample';
 
@@ -381,6 +381,13 @@ export type V1CreateInquiryPayload = {
   reportReason?: V1InquiryReportReason;
 };
 
+export type V1MatchLifecycle = {
+  canEdit: boolean;
+  canDelete: boolean;
+  canConfirmProceed?: boolean;
+  onHoldReason: 'NO_PARTICIPANTS' | 'UNDER_CAPACITY' | 'NO_OPPONENT' | null;
+};
+
 export type V1Match = {
   canComplete?: boolean;
   canWithdraw?: boolean;
@@ -407,7 +414,8 @@ export type V1Match = {
   capacity?: number;
   participantCount?: number;
   hostParticipates?: boolean;
-  status: V1Status;
+  status: V1MatchApiStatus;
+  lifecycle?: V1MatchLifecycle;
   displayState?: string;
   approvalRequired?: boolean;
   paymentRequired?: boolean;
@@ -1126,6 +1134,7 @@ export type V1TeamMatch = V1Match & {
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: { name: string; addressText?: string | null };
   displayState?: V1TeamMatchApiStatus;
+  lifecycle?: V1MatchLifecycle;
   costNote?: string | null;
   /**
    * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드

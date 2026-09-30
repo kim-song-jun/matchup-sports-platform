@@ -231,6 +231,8 @@ function matchStatusBadgeLabel(
   completed = false,
   lifecycleStatus?: V1MatchApiStatus,
 ) {
+  if (lifecycleStatus === 'on_hold') return '보류';
+  if (lifecycleStatus === 'scheduled') return '진행 확정';
   if (lifecycleStatus === 'in_progress') return '진행중';
   if (lifecycleStatus === 'completion_pending') return mode === 'mine' ? '종료 확인 필요' : '종료 확인 중';
   if (completed || lifecycleStatus === 'completed') return '종료';
@@ -258,7 +260,7 @@ export function MatchDetailPageSkeleton() {
   );
 }
 
-export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
+export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDetailViewModel; lifecyclePanel?: React.ReactNode }) {
   const { match, mode } = model;
   const [heroMessage, setHeroMessage] = useState('');
   const locked = mode === 'pending' || mode === 'approved' || mode === 'closed' || match.status === 'full';
@@ -392,6 +394,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           </div>
         </div>
 
+        {lifecyclePanel}
+
         {/* Desktop: 2-column layout — left body, right sticky CTA card */}
         <div className="tm-match-detail-desktop-layout tm-show-desktop">
           {/* Left column */}
@@ -422,10 +426,10 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' && !isPostStartLifecycle ? approvedStateCard : null}
+            {mode === 'approved' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? approvedStateCard : null}
             {/* [P2] 마감 사유를 아는 만큼만 정확히 말한다 — 시각이 지났으면 그 이유를,
                 아니면(정원 마감·취소·완료·만료) 기존 중립 문구를 유지한다. */}
-            {mode === 'closed' && !isPostStartLifecycle ? (
+            {mode === 'closed' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? (
               isDeadlinePassedClosed
                 ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
                 : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
@@ -471,7 +475,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               {mode === 'mine' ? (
                 <>
                   <Link className={`tm-btn tm-btn-lg ${model.canComplete ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href={match.applicationsHref ?? `/matches/${match.id}/applications`}>{model.canComplete ? '참여 여부 확인' : '신청자 관리'}</Link>
-                  {!model.completed && !model.canComplete ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
+                  {!model.completed && !model.canComplete && match.editHref ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
                 </>
               ) : (
                 <Button
@@ -512,8 +516,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' && !isPostStartLifecycle ? approvedStateCard : null}
-          {mode === 'closed' && !isPostStartLifecycle ? (
+          {mode === 'approved' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? approvedStateCard : null}
+          {mode === 'closed' && !isPostStartLifecycle && match.lifecycleStatus !== 'on_hold' ? (
             isDeadlinePassedClosed
               ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
               : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
@@ -806,6 +810,8 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
  * 사용자가 할 수 있는 일이 다르므로(전자는 자리가 날 수 있고 후자는 끝났다) 문구도 가른다.
  */
 function matchStateBadge(match: MatchCardModel): { label: string; className: string; subdued: boolean; useDeadline: boolean } | null {
+  if (match.lifecycleStatus === 'on_hold') return { label: '보류', className: 'tm-badge-orange', subdued: true, useDeadline: false };
+  if (match.lifecycleStatus === 'scheduled') return { label: '진행 확정', className: 'tm-badge-green', subdued: false, useDeadline: false };
   if (match.lifecycleStatus === 'in_progress') return { label: '진행중', className: 'tm-badge-green', subdued: false, useDeadline: false };
   if (match.lifecycleStatus === 'completion_pending') return { label: match.status === 'mine' ? '종료 확인 필요' : '종료 확인 중', className: 'tm-badge-orange', subdued: true, useDeadline: false };
   if (match.lifecycleStatus === 'completed') return { label: '종료', className: 'tm-badge-grey', subdued: true, useDeadline: false };

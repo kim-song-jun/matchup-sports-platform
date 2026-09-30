@@ -37,6 +37,7 @@ import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, 
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
+import { MatchLifecyclePanel } from '../matches/match-lifecycle-panel';
 import { TeamMatchDetailPageSkeleton, TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -431,7 +432,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     }),
   };
 
-  return <TeamMatchDetailPageView model={model} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
+  return <TeamMatchDetailPageView model={model} lifecyclePanel={!seeding && query.data.lifecycle && !query.data.league ? <MatchLifecyclePanel id={teamMatchId} domain="team-matches" status={getStatus(query.data)} lifecycle={query.data.lifecycle} canManage={Boolean(query.data.viewer?.manageableHostTeam && query.data.viewer?.manageRoute)} /> : undefined} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
 }
 
 
@@ -621,6 +622,7 @@ function applyLabel(
 const OWN_TEAM_MATCH_LABEL = '우리 팀 경기예요';
 
 function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
+  if (status === 'on_hold') return '보류';
   if (status === 'cancelled') return TEAM_MATCH_CANCELLED_LABEL;
   if (viewerState === 'host_team') return '내가 만든 팀매치';
   if (viewerState === 'requested') return '승인 대기';
@@ -691,6 +693,7 @@ function buildHostActions({
       ...(isLeagueFixture ? [] : [cancelAction]),
     ];
   }
+  if (status === 'on_hold') return [];
   if (status === 'closed') {
     return [
       { label: '모집 재개', tone: 'primary', pending, onClick: reopenTeamMatch },

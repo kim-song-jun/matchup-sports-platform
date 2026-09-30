@@ -27,7 +27,8 @@
 
 ## GET /matches (MatchFilterDto)
 
-- Query
+정본: `apps/v1_api/src/matches/{matches.controller,matches.service}.ts`, DTO, `match-applications.controller.ts`, v1 Web hooks/types.
+공통 prefix/envelope/auth/error는 `../global-contract.md`를 따른다. 아래 상태는 DB 저장값과 읽기 시점 표시값을 구분한다.
 
 | 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
@@ -43,7 +44,7 @@
 
 - Response: `{ items, pageInfo }`
 - 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. `deadline`/`starts_at`은 경기 시작 임박순이며 `recommended`는 현재 시작 임박순으로 처리한다.
-- `status`를 생략한 일반 목록은 시작 전 raw `recruiting`/`closed`와 최근 7일 안에 시작·완료된 매치를 포함한다. raw 상태는 mutation guard를 위해 그대로 두고, 화면 상태는 `displayState`로 구분한다: 시작 전 `recruiting|closed|full`, `startAt <= now < endAt`은 `in_progress`, `endAt <= now`(종료 시각이 없으면 시작 시각부터)는 `completion_pending`, 완료 확정 뒤에는 `completed`다.
+- `status`를 생략한 일반 목록은 시작 전 raw `recruiting`/`closed`와 최근 7일 안에 시작·완료된 매치를 포함한다. raw 상태는 mutation guard를 위해 그대로 두고, 화면 상태는 `displayState`로 구분한다: 시작 전 `recruiting|closed|full`, 진행 조건 충족 시 `startAt <= now < endAt`은 `in_progress`, `endAt <= now`(종료 시각이 없으면 시작 시각부터)는 `completion_pending`, 완료 확정 뒤에는 `completed`다.
 - `completion_pending` 매치는 호스트가 확정 명단에서 참가자별 `completed|no_show`를 지정하고 완료할 수 있다. 완료·미완료 모두 공개 목록에는 최대 7일만 유지되며, `/me/matches` 이력은 이 공개 보존 기간의 영향을 받지 않는다.
 - `sort=recommended` 목록과 `GET /home/recommendations`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
@@ -92,7 +93,7 @@
 - `capacity`를 수정 후의 활성 참가자 수보다 낮게 수정 불가. `version` 필수.
 - 수정은 매치 행 잠금 후 최신 상태·버전·참가 인원을 재확인한다. 같은 버전의 동시 수정은
   하나만 저장되며 나머지는 `409 VERSION_CONFLICT`. 승인과 정원 축소가 겹쳐도 정원 초과를 허용하지 않는다.
-- 시작된 매치는 raw status가 `closed`여도 edit 응답 `editable=false`, 저장은 409다.
+- 진행 조건이 충족되어 시작된 매치는 edit 응답 `editable=false`, 저장은 409다. 인원 미달 보류 매치는 미래 일정으로 수정할 수 있다.
 - `imageUrl`은 `null` 전달로 제거 가능
 - `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
 - `costNote`도 create와 동일 계약(선택, ≤200자, 미전달/빈 문자열은 `null`로 저장).
@@ -201,3 +202,13 @@ revision flow has produced the applicable persisted result state.
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`
+
+
+## Task 181 — 참가 조건 미충족 보류
+
+- 개인매치는 마감 또는 시작 시각이 지나도 확정 인원이 정원에 미달하면 `status/displayState=on_hold`. 신청 대기는 확정 인원이 아니다. 정원을 충족하거나 주최자가 진행 확인한 매치만 기존 `in_progress → completion_pending → completed` 흐름을 따른다.
+- `GET /matches/:id`의 `lifecycle`: `canEdit/canDelete/canConfirmProceed/onHoldReason`. 확정 참가자가 없으면 `NO_PARTICIPANTS`, 정원 미달이면 `UNDER_CAPACITY`. 주최자 불참 옵션을 유지한다.
+- 인증 + 주최자 권한의 `POST /matches/:id/confirm-proceed`: 보류 중이고 주최자 외 확정 참가자가 1명 이상인 경우 현재 인원으로 진행 결정. `v1_matches.proceed_confirmed_at` 저장. 시작 전은 scheduled, 시작 후에는 기존 진행/종료 확인 상태. 참가자에게 match_proceed_confirmed 알림.
+- PATCH 수정: 보류를 미래 일정으로 변경해 recruiting 재모집. 진행 결정 초기화. 일정/장소 변경 시 requested 신청 expired, approved 신청 withdrawn, 기존 참가자 cancelled로 전환하고 match_updated 알림으로 재신청 안내. row lock 및 stale version 검증.
+- 인증 + 주최자 권한의 `DELETE /matches/:id`: recruiting/closed/cancelled이며 모든 신청 이력 및 주최자 외 참가 이력이 없을 때 archived/deletedAt soft delete + 감사 로그. 이력이 있으면 409 STATE_CONFLICT, 취소를 안내한다.
+- 보류에서도 POST cancel 가능. 타인·비활성 계정 mutation은 기존 권한 검증으로 거절. 진행 중·완료·취소 상태를 보류로 역전하지 않는다. 새 상태는 read-derived 표시 상태이고 목록 query enum은 기존 계약 유지.

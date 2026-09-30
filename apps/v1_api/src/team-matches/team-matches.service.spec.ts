@@ -106,7 +106,7 @@ describe('TeamMatchesService', () => {
     v1User: { findUnique: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
-    v1TeamMatchApplication: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    v1TeamMatchApplication: { count: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     // 매치 ↔ 팀일정 연동(레인 schedule): create()/approveApplication()/cancel()/update()가 같은
     // 트랜잭션 안에서 team-schedules.service.ts의 평문 함수(createTeamMatchScheduleInTx 등)를
     // 호출하며 이 tx 프록시(=prisma 목)를 그대로 넘긴다. v1TeamSchedule 델리게이트가 없으면
@@ -115,7 +115,7 @@ describe('TeamMatchesService', () => {
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock };
-    v1Game: { findUnique: jest.Mock };
+    v1Game: { findUnique: jest.Mock; updateMany: jest.Mock };
     v1GameSide: { update: jest.Mock };
     v1GameParticipant: { createManyAndReturn: jest.Mock };
     // approveApplication의 초기 라인업 스냅샷(hydrateApprovedAwaySnapshot)이 신원 연결까지
@@ -145,6 +145,7 @@ describe('TeamMatchesService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       v1TeamMatchApplication: {
+        count: jest.fn().mockResolvedValue(0),
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
@@ -162,6 +163,7 @@ describe('TeamMatchesService', () => {
         findMany: jest.fn(),
       },
       v1Game: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUnique: jest.fn().mockResolvedValue({
           id: 'game-1',
           sides: [{ id: 'side-away', sideKey: 'AWAY', teamId: null }],
@@ -487,17 +489,12 @@ describe('TeamMatchesService', () => {
     });
   });
 
-  it('cancel: 과거 startAt(recruiting인데 만료) → 409 STATE_CONFLICT', async () => {
-    // getApiStatus returns 'expired' when startAt < now, even if status='recruiting'
-    prisma.v1TeamMatch.findFirst.mockResolvedValue(
-      teamMatchRow({ status: 'recruiting', startAt: PAST }),
-    );
+  it('cancel: 상대팀 없는 과거 매치는 보류 상태에서 취소할 수 있다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ status: 'recruiting', startAt: PAST }));
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
-
-    await expect(service.cancel(manager, 'tm-1', {})).rejects.toMatchObject({
-      status: 409,
-    });
-    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
+    const result = await service.cancel(manager, 'tm-1', {});
+    expect(result).toMatchObject({ teamMatchId: 'tm-1', status: 'cancelled', cancelledApplications: 0 });
   });
 
   it('cancel: 리그 대진(leagueId 有)은 호스트 팀이 직접 취소할 수 없다 → 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN', async () => {
@@ -721,7 +718,30 @@ describe('TeamMatchesService', () => {
     );
   });
 
-  it('edit: 모집 상태여도 시작 시간이 지났으면 수정 잠금 상태로 내려준다', async () => {
+  it('remove: 신청 이력 없는 보류 팀매치는 삭제할 수 있다', async () => {
+    const row = teamMatchRow({ startAt: PAST });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(row);
+    prisma.v1TeamMatch.update.mockImplementation(async ({ data }) => Object.assign(row, data));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    expect(await service.remove(manager, 'tm-1')).toEqual({ teamMatchId: 'tm-1', deleted: true });
+    expect(row.status).toBe('archived');
+    expect(row.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('remove: 철회된 신청도 이력이 있으면 취소 경로를 사용해야 한다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ startAt: PAST }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatchApplication.count.mockResolvedValue(1);
+    await expect(service.remove(manager, 'tm-1')).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('remove: 확정 상대팀이 있는 팀매치는 삭제할 수 없다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'opponent' }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    await expect(service.remove(manager, 'tm-1')).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('edit: 상대팀 없는 과거 매치는 보류 상태로 수정할 수 있다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ status: 'recruiting', startAt: PAST }),
     );
@@ -729,9 +749,9 @@ describe('TeamMatchesService', () => {
 
     const result = await service.edit(manager, 'tm-1');
 
-    expect(result.editable).toBe(false);
-    expect(result.lockedReason).toBe('expired');
-    expect(result.status).toBe('expired');
+    expect(result.editable).toBe(true);
+    expect(result.lockedReason).toBeNull();
+    expect(result.status).toBe('on_hold');
   });
 
   // ─── withdrawApplication: 상태 머신 ───────────────────────────────────────
@@ -939,7 +959,7 @@ describe('TeamMatchesService', () => {
 
   // ─── getApiStatus: expired 분기 ───────────────────────────────────────────
 
-  it('detail: startAt이 과거면 getApiStatus가 expired를 반환 (NOT_FOUND_OR_ARCHIVED 전이 없음)', async () => {
+  it('detail: 상대팀 없이 startAt이 과거면 on_hold를 반환 (NOT_FOUND_OR_ARCHIVED 전이 없음)', async () => {
     // The recruiting + past startAt match should be visible as "expired", not 404.
     const teamMatch = {
       ...teamMatchRow({ status: 'recruiting', startAt: PAST }),
@@ -963,7 +983,7 @@ describe('TeamMatchesService', () => {
     prisma.v1Team.findMany.mockResolvedValue([]);
 
     const result = await service.detail(null, 'tm-1');
-    expect(result.status).toBe('expired');
+    expect(result.status).toBe('on_hold');
   });
 
   it('detail: raw status가 recruiting이어도 신청 마감이 지났으면 displayState는 closed다', async () => {
@@ -990,8 +1010,8 @@ describe('TeamMatchesService', () => {
 
     const result = await service.detail(null, 'tm-1');
 
-    expect(result.status).toBe('recruiting');
-    expect(result.displayState).toBe('closed');
+    expect(result.status).toBe('on_hold');
+    expect(result.displayState).toBe('on_hold');
   });
 
   // Task 17: the result-entry/approval screens call `/games/:gameId/...` and

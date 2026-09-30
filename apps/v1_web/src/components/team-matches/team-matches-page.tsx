@@ -237,7 +237,7 @@ const LINEUP_ACTION_COPY = {
   'match-roster': { title: '경기 명단', description: '참가 명단 선수가 출전해요. 이번 경기에 빠지는 선수만 빼 주세요.', cta: '명단 조정' },
 } as const;
 
-export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode }) {
+export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode; lifecyclePanel?: React.ReactNode }) {
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
@@ -434,7 +434,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
     <>
       {showChat ? chatButton : null}
       {mode === 'mine' ? (
-        <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/team-matches/${match.id}/edit`}>{cta}</Link>
+        <>{match.manageHref ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref}>{cta}</Link> : <span className="tm-text-caption">{model.statusLabel ?? '신청자 관리에서 상태를 확인해 주세요.'}</span>}</>
       ) : (
         /* P2: 완료 메시지 능동형 전환 ("신청이 취소되었어요" → "신청을 취소했어요")
          *
@@ -458,6 +458,8 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
         </AppBackLink>
         <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>
       </div>
+
+      {lifecyclePanel}
 
       {/* Desktop 2-column layout wrapper */}
       <div className="tm-team-match-detail-desktop tm-content-enter">
@@ -1073,7 +1075,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             {isClosed ? (
               <span className="tm-badge tm-badge-grey tm-card-closed-badge">
                 <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-                {match.apiStatus === 'completed' ? '경기 종료' : '신청 마감'}
+                {match.apiStatus === 'on_hold' ? '보류' : match.apiStatus === 'completed' ? '경기 종료' : '신청 마감'}
               </span>
             ) : null}
             {openLabel ? (

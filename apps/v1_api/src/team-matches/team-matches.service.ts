@@ -256,6 +256,7 @@ export class TeamMatchesService {
       deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
+      lifecycle: { canEdit: !teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId, canDelete: Boolean(viewer.manageRoute) && !teamMatch.approvedApplicantTeamId && ['recruiting', 'closed', 'cancelled'].includes(teamMatch.status) && await this.prisma.v1TeamMatchApplication.count({ where: { teamMatchId } }) === 0, onHoldReason: this.getApiStatus(teamMatch) === 'on_hold' ? 'NO_OPPONENT' : null },
       isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
       costNote: teamMatch.costNote,
       // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
@@ -683,11 +684,11 @@ export class TeamMatchesService {
   async edit(user: V1AuthUser, teamMatchId: string) {
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
     const apiStatus = this.getApiStatus(teamMatch);
-    const editable = teamMatch.status === 'recruiting' && apiStatus !== 'expired';
+    const editable = ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId;
     return {
       teamMatchId: teamMatch.id,
       editable,
-      lockedReason: editable ? null : apiStatus === 'expired' ? 'expired' : 'terminal_or_matched_status',
+      lockedReason: editable ? null : 'terminal_or_matched_status',
       form: {
         hostTeamId: teamMatch.hostTeamId,
         sportId: teamMatch.sportId,
@@ -718,7 +719,7 @@ export class TeamMatchesService {
     this.assertActiveAccount(user);
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
     if (teamMatch.updatedAt.toISOString() !== dto.version) throw stateConflict('Team match version is stale', 'VERSION_CONFLICT');
-    if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'expired') throw stateConflict('Team match cannot be updated in current status');
+    if (!['recruiting', 'closed'].includes(teamMatch.status) || teamMatch.approvedApplicantTeamId) throw stateConflict('Team match cannot be updated in current status');
     if (dto.hostTeamId !== teamMatch.hostTeamId) throw stateConflict('Host team cannot be changed');
     if (dto.sportId !== teamMatch.hostTeam.sportId) {
       throw validationError('sportId must match the host team sport', 'sportId');
@@ -738,11 +739,19 @@ export class TeamMatchesService {
     // 메서드와 달리 여기만 단일 update() 호출이었다). 경기조건 구조화 필드(matchFormat/matchStyle/
     // uniformColor)는 이 트랜잭션 승격과 별개로 함께 저장해야 한다 — 둘 중 하나만 반영하면
     // 일정 동기화가 빠지거나 새 경기조건 저장이 무효화된다.
+    const requiresReconfirmation = teamMatch.startAt.getTime() !== dates.startsAt.getTime()
+      || (teamMatch.endAt?.getTime() ?? null) !== (dates.endsAt?.getTime() ?? null)
+      || teamMatch.placeName !== dto.manualPlaceName || teamMatch.placeAddress !== (dto.addressText ?? null);
     const conditionFields = this.normalizeMatchConditionFields(dto);
     const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatch.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatch.id} FOR UPDATE`;
+      const current = await tx.v1TeamMatch.findFirst({ where: { id: teamMatch.id, deletedAt: null } });
+      if (!current || current.updatedAt.toISOString() !== dto.version || current.approvedApplicantTeamId || !['recruiting', 'closed'].includes(current.status)) throw stateConflict('Team match state changed', 'VERSION_CONFLICT');
       const teamMatchUpdated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: {
+          status: 'recruiting',
           sportId: dto.sportId,
           regionId: dto.regionId,
           title: dto.title,
@@ -763,10 +772,21 @@ export class TeamMatchesService {
           costNote: dto.costNote ?? null,
         },
       });
+      if (requiresReconfirmation) await tx.v1TeamMatchApplication.updateMany({
+        where: { teamMatchId: teamMatch.id, status: 'requested' },
+        data: { status: 'expired', reviewedByUserId: user.id, reviewedAt: new Date() },
+      });
+      await tx.v1StatusChangeLog.create({ data: {
+        targetType: 'team_match', targetId: teamMatch.id, fromStatus: current.status, toStatus: 'recruiting',
+        actorType: 'user', actorUserId: user.id, reason: requiresReconfirmation ? 'schedule_or_place_changed_reapply_required' : 'host_updated',
+      } });
       await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
       return teamMatchUpdated;
     });
 
+    if (requiresReconfirmation) this.emitTeamMatchNotificationToApplicantManagers(
+      teamMatch.id, 'team_match_updated', `"${teamMatch.title}" 일정 또는 장소가 변경됐어요. 변경 내용을 확인하고 다시 신청해 주세요.`,
+    );
     return {
       teamMatchId: updated.id,
       status: updated.status,
@@ -790,7 +810,7 @@ export class TeamMatchesService {
     if (teamMatch.status === 'cancelled') {
       throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already cancelled' });
     }
-    if (teamMatch.status === 'completed' || this.getApiStatus(teamMatch) === 'expired') {
+    if (teamMatch.status === 'completed' || teamMatch.status === 'archived') {
       throw stateConflict('Team match cannot be cancelled in current status');
     }
 
@@ -813,6 +833,7 @@ export class TeamMatchesService {
       // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId로 연결된 SCHEDULED 스케줄(호스트/상대 최대
       // 2건)을 같은 트랜잭션 안에서 CANCELLED로 cascade한다 — row는 삭제하지 않는다.
       await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, dto.reason ?? 'host_cancelled');
+      await tx.v1Game.updateMany({ where: { teamMatchId: teamMatch.id, state: 'SCHEDULED' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -824,12 +845,12 @@ export class TeamMatchesService {
           reason: dto.reason ?? 'host_cancelled',
         },
       });
-      return { applications };
+      return { applications, opponentTeamId: current.approvedApplicantTeamId };
     });
 
     // 알림: 승인된 상대팀 manager+에게 취소 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
-    if (teamMatch.approvedApplicantTeamId) {
-      const opponentTeamId = teamMatch.approvedApplicantTeamId;
+    if (result.opponentTeamId) {
+      const opponentTeamId = result.opponentTeamId;
       this.notifications.emitToManyDeferred(
         async () =>
           (
@@ -852,13 +873,30 @@ export class TeamMatchesService {
     };
   }
 
+  async remove(user: V1AuthUser, teamMatchId: string) {
+    this.assertActiveAccount(user);
+    await this.getManageableTeamMatch(user, teamMatchId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatchId} FOR UPDATE`;
+      const match = await tx.v1TeamMatch.findFirst({ where: { id: teamMatchId, deletedAt: null } });
+      if (!match || match.approvedApplicantTeamId || !['recruiting', 'closed', 'cancelled'].includes(match.status)) throw stateConflict('Team match cannot be deleted');
+      if (await tx.v1TeamMatchApplication.count({ where: { teamMatchId } })) throw stateConflict('신청 이력이 있어 삭제할 수 없어요. 팀매치 취소를 이용해 주세요.');
+      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatchId, 'host_deleted');
+      await tx.v1Game.updateMany({ where: { teamMatchId, state: 'SCHEDULED' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
+      await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: 'archived', deletedAt: new Date() } });
+      await tx.v1StatusChangeLog.create({ data: { targetType: 'team_match', targetId: teamMatchId, fromStatus: match.status, toStatus: 'archived', actorType: 'user', actorUserId: user.id, reason: 'host_deleted_without_application_history' } });
+    });
+    return { teamMatchId, deleted: true };
+  }
+
   async close(user: V1AuthUser, teamMatchId: string, dto: CloseTeamMatchDto) {
     this.assertActiveAccount(user);
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
     if (teamMatch.status === 'closed') {
       throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already closed' });
     }
-    if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'expired') {
+    if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'on_hold') {
       throw stateConflict('Only active recruiting team matches can be closed');
     }
 
@@ -2055,7 +2093,7 @@ export class TeamMatchesService {
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {
-    if (teamMatch.status === 'recruiting' && teamMatch.startAt !== null && teamMatch.startAt < new Date()) return 'expired';
+    if (!teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId && ((teamMatch.startAt !== null && teamMatch.startAt <= new Date()) || (teamMatch.deadlineAt && teamMatch.deadlineAt <= new Date()))) return 'on_hold';
     return teamMatch.status;
   }
 

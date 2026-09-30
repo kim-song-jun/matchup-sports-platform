@@ -233,6 +233,7 @@ function getViewerState(match: V1Match) {
 function toPersonalStatus(match: V1Match): MyMatchStatus {
   const state = getViewerState(match);
   const display = match.displayState ?? match.status;
+  if (display === 'on_hold' || display === 'scheduled' || display === 'in_progress') return display;
   if (state === 'requested') return 'pending';
   if (display === 'completed' || display === 'expired' || display === 'closed' || display === 'cancelled') return 'ended';
   if (state === 'approved' || state === 'participant') return 'approved';
@@ -241,6 +242,7 @@ function toPersonalStatus(match: V1Match): MyMatchStatus {
 
 function toTeamStatus(match: V1MyTeamMatch): MyMatchStatus {
   const display = match.displayState ?? match.status;
+  if (display === 'on_hold') return 'on_hold';
   if (match.relation === 'requested') return 'pending';
   if (match.relation === 'rejected' || match.relation === 'withdrawn') return 'ended';
   if (display === 'completed' || display === 'expired' || display === 'closed' || display === 'cancelled') return 'ended';
@@ -266,6 +268,7 @@ function personalStatusLabel(status: MyMatchStatus, match: V1Match) {
 
 function teamStatusLabel(match: V1MyTeamMatch, mode: 'joined' | 'created') {
   const display = match.displayState ?? match.status;
+  if (display === 'on_hold') return '보류';
   if (display === 'completed') return '경기 완료';
   if (display === 'cancelled') return '경기 취소';
   if (display === 'expired') return '기간 종료';

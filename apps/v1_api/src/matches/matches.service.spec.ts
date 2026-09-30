@@ -72,6 +72,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     minSportLevel: null,
     maxSportLevel: null,
     status: 'recruiting',
+    proceedConfirmedAt: null as Date | null,
     cancelledAt: null,
     completedAt: null,
     createdAt: new Date('2026-06-01T00:00:00.000Z'),
@@ -232,9 +233,16 @@ describe('MatchesService', () => {
 
   // ─── 1. 비-호스트 취소 → 403 ──────────────────────────────────────────────
 
+  it('complete: 참가 조건 미달 보류는 진행 확인 없이 완료할 수 없다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ startAt: PAST, participants: [] }));
+    await expect(service.complete(host, 'match-1', { participants: [] })).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
   it('complete: 호스트가 모든 활성 참가자의 참여 여부를 확정하면 매치와 참가자 기록을 함께 완료한다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({
       startAt: PAST,
+      proceedConfirmedAt: new Date(),
       participants: [
         { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
         { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
@@ -275,6 +283,7 @@ describe('MatchesService', () => {
   it('complete: 참가하지 않는 호스트를 참가자로 다시 만들거나 완료 인원에 포함하지 않는다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({
       startAt: PAST,
+      proceedConfirmedAt: new Date(),
       participants: [
         { id: 'host-participant', userId: host.id, role: 'host', status: 'cancelled' },
         { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
@@ -298,6 +307,7 @@ describe('MatchesService', () => {
   it('complete: 활성 참가자를 빠뜨리면 완료하지 않는다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({
       startAt: PAST,
+      proceedConfirmedAt: new Date(),
       participants: [
         { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
         { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
@@ -578,7 +588,7 @@ describe('MatchesService', () => {
     });
   });
 
-  it('edit: 시작 시각이 지난 매치는 status가 여전히 recruiting이어도 editable:false + lockedReason:terminal_status를 반환한다', async () => {
+  it('edit: 참가 조건 미달로 시작 시각이 지난 매치는 보류에서 수정 가능하다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(
       matchRow({ hostUserId: host.id, status: 'recruiting', startAt: PAST }),
     );
@@ -586,9 +596,9 @@ describe('MatchesService', () => {
 
     const result = await service.edit(host, 'match-1');
 
-    expect(result.editable).toBe(false);
-    expect(result.lockedReason).toBe('terminal_status');
-    expect(result.status).toBe('expired');
+    expect(result.editable).toBe(true);
+    expect(result.lockedReason).toBeNull();
+    expect(result.status).toBe('on_hold');
   });
 
   it('edit: 시작 시각이 남은 recruiting 매치는 editable:true를 반환한다 (회귀 방지)', async () => {
@@ -657,7 +667,8 @@ describe('MatchesService', () => {
     const common = {
       sport: { id: 'sport-1', name: '풋살' },
       region: null,
-      participants: [],
+      participants: [{ role: 'participant', status: 'active' }],
+      proceedConfirmedAt: new Date(),
       hostUser: { id: host.id, profile: null, reputationSummary: null },
     };
     prisma.v1Match.findMany.mockResolvedValue([
@@ -903,7 +914,7 @@ describe('MatchesService', () => {
       startsAt: FUTURE.toISOString(),
       capacity: 2,
       hostParticipates: false,
-      manualPlaceName: '강남 풋살장',
+      manualPlaceName: current.placeName,
       version: current.updatedAt.toISOString(),
     });
 
@@ -1201,5 +1212,90 @@ describe('MatchesService', () => {
       response: { code: 'VALIDATION_FAILED', details: { field: 'deadlineAt' } },
     });
     expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchesService — on-hold lifecycle', () => {
+  const makeService = (row: ReturnType<typeof matchRow>, count = 1, history = 0) => {
+    const db: any = {
+      v1Match: { findFirst: jest.fn().mockImplementation(async () => row.deletedAt ? null : row), update: jest.fn().mockImplementation(async ({ data }) => Object.assign(row, data)) },
+      v1MatchParticipant: { upsert: jest.fn().mockResolvedValue({ id: 'host-participant' }), count: jest.fn().mockImplementation(async ({ where }) => where.role ? Math.max(0, count - 1) : count), findMany: jest.fn().mockResolvedValue(count > 1 ? [{ userId: otherUser.id }] : []) },
+      v1MatchApplication: { count: jest.fn().mockResolvedValue(history), findMany: jest.fn().mockResolvedValue([]) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    db.$transaction = async (fn: any) => fn(db);
+    const notifications: any = { emitNotificationToMany: jest.fn().mockResolvedValue(undefined) };
+    return { service: new MatchesService(db, notifications), db };
+  };
+
+  it('past match with no confirmed applicants is editable on hold', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }));
+    expect(await service.edit(host, 'match-1')).toMatchObject({ editable: true, status: 'on_hold' });
+  });
+
+  it('pending applications do not permit proceeding without confirmed participants', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }), 1, 3);
+    await expect(service.confirmProceed(host, 'match-1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('under-capacity match stays on hold until the host confirms', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, endAt: FUTURE }), 3);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'on_hold' });
+    expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'in_progress' });
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress', editable: false });
+  });
+
+  it('confirmation before kickoff is scheduled, not in progress', async () => {
+    const { service } = makeService(matchRow({ deadlineAt: PAST }), 3);
+    expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'scheduled' });
+  });
+
+  it('fully confirmed match follows normal kickoff and cannot be edited', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, endAt: FUTURE }), 6);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress', editable: false });
+  });
+
+  it('non-host cannot confirm or delete', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, endAt: FUTURE }), 3);
+    await expect(service.confirmProceed(otherUser, 'match-1')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.remove(otherUser, 'match-1')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('past match with no application history can be deleted', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }));
+    expect(await service.remove(host, 'match-1')).toEqual({ matchId: 'match-1', deleted: true });
+    await expect(service.edit(host, 'match-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rescheduling clears the proceed decision and requires existing participants to reapply', async () => {
+    const row = matchRow({ proceedConfirmedAt: new Date() });
+    const { service, db } = makeService(row, 3);
+    const active = new Set([otherUser.id, 'participant-2']);
+    db.v1Sport = { findFirst: jest.fn().mockResolvedValue({ id: 'sport-1' }) };
+    db.v1Region = { findFirst: jest.fn().mockResolvedValue({ id: 'region-1' }) };
+    db.v1MatchParticipant.findMany.mockImplementation(async () => [...active].map(userId => ({ userId })));
+    db.v1MatchParticipant.updateMany = jest.fn().mockImplementation(async () => { const count = active.size; active.clear(); return { count }; });
+    const applications = [{ status: 'approved' }, { status: 'requested' }];
+    db.v1MatchApplication.updateMany = jest.fn().mockImplementation(async ({ where, data }) => {
+      let count = 0;
+      for (const application of applications) if (application.status === where.status) { application.status = data.status; count++; }
+      return { count };
+    });
+    let saved = row;
+    db.v1Match.update.mockImplementation(async ({ data }: { data: Partial<typeof row> }) => { saved = { ...saved, ...data }; return saved; });
+    const result = await service.update(host, 'match-1', {
+      sportId: 'sport-1', regionId: 'region-1', title: row.title, manualPlaceName: '새 구장', capacity: 6,
+      startsAt: new Date(FUTURE.getTime() + 86400000).toISOString(), version: row.updatedAt.toISOString(),
+    });
+    expect(result.status).toBe('recruiting');
+    expect(saved.proceedConfirmedAt).toBeNull();
+    expect(active.size).toBe(0);
+    expect(applications.map(a => a.status)).toEqual(['withdrawn', 'expired']);
+  });
+
+  it('withdrawn application history still prevents deletion', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }), 1, 1);
+    await expect(service.remove(host, 'match-1')).rejects.toBeInstanceOf(ConflictException);
   });
 });

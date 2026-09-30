@@ -86,6 +86,11 @@ describe('platform team match collaboration (real DB)', () => {
     const results = await Promise.all([reviews.submit(f.operator, payload), reviews.submit(actor(second.id), payload)]);
     expect(results.filter((result) => result.alreadySubmitted)).toHaveLength(1);
     expect(await prisma.v1PostEventReview.count({ where: { sourceType: 'platform_team_match', sourceId: f.match.id, targetUserId: f.userIds[1] } })).toBe(1);
+    await expect(prisma.v1PostEventReview.create({ data: {
+      reviewerUserId: second.id, sourceType: 'platform_team_match', sourceId: f.match.id,
+      targetType: 'user', targetUserId: f.userIds[1], rating: 4,
+      platformReviewKey: `${f.match.id}:user:${f.userIds[1]}`,
+    } })).rejects.toMatchObject({ code: 'P2002' });
     const received = await reviews.received(actor(f.userIds[1]), {});
     expect(received.items).toEqual([expect.objectContaining({ sourceType: 'platform_team_match', reviewerUser: { userId: null, name: 'Teameet 운영', imageUrl: null } })]);
     expect((await reviews.receivedSummary(actor(f.userIds[1]), { targetType: 'user' })).bySport).toEqual([]);

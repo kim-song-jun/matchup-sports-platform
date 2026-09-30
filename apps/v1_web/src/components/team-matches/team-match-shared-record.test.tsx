@@ -34,6 +34,7 @@ describe('shared record participant flow', () => {
     render(<TeamMatchSharedRecord teamMatchId="match" admin />);
     expect(screen.getByRole('link', { name: '팀매치 운영 상세로' })).toHaveAttribute('href', '/admin/team-matches/match');
     expect(screen.queryByRole('button', { name: /종료 확인/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/변경 이력/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
     expect(screen.getByText(/Teameet 운영으로/)).toBeInTheDocument();
     fireEvent.change(screen.getByRole('combobox', { name: '득점 팀' }), { target: { value: 'away' } });

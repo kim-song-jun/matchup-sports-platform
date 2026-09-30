@@ -108,7 +108,7 @@
   "src/components/tournament-live/operate/assist-picker-sheet.tsx": 4,
   "src/components/tournament-live/operate/elapsed-match-clock.tsx": 3,
   "src/components/tournament-live/operate/lineup-grid.tsx": 9,
-  "src/components/tournament-live/operate/operate-console.tsx": 17,
+  "src/components/tournament-live/operate/operate-console.tsx": 16,
   "src/components/tournament-live/operate/penalty-shootout-panel.tsx": 6,
   "src/components/tournament-live/operate/queue-status-panel.tsx": 4,
   "src/components/tournament-live/operate/recorded-event-list.tsx": 6,

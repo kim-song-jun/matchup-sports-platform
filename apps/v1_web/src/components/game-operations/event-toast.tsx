@@ -73,7 +73,16 @@ export function useEventToast() {
   return { toasts, showToast, dismiss };
 }
 
-export function EventToasts({ toasts, onDismiss }: { toasts: readonly EventToastItem[]; onDismiss?: (id: number) => void }) {
+export function EventToasts({
+  toasts,
+  onDismiss,
+  aboveBottomBar = false,
+}: {
+  toasts: readonly EventToastItem[];
+  onDismiss?: (id: number) => void;
+  /** 화면 아래에 고정 조작 바가 있는 폰에서 토스트가 그 바를 덮지 않게 위로 띄운다. */
+  aboveBottomBar?: boolean;
+}) {
   if (toasts.length === 0) return null;
   // `left-1/2 + -translate-x-1/2`로 가운데를 맞추면 390px에서 토스트가 세로로
   // 찌그러진다(실측: "골을 기록했어요"가 한 줄에 한 글자씩 쌓였다). fixed 요소는
@@ -87,7 +96,9 @@ export function EventToasts({ toasts, onDismiss }: { toasts: readonly EventToast
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="tm-native-toast-stack pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4"
+      className={`tm-native-toast-stack pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${
+        aboveBottomBar ? 'bottom-28 sm:bottom-6' : 'bottom-6'
+      }`}
     >
       {toasts.map((toast) => (
         <div

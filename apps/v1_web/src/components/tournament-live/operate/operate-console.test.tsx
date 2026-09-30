@@ -543,7 +543,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       expect(screen.getByRole('button', { name: '후반 시작' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+      // 조기 정상 종료는 주 조작 줄이 아니라 ⋯ 더보기 시트 안에 있다.
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
       expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
       expect(screen.getByText(/하프타임이에요/)).toBeInTheDocument();
@@ -585,6 +586,103 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       await waitFor(() =>
         expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything()),
       );
+    });
+  });
+
+  // Task 180 G6(F69) — 자주 누르는 "전반 종료" 곁에 되돌릴 수 없는 "경기 종료"가 있던 배치를
+  // 없앴다. 정규 시간이 끝나기 전의 종료 계열은 ⋯ 시트 안에만 있다.
+  describe('조기 종료는 ⋯ 더보기 시트 안에만 있다', () => {
+    const FIRST_HALF = [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ];
+    const REGULATION_ENDED = [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+    ];
+
+    it('전반 중에는 헤더에 "경기 종료"·"몰수·중단으로 종료"가 없고, ⋯ 시트 안에 둘 다 있다', () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /몰수·중단으로 종료/ })).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
+      expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+    });
+
+    it('시트에서 "경기 종료"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ }));
+
+      const confirmDialog = await screen.findByRole('dialog');
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(confirmDialog).not.toHaveAccessibleName('경기 더보기');
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+
+      fireEvent.click(within(confirmDialog).getByRole('button', { name: '경기 종료' }));
+      await waitFor(() =>
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything()),
+      );
+    });
+
+    it('시트에서 "몰수·중단으로 종료"를 고르면 사유 입력 창이 열린다', () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^몰수·중단으로 종료/ }));
+
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(screen.getByRole('dialog', { name: '몰수·중단으로 종료' })).toBeInTheDocument();
+    });
+
+    it('일시 중지 중에도 "경기 종료"는 헤더가 아니라 시트 안에 있다', () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state: 'PAUSED' },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'PAUSED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '재개' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      expect(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ })).toBeInTheDocument();
+    });
+
+    it('정규 시간 종료 뒤의 "경기 종료"는 헤더 주 버튼이고, 시트에는 몰수·중단만 남는다', () => {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '경기 종료' })).toBeEnabled();
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
+      expect(within(sheet).queryByRole('button', { name: /^경기 종료/ })).toBeNull();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeInTheDocument();
+    });
+
+    it('조작할 명령이 없는 경기(종료됨)에는 조작 줄과 ⋯ 가 없다', () => {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state: 'ENDED' },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByRole('button', { name: '더보기' })).toBeNull();
+      expect(screen.queryByRole('group', { name: '경기 진행 조작' })).toBeNull();
     });
   });
 });
@@ -1272,9 +1370,12 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    const endButton = screen.getByRole('button', { name: '경기 종료' });
+    // 조기 종료는 ⋯ 시트 안에서만 만난다 — 비활성이고, 왜 못 누르는지 배너와 시트가 함께 말한다.
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    const endButton = within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ });
     expect(endButton).toBeDisabled();
-    expect(screen.getByText(/승부차기 결과를 입력해주세요/)).toBeInTheDocument();
+    expect(screen.getAllByText(/승부차기 결과를 입력해주세요/).length).toBeGreaterThanOrEqual(1);
     // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
   });

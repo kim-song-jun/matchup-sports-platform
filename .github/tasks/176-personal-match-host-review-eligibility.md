@@ -25,6 +25,14 @@ to review.
 
 ## Progress Snapshot
 
+- 2026-09-30 follow-up: personal reviews now expire after a fixed 168 hours from `completedAt`
+  (`startAt` for old completed rows without a completion timestamp). Source/submit return 410
+  `REVIEW_WINDOW_CLOSED`; pending excludes expired rows before its query limit. Existing reviews remain.
+  Exact boundary, timestamp fallback, host eligibility and submission rejection are covered by service tests.
+  Validation: focused Jest run passed (2 suites, 81 tests); API `tsc --noEmit` passed after refreshing
+  the isolated worktree's stale Prisma client. No database changes. No live browser/API QA or deployment
+  performed for this follow-up; changes remain in `hotfix-worktrees/review-host-target-deploy`.
+
 - 2026-09-28: Alpha match `59b656d9-a963-4f23-9aca-0b8ac75abcdf` reproduced the contract mismatch:
   completed, `hostParticipates=false`, one actual participant, review-source request returned 403.
 - 2026-09-28: Implemented host reviewer eligibility while keeping targets restricted to actual eligible

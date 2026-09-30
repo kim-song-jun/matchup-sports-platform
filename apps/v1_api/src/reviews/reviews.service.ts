@@ -25,7 +25,7 @@ import {
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
-import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
+import { formatReviewWindow, PERSONAL_REVIEW_WINDOW_HOURS, reviewWindowClosed } from './review-deadline';
 import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
 import { aggregatePersonalMetricScores, REVIEW_METRICS, type MetricScoreRow } from './review-metric-aggregation';
@@ -429,11 +429,18 @@ export class ReviewsService {
   }
 
   private async pendingPersonalReviews(user: V1AuthUser, limit: number) {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - PERSONAL_REVIEW_WINDOW_HOURS * 60 * 60 * 1000);
     const matches = await this.prisma.v1Match.findMany({
       where: {
         deletedAt: null,
         OR: [{ status: 'completed' }, { completedAt: { not: null } }],
         AND: [{
+          OR: [
+            { completedAt: { gte: cutoff } },
+            { completedAt: null, startAt: { gte: cutoff } },
+          ],
+        }, {
           OR: [
             { hostUserId: user.id },
             {
@@ -468,6 +475,7 @@ export class ReviewsService {
     const reviewedBySource = groupReviewedTargets(reviews);
 
     return matches
+      .filter((match) => !reviewWindowClosed(match.completedAt ?? match.startAt, now, PERSONAL_REVIEW_WINDOW_HOURS))
       .map((match) => {
         const targetUserIds = new Set(match.participants.map((participant) => participant.userId));
         if (match.hostUserId) targetUserIds.add(match.hostUserId);
@@ -615,6 +623,9 @@ export class ReviewsService {
     const isParticipant = match.participants.some((participant) => participant.userId === user.id);
     if (!isHost && !isParticipant) {
       throw forbidden('NOT_SOURCE_PARTICIPANT', 'Only participants can review this match');
+    }
+    if (reviewWindowClosed(match.completedAt ?? match.startAt, new Date(), PERSONAL_REVIEW_WINDOW_HOURS)) {
+      throw gone('REVIEW_WINDOW_CLOSED', '평가 가능 기간(7일)이 지났어요.');
     }
 
     const targetUsers = [...match.participants];

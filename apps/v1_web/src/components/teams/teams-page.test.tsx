@@ -588,7 +588,7 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     render(<TeamMembersPageView model={model} />);
 
     expect(screen.getByRole('heading', { level: 1, name: '성수 러너스 FC · 멤버 목록' })).toBeInTheDocument();
-    expect(screen.queryByText('권한 규칙')).not.toBeInTheDocument();
+    expect(screen.queryByText(/확인 창을 거쳐요/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^가입 신청/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^초대/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '관리' })).not.toBeInTheDocument();

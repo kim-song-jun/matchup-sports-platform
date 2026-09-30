@@ -341,7 +341,7 @@ function deepLinkForEvent(
   targetId: string | null,
 ): string | null {
   if (type === 'team_join_application_received' && targetId) {
-    return `/teams/${targetId}/members`;
+    return `/teams/${targetId}/members?tab=requests`;
   }
   // 초대받은 사람이 수락·거절하는 곳은 팀 상세가 아니라 내 초대함이다. targetId 는 팀 id 그대로다.
   if (type === 'team_invitation_received') {

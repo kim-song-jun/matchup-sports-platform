@@ -220,13 +220,21 @@ export type TeamMembersViewModel = {
     };
   }>;
   requests: Array<{
+    id: string;
     name: string;
     meta: string;
-    status: string;
     profileHref?: string;
-    actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
-    actionPending?: boolean;
+    /** 이 화면에서 방금 승인했다 — 목록 조회에서 빠져도 "승인 완료"로 제자리에 남는다. */
+    approved?: boolean;
+    pending?: boolean;
+    /** 개별 승인은 확인 창 없이 바로 반영된다(G12 F37). */
+    onApprove: () => void;
+    /** 거절은 확인 창을 거친다. */
+    onReject: () => void;
   }>;
+  requestsLoading?: boolean;
+  /** 대기 중인 신청이 둘 이상일 때만 — 확인 창 한 번으로 전부 승인한다. */
+  approveAll?: { count: number; pending: boolean; onSelect: () => void };
   /** owner/manager 전용 — 보낸 초대 목록 + 초대 폼 */
   invitations?: {
     /** 이메일 입력 폼 */

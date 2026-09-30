@@ -42,7 +42,6 @@ import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/l
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
-import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -437,10 +436,12 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
 
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // 팀 상세가 받은 출처를 이어받아 왔으면 뒤로가기를 그 팀 상세(출처 포함)로 돌린다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(searchParams.get('from'));
   const membersHref = withFromPath(`/teams/${teamId}/members`, fromPath);
-  const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>('members');
+  // 가입 신청 알림·"멤버 초대" 바로가기는 해당 탭을 열고 들어온다(G12 F36). 권한이 없으면 뷰가 멤버 탭으로 돌린다.
+  const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>(() => toMembersTab(searchParams.get('tab')));
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
@@ -482,12 +483,17 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [actionError, setActionError] = useState<string | null>(null);
   // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
   const cancellingInvitations = usePendingIds();
+  const approvingApplications = usePendingIds();
+  const [approvingAll, setApprovingAll] = useState(false);
+  // 이 화면에서 방금 승인한 신청 — 목록 조회에서 빠져도 "승인 완료"로 제자리에 남겨 결과를 보여 준다.
+  const [approvedApplications, setApprovedApplications] = useState<V1TeamJoinApplication[]>([]);
 
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
   const invitationItems = invitationsQuery.data?.items ?? [];
   const viewerUserId = memberItems.find((member) => member.membershipId === viewerMembershipId)?.userId ?? null;
-  const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
+  const actionPending = changeRole.isPending || removeMember.isPending || rejectApplication.isPending;
+  const requestRows = mergeApprovedApplications(requestItems, approvedApplications);
 
   function handleLeaveTeam() {
     setLeaveError(null);
@@ -522,6 +528,52 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       { membershipId, reason: 'removed_from_v1_web_member_page' },
       { onError: (err) => setActionError(teamErrorMessage(err, '멤버를 내보내지 못했어요. 잠시 후 다시 시도해 주세요.')) },
     );
+  }
+
+  // 승인은 잘못돼도 내보내기로 되돌릴 수 있는 가벼운 동작이라 확인 창 없이 바로 반영한다(G12 F37).
+  function approveNow(application: V1TeamJoinApplication) {
+    setActionError(null);
+    approvingApplications.start(application.applicationId);
+    approveApplication.mutate(
+      { applicationId: application.applicationId, note: null },
+      {
+        onSuccess: () => {
+          trackEvent('team_application_accept', { teamId });
+          setApprovedApplications((current) => [...current, application]);
+        },
+        onError: (err) => setActionError(teamErrorMessage(err, '가입 신청을 승인하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+        onSettled: () => approvingApplications.finish(application.applicationId),
+      },
+    );
+  }
+
+  async function approveAll(applications: V1TeamJoinApplication[]) {
+    const count = applications.length;
+    const ok = await confirm({
+      title: `${count}명을 모두 승인할까요?`,
+      message: '승인하면 바로 팀 멤버가 되고, 신청한 분들에게 알림이 가요.',
+      confirmLabel: `${count}명 승인`,
+    });
+    if (!ok) return;
+    setActionError(null);
+    setApprovingAll(true);
+    const approved: V1TeamJoinApplication[] = [];
+    const failures: unknown[] = [];
+    // 순서대로 보낸다 — 정원이 차면 그 뒤부터 서버가 거절하므로 앞선 신청이 먼저 들어가야 한다.
+    for (const application of applications) {
+      try {
+        await approveApplication.mutateAsync({ applicationId: application.applicationId, note: null });
+        trackEvent('team_application_accept', { teamId });
+        approved.push(application);
+      } catch (err) {
+        failures.push(err);
+      }
+    }
+    setApprovedApplications((current) => [...current, ...approved]);
+    setApprovingAll(false);
+    if (failures.length > 0) {
+      setActionError(`${failures.length}명은 승인하지 못했어요. ${teamErrorMessage(failures[0], '잠시 후 다시 시도해 주세요.')}`);
+    }
   }
 
   function handleSendInvitation() {
@@ -634,19 +686,30 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           }),
         )
       : fallback.members,
-    requests: requestItems.map((application) =>
+    requests: requestRows.map((application) =>
       toRequestModel(application, membersHref, {
-        actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate(
-          { applicationId: application.applicationId, note: null },
-          { onSuccess: () => trackEvent('team_application_accept', { teamId }) },
-        )),
-        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate(
+        approved: approvedApplications.some((item) => item.applicationId === application.applicationId),
+        pending: approvingAll || actionPending || approvingApplications.has(application.applicationId),
+        approve: () => approveNow(application),
+        reject: () => confirmAction(confirm, {
+          title: '가입 신청 거절',
+          message: `${application.applicant.displayName}님의 가입 신청을 거절할까요? 신청이 사라지고 ${application.applicant.displayName}님에게 알림이 가요.`,
+          confirmLabel: '거절',
+          tone: 'danger',
+        }, () => rejectApplication.mutate(
           { applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' },
-          { onSuccess: () => trackEvent('team_application_reject', { teamId }) },
+          {
+            onSuccess: () => trackEvent('team_application_reject', { teamId }),
+            onError: (err) => setActionError(teamErrorMessage(err, '가입 신청을 거절하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+          },
         )),
       }),
     ),
+    requestsLoading: applications.isPending,
+    approveAll:
+      requestItems.length >= 2
+        ? { count: requestItems.length, pending: approvingAll, onSelect: () => void approveAll(requestItems) }
+        : undefined,
     invitations: canManageInvitations
       ? {
           form: {
@@ -1147,23 +1210,35 @@ function toRequestModel(
   application: V1TeamJoinApplication,
   membersHref: string,
   actions: {
-    actionPending: boolean;
+    approved: boolean;
+    pending: boolean;
     approve: () => void;
     reject: () => void;
   },
 ): TeamMembersViewModel['requests'][number] {
   return {
+    id: application.applicationId,
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
-    status: teamJoinApplicationStatusLabel(application.status),
     // 뒤로가기가 가입 신청 목록으로 돌아오도록 출처를 함께 넘긴다(toMemberModel과 동일 패턴).
     profileHref: withFromPath(`/users/${application.applicant.userId}`, membersHref),
-    actions: [
-      { label: '승인', onSelect: actions.approve },
-      { label: '거절', tone: 'danger', onSelect: actions.reject },
-    ],
-    actionPending: actions.actionPending,
+    approved: actions.approved,
+    pending: actions.pending,
+    onApprove: actions.approve,
+    onReject: actions.reject,
   };
+}
+
+/** 방금 승인한 신청을 조회 결과(대기 중만)에 되돌려 넣어 신청 순서(최신 먼저) 그대로 보인다. */
+function mergeApprovedApplications(pending: V1TeamJoinApplication[], approved: V1TeamJoinApplication[]) {
+  const pendingIds = new Set(pending.map((application) => application.applicationId));
+  const gone = approved.filter((application) => !pendingIds.has(application.applicationId));
+  if (gone.length === 0) return pending;
+  return [...pending, ...gone].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function toMembersTab(value: string | null): TeamMembersViewModel['activeTab'] {
+  return value === 'requests' || value === 'invitations' ? value : 'members';
 }
 
 /**

@@ -237,8 +237,8 @@ export function getTeamMembersViewModel(): TeamMembersViewModel {
       { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', actions: [] },
     ],
     requests: [
-      { name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', status: '검토 중', actions: [] },
-      { name: '최유진', meta: '초보 · 광진 · 평일 가능', status: '검토 중', actions: [] },
+      { id: 'application-1', name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', onApprove: () => undefined, onReject: () => undefined },
+      { id: 'application-2', name: '최유진', meta: '초보 · 광진 · 평일 가능', onApprove: () => undefined, onReject: () => undefined },
     ],
   };
 }

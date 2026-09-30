@@ -4666,6 +4666,72 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 20px;
 }
 
+/* 멤버 관리 권한 안내 한 줄 — 예전 "권한 규칙" 카드(G12·H2 A-1). */
+.tm-member-rule-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 12px 0 0;
+  color: var(--text-muted);
+}
+
+/* 사람 이름 첫 글자 동그라미(가입 신청·초대·멤버 행). grey100 지면이라 글자는 grey700. */
+.tm-member-initial {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-circle);
+  background: var(--grey100);
+  color: var(--grey700);
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+}
+
+.tm-member-name-link {
+  display: block;
+  color: var(--text-strong);
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+/* 가입 신청 목록 — 모바일에서 카드 사이가 0 이던 것(F95)을 목록 자체의 간격으로 준다. */
+.tm-member-request-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tm-member-request-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.tm-member-reject {
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
+.tm-member-approve-all {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+}
+
+@media (min-width: 1024px) {
+  .tm-member-request-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
 .tm-member-actions {
   display: flex;
   justify-content: flex-end;

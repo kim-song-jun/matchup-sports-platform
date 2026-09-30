@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check, ChevronDown, Lock } from 'lucide-react';
+import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
@@ -1584,15 +1584,16 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         <div className="tm-team-stat-grid" style={{ gridTemplateColumns: canManageMembers ? '1fr 1fr 1fr' : '1fr 1fr' }}>
           <Card pad={12}><KPIStat label="전체" value={model.summary.total} unit="명" /></Card>
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
-          {canManageMembers ? <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card> : null}
+          {canManageMembers ? <Card pad={12}><KPIStat label="가입 신청 대기" value={model.summary.pending} unit="명" /></Card> : null}
         </div>
         {model.selfNotice ? <div style={{ marginTop: 16 }}>{model.selfNotice}</div> : null}
         <ActionErrorNotice message={model.actionError} />
+        {/* 가입 신청 승인은 바로 반영되므로 "모든 변경은 확인 창" 은 더 이상 맞지 않는다(G12 승인 즉시). */}
         {canManageMembers ? (
-          <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
-            <div className="tm-text-label">권한 규칙</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
-          </Card>
+          <p className="tm-text-caption tm-member-rule-line">
+            <Info size={14} aria-hidden="true" style={{ flex: 'none' }} />
+            역할 변경·거절·내보내기는 확인 창을 거쳐요. 승인은 바로 반영돼요.
+          </p>
         ) : null}
         {visibleTabs.length > 1 ? (
           <div className="tm-team-form-chip-row" role="group" aria-label="멤버 탭 선택" style={{ marginTop: 16 }}>
@@ -1608,15 +1609,82 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
             {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} profileHref={member.profileHref} actions={member.actions} actionPending={member.actionPending} selfLeave={member.selfLeave} />)}
           </MemberSection>
         ) : model.activeTab === 'requests' ? (
-          <MemberSection title="가입 신청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
-            {model.requests.map((request, index) => <MemberCard key={index} title={request.name} sub={request.meta} role={request.status} profileHref={request.profileHref} actions={request.actions} actionPending={request.actionPending} />)}
-          </MemberSection>
+          <JoinRequestSection model={model} />
         ) : model.invitations ? (
           <InvitationSection invitations={model.invitations} />
         ) : null}
       </div>
     </>
   );
+}
+
+/**
+ * 가입 신청 — 승인이 주 버튼, 거절은 글자 버튼(F38). 승인은 바로 반영되고 거절만 확인 창(F37).
+ * 둘 이상 기다리면 "모두 승인" 한 번(확인 창)으로 받는다.
+ */
+function JoinRequestSection({ model }: { model: TeamMembersViewModel }) {
+  if (model.requestsLoading) {
+    return (
+      <div className="tm-member-request-list" aria-busy="true" aria-label="가입 신청 불러오는 중">
+        {[0, 1].map((i) => <div key={i} className="tm-review-skeleton" style={{ height: 68, borderRadius: 'var(--radius-container)' }} aria-hidden="true" />)}
+      </div>
+    );
+  }
+  if (model.requests.length === 0) {
+    return (
+      <section className="tm-member-section">
+        <EmptyState title="기다리는 가입 신청이 없어요" sub="새 신청이 오면 알림으로 알려 드려요." />
+      </section>
+    );
+  }
+  const approveAll = model.approveAll;
+  return (
+    <section className="tm-member-section" aria-label="가입 신청">
+      {approveAll ? (
+        <div className="tm-on-tint tm-member-approve-all">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{approveAll.count}명이 기다리고 있어요</div>
+            <div className="tm-text-caption" style={{ marginTop: 2 }}>한 번에 받을 수도 있어요.</div>
+          </div>
+          <button className="tm-btn tm-btn-md tm-btn-primary" type="button" style={{ flex: 'none' }} disabled={approveAll.pending} onClick={approveAll.onSelect}>
+            {approveAll.pending ? '승인하는 중…' : '모두 승인'}
+          </button>
+        </div>
+      ) : (
+        <div className="tm-text-caption">승인하면 바로 팀 멤버가 돼요.</div>
+      )}
+      <div className="tm-member-request-list">
+        {model.requests.map((request) => (
+          <div key={request.id} className="tm-card tm-member-request-row">
+            <MemberInitial name={request.name} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {request.profileHref ? (
+                <Link className="tm-text-body tm-member-name-link" href={request.profileHref}>{request.name}</Link>
+              ) : (
+                <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>{request.name}</div>
+              )}
+              <div className="tm-text-caption line-clamp-1" style={{ marginTop: 2 }}>{request.meta}</div>
+            </div>
+            {request.approved ? (
+              <span className="tm-badge tm-badge-green" style={{ gap: 4, flex: 'none' }}>
+                <Check size={12} strokeWidth={3} aria-hidden="true" />승인 완료
+              </span>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 'none' }}>
+                <button className="tm-btn tm-btn-sm tm-btn-ghost tm-member-reject" type="button" aria-label={`${request.name} 가입 신청 거절`} disabled={request.pending} onClick={request.onReject}>거절</button>
+                <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" aria-label={`${request.name} 가입 신청 승인`} disabled={request.pending} onClick={request.onApprove}>승인</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** 사람 이름 첫 글자 동그라미 — 가입 신청·초대·멤버 행이 같은 모양을 쓴다. */
+function MemberInitial({ name }: { name: string }) {
+  return <span aria-hidden="true" className="tm-member-initial">{Array.from(name)[0] ?? '?'}</span>;
 }
 
 /** 목록 어디서 눌렀든 거절 이유가 화면 밖 위쪽에 묻히지 않게, 생길 때 끌어와 읽힌다. */
@@ -1731,25 +1799,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           {items.map((item) => (
             <div key={item.invitationId} className="tm-invitation-card">
               <div className="tm-invitation-card-head">
-                {/* 아바타 대체 — 이니셜 */}
-                <div
-                  aria-hidden="true"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 'var(--radius-circle)',
-                    background: 'var(--grey100)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    fontSize: 'var(--font-size-body-sm)',
-                    fontWeight: 700,
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  {Array.from(item.displayName)[0] ?? '?'}
-                </div>
+                <MemberInitial name={item.displayName} />
                 <div className="tm-invitation-meta">
                   <span className="tm-invitation-meta-name">{item.displayName}</span>
                   <span className="tm-invitation-meta-date">{formatInvitationDate(item.createdAt)} 초대</span>

@@ -173,6 +173,7 @@ describe('TeamDetailPageClient GA events', () => {
 
 describe('TeamMembersPageClient GA events', () => {
   const approveMutate = vi.fn();
+  const approveMutateAsync = vi.fn();
   const rejectMutate = vi.fn();
 
   beforeEach(() => {
@@ -221,7 +222,7 @@ describe('TeamMembersPageClient GA events', () => {
     teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
     teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
-    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: approveMutate });
+    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: approveMutate, mutateAsync: approveMutateAsync });
     teamApiMocks.useV1RejectTeamJoinApplication.mockReturnValue({ isPending: false, mutate: rejectMutate });
     teamApiMocks.useV1SendTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
@@ -291,10 +292,9 @@ describe('TeamMembersPageClient GA events', () => {
     render(<TeamMembersPageClient teamId="team-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: /^가입 신청/ }));
-    fireEvent.click(screen.getByRole('button', { name: '관리' }));
-    fireEvent.click(screen.getByRole('button', { name: '승인' }));
-    const approveDialog = screen.getByRole('dialog', { name: '가입 신청 승인' });
-    fireEvent.click(within(approveDialog).getByRole('button', { name: '승인' }));
+    // 개별 승인은 확인 창 없이 바로 반영된다(G12 F37).
+    fireEvent.click(screen.getByRole('button', { name: '이서준 가입 신청 승인' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     await waitFor(() => {
       expect(approveMutate).toHaveBeenCalledWith(
@@ -313,8 +313,7 @@ describe('TeamMembersPageClient GA events', () => {
     render(<TeamMembersPageClient teamId="team-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: /^가입 신청/ }));
-    fireEvent.click(screen.getByRole('button', { name: '관리' }));
-    fireEvent.click(screen.getByRole('button', { name: '거절' }));
+    fireEvent.click(screen.getByRole('button', { name: '이서준 가입 신청 거절' }));
     const rejectDialog = screen.getByRole('dialog', { name: '가입 신청 거절' });
     fireEvent.click(within(rejectDialog).getByRole('button', { name: '거절' }));
 
@@ -324,6 +323,103 @@ describe('TeamMembersPageClient GA events', () => {
         expect.objectContaining({ onSuccess: expect.any(Function) }),
       );
       expect(trackEvent).toHaveBeenCalledWith('team_application_reject', { teamId: 'team-1' });
+    });
+  });
+
+  // G12(F36): 가입 신청 알림은 ?tab=requests 로 들어온다 — 멤버 탭이 아니라 가입 신청 탭이 열려 있어야 한다.
+  it('tab=requests 로 들어오면 가입 신청 탭이 바로 열린다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=requests');
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(screen.getByRole('button', { name: /^가입 신청/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '이서준 가입 신청 승인' })).toBeInTheDocument();
+  });
+
+  it('권한 없는 사람이 tab=requests 로 들어와도 멤버 목록만 본다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=requests');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: true, viewer: { role: 'member', membershipId: 'membership-owner' } },
+      isError: false,
+    });
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(screen.queryByText('이서준')).toBeNull();
+    expect(screen.getAllByText('김도윤').length).toBeGreaterThan(0);
+  });
+
+  it('승인한 신청은 목록 조회에서 빠져도 "승인 완료"로 제자리에 남는다', async () => {
+    approveMutate.mockImplementation((_vars, options) => {
+      options?.onSuccess?.();
+      options?.onSettled?.();
+    });
+    const view = render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: /^가입 신청/ }));
+    fireEvent.click(screen.getByRole('button', { name: '이서준 가입 신청 승인' }));
+
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    view.rerender(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(await screen.findByText('승인 완료')).toBeInTheDocument();
+    expect(screen.getByText('이서준')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이서준 가입 신청 승인' })).toBeNull();
+  });
+
+  describe('모두 승인', () => {
+    const requested = (id: string, name: string, createdAt: string) => ({
+      applicationId: id,
+      status: 'requested',
+      message: null,
+      createdAt,
+      applicant: { userId: `user-${id}`, displayName: name },
+    });
+
+    beforeEach(() => {
+      teamApiMocks.useV1TeamJoinApplications.mockReturnValue({
+        data: { items: [requested('a-2', '박하늘', '2026-07-02T00:00:00.000Z'), requested('a-1', '이서준', '2026-07-01T00:00:00.000Z')] },
+      });
+      navigationMocks.searchParams = new URLSearchParams('tab=requests');
+    });
+
+    it('한 명뿐이면 모두 승인 버튼을 두지 않는다', () => {
+      teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [requested('a-1', '이서준', '2026-07-01T00:00:00.000Z')] } });
+      render(<TeamMembersPageClient teamId="team-1" />);
+
+      expect(screen.queryByRole('button', { name: '모두 승인' })).toBeNull();
+    });
+
+    it('확인 창에서 취소하면 아무것도 승인하지 않는다', async () => {
+      render(<TeamMembersPageClient teamId="team-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '모두 승인' }));
+      const dialog = await screen.findByRole('dialog', { name: '2명을 모두 승인할까요?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(approveMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('확인하면 신청 순서대로 모두 승인하고 각 행에 결과를 남긴다', async () => {
+      approveMutateAsync.mockResolvedValue({ status: 'approved' });
+      render(<TeamMembersPageClient teamId="team-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '모두 승인' }));
+      const dialog = await screen.findByRole('dialog', { name: '2명을 모두 승인할까요?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '2명 승인' }));
+
+      await waitFor(() => expect(screen.getAllByText('승인 완료')).toHaveLength(2));
+      expect(approveMutateAsync.mock.calls.map(([vars]) => vars.applicationId)).toEqual(['a-2', 'a-1']);
+    });
+
+    it('일부가 거절되면 몇 명이 왜 안 됐는지 알리고, 된 사람만 승인 완료로 둔다', async () => {
+      approveMutateAsync
+        .mockResolvedValueOnce({ status: 'approved' })
+        .mockRejectedValueOnce(new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_FULL', message: '정원이 다 찬 팀이에요.', timestamp: '' }));
+      Element.prototype.scrollIntoView = vi.fn();
+      render(<TeamMembersPageClient teamId="team-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '모두 승인' }));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '2명을 모두 승인할까요?' })).getByRole('button', { name: '2명 승인' }));
+
+      expect(await screen.findByText('1명은 승인하지 못했어요. 정원이 다 찬 팀이에요.')).toBeInTheDocument();
+      expect(screen.getAllByText('승인 완료')).toHaveLength(1);
+      expect(screen.getByRole('button', { name: '이서준 가입 신청 승인' })).toBeInTheDocument();
     });
   });
 
@@ -370,7 +466,7 @@ describe('TeamMembersPageClient GA events', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /^가입 신청/ })).toBeNull();
       expect(screen.queryByText('이서준')).toBeNull();
-      expect(screen.queryByText('권한 규칙')).toBeNull();
+      expect(screen.queryByText(/확인 창을 거쳐요/)).toBeNull();
       expect(screen.queryByRole('button', { name: '관리' })).toBeNull();
       expect(screen.getByRole('heading', { name: '성수 풋살 크루 · 멤버 목록' })).toBeInTheDocument();
       expect(teamApiMocks.useV1TeamJoinApplications).toHaveBeenLastCalledWith(

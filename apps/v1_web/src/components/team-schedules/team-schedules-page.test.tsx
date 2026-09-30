@@ -87,6 +87,7 @@ function buildModel(
     },
     cancelModal: {
       open: false,
+      noticeLine: '팀원에게 알림이 가요.',
       reason: '',
       onReasonChange: () => undefined,
       onConfirm: () => undefined,
@@ -254,6 +255,18 @@ describe('일정 상세 — 취소 확인 창 (H9 A-3)', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole('dialog')).not.toHaveTextContent('용병 모집');
+  });
+
+  it('취소하면 누구에게 알림이 가는지 확인 창에 한 줄로 알린다', () => {
+    const view = renderPage(<ScheduleDetailPageView model={withCancel({})} />);
+    expect(screen.getByRole('dialog')).toHaveTextContent('되돌릴 수 없어요. 팀원에게 알림이 가요.');
+
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <ScheduleDetailPageView model={withCancel({ noticeLine: '팀원과 승인된 용병에게 알림이 가요.' }, true)} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('함께 닫혀요. 팀원과 승인된 용병에게 알림이 가요.');
   });
 
   it('취소 요청이 실패하면 창을 연 채로 사유를 알린다', () => {

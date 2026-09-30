@@ -71,6 +71,7 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
@@ -604,6 +605,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     },
     cancelModal: {
       open: cancelOpen,
+      noticeLine: schedule ? scheduleCancelNoticeLine(schedule.visibility, recruitment?.approvedCount ?? 0) : '',
       reason: cancelReason,
       onReasonChange: setCancelReason,
       onConfirm: onCancelConfirm,

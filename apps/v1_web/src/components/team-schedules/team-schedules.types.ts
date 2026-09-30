@@ -248,6 +248,8 @@ export type ScheduleDetailViewModel = {
   manage: ScheduleManageActionsModel;
   cancelModal: {
     open: boolean;
+    /** 누구에게 취소 알림이 가는지 — scheduleCancelNoticeLine. */
+    noticeLine: string;
     reason: string;
     onReasonChange: (value: string) => void;
     onConfirm: () => void;

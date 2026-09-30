@@ -8,6 +8,8 @@ import { LineupReminderService } from '../../src/jobs/lineup-reminders/lineup-re
 import type { GameOperationClaim } from '../../src/jobs/v1-game-operations-worker.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { LINEUP_INCLUDED_NOTIFICATION_TYPE, TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
+import { TeamMatchRecordService } from '../../src/team-matches/team-match-record.service';
+import { createSharedRecordFixture } from '../fixtures/team-match-shared-record.fixture';
 
 /**
  * Task 180 H1-lineup-included — 친선 참석명단 제출이 같은 트랜잭션에 outbox 행을 남기고, 워커 핸들러가 그 리비전의
@@ -120,5 +122,36 @@ describe('Task 180 H1 — 참석명단 포함 알림(제출 → outbox → 워�
     const body = await prisma.v1Notification.findFirstOrThrow({ where: { targetId: ids.teamMatch, recipientUserId: ids.p3 }, select: { body: true, deepLink: true } });
     expect(body).toMatchObject({ deepLink: `/team-matches/${ids.teamMatch}` });
     expect(body.body).toMatch(/^"성수 FC" · vs 망원 FC · .+ · 망원 풋살장$/);
+  });
+
+  it('[H5] 첫 기록 뒤 늦게 추가된 선수만 한 번 받는다 — 제출 때 알림이 없던 기존 선수는 받지 않고, 재시도·재처리도 한 건', async () => {
+    // 이 픽스처의 제출본은 알림 없이 만들어진다(배포 전 제출본과 같은 상태) — 기존 선수가 걸러지는 이유가 "이미 받아서"가 아님을 보장한다.
+    const f = await createSharedRecordFixture(prisma);
+    const late = randomUUID();
+    await prisma.v1User.create({ data: { id: late, email: `${late}@example.test`, accountStatus: 'active', onboardingStatus: 'completed', profile: { create: { nickname: '늦게 온 선수' } } } });
+    await prisma.v1TeamMembership.create({ data: { teamId: f.teams[0].id, userId: late, role: 'member', status: 'active' } });
+    const owner = authUser(f.userIds[0]);
+    await new TeamMatchRecordService(prisma).mutate(authUser(f.userIds[1]), f.match.id, {
+      action: 'add',
+      expectedVersion: 0,
+      commandId: randomUUID(),
+      sideId: f.sides[0].id,
+      participantId: f.participants[0].id,
+    });
+
+    const key = randomUUID();
+    const added = await lineups.addLateParticipant(owner, f.match.id, key, { userId: late, jerseyNumber: 21 });
+    await lineups.addLateParticipant(owner, f.match.id, key, { userId: late, jerseyNumber: 21 });
+    await expect(lineups.addLateParticipant(owner, f.match.id, randomUUID(), { userId: late, jerseyNumber: 22 })).rejects.toMatchObject({ status: 422 });
+
+    const outbox = await prisma.v1OutboxEvent.findMany({ where: { aggregateId: added.lineupId, type: LINEUP_INCLUDED_NOTIFICATION_TYPE } });
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({ businessKey: `team-match-lineup-included:${added.lineupId}:${late}`, payload: { lineupId: added.lineupId, userId: late } });
+    const claim: GameOperationClaim = { ...outbox[0], leaseOwner: 'spec', leaseUntil: new Date(), afterCommit: [] };
+    await prisma.$transaction((tx) => reminders.lineupIncludedHandler(claim, tx));
+    await prisma.$transaction((tx) => reminders.lineupIncludedHandler(claim, tx));
+
+    const notified = await prisma.v1Notification.findMany({ where: { targetId: f.match.id, title: '참석명단에 올랐어요' }, select: { recipientUserId: true } });
+    expect(notified.map((row) => row.recipientUserId)).toEqual([late]);
   });
 });

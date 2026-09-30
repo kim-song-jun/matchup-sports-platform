@@ -154,9 +154,10 @@ export class LineupReminderService {
    * 친선 참석명단 제출(H1-lineup-included) — 제출된 리비전의 선수 중 지금도 팀 활성 멤버인 사람에게 '참석명단에 올랐어요'.
    * 경기·사람당 한 번이라 다시 제출하면 새로 오른 사람만 받고, 빠진 사람에게는 보내지 않는다. 킥오프 2시간 안의
    * 제출은 킥오프 알림의 키로 써서 뒤이은 스캔이 같은 사람에게 킥오프 알림을 또 보내지 않는다(한 건만).
+   * payload 에 userId 가 있으면(첫 기록 뒤 늦게 추가 — H5) 그 사람만 본다.
    */
   readonly lineupIncludedHandler: GameOperationHandler = async (claim, tx) => {
-    const lineupId = lineupIdOf(claim.payload);
+    const { lineupId, addedUserId } = lineupNoticeOf(claim.payload);
     const lineup = await tx.v1GameLineup.findUnique({
       where: { id: lineupId },
       select: { id: true, gameId: true, sideId: true, state: true, invalidatedAt: true },
@@ -178,7 +179,7 @@ export class LineupReminderService {
     if (match === null || match.startAt === null || teamId === null || match.hostTeam === null || match.approvedApplicantTeam === null) return;
     const [ownTeam, opponent] = teamId === match.hostTeamId ? [match.hostTeam, match.approvedApplicantTeam] : [match.approvedApplicantTeam, match.hostTeam];
 
-    const listed = await tx.v1GameParticipant.findMany({ where: { lineupId, userId: { not: null } }, select: { userId: true } });
+    const listed = await tx.v1GameParticipant.findMany({ where: { lineupId, userId: addedUserId ?? { not: null } }, select: { userId: true } });
     const members = await tx.v1TeamMembership.findMany({
       where: { teamId, status: 'active', userId: { in: listed.flatMap((row) => (row.userId === null ? [] : [row.userId])) } },
       select: { userId: true },
@@ -220,10 +221,13 @@ export class LineupReminderService {
   };
 }
 
-function lineupIdOf(payload: unknown): string {
-  const lineupId = typeof payload === 'object' && payload !== null ? (payload as { lineupId?: unknown }).lineupId : undefined;
-  if (typeof lineupId !== 'string' || lineupId.length === 0) throw new Error('Lineup included notice payload requires lineupId');
-  return lineupId;
+function lineupNoticeOf(payload: unknown): { lineupId: string; addedUserId: string | undefined } {
+  const value = typeof payload === 'object' && payload !== null ? (payload as { lineupId?: unknown; userId?: unknown }) : {};
+  if (typeof value.lineupId !== 'string' || value.lineupId.length === 0) throw new Error('Lineup included notice payload requires lineupId');
+  if (value.userId !== undefined && (typeof value.userId !== 'string' || value.userId.length === 0)) {
+    throw new Error('Lineup included notice payload userId must be a non-empty string');
+  }
+  return { lineupId: value.lineupId, addedUserId: value.userId };
 }
 
 /**

@@ -432,7 +432,12 @@ describe('LineupReminderService', () => {
         v1GameLineup: { findUnique: jest.fn().mockResolvedValue({ id: 'lineup-2', gameId: 'game-f', sideId: 'side-home', state: options.lineupState ?? 'SUBMITTED', invalidatedAt: null }) },
         v1GameSide: { findUnique: jest.fn().mockResolvedValue({ teamId: 'team-home' }) },
         v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(options.matchFound === false ? null : { ...match, startAt: options.startAt ?? KICKOFF }) },
-        v1GameParticipant: { findMany: jest.fn().mockResolvedValue([...(options.listed ?? []), null].map((userId) => ({ userId })).filter((row) => row.userId !== null)) },
+        v1GameParticipant: {
+          // where.userId 가 문자열이면(늦은 추가) 그 사람 행만 — 실제 쿼리처럼 필터를 지킨다.
+          findMany: jest.fn(({ where }: { where: { userId: string | { not: null } } }) =>
+            Promise.resolve((options.listed ?? []).filter((userId) => typeof where.userId !== 'string' || where.userId === userId).map((userId) => ({ userId }))),
+          ),
+        },
         v1TeamMembership: {
           // 명단의 모든 사람이 멤버십 행을 갖고, activeMembers 밖은 'left' 다 — status 조건을 빼면 탈퇴자가 섞인다.
           findMany: jest.fn(({ where }: { where: { status?: string; userId: { in: string[] } } }) =>
@@ -448,15 +453,24 @@ describe('LineupReminderService', () => {
           findMany: jest.fn(({ where }: { where: { businessKey: { in: string[] } } }) =>
             Promise.resolve(where.businessKey.in.filter((key) => existing.has(key)).map((businessKey) => ({ businessKey }))),
           ),
-          createMany: jest.fn().mockResolvedValue({ count: 0 }),
+          // 쓴 키는 다음 조회에 보인다 — 같은 핸들러가 두 번 돌 때(재전달) 두 번째가 첫 번째 행을 봐야 한다.
+          createMany: jest.fn(({ data }: { data: Array<{ businessKey: string }> }) => {
+            data.forEach((row) => existing.add(row.businessKey));
+            return Promise.resolve({ count: data.length });
+          }),
         },
       };
     }
-    const includedClaim = () => ({ ...fakeClaim(), type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION', payload: { lineupId: 'lineup-2' }, afterCommit: undefined });
-    function run(tx: ReturnType<typeof includedTx>) {
+    const includedClaim = (payload: Record<string, string> = { lineupId: 'lineup-2' }) => ({
+      ...fakeClaim(),
+      type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION',
+      payload,
+      afterCommit: undefined,
+    });
+    function run(tx: ReturnType<typeof includedTx>, payload?: Record<string, string>) {
       const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
       const service = new LineupReminderService({} as never, fakePrisma().prisma as never, webPush as never);
-      return { webPush, done: service.lineupIncludedHandler(includedClaim() as never, tx as never) };
+      return { webPush, done: service.lineupIncludedHandler(includedClaim(payload) as never, tx as never) };
     }
     const rowsOf = (tx: ReturnType<typeof includedTx>) =>
       tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data) as Array<Record<string, string>>;
@@ -487,6 +501,29 @@ describe('LineupReminderService', () => {
       await done;
 
       expect(rowsOf(tx).map((row) => row.recipientUserId)).toEqual(['p3']);
+    });
+
+    it('[H5 늦은 추가] payload 의 그 선수만 받는다 — 제출 때 알림이 없던 기존 선수(배포 전 제출본 등)에게 경기 중에 가지 않는다', async () => {
+      const tx = includedTx({ listed: ['p1', 'p2', 'late'] });
+      await run(tx, { lineupId: 'lineup-2', userId: 'late' }).done;
+
+      expect(rowsOf(tx).map((row) => [row.recipientUserId, row.title])).toEqual([['late', '참석명단에 올랐어요']]);
+    });
+
+    it('[H5 늦은 추가] 같은 알림이 두 번 처리돼도(재전달·두 번 추가) 한 건이다', async () => {
+      const tx = includedTx({ listed: ['p1', 'late'] });
+      await run(tx, { lineupId: 'lineup-2', userId: 'late' }).done;
+      await run(tx, { lineupId: 'lineup-2', userId: 'late' }).done;
+
+      expect(rowsOf(tx).map((row) => row.recipientUserId)).toEqual(['late']);
+    });
+
+    it('[H5 늦은 추가] userId 가 빈 문자열이거나 문자열이 아니면 잘못된 payload 로 실패한다(아무에게도 쓰지 않는다)', async () => {
+      for (const userId of ['', 42]) {
+        const tx = includedTx({ listed: ['p1'] });
+        await expect(run(tx, { lineupId: 'lineup-2', userId } as never).done).rejects.toThrow('userId');
+        expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+      }
     });
 
     it('킥오프 2시간 안에 제출하면 킥오프 알림의 키로 써서 뒤이은 킥오프 알림과 한 건으로 합친다', async () => {

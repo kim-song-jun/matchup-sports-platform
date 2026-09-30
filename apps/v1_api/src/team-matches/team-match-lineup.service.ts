@@ -41,16 +41,21 @@ export const LINEUP_INCLUDED_NOTIFICATION_TYPE = 'TEAM_MATCH_LINEUP_INCLUDED_NOT
 /**
  * 제출된 참석명단 리비전의 선수에게 '참석명단에 올랐어요'를 보내도록 같은 트랜잭션에 outbox 행을 넣는다.
  * 명단에 선수를 새로 올리는 경로(다시 제출 등)는 모두 이걸 불러야 한다 — 이미 받은 사람은 워커가 거른다.
+ * `addedUserId` 는 리비전을 새로 만들지 않는 늦은 추가용이다: 키에 사람을 붙여야 제출 때의 행과 겹쳐 버려지지 않고,
+ * 워커가 그 사람만 본다(제출 때 알림이 없던 기존 선수에게 경기 중에 가지 않게).
  */
-export async function enqueueLineupIncludedNotice(tx: Transaction, lineupId: string): Promise<void> {
+export async function enqueueLineupIncludedNotice(tx: Transaction, lineupId: string, addedUserId?: string): Promise<void> {
   await tx.v1OutboxEvent.createMany({
     data: [
       {
-        businessKey: `team-match-lineup-included:${lineupId}`,
+        businessKey:
+          addedUserId === undefined
+            ? `team-match-lineup-included:${lineupId}`
+            : `team-match-lineup-included:${lineupId}:${addedUserId}`,
         aggregateType: 'V1_GAME_LINEUP',
         aggregateId: lineupId,
         type: LINEUP_INCLUDED_NOTIFICATION_TYPE,
-        payload: { lineupId },
+        payload: addedUserId === undefined ? { lineupId } : { lineupId, userId: addedUserId },
       },
     ],
     skipDuplicates: true,
@@ -661,6 +666,7 @@ export class TeamMatchLineupService {
               { actorType: 'USER', actorUserId: user.id },
               'roster',
             );
+            await enqueueLineupIncludedNotice(tx, lineup.id, entry.userId);
           }
           const occurredAt = new Date();
           const added = {

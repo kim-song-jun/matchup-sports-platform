@@ -211,6 +211,8 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
   처리하면 남은 대기 건수로 지금 팀장·매니저의 줄을 다시 쓰고, 0건이면 줄을 읽음으로 둔다.
 - **참석명단 포함**: 경기·사람당 한 번(`lineup-included:{gameId}:{userId}`) — 다시 제출하면 새로 오른 사람만 받고 빠진 사람에게는
   보내지 않는다. 킥오프 2시간 안에 제출하면 킥오프 알림 키(`game-kickoff:…`)로 써서 뒤이은 킥오프 알림과 한 건으로 합친다.
+  첫 기록 뒤 늦게 추가된 선수(`POST /team-matches/:id/lineup/late-additions`, 게스트 제외)는 추가할 때 **그 사람에게만** 한 번 간다 —
+  outbox 키 `team-match-lineup-included:{lineupId}:{userId}`, payload `{ lineupId, userId }`(제출본에 원래 있던 선수는 이때 받지 않는다).
 - **발송 경로**: 일정 생성·취소와 참석명단 포함은 같은 트랜잭션의 outbox 행(`SCHEDULE_CREATED_NOTIFICATION`·
   `SCHEDULE_CANCELLED_NOTIFICATION`·`TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION`)을 게임 운영 워커가 받아 쓴다(실시간 소켓 이벤트 없음 — 목록 polling 으로 보인다).
 - **밤(KST 21~09시)**: 팀(`teamEnabled`)·경기(`teamMatchEnabled`) 사건 알림은 알림함 행만 남기고 푸시하지 않는다(아침에 몰아 보내지도 않음).

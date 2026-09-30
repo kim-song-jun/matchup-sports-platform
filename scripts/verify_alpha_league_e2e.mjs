@@ -212,17 +212,19 @@ try {
       note('3-대진', `${link.text}: 대진이 이미 있어 생성 단계를 건너뛴다`);
     }
 
-    // AdminDataTable 은 데스크톱 <table> 과 모바일 카드 목록을 둘 다 DOM 에 렌더하므로
-    // 버튼 개수는 대진 수의 2배로 잡힌다 — 개수로 세지 말고 "남아 있는 동안" 반복한다.
-    const forfeitSel = 'button[aria-label$="몰수패 처리"]';
-    const distinct = new Set(
-      await page.locator(forfeitSel).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))),
-    );
-    note('3-대진', `${link.text}: 몰수 가능 대진 ${distinct.size}건 (DOM 버튼 ${await page.locator(forfeitSel).count()}개 — 표/카드 이중 렌더)`);
+    // 몰수패 처리는 대진 표 행의 ⋯ 시트 안에 있다. 데스크톱 표의 행만 센다(모바일 카드는 같은 행의 사본).
+    const menuSel = 'table button[aria-label$="더보기"]';
+    const rowCount = await page.locator(menuSel).count();
+    note('3-대진', `${link.text}: 대진 행 ${rowCount}건`);
 
-    for (let i = 0; i < distinct.size; i += 1) {
-      if ((await page.locator(forfeitSel).count()) === 0) break;
-      await page.locator(forfeitSel).first().click();
+    for (let i = 0; i < rowCount; i += 1) {
+      await page.locator(menuSel).nth(i).click();
+      const forfeitItem = page.getByRole('dialog').getByRole('button', { name: /^몰수패 처리/ });
+      if ((await forfeitItem.count()) === 0) {
+        await page.getByRole('dialog').getByRole('button', { name: '닫기' }).click();
+        continue;
+      }
+      await forfeitItem.click();
       await page.waitForSelector('#admin-reason-status', { timeout: 10000 });
       const opts = await page.locator('#admin-reason-status option').evaluateAll((els) =>
         els.map((el) => ({ v: el.value, t: el.textContent.trim() })),

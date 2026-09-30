@@ -160,7 +160,7 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
     >
       <AlertBanner
         tone="info"
-        message={`${board.data.teamNameSnapshot} 팀원만 볼 수 있어요. 상대 팀과 관중에게는 등번호와 이름만 공개되고, 선발·후보와 배치는 나가지 않아요.`}
+        message={`${board.data.teamNameSnapshot} 팀원만 볼 수 있는 배치예요. 상대 팀과 관중에게는 등번호와 이름만 공개돼요.`}
       />
 
       {!canEdit ? (

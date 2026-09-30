@@ -115,6 +115,10 @@ describe('TacticsBoardClient — 처음 여는 풋살 보드', () => {
     expect(screen.getAllByRole('button', { name: /^2-2\s/ })[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^2-2-1\s/ })).not.toBeInTheDocument();
     expect(screen.getAllByText('5:5 경기예요. 필드 4명 대형만 보여요.')[0]).toBeInTheDocument();
+    // 정본 "선후발 없음" — 안내 띠가 선발·후보를 말하지 않는다(W3-V5).
+    const banner = screen.getByText(/팀원만 볼 수 있는 배치예요/);
+    expect(banner).toHaveTextContent('성수 FC 팀원만 볼 수 있는 배치예요. 상대 팀과 관중에게는 등번호와 이름만 공개돼요.');
+    expect(banner.textContent).not.toMatch(/선발|후보/);
   });
 
   it('팀원 전원이 대기 칩(등번호 순)이고, 한 번씩 누르면 GK → FX 순서로 코트에 앉아 그대로 저장된다', async () => {

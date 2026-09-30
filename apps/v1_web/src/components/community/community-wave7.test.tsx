@@ -84,6 +84,34 @@ describe('채팅방 빈 상태', () => {
   });
 });
 
+describe('채팅방 입력 — Enter 전송', () => {
+  function renderRoom(onSend = vi.fn()) {
+    renderWithClient(
+      <ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, draft: '안녕하세요', onSend }} roomId="room-1" />,
+    );
+    return { onSend, input: screen.getByRole('textbox', { name: '메시지 입력' }) };
+  }
+
+  it('Enter 로 보낸다', () => {
+    const { onSend, input } = renderRoom();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('한글 조합 중 Enter 는 글자 확정이라 보내지 않는다 (isComposing · Safari keyCode 229)', () => {
+    const { onSend, input } = renderRoom();
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('모바일 키보드 엔터 키를 "전송"으로 표시한다', () => {
+    const { input } = renderRoom();
+    expect(input).toHaveAttribute('enterkeyhint', 'send');
+  });
+});
+
 const emptyNotifications: NotificationsViewModel = { status: 'ready', unreadCount: 0, notifications: [] };
 
 describe('알림 빈 상태', () => {

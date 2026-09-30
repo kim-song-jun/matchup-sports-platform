@@ -262,6 +262,16 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             placeholder={model.inputLockedMessage ?? '메시지 입력'}
             aria-label="메시지 입력"
             disabled={model.status !== 'ready' || Boolean(model.inputLockedMessage)}
+            // 모바일 키보드의 엔터 키를 "전송"으로 보여 준다.
+            enterKeyHint="send"
+            onKeyDown={(event) => {
+              // 입력칸이 form 밖이라 Enter 가 아무 일도 안 했다. 한글 조합 중 Enter(isComposing,
+              // Safari 는 조합 직후 keyCode 229)는 글자 확정이라 보내지 않는다 — 보내면 마지막 글자가
+              // 입력칸에 남거나 두 번 전송된다. 빈 내용·전송 중 차단은 onSend 가 한다.
+              if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing || event.keyCode === 229) return;
+              event.preventDefault();
+              model.onSend?.();
+            }}
           />
           <button
             className="tm-btn tm-btn-icon tm-btn-primary"

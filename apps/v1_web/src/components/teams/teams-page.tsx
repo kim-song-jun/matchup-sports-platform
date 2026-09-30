@@ -1530,7 +1530,7 @@ function ActionErrorNotice({ message }: { message?: string | null }) {
 }
 
 function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembersViewModel['invitations']> }) {
-  const { form, items, listLoading, listError, onRetry } = invitations;
+  const { form, items, pastItems, listLoading, listError, onRetry } = invitations;
 
   return (
     <section className="tm-member-section">
@@ -1627,25 +1627,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           {items.map((item) => (
             <div key={item.invitationId} className="tm-invitation-card">
               <div className="tm-invitation-card-head">
-                {/* 아바타 대체 — 이니셜 */}
-                <div
-                  aria-hidden="true"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 'var(--radius-circle)',
-                    background: 'var(--grey100)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    fontSize: 'var(--font-size-body-sm)',
-                    fontWeight: 700,
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  {Array.from(item.displayName)[0] ?? '?'}
-                </div>
+                <InvitationInitial name={item.displayName} />
                 <div className="tm-invitation-meta">
                   <span className="tm-invitation-meta-name">{item.displayName}</span>
                   <span className="tm-invitation-meta-date">{formatInvitationDate(item.createdAt)} 초대</span>
@@ -1674,7 +1656,53 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           ))}
         </div>
       )}
+
+      {/* 지난 초대 — 목록에서 사라진 초대가 왜 없어졌는지(수락·거절·취소) 최근 30일만 남긴다 */}
+      {!listLoading && !listError && pastItems.length > 0 ? (
+        <>
+          <div className="tm-text-label" style={{ marginTop: 20 }}>지난 초대</div>
+          <div className="tm-text-caption" style={{ marginTop: 3, marginBottom: 12 }}>최근 30일에 끝난 초대예요.</div>
+          <ul aria-label="지난 초대" style={{ display: 'grid', gap: 12, listStyle: 'none', margin: 0, padding: 0 }}>
+            {pastItems.map((item) => (
+              <li key={item.invitationId} className="tm-invitation-card">
+                <div className="tm-invitation-card-head">
+                  <InvitationInitial name={item.displayName} />
+                  <div className="tm-invitation-meta">
+                    <span className="tm-invitation-meta-name">{item.displayName}</span>
+                    <span className="tm-invitation-meta-date">{formatInvitationDate(item.closedAt)}</span>
+                  </div>
+                  <span className="tm-badge tm-badge-grey">{item.statusLabel}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </section>
+  );
+}
+
+/** 초대 카드의 아바타 대체 — 이름 첫 글자. */
+function InvitationInitial({ name }: { name: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 'var(--radius-circle)',
+        background: 'var(--grey100)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        fontSize: 'var(--font-size-body-sm)',
+        fontWeight: 700,
+        color: 'var(--text-muted)',
+      }}
+    >
+      {Array.from(name)[0] ?? '?'}
+    </div>
   );
 }
 

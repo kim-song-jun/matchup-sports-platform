@@ -4366,10 +4366,14 @@ export type V1TeamInvitationSummary = {
   };
 };
 
+/** 지난 초대 1건 — 최근 30일에 수락·거절·취소로 끝난 초대. closedAt 은 끝난 시각 */
+export type V1PastTeamInvitation = V1TeamInvitationSummary & { closedAt: string };
+
 /** GET /teams/:teamId/invitations 응답 */
 export type V1TeamInvitationsPage = {
   teamId: string;
   items: V1TeamInvitationSummary[];
+  pastItems: V1PastTeamInvitation[];
 };
 
 /** 받은 초대 1건 (GET /me/invitations items 요소) */

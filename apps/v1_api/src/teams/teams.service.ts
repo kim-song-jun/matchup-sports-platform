@@ -59,6 +59,10 @@ const TEAM_FULL_MESSAGE = '정원이 다 찬 팀이에요.';
  */
 const MY_JOIN_APPLICATIONS_GROUP_LIMIT = 20;
 
+/** 초대 탭 '지난 초대' — 최근 30일에 끝난 초대만, 최대 50건. */
+const PAST_INVITATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const PAST_INVITATION_LIMIT = 50;
+
 type TeamWithRelations = V1Team & {
   sport: { id: string; name: string };
   region: { id: string; name: string; parent: { name: string } | null } | null;
@@ -1503,36 +1507,49 @@ export class TeamsService {
   async listInvitations(user: V1AuthUser, teamId: string) {
     await this.assertManagerOrOwner(user, teamId);
 
-    const invitations = await this.prisma.v1TeamInvitation.findMany({
-      where: { teamId, status: 'pending' },
-      orderBy: [{ createdAt: 'desc' }],
-      include: {
-        invitedUser: {
-          select: {
-            id: true,
-            profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
-          },
+    const include = {
+      invitedUser: {
+        select: {
+          id: true,
+          profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
         },
+      },
+    } as const;
+    const [invitations, past] = await Promise.all([
+      this.prisma.v1TeamInvitation.findMany({
+        where: { teamId, status: 'pending' },
+        orderBy: [{ createdAt: 'desc' }],
+        include,
+      }),
+      // 지난 초대(H1-invite-declined): 수락·거절·취소로 끝난 초대를 최근 30일만. 끝난 시각은 updatedAt 이다 —
+      // 취소는 respondedAt 을 남기지 않는다.
+      this.prisma.v1TeamInvitation.findMany({
+        where: { teamId, status: { in: ['accepted', 'declined', 'cancelled'] }, updatedAt: { gte: new Date(Date.now() - PAST_INVITATION_WINDOW_MS) } },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: PAST_INVITATION_LIMIT,
+        include,
+      }),
+    ]);
+    const toItem = (inv: (typeof invitations)[number]) => ({
+      invitationId: inv.id,
+      teamId: inv.teamId,
+      invitedUserId: inv.invitedUserId,
+      status: inv.status,
+      message: inv.message,
+      createdAt: inv.createdAt,
+      invitedUser: {
+        userId: inv.invitedUser.id,
+        displayName:
+          inv.invitedUser.profile?.nickname ?? inv.invitedUser.profile?.displayName ??
+          '초대된 사용자',
+        profileImageUrl: inv.invitedUser.profile?.profileImageUrl ?? null,
       },
     });
 
     return {
       teamId,
-      items: invitations.map((inv) => ({
-        invitationId: inv.id,
-        teamId: inv.teamId,
-        invitedUserId: inv.invitedUserId,
-        status: inv.status,
-        message: inv.message,
-        createdAt: inv.createdAt,
-        invitedUser: {
-          userId: inv.invitedUser.id,
-          displayName:
-            inv.invitedUser.profile?.nickname ?? inv.invitedUser.profile?.displayName ??
-            '초대된 사용자',
-          profileImageUrl: inv.invitedUser.profile?.profileImageUrl ?? null,
-        },
-      })),
+      items: invitations.map(toItem),
+      pastItems: past.map((inv) => ({ ...toItem(inv), closedAt: inv.updatedAt })),
     };
   }
 
@@ -1822,7 +1839,15 @@ export class TeamsService {
     this.assertActiveAccount(user);
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
       where: { id: invitationId },
-      select: { id: true, teamId: true, invitedUserId: true, status: true },
+      select: {
+        id: true,
+        teamId: true,
+        invitedUserId: true,
+        invitedByUserId: true,
+        status: true,
+        team: { select: { name: true } },
+        invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } },
+      },
     });
     if (!invitation) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
@@ -1847,6 +1872,9 @@ export class TeamsService {
       select: { id: true, status: true },
     });
     await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
+    void this.notifications.emitNotification(invitation.invitedByUserId, 'team_invitation_declined', invitation.teamId, undefined, {
+      vars: { team: invitation.team.name, name: notificationDisplayName(invitation.invitedUser.profile) },
+    });
 
     return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };
   }

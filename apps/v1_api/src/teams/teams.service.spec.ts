@@ -106,6 +106,7 @@ function invitationRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2026-06-01'),
     respondedAt: null,
     team: { id: 'team-1', name: '테스트팀', status: 'active', memberCount: 5 },
+    invitedUser: { profile: { nickname: '초대받은이', displayName: null } },
     ...overrides,
   };
 }
@@ -2371,6 +2372,11 @@ describe('TeamsService', () => {
         }),
       );
       expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith(invitee.id, 'team-1');
+      // 초대한 사람에게만 '○○님이 초대를 거절했어요'(H1-invite-declined) — 거절한 본인은 받지 않는다.
+      expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+      expect(notifications.emitNotification).toHaveBeenCalledWith(manager.id, 'team_invitation_declined', 'team-1', undefined, {
+        vars: { team: '테스트팀', name: '초대받은이' },
+      });
     });
 
     it('본인 아닌 유저의 거절 시도는 초대 알림을 건드리지 않는다', async () => {
@@ -2379,6 +2385,7 @@ describe('TeamsService', () => {
       await expect(service.declineInvitation(member, 'inv-1')).rejects.toBeDefined();
 
       expect(notifications.markTeamInvitationHandled).not.toHaveBeenCalled();
+      expect(notifications.emitNotification).not.toHaveBeenCalled();
     });
 
     it('본인 아닌 유저가 거절 시도 → 403 PERMISSION_DENIED', async () => {
@@ -2491,6 +2498,7 @@ describe('TeamsService', () => {
           invitedUser: { id: invitee.id, profile: { nickname: 'nick', displayName: null, profileImageUrl: null } },
         },
       ]);
+      prisma.v1TeamInvitation.findMany.mockResolvedValueOnce([]);
 
       const result = await service.listInvitations(manager, 'team-1');
 
@@ -2503,6 +2511,37 @@ describe('TeamsService', () => {
         status: 'pending',
         invitedUser: { userId: invitee.id, displayName: 'nick' },
       });
+    });
+
+    it('지난 초대는 최근 30일에 수락·거절·취소로 끝난 것만, 끝난 시각과 함께 내린다', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      const closedAt = new Date('2026-09-29T15:00:00.000Z');
+      prisma.v1TeamInvitation.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        {
+          id: 'inv-old',
+          teamId: 'team-1',
+          invitedUserId: 'u-17',
+          status: 'declined',
+          message: null,
+          createdAt: new Date('2026-09-20'),
+          updatedAt: closedAt,
+          invitedUser: { id: 'u-17', profile: { nickname: '선수17', displayName: null, profileImageUrl: null } },
+        },
+      ]);
+
+      const before = Date.now();
+      const result = await service.listInvitations(owner, 'team-1');
+      const after = Date.now();
+
+      expect(result.items).toEqual([]);
+      expect(result.pastItems).toEqual([
+        expect.objectContaining({ invitationId: 'inv-old', status: 'declined', closedAt, invitedUser: expect.objectContaining({ displayName: '선수17' }) }),
+      ]);
+      const pastWhere = prisma.v1TeamInvitation.findMany.mock.calls[1][0].where;
+      expect(pastWhere.status).toEqual({ in: ['accepted', 'declined', 'cancelled'] });
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      expect(pastWhere.updatedAt.gte.getTime()).toBeGreaterThanOrEqual(before - thirtyDays);
+      expect(pastWhere.updatedAt.gte.getTime()).toBeLessThanOrEqual(after - thirtyDays);
     });
 
     it('일반 멤버는 초대 목록 조회 불가 → 403 PERMISSION_DENIED', async () => {

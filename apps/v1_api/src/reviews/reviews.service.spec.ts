@@ -1498,6 +1498,26 @@ describe('ReviewsService', () => {
       expect(userReputationUpsert).toHaveBeenCalled();
     });
 
+    // F60: 라인업을 뺐다 되돌리면 그 선수의 참가자 행이 저장 순서상 맨 뒤로 간다. 대상 목록이 저장
+    // 순서를 그대로 쓰면 1번이 맨 아래에 뜬다.
+    it('상대 선수 대상은 저장 순서가 아니라 등번호 오름차순이고 번호 없는 선수는 뒤로 간다', async () => {
+      const noNumber = 'away-player-none';
+      const { prisma } = teamMatchWorld(
+        [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
+        [],
+        [opponentB, noNumber, opponentA], // 저장 순서: 10번, 번호 없음, 1번(뺐다 되돌려 맨 뒤)
+        [],
+        null,
+        { [opponentB]: 10, [opponentA]: 1 },
+      );
+      const service = makeService(prisma);
+
+      const source = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId });
+
+      expect(source.targets.filter((target) => target.targetType === 'user').map((target) => target.targetUserId))
+        .toEqual([opponentA, opponentB, noNumber]);
+    });
+
     it('라인업에 없는 사람은 대상이 아니다', async () => {
       const { prisma, createMock } = teamMatchWorld(
         [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
@@ -1944,6 +1964,8 @@ function teamMatchWorld(
    * null 이면 홈 사이드에 라인업이 없다(예전 기본 동작), 빈 배열이면 라인업은 있으나 아무도 안 실렸다.
    */
   homeRosterUserIds: string[] | null = null,
+  /** 원정 최신 라인업 선수별 등번호(F60). 없는 userId 는 번호 없음(null)이다. */
+  awayJerseyNumbers: Record<string, number> = {},
 ) {
   const membershipRows: FakeRow[] = memberships.map((membership) => ({
     ...membership,
@@ -2010,6 +2032,7 @@ function teamMatchWorld(
       lineupId: latestLineupId,
       userId,
       displayNameSnapshot: `선수-${userId}`,
+      jerseyNumber: awayJerseyNumbers[userId] ?? null,
     })),
     ...(homeRosterUserIds ?? []).map((userId) => ({
       id: `participant-${userId}`,

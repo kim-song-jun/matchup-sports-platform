@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { compareRosterOrder } from '../common/roster-order';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
@@ -863,7 +864,7 @@ export class ReviewsService {
 
     const participants = await db.v1GameParticipant.findMany({
       where: { lineupId: { in: latestLineupIds } },
-      select: { id: true, sideId: true, userId: true, displayNameSnapshot: true },
+      select: { id: true, sideId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true },
     });
     const resolvedParticipants = await this.resolveTeamMatchParticipantUsers(participants, db);
     // V1GameParticipant.userId 는 FK 가 아니라 nullable 컬럼이라(스키마 주석 참조) relation include 가
@@ -874,10 +875,16 @@ export class ReviewsService {
     });
     const profileById = new Map(profiles.map((profile) => [profile.id, profile.profile]));
 
+    // 후기 대상 목록은 등번호순 — 저장 순서(뺐다 되돌린 선수가 맨 뒤)를 그대로 쓰지 않는다.
+    const orderedParticipants = [...resolvedParticipants].sort((a, b) => compareRosterOrder(
+      { jerseyNumber: a.jerseyNumber, name: profileById.get(a.userId)?.nickname ?? a.displayNameSnapshot, id: a.userId },
+      { jerseyNumber: b.jerseyNumber, name: profileById.get(b.userId)?.nickname ?? b.displayNameSnapshot, id: b.userId },
+    ));
+
     for (const [teamId, teamSideIds] of sideIdsByTeamId) {
       const seen = new Set<string>();
       const roster: SideLineupRoster['players'] = [];
-      for (const participant of resolvedParticipants) {
+      for (const participant of orderedParticipants) {
         if (!teamSideIds.includes(participant.sideId)) continue;
         // 최신 라인업으로 이미 좁혔지만, 한 사람이 같은 라인업에 중복 등록되는 입력 오류까지
         // 대비해 dedup은 유지한다.

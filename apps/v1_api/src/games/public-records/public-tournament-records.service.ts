@@ -3,6 +3,7 @@ import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionSt
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
+import { compareRosterOrder } from '../../common/roster-order';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
 import {
   ALL_COMPETITION_KINDS,
@@ -2457,6 +2458,8 @@ function buildLineup(
   const home = fixture.game.sides.find((side) => side.sideKey === 'HOME') ?? null;
   const away = fixture.game.sides.find((side) => side.sideKey === 'AWAY') ?? null;
 
+  // 저장 순서가 아니라 등번호순으로 내보낸다(뺐다 되돌린 선수가 맨 뒤로 가지 않게). 이름이 가려진 행은
+  // 이름 없이 정렬해 숨긴 이름의 순서가 새지 않는다.
   const present = (sideId: string | undefined) =>
     (sideId ? (bySide.get(sideId) ?? []) : []).map((participant) => {
       const consent = consentMap.get(participant.id);
@@ -2482,7 +2485,10 @@ function buildLineup(
         // 이름 게이팅 롤백 스위치가 켜져도 동의 없는 사람의 프로필은 열리지 않는다.
         profileHref: eligible ? resolveParticipantProfileHref(participant.userId, consent) : null,
       };
-    });
+    }).sort((a, b) => compareRosterOrder(
+      { jerseyNumber: a.jerseyNumber, name: a.displayName ?? '', id: a.participantId },
+      { jerseyNumber: b.jerseyNumber, name: b.displayName ?? '', id: b.participantId },
+    ));
 
   return { home: present(home?.id), away: present(away?.id) };
 }

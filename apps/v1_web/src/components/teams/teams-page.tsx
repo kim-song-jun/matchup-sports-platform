@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
-import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -20,6 +20,7 @@ import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
+import { TeamMembersSection } from './team-members-section';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -1605,9 +1606,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           </div>
         ) : null}
         {!canManageMembers || model.activeTab === 'members' ? (
-          <MemberSection title={canManageMembers ? '팀 멤버' : '멤버 목록'} sub={canManageMembers ? '팀에 속한 멤버의 역할과 권한을 관리해요.' : '팀에 속한 멤버를 확인할 수 있어요.'} desktopGrid>
-            {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} profileHref={member.profileHref} actions={member.actions} actionPending={member.actionPending} selfLeave={member.selfLeave} />)}
-          </MemberSection>
+          <TeamMembersSection members={model.members} loading={model.membersLoading} />
         ) : model.activeTab === 'requests' ? (
           <JoinRequestSection model={model} />
         ) : model.invitations ? (
@@ -2107,104 +2106,6 @@ function TeamCapacityField({ value, min, onChange }: { value: number; min?: numb
       </div>
       {floor > 2 ? <div className="tm-text-caption" style={{ marginTop: 8 }}>지금 팀원이 {floor}명이라 그보다 적게 정할 수 없어요.</div> : null}
     </div>
-  );
-}
-
-function MemberSection({ title, sub, desktopGrid, children }: { title: string; sub: string; desktopGrid?: boolean; children: ReactNode }) {
-  return (
-    <section className="tm-member-section">
-      <div className="tm-text-label">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div>
-      <div className={desktopGrid ? 'tm-team-members-desktop-layout' : ''} style={desktopGrid ? undefined : { display: 'grid', gap: 12, marginTop: 12 }}>
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function MemberCard({
-  title,
-  sub,
-  role,
-  profileHref,
-  actions,
-  actionPending,
-  selfLeave,
-}: {
-  title: string;
-  sub: string;
-  role: string;
-  profileHref?: string;
-  actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
-  actionPending?: boolean;
-  selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; error?: string | null; onSelect: () => void };
-}) {
-  const [open, setOpen] = useState(false);
-  const reasonIdBase = useId();
-  const hasActions = actions.length > 0;
-  const disabled = actionPending || !hasActions;
-  const leaveReasonId = `${reasonIdBase}-leave`;
-  const leaveReasonShown = Boolean(selfLeave?.disabled && selfLeave.disabledReason);
-
-  return (
-    <Card pad={16}>
-      <ListItem title={title} sub={sub} trailing={role} href={profileHref} chev={Boolean(profileHref)} />
-      {hasActions ? (
-        <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
-          관리
-        </button>
-      ) : null}
-      {open && !disabled ? (
-        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 12 }}>
-          {actions.map((action, index) => {
-            const reasonId = `${reasonIdBase}-action-${index}`;
-            return (
-              <div key={action.label}>
-                <button
-                  className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
-                  type="button"
-                  disabled={Boolean(action.disabledReason)}
-                  aria-describedby={action.disabledReason ? reasonId : undefined}
-                  onClick={() => {
-                    setOpen(false);
-                    action.onSelect();
-                  }}
-                >
-                  {action.label}
-                </button>
-                {action.disabledReason ? (
-                  <p id={reasonId} className="tm-text-caption" style={{ margin: '4px 0 0' }}>
-                    {action.disabledReason}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-      {selfLeave ? (
-        <button
-          className="tm-btn tm-btn-sm tm-btn-danger tm-btn-block"
-          style={{ marginTop: 12, minHeight: 44 }}
-          type="button"
-          disabled={selfLeave.disabled || selfLeave.pending}
-          aria-describedby={leaveReasonShown ? leaveReasonId : undefined}
-          onClick={selfLeave.onSelect}
-        >
-          {selfLeave.pending ? '나가는 중…' : '팀 나가기'}
-        </button>
-      ) : null}
-      {leaveReasonShown ? (
-        <p id={leaveReasonId} className="tm-text-caption" style={{ marginTop: 8 }}>
-          {selfLeave?.disabledReason}
-        </p>
-      ) : null}
-      {selfLeave?.error ? (
-        <p role="alert" className="tm-text-caption" style={{ marginTop: 8, color: 'var(--red700)' }}>
-          {selfLeave.error}
-        </p>
-      ) : null}
-    </Card>
   );
 }
 

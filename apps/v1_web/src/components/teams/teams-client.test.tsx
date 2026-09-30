@@ -467,7 +467,6 @@ describe('TeamMembersPageClient GA events', () => {
       expect(screen.queryByRole('button', { name: /^가입 신청/ })).toBeNull();
       expect(screen.queryByText('이서준')).toBeNull();
       expect(screen.queryByText(/확인 창을 거쳐요/)).toBeNull();
-      expect(screen.queryByRole('button', { name: '관리' })).toBeNull();
       expect(screen.getByRole('heading', { name: '성수 풋살 크루 · 멤버 목록' })).toBeInTheDocument();
       expect(teamApiMocks.useV1TeamJoinApplications).toHaveBeenLastCalledWith(
         'team-1',
@@ -476,6 +475,11 @@ describe('TeamMembersPageClient GA events', () => {
       );
       expect(teamApiMocks.useV1TeamInvitations).toHaveBeenLastCalledWith('team-1', { enabled: false });
     });
+    // 멤버가 된 본인 행의 ⋯ 시트에는 나가기만 남는다 — 역할·내보내기 동작이 남아 있으면 안 된다.
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+    const sheet = screen.getByRole('dialog', { name: '김도윤' });
+    expect(within(sheet).getByRole('button', { name: '팀 나가기' })).toBeEnabled();
+    expect(within(sheet).queryByRole('button', { name: /매니저로 지정|팀장 넘기기|내보내기/ })).toBeNull();
   });
 });
 
@@ -1455,8 +1459,9 @@ describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
     }
   }
 
-  function manageButtonOf(name: string) {
-    return within(screen.getByText(name).closest('.tm-card') as HTMLElement).getByRole('button', { name: '관리' });
+  function openSheetOf(name: string) {
+    fireEvent.click(screen.getByRole('button', { name: `${name} 관리` }));
+    return screen.getByRole('dialog', { name });
   }
 
   beforeEach(() => {
@@ -1468,11 +1473,11 @@ describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
     setup('owner');
     render(<TeamMembersPageClient teamId="team-1" />);
 
-    fireEvent.click(manageButtonOf('김도윤'));
-    expect(screen.queryByRole('button', { name: '결장 기간' })).toBeNull();
+    const own = openSheetOf('김도윤');
+    expect(within(own).queryByRole('button', { name: '결장 기간 등록' })).toBeNull();
+    fireEvent.click(within(own).getByRole('button', { name: '닫기' }));
 
-    fireEvent.click(manageButtonOf('박서준'));
-    fireEvent.click(screen.getByRole('button', { name: '결장 기간' }));
+    fireEvent.click(within(openSheetOf('박서준')).getByRole('button', { name: '결장 기간 등록' }));
     expect(await screen.findByRole('dialog', { name: '결장 기간 · 박서준' })).toBeInTheDocument();
   });
 
@@ -1515,12 +1520,11 @@ describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
     // 취소된 기간은 빠지고 살아 있는 기간만, 사유와 함께 보인다.
     expect(screen.getByText(/^내 결장 기간: 10\/3 \(.\)~10\/12 \(.\)\(부상\)\. /)).toBeInTheDocument();
     expect(screen.queryByText(/개인 사정/)).toBeNull();
-    fireEvent.click(manageButtonOf('김도윤'));
-    expect(screen.queryByRole('button', { name: '결장 기간' })).toBeNull();
+    expect(within(openSheetOf('김도윤')).queryByRole('button', { name: '결장 기간 등록' })).toBeNull();
   });
 });
 
-describe('TeamMembersPageClient — 운영진 5명 한도', () => {
+describe('TeamMembersPageClient — 매니저 5명 한도', () => {
   const changeRoleMutate = vi.fn();
 
   function setup(managerCount: number) {
@@ -1567,9 +1571,9 @@ describe('TeamMembersPageClient — 운영진 5명 한도', () => {
     }
   }
 
-  function openManage(name: string) {
-    const card = screen.getByText(name).closest('.tm-card') as HTMLElement;
-    fireEvent.click(within(card).getByRole('button', { name: '관리' }));
+  function openSheetOf(name: string) {
+    fireEvent.click(screen.getByRole('button', { name: `${name} 관리` }));
+    return screen.getByRole('dialog', { name });
   }
 
   beforeEach(() => {
@@ -1577,27 +1581,47 @@ describe('TeamMembersPageClient — 운영진 5명 한도', () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it('운영진이 5명 차 있으면 "운영진 지정"을 이유와 함께 비활성으로 둔다', () => {
+  it('매니저가 5명 차 있으면 "매니저로 지정"을 이유와 함께 비활성으로 둔다', () => {
     setup(5);
     render(<TeamMembersPageClient teamId="team-1" />);
 
-    openManage('박서준');
+    const sheet = openSheetOf('박서준');
 
-    const promote = screen.getByRole('button', { name: '운영진 지정' });
+    const promote = within(sheet).getByRole('button', { name: /^매니저로 지정/ });
     expect(promote).toBeDisabled();
-    expect(screen.getByText('매니저는 최대 5명이에요.')).toBeVisible();
-    expect(promote).toHaveAccessibleDescription('매니저는 최대 5명이에요.');
+    expect(promote).toHaveTextContent('매니저는 최대 5명이에요.');
     // 내보내기 등 나머지 관리 동작은 그대로 누를 수 있다.
-    expect(screen.getByRole('button', { name: '내보내기' })).toBeEnabled();
+    expect(within(sheet).getByRole('button', { name: '팀에서 내보내기' })).toBeEnabled();
+  });
+
+  it('행 배지는 역할 라벨 단일 소스를 따른다 — manager·옛 admin 은 "매니저", 멤버는 배지 없이', () => {
+    setup(1);
+    const row = (membershipId: string, displayName: string, role: string) => ({
+      membershipId, userId: `u-${membershipId}`, displayName, role, status: 'active', joinedAt: '2026-01-01T00:00:00.000Z', canChangeRole: false, canRemove: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [row('m-1', '김도윤', 'owner'), row('m-2', '최매니', 'manager'), row('m-3', '옛관리', 'admin'), row('m-4', '박서준', 'member')],
+        summary: { ownerCount: 1, managerCount: 2, memberCount: 4 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const badges = Array.from(document.querySelectorAll('.tm-member-row .tm-badge')).map((badge) => badge.textContent);
+    expect(badges).toEqual(['팀장', '매니저', '매니저']);
+    expect(screen.getByText('팀장·매니저')).toBeInTheDocument();
   });
 
   it('4명이면 아직 지정할 수 있다', () => {
     setup(4);
     render(<TeamMembersPageClient teamId="team-1" />);
 
-    openManage('박서준');
+    const sheet = openSheetOf('박서준');
 
-    expect(screen.getByRole('button', { name: '운영진 지정' })).toBeEnabled();
+    expect(within(sheet).getByRole('button', { name: /^매니저로 지정/ })).toBeEnabled();
     expect(screen.queryByText('매니저는 최대 5명이에요.')).not.toBeInTheDocument();
   });
 
@@ -1616,10 +1640,9 @@ describe('TeamMembersPageClient — 운영진 5명 한도', () => {
     });
     render(<TeamMembersPageClient teamId="team-1" />);
 
-    openManage('박서준');
-    fireEvent.click(screen.getByRole('button', { name: '운영진 지정' }));
-    const dialog = await screen.findByRole('dialog', { name: '운영진 지정' });
-    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+    fireEvent.click(within(openSheetOf('박서준')).getByRole('button', { name: /^매니저로 지정/ }));
+    const dialog = await screen.findByRole('dialog', { name: '매니저로 지정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '매니저로 지정' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('매니저는 최대 5명이에요');

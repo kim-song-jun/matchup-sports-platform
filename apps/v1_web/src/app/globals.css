@@ -4697,6 +4697,36 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-decoration: none;
 }
 
+/* 멤버 행 64px — 버튼 4개 대신 ⋯ 하나(H2 A-1). 행 사이는 hairline 한 줄. */
+.tm-member-rows {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tm-member-row-main {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tm-member-row-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 /* 가입 신청 목록 — 모바일에서 카드 사이가 0 이던 것(F95)을 목록 자체의 간격으로 준다. */
 .tm-member-request-list {
   display: grid;

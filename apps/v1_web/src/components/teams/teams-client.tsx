@@ -50,7 +50,7 @@ import { JerseyNumberDialog } from './jersey-number-dialog';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
 import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
-import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
+import type { TeamDetailViewModel, TeamListViewModel, TeamMemberAction, TeamMemberRowModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
 import {
   buildTeamHref,
@@ -480,7 +480,6 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
-  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
   const cancellingInvitations = usePendingIds();
@@ -493,11 +492,11 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const requestItems = applications.data?.items ?? [];
   const invitationItems = invitationsQuery.data?.items ?? [];
   const viewerUserId = memberItems.find((member) => member.membershipId === viewerMembershipId)?.userId ?? null;
-  const actionPending = changeRole.isPending || removeMember.isPending || rejectApplication.isPending;
+  const actionPending = changeRole.isPending || removeMember.isPending || rejectApplication.isPending || leaveTeam.isPending;
   const requestRows = mergeApprovedApplications(requestItems, approvedApplications);
 
   function handleLeaveTeam() {
-    setLeaveError(null);
+    setActionError(null);
     leaveTeam.mutate(
       { reason: 'left_from_v1_web_member_page' },
       {
@@ -505,9 +504,9 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         onError: (err) => {
           const responseCode = err instanceof V1ApiError ? err.code : undefined;
           if (responseCode === 'CONCURRENT_UPDATE') {
-            setLeaveError('처리 중 팀 상태가 바뀌었어요. 다시 시도해 주세요.');
+            setActionError('처리 중 팀 상태가 바뀌었어요. 다시 시도해 주세요.');
           } else {
-            setLeaveError(extractErrorMessage(err, '팀을 나가지 못했어요. 다시 시도해 주세요.'));
+            setActionError(extractErrorMessage(err, '팀을 나가지 못했어요. 다시 시도해 주세요.'));
           }
         },
       },
@@ -641,52 +640,62 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     actionError,
     selfNotice:
       !canManageMembers && viewerUserId !== null ? <MyUnavailabilityNotice teamId={teamId} userId={viewerUserId} /> : undefined,
-    members: memberItems.length
-      ? memberItems.map((member) =>
-          toMemberModel(member, membersHref, {
-            actionPending,
-            canManageMembers,
-            canDelegateOwner,
-            promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRoleTo(member.membershipId, 'manager')),
-            promoteDisabledReason: (team.data?.managerCount ?? 0) >= TEAM_MANAGER_LIMIT ? `매니저는 최대 ${TEAM_MANAGER_LIMIT}명이에요.` : undefined,
-            delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRoleTo(member.membershipId, 'owner')),
-            demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRoleTo(member.membershipId, 'member')),
-            openUnavailability:
-              canManageMembers && member.status === 'active' && member.membershipId !== viewerMembershipId
-                ? () => {
-                    setUnavailabilityTarget({ userId: member.userId, displayName: member.displayName });
-                    setUnavailabilityOpen(true);
-                  }
-                : undefined,
-            editJersey: () => setJerseyTarget({
-              membershipId: member.membershipId,
-              name: member.displayName,
-              current: member.jerseyNumber ?? null,
-            }),
-            remove: () => confirmAction(confirm, {
-              title: '멤버 내보내기',
-              message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지돼요.`,
-              confirmLabel: '내보내기',
-              tone: 'danger',
-              confirmationPhrase: '확인했습니다',
-            }, () => removeMembership(member.membershipId)),
-            selfLeave:
-              viewerMembershipId && member.membershipId === viewerMembershipId
-                ? {
-                    pending: leaveTeam.isPending,
-                    error: leaveError,
-                    activeOwnerCount: members.data?.summary.ownerCount,
-                    onSelect: () =>
-                      confirmAction(
-                        confirm,
-                        { title: '팀 나가기', message: '정말 이 팀을 나가시겠어요? 다시 가입하려면 새로 신청해야 해요.', confirmLabel: '나가기', tone: 'danger' },
-                        handleLeaveTeam,
-                      ),
-                  }
-                : undefined,
-          }),
-        )
-      : fallback.members,
+    members: memberItems.map((member) =>
+      toMemberModel(member, membersHref, {
+        actionPending,
+        canManageMembers,
+        canDelegateOwner,
+        isSelf: member.membershipId === viewerMembershipId,
+        promote: () => confirmAction(confirm, {
+          title: '매니저로 지정',
+          message: `${member.displayName}님이 매니저가 돼요. 가입 신청·초대·일정을 함께 관리할 수 있어요.`,
+          confirmLabel: '매니저로 지정',
+        }, () => changeRoleTo(member.membershipId, 'manager')),
+        promoteDisabledReason: (team.data?.managerCount ?? 0) >= TEAM_MANAGER_LIMIT ? `매니저는 최대 ${TEAM_MANAGER_LIMIT}명이에요.` : undefined,
+        delegateOwner: () => confirmAction(confirm, {
+          title: '팀장 넘기기',
+          message: `${member.displayName}님이 새 팀장이 되고, 나는 매니저가 돼요. 다시 팀장이 되려면 ${member.displayName}님이 넘겨줘야 해요.`,
+          confirmLabel: '팀장 넘기기',
+          tone: 'danger',
+        }, () => changeRoleTo(member.membershipId, 'owner')),
+        demote: () => confirmAction(confirm, {
+          title: '멤버로 내리기',
+          message: `${member.displayName}님의 매니저 권한이 없어지고 멤버가 돼요.`,
+          confirmLabel: '멤버로 내리기',
+        }, () => changeRoleTo(member.membershipId, 'member')),
+        openUnavailability:
+          canManageMembers && member.status === 'active' && member.membershipId !== viewerMembershipId
+            ? () => {
+                setUnavailabilityTarget({ userId: member.userId, displayName: member.displayName });
+                setUnavailabilityOpen(true);
+              }
+            : undefined,
+        editJersey: () => setJerseyTarget({
+          membershipId: member.membershipId,
+          name: member.displayName,
+          current: member.jerseyNumber ?? null,
+        }),
+        remove: () => confirmAction(confirm, {
+          title: '팀에서 내보내기',
+          message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지돼요.`,
+          confirmLabel: '내보내기',
+          tone: 'danger',
+          confirmationPhrase: '확인했습니다',
+        }, () => removeMembership(member.membershipId)),
+        leave: {
+          activeOwnerCount: members.data?.summary.ownerCount,
+          activeMemberCount: members.data?.summary.memberCount,
+          managerCount: members.data?.summary.managerCount,
+          onSelect: () =>
+            confirmAction(
+              confirm,
+              { title: '팀 나가기', message: '정말 이 팀을 나가시겠어요? 다시 가입하려면 새로 신청해야 해요.', confirmLabel: '나가기', tone: 'danger' },
+              handleLeaveTeam,
+            ),
+        },
+      }),
+    ),
+    membersLoading: !team.data || (canViewMembers && members.isPending === true),
     requests: requestRows.map((application) =>
       toRequestModel(application, membersHref, {
         approved: approvedApplications.some((item) => item.applicationId === application.applicationId),
@@ -1120,8 +1129,9 @@ function toMemberModel(
     actionPending: boolean;
     canManageMembers: boolean;
     canDelegateOwner: boolean;
+    isSelf: boolean;
     promote: () => void;
-    /** 운영진이 한도까지 찼을 때 "운영진 지정"을 막는 이유. 서버가 최종 판정한다. */
+    /** 매니저가 한도까지 찼을 때 "매니저로 지정"을 막는 이유. 서버가 최종 판정한다. */
     promoteDisabledReason?: string;
     delegateOwner: () => void;
     demote: () => void;
@@ -1129,56 +1139,63 @@ function toMemberModel(
     editJersey: () => void;
     /** 결장 기간 시트 — 팀장·매니저가 다른 멤버 행에서만(본인 등록 없음, D6). */
     openUnavailability?: () => void;
-    /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
-    selfLeave?: { pending: boolean; error?: string | null; activeOwnerCount: number | undefined; onSelect: () => void };
+    leave: { activeOwnerCount?: number; activeMemberCount?: number; managerCount?: number; onSelect: () => void };
   },
-): TeamMembersViewModel['members'][number] {
-  const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
-  if (actions.canManageMembers && member.canChangeRole && member.role === 'member') {
-    itemActions.push({ label: '운영진 지정', disabledReason: actions.promoteDisabledReason, onSelect: actions.promote });
-  }
-  if (actions.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
-    itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
-    itemActions.push({ label: '멤버 강등', onSelect: actions.demote });
-  }
-  if (actions.canManageMembers && member.canRemove && member.role !== 'owner') {
-    itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
-  }
+): TeamMemberRowModel {
+  const role = teamRoleLabel(member.role) ?? '멤버';
+  const hasJersey = member.jerseyNumber !== null && member.jerseyNumber !== undefined;
+  const itemActions: TeamMemberAction[] = [];
   // 등번호는 권한 계층과 무관한 팀 살림이라 owner 행에도 붙는다 — 주장이 7번을 달 수
   // 없으면 이상하다. 서버가 canEditJersey를 그 기준으로 계산해 준다.
   if (member.canEditJersey === true) {
     itemActions.push({
-      label: member.jerseyNumber === null || member.jerseyNumber === undefined ? '등번호 지정' : '등번호 변경',
+      key: 'jersey',
+      label: hasJersey ? '등번호 변경' : '등번호 지정',
+      description: hasJersey ? `지금 ${member.jerseyNumber}번` : undefined,
       onSelect: actions.editJersey,
     });
   }
-  if (actions.openUnavailability) itemActions.push({ label: '결장 기간', onSelect: actions.openUnavailability });
-  const ownerCanLeave = member.role !== 'owner' || (actions.selfLeave?.activeOwnerCount ?? 0) > 1;
+  if (actions.openUnavailability) itemActions.push({ key: 'unavailability', label: '결장 기간 등록', onSelect: actions.openUnavailability });
+  if (actions.canManageMembers && member.canChangeRole && member.role === 'member') {
+    itemActions.push({ key: 'promote', label: '매니저로 지정', description: '매니저 권한이 생겨요', disabledReason: actions.promoteDisabledReason, onSelect: actions.promote });
+  }
+  if (actions.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
+    itemActions.push({ key: 'demote', label: '멤버로 내리기', description: '매니저 권한이 없어져요', onSelect: actions.demote });
+    itemActions.push({ key: 'delegate', label: '팀장 넘기기', description: '내가 팀장에서 내려오고, 이 분이 새 팀장이 돼요', risky: true, onSelect: actions.delegateOwner });
+  }
+  if (actions.canManageMembers && member.canRemove && member.role !== 'owner') {
+    itemActions.push({ key: 'remove', label: '팀에서 내보내기', risky: true, destructive: true, onSelect: actions.remove });
+  }
+  // 팀장 혼자 남은 팀은 나가기 대신 멤버 관리 화면의 '혼자 남은 팀장' 카드(H3)가 이유와 길을 한 번만 말한다.
+  const aloneInTeam = (actions.leave.activeMemberCount ?? 0) <= 1;
+  if (actions.isSelf && !(member.role === 'owner' && aloneInTeam)) {
+    const ownerCanLeave = member.role !== 'owner' || (actions.leave.activeOwnerCount ?? 0) > 1;
+    const handOverFirst = (actions.leave.managerCount ?? 0) > 0
+      ? '팀을 나가려면 먼저 매니저에게 팀장을 넘겨야 해요.'
+      : '팀을 나가려면 먼저 매니저에게 팀장을 넘겨야 해요. 멤버 한 명을 매니저로 지정한 뒤 넘겨 주세요.';
+    itemActions.push({
+      key: 'leave',
+      label: '팀 나가기',
+      risky: true,
+      destructive: true,
+      disabledReason: ownerCanLeave ? undefined : handOverFirst,
+      onSelect: actions.leave.onSelect,
+    });
+  }
 
   return {
+    id: member.membershipId,
     name: member.displayName,
-    role: teamRoleLabel(member.role) ?? '멤버',
+    role,
+    roleTone: member.role === 'owner' ? 'owner' : role === '매니저' ? 'manager' : undefined,
     // 등번호가 있으면 가입일과 함께 보여준다 — 라인업을 짤 때 누가 몇 번인지 여기서
     // 바로 확인할 수 있어야 팀원 화면과 라인업 화면이 따로 놀지 않는다.
-    meta:
-      member.jerseyNumber === null || member.jerseyNumber === undefined
-        ? `가입 ${formatDate(member.joinedAt)}`
-        : `${member.jerseyNumber}번 · 가입 ${formatDate(member.joinedAt)}`,
-    // 뒤로가기가 팀원 목록으로 돌아오도록 출처를 함께 넘긴다(팀 상세 "주요 멤버"
-    // 미리보기와 동일 패턴).
+    meta: hasJersey ? `${member.jerseyNumber}번 · 가입 ${formatDate(member.joinedAt)}` : `가입 ${formatDate(member.joinedAt)}`,
+    jerseyNumber: member.jerseyNumber ?? null,
+    // 뒤로가기가 팀원 목록으로 돌아오도록 출처를 함께 넘긴다(팀 상세 "주요 멤버" 미리보기와 동일 패턴).
     profileHref: withFromPath(`/users/${member.userId}`, membersHref),
-    locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
-    selfLeave: actions.selfLeave
-      ? {
-          disabled: !ownerCanLeave,
-          disabledReason: ownerCanLeave ? undefined : '팀장을 매니저에게 넘겨야 나갈 수 있어요. 매니저가 없으면 멤버 한 명을 먼저 매니저로 지정해 주세요.',
-          pending: actions.selfLeave.pending,
-          error: actions.selfLeave.error,
-          onSelect: actions.selfLeave.onSelect,
-        }
-      : undefined,
   };
 }
 

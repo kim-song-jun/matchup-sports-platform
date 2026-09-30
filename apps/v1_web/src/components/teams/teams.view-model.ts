@@ -232,9 +232,9 @@ export function getTeamMembersViewModel(): TeamMembersViewModel {
     ],
     summary: { total: 18, managers: 2, pending: 3 },
     members: [
-      { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
-      { name: '박서준', role: '매니저', meta: 'GK · 가입 2024.05', actions: [] },
-      { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', actions: [] },
+      { id: 'membership-1', name: '김도윤', role: '팀장', roleTone: 'owner', meta: 'FW · 가입 2024.03', actions: [] },
+      { id: 'membership-2', name: '박서준', role: '매니저', roleTone: 'manager', meta: 'GK · 가입 2024.05', actions: [] },
+      { id: 'membership-3', name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', actions: [] },
     ],
     requests: [
       { id: 'application-1', name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', onApprove: () => undefined, onReject: () => undefined },

@@ -189,6 +189,33 @@ export type TeamFormViewModel = {
   };
 };
 
+/** 멤버 행의 ⋯ 시트 항목(H2 A-2). risky 는 '되돌리기 어려운 동작' 소제목 아래로 떨어진다. */
+export type TeamMemberAction = {
+  key: string;
+  label: string;
+  description?: string;
+  risky?: boolean;
+  destructive?: boolean;
+  /** 있으면 항목을 비활성으로 두고 설명 자리에 이 이유를 보여 준다. */
+  disabledReason?: string;
+  onSelect: () => void;
+};
+
+export type TeamMemberRowModel = {
+  /** membershipId — 행 키이자 방금 바뀐 행을 강조할 때 쓴다. */
+  id: string;
+  name: string;
+  /** '팀장' | '매니저' | '멤버' — teamRoleLabel 에서 온다. */
+  role: string;
+  /** 배지는 팀장·매니저만. 멤버는 기본 상태라 배지 없이 둔다. */
+  roleTone?: 'owner' | 'manager';
+  meta: string;
+  jerseyNumber?: number | null;
+  profileHref?: string;
+  actions: TeamMemberAction[];
+  actionPending?: boolean;
+};
+
 export type TeamMembersViewModel = {
   teamName: string;
   /** Live viewer role from the team detail response; absent only in the loading fallback. */
@@ -200,25 +227,8 @@ export type TeamMembersViewModel = {
   selfNotice?: ReactNode;
   /** 역할 변경·내보내기가 서버에서 거절됐을 때의 이유. 목록 위에 뜨고 화면으로 끌어온다. */
   actionError?: string | null;
-  members: Array<{
-    name: string;
-    role: string;
-    meta: string;
-    profileHref?: string;
-    manageLabel?: string;
-    locked?: boolean;
-    /** disabledReason 이 있으면 버튼을 비활성으로 두고 그 이유를 버튼 아래에 보여준다. */
-    actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
-    actionPending?: boolean;
-    /** 본인 행에만 노출되는 "팀 나가기" 버튼. owner는 소유권 이전 전까지 disabled + 툴팁. */
-    selfLeave?: {
-      disabled: boolean;
-      disabledReason?: string;
-      pending?: boolean;
-      error?: string | null;
-      onSelect: () => void;
-    };
-  }>;
+  members: TeamMemberRowModel[];
+  membersLoading?: boolean;
   requests: Array<{
     id: string;
     name: string;

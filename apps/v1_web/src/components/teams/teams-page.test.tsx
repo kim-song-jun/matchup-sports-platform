@@ -56,7 +56,7 @@ function render(ui: ReactElement) {
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-function mockOwnerMembersPage(activeOwnerCount: number) {
+function mockOwnerMembersPage(activeOwnerCount: number, { memberCount = activeOwnerCount, managerCount = 0 }: { memberCount?: number; managerCount?: number } = {}) {
   const leaveMutate = vi.fn();
   teamApiMocks.useV1TeamDetail.mockReturnValue({
     data: {
@@ -84,7 +84,7 @@ function mockOwnerMembersPage(activeOwnerCount: number) {
           canRemove: false,
         },
       ],
-      summary: { ownerCount: activeOwnerCount, managerCount: 0, memberCount: activeOwnerCount },
+      summary: { ownerCount: activeOwnerCount, managerCount, memberCount },
       viewerRole: 'owner',
       pageInfo: { nextCursor: null, hasNext: false },
     },
@@ -561,8 +561,12 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
   });
 });
 
-describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
-  it('일반 멤버는 관리자 문구·가입 신청 탭·비활성 관리 버튼 없이 본인 탈퇴만 본다', () => {
+describe('TeamMembersPageView — 멤버 행과 ⋯ 시트 (H2 A-1·A-2)', () => {
+  function memberRow(index: number, extra: Partial<TeamMembersViewModel['members'][number]> = {}): TeamMembersViewModel['members'][number] {
+    return { id: `m-${index}`, name: `선수${String(index).padStart(2, '0')}`, role: '멤버', meta: '가입 2026. 09. 30.', actions: [], ...extra };
+  }
+
+  it('일반 멤버는 권한 안내·가입 신청 탭 없이 멤버 목록만 보고, 동작이 없는 행에는 ⋯ 가 없다', () => {
     const base = getTeamMembersViewModel();
     const model: TeamMembersViewModel = {
       ...base,
@@ -574,14 +578,8 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
         { key: 'invitations', label: '초대', count: 2, onSelect: vi.fn() },
       ],
       members: [
-        { name: '김도윤', role: '팀장', meta: '가입 2024.03', actions: [] },
-        {
-          name: '이하나',
-          role: '멤버',
-          meta: '가입 2024.05',
-          actions: [],
-          selfLeave: { disabled: false, pending: false, onSelect: vi.fn() },
-        },
+        { id: 'm-owner', name: '김도윤', role: '팀장', roleTone: 'owner', meta: '가입 2024.03', actions: [] },
+        memberRow(1, { name: '이하나', actions: [{ key: 'leave', label: '팀 나가기', risky: true, destructive: true, onSelect: vi.fn() }] }),
       ],
     };
 
@@ -589,57 +587,110 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: '성수 러너스 FC · 멤버 목록' })).toBeInTheDocument();
     expect(screen.queryByText(/확인 창을 거쳐요/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^가입 신청/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^초대/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '관리' })).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: '멤버 탭 선택' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '팀 나가기' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '김도윤 관리' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이하나 관리' })).toBeEnabled();
+    // 팀장만 배지를 달고, 기본 역할인 멤버는 배지가 없다.
+    expect(screen.getByText('팀장')).toHaveClass('tm-badge');
+    expect(screen.queryByText('멤버', { selector: '.tm-badge' })).toBeNull();
   });
 
-  it('본인 행에만 "팀 나가기" 버튼이 보이고 클릭 시 onSelect가 호출된다', () => {
-    const onSelect = vi.fn();
-    const base = getTeamMembersViewModel();
+  it('⋯ 시트는 되돌리기 어려운 동작을 소제목 아래로 떼고, 고르면 시트를 닫고 동작을 부른다', () => {
+    const onRemove = vi.fn();
+    const onDemote = vi.fn();
     const model: TeamMembersViewModel = {
-      ...base,
+      ...getTeamMembersViewModel(),
       members: [
-        { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
-        {
-          name: '이하나',
-          role: '멤버',
-          meta: 'MF · 최근 4경기',
-          actions: [],
-          selfLeave: { disabled: false, pending: false, onSelect },
-        },
+        memberRow(1, {
+          name: '박서준',
+          role: '매니저',
+          roleTone: 'manager',
+          meta: '7번 · 가입 2026. 09. 30.',
+          actions: [
+            { key: 'remove', label: '팀에서 내보내기', risky: true, destructive: true, onSelect: onRemove },
+            { key: 'demote', label: '멤버로 내리기', description: '매니저 권한이 없어져요', onSelect: onDemote },
+          ],
+        }),
       ],
     };
 
     render(<TeamMembersPageView model={model} />);
+    fireEvent.click(screen.getByRole('button', { name: '박서준 관리' }));
 
-    const leaveButtons = screen.getAllByRole('button', { name: '팀 나가기' });
-    // 본인(이하나) 행에만 1개만 렌더된다 — 김도윤 행에는 selfLeave가 없으므로 버튼 없음
-    expect(leaveButtons).toHaveLength(1);
+    const sheet = screen.getByRole('dialog', { name: '박서준' });
+    expect(within(sheet).getByText('매니저 · 7번 · 가입 2026. 09. 30.')).toBeInTheDocument();
+    const labels = within(sheet).getAllByRole('button').map((button) => button.textContent);
+    // 닫기 · 위험하지 않은 동작 · (소제목) · 위험 동작 순서
+    expect(labels.slice(1)).toEqual(['멤버로 내리기매니저 권한이 없어져요', '팀에서 내보내기']);
+    const heading = within(sheet).getByText('되돌리기 어려운 동작');
+    expect(heading.compareDocumentPosition(within(sheet).getByRole('button', { name: '팀에서 내보내기' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(within(sheet).getByRole('button', { name: /멤버로 내리기/ })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
 
-    fireEvent.click(leaveButtons[0]);
-    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(sheet).getByRole('button', { name: '팀에서 내보내기' }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: '박서준' })).toBeNull();
   });
 
-  it('단독 owner는 active owner 요약에 따라 "팀 나가기"가 비활성화된다', () => {
+  it('검색은 멤버가 8명부터 생기고, 이름 일부나 등번호로 찾는다', () => {
+    const seven = Array.from({ length: 7 }, (_, index) => memberRow(index + 1));
+    const first = render(<TeamMembersPageView model={{ ...getTeamMembersViewModel(), members: seven }} />);
+    expect(screen.queryByRole('searchbox', { name: '멤버 검색' })).toBeNull();
+    expect(screen.getByText('멤버 7명')).toBeInTheDocument();
+
+    const eight = [...seven, memberRow(8, { name: '골키퍼김', jerseyNumber: 12, meta: '12번 · 가입 2026. 09. 30.' })];
+    first.unmount();
+    render(<TeamMembersPageView model={{ ...getTeamMembersViewModel(), members: eight }} />);
+    const search = screen.getByRole('searchbox', { name: '멤버 검색' });
+
+    fireEvent.change(search, { target: { value: '12번' } });
+    expect(screen.getByText('검색 결과 1명')).toBeInTheDocument();
+    expect(screen.getByText('골키퍼김')).toBeInTheDocument();
+    expect(screen.queryByText('선수01')).toBeNull();
+
+    fireEvent.change(search, { target: { value: '선수0' } });
+    expect(screen.getByText('검색 결과 7명')).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '없는사람' } });
+    expect(screen.getByText('‘없는사람’에 맞는 멤버가 없어요.')).toBeInTheDocument();
+  });
+});
+
+describe('TeamMembersPageClient — 팀 나가기 (self-leave)', () => {
+  it('팀장 혼자 남은 팀이면 나가기 항목을 두지 않는다 — 이유는 혼자 남은 팀장 카드(H3)가 한 번만 말한다', () => {
     mockOwnerMembersPage(1);
 
     render(<TeamMembersPageClient teamId="team-1" />);
 
-    const button = screen.getByRole('button', { name: /팀 나가기/ });
+    expect(screen.queryByRole('button', { name: '김도윤 관리' })).toBeNull();
+    expect(screen.queryByText(/넘겨야/)).not.toBeInTheDocument();
+  });
+
+  it('다른 멤버가 있는 단독 팀장은 "팀 나가기"가 비활성이고, 매니저가 없으면 지정부터 하라고 알려 준다', () => {
+    mockOwnerMembersPage(1, { memberCount: 3, managerCount: 0 });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+
+    const button = within(screen.getByRole('dialog', { name: '김도윤' })).getByRole('button', { name: /팀 나가기/ });
     expect(button).toBeDisabled();
-    // 이유는 aria-label 이 아니라 화면에 보이는 문장이고, 버튼이 그 문장을 설명으로 가리킨다.
-    const reason = screen.getByText(/팀장을 매니저에게 넘겨야 나갈 수 있어요/);
-    expect(reason).toBeVisible();
-    expect(button).toHaveAccessibleDescription(reason.textContent ?? '');
+    expect(button).toHaveTextContent('팀을 나가려면 먼저 매니저에게 팀장을 넘겨야 해요. 멤버 한 명을 매니저로 지정한 뒤 넘겨 주세요.');
+  });
+
+  it('매니저가 있으면 넘기라는 말만 한다', () => {
+    mockOwnerMembersPage(1, { memberCount: 3, managerCount: 1 });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+
+    const button = within(screen.getByRole('dialog', { name: '김도윤' })).getByRole('button', { name: /팀 나가기/ });
+    expect(button).toHaveTextContent(/^팀 나가기팀을 나가려면 먼저 매니저에게 팀장을 넘겨야 해요\.$/);
   });
 
   it('나갈 수 있는 팀장에게는 비활성 이유를 보여주지 않는다', () => {
     mockOwnerMembersPage(2);
 
     render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
 
     expect(screen.queryByText(/넘겨야 나갈 수 있어요/)).not.toBeInTheDocument();
   });
@@ -648,12 +699,12 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     const leaveMutate = mockOwnerMembersPage(2);
 
     render(<TeamMembersPageClient teamId="team-1" />);
-
-    const button = screen.getByRole('button', { name: '팀 나가기' });
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+    const button = within(screen.getByRole('dialog', { name: '김도윤' })).getByRole('button', { name: '팀 나가기' });
     expect(button).toBeEnabled();
 
     fireEvent.click(button);
-    expect(screen.getByRole('dialog', { name: '팀 나가기' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '팀 나가기' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '나가기' }));
 
     await waitFor(() => expect(leaveMutate).toHaveBeenCalledWith(

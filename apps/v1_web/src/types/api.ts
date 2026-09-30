@@ -3809,8 +3809,22 @@ export type V1TournamentPlayer = {
   removedAt: string | null;
 };
 
+/**
+ * 팀 명단 조회(`GET …/registrations/:id/players`)의 선수 한 명.
+ * 팀장·매니저는 모든 행을, 일반 팀원은 본인 행만 개인정보를 받는다. 그 밖의 행은
+ * `realName`·`birthDateSnapshot`·`genderSnapshot` 이 `null` 이고 표시 이름은 `nickname` 이다.
+ * `eligibilityNote`(어드민 심사 메모)는 팀장·매니저 응답에만 값이 있다.
+ */
+export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {
+  realName: string | null;
+  /** 프로필이 없으면 null — 실명으로 대체하지 않는다. */
+  nickname: string | null;
+  /** false 면 이 행의 개인정보 세 필드는 "미입력"이 아니라 가려진 것이다. */
+  personalInfoVisible: boolean;
+};
+
 export type V1TournamentRosterResponse = {
-  players: V1TournamentPlayer[];
+  players: V1TournamentRosterPlayer[];
   belowMinimum: boolean;
 };
 

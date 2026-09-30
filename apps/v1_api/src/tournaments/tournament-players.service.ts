@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  V1TeamMembershipRole,
   V1TournamentGenderCategory,
   V1TournamentPlayer,
   V1TournamentRegistration,
@@ -50,6 +51,9 @@ import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/ros
  * **직접** 넘겨 카운터가 호출부 수와 1:1 이 되게 한다(Copilot 리뷰 지적).
  */
 
+/** 팀 명단 관리 권한 — 명단 편집과 선수 개인정보(실명·생년월일·성별) 열람이 같은 선에서 갈린다. */
+const ROSTER_MANAGEMENT_ROLES: readonly V1TeamMembershipRole[] = ['owner', 'manager'];
+
 /** 어드민 명단 CSV 의 선수 열 — 팀별·전체 CSV 가 같은 순서를 쓴다. */
 const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber';
 
@@ -69,7 +73,7 @@ export class TournamentPlayersService {
         teamId,
         userId,
         status: 'active',
-        role: { in: ['owner', 'manager'] },
+        role: { in: [...ROSTER_MANAGEMENT_ROLES] },
         team: { status: 'active', deletedAt: null },
       },
     });
@@ -99,7 +103,8 @@ export class TournamentPlayersService {
     return registration;
   }
 
-  private async assertTeamMember(teamId: string, userId: string) {
+  /** 활성 팀원이면 역할을 돌려준다. 역할에 따라 응답에 싣는 개인정보가 갈리기 때문이다. */
+  private async requireTeamMemberRole(teamId: string, userId: string): Promise<V1TeamMembershipRole> {
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: {
         teamId,
@@ -107,6 +112,7 @@ export class TournamentPlayersService {
         status: 'active',
         team: { status: 'active', deletedAt: null },
       },
+      select: { role: true },
     });
     if (!membership) {
       throw new ForbiddenException({
@@ -114,6 +120,7 @@ export class TournamentPlayersService {
         message: '팀에 속한 멤버만 선수 명단을 볼 수 있어요.',
       });
     }
+    return membership.role;
   }
 
   /**
@@ -187,9 +194,16 @@ export class TournamentPlayersService {
 
   // ─── 명단 조회 ────────────────────────────────────────────────────────────────
 
+  /**
+   * 팀 명단 조회. 활성 팀원이면 누구나 부르지만 **실명·생년월일·성별은 팀장·매니저와 본인 행에만**
+   * 실린다(팀원 목록이 본인 행만 예외로 여는 것과 같다). 그 밖의 행은 같은 키를 `null` 로 두고
+   * 표시 이름(`nickname`)을 준다. 화면이 "숨김"과 "미입력"을 가르도록 행마다 `personalInfoVisible`
+   * 을 내려준다. 어드민 심사 메모는 본인 행이어도 팀장·매니저에게만 실린다.
+   */
   async listPlayers(user: V1AuthUser, tournamentId: string, registrationId: string) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
-    await this.assertTeamMember(registration.teamId, user.id);
+    const viewerRole = await this.requireTeamMemberRole(registration.teamId, user.id);
+    const isManagement = ROSTER_MANAGEMENT_ROLES.includes(viewerRole);
 
     // 리그도 최소 인원(`minPlayers`)으로 미달 여부를 판정한다.
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
@@ -202,6 +216,7 @@ export class TournamentPlayersService {
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
       where: { registrationId, removedAt: null },
+      include: { user: { select: { profile: { select: { nickname: true } } } } },
       orderBy: { addedAt: 'asc' },
     });
 
@@ -210,8 +225,13 @@ export class TournamentPlayersService {
     const jerseyByPlayerId = await readJerseyNumbers(this.prisma, registrationId);
 
     return {
-      players: players.map((player) =>
-        this.serializePlayer(player, jerseyByPlayerId.get(player.id) ?? null),
+      players: players.map(({ user: playerUser, ...player }) =>
+        this.serializeRosterPlayer(
+          player,
+          jerseyByPlayerId.get(player.id) ?? null,
+          playerUser.profile?.nickname ?? null,
+          { personalInfo: isManagement || player.userId === user.id, reviewNote: isManagement },
+        ),
       ),
       belowMinimum: players.length < tournament.minPlayers,
     };
@@ -1034,6 +1054,28 @@ export class TournamentPlayersService {
       eligibilityNote: row.eligibilityNote ?? null,
       addedAt: row.addedAt.toISOString(),
       removedAt: row.removedAt?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * 팀 명단 조회용 직렬화. 숨길 때는 값만 `null` 로 둔다(같은 화면이 여러 응답을 한 타입으로
+   * 읽는다). `nickname` 은 공개 명단이 이미 쓰는 표시 이름이라 항상 싣는다.
+   */
+  private serializeRosterPlayer(
+    row: V1TournamentPlayer,
+    jerseyNumber: number | null,
+    nickname: string | null,
+    access: { personalInfo: boolean; reviewNote: boolean },
+  ) {
+    const player = this.serializePlayer(row, jerseyNumber);
+    return {
+      ...player,
+      ...(access.personalInfo
+        ? {}
+        : { realName: null, birthDateSnapshot: null, genderSnapshot: null }),
+      ...(access.reviewNote ? {} : { eligibilityNote: null }),
+      nickname,
+      personalInfoVisible: access.personalInfo,
     };
   }
 

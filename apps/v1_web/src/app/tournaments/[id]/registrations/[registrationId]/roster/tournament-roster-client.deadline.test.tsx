@@ -52,13 +52,27 @@ const useV1RemovePlayerMock = vi.mocked(useV1RemovePlayer);
 const PAST_DEADLINE = '2020-01-01T00:00:00.000Z';
 const FUTURE_DEADLINE = '2099-01-01T00:00:00.000Z';
 
+/** 일반 팀원이 받는 응답 — 실명·생년월일·성별이 서버에서 비워진다. */
+function memberViewPlayer(overrides: Record<string, unknown> = {}) {
+  return mockPlayer({
+    realName: null,
+    birthDateSnapshot: null,
+    genderSnapshot: null,
+    personalInfoVisible: false,
+    ...overrides,
+  });
+}
+
 function mockPlayer(overrides: Record<string, unknown> = {}) {
   return {
     id: 'player-1',
     jerseyNumber: null as number | null,
     userId: 'user-1',
-    realName: '홍길동',
-    birthDateSnapshot: '1995-03-15',
+    realName: '홍길동' as string | null,
+    nickname: '길동이' as string | null,
+    birthDateSnapshot: '1995-03-15' as string | null,
+    genderSnapshot: 'male' as const,
+    personalInfoVisible: true,
     eligibilityStatus: 'non_pro' as const,
     eligibilityNote: null,
     addedAt: '2026-01-01T00:00:00.000Z',
@@ -559,15 +573,23 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
 
   it('member 역할은 추가·수정·삭제 버튼이 전부 안 보이고, "팀장에게 요청"으로 안내한다', () => {
     mockTeam('member');
+    // 일반 팀원은 서버에서 실명이 없는 응답을 받는다 — 표시 이름은 닉네임이다.
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [memberViewPlayer()], belowMinimum: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
 
     render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
 
     expect(screen.getByText('팀장에게 요청')).toBeInTheDocument();
     expect(screen.getByText(/추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '길동이 수정' })).not.toBeInTheDocument();
     // 명단 자체(읽기)는 그대로 보인다 — 막는 건 쓰기뿐이다.
-    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('길동이')).toBeInTheDocument();
   });
 
   it.each(['owner', 'manager'] as const)('%s 역할은 기존과 동일하게 추가·수정 버튼이 보인다', (role) => {
@@ -603,6 +625,217 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
     // 팀 권한과 무관한 마감 정보는 조회 실패와 상관없이 그대로 보인다.
     expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
+  });
+});
+
+// 개인정보(F93): 서버가 일반 팀원 응답에서 남의 행의 실명·생년월일·성별을 비운다(본인 행은 남는다).
+// 화면은 그 빈 값을 "미입력"으로 읽지 않고 줄 자체를 그리지 않아야 하고, 팀장·매니저 화면은 그대로여야 한다.
+describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    useV1TournamentMock.mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+  });
+
+  function renderAs(
+    role: 'owner' | 'manager' | 'member',
+    response: { players: unknown[] },
+  ) {
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { belowMinimum: false, ...response },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    return render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+  }
+
+  it.each(['owner', 'manager'] as const)('%s 는 실명과 생년월일을 그대로 본다', (role) => {
+    renderAs(role, { players: [mockPlayer({ jerseyNumber: 7 })] });
+
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('1995.03.15')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+  });
+
+  it('일반 팀원은 닉네임·등번호·자격 상태만 보고 생년월일 줄은 그려지지 않는다', () => {
+    const { container } = renderAs('member', {
+      players: [memberViewPlayer({ jerseyNumber: 7 })],
+    });
+
+    expect(screen.getByText('길동이')).toBeInTheDocument();
+    expect(screen.getByLabelText('등번호 7번')).toBeInTheDocument();
+    expect(screen.getByText('아마추어')).toBeInTheDocument();
+    // "미입력"으로 대신 그리지 않는다 — 입력 여부가 아니라 가려진 값이다.
+    expect(screen.queryByText('미입력')).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\d{4}\.\d{2}\.\d{2}/);
+    expect(container.textContent).not.toContain('홍길동');
+  });
+
+  it('일반 팀원에게 닉네임이 없는 선수는 실명 대신 자리표시자로 그려진다', () => {
+    renderAs('member', {
+      players: [memberViewPlayer({ nickname: null })],
+    });
+
+    expect(screen.getByText('(탈퇴한 선수)')).toBeInTheDocument();
+  });
+
+  // 서버 계약: member 는 본인 행만 값이 있다. 남의 행에는 생년월일 줄이 없고 본인 행에는 있다.
+  it('일반 팀원은 본인 행의 생년월일만 보고 남의 행에는 생년월일 줄이 없다', () => {
+    const { container } = renderAs('member', {
+      players: [
+        memberViewPlayer({ id: 'player-other', userId: 'user-other' }),
+        mockPlayer({
+          id: 'player-own',
+          userId: 'user-own',
+          realName: '김본인',
+          nickname: '본인이',
+          birthDateSnapshot: '1990-01-02',
+          genderSnapshot: 'female',
+          personalInfoVisible: true,
+        }),
+      ],
+    });
+
+    expect(screen.getByText('김본인')).toBeInTheDocument();
+    expect(screen.getByText('1990.01.02')).toBeInTheDocument();
+    expect(screen.getByText('길동이')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('1995.03.15');
+    expect(container.textContent?.match(/\d{4}\.\d{2}\.\d{2}/g)).toHaveLength(1);
+  });
+
+  it('행에 personalInfoVisible 이 없으면(구버전 서버) 가린 쪽으로 그린다', () => {
+    const { container } = renderAs('owner', {
+      players: [mockPlayer({ personalInfoVisible: undefined })],
+    });
+
+    expect(container.textContent).not.toMatch(/\d{4}\.\d{2}\.\d{2}/);
+  });
+});
+
+// F98: 리그 참가 명단 화면이 리그 기간 대신 "일정 미정" 을, 리그 말투 대신 "대회" 를 말했다.
+// 종료 여부는 서버가 준 status 그대로 판정하고(진행 중이면 막지 않는다), 표시만 리그 말투로 한다.
+describe('TournamentRosterPageClient — 정규 리그 표시', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'member' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [memberViewPlayer()], belowMinimum: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+  });
+
+  // 시즌 종료일은 실제 시계와 무관하게 먼 미래/과거로 고정한다.
+  const SEASON_LEFT_END = '2099-11-30T14:59:59.999Z';
+  const SEASON_OVER_END = '2020-11-30T14:59:59.999Z';
+
+  function mockCompetition(
+    kind: 'regular_league' | 'regular_tournament',
+    status: string,
+    scheduledEndAt = '2026-11-30T14:59:59.999Z',
+  ) {
+    useV1TournamentMock.mockReturnValue({
+      data: {
+        kind,
+        status,
+        minPlayers: 5,
+        maxPlayers: 20,
+        rosterDeadlineAt: null,
+        // 리그 거울 행은 신청 마감이 없고 기간은 scheduledAt/scheduledEndAt 에 있다.
+        registrationDeadlineAt: kind === 'regular_league' ? null : '2099-01-01T00:00:00.000Z',
+        scheduledAt: '2026-09-29T15:00:00.000Z',
+        scheduledEndAt,
+      },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+  }
+
+  it('진행 중 리그: 리그 기간과 "진행 중" 이 보이고 종료·일정 미정 문구는 없다', () => {
+    mockCompetition('regular_league', 'in_progress');
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(screen.getByText('리그 기간')).toBeInTheDocument();
+    expect(screen.getByText('2026년 9월 30일 (수) ~ 2026년 11월 30일 (월)')).toBeInTheDocument();
+    expect(screen.getByText('진행 중')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('일정 미정');
+    expect(container.textContent).not.toContain('종료');
+    expect(container.textContent).not.toContain('대회 신청 마감');
+  });
+
+  it('시즌이 끝난 뒤 종료된 리그: 종료 안내는 남기되 "대회" 가 아니라 "리그" 로 말한다', () => {
+    mockCompetition('regular_league', 'completed', SEASON_OVER_END);
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(screen.getAllByText('리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('대회가');
+    expect(screen.getByText('리그 기간')).toBeInTheDocument();
+  });
+
+  it('시즌이 남았는데 종료된 리그: 모든 경기가 확정돼 종료 처리됐다는 이유를 말한다', () => {
+    mockCompetition('regular_league', 'completed', SEASON_LEFT_END);
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(
+      screen.getByText('모든 경기 결과가 확정돼 리그가 종료 처리됐어요. 더 이상 선수 명단을 수정할 수 없어요.'),
+    ).toBeInTheDocument();
+    expect(container.textContent).not.toContain('종료되었거나 취소돼');
+  });
+
+  it('대조군: 시즌이 남은 리그라도 취소됐으면 기존 리그 문구 그대로다', () => {
+    mockCompetition('regular_league', 'cancelled', SEASON_LEFT_END);
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(screen.getAllByText('리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('종료 처리됐어요');
+  });
+
+  it('대조군: 종료된 대회는 기존 "대회" 문구와 신청 마감 표시 그대로다', () => {
+    mockCompetition('regular_tournament', 'completed', SEASON_LEFT_END);
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getAllByText('대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length).toBeGreaterThan(0);
+    expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
+    expect(screen.queryByText('리그 기간')).not.toBeInTheDocument();
   });
 });
 

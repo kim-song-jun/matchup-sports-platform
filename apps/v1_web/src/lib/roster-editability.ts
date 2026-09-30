@@ -28,11 +28,27 @@ export function isTournamentRosterMutable(
   return tournament.kind === 'regular_league' && tournament.status === 'draft';
 }
 
-/** 명단을 못 고치는 이유를 사실대로 말한다 — 아직 공개 전인 대회를 "종료·취소"로 안내하지 않는다. */
-export function tournamentRosterClosedMessage(status: string | null | undefined): string {
+/**
+ * 명단을 못 고치는 이유를 사실대로 말한다 — 아직 공개 전인 대회를 "종료·취소"로 안내하지 않는다.
+ * 정규 리그(`kind === 'regular_league'`)는 "대회" 대신 "리그"라고 부른다.
+ *
+ * 리그는 모든 경기 결과가 확정되면 시즌 종료일 전에도 서버가 `completed` 로 자동 전이한다.
+ * 시즌이 남았는데 그냥 "종료"라고만 하면 진행 중으로 읽히므로, 그 경우에만 이유를 말한다.
+ */
+export function tournamentRosterClosedMessage(
+  status: string | null | undefined,
+  kind?: string | null,
+  seasonEndAt?: string | null,
+  nowMs: number = Date.now(),
+): string {
+  const isLeague = kind === 'regular_league';
+  if (isLeague && status === 'completed' && seasonEndAt && nowMs < new Date(seasonEndAt).getTime()) {
+    return '모든 경기 결과가 확정돼 리그가 종료 처리됐어요. 더 이상 선수 명단을 수정할 수 없어요.';
+  }
+  const subject = isLeague ? '리그' : '대회';
   return status === 'completed' || status === 'cancelled'
-    ? '대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'
-    : '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.';
+    ? `${subject}가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.`
+    : `${subject}가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.`;
 }
 
 export type RosterDeadlineState = {

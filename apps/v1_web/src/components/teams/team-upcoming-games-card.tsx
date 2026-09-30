@@ -123,9 +123,10 @@ const STATUS_COLOR: Record<StatusTone, string> = {
 
 function rosterStatus(game: V1TeamUpcomingGame): { text: string; tone: StatusTone } {
   if (game.competitionKind === 'FRIENDLY') {
+    // "참석명단 제출"은 할 일(버튼 이름)로도 읽혀 완료 상태가 흐렸다(L15) — 상태는 "제출 완료 / 제출 전".
     return game.lineupState === 'DONE'
-      ? { text: '참석명단 제출', tone: 'ok' }
-      : { text: '참석명단 미제출', tone: 'warn' };
+      ? { text: '참석명단 제출 완료', tone: 'ok' }
+      : { text: '참석명단 제출 전', tone: 'warn' };
   }
   if (game.rosterSummary === null) return { text: '참가 명단 확정 전', tone: 'muted' };
   return { text: formatRosterSummary(game.rosterSummary), tone: 'ok' };

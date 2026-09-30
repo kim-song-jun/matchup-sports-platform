@@ -91,7 +91,7 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 179 팀 A)', ()
 
     const friendly = within(row('성수FS'));
     expect(friendly.getByText('친선')).toBeInTheDocument();
-    expect(friendly.getByText('참석명단 미제출')).toBeInTheDocument();
+    expect(friendly.getByText('참석명단 제출 전')).toBeInTheDocument();
     expect(friendly.getByRole('link', { name: 'vs 성수FS 참석명단' })).toHaveAttribute('href', '/team-matches/tm-f/lineup');
     expect(friendly.queryByRole('link', { name: 'vs 성수FS 명단' })).toBeNull();
   });
@@ -108,7 +108,7 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 179 팀 A)', ()
       const link = within(row(opponent)).getByRole('link', { name: `vs ${opponent} 참석명단` });
       expect(link).toHaveClass('tm-btn-outline');
       // 미제출은 버튼 색이 아니라 상태 글자로 알린다.
-      expect(within(row(opponent)).getByText('참석명단 미제출')).toBeInTheDocument();
+      expect(within(row(opponent)).getByText('참석명단 제출 전')).toBeInTheDocument();
     }
   });
 
@@ -117,19 +117,19 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 179 팀 A)', ()
     render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters={false} />);
 
     expect(screen.getByText('10명 출전 · 1명 빠짐')).toBeInTheDocument();
-    expect(screen.getByText('참석명단 미제출')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 제출 전')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /명단$/ })).toBeNull();
     expect(screen.getAllByRole('link', { name: /전술$/ })).toHaveLength(3);
   });
 
-  it('제출한 친선은 "참석명단 제출", 명단이 확정 전인 대회 경기는 명단 버튼 없이 안내만', () => {
+  it('제출한 친선은 "참석명단 제출 완료", 명단이 확정 전인 대회 경기는 명단 버튼 없이 안내만', () => {
     show([
       game({ gameId: 'g-f', competitionKind: 'FRIENDLY', opponentName: '성수FS', rosterSummary: null, lineupState: 'DONE', teamMatchId: 'tm-f' }),
       game({ gameId: 'g-t', competitionKind: 'TOURNAMENT', opponentName: '번개FC', rosterSummary: null }),
     ]);
     render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters />);
 
-    expect(within(row('성수FS')).getByText('참석명단 제출')).toBeInTheDocument();
+    expect(within(row('성수FS')).getByText('참석명단 제출 완료')).toBeInTheDocument();
     const tournament = within(row('번개FC'));
     expect(tournament.getByText('참가 명단 확정 전')).toBeInTheDocument();
     // 기준 명단이 없으면 경기 명단 화면이 404 라 버튼을 내지 않는다.

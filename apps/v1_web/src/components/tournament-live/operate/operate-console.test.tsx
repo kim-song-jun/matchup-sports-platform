@@ -746,17 +746,38 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       });
     }
 
-    it('"전원 도착"은 누른 팀의 sideId 로 일괄 검인을 요청하고, 다른 팀은 건드리지 않는다', () => {
+    // 일괄 검인은 도착 시각을 여러 명에게 한꺼번에 남기고 일괄로 되돌리는 길이 없다 — 눌러서 바로 나가지 않는다.
+    it('"전원 도착"은 몇 명이 표시되는지 묻는 확인을 거친 뒤에야 누른 팀의 sideId 로 일괄 검인을 요청한다', async () => {
       mocks.confirmSideArrival.mockClear();
       scheduledWithRosters();
       render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
       fireEvent.click(screen.getByRole('button', { name: '성수 풋살 클럽 전원 도착 확인' }));
 
-      expect(mocks.confirmSideArrival).toHaveBeenCalledTimes(1);
+      const dialog = await screen.findByRole('dialog', { name: '성수 풋살 클럽 1명을 도착으로 표시할까요?' });
+      expect(mocks.confirmSideArrival).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '전원 도착' }));
+
+      await waitFor(() => expect(mocks.confirmSideArrival).toHaveBeenCalledTimes(1));
       expect(mocks.confirmSideArrival.mock.calls[0][0]).toBe('side-away');
-      // 기본값은 전원 미확인 — 버튼을 누르기 전에 도착으로 그려지는 사람이 없다.
+      // 기본값은 전원 미확인 — 다른 팀은 건드리지 않는다.
       expect(screen.getByRole('switch', { name: /홈선수1/ })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('확인 창에서 취소하면 아무도 도착으로 표시되지 않는다', async () => {
+      mocks.confirmSideArrival.mockClear();
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '성수 풋살 클럽 전원 도착 확인' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      // 확인 결과는 오버레이 히스토리가 정리된 뒤에 전달된다 — 그 뒤까지 흘려보내고 나서도 호출이 없어야 한다.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      });
+      expect(mocks.confirmSideArrival).not.toHaveBeenCalled();
     });
 
     it('경기 시작 전 콘솔은 "킥오프 준비"로 팀별 명단 요약과 도착 확인을 한 자리에 보인다', () => {

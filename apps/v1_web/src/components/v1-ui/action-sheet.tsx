@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useId, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { overlayLinkClick } from '@/lib/overlay-history';
 import { useModalA11y } from './use-modal-a11y';
 
 interface ActionSheetActionBase {
@@ -46,10 +48,11 @@ const ROW_CLASS =
  *
  * 열림은 URL 이 아니라 부모의 로컬 상태가 소유한다(그래서 URL 이 소유하는 `BottomSheet` 가
  * 아니라 다른 상태 기반 시트들처럼 `useModalA11y` 를 쓴다). 동작을 고르면 부모가 시트를 먼저
- * 닫아야 뒤이어 뜨는 확인 창과 겹치지 않는다 — 링크 항목은 이동하며 시트가 사라진다.
+ * 닫아야 뒤이어 뜨는 확인 창과 겹치지 않는다 — 링크 항목은 `overlayLinkClick` 으로 이동하며 시트가 닫힌다.
  */
 export function ActionSheet({ open, title, actions, onClose }: ActionSheetProps) {
   const titleId = useId();
+  const pathname = usePathname();
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
 
   if (!open) return null;
@@ -86,7 +89,9 @@ export function ActionSheet({ open, title, actions, onClose }: ActionSheetProps)
           {actions.map((action) => (
             <li key={action.key}>
               {action.href !== undefined ? (
-                <Link href={action.href} className={ROW_CLASS}>
+                // 오버레이 안 링크는 일반 push 가 아니라 이 경로로 이동한다 — 시트의 뒤로가기 표식 항목이 새
+                // 페이지 앞에 남아 다음 뒤로가기가 죽은 정류장에 서는 것을 막는다.
+                <Link href={action.href} className={ROW_CLASS} onClick={overlayLinkClick(action.href, pathname ?? '', onClose)}>
                   <ActionLabel action={action}>{action.description}</ActionLabel>
                 </Link>
               ) : (

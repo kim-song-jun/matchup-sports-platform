@@ -6,6 +6,7 @@ import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primit
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
 import { cssUrl } from '@/lib/assets';
+import { useKeepTappedItemInPlace } from './review-scroll-anchor';
 import { REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewMetricDraft, ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import {
@@ -522,6 +523,9 @@ function ReviewPlayerItem({
   target: ReviewTargetViewModel;
 }) {
   const panelId = useId();
+  const itemRef = useRef<HTMLDivElement>(null);
+  // 위쪽 선수 패널이 접히면 이 행이 화면에서 밀려나므로, 누른 자리에 그대로 두도록 스크롤을 보정한다.
+  const keepInPlace = useKeepTappedItemInPlace(open);
   const locked = isTargetLocked(target);
   const status = reviewDraftStatus(draft);
   const hasInput = !locked && status !== 'empty';
@@ -554,6 +558,7 @@ function ReviewPlayerItem({
 
   return (
     <div
+      ref={itemRef}
       className={open ? `tm-review-player tm-card tm-review-target-card${hasInput ? ' tm-review-target-active' : ''}` : 'tm-review-player'}
       data-open={open}
     >
@@ -562,7 +567,10 @@ function ReviewPlayerItem({
         aria-expanded={open}
         className="tm-list-row tm-review-player-row"
         data-state={rowState}
-        onClick={onToggle}
+        onClick={() => {
+          keepInPlace(itemRef.current);
+          onToggle();
+        }}
         type="button"
       >
         <Avatar imageUrl={target.imageUrl} initials={target.initials} size={36} />

@@ -87,6 +87,8 @@ describe('RecordConsentSettingsPageClient', () => {
     // 서버는 끄는 즉시 연결된 모든 기록을 비공개로 돌린다(새 경기부터가 아니다) -- 문구가 그 동작을 말한다.
     expect(screen.getByText(/끄면 바로 모두 비공개로 돌아가요/)).toBeInTheDocument();
     expect(screen.queryByText(/새 경기부터/)).not.toBeInTheDocument();
+    // 활동 기록 KPI·득점 목록에는 도움도 나온다 -- 무엇이 공개되는지 말하는 각주가 빠뜨리면 안 된다.
+    expect(screen.getByText(/득점, 도움, 경고·퇴장/)).toBeInTheDocument();
   });
 
   it('저장에 실패하면 조용히 넘어가지 않고 이유를 알린다', async () => {

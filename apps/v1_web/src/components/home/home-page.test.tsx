@@ -177,3 +177,50 @@ describe('HomePageView back-navigation from=/home', () => {
     expect(link).toHaveAttribute('href', '/tournaments/tour-1?from=%2Fhome');
   });
 });
+
+describe('HomePageView — 맨 위 "다음 경기" 자리 (Task 180 G7)', () => {
+  const nextGame = {
+    gameId: 'game-1',
+    teamMatchId: 'tm-1',
+    competitionKind: 'LEAGUE' as const,
+    competitionId: 'league-1',
+    title: '마포 주말 리그 1주차',
+    opponentName: '합정 유나이티드',
+    scheduledAt: '2099-01-01T10:00:00.000Z',
+    placeName: null,
+    teamId: 'team-a',
+    teamName: '마포 FC',
+    viewerCanManage: false,
+    viewerParticipating: true,
+    participantCount: 10,
+  };
+
+  it('다음 경기가 있으면 그 카드를 그리고 빈 상태는 없다', () => {
+    render(<HomePageView model={buildModel({ teamActivity: { hasTeam: true, nextGame } })} />);
+    expect(screen.getByRole('heading', { name: 'vs 합정 유나이티드' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '먼저 해 볼 일' })).not.toBeInTheDocument();
+  });
+
+  it('팀이 없는 새 가입자에게는 같은 자리가 "먼저 해 볼 일" — 팀 만들기·팀 찾기·매치 둘러보기', () => {
+    render(<HomePageView model={buildModel({ teamActivity: { hasTeam: false, nextGame: null } })} />);
+    const starter = screen.getByRole('region', { name: '먼저 해 볼 일' });
+    expect(starter).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '팀 만들기' })).toHaveAttribute('href', '/teams/new');
+    expect(screen.getByRole('link', { name: '팀 찾기' })).toHaveAttribute('href', '/teams');
+    expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
+  });
+
+  it('팀은 있고 잡힌 경기가 없으면 아무것도 그리지 않는다(빈 상태는 새 가입자 전용)', () => {
+    render(<HomePageView model={buildModel({ teamActivity: { hasTeam: true, nextGame: null } })} />);
+    expect(screen.queryByRole('region', { name: '먼저 해 볼 일' })).not.toBeInTheDocument();
+    expect(screen.queryByText('다음 경기')).not.toBeInTheDocument();
+  });
+
+  it('서버가 팀 정보를 계산하지 못했거나(null) 로그아웃 상태면 "팀 없음"으로 읽지 않는다', () => {
+    const { rerender } = render(<HomePageView model={buildModel({ teamActivity: null })} />);
+    expect(screen.queryByRole('region', { name: '먼저 해 볼 일' })).not.toBeInTheDocument();
+
+    rerender(<HomePageView model={buildModel({ signedOut: true, teamActivity: { hasTeam: false, nextGame: null } })} />);
+    expect(screen.queryByRole('region', { name: '먼저 해 볼 일' })).not.toBeInTheDocument();
+  });
+});

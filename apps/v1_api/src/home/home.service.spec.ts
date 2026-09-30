@@ -1,5 +1,9 @@
 import { HomeService } from './home.service';
 
+const teamActivityService = {
+  forUser: jest.fn().mockResolvedValue({ hasTeam: false, nextGame: null }),
+} as never;
+
 describe('HomeService', () => {
   it('추천 매치는 경기 전이면서 신청 마감이 지나지 않은 모집 행만 조회한다', async () => {
     const prisma = {
@@ -7,7 +11,7 @@ describe('HomeService', () => {
       v1Notice: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
-    const service = new HomeService(prisma as never, popupsService as never);
+    const service = new HomeService(prisma as never, popupsService as never, teamActivityService);
 
     await service.getRecommendations(null, {});
 
@@ -41,7 +45,7 @@ describe('HomeService', () => {
         publishedAt,
       }),
     };
-    const service = new HomeService(prisma as never, popupsService as never);
+    const service = new HomeService(prisma as never, popupsService as never, teamActivityService);
 
     const result = await service.getHome(null, {});
 
@@ -86,7 +90,7 @@ describe('HomeService', () => {
       v1Notice: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
-    const service = new HomeService(prisma as never, popupsService as never);
+    const service = new HomeService(prisma as never, popupsService as never, teamActivityService);
 
     const result = await service.getHome(null, {});
 
@@ -119,7 +123,7 @@ describe('HomeService', () => {
       v1UserProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
-    const service = new HomeService(prisma as never, popupsService as never);
+    const service = new HomeService(prisma as never, popupsService as never, teamActivityService);
 
     await service.getHome({ id: 'user-1' } as never, {} as never);
 

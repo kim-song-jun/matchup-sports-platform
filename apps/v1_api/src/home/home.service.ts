@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { PopupsService } from '../popups/popups.service';
+import { HomeTeamActivityService } from './home-team-activity.service';
 import { HomeQueryDto, HomeRecommendationsQueryDto } from './dto/home-query.dto';
 
 @Injectable()
@@ -10,10 +11,11 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly popupsService: PopupsService,
+    private readonly teamActivityService: HomeTeamActivityService,
   ) {}
 
   async getHome(user: V1AuthUser | null, query: HomeQueryDto) {
-    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute] =
+    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute, teamActivity] =
       await Promise.all([
         this.getViewer(user),
         this.getSummary(user),
@@ -22,6 +24,7 @@ export class HomeService {
         this.getRecentNotices(),
         this.getUnreadCount(user),
         this.getMyTeamRoute(user),
+        this.teamActivityService.forUser(user),
       ]);
 
     const featured = recommendations[0] ?? null;
@@ -29,6 +32,7 @@ export class HomeService {
     return {
       viewer,
       summary,
+      teamActivity,
       featuredMatch: featured
         ? {
             matchId: featured.matchId,

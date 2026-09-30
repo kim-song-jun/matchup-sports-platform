@@ -4,6 +4,8 @@ import { Eye, ShieldAlert, X } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
+import { HomeStarterCard } from './home-starter-card';
+import { NextGameCard } from './next-game-card';
 import {
   ChatIcon,
   ChevronRightIcon,
@@ -93,6 +95,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
               0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
           <div className="tm-home-banner-slot">
+            {/* 다음 경기는 유도 배너 예산 밖이다 -- 배너가 아니라 오늘의 정보라 조건이 맞으면 항상 맨 위에
+                온다. 팀이 없는 새 가입자에게는 같은 자리가 "먼저 해 볼 일"이 된다. */}
+            {model.teamActivity?.nextGame ? <NextGameCard game={model.teamActivity.nextGame} /> : null}
+            {!dash && model.teamActivity?.hasTeam === false ? <HomeStarterCard /> : null}
             {/* Task 154 P2-1: 조건이 맞아도 이번 방문에 선택된 유도 배너 하나만 렌더한다.
                 차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
                 밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.

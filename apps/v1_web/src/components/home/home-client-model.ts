@@ -59,6 +59,7 @@ export function toHomeModel(
     hasNewNotification: unreadCount > 0,
     chatUnreadCount,
     stats: normalizeStats(home),
+    teamActivity: home.teamActivity ?? null,
     featuredMatch: normalizeFeaturedMatch(home, recommendedMatches),
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),

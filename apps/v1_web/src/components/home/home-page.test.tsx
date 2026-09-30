@@ -89,7 +89,7 @@ function buildModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     popup: null,
     notices: [],
     bannerDecision: { showPhoneVerify: false, nudge: 'recordConsent', deferred: [] },
-    recordConsentNudge: { pendingCount: 2, saving: false, onGrant: vi.fn(), onDismiss: vi.fn() },
+    recordConsentNudge: { pendingCount: 2, mentionsRanking: false, saving: false, onGrant: vi.fn(), onDismiss: vi.fn() },
     ...overrides,
   };
 }
@@ -117,6 +117,33 @@ describe('HomePageView back-navigation from=/home', () => {
     render(<HomePageView model={buildModel()} />);
     const link = screen.getByRole('link', { name: '어떤 기록인지 보기' });
     expect(link).toHaveAttribute('href', '/my/settings/record-consent?from=%2Fhome');
+  });
+
+  it('shows the latest pending record in the record-consent nudge, and only promises what the user will actually get', () => {
+    const latestRecord = {
+      caption: '9/30 (수) · 마포 주말 리그',
+      result: 'WON' as const,
+      matchup: '마포 FC vs 합정 유나이티드',
+      stats: '내 기록 · 1골 · 1도움',
+    };
+    const nudge = { pendingCount: 2, saving: false, onGrant: vi.fn(), onDismiss: vi.fn() };
+    const { rerender } = render(
+      <HomePageView model={buildModel({ recordConsentNudge: { ...nudge, latestRecord, mentionsRanking: true } })} />,
+    );
+
+    expect(screen.getByText('2경기가 공개를 기다려요')).toBeInTheDocument();
+    expect(screen.getByText('9/30 (수) · 마포 주말 리그')).toBeInTheDocument();
+    expect(screen.getByText('승')).toBeInTheDocument();
+    expect(screen.getByText('마포 FC vs 합정 유나이티드')).toBeInTheDocument();
+    expect(screen.getByText('내 기록 · 1골 · 1도움')).toBeInTheDocument();
+    expect(screen.getByText('공개하면 프로필과 득점·도움 순위에 내 이름이 나와요.')).toBeInTheDocument();
+
+    // 순위에 오르지 않는 사람에게는 순위를 약속하지 않고, 기록 조회가 실패해도 배너는 한 줄 없이 뜬다.
+    rerender(<HomePageView model={buildModel({ recordConsentNudge: { ...nudge, mentionsRanking: false } })} />);
+    expect(screen.getByText('공개하면 프로필에 내 기록이 나와요.')).toBeInTheDocument();
+    expect(screen.queryByText(/득점·도움 순위/)).not.toBeInTheDocument();
+    expect(screen.queryByText('내 기록 · 1골 · 1도움')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '공개하기' })).toBeInTheDocument();
   });
 
   it('regression: does not omit from= when navigating away from home', () => {

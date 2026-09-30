@@ -192,6 +192,45 @@ export function resolveParticipantDisplayName(
   return profile.nickname;
 }
 
+/** 골에 붙는 도움(어시스트) 선수. 필드 의미는 이벤트의 득점자 필드와 같다 -- `null` 은 "가림"이다. */
+export interface PublicEventAssist {
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly profileHref: string | null;
+}
+
+/**
+ * 도움 선수를 득점자와 **같은 세 함수**(`resolveParticipantNameEligible` ->
+ * `resolveParticipantDisplayName` / `resolveParticipantProfileHref`)로 해석한다. 도움은 같은
+ * 이벤트 줄에 붙은 이름이라 득점자보다 더 보이거나 덜 보이면 안 된다 -- 규칙을 여기 한 곳에서
+ * 빌리지 않고 새로 쓰면 언젠가 갈린다. 참가자마다 자기 동의로 판정하므로 득점자가 가려져도
+ * 도움 선수의 이름은 그 선수 자신의 규칙을 따른다.
+ *
+ * 도움이 없는 골은 `null` 이다("도움 미기입"과 "가림"은 다른 사실이다).
+ */
+export function presentEventAssist(
+  assistParticipantId: string | null | undefined,
+  ctx: {
+    readonly participantById: ReadonlyMap<
+      string,
+      { userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }
+    >;
+    readonly consentMap: ReadonlyMap<string, ParticipantConsentEligibility>;
+    readonly nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>;
+    readonly isStaffBypass: boolean;
+  },
+): PublicEventAssist | null {
+  if (assistParticipantId === null || assistParticipantId === undefined) return null;
+  const participant = ctx.participantById.get(assistParticipantId);
+  const consent = ctx.consentMap.get(assistParticipantId);
+  const eligible = resolveParticipantNameEligible(ctx.isStaffBypass, consent);
+  return {
+    participantName: eligible ? resolveParticipantDisplayName(participant, ctx.nameProfileByUserId) : null,
+    jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+    profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
+  };
+}
+
 /** GOAL/CARD 이벤트의 `payload`에서 카드 색을 읽는다 -- 카드가 아니거나 색 정보가
  * 없는(과거 payload) 이벤트는 null. `buildEvents`/`loadScheduleEvents`/팀 전적
  * 이벤트 요약이 모두 이 파서를 공유한다. */

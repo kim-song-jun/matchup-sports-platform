@@ -575,6 +575,7 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
         opponentTeamName: '부산 FC',
         result: 'WON',
         goals: 1,
+        assists: 0,
         cards: { yellow: 0, red: 0 },
         minutesPlayed: 90,
         started: true,
@@ -999,8 +1000,8 @@ describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속',
         data={makeMatch({
           lineup: null, // 라인업 슬롯의 익명 라벨과 섞이지 않도록 이 테스트는 라인업을 비운다.
           events: [
-            { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, profileHref: null, period: 1, clockMs: 600_000 },
-            { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, profileHref: null, period: 1, clockMs: 900_000 },
+            { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, profileHref: null, period: 1, clockMs: 600_000 },
+            { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, profileHref: null, period: 1, clockMs: 900_000 },
           ],
         })}
       />,
@@ -1015,7 +1016,7 @@ describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속',
         data={makeMatch({
           lineup: null,
           events: [
-            { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, profileHref: null, period: 1, clockMs: 600_000 },
+            { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, profileHref: null, period: 1, clockMs: 600_000 },
           ],
         })}
       />,

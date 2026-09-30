@@ -1,4 +1,5 @@
 import type { HomeBannerDecision } from '@/lib/home-banner-policy';
+import type { PendingRecordLine } from '@/components/public-game-records/record-consent-preview';
 
 export type HomeMatchCard = {
   id: string;
@@ -110,13 +111,17 @@ export type HomeViewModel = {
    */
   bannerDecision: HomeBannerDecision;
   /**
-   * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3). undefined면 렌더하지 않는다.
+   * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3, Task 180 G9). undefined면 렌더하지 않는다.
    * 아직 응답한 적 없고, **켜면 실제로 공개될 기록이 있는** 사용자에게만 뜬다 --
    * 연결·공식확정이 안 끝난 사람에게 조르면 켜도 화면이 그대로라 신뢰만 잃는다.
    */
   recordConsentNudge?: {
     /** 지금 켜면 공개될 경기 수. 0이면 애초에 이 객체가 undefined 다. */
     pendingCount: number;
+    /** 가장 최근 공개 대기 기록. 기록 조회가 실패했으면 undefined -- 그때는 한 줄 없이 뜬다. */
+    latestRecord?: PendingRecordLine;
+    /** 공개하면 득점·도움 순위에 이름이 오르는 사람인지. 오르지 않는데 오른다고 말하지 않기 위한 값. */
+    mentionsRanking: boolean;
     saving: boolean;
     onGrant: () => void;
     onDismiss: () => void;

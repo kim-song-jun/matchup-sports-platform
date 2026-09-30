@@ -143,7 +143,7 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
     <div style={{ marginTop: 24 }}>
       {/* 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 제거했다. 작성자도 공개한다. */}
       <div className="tm-my-section-label">경기에서 받은 리뷰</div>
-      <div className="tm-text-caption" style={{ marginBottom: 12 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
+      <div className="tm-text-caption" style={{ marginBottom: 12 }}>상호 작성이 끝나거나 72시간이 지나면 보여요. 운영 평가는 바로 공개되며 참가자 평점과 별도예요.</div>
       {model.userGroups.length > 0 ? <ReceivedGroupSection groups={model.userGroups} title="내가 받은 리뷰" /> : null}
       {model.teamGroups.length > 0 ? (
         <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.teamGroups} title="내 팀이 받은 리뷰" /></div>
@@ -166,7 +166,9 @@ export function ReviewSourcePageView({
   onUpdateMetricScore,
   onUpdateRating,
   submitting,
+  admin = false,
 }: QueryStateProps & {
+  admin?: boolean;
   drafts: Record<string, ReviewTargetDraft>;
   message: string | null;
   model: ReviewSourcePageModel | null;
@@ -213,7 +215,7 @@ export function ReviewSourcePageView({
           </>
         ) : null}
       </div>
-      <div className="tm-fixed-cta">
+      <div className={admin ? 'mt-6' : 'tm-fixed-cta'}>
         {/* 별점은 기본값(5)으로 이미 채워져 있어서, 태그를 안 고른 사용자 눈에는 "다 했는데
             버튼만 회색"으로 보인다 — 태그 1개 이상은 서버 계약(SubmitReviewDto 의
             `@ArrayMinSize(1)`)이라 버튼을 풀어줄 수는 없으니, 왜 못 보내는지를 말해준다.

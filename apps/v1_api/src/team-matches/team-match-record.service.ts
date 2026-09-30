@@ -18,6 +18,7 @@ import {
   type ParticipantConsentEligibility,
 } from '../games/public-records/public-consent';
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
+import { platformMatchOperator } from './platform-match-operator';
 
 type Tx = Prisma.TransactionClient;
 export type SharedSubMatch = { id: string; title: string; order: number };
@@ -26,7 +27,7 @@ type Confirmation = { sideId: string; userId: string; name: string; at: string }
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const conflict = (code: string, message: string) => new ConflictException({ code, message });
 const include = {
-  teamMatch: { select: { id: true, title: true, status: true, startAt: true, deletedAt: true, hostTeamId: true, approvedApplicantTeamId: true, leagueId: true, tournamentId: true } },
+  teamMatch: { select: { id: true, title: true, status: true, startAt: true, deletedAt: true, hostTeamId: true, approvedApplicantTeamId: true, leagueId: true, tournamentId: true, platformManaged: true } },
   sides: true,
   lineups: { orderBy: { revision: 'desc' as const } },
   participants: true,
@@ -131,7 +132,9 @@ export class TeamMatchRecordService {
       select: { participantId: true },
     });
     const entries = roster.filter((p) => p.userId === user.id || (!p.userId && links.some((link) => link.participantId === p.id)));
-    return entries.length === 1 ? entries[0] : null;
+    if (entries.length === 1) return { ...entries[0], operator: false as const, adminId: null };
+    const admin = await platformMatchOperator(tx, user, game.teamMatch!);
+    return admin ? { sideId: null, displayNameSnapshot: 'Teameet 운영', operator: true as const, adminId: admin.id } : null;
   }
 
   /**
@@ -216,7 +219,7 @@ export class TeamMatchRecordService {
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
-      canEdit: !!actor && phase === 'live' && readiness.lineupReady, participant: !!actor, ownSideId,
+      canEdit: !!actor && phase === 'live' && readiness.lineupReady, participant: !!actor && !actor.operator, operator: actor?.operator ?? false, ownSideId,
       ...readiness,
       sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
@@ -238,7 +241,10 @@ export class TeamMatchRecordService {
         throw conflict('ROSTER_INCOMPLETE', '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.');
       }
       const actor = await this.actor(tx, game, user);
-      if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자만 기록할 수 있어요.' });
+      if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자와 플랫폼 주관 경기의 운영자만 기록할 수 있어요.' });
+      if (actor.operator && (dto.action === 'confirm' || dto.action === 'reopen')) {
+        throw new ForbiddenException({ code: 'TEAM_CONFIRMATION_REQUIRED', message: '경기 종료 확인은 양 팀 참가자가 직접 진행해 주세요.' });
+      }
       const payloadHash = canonicalGameCommandPayloadHash(dto);
       const replay = await tx.v1TeamMatchRecordChange.findUnique({ where: { gameId_commandId: { gameId: game.id, commandId: dto.commandId } } });
       if (replay) {
@@ -259,7 +265,7 @@ export class TeamMatchRecordService {
 
       if (dto.action === 'confirm') {
         if (confirmations.some((c) => c.sideId === actor.sideId)) throw conflict('ALREADY_CONFIRMED', '우리 팀은 이미 종료를 확인했어요.');
-        confirmations.push({ sideId: actor.sideId, userId: user.id, name: actor.displayNameSnapshot, at: new Date().toISOString() });
+        confirmations.push({ sideId: actor.sideId!, userId: user.id, name: actor.displayNameSnapshot, at: new Date().toISOString() });
       } else if (dto.action === 'reopen') {
         confirmations = [];
       } else {
@@ -324,6 +330,10 @@ export class TeamMatchRecordService {
       await tx.v1TeamMatchRecordChange.create({ data: {
         gameId: game.id, version, commandId: dto.commandId, payloadHash, actorUserId: user.id, actorName: actor.displayNameSnapshot,
         action: dto.action, goalId, subMatchId, before: before ? json(before) : Prisma.JsonNull, after: after ? json(after) : Prisma.JsonNull,
+      } });
+      if (actor.operator) await tx.v1AdminActionLog.create({ data: {
+        adminUserId: actor.adminId!, action: 'team_match.record', targetType: 'team_match', targetId: teamMatchId,
+        beforeJson: { version: version - 1 }, afterJson: { version, action: dto.action, commandId: dto.commandId },
       } });
       if (official) await this.officialize(tx, game, goals, subMatches, confirmations, user.id);
       else await tx.v1Game.update({ where: { id: game.id }, data: { state: 'LIVE', version: { increment: 1 } } });

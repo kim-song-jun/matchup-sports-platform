@@ -70,6 +70,24 @@ export async function loadCompetitionRosterBase(
   };
 }
 
+/**
+ * 등번호 원본 = 확정된 참가 신청. 기준 명단이 참가 명단(`REGISTRATION`)이고 뷰어가 그 팀의 팀장·매니저일 때만 id 를 준다 —
+ * 등번호 저장 API(`PATCH …/players/:playerId/jersey-number`)의 권한과 같아서, 열어 줘도 저장이 403 이 되는 사람에게는 주지 않는다.
+ * 기준 명단을 읽는 쿼리(`loadCompetitionRosterBase`)와 같은 조건으로 찾는다.
+ */
+export async function loadJerseyRegistrationId(
+  tx: Tx,
+  scope: CompetitionTeamScope,
+  input: { baseSource: GameRosterBaseSource; isTeamManager: boolean },
+): Promise<string | null> {
+  if (!input.isTeamManager || input.baseSource !== 'REGISTRATION') return null;
+  const registration = await tx.v1TournamentRegistration.findFirst({
+    where: { tournamentId: scope.competitionId, teamId: scope.teamId, status: 'confirmed' },
+    select: { id: true },
+  });
+  return registration?.id ?? null;
+}
+
 /** 명단 화면·요약·계산 목록이 이 순서를 그대로 쓴다 — 규칙은 `compareRosterOrder` 한 곳에 있다. */
 function rosterOrder(a: GameRosterBaseEntry, b: GameRosterBaseEntry): number {
   return compareRosterOrder(

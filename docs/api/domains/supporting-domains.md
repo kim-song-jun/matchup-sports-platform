@@ -1,5 +1,18 @@
 # Domain Contract — Supporting Domains
 
+## 플랫폼 팀매치 운영 리뷰 (Task 149, 2026-09-30)
+
+- 기존 리뷰 source/submit DTO의 `sourceType`에 `platform_team_match` 추가:
+  `GET /reviews/sources/platform_team_match/:sourceId`, `POST /reviews`.
+- 두 엔드포인트는 V1AuthGuard 후 서비스에서 해당 매치의 `platformManaged`, 독립 친선 범위, active·미회수 owner/ops와 연결 계정 상태를 재검증한다. 일반 사용자·support는 403 `PLATFORM_OPERATOR_REQUIRED`.
+- `completed` + current official revision `OFFICIAL` + completedAt 필수(409 `SOURCE_NOT_COMPLETED`). 기존 관리자 설정 리뷰 기간을 적용(410 `REVIEW_WINDOW_CLOSED`).
+- 대상은 양 팀과 최신 유효 제출 라인업에서 실제 계정으로 해석되는 선수. 자기 자신·비출전자·연결되지 않은 게스트는 불가(403 `TARGET_NOT_REVIEWABLE`). 기존 rating/tags/개인 4항목 DTO 검증을 유지한다.
+- 매치/대상별 플랫폼 전체 1건: 게임 잠금 및 서버가 생성하는 `platformReviewKey = matchId:targetType:targetId`의 DB unique index로 어드민 간 중복·동시 제출을 방지한다. 재제출은 기존 결과와 `alreadySubmitted: true` 반환. 숨김/삭제된 리뷰도 중복 제한을 유지한다.
+- `GET /reviews/received`에 바로 공개한다. 작성자는 `{userId:null,name:"Teameet 운영",imageUrl:null}`; 실제 작성자는 DB와 관리자 감사 로그에 보관한다.
+- 운영 리뷰는 별도 source이며 기존 상호 리뷰, reciprocal reveal, 개인/팀 평판·요약에는 영향을 주지 않는다. 운영 권한만으로 어드민이 평가 대상으로 추가되지 않는다.
+- 작성 내역은 관리자 매치 리뷰 화면에서 확인한다. 일반 `tab=written`에는 운영 리뷰를 섞지 않는다. 기존 관리자 리뷰 hide/unhide 경로를 그대로 사용할 수 있다.
+- 마이그레이션은 enum 확장 후 nullable unique scope column을 추가한다. 기존 행은 NULL이며 변환·삭제가 없다. 이전 앱의 쓰기 계약을 제한하지 않는 additive 변경이다.
+
 ## 범위
 
 낮은 호출 빈도지만 프론트 통합 시 누락되기 쉬운 지원 도메인 계약을 정리한다.
@@ -44,6 +57,9 @@
     방장이 `hostParticipates=false`로 직접 참가하지 않았더라도 방장은 참가자를 평가할 수 있고, 실제 참가자도
     방장을 평가할 수 있다. 본인과 참가자 목록에 이미 포함된 방장은 중복 대상에서 제외한다. 방장도 참가자도
     아닌 사용자는 `403 NOT_SOURCE_PARTICIPANT`다.
+    작성 기한은 `completedAt`부터 고정 7일(168시간)이다. 완료 시각이 없는 기존 완료 행은 `startAt`을 기준으로 한다.
+    정확히 168시간까지 허용하며 초과 시 대상 조회·제출 모두 `410 REVIEW_WINDOW_CLOSED`로 차단하고 pending 목록에서도 제외한다.
+    팀·대회 관리자 기간 설정은 개인 매치에 적용하지 않는다. 이미 작성한 리뷰는 유지한다.
   - `team_match`: 완료된 팀매치의 참가팀 active 멤버가 상대 팀(`targetType=team`)과 상대 선수(`targetType=user`)를 평가한다.
     상대 선수는 상대 사이드 최신 라인업에서 계정으로 해석된 참가자이고, 등번호 오름차순(번호 없음은 뒤, 같으면 이름순)으로 나온다.
     - 작성 자격: 작성자 사이드 최신 라인업에 계정으로 해석된 참가자가 1명 이상이면 그 명단에 있는 팀원만 작성자다. 경기별 명단 조정으로 빠진 팀원은 pending 목록(홈·마이 개수 포함)에 나오지 않고, 상세 조회와 제출(팀·선수 후기 모두)은 `403 NOT_ACTUAL_PARTICIPANT`다. 계정으로 해석된 참가자가 없으면(빈 라인업·계정 미연결 자동 명단 포함) 활성 팀원 전원이 작성자다.

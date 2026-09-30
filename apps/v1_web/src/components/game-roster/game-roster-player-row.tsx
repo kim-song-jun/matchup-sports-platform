@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { Button } from '@/components/v1-ui/button';
+import { PlusIcon } from '@/components/v1-ui/icons';
 import type { V1TeamRosterCellStatus } from '@/hooks/use-v1-game-roster';
 import {
   GAME_ROSTER_AUTO_ACTOR_LABEL,
@@ -60,6 +62,8 @@ export interface GameRosterPlayerRowProps {
   note?: string | null;
   /** 오른쪽 조작 영역(토글·버튼). 조작 요소의 44px 터치는 호출부가 맡는다. */
   trailing?: ReactNode;
+  /** 있으면 등번호 칸이 버튼이 된다 — 눌러서 번호를 넣거나 바꾼다(빈 칸은 점선 "+"). */
+  onJerseyPress?: () => void;
 }
 
 /** 경기 명단 한 줄 — 경기 명단 화면·빠른 선택 시트·팀 표·어드민 펼침이 같이 쓴다. */
@@ -73,26 +77,50 @@ export function GameRosterPlayerRow({
   actorRole,
   note,
   trailing,
+  onJerseyPress,
 }: GameRosterPlayerRowProps) {
   const captions = [actorCaption(status, actorRole), accountLinked ? null : '계정 없이 기록돼요', note ?? null].filter(
     (part): part is string => part !== null && part !== '',
   );
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, padding: '8px 0' }}>
-      <span
-        className="tm-text-label"
-        style={{ flex: '0 0 auto', minWidth: 28, textAlign: 'center', color: 'var(--text-muted)' }}
-      >
-        <span className="sr-only">등번호 </span>
-        {jerseyNumber === null ? (
-          <>
-            <span className="sr-only">없음</span>
-            <span aria-hidden="true">–</span>
-          </>
-        ) : (
-          jerseyNumber
-        )}
-      </span>
+      {onJerseyPress === undefined ? (
+        <span
+          className="tm-text-label"
+          style={{ flex: '0 0 auto', minWidth: 28, textAlign: 'center', color: 'var(--text-muted)' }}
+        >
+          <span className="sr-only">등번호 </span>
+          {jerseyNumber === null ? (
+            <>
+              <span className="sr-only">없음</span>
+              <span aria-hidden="true">–</span>
+            </>
+          ) : (
+            jerseyNumber
+          )}
+        </span>
+      ) : jerseyNumber === null ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onJerseyPress}
+          aria-label={`${displayName} 등번호 넣기`}
+          style={emptyJerseyButtonStyle}
+        >
+          <PlusIcon size={16} strokeWidth={2} />
+        </Button>
+      ) : (
+        <Button
+          variant="neutral"
+          size="sm"
+          className="tab-num"
+          onClick={onJerseyPress}
+          aria-label={`${displayName} 등번호 ${jerseyNumber}번 바꾸기`}
+          style={jerseyButtonStyle}
+        >
+          {jerseyNumber}
+        </Button>
+      )}
       <div style={{ minWidth: 0, flex: '1 1 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <span className="tm-text-label" style={{ overflowWrap: 'anywhere' }}>
@@ -149,3 +177,12 @@ const checkboxLabelStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 const checkboxStyle: React.CSSProperties = { width: 22, height: 22, margin: 0, accentColor: 'var(--blue500)' };
+
+const jerseyButtonStyle: CSSProperties = { flex: '0 0 auto', minWidth: 44, padding: 0, fontWeight: 700 };
+const emptyJerseyButtonStyle: CSSProperties = {
+  flex: '0 0 auto',
+  minWidth: 44,
+  padding: 0,
+  borderStyle: 'dashed',
+  color: 'var(--text-muted)',
+};

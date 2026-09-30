@@ -4188,7 +4188,7 @@ export function useV1AdminRemovePlayer(registrationId: string) {
  *
  * 어드민 훅은 tournamentId 를 모르는 자리라 소비자 키를 predicate 로 찾는다.
  */
-function invalidateRosterViews(
+export function invalidateRosterViews(
   queryClient: QueryClient,
   tournamentId: string | null,
   registrationId: string,
@@ -4261,12 +4261,22 @@ export function useV1UpdatePlayerJersey(tournamentId: string, registrationId: st
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ playerId, jerseyNumber }: { playerId: string; jerseyNumber: number | null }) =>
-      v1Patch<V1TournamentPlayer>(
-        `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}/jersey-number`,
-        { jerseyNumber },
-      ),
+      patchPlayerJersey({ tournamentId, registrationId, playerId, jerseyNumber }),
     onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
   });
+}
+
+/** 등번호 저장 요청 — 참가 명단 화면과 경기 명단 화면이 같은 엔드포인트를 쓴다. */
+export function patchPlayerJersey(input: {
+  tournamentId: string;
+  registrationId: string;
+  playerId: string;
+  jerseyNumber: number | null;
+}) {
+  return v1Patch<V1TournamentPlayer>(
+    `/tournaments/${input.tournamentId}/registrations/${input.registrationId}/players/${input.playerId}/jersey-number`,
+    { jerseyNumber: input.jerseyNumber },
+  );
 }
 
 export function useV1UpdatePlayer(tournamentId: string, registrationId: string) {

@@ -1,5 +1,8 @@
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 
+/** 등번호 저장(참가 명단 API)이 같은 팀의 다른 선수 번호와 겹칠 때 — 문구는 시트가 누가 쓰는지 알고 직접 쓴다. */
+export const DUPLICATE_JERSEY_CODE = 'ROSTER_DUPLICATE_JERSEY_NUMBER';
+
 /** Task 179 명단 조정·결장·일괄 저장 에러 코드 → 사용자 문구. 이 도메인의 단일 소스. */
 const GAME_ROSTER_ERROR_MESSAGES: Record<string, string> = {
   LINEUP_DEADLINE_PASSED: '경기가 시작돼서 명단을 바꿀 수 없어요. 바꿀 게 있으면 운영진에게 알려 주세요.',

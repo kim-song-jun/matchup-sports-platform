@@ -30,9 +30,9 @@ export const GAME_ROSTER_MSW = {
     { gameId: 'roster-game-2', sideId: 'roster-side-2', startAt: '2026-10-11T01:00:00.000Z', opponentName: '강남 유나이티드' },
   ],
   players: [
-    { userId: 'player-1', displayName: '김민재', jerseyNumber: 7 },
-    { userId: 'player-2', displayName: '박서준', jerseyNumber: 10 },
-    { userId: 'player-3', displayName: '한도윤', jerseyNumber: null },
+    { userId: 'player-1', participantId: 'tournament-player-1', displayName: '김민재', jerseyNumber: 7 },
+    { userId: 'player-2', participantId: 'tournament-player-2', displayName: '박서준', jerseyNumber: 10 },
+    { userId: 'player-3', participantId: 'tournament-player-3', displayName: '한도윤', jerseyNumber: null },
   ],
 } as const;
 
@@ -74,6 +74,12 @@ export function createV1GameRosterMswHandlers() {
     requests: [] as GameRosterMswRequest[],
     seq: 0,
     viewerRole: 'TEAM_MANAGER' as V1GameRosterViewerRole,
+    /** 등번호의 원본은 참가 명단이다 — 저장(PATCH)이 여기를 바꾸고, 명단 응답은 여기서 읽는다. */
+    jerseys: new Map<string, number | null>(GAME_ROSTER_MSW.players.map((p) => [p.userId, p.jerseyNumber])),
+    /** TEAM_MEMBERS = 참가 명단이 없는 리그 팀(팀원 전체가 기준 — 번호 원본·선수 id 가 없다). */
+    baseSource: 'REGISTRATION' as 'REGISTRATION' | 'TEAM_MEMBERS',
+    /** true = 운영진이 명단을 잠갔다(등번호 저장이 409 ROSTER_LOCKED). */
+    rosterLocked: false,
     /** false = 보기만 하는 운영자(지원 계정·명단 권한 없는 스태프) — 서버의 `canWrite`/`writeRole null`. */
     canWrite: true,
     /** 출전정지(규정 있는 대회) — userId → 사유·남은 경기. 모든 경기에 같이 건다. */
@@ -100,7 +106,22 @@ export function createV1GameRosterMswHandlers() {
     displayName: userId === null ? '시스템' : (NAMES[userId] ?? '알 수 없음'),
     role,
   });
-  const person = (p: (typeof GAME_ROSTER_MSW.players)[number]) => ({ ...p, accountLinked: true });
+  const fallback = () => state.baseSource === 'TEAM_MEMBERS';
+  const person = ({ participantId, ...p }: (typeof GAME_ROSTER_MSW.players)[number]) => ({
+    ...p,
+    jerseyNumber: fallback() ? null : (state.jerseys.get(p.userId) ?? null),
+    accountLinked: !fallback(),
+    participantId: fallback() ? null : participantId,
+  });
+  // 서버와 같은 명단 순서 — 등번호 오름차순, 번호 없는 선수는 뒤에 이름순.
+  const orderedPlayers = () =>
+    [...GAME_ROSTER_MSW.players].sort((a, b) => {
+      const x = fallback() ? null : (state.jerseys.get(a.userId) ?? null);
+      const y = fallback() ? null : (state.jerseys.get(b.userId) ?? null);
+      if (x !== null && y !== null && x !== y) return x - y;
+      if ((x === null) !== (y === null)) return x === null ? 1 : -1;
+      return a.displayName.localeCompare(b.displayName, 'ko');
+    });
   const canWrite = () => state.viewerRole !== 'TEAM_MEMBER' && state.canWrite;
 
   async function record(request: Request, path: string) {
@@ -110,7 +131,7 @@ export function createV1GameRosterMswHandlers() {
 
   function view(game: (typeof GAME_ROSTER_MSW.games)[number]): V1GameRosterView {
     const gameState = state.gameStates.get(game.gameId)!;
-    const base = GAME_ROSTER_MSW.players.map((p) => {
+    const base = orderedPlayers().map((p) => {
       const status = state.suspensions.has(p.userId)
         ? ('SUSPENDED' as const)
         : coveringUnavailability(p.userId, game.startAt)
@@ -120,12 +141,12 @@ export function createV1GameRosterMswHandlers() {
           : ('PARTICIPATING' as const);
       return { ...person(p), status };
     });
-    const excluded = GAME_ROSTER_MSW.players.flatMap((p) => {
+    const excluded = orderedPlayers().flatMap((p) => {
       const adj = activeAdjustment(game.gameId, p.userId);
       if (!adj || state.suspensions.has(p.userId) || coveringUnavailability(p.userId, game.startAt)) return [];
       return [{ ...person(p), adjustmentId: adj.id, reason: adj.reason, excludedAt: adj.createdAt, actor: actor(adj.actorUserId, adj.actorRole) }];
     });
-    const unavailable = GAME_ROSTER_MSW.players.flatMap((p) => {
+    const unavailable = orderedPlayers().flatMap((p) => {
       const u = coveringUnavailability(p.userId, game.startAt);
       if (!u || state.suspensions.has(p.userId)) return [];
       return [{ ...person(p), unavailabilityId: u.id, reason: u.reason, startsAt: u.startsAt, endsAt: u.endsAt, actor: actor(u.actorUserId, u.actorRole) }];
@@ -133,7 +154,7 @@ export function createV1GameRosterMswHandlers() {
     const participants = base
       .filter((p) => p.status === 'PARTICIPATING')
       .map(({ status: _status, ...p }) => ({ ...p, joinedAfterFixtureCreated: state.joinedAfter.has(p.userId) }));
-    const suspended = GAME_ROSTER_MSW.players.flatMap((p) => {
+    const suspended = orderedPlayers().flatMap((p) => {
       const s = state.suspensions.get(p.userId);
       return s ? [{ ...person(p), reason: s.reason, remainingMatches: s.remainingMatches }] : [];
     });
@@ -148,7 +169,9 @@ export function createV1GameRosterMswHandlers() {
       deadline: game.startAt,
       editable: gameState === 'SCHEDULED' && canWrite(),
       viewerRole: state.viewerRole,
-      baseSource: 'REGISTRATION',
+      baseSource: state.baseSource,
+      jerseyRegistrationId:
+        state.viewerRole === 'TEAM_MANAGER' && !fallback() ? GAME_ROSTER_MSW.registrationId : null,
       base,
       participants,
       excluded,
@@ -295,6 +318,30 @@ export function createV1GameRosterMswHandlers() {
       });
       return ok({ teamId: String(params.teamId), results });
     }),
+    // 참가 명단 등번호 API — 팀장·매니저만, 팀 안에서 번호가 겹치면 409(서버 assertJerseyAvailable 과 같다).
+    http.patch(
+      `${api}/tournaments/:tournamentId/registrations/:registrationId/players/:playerId/jersey-number`,
+      async ({ request, params }) => {
+        await record(request, new URL(request.url).pathname);
+        const { jerseyNumber } = state.requests.at(-1)!.body as { jerseyNumber: number | null };
+        if (state.viewerRole !== 'TEAM_MANAGER') return forbidden('팀장 또는 매니저만 명단을 관리할 수 있어요.');
+        if (params.tournamentId !== GAME_ROSTER_MSW.tournamentId || params.registrationId !== GAME_ROSTER_MSW.registrationId) {
+          return fail(404, 'REGISTRATION_NOT_FOUND', '신청 내역을 찾을 수 없어요.');
+        }
+        const player = GAME_ROSTER_MSW.players.find((p) => p.participantId === params.playerId);
+        if (!player) return fail(404, 'PLAYER_NOT_FOUND', '선수를 찾을 수 없어요.');
+        if (jerseyNumber !== null && !(Number.isInteger(jerseyNumber) && jerseyNumber >= 0 && jerseyNumber <= 99)) {
+          return fail(400, 'VALIDATION_ERROR', '등번호는 0에서 99 사이로 입력해 주세요.');
+        }
+        if (state.rosterLocked) return fail(409, 'ROSTER_LOCKED', '명단이 잠겼어요. 운영진에게 문의해 주세요.');
+        const holder = GAME_ROSTER_MSW.players.find(
+          (p) => p.userId !== player.userId && jerseyNumber !== null && state.jerseys.get(p.userId) === jerseyNumber,
+        );
+        if (holder) return fail(409, 'ROSTER_DUPLICATE_JERSEY_NUMBER', `${jerseyNumber}번은 이미 다른 선수가 달고 있어요.`);
+        state.jerseys.set(player.userId, jerseyNumber);
+        return ok({ id: player.participantId, userId: player.userId, jerseyNumber });
+      },
+    ),
     http.get(`${api}/teams/:teamId/unavailability`, async ({ request, params }) => {
       const url = new URL(request.url);
       await record(request, `${url.pathname}${url.search}`);
@@ -366,6 +413,17 @@ export function createV1GameRosterMswHandlers() {
     },
     setViewerRole(role: V1GameRosterViewerRole) {
       state.viewerRole = role;
+    },
+    /** 참가 명단이 없는 리그 팀으로 — 번호 원본·선수 id 가 없고 계정 없이 기록된다. */
+    useTeamMembersFallback() {
+      state.baseSource = 'TEAM_MEMBERS';
+    },
+    lockRoster() {
+      state.rosterLocked = true;
+    },
+    /** 다른 운영진이 먼저 번호를 바꾼 것처럼 서버 상태만 바꾼다. */
+    setJersey(userId: string, jerseyNumber: number | null) {
+      state.jerseys.set(userId, jerseyNumber);
     },
     /** 보기만 하는 운영자로 — 표의 `editable` 이 전부 false, 쓰기는 403. */
     setCanWrite(value: boolean) {

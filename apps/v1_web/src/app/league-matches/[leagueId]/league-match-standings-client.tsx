@@ -358,11 +358,12 @@ function ClaimFixturesCard({
  * 보내기만** 한다.
  *
  * ## 노출 규칙 — 홈 넛지와 **같은 조건**을 쓴다
- * `home-client.tsx` 의 `showRecordConsentNudge` 와 같은 두 항이다.
+ * `home/use-record-consent-nudge.ts` 의 `candidate` 와 같은 두 항이다(홈은 여기에 "X 로 넘긴 뒤 새
+ * 대기 경기가 없으면 숨김"이 더해진다).
  * - `hasResponded === false`: 한 번이라도 답한 적 있으면 띄우지 않는다. `granted:false` 는
  *   "거부"와 "아직 안 물어봄"을 구분하지 못하는데, **명시적으로 끈 사람을 다시 조르는 것은
- *   같은 요청을 반복하는 것**이다. 리그는 참가 중인 리그 수만큼 이 화면이 있어서 닫기 버튼도
- *   노출 상한도 없는 이 카드가 그만큼 반복된다 — 홈보다 오히려 더 끈질기다. 옛 서버 응답에는
+ *   같은 요청을 반복하는 것**이다. 리그는 참가 중인 리그 수만큼 이 화면이 있어서 닫기 버튼이
+ *   없는 이 카드가 그만큼 반복된다 — 홈보다 오히려 더 끈질기다. 옛 서버 응답에는
  *   이 필드가 없는데, 그때는 판단 근거가 없으므로 띄우지 않는다(홈과 동일).
  *   `hasResponded === false` 면 동의 row 자체가 없다는 뜻이라 `granted` 는 반드시 false 다
  *   (profile.service.ts `withPendingRecordSignal`: `hasResponded = consent !== null`) — 그래서

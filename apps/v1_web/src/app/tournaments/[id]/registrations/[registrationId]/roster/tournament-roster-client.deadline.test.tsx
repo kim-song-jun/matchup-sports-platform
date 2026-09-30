@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   useV1AddPlayer,
@@ -674,6 +674,41 @@ describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
     expect(screen.getByText('홍길동')).toBeInTheDocument();
     expect(screen.getByText('1995.03.15')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+  });
+
+  it.each(['owner', 'manager'] as const)('%s 화면은 실명 아래에 경기 명단에 나가는 이름(닉네임)을 함께 보인다', (role) => {
+    renderAs(role, { players: [mockPlayer()] });
+
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    const hint = screen.getByText(/경기 명단 이름/);
+    expect(hint).toHaveTextContent('경기 명단 이름 길동이');
+    expect(within(hint).getByText('길동이').tagName).toBe('STRONG');
+  });
+
+  it('실명과 닉네임이 같거나 닉네임이 없으면 병기하지 않는다', () => {
+    renderAs('owner', {
+      players: [
+        mockPlayer({ id: 'p-same', userId: 'u-same', realName: '홍길동', nickname: '홍길동' }),
+        mockPlayer({ id: 'p-none', userId: 'u-none', realName: '김철수', nickname: null }),
+      ],
+    });
+
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('김철수')).toBeInTheDocument();
+    expect(screen.queryByText(/경기 명단 이름/)).toBeNull();
+  });
+
+  it('일반 팀원은 남의 행뿐 아니라 실명이 보이는 본인 행에도 병기를 받지 않는다', () => {
+    renderAs('member', {
+      players: [
+        memberViewPlayer({ id: 'player-other', userId: 'user-other' }),
+        mockPlayer({ id: 'player-own', userId: 'user-own', realName: '김본인', nickname: '본인이' }),
+      ],
+    });
+
+    expect(screen.getByText('김본인')).toBeInTheDocument();
+    expect(screen.queryByText(/경기 명단 이름/)).toBeNull();
+    expect(screen.queryByText('본인이')).toBeNull();
   });
 
   it('일반 팀원은 닉네임·등번호·자격 상태만 보고 생년월일 줄은 그려지지 않는다', () => {

@@ -42,6 +42,7 @@ import {
   isTournamentParticipantNameGatingReverted,
   loadParticipantNameProfiles,
   parseCardColor,
+  presentEventAssist,
   resolveParticipantDisplayName,
   resolveParticipantNameEligible,
   resolveParticipantProfileHref,
@@ -1452,6 +1453,7 @@ export class PublicTournamentRecordsService {
         type: true,
         sideId: true,
         participantId: true,
+        assistParticipantId: true,
         payload: true,
         period: true,
         clockMs: true,
@@ -1472,6 +1474,12 @@ export class PublicTournamentRecordsService {
     // (아래 참고: 이름/등번호가 라인업 게이트와 독립인 것과 같은 이유로) 타임라인을
     // 홈/원정으로 나눠 보여줄 수 있어야 한다.
     const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));
+    // 공식 스냅샷 골의 `id` 는 종료 시 복사된 `V1GameEvent.id` 라 스냅샷에는 없는 도움을 이벤트
+    // 행에서 되찾는다. 운영자가 선수별 합계만 입력한 리그 스냅샷은 id 가 달라 매칭되지 않는다.
+    const assistParticipantIdByEventId = new Map(
+      events.map((event) => [event.id, event.assistParticipantId] as const),
+    );
+    const assistCtx = { participantById, consentMap, nameProfileByUserId, isStaffBypass };
     const eventRows = events
       .filter(
         (event) =>
@@ -1515,6 +1523,7 @@ export class PublicTournamentRecordsService {
             : null,
           jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
           profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
+          assist: event.type === 'GOAL' ? presentEventAssist(event.assistParticipantId, assistCtx) : null,
           // 백필로 복원된 골은 `period: 1`로 저장돼 있지만 그건 컬럼이 non-null이라
           // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
           // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
@@ -1553,6 +1562,9 @@ export class PublicTournamentRecordsService {
           : null,
         jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
         profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
+        assist: event.ownGoal
+          ? null
+          : presentEventAssist(assistParticipantIdByEventId.get(event.id), assistCtx),
         period: event.period,
         clockMs: event.minute === null ? null : event.minute * 60000,
       };

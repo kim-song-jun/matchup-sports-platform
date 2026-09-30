@@ -48,6 +48,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
     const data = makeDetail({
       events: [
         {
+          assist: null,
           type: 'GOAL',
           cardColor: null,
           sideId: 'side-home',
@@ -71,6 +72,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
     const data = makeDetail({
       events: [
         {
+          assist: null,
           type: 'CARD',
           cardColor: 'YELLOW',
           sideId: 'side-home',
@@ -95,8 +97,8 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   it('전반과 후반 이벤트가 각각 자기 구간에만 들어간다 (시간 역전 버그 회귀)', () => {
     const data = makeDetail({
       events: [
-        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', profileHref: null, jerseyNumber: 9, period: 1, clockMs: 600_000 },
-        { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', profileHref: null, jerseyNumber: 10, period: 2, clockMs: 300_000 },
+        { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', profileHref: null, jerseyNumber: 9, period: 1, clockMs: 600_000 },
+        { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', profileHref: null, jerseyNumber: 10, period: 2, clockMs: 300_000 },
       ],
     });
 
@@ -113,7 +115,7 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   it('period가 null인 이벤트는 "기타" 구간에 담겨 유실되지 않는다', () => {
     const data = makeDetail({
       events: [
-        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', profileHref: null, jerseyNumber: 5, period: null, clockMs: null },
+        { assist: null, type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', profileHref: null, jerseyNumber: 5, period: null, clockMs: null },
       ],
     });
 
@@ -127,8 +129,8 @@ describe('MatchDetailContent — 카드 색상', () => {
   it('익명 골은 "익명", 익명 자책골은 "OG"로 표시한다', () => {
     const data = makeDetail({
       events: [
-        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: null, participantName: null, profileHref: null, jerseyNumber: null, period: 1, clockMs: 60_000 },
-        { type: 'OWN_GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, profileHref: null, jerseyNumber: null, period: 1, clockMs: 120_000 },
+        { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: null, participantName: null, profileHref: null, jerseyNumber: null, period: 1, clockMs: 60_000 },
+        { assist: null, type: 'OWN_GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: null, participantName: null, profileHref: null, jerseyNumber: null, period: 1, clockMs: 120_000 },
       ],
     });
 
@@ -141,8 +143,8 @@ describe('MatchDetailContent — 카드 색상', () => {
   it('옐로카드와 레드카드를 서로 다른 아이콘과 접근 가능한 이름으로 표시한다', () => {
     const data = makeDetail({
       events: [
-        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-yellow', participantName: '옐로 선수', profileHref: null, jerseyNumber: 5, period: 1, clockMs: 300_000 },
-        { type: 'CARD', cardColor: 'RED', sideId: 'side-away', side: 'away', participantId: 'p-red', participantName: '레드 선수', profileHref: null, jerseyNumber: 6, period: 1, clockMs: 600_000 },
+        { assist: null, type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-yellow', participantName: '옐로 선수', profileHref: null, jerseyNumber: 5, period: 1, clockMs: 300_000 },
+        { assist: null, type: 'CARD', cardColor: 'RED', sideId: 'side-away', side: 'away', participantId: 'p-red', participantName: '레드 선수', profileHref: null, jerseyNumber: 6, period: 1, clockMs: 600_000 },
       ],
     });
 
@@ -254,7 +256,7 @@ describe('MatchDetailContent — 선수 이름 프로필 링크', () => {
   it('이벤트 타임라인의 득점자도 링크가 된다', () => {
     const data = makeDetail({
       events: [
-        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김도윤', jerseyNumber: 7, profileHref: '/users/u-1', period: 1, clockMs: 600_000 },
+        { assist: null, type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김도윤', jerseyNumber: 7, profileHref: '/users/u-1', period: 1, clockMs: 600_000 },
       ],
     });
 
@@ -411,5 +413,76 @@ describe('MatchDetailContent — 공식 확정 대기 문구', () => {
     render(<MatchDetailContent data={makeDetail({ status: 'ended', pendingProjection: false })} />);
 
     expect(screen.queryByText(pendingText)).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchDetailContent — 득점자 아래 도움 줄', () => {
+  const scorer = {
+    type: 'GOAL',
+    cardColor: null,
+    sideId: 'side-home',
+    side: 'home' as const,
+    participantId: 'p-1',
+    participantName: '김득점',
+    jerseyNumber: 9,
+    profileHref: null,
+    period: 1,
+    clockMs: 360_000,
+  };
+
+  it('도움이 있는 골은 득점자 아래에 "도움 · 등번호 이름"을 보이고, 프로필 링크가 있으면 이름이 링크다', () => {
+    const data = makeDetail({
+      events: [
+        { ...scorer, assist: { participantName: '이도움', jerseyNumber: 3, profileHref: '/users/user-3' } },
+        // 도움을 기입하지 않은 다른 골 -- 도움 줄이 통째로 없어야 한다(빈 "도움 ·" 금지).
+        { ...scorer, participantId: 'p-2', participantName: '박득점', clockMs: 720_000, assist: null },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    const assistLines = screen.getAllByText(/^도움 ·/);
+    expect(assistLines).toHaveLength(1);
+    expect(assistLines[0]).toHaveTextContent('도움 · 3 이도움');
+    expect(screen.getByRole('link', { name: '이도움' })).toHaveAttribute('href', '/users/user-3');
+    // 득점자 이름은 도움 줄과 별개로 그대로다.
+    expect(screen.getByText('김득점')).toBeInTheDocument();
+  });
+
+  it('가려진 도움 선수는 득점자와 같은 "비공개 선수" 표기이고, 도움 줄 자체는 남는다', () => {
+    const data = makeDetail({
+      events: [{ ...scorer, assist: { participantName: null, jerseyNumber: null, profileHref: null } }],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByText(/^도움 ·/)).toHaveTextContent('도움 · 비공개 선수');
+    // 익명 득점("익명")과 섞이지 않는다.
+    expect(screen.queryByText('익명')).not.toBeInTheDocument();
+  });
+
+  it('assist 필드가 없는 옛 서버 응답에서도 깨지지 않고 도움 줄이 없다', () => {
+    const legacyEvent = { ...scorer } as unknown as PublicMatchDetail['events'][number];
+
+    render(<MatchDetailContent data={makeDetail({ events: [legacyEvent] })} />);
+
+    expect(screen.getByText('김득점')).toBeInTheDocument();
+    expect(screen.queryByText(/도움/)).not.toBeInTheDocument();
+  });
+
+  it('원정 골의 도움도 같은 줄 구조로 원정 열에 붙는다', () => {
+    const data = makeDetail({
+      events: [
+        { ...scorer, side: 'away', sideId: 'side-away', assist: { participantName: '최도움', jerseyNumber: null, profileHref: null } },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    const row = screen.getByRole('listitem');
+    // 홈 열(첫 자식)은 비고, 원정 열(마지막 자식)에 득점자와 도움이 함께 있다.
+    expect(row.firstElementChild).toBeEmptyDOMElement();
+    expect(within(row.lastElementChild as HTMLElement).getByText('김득점')).toBeInTheDocument();
+    expect(within(row.lastElementChild as HTMLElement).getByText(/^도움 ·/)).toHaveTextContent('도움 · 최도움');
   });
 });

@@ -18,6 +18,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { josa } from '@/lib/korean';
+import { parseJerseyInput } from '@/lib/jersey-number';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
@@ -46,6 +47,7 @@ import {
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
+export { parseJerseyInput };
 
 /* ── Helpers ── */
 
@@ -217,22 +219,6 @@ export function TournamentRosterDeadlineCard({
       ) : null}
     </Card>
   );
-}
-
-/**
- * 등번호 입력값을 보낼 값으로 바꾼다.
- *
- * **`Number()` 에 그냥 넘기면 안 된다.** `type="number"` 입력은 `e`·`1e2`·`-` 를 그대로
- * 통과시키고, `Number('e')` 는 `NaN` 이며 **`NaN` 은 JSON 에서 `null` 로 직렬화된다** —
- * 서버에서 "번호를 안 보냄" 과 구분되지 않아 번호가 조용히 사라진다(2026-09-04 Copilot 리뷰).
- *
- * 빈 값은 **번호 없는 선수**이지 오류가 아니다. `0` 은 유효한 등번호다.
- */
-export function parseJerseyInput(raw: string): { ok: true; value?: number } | { ok: false } {
-  const trimmed = raw.trim();
-  if (trimmed === '') return { ok: true };
-  if (!/^\d{1,2}$/.test(trimmed)) return { ok: false };
-  return { ok: true, value: Number(trimmed) };
 }
 
 /* ── Add player form ── */
@@ -870,6 +856,7 @@ function PlayerRow({
   onToggleEdit,
   isPrimary,
   onUpdateJersey,
+  showGameRosterName,
 }: {
   player: V1TournamentRosterPlayer;
   onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
@@ -888,6 +875,11 @@ function PlayerRow({
   isPrimary: boolean;
   /** 등번호만 고치는 경로 — 자격과 서버 엔드포인트가 다르다. */
   onUpdateJersey: (playerId: string, jerseyNumber: number | null) => Promise<unknown>;
+  /**
+   * 팀장·매니저 화면에서만 실명 옆에 경기 명단·기록에 나가는 이름(닉네임)을 함께 보인다 — 번호를 넣는 사람이
+   * 경기 명단의 누구인지 대조하지 않도록. 일반 팀원은 서버가 남의 실명을 비워 이미 닉네임만 보므로 그대로 둔다.
+   */
+  showGameRosterName: boolean;
 }) {
   const [draftEligibility, setDraftEligibility] = useState<V1PlayerEligibilityStatus>(player.eligibilityStatus);
   // 문자열로 든다 — 빈 값("번호 없음")과 `0` 을 숫자로는 못 가른다.
@@ -1007,6 +999,11 @@ function PlayerRow({
           {player.personalInfoVisible ? (
             <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
               {formatRosterBirthDate(player.birthDateSnapshot)}
+            </div>
+          ) : null}
+          {showGameRosterName && player.realName !== null && player.nickname !== null && player.nickname !== player.realName ? (
+            <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+              경기 명단 이름 <strong style={{ color: 'var(--text-strong)' }}>{player.nickname}</strong>
             </div>
           ) : null}
         </div>
@@ -1649,6 +1646,7 @@ export function TournamentRosterPageClient({
                 isEditing={editingPlayerId === player.id}
                 onToggleEdit={() => handleToggleEdit(player.id)}
                 isPrimary={draftForms.length === 0 && editingPlayerId === player.id}
+                showGameRosterName={canManageRoster}
               />
             ))}
           </Card>

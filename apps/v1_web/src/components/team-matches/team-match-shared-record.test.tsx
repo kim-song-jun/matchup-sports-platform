@@ -18,7 +18,7 @@ beforeEach(() => {
   state.search = '';
   state.data = {
     teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
-    serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, ownSideId: 'home',
+    serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, operator: false, ownSideId: 'home',
     lineupReady: true, missingSides: [],
     sides: [{ id: 'home', key: 'HOME', name: '한강', score: 0 }, { id: 'away', key: 'AWAY', name: '마포', score: 0 }],
     participants: [
@@ -29,6 +29,25 @@ beforeEach(() => {
   };
 });
 describe('shared record participant flow', () => {
+  it('platform operators can record both sides, see history, but cannot confirm for a team', async () => {
+    state.data = { ...state.data, participant: false, operator: true, ownSideId: null };
+    render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+    expect(screen.getByRole('link', { name: '팀매치 운영 상세로' })).toHaveAttribute('href', '/admin/team-matches/match');
+    expect(screen.queryByRole('button', { name: /종료 확인/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/변경 이력/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
+    expect(screen.getByText(/Teameet 운영으로/)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: '득점 팀' }), { target: { value: 'away' } });
+    fireEvent.click(screen.getByRole('button', { name: '득점 등록' }));
+    await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'add', sideId: 'away', expectedVersion: 3 })));
+  });
+
+  it('admin legacy records never redirect into the public shell', () => {
+    state.data = { ...state.data, phase: 'legacy', canEdit: false, participant: false, operator: true };
+    render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+    expect(state.replace).not.toHaveBeenCalled();
+    expect(screen.getByText(/공동 기록 대상이 아니에요/)).toBeInTheDocument();
+  });
   // 2026-09-29: "← 매치 상세" 카드 링크는 제거했다 — 뒤로가기는 매치 상세를 거치지 않고
   // 이 화면이 받은 출처로 곧장 돌아간다(활동기록 등). 출처가 아예 없을 때만(공유 링크로
   // 바로 들어온 경우) route-chrome 의 정적 backHref가 `?view=detail`로 매치 상세를 대신 가리킨다.

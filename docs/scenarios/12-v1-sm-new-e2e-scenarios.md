@@ -484,6 +484,9 @@ written review list, received review grouping.
 - `V1-14-008`: 개인매치 방장이 `hostParticipates=false`여도 완료 후 실제 참가자를 리뷰할 수 있고,
   실제 참가자도 비참가 방장을 리뷰할 수 있다. 본인과 중복 방장 대상은 제외하며, 방장도 참가자도 아닌
   사용자는 동일 source 조회에서 `403 NOT_SOURCE_PARTICIPANT`로 차단된다.
+- 개인 매치 리뷰 기한: 완료 후 168시간까지 조회·제출 가능하고, 초과하면 둘 다
+  `410 REVIEW_WINDOW_CLOSED`다. 만료된 매치는 pending에서 제외하고 작성 완료 리뷰는 유지한다.
+  `completedAt`이 없는 기존 완료 매치는 `startAt` 기준으로 같은 제한을 적용한다.
 
 DB evidence:
 `v1_matches`, `v1_match_participants`, `v1_team_matches`,

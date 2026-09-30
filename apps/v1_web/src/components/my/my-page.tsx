@@ -268,6 +268,7 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
             ? <EmptyState illustration={{ name: 'auth-welcome' }} title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
             : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
+        {model.dissolvedSection}
       </div>
   );
 }

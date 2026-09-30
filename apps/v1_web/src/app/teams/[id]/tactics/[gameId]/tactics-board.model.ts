@@ -8,6 +8,7 @@ import {
   type FormationSlot,
 } from '@/components/lineup/formation-slots';
 import type { V1SaveTacticsBoardInput, V1TacticsBoard } from '@/hooks/use-v1-api';
+import { courtKindForSport } from '@/components/lineup/pitch-lines';
 
 /**
  * 전술보드 화면 상태(Task 180 H7 A안) — 팀 내부 도구다(정본 §3). 참석명단·경기 명단을 읽지 않고,
@@ -55,7 +56,10 @@ export function initialFormation(board: V1TacticsBoard, options: FormationPreset
 }
 
 export function formationNoteFor(board: V1TacticsBoard, options: FormationPreset[]): string | null {
-  if (options.length === 0) return '지금은 자유 배치예요. 선수를 피치 위 원하는 자리에 놓아 주세요.';
+  if (options.length === 0) {
+    const courtNoun = courtKindForSport(board.sportCode) === 'futsal' ? '코트' : '피치';
+    return `지금은 자유 배치예요. 선수를 ${courtNoun} 위 원하는 자리에 놓아 주세요.`;
+  }
   const players = board.playersPerSide;
   return players === undefined ? null : `${players}:${players} 경기예요. 필드 ${players - 1}명 대형만 보여요.`;
 }

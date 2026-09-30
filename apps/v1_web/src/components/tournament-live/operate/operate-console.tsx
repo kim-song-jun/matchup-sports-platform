@@ -797,7 +797,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       }
       setCommandPending(true);
       setCommandError(null);
-      const commandBody: GameCommandRequest = replayBody ?? {
+      let commandBody: GameCommandRequest = replayBody ?? {
         expectedVersion: gameVersionRef.current,
         clientCommandId: randomUuid(),
         takeoverToken: gate.token,
@@ -808,14 +808,41 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       const attemptId = ++commandAttemptRef.current;
       const ownsAttempt = () =>
         commandScopeGenerationRef.current === attemptGeneration && commandAttemptRef.current === attemptId;
-      try {
-        let result: Awaited<ReturnType<typeof postV1GameCommand>>;
-        // fetch 에는 제한 시간이 없어 망이 먹통이면 요청이 끝없이 걸린다. 끊어서 "응답을 못 받음"으로
-        // 드러내면 아래 재시도가 같은 clientCommandId 로 다시 보내고, 이미 처리됐다면 서버가 재생한다.
+      // fetch 에는 제한 시간이 없어 망이 먹통이면 요청이 끝없이 걸린다. 끊어서 "응답을 못 받음"으로
+      // 드러내면 아래 재시도가 같은 clientCommandId 로 다시 보내고, 이미 처리됐다면 서버가 재생한다.
+      const send = async (body: GameCommandRequest) => {
         const abort = new AbortController();
         const abortTimer = setTimeout(() => abort.abort(), COMMAND_RESPONSE_TIMEOUT_MS);
         try {
-          result = await postV1GameCommand(gameId, command, commandBody, { signal: abort.signal });
+          return await postV1GameCommand(gameId, command, body, { signal: abort.signal });
+        } finally {
+          clearTimeout(abortTimer);
+        }
+      };
+      try {
+        let result: Awaited<ReturnType<typeof postV1GameCommand>>;
+        try {
+          try {
+            result = await send(commandBody);
+          } catch (error) {
+            // 서버 멱등 해시는 토큰·occurredAt 까지 본문 전체라, 재시도는 처음 본문 그대로여야 저장된 결과가
+            // 재생된다. 이 두 거절은 멱등 조회를 지난 뒤에만 나오므로 첫 요청이 저장되지 않았다는 뜻이고,
+            // 같은 본문은 앞으로도 저장될 수 없다 — 같은 clientCommandId 에 지금의 토큰·시각을 실어 다시 보낸다.
+            const current = commandGateRef.current;
+            const code = error instanceof V1ApiError ? error.code : null;
+            const refreshable =
+              code === 'CLOCK_DRIFT' ||
+              (code === 'TAKEOVER_TOKEN_EXPIRED' && current.token !== commandBody.takeoverToken);
+            if (replayBody === undefined || !refreshable || !current.connected || current.token === null || !ownsAttempt()) {
+              throw error;
+            }
+            commandBody = {
+              ...commandBody,
+              takeoverToken: current.token,
+              occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
+            };
+            result = await send(commandBody);
+          }
         } catch (error) {
           if (ownsAttempt()) {
             const uncertain = !(error instanceof V1ApiError) || error.statusCode === 408 || error.statusCode >= 500;
@@ -831,8 +858,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             );
           }
           return false;
-        } finally {
-          clearTimeout(abortTimer);
         }
         if (!ownsAttempt()) return false;
         // UX 감사 — 커맨드 성공은 소켓으로 브로드캐스트되지 않는다(REST

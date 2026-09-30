@@ -1,7 +1,8 @@
 import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
+import { V1ApiError } from '@/lib/api-client';
 
 /**
  * "기록한 이벤트" 자리에 **로컬 전송 큐**를 그리고 있었다. 큐는 이번 세션에서 내가 올린 것만
@@ -1098,6 +1099,126 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    describe('재시도 사이 운영 권한이 다시 발급되거나 시간이 흐르면', () => {
+      const hangUntilAbort = (_gameId: string, _command: string, _body: unknown, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        });
+      const rejected = (statusCode: number, code: string, message: string) =>
+        new V1ApiError({ status: 'error', timestamp: '', statusCode, code, message });
+      const bodyOf = (call: number) => mocks.postV1GameCommand.mock.calls[call][2] as Record<string, unknown>;
+
+      /** 첫 재개가 응답 없이 제한 시간을 넘긴 뒤, 콘솔 상태를 바꾸고 `waitMs` 만큼 지나 "같은 요청 재시도"를 누른다. */
+      async function retryAfterTimeout(change: Record<string, unknown>, waitMs = 0) {
+        secondHalf('PAUSED');
+        const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+        fireEvent.click(screen.getByRole('button', { name: '재개' }));
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '재개' }));
+        await act(async () => {
+          // 확인 창이 닫히는 시간까지 넉넉히 더한다.
+          await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS + 2_000 + waitMs);
+        });
+        secondHalf('PAUSED', change);
+        view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+        fireEvent.click(screen.getByRole('button', { name: '같은 요청 재시도' }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+      }
+
+      // 한 테스트가 남긴 Once 응답이 다음 테스트로 새지 않게, 기본 구현만 남기고 매번 비운다.
+      let defaultImplementation: ReturnType<typeof mocks.postV1GameCommand.getMockImplementation>;
+      beforeEach(() => {
+        vi.useFakeTimers();
+        defaultImplementation = mocks.postV1GameCommand.getMockImplementation();
+        mocks.postV1GameCommand.mockReset();
+        mocks.postV1GameCommand.mockImplementationOnce(hangUntilAbort);
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+        mocks.postV1GameCommand.mockReset();
+        if (defaultImplementation) mocks.postV1GameCommand.mockImplementation(defaultImplementation);
+      });
+
+      // 서버는 토큰까지 해시해 멱등을 가린다 — 토큰을 바꿔 보내면 저장된 결과가 재생되지 않고 409 가 된다.
+      it('첫 요청이 이미 저장됐다면 새 토큰이 있어도 처음 본문 그대로 보내 서버가 결과를 재생하게 한다', async () => {
+        mocks.postV1GameCommand.mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3, replayed: true });
+        await retryAfterTimeout({ takeover: { ...HELD, token: 'tok-2' } });
+
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2);
+        expect(bodyOf(1)).toEqual(bodyOf(0));
+        expect(bodyOf(1).takeoverToken).toBe('tok');
+        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+          expect.objectContaining({ state: 'LIVE', version: 3 }),
+        );
+      });
+
+      it('처음 본문이 옛 토큰으로 거절되면 저장되지 않은 것이라, 같은 clientCommandId 에 새 토큰을 실어 한 번 더 보낸다', async () => {
+        mocks.postV1GameCommand
+          .mockRejectedValueOnce(rejected(403, 'TAKEOVER_TOKEN_EXPIRED', 'A valid exclusive takeover token is required'))
+          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3 });
+        await retryAfterTimeout({ takeover: { ...HELD, token: 'tok-2' } });
+
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(3);
+        expect(bodyOf(1)).toEqual(bodyOf(0));
+        // clientCommandId·expectedVersion·payload 는 그대로 — 새 명령이 아니라 같은 명령이다.
+        expect(bodyOf(2)).toEqual({ ...bodyOf(0), takeoverToken: 'tok-2', occurredAt: expect.any(String) });
+        expect(mocks.postV1GameCommand.mock.calls[2][1]).toBe('resume');
+        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+          expect.objectContaining({ state: 'LIVE', version: 3 }),
+        );
+        expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
+        expect(screen.queryByText('A valid exclusive takeover token is required')).toBeNull();
+      });
+
+      // 새 토큰 본문이 저장됐을 수 있으니, 다음 재시도가 처음 본문을 보내면 서버는 재생 대신 409 를 낸다.
+      it('새 토큰으로 다시 보낸 본문도 응답이 없으면, 다음 재시도는 그 새 본문을 그대로 보낸다', async () => {
+        mocks.postV1GameCommand
+          .mockRejectedValueOnce(rejected(403, 'TAKEOVER_TOKEN_EXPIRED', 'A valid exclusive takeover token is required'))
+          .mockImplementationOnce(hangUntilAbort)
+          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3, replayed: true });
+        await retryAfterTimeout({ takeover: { ...HELD, token: 'tok-2' } });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS);
+        });
+        fireEvent.click(screen.getByRole('button', { name: '같은 요청 재시도' }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(4);
+        expect(bodyOf(2).takeoverToken).toBe('tok-2');
+        expect(bodyOf(3)).toEqual(bodyOf(2));
+        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+          expect.objectContaining({ state: 'LIVE', version: 3 }),
+        );
+      });
+
+      it('서버 시각 허용 폭(30초)을 넘겨 처음 본문이 거절되면, 같은 clientCommandId 에 지금 시각을 실어 다시 보낸다', async () => {
+        mocks.postV1GameCommand
+          .mockRejectedValueOnce(rejected(422, 'CLOCK_DRIFT', 'occurredAt has drifted from server time by more than 30 seconds'))
+          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3 });
+        await retryAfterTimeout({}, 40_000);
+
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(3);
+        const original = bodyOf(0);
+        const resent = bodyOf(2);
+        expect(resent).toEqual({ ...original, occurredAt: expect.any(String) });
+        expect(Date.parse(String(resent.occurredAt)) - Date.parse(String(original.occurredAt))).toBeGreaterThanOrEqual(40_000);
+      });
+
+      it('토큰이 그대로인데 거절되면 권한을 잃은 것이라 다시 보내지 않고, 거절 사유를 보여 준다', async () => {
+        mocks.postV1GameCommand.mockRejectedValueOnce(
+          rejected(403, 'TAKEOVER_TOKEN_EXPIRED', 'A valid exclusive takeover token is required'),
+        );
+        await retryAfterTimeout({});
+
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2);
+        expect(screen.getByText('A valid exclusive takeover token is required')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
+      });
     });
   });
 });

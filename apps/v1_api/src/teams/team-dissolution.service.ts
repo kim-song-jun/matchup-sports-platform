@@ -259,8 +259,8 @@ export function emitTeamDissolutionNotifications(
       `"${application.title}" 팀매치 상대팀 신청이 취소됐어요.`,
     );
   }
-  for (const userId of outcome.cancelledInvitationUserIds) {
-    void notifications.markTeamInvitationCancelled(userId, teamId, teamName);
+  for (const invitation of outcome.cancelledInvitations) {
+    void notifications.markTeamInvitationCancelled(invitation.userId, teamId, teamName, invitation.sentAt);
   }
 }
 

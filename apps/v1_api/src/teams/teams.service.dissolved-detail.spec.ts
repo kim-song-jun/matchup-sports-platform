@@ -4,6 +4,7 @@
  */
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ChatService } from '../chat/chat.service';
 import { TeamsService } from './teams.service';
 
 const OWNER = { id: 'owner-user', email: 'o@t.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -32,7 +33,7 @@ function setup(row: ReturnType<typeof teamRow>, archivedByActor: 'user' | 'admin
     v1TeamContactBlock: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(null) },
   };
-  const service = new TeamsService(prisma as unknown as PrismaService, {} as NotificationsService);
+  const service = new TeamsService(prisma as unknown as PrismaService, {} as NotificationsService, {} as ChatService);
   return { prisma, service };
 }
 

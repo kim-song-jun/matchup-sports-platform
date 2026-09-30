@@ -219,7 +219,7 @@ describe('TeamMembersPageClient GA events', () => {
         ],
       },
     });
-    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
     teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: approveMutate, mutateAsync: approveMutateAsync });
@@ -1340,7 +1340,7 @@ describe('TeamMembersPageClient 초대 폼', () => {
       isError: false,
     });
     teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
-    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
     teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
@@ -1445,7 +1445,7 @@ describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
       isError: false,
     });
     teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
-    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
     for (const hook of [
       teamApiMocks.useV1ChangeTeamMembershipRole,
       teamApiMocks.useV1RemoveTeamMembership,
@@ -1557,7 +1557,7 @@ describe('TeamMembersPageClient — 매니저 5명 한도', () => {
       isError: false,
     });
     teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
-    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
     teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: changeRoleMutate });
     for (const hook of [
       teamApiMocks.useV1RemoveTeamMembership,

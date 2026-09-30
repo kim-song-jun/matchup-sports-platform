@@ -75,6 +75,18 @@ export function myJoinApplicationStatusLabel(status: string): string {
   return MY_JOIN_APPLICATION_STATUS[status] ?? '처리됨';
 }
 
+/** 보낸 초대가 끝난 이유(초대 탭 '지난 초대'). 초대에는 만료 상태가 없다. */
+const SENT_INVITATION_STATUS: Record<string, string> = {
+  pending: '초대 중',
+  accepted: '수락',
+  declined: '거절',
+  cancelled: '취소',
+};
+
+export function sentInvitationStatusLabel(status: string): string {
+  return SENT_INVITATION_STATUS[status] ?? '종료';
+}
+
 /** 팀 멤버십 상태. */
 const TEAM_MEMBER_STATUS: Record<string, string> = {
   active: '활동 중',

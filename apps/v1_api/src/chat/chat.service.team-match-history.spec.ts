@@ -194,7 +194,7 @@ describe('ChatService — 팀매치 방 열람 경계 (F64)', () => {
     // 입장 시스템 메시지는 그대로 남는다 — 열람 경계만 바뀌었다.
     world.as(userA.id);
     const forA = await service.messages(userA, 'room-1', { limit: 30 });
-    const joined = forA.items.filter((item) => item.systemEventType === 'joined' && item.content === 'Bob님이 들어왔습니다');
+    const joined = forA.items.filter((item) => item.systemEventType === 'joined' && item.content === 'Bob님이 들어왔어요');
     expect(joined).toHaveLength(1);
     expect(joined[0].sentAt).toEqual(minutesAfterCreation(5));
   });

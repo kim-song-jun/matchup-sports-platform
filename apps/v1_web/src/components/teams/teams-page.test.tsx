@@ -91,7 +91,7 @@ function mockOwnerMembersPage(activeOwnerCount: number, { memberCount = activeOw
     isError: false,
   });
   teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
-  teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+  teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
   teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
   teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
   teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
@@ -367,6 +367,7 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
           successMessage: null,
         },
         items: [],
+        pastItems: [],
         listLoading: false,
         listError: false,
         onRetry: vi.fn(),
@@ -758,6 +759,7 @@ describe('TeamMembersPageClient — 팀 나가기 (self-leave)', () => {
           { invitationId: 'inv-a', invitedUser: { userId: 'u-a', displayName: '김도윤', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
           { invitationId: 'inv-b', invitedUser: { userId: 'u-b', displayName: '박서준', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
         ],
+        pastItems: [],
       },
       isLoading: false,
       isError: false,
@@ -783,6 +785,36 @@ describe('TeamMembersPageClient — 팀 나가기 (self-leave)', () => {
     await waitFor(() => expect(cancelMutate).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('button', { name: '김도윤님 초대 취소' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '박서준님 초대 취소' })).toBeDisabled();
+  });
+
+  it('알림이 가리킨 ?tab=invitations 로 들어오면 초대 탭이 바로 열리고, 지난 초대가 끝난 이유와 함께 보인다', () => {
+    mockOwnerMembersPage(1);
+    navMocks.searchParams.mockReturnValue(new URLSearchParams('tab=invitations'));
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({
+      data: {
+        items: [],
+        pastItems: [
+          { invitationId: 'inv-d', invitedUser: { userId: 'u-d', displayName: '선수17', profileImageUrl: null }, status: 'declined', message: null, createdAt: '2026-09-20T00:00:00Z', closedAt: '2026-09-29T15:00:00Z' },
+          { invitationId: 'inv-c', invitedUser: { userId: 'u-c', displayName: '선수18', profileImageUrl: null }, status: 'cancelled', message: null, createdAt: '2026-09-20T00:00:00Z', closedAt: '2026-09-28T15:00:00Z' },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    try {
+      render(<TeamMembersPageClient teamId="team-1" />);
+
+      expect(screen.getByRole('button', { name: /^초대 \d+$/ })).toHaveAttribute('aria-pressed', 'true');
+      const past = screen.getByRole('list', { name: '지난 초대' });
+      expect(within(past).getByText('선수17')).toBeInTheDocument();
+      expect(within(past).getByText('거절')).toBeInTheDocument();
+      expect(within(past).getByText('취소')).toBeInTheDocument();
+      // 끝난 초대는 되돌릴 수 없다 — 취소 버튼이 없다.
+      expect(within(past).queryByRole('button')).toBeNull();
+    } finally {
+      navMocks.searchParams.mockImplementation(() => new URLSearchParams());
+    }
   });
 });
 

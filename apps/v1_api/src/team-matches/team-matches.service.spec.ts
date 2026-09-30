@@ -14,6 +14,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { GamesService } from '../games/games.service';
 import { TeamMatchesService } from './team-matches.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -1582,6 +1583,32 @@ describe('TeamMatchesService', () => {
     // 신청 제출(POST)은 쓰기 경로의 critical path다 — 응답에 노출되지 않는 hostTeam 신뢰점수를 위해
     // 추가 쿼리를 태우면 안 된다.
     expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
+  });
+
+  it('createApplication: 호스트 팀장·매니저 알림 제목에 신청한 팀을, 본문에 우리 팀과 일시를 싣는다(H1-teammatch-applied)', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1', name: '합정 유나이티드' } });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host', title: '토요일 저녁 친선전' }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: { id: 'team-host', name: '마포 FC', ownerUserId: 'owner-user', status: 'active', profile: null, trustScore: null, memberships: [] },
+      approvedApplicantTeam: null,
+      applications: [],
+    });
+    prisma.v1TeamMatchApplication.create.mockResolvedValue({ id: 'app-new', teamMatchId: 'tm-1', applicantTeamId: 'team-applicant', status: 'requested' });
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+
+    await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_received',
+      'tm-1',
+      undefined,
+      { vars: { name: '합정 유나이티드', team: '마포 FC', when: formatKstMonthDayTime(FUTURE) } },
+    );
   });
 
   it('createApplication: 플랫폼 모집에도 관리 중인 같은 종목 팀으로 신청할 수 있다', async () => {

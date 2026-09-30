@@ -13,6 +13,7 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  scheduleCancelNoticeLine,
   scheduleRsvpDeadlineLabel,
   scheduleStateLabel,
   scheduleTypeLabel,
@@ -318,5 +319,17 @@ describe('attendanceLockedReason', () => {
     expect(attendanceLockedReason('COMPLETED', false)).toBe('이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.');
     expect(attendanceLockedReason('SCHEDULED', true)).toBe('참석 신청 마감 시간이 지났어요.');
     expect(attendanceLockedReason('SCHEDULED', false)).toBeNull();
+  });
+});
+
+describe('scheduleCancelNoticeLine — 서버 취소 알림 수신자와 같은 말', () => {
+  it('전체 공개 일정에 승인된 용병이 있으면 용병도 알림을 받는다고 말한다', () => {
+    expect(scheduleCancelNoticeLine('PUBLIC', 2)).toBe('팀원과 승인된 용병에게 알림이 가요.');
+  });
+
+  it('승인된 용병이 없거나, 공개가 아닌 일정이면 용병을 말하지 않는다 — 비공개 일정 용병에겐 서버도 보내지 않는다', () => {
+    expect(scheduleCancelNoticeLine('PUBLIC', 0)).toBe('팀원에게 알림이 가요.');
+    expect(scheduleCancelNoticeLine('TEAM', 3)).toBe('팀원에게 알림이 가요.');
+    expect(scheduleCancelNoticeLine('MEMBERS', 3)).toBe('팀원에게 알림이 가요.');
   });
 });

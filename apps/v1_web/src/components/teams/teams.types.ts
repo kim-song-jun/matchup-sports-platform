@@ -275,6 +275,8 @@ export type TeamMembersViewModel = {
       cancelPending: boolean;
       onCancel: () => void;
     }>;
+    /** 최근 30일에 끝난 초대 — 수락·거절·취소(초대가 목록에서 사라진 이유) */
+    pastItems: Array<{ invitationId: string; displayName: string; statusLabel: string; closedAt: string }>;
     listLoading: boolean;
     /** 목록 조회 실패 여부 — true면 EmptyState 대신 에러+재시도 UI로 분기 */
     listError: boolean;

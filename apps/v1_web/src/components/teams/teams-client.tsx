@@ -42,7 +42,7 @@ import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/l
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
-import { teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
+import { sentInvitationStatusLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -446,14 +446,18 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   return <TeamDetailPageView model={model} />;
 }
 
+/** 알림이 가입 신청·초대 탭을 직접 가리킨다(?tab=requests|invitations). 관리 권한이 없으면 화면은 멤버 목록만 그린다. */
+function membersTabFromQuery(value: string | null): TeamMembersViewModel['activeTab'] {
+  return value === 'requests' || value === 'invitations' ? value : 'members';
+}
+
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // 팀 상세가 받은 출처를 이어받아 왔으면 뒤로가기를 그 팀 상세(출처 포함)로 돌린다.
   const fromPath = sanitizeRedirectPath(searchParams.get('from'));
   const membersHref = withFromPath(`/teams/${teamId}/members`, fromPath);
-  // 가입 신청 알림·"멤버 초대" 바로가기는 해당 탭을 열고 들어온다(G12 F36). 권한이 없으면 뷰가 멤버 탭으로 돌린다.
-  const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>(() => toMembersTab(searchParams.get('tab')));
+  const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>(() => membersTabFromQuery(searchParams.get('tab')));
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
@@ -803,6 +807,12 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
                   );
                 },
               ),
+          })),
+          pastItems: (invitationsQuery.data?.pastItems ?? []).map((inv) => ({
+            invitationId: inv.invitationId,
+            displayName: inv.invitedUser.displayName,
+            statusLabel: sentInvitationStatusLabel(inv.status),
+            closedAt: inv.closedAt,
           })),
           listLoading: invitationsQuery.isLoading,
           listError: invitationsQuery.isError,
@@ -1298,10 +1308,6 @@ function mergeApprovedApplications(pending: V1TeamJoinApplication[], approved: V
   const gone = approved.filter((application) => !pendingIds.has(application.applicationId));
   if (gone.length === 0) return pending;
   return [...pending, ...gone].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-function toMembersTab(value: string | null): TeamMembersViewModel['activeTab'] {
-  return value === 'requests' || value === 'invitations' ? value : 'members';
 }
 
 /**

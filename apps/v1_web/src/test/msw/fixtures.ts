@@ -679,10 +679,10 @@ export const v1ChatMessagesByRoomFixture: Record<string, CursorPage<V1ChatMessag
     items: [
       {
         messageId: 'chat-match-1-join-1',
-        sender: { userId: 'user-3', displayName: 'New member', profileImageUrl: null },
+        sender: { userId: 'user-3', displayName: '새멤버', profileImageUrl: null },
         messageType: 'system',
         systemEventType: 'joined',
-        content: 'New member joined the room',
+        content: '새멤버님이 들어왔어요',
         status: 'sent',
         sentAt: '2026-05-18T09:04:00.000Z',
         mine: false,
@@ -751,8 +751,8 @@ export const v1NotificationsFixture = {
     {
       notificationId: 'notification-2',
       type: 'team_match',
-      title: '팀매치 신청 도착',
-      body: '상대팀 신청이 들어왔어요. 조건을 확인해 주세요.',
+      title: '합정 유나이티드 팀이 팀매치를 신청했어요',
+      body: '"마포 FC" · 친선 팀매치 · 5/30 (토) 19:00 · 승인하거나 거절해 주세요.',
       target: { type: 'team_match', id: 'team-match-1', route: '/team-matches/team-match-1' },
       status: 'created',
       readAt: null,

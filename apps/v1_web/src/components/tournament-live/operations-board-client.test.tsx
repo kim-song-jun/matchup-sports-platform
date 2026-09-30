@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperationsBoardClient } from './operations-board-client';
@@ -147,6 +147,12 @@ describe('OperationsBoardClient', () => {
     });
   });
 
+  /** 첫 번째(데스크톱 표) 행의 ⋯ 를 눌러 시트를 연다. 표와 카드가 둘 다 DOM 에 있어 이름이 겹친다. */
+  function openRowMenu(title = '레드팀 vs 블루팀') {
+    fireEvent.click(screen.getAllByRole('button', { name: `${title} 더보기` })[0]);
+    return screen.getByRole('dialog', { name: `${title} 더보기` });
+  }
+
   it('renders a fixture row joined with its public team names, game state, and both stable + live warnings', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 
@@ -190,7 +196,7 @@ describe('OperationsBoardClient', () => {
       isError: false,
     });
 
-    it('시작 전 경기의 양 팀 신청만 한 번씩 조회하고, 빠짐(빠짐+결장)·정지와 팀별 명단 링크를 보인다', () => {
+    it('시작 전 경기의 양 팀 신청만 한 번씩 조회하고, 빠짐(빠짐+결장)·정지는 경고 칸에, 팀별 명단 링크는 ⋯ 안에 둔다', () => {
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
         data: { ...PAGE, items: [SCHEDULED_ITEM, { ...ENDED_PENALTY_ITEM, homeRegistrationId: 'reg-ended', awayRegistrationId: 'reg-ended-2' }] },
         isPending: false,
@@ -207,17 +213,43 @@ describe('OperationsBoardClient', () => {
       // 끝난 경기의 신청은 부르지 않는다 — 조정은 시작 전에만 한다.
       expect(mocks.useRosterList).toHaveBeenLastCalledWith('t-1', ['reg-home', 'reg-away']);
       expect(screen.getAllByText('레드팀 · 빠짐 2 · 정지 1').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('블루팀 · 빠짐 0 · 정지 0').length).toBeGreaterThan(0);
+      // 빠짐·정지가 모두 0 인 팀은 경고가 아니다 — 칸을 차지하지 않는다 (대조군: 위 레드팀은 뜬다).
+      expect(screen.queryByText('블루팀 · 빠짐 0 · 정지 0')).toBeNull();
+      // 명단 링크는 행에 늘어놓지 않고 ⋯ 시트 안에 있다.
+      expect(screen.queryByRole('link', { name: '레드팀 경기 명단' })).toBeNull();
+      const sheet = openRowMenu();
       // 명단 화면의 뒤로가기가 팀 상세가 아니라 이 보드로 돌아오게 출처를 싣는다.
-      const redLinks = screen.getAllByRole('link', { name: '레드팀 경기 명단' });
-      expect(redLinks[0]).toHaveAttribute('href', `/teams/team-red/games/game-1/roster?from=${BOARD_FROM}`);
-      expect(screen.getAllByRole('link', { name: '블루팀 경기 명단' })[0]).toHaveAttribute(
+      expect(within(sheet).getByRole('link', { name: /^레드팀 경기 명단/ })).toHaveAttribute(
+        'href',
+        `/teams/team-red/games/game-1/roster?from=${BOARD_FROM}`,
+      );
+      expect(within(sheet).getByRole('link', { name: /^블루팀 경기 명단/ })).toHaveAttribute(
         'href',
         `/teams/team-blue/games/game-1/roster?from=${BOARD_FROM}`,
       );
     });
 
-    it('표에 그 경기 열이 없어도(시작 시각이 지났지만 아직 시작 전) 불러온 팀에는 "명단" 버튼을 둔다', () => {
+    it('빠짐·정지 경고는 한 덩어리 칩이다 — 숫자 사이에서 줄이 꺾이지 않게 한 줄로 고정된다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [SCHEDULED_ITEM] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      mocks.useRosterList.mockReturnValue([
+        matrixFor('reg-home', 'team-red', '블루팀', { excluded: 0, unavailable: 0, suspended: 3 }),
+        matrixFor('reg-away', 'team-blue', '레드팀', { excluded: 0, unavailable: 0, suspended: 0 }),
+      ]);
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      // F53 — 예전엔 "정지 0" 이 "정 / 지 0" 으로 글자 중간에서 끊겼다. jsdom 은 레이아웃을 재지 못해
+      // 꺾임을 막는 클래스가 칩에 걸려 있는지를 계약으로 둔다.
+      const chip = screen.getAllByText('레드팀 · 빠짐 0 · 정지 3')[0].closest('span') as HTMLElement;
+      expect(chip).toHaveClass('whitespace-nowrap');
+    });
+
+    it('표에 그 경기 열이 없어도(시작 시각이 지났지만 아직 시작 전) 불러온 팀의 명단 링크는 ⋯ 안에 둔다', () => {
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
         data: { ...PAGE, items: [SCHEDULED_ITEM] },
         isPending: false,
@@ -232,17 +264,18 @@ describe('OperationsBoardClient', () => {
       ]);
       render(<OperationsBoardClient tournamentId="t-1" />);
 
-      expect(screen.getAllByText('레드팀 · 요약은 명단 화면에서 볼 수 있어요').length).toBeGreaterThan(0);
-      expect(screen.getAllByRole('link', { name: '레드팀 경기 명단' })[0]).toHaveAttribute(
+      // 요약을 못 읽은 것은 경고가 아니다 — 칩을 만들지 않는다.
+      expect(screen.queryByText(/요약은 명단 화면에서 볼 수 있어요/)).toBeNull();
+      const sheet = openRowMenu();
+      expect(within(sheet).getByRole('link', { name: /^레드팀 경기 명단/ })).toHaveAttribute(
         'href',
         `/teams/team-red/games/game-1/roster?from=${BOARD_FROM}`,
       );
-      // 아직 불러오는 팀은 팀을 몰라 버튼을 만들 수 없다 — 줄을 비워 둔다.
-      expect(screen.queryAllByRole('link', { name: '블루팀 경기 명단' })).toHaveLength(0);
-      expect(screen.queryByText(/블루팀 ·/)).toBeNull();
+      // 아직 불러오는 팀은 팀을 몰라 링크를 만들 수 없다.
+      expect(within(sheet).queryByRole('link', { name: /^블루팀 경기 명단/ })).toBeNull();
     });
 
-    it('진행 중 경기에는 요약 표에 그 경기 열이 있어도 명단 요약·버튼을 보이지 않는다', () => {
+    it('진행 중 경기에는 요약 표에 그 경기 열이 있어도 명단 경고·링크를 보이지 않는다', () => {
       // 같은 두 팀의 시작 전 경기(대조군)와 진행 중 경기 — 두 경기 모두 표에 열이 있다.
       const LIVE_ITEM: V1TournamentOperationsBoardItem = { ...ITEM_A, fixtureId: 'fixture-live', fixtureNumber: 7, gameId: 'game-live' };
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
@@ -266,15 +299,19 @@ describe('OperationsBoardClient', () => {
         screen.getAllByText(label).map((node) => (node.closest('tr') ?? node.closest('li')) as HTMLElement);
       const liveRows = rowsOf('8강 7번');
       expect(liveRows.length).toBeGreaterThan(0);
-      for (const row of liveRows) {
-        expect(within(row).queryByRole('link', { name: /경기 명단$/ })).toBeNull();
-        expect(within(row).queryByText(/빠짐 \d/)).toBeNull();
-      }
-      const scheduledRows = rowsOf('레드팀 vs 블루팀');
-      expect(scheduledRows.some((row) => within(row).queryByRole('link', { name: '레드팀 경기 명단' }) !== null)).toBe(true);
+      for (const row of liveRows) expect(within(row).queryByText(/빠짐 \d/)).toBeNull();
+      // 시작 전 경기(대조군)에는 경고가 뜬다.
+      expect(rowsOf('레드팀 vs 블루팀').some((row) => within(row).queryByText(/빠짐 1/) !== null)).toBe(true);
+
+      // 진행 중 경기의 ⋯ 시트에는 명단 링크가 없다 (결과 항목은 제출된 결과가 있어 있다).
+      const liveSheet = openRowMenu('8강 7번');
+      expect(within(liveSheet).queryByRole('link', { name: /경기 명단/ })).toBeNull();
+      fireEvent.click(within(liveSheet).getByRole('button', { name: '닫기' }));
+      const scheduledSheet = openRowMenu();
+      expect(within(scheduledSheet).getByRole('link', { name: /^레드팀 경기 명단/ })).toBeInTheDocument();
     });
 
-    it('요약 조회가 실패한 팀은 실패라고 말하고 버튼을 만들지 않는다', () => {
+    it('요약 조회가 실패한 팀은 실패라고 말하고 명단 링크를 만들지 않는다', () => {
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
         data: { ...PAGE, items: [SCHEDULED_ITEM] },
         isPending: false,
@@ -288,7 +325,49 @@ describe('OperationsBoardClient', () => {
       expect(mocks.useRosterList).toHaveBeenLastCalledWith('t-1', ['reg-home', 'reg-away']);
       expect(screen.getAllByText('레드팀 명단 요약을 불러오지 못했어요').length).toBeGreaterThan(0);
       expect(screen.getAllByText('블루팀 · 빠짐 0 · 정지 2').length).toBeGreaterThan(0);
-      expect(screen.queryAllByRole('link', { name: '레드팀 경기 명단' })).toHaveLength(0);
+      const sheet = openRowMenu();
+      expect(within(sheet).queryByRole('link', { name: /^레드팀 경기 명단/ })).toBeNull();
+      expect(within(sheet).getByRole('link', { name: /^블루팀 경기 명단/ })).toBeInTheDocument();
+    });
+  });
+
+  // Task 180 G6(F53·F55) — 운영 열은 주 버튼 하나 + ⋯ 다.
+  describe('운영 열', () => {
+    it('운영 콘솔 링크 하나와 ⋯ 만 행에 두고, 결과 정정은 ⋯ 안으로 들어간다', () => {
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.getAllByRole('link', { name: /운영 콘솔/ }).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('button', { name: '결과 정정' })).toBeNull();
+      const sheet = openRowMenu();
+      expect(within(sheet).getByRole('button', { name: /^결과 정정/ })).toBeEnabled();
+    });
+
+    it('아직 결과가 없는 경기(예정·진행 중, 제출 전)에는 결과 정정 항목이 없고, 넣을 항목이 없으면 ⋯ 자체가 없다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: {
+          ...PAGE,
+          items: [{ ...ITEM_A, gameState: 'SCHEDULED', currentRevisionState: null }],
+          liveWarnings: [],
+        },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      // 시작 전이라도 명단 링크가 없으면(요약 조회 전) 시트에 넣을 것이 없다.
+      expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
+      expect(screen.queryByText(/결과 정정/)).toBeNull();
+    });
+
+    it('SUPPORT_READONLY 에게는 같은 항목이 "결과 보기"로 나온다', () => {
+      mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      const sheet = openRowMenu();
+      expect(within(sheet).getByRole('button', { name: /^결과 보기/ })).toBeInTheDocument();
+      expect(within(sheet).queryByRole('button', { name: /결과 정정/ })).toBeNull();
     });
   });
 
@@ -297,7 +376,11 @@ describe('OperationsBoardClient', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 
     expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: '결과 정정' })[0]);
+    await user.click(screen.getAllByRole('button', { name: '레드팀 vs 블루팀 더보기' })[0]);
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
+
+    // 항목을 고르면 시트는 닫히고 인라인 패널이 열린다.
+    expect(screen.queryByRole('dialog', { name: /더보기/ })).toBeNull();
 
     expect(screen.getAllByTestId('inline-correction-game-1')).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: '정정 닫기' })).toHaveLength(1);
@@ -314,7 +397,8 @@ describe('OperationsBoardClient', () => {
       refetch: vi.fn().mockResolvedValue({ isSuccess: true, data: [{ state: 'OFFICIAL' }] }),
     });
     render(<OperationsBoardClient tournamentId="t-1" />);
-    await user.click(screen.getAllByRole('button', { name: '결과 정정' })[0]);
+    await user.click(screen.getAllByRole('button', { name: '레드팀 vs 블루팀 더보기' })[0]);
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
     await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
     expect(await screen.findByTestId('inline-correction-game-1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '테스트 결과 확인' })).not.toBeInTheDocument();
@@ -327,7 +411,8 @@ describe('OperationsBoardClient', () => {
       refetch: vi.fn().mockResolvedValue({ isSuccess: false, data: [{ state: 'OFFICIAL' }] }),
     });
     render(<OperationsBoardClient tournamentId="t-1" />);
-    await user.click(screen.getAllByRole('button', { name: '결과 정정' })[0]);
+    await user.click(screen.getAllByRole('button', { name: '레드팀 vs 블루팀 더보기' })[0]);
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
     await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
     expect(screen.getByRole('button', { name: '테스트 결과 확인' })).toBeInTheDocument();
     expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
@@ -435,6 +520,7 @@ describe('OperationsBoardClient', () => {
       expect(screen.queryByText('0:1')).not.toBeInTheDocument();
     });
 
+    // F55 — 비활성 버튼으로 남기지 않고 항목 자체를 뺀다.
     it('does not offer correction for a paused game without a revision', () => {
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
         data: { ...PAGE, items: [{ ...ITEM_A, gameState: 'PAUSED', currentRevisionState: null }], liveWarnings: [] },
@@ -446,7 +532,8 @@ describe('OperationsBoardClient', () => {
 
       render(<OperationsBoardClient tournamentId="t-1" />);
 
-      expect(screen.getAllByRole('button', { name: '결과 정정' }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
+      expect(screen.queryByText('결과 정정')).toBeNull();
+      expect(screen.queryByRole('button', { name: /더보기/ })).toBeNull();
     });
   });
 

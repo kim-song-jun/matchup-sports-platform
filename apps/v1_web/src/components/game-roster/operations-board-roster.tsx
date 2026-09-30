@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import type { V1AdminRegistrationRosterMatrix } from '@/hooks/use-v1-game-roster';
 import type { V1GameRosterSummary } from '@/hooks/use-v1-api';
+import type { ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { withFromPath } from '@/lib/session-storage';
 import type { V1TournamentOperationsBoardItem } from '@/types/api';
@@ -51,57 +51,72 @@ export type BoardRosterSideState = {
   failed: boolean;
 };
 
+type BoardRosterRow = { key: 'home' | 'away'; state: BoardRosterSideState; name: string };
+
 /**
- * 운영 보드 경기 카드의 "빠짐 N · 정지 N" 과 "명단" 버튼(Task 179). 빠짐 = 이번 경기 빠짐 + 결장.
- * 편집은 경기 명단 화면에서 운영자 권한으로 한다 — 보드에는 편집을 두지 않는다(운영 방해 없이).
- * 팀 표는 시작 시각이 지난 경기를 싣지 않지만 편집은 `SCHEDULED` 동안 열려 있어, 열이 없어도 버튼은 둔다.
+ * 시작 전 경기의 팀별 명단 상태. 편집은 경기 명단 화면에서 운영자 권한으로 한다 — 보드에는 편집을
+ * 두지 않는다(운영 방해 없이). 팀 표는 시작 시각이 지난 경기를 싣지 않지만 편집은 `SCHEDULED`
+ * 동안 열려 있어, 열이 없어도 명단 화면으로 가는 길은 둔다.
  */
-export function BoardRosterSummary({
-  item,
-  home,
-  away,
-  from,
-}: {
-  item: V1TournamentOperationsBoardItem;
-  home: BoardRosterSideState;
-  away: BoardRosterSideState;
-  /** 명단 화면의 뒤로가기가 이 보드로 돌아오게 싣는 출처. */
-  from: string | null;
-}) {
-  if (item.gameId === null || item.gameState !== 'SCHEDULED') return null;
-  const gameId = item.gameId;
-  const rows = [
-    { key: 'home', state: home, fallbackName: home.name ?? away.side?.opponentName ?? '홈팀' },
-    { key: 'away', state: away, fallbackName: away.name ?? home.side?.opponentName ?? '원정팀' },
+function boardRosterRows(
+  item: V1TournamentOperationsBoardItem,
+  home: BoardRosterSideState,
+  away: BoardRosterSideState,
+): BoardRosterRow[] {
+  if (item.gameId === null || item.gameState !== 'SCHEDULED') return [];
+  return [
+    { key: 'home' as const, state: home, name: home.name ?? away.side?.opponentName ?? '홈팀' },
+    { key: 'away' as const, state: away, name: away.name ?? home.side?.opponentName ?? '원정팀' },
   ].filter((row) => row.state.registrationId !== null && (row.state.teamId !== null || row.state.failed));
-  if (rows.length === 0) return null;
-  return (
-    <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0" aria-label="경기 명단 요약">
-      {rows.map(({ key, state, fallbackName }) => (
-        <li key={key} className="flex flex-wrap items-center gap-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          {state.teamId === null ? (
-            <span>{fallbackName} 명단 요약을 불러오지 못했어요</span>
-          ) : (
-            <>
-              <span className="min-w-0 break-words">
-                {fallbackName} · {state.side === null ? '요약은 명단 화면에서 볼 수 있어요' : summaryText(state.side.summary)}
-              </span>
-              <Link
-                href={withFromPath(gameRosterScreenPath(state.teamId, gameId), from)}
-                aria-label={`${fallbackName} 경기 명단`}
-                className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border)] px-3 font-medium whitespace-nowrap text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                명단
-              </Link>
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
-function summaryText(summary: V1GameRosterSummary | null): string {
-  if (summary === null) return '참가 명단 없음';
-  return `빠짐 ${summary.excluded + summary.unavailable} · 정지 ${summary.suspended}`;
+/**
+ * 운영 보드 경고 칸에 함께 올라가는 명단 경고 문장. 빠짐 = 이번 경기 빠짐 + 결장.
+ * 경고만 올린다 — 빠짐·정지가 모두 0 인 팀은 조치할 것이 없어 칸을 차지하지 않는다.
+ * (명단 요약을 아직 못 읽은 팀 — 표에 그 경기 열이 없는 경우 — 도 경고가 아니라서 올리지 않는다.)
+ */
+export function boardRosterAlerts(
+  item: V1TournamentOperationsBoardItem,
+  home: BoardRosterSideState,
+  away: BoardRosterSideState,
+): string[] {
+  const alerts: string[] = [];
+  for (const { state, name } of boardRosterRows(item, home, away)) {
+    if (state.teamId === null) {
+      alerts.push(`${name} 명단 요약을 불러오지 못했어요`);
+    } else if (state.side !== null) {
+      if (state.side.summary === null) {
+        alerts.push(`${name} 참가 명단 없음`);
+      } else {
+        const missing = state.side.summary.excluded + state.side.summary.unavailable;
+        if (missing > 0 || state.side.summary.suspended > 0) {
+          alerts.push(`${name} · 빠짐 ${missing} · 정지 ${state.side.summary.suspended}`);
+        }
+      }
+    }
+  }
+  return alerts;
+}
+
+/** ⋯ 시트 안의 팀별 "경기 명단" 링크 — 명단 화면의 뒤로가기가 이 보드로 돌아오게 출처(`from`)를 싣는다. */
+export function boardRosterLinkActions(
+  item: V1TournamentOperationsBoardItem,
+  home: BoardRosterSideState,
+  away: BoardRosterSideState,
+  from: string | null,
+): ActionSheetAction[] {
+  const gameId = item.gameId;
+  if (gameId === null) return [];
+  return boardRosterRows(item, home, away).flatMap(({ key, state, name }) =>
+    state.teamId === null
+      ? []
+      : [
+          {
+            key: `roster-${key}`,
+            label: `${name} 경기 명단`,
+            description: '이번 경기에 뛸 선수를 확인하고 조정해요',
+            href: withFromPath(gameRosterScreenPath(state.teamId, gameId), from),
+          },
+        ],
+  );
 }

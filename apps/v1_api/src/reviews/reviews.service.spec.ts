@@ -1712,6 +1712,39 @@ describe('ReviewsService', () => {
       expect(createMock).toHaveBeenCalledTimes(2);
     });
 
+    // 팀 후기 제출과 같은 코드로 떨어져야 한다 — 같은 사유(명단 밖 작성자)가 제출 종류에 따라 다른 403 이면 안 된다.
+    it('겸직자가 명단에서 빠진 방향의 상대 선수 후기는 NOT_ACTUAL_PARTICIPANT, 열린 방향 선수는 저장된다', async () => {
+      // memberA: 홈·원정 양쪽 팀원. 홈 명단에는 없고(빠짐) 원정 명단에는 있다 → 원정 팀원으로서 홈 선수만 평가한다.
+      const { prisma, createMock } = teamMatchWorld(
+        [
+          { userId: memberAId, teamId: hostTeamId, role: 'member' },
+          { userId: memberAId, teamId: awayTeamId, role: 'member' },
+        ],
+        [],
+        [memberAId, opponentA],
+        [],
+        [memberBId],
+      );
+      const service = makeService(prisma);
+      const submitPlayer = (targetUserId: string) => service.submit(authUser(memberAId), { ...playerDto, targetUserId });
+
+      // opponentA 는 원정 명단 선수 — 홈 팀원으로서 평가하는 닫힌 방향의 대상이다.
+      const closed = await submitPlayer(opponentA).catch((err: unknown) => err);
+      expect(closed).toBeInstanceOf(ForbiddenException);
+      expect((closed as ForbiddenException).getResponse()).toMatchObject({ code: 'NOT_ACTUAL_PARTICIPANT' });
+      // 대조군: 어느 방향에도 없는 선수는 여전히 "대상 아님"이다.
+      const unknown = await submitPlayer('never-played').catch((err: unknown) => err);
+      expect((unknown as ForbiddenException).getResponse()).toMatchObject({ code: 'TARGET_NOT_REVIEWABLE' });
+      expect(createMock).not.toHaveBeenCalled();
+
+      // 열린 방향(원정 팀원 → 홈 선수)은 그대로 저장된다.
+      const open = await submitPlayer(memberBId);
+      expect(open.alreadySubmitted).toBe(false);
+      expect(createMock).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ reviewerTeamId: awayTeamId, targetUserId: memberBId }),
+      }));
+    });
+
     it('양 팀 겸직자가 한쪽 사이드 명단에서만 빠지면 그 방향만 닫힌다', async () => {
       // memberA 는 홈·원정 양쪽 팀원. 홈 명단에는 없고(빠짐) 원정 명단에는 있다.
       const { prisma, createMock } = teamMatchWorld(

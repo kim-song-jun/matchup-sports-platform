@@ -793,7 +793,11 @@ export class ReviewsService {
         return [...teamTargets, ...playerTargets];
       }),
     };
-    return { payload, reviewerTeams, benchedTeamIds, opponentOf };
+    // 닫힌 방향의 상대 선수 — 제출 시 "없는 대상"이 아니라 "명단 밖 작성자"로 구분해 응답하기 위한 것이다.
+    const benchedTargetUserIds = new Set(
+      benchedTeamIds.flatMap((teamId) => (rosterByTeamId.get(opponentOf(teamId).id) ?? []).map((player) => player.userId)),
+    );
+    return { payload, reviewerTeams, benchedTeamIds, benchedTargetUserIds, opponentOf };
   }
 
   /**
@@ -922,9 +926,13 @@ export class ReviewsService {
   private async submitTeamMatchPlayerReview(user: V1AuthUser, dto: SubmitReviewDto, tagCodes: ReviewTagCode[]) {
     if (!dto.targetUserId) throw badRequest('TARGET_USER_REQUIRED', 'targetUserId is required');
     const targetUserId = dto.targetUserId;
-    const { payload: source } = await this.teamMatchSourceContext(user, dto.sourceId);
+    const { payload: source, benchedTargetUserIds } = await this.teamMatchSourceContext(user, dto.sourceId);
     const target = source.targets.find((item) => item.targetType === 'user' && item.targetUserId === targetUserId);
-    if (!target) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target user is not reviewable for this source');
+    if (!target) {
+      // 겸직자가 한쪽 사이드 명단에서만 빠진 경우, 그 방향의 상대 선수는 대상 문제가 아니라 명단 문제다.
+      if (benchedTargetUserIds.has(targetUserId)) throw notActualParticipant();
+      throw forbidden('TARGET_NOT_REVIEWABLE', 'Target user is not reviewable for this source');
+    }
     const existing = target.review;
     if (existing) return { review: existing, alreadySubmitted: true };
 

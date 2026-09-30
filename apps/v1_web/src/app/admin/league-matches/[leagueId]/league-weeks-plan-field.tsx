@@ -39,7 +39,7 @@ export function LeagueWeeksPlanField({
   return (
     <>
       <div className="w-full">
-        <p className="rounded-lg bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-strong)]">
+        <p className="rounded-lg bg-[var(--surface-soft)] p-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
           <span className="font-semibold">
             {teamCount}팀 · {weeksPlanLabel(plan)}
           </span>{' '}
@@ -65,7 +65,7 @@ export function LeagueWeeksPlanField({
         </div>
       </div>
       <div>
-        <label htmlFor={inputId} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+        <label htmlFor={inputId} className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
           주차 수
         </label>
         <input

@@ -786,7 +786,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               />
               {/* 잠긴 칸의 회색 시각이 자리표시처럼 보여 왜 못 바꾸는지 몰랐다(F41) — 여는 방법을 적는다. */}
               {dayOfWeek === '' && selectedDates.length === 0 ? (
-                <p id={timeHintId} className="mt-1 w-36 text-xs text-[var(--text-muted)]">
+                <p id={timeHintId} className="mt-1 w-36 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                   요일이나 경기 날짜를 먼저 고르면 바꿀 수 있어요.
                 </p>
               ) : null}
@@ -1133,7 +1133,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       className={`${inputClass} w-36 disabled:opacity-50`}
                     />
                     {dayOfWeek === '' ? (
-                      <p id={`${timeHintId}-regen`} className="mt-1 w-36 text-xs text-[var(--text-muted)]">
+                      <p id={`${timeHintId}-regen`} className="mt-1 w-36 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                         요일을 먼저 고르면 바꿀 수 있어요.
                       </p>
                     ) : null}
@@ -1539,7 +1539,7 @@ function FixtureTimingFields({
           className={`${inputClass} w-28 disabled:opacity-50`}
         />
         {dayOfWeekUnset ? (
-          <p id={`${idPrefix}-end-time-hint`} className="mt-1 w-28 text-xs text-[var(--text-muted)]">
+          <p id={`${idPrefix}-end-time-hint`} className="mt-1 w-28 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
             요일을 먼저 고르면 바꿀 수 있어요.
           </p>
         ) : null}

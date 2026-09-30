@@ -16,6 +16,7 @@ import {
   Timer,
   Ellipsis,
 } from 'lucide-react';
+import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
@@ -45,7 +46,6 @@ import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
 import { ArrivalCheckinPanel } from './arrival-checkin-panel';
-import { ConsoleMoreSheet, type ConsoleMoreAction } from './console-more-sheet';
 import { ConsoleNextSteps } from './console-next-steps';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { RestTimer } from './rest-timer';
@@ -1064,7 +1064,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 정규 시간이 끝나기 전에도 눌리는 "경기 종료"(조기 정상 종료)와 몰수·중단 종료는
   // 주 조작 줄이 아니라 ⋯ 시트 안에 둔다. 정규 시간 종료 뒤의 "경기 종료"만 주 버튼이다.
   const endAvailable = availableCommands.includes('end');
-  const moreActions: ConsoleMoreAction[] = [];
+  const moreActions: ActionSheetAction[] = [];
   if (endAvailable && !regulationEnded) {
     moreActions.push({
       key: 'early-end',
@@ -1531,8 +1531,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
           높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
           부풀어 보인다. */}
-      <ConsoleMoreSheet
+      <ActionSheet
         open={moreOpen && moreActions.length > 0}
+        title="경기 더보기"
         actions={moreActions}
         onClose={() => setMoreOpen(false)}
       />

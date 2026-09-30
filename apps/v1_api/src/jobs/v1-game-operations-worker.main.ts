@@ -9,6 +9,10 @@ import {
 } from '../inquiries/inquiry-slack-notifier';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import {
+  SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
+  SCHEDULE_CREATED_NOTIFICATION_TYPE,
+} from '../team-schedules/team-schedules.service';
+import {
   LINEUP_REMINDER_SCAN_TYPE,
   LineupReminderService,
   scheduleNextScan,
@@ -62,6 +66,9 @@ async function bootstrap(): Promise<void> {
     'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
     scheduleReminders.guestApplicationManagerNotificationHandler,
   );
+  // 일정 생성·취소 알림(Task 180 H1) — team-schedules.service.ts 가 같은 트랜잭션에 넣은 outbox 행.
+  worker.registerHandler(SCHEDULE_CREATED_NOTIFICATION_TYPE, scheduleReminders.scheduleCreatedNotificationHandler);
+  worker.registerHandler(SCHEDULE_CANCELLED_NOTIFICATION_TYPE, scheduleReminders.scheduleCancelledNotificationHandler);
 
   // 라인업 리마인더 lane. 이벤트가 아니라 "아직 안 한 상태"를 감지해야 하므로 주기
   // 스캔이 필요한데, 두 번째 스케줄러를 들이지 않고 이 워커의 outbox 루프를 그대로

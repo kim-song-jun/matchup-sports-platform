@@ -22,6 +22,26 @@ const RESOURCE_TYPE = 'V1_TEAM_SCHEDULE';
 const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 type Tx = Prisma.TransactionClient;
+
+/** 일정 생성·취소 알림(H1-schedule-*) outbox 종류 — 워커의 ScheduleReminderService 가 받아 팀원에게 쓴다. */
+export const SCHEDULE_CREATED_NOTIFICATION_TYPE = 'SCHEDULE_CREATED_NOTIFICATION';
+export const SCHEDULE_CANCELLED_NOTIFICATION_TYPE = 'SCHEDULE_CANCELLED_NOTIFICATION';
+
+/** 같은 트랜잭션에 알림 outbox 행을 넣는다 — 일정이 롤백되면 알림도 없고, 커밋되면 워커가 반드시 보낸다. */
+async function enqueueScheduleNotice(tx: Tx, kind: 'created' | 'cancelled', scheduleId: string, actorUserId: string): Promise<void> {
+  await tx.v1OutboxEvent.createMany({
+    data: [
+      {
+        businessKey: `schedule:${scheduleId}:${kind}-notification`,
+        aggregateType: RESOURCE_TYPE,
+        aggregateId: scheduleId,
+        type: kind === 'created' ? SCHEDULE_CREATED_NOTIFICATION_TYPE : SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
+        payload: { scheduleId, actorUserId },
+      },
+    ],
+    skipDuplicates: true,
+  });
+}
 type LinkedMatch = { teamMatchId: string; tournamentId: string | null; leagueId: string | null };
 type MatchProjection = { linkedMatch: LinkedMatch; confirmed: boolean };
 
@@ -437,6 +457,8 @@ export class TeamSchedulesService {
         },
       });
 
+      await enqueueScheduleNotice(tx, 'created', created.id, user.id);
+
       const response = { ...this.toDetailJson(created), replayed: false };
       // P1-6 fix: resourceId is `teamId` (matching the lock/lookup above), not `created.id` — see
       // this method's own P1-6 comment above for why the created schedule's id must not double as
@@ -654,6 +676,7 @@ export class TeamSchedulesService {
         SET state = 'CLOSED'::"V1GuestRecruitmentState", version = version + 1, updated_at = CURRENT_TIMESTAMP
         WHERE schedule_id = ${scheduleId} AND state = 'OPEN'::"V1GuestRecruitmentState"
       `;
+      await enqueueScheduleNotice(tx, 'cancelled', scheduleId, user.id);
 
       const after = await tx.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
       const response = {

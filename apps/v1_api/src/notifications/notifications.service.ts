@@ -2,7 +2,7 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { isQuietHour, quietHoursEndAfter } from '../common/quiet-hours';
+import { isQuietHour, nightPushAllowed } from '../common/quiet-hours';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   NotificationsQueryDto,
@@ -57,6 +57,9 @@ export type NotificationEventType =
   | 'team_member_left'
   // 초대한 사람에게(H1-invite-declined). 이유·다시 초대 권유는 싣지 않는다.
   | 'team_invitation_declined'
+  // 팀 일정 생성·취소(H1-schedule-*). 워커(jobs/schedule-reminders)가 outbox 로 받아 쓴다 — targetId "${teamId}:${scheduleId}".
+  | 'team_schedule_created'
+  | 'team_schedule_cancelled'
   | 'team_contact_received'
   | 'team_contact_accepted'
   | 'team_contact_declined'
@@ -169,6 +172,8 @@ const TEAM_MEMBERSHIP_EVENTS: ReadonlySet<NotificationEventType> = new Set([
 const SCHEDULE_TARGET_EVENTS: ReadonlySet<NotificationEventType> = new Set([
   'schedule_rsvp_deadline_reminder',
   'schedule_guest_recruitment_close_reminder',
+  'team_schedule_created',
+  'team_schedule_cancelled',
 ]);
 
 /**
@@ -220,8 +225,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
-    type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder' ||
+    SCHEDULE_TARGET_EVENTS.has(type) ||
     type === 'team_contact_received' ||
     type === 'team_contact_accepted' ||
     type === 'team_contact_declined'
@@ -314,8 +318,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
-    type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder'
+    SCHEDULE_TARGET_EVENTS.has(type)
   ) {
     return 'team';
   }
@@ -470,10 +473,7 @@ function deepLinkForEvent(
   // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
   // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in
   // this service.
-  if (
-    (type === 'schedule_rsvp_deadline_reminder' || type === 'schedule_guest_recruitment_close_reminder') &&
-    targetId
-  ) {
+  if (SCHEDULE_TARGET_EVENTS.has(type) && targetId) {
     const [teamId, scheduleId] = targetId.split(':');
     if (teamId && scheduleId) {
       return `/teams/${teamId}/schedules/${scheduleId}`;
@@ -567,6 +567,8 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_membership_removed: '팀에서 제외됐어요',
   team_member_left: '{name}님이 팀을 나갔어요',
   team_invitation_declined: '{name}님이 초대를 거절했어요',
+  team_schedule_created: '새 일정이 올라왔어요',
+  team_schedule_cancelled: '일정이 취소됐어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -637,6 +639,9 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_membership_removed: '"{team}" · 이 팀의 일정과 채팅은 더 볼 수 없어요.',
   team_member_left: '"{team}" · 지금 멤버는 {count}명이에요.',
   team_invitation_declined: '"{team}" 팀 초대가 거절됐어요.',
+  team_schedule_created: '"{team}" · {title} · {when}. 참석 여부를 알려 주세요.',
+  // 취소 사유는 팀장·매니저가 적은 문장 그대로다.
+  team_schedule_cancelled: '"{team}" · {title}({when}) · {reason}',
   inquiry_answered: '답변 내용을 확인해 주세요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
@@ -950,8 +955,7 @@ export class NotificationsService {
     const now = new Date();
     if (!NIGHT_HELD_PREF_FIELDS.has(preferenceFieldForEvent(type)) || !isQuietHour(now)) return true;
     try {
-      const startsAt = await this.eventStartsAt(type, targetType, targetId);
-      return startsAt !== null && startsAt < quietHoursEndAfter(now);
+      return nightPushAllowed(now, await this.eventStartsAt(type, targetType, targetId));
     } catch (err) {
       this.logger.warn({ type, targetId, err }, '야간 푸시 판정용 시작 시각 조회 실패 — 푸시를 보류합니다');
       return false;

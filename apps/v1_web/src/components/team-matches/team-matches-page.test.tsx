@@ -53,6 +53,50 @@ describe('team match images', () => {
   });
 });
 
+describe('취소된 팀매치 상세 (L31)', () => {
+  function cancelledModel() {
+    const model = getTeamMatchDetailViewModel('mine');
+    return {
+      ...model,
+      mode: 'cancelled' as const,
+      applyLabel: '취소된 팀매치예요',
+      statusLabel: '취소됨',
+      match: { ...model.match, apiStatus: 'cancelled' as const, closed: true, manageHref: '/team-matches/team-match-1/edit' },
+    };
+  }
+
+  it('취소 안내 카드를 보이고 "참가 확정"·"승인 완료"·"매치 관리" 는 어디에도 없다', () => {
+    renderPage(<TeamMatchDetailPageView model={cancelledModel()} />);
+
+    expect(screen.getAllByText('취소된 팀매치예요').length).toBeGreaterThan(0);
+    expect(screen.getByText('이 팀매치는 취소되어 진행되지 않아요.')).toBeInTheDocument();
+    expect(screen.queryByText('참가 확정')).not.toBeInTheDocument();
+    expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
+    expect(screen.queryByText('매치 관리')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '매치 관리' })).not.toBeInTheDocument();
+  });
+
+  it('하단 CTA 는 비활성이고 채팅 버튼은 없다', () => {
+    renderPage(<TeamMatchDetailPageView model={cancelledModel()} />);
+
+    for (const button of screen.getAllByRole('button', { name: '취소된 팀매치예요' })) {
+      expect(button).toBeDisabled();
+    }
+    expect(screen.queryByRole('button', { name: /채팅/ })).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 취소가 아닌 호스트 화면은 "매치 관리" 링크와 채팅을 그대로 가진다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.applyLabel = '매치 관리';
+    model.onChat = vi.fn();
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getAllByRole('link', { name: '매치 관리' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /채팅/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByText('이 팀매치는 취소되어 진행되지 않아요.')).not.toBeInTheDocument();
+  });
+});
+
 describe('team match pending chat guidance', () => {
   it('shows guidance after click without rendering persistent helper copy', () => {
     const model = getTeamMatchDetailViewModel('pending');

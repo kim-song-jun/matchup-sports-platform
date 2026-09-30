@@ -113,6 +113,8 @@ export type TeamMatchStateViewModel = TeamMatchListViewModel & {
   backHref?: string;
 };
 
+export type TeamMatchDetailMode = 'default' | 'pending' | 'approved' | 'mine' | 'cancelled';
+
 export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;
@@ -145,7 +147,11 @@ export type TeamMatchDetailViewModel = {
       actionPending?: boolean;
     }>;
   };
-  mode: 'default' | 'pending' | 'approved' | 'mine';
+  /**
+   * 'cancelled' 는 뷰어와 무관한 매치 상태가 우선한다 — cancel() 은 신청서 상태를 그대로 두므로
+   * viewerState 는 취소 뒤에도 'approved'/'host_team' 으로 남는다(matches.mode.ts 와 같은 이유).
+   */
+  mode: TeamMatchDetailMode;
   /**
    * 뒤로가기 목적지. `/team-matches/:id`는 topBar:false라 셸 뒤로가기가 없고 페이지가
    * 직접 모바일·데스크톱 링크를 그린다 — 계산 위치: `TeamMatchDetailPageClient`

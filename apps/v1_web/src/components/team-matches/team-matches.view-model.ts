@@ -1,6 +1,7 @@
 import type {
   TeamMatchCreateStep,
   TeamMatchCreateViewModel,
+  TeamMatchDetailMode,
   TeamMatchDetailViewModel,
   TeamMatchListViewModel,
   TeamMatchStateViewModel,
@@ -21,14 +22,17 @@ const teamMatches = [
   { id: 'team-match-4', title: '내 팀이 만든 강남 풋살 매치', imageUrl: '/mock/generated/futsal-rooftop.webp', sport: '풋살', hostTeam: '강남 러너스 FS', venue: '강남 실내풋살장', region: '서울 강남', date: '5월 15일 목', time: '21:00', endTime: '23:00', format: '5:5', grade: 'B', style: '친선', cost: 100000, opponentCost: 50000, uniform: '흰색', gender: '성별 무관', manner: 4.9, wins: 19, opponentTeam: null, status: 'mine' as const, closed: false },
 ];
 
-const teamMatchDetailByMode: Record<TeamMatchDetailViewModel['mode'], (typeof teamMatches)[number]> = {
+// 취소 화면은 실데이터 전용이라 로딩 골격(목업)에 취소 변형은 없다.
+type SkeletonMode = Exclude<TeamMatchDetailMode, 'cancelled'>;
+
+const teamMatchDetailByMode: Record<SkeletonMode, (typeof teamMatches)[number]> = {
   default: teamMatches[0],
   pending: teamMatches[1],
   approved: teamMatches[2],
   mine: teamMatches[3],
 };
 
-const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailViewModel['match'], 'description' | 'address' | 'applicantTeams'>> = {
+const detailCopy: Record<SkeletonMode, Pick<TeamMatchDetailViewModel['match'], 'description' | 'address' | 'applicantTeams'>> = {
   default: {
     description: '우리 팀 홈구장에서 친선 팀매치를 진행해요. 상대팀은 신청 후 팀 정보와 등급을 확인해 승인해요.',
     address: '서울 마포구 월드컵로 240',
@@ -129,7 +133,7 @@ export function getTeamMatchStateViewModel(state: 'empty' | 'error'): TeamMatchS
   };
 }
 
-export function getTeamMatchDetailViewModel(mode: TeamMatchDetailViewModel['mode'] = 'default'): TeamMatchDetailViewModel {
+export function getTeamMatchDetailViewModel(mode: SkeletonMode = 'default'): TeamMatchDetailViewModel {
   const match = teamMatchDetailByMode[mode];
   return {
     mode,

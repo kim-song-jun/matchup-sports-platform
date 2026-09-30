@@ -506,6 +506,79 @@ describe('TeamMatchDetailPageClient — 명단 입구는 친선이면 참석명�
   });
 });
 
+// L31 — 취소된 팀매치 상세가 취소를 표시하지 않고 "참가 확정 · 참석명단 관리 · 채팅" 을 그대로 보였다.
+// 서버는 취소된 매치의 채팅을 거부하므로(chat.service.ts assertCanUseTeamMatchChat, status ∈ matched/completed)
+// 버튼을 숨기는 것이 맞다. 대조군: 같은 뷰어·같은 팀 구성으로 status 만 matched 면 전부 그대로 보인다.
+describe('TeamMatchDetailPageClient — 취소된 팀매치는 취소를 표시하고 행동을 숨긴다 (L31)', () => {
+  type CancelViewer = { state: V1TeamMatchViewerState; manageableHostTeam: boolean; manageableOpponentTeam: boolean };
+  const HOST_VIEWER: CancelViewer = { state: 'host_team', manageableHostTeam: true, manageableOpponentTeam: false };
+  const OPPONENT_VIEWER: CancelViewer = { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true };
+
+  function mockMatch(viewer: CancelViewer, status: 'matched' | 'cancelled') {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        gameId: 'game-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        startsAt: '2026-10-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: status,
+        status,
+        viewer,
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: { teamId: 'team-away', name: '상대 팀' },
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+    myTeamsRef.current = { items: [{ teamId: 'team-host', role: 'owner' }, { teamId: 'team-away', role: 'owner' }] };
+  });
+
+  afterEach(() => {
+    myTeamsRef.current = undefined;
+  });
+
+  it.each([
+    ['호스트팀 운영진', HOST_VIEWER],
+    ['승인된 상대팀 운영진', OPPONENT_VIEWER],
+  ])('%s: 취소 상태를 표시하고 참석명단·채팅·신청 행동은 없다', (_label, viewer) => {
+    mockMatch(viewer, 'cancelled');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-mode')).toHaveTextContent('cancelled');
+    expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('취소됨');
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('취소된 팀매치예요');
+    expect(screen.queryByTestId('lineup-action')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '채팅 열기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
+    // 서버가 거부하는 채팅방 생성을 상세 진입만으로 호출하지 않는다.
+    expect(resolveChatRoomMutateMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['호스트팀 운영진', HOST_VIEWER, 'mine'],
+    ['승인된 상대팀 운영진', OPPONENT_VIEWER, 'approved'],
+  ])('대조군 — %s: 같은 구성에서 matched 면 명단·채팅이 그대로 보인다', (_label, viewer, mode) => {
+    mockMatch(viewer, 'matched');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-mode')).toHaveTextContent(mode);
+    expect(screen.getByTestId('lineup-action')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '채팅 열기' })).toBeInTheDocument();
+    expect(screen.getByTestId('team-match-status-label')).not.toHaveTextContent('취소됨');
+  });
+});
+
 // 감사 결함 2건 회귀 방지 (2026-08-27):
 // ① canOpenTeamMatchChat 이 viewerState('host_team'/'approved')를 봤는데, 그건 host 팀
 //    owner/manager 와 "신청서를 낸 사람 한 명"만 통과한다 — 리그 대진처럼 운영자가 신청서를

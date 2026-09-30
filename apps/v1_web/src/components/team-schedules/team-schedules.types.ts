@@ -99,8 +99,8 @@ export type ScheduleGuestRecruitmentModel = {
     onEdit: () => void;
     pending: boolean;
     exists: boolean;
-    /** 예정된 일정만 새 모집을 열 수 있다 — 취소·종료된 일정은 서버도 거절한다. */
-    canCreate: boolean;
+    /** 예정된 일정만 모집을 열고 고칠 수 있다 — 취소·종료된 일정은 서버가 SCHEDULE_TERMINAL 로 거절한다. */
+    scheduleActive: boolean;
     editPanel?: {
       open: boolean;
       slots: string;

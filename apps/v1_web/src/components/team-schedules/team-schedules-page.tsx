@@ -362,7 +362,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
               </div>
             ) : null,
             model.attendees.visible ? <ScheduleAttendeeSection key="attendees" model={model.attendees} friendlyMatch={attendance.friendlyMatch} /> : null,
-            guestRecruitment.visible || guestRecruitment.manage ? (
+            showsGuestRecruitment(guestRecruitment) ? (
               <GuestRecruitmentSection key="guest" model={guestRecruitment} />
             ) : null,
             manage.visible ? (
@@ -619,8 +619,16 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
   );
 }
 
+/**
+ * 취소·종료된 일정은 모집을 열 수도 고칠 수도 없다 — 열린 적 없는 모집을 "아직"이라 말하지 않고 칸을 없앤다(W2-V4).
+ * 부모가 구분선 칸을 만들기 전에 판정해야 빈 칸이 남지 않는다.
+ */
+function showsGuestRecruitment(model: ScheduleDetailViewModel['guestRecruitment']): boolean {
+  return model.visible || Boolean(model.manage?.scheduleActive);
+}
+
 function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['guestRecruitment'] }) {
-  if (!model.visible && !model.manage) return null;
+  const scheduleActive = model.manage?.scheduleActive ?? false;
 
   return (
     <div>
@@ -642,14 +650,12 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
         <div className="tm-text-caption">아직 용병 모집이 열려 있지 않아요.</div>
       )}
 
-      {model.manage ? (
+      {model.manage && scheduleActive ? (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {!model.manage.exists ? (
-            model.manage.canCreate ? (
-              <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" disabled={model.manage.pending} onClick={model.manage.onCreate}>
-                용병 모집 열기
-              </button>
-            ) : null
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" disabled={model.manage.pending} onClick={model.manage.onCreate}>
+              용병 모집 열기
+            </button>
           ) : (
             <>
               <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" disabled={model.manage.pending} onClick={model.manage.onEdit}>

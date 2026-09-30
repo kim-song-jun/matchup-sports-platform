@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -310,33 +310,53 @@ describe('일정 상세 — 참석명단 요약 (H9 D-1)', () => {
 });
 
 describe('일정 상세 — 용병 모집 열기', () => {
-  function withRecruitment(canCreate: boolean) {
+  function withRecruitment(scheduleActive: boolean, recruitment: Partial<ScheduleDetailViewModel['guestRecruitment']> = {}) {
     const base = buildModel({});
+    const exists = recruitment.visible ?? false;
     return {
       ...base,
       guestRecruitment: {
         ...base.guestRecruitment,
+        ...recruitment,
         manage: {
           onCreate: () => undefined,
           onToggleOpen: () => undefined,
           onEdit: () => undefined,
           pending: false,
-          exists: false,
-          canCreate,
+          exists,
+          scheduleActive,
           applications: { items: [], loading: false, error: null, onApprove: () => undefined, onReject: () => undefined, pendingApplicationId: null },
         },
       },
     };
   }
+  const closedRecruitment = { visible: true, slots: 3, applicantCount: 1, approvedCount: 0, stateLabel: '마감', closesAtLabel: '10월 7일 20:00 마감' };
 
   it('예정된 일정에서만 모집을 열 수 있다', () => {
     renderPage(<ScheduleDetailPageView model={withRecruitment(true)} />);
+    expect(screen.getByText('아직 용병 모집이 열려 있지 않아요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '용병 모집 열기' })).toBeInTheDocument();
   });
 
-  it('취소·종료된 일정에는 모집 열기를 내지 않는다', () => {
+  // W2-V4 — 취소된 일정에 "아직 … 열려 있지 않아요"만 남으면 앞으로 열릴 것처럼 읽혔다.
+  it('취소·종료된 일정에 열린 적 없는 모집은 칸째 없다', () => {
     renderPage(<ScheduleDetailPageView model={withRecruitment(false)} />);
+    expect(screen.queryByText('용병 모집')).not.toBeInTheDocument();
+    expect(screen.queryByText(/아직 용병 모집이/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '용병 모집 열기' })).not.toBeInTheDocument();
+    // 칸이 빠진 자리에 구분선만 남지 않는다 — 운영 관리 칸이 마지막이다.
+    expect(screen.getByText('운영 관리').closest('.tm-card')?.lastElementChild).toHaveTextContent('운영 관리');
+  });
+
+  it('취소된 일정의 모집 기록은 읽기만 남고, 서버가 거절할 수정·마감 버튼은 없다', () => {
+    renderPage(<ScheduleDetailPageView model={withRecruitment(false, closedRecruitment)} />);
+    expect(screen.getByText('용병 모집')).toBeInTheDocument();
+    expect(screen.getByText(/1\/3명 신청 · 승인 0명 · 마감/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '모집 정보 수정' })).not.toBeInTheDocument();
+
+    cleanup();
+    renderPage(<ScheduleDetailPageView model={withRecruitment(true, closedRecruitment)} />);
+    expect(screen.getByRole('button', { name: '모집 정보 수정' })).toBeInTheDocument();
   });
 });
 

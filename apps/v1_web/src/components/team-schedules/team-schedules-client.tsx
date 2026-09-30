@@ -516,7 +516,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
             onEdit: onOpenRecruitmentEdit,
             pending: createRecruitment.isPending || updateRecruitment.isPending,
             exists: Boolean(recruitment),
-            canCreate: schedule?.state === 'SCHEDULED',
+            scheduleActive: schedule?.state === 'SCHEDULED',
             editPanel: recruitmentEditOpen
               ? {
                   open: true,

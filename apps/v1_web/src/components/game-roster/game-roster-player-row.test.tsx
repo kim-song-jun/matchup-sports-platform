@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { gameRosterActorRoleLabel, gameRosterReasonLabel } from '@/lib/v1-status-labels';
 import { GameRosterPlayerRow } from './game-roster-player-row';
 
@@ -39,6 +39,32 @@ describe('GameRosterPlayerRow', () => {
     render(<GameRosterPlayerRow {...base} status="EXCLUDED" reason="SOMETHING_NEW" actorRole="ROBOT" />);
     expect(screen.getByText('빠짐')).toBeInTheDocument();
     expect(screen.queryByText(/SOMETHING_NEW|ROBOT/)).toBeNull();
+  });
+});
+
+describe('GameRosterPlayerRow — 등번호 칸', () => {
+  it('누를 수 있게 하면 번호 칸이 버튼이 되고, 빈 칸은 "넣기"·찬 칸은 "바꾸기"로 읽힌다', () => {
+    const onPress = vi.fn();
+    const { rerender } = render(<GameRosterPlayerRow {...base} status="PARTICIPATING" onJerseyPress={onPress} />);
+    const filled = screen.getByRole('button', { name: '박서준 등번호 7번 바꾸기' });
+    expect(filled).toHaveTextContent('7');
+    fireEvent.click(filled);
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    rerender(<GameRosterPlayerRow {...base} jerseyNumber={null} status="PARTICIPATING" onJerseyPress={onPress} />);
+    fireEvent.click(screen.getByRole('button', { name: '박서준 등번호 넣기' }));
+    expect(onPress).toHaveBeenCalledTimes(2);
+  });
+
+  it('0번도 채워진 번호다 — "넣기"로 바뀌지 않는다', () => {
+    render(<GameRosterPlayerRow {...base} jerseyNumber={0} status="PARTICIPATING" onJerseyPress={() => {}} />);
+    expect(screen.getByRole('button', { name: '박서준 등번호 0번 바꾸기' })).toHaveTextContent('0');
+  });
+
+  it('누를 수 없게 하면 번호는 글자일 뿐 버튼이 아니다', () => {
+    render(<GameRosterPlayerRow {...base} status="PARTICIPATING" />);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByText('7')).toBeInTheDocument();
   });
 });
 

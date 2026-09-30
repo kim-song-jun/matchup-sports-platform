@@ -18,6 +18,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { josa } from '@/lib/korean';
+import { parseJerseyInput } from '@/lib/jersey-number';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
@@ -46,6 +47,7 @@ import {
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
+export { parseJerseyInput };
 
 /* ── Helpers ── */
 
@@ -217,22 +219,6 @@ export function TournamentRosterDeadlineCard({
       ) : null}
     </Card>
   );
-}
-
-/**
- * 등번호 입력값을 보낼 값으로 바꾼다.
- *
- * **`Number()` 에 그냥 넘기면 안 된다.** `type="number"` 입력은 `e`·`1e2`·`-` 를 그대로
- * 통과시키고, `Number('e')` 는 `NaN` 이며 **`NaN` 은 JSON 에서 `null` 로 직렬화된다** —
- * 서버에서 "번호를 안 보냄" 과 구분되지 않아 번호가 조용히 사라진다(2026-09-04 Copilot 리뷰).
- *
- * 빈 값은 **번호 없는 선수**이지 오류가 아니다. `0` 은 유효한 등번호다.
- */
-export function parseJerseyInput(raw: string): { ok: true; value?: number } | { ok: false } {
-  const trimmed = raw.trim();
-  if (trimmed === '') return { ok: true };
-  if (!/^\d{1,2}$/.test(trimmed)) return { ok: false };
-  return { ok: true, value: Number(trimmed) };
 }
 
 /* ── Add player form ── */

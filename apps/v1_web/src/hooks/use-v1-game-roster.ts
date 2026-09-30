@@ -5,7 +5,7 @@ import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type { GameRosterAdjustmentReason, MemberUnavailabilityReason } from '@/lib/v1-status-labels';
 import type { V1GameState } from '@/types/api';
-import type { V1GameRosterSummary } from '@/hooks/use-v1-api';
+import { invalidateRosterViews, patchPlayerJersey, type V1GameRosterSummary } from '@/hooks/use-v1-api';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 
@@ -34,6 +34,8 @@ export type V1GameRosterPerson = {
   jerseyNumber: number | null;
   /** false = 리그 폴백 팀원(경기 기록에 계정 없이 들어간다). */
   accountLinked: boolean;
+  /** 참가 명단 선수 id(등번호 저장 API 의 `:playerId`). 참가 명단 행이 없는 리그 폴백 팀원은 null. */
+  participantId: string | null;
 };
 
 export type V1GameRosterView = {
@@ -49,6 +51,8 @@ export type V1GameRosterView = {
   editable: boolean;
   viewerRole: V1GameRosterViewerRole;
   baseSource: 'REGISTRATION' | 'TEAM_MEMBERS';
+  /** 등번호의 원본인 확정 참가 신청 id — 참가 명단이 기준이고 뷰어가 이 팀 팀장·매니저일 때만 온다. */
+  jerseyRegistrationId: string | null;
   base: (V1GameRosterPerson & { status: V1GameRosterPlayerStatus })[];
   participants: (V1GameRosterPerson & { joinedAfterFixtureCreated: boolean })[];
   excluded: (V1GameRosterPerson & {
@@ -299,6 +303,34 @@ export function useV1ApplyGameRosterBatch(teamId: string) {
       }
       invalidateLineupReaders(queryClient, gameIds);
       invalidateTeamRosterViews(queryClient, result.teamId);
+    },
+  });
+}
+
+/**
+ * 경기 명단에서 등번호를 고친다. 번호의 원본은 참가 명단이라 저장은 참가 명단 등번호 API 를 그대로 쓰고,
+ * 같은 번호가 나가는 이 팀의 경기 명단 화면들과 참가 명단 캐시를 낡게 한다. 라인업 읽기 화면은 서버 워커가
+ * 이어서 맞추므로(바로 다시 받아도 옛 값이다) 건드리지 않는다.
+ */
+export function useV1UpdateGameRosterJersey(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      competitionId: string;
+      registrationId: string;
+      participantId: string;
+      jerseyNumber: number | null;
+    }) =>
+      patchPlayerJersey({
+        tournamentId: input.competitionId,
+        registrationId: input.registrationId,
+        playerId: input.participantId,
+        jerseyNumber: input.jerseyNumber,
+      }),
+    onSuccess: (_player, input) => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamGameRosterAll(teamId) });
+      invalidateTeamRosterViews(queryClient, teamId);
+      void invalidateRosterViews(queryClient, input.competitionId, input.registrationId);
     },
   });
 }

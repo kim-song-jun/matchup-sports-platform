@@ -374,7 +374,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
     detailBackHref: fromPath ?? '/team-matches',
-    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess, isParticipantMember),
     // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
     applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
     hostActions: !seeding && canManageMatchListing
@@ -419,6 +419,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       eligible: selectedEligibility?.eligible,
       isGuest,
       hasNoTeam,
+      isParticipantMember,
       apply: (teamId) =>
         applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }).then((result) => {
           trackEvent('team_match_apply_complete', { teamMatchId });
@@ -591,6 +592,8 @@ function applyLabel(
   hasNoTeam?: boolean,
   /** eligibility 응답 도착 여부. 도착 전에는 "철회 대상을 못 찾았다"고 단정할 수 없다. */
   eligibilityLoaded?: boolean,
+  /** 참가팀(host·승인 상대팀)의 active 멤버 — 신청할 대상이 아니라 자기 팀 경기를 보는 사람이다. */
+  isParticipantMember?: boolean,
 ) {
   if (status === 'cancelled') return '취소된 팀매치예요';
   if (viewerState === 'host_team') return '매치 관리';
@@ -605,6 +608,7 @@ function applyLabel(
     return eligibilityLoaded ? '팀 운영진만 취소할 수 있어요' : '신청 취소';
   }
   if (viewerState === 'approved') return '승인 완료';
+  if (isParticipantMember) return OWN_TEAM_MATCH_LABEL;
   if (status !== 'recruiting') return '신청 불가';
   // 비인증 사용자: 로그인 유도 (#13)
   if (isGuest) return '로그인하고 신청하기';
@@ -613,6 +617,8 @@ function applyLabel(
   if (team?.eligible) return `${josa(team.name, ['으로', '로'])} 신청`;
   return reasonLabel(team?.reasonCode);
 }
+
+const OWN_TEAM_MATCH_LABEL = '우리 팀 경기예요';
 
 function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
   if (status === 'cancelled') return TEAM_MATCH_CANCELLED_LABEL;
@@ -813,6 +819,7 @@ function getApplyAction({
   eligible,
   isGuest,
   hasNoTeam,
+  isParticipantMember,
   apply,
   withdraw,
   reasonCode,
@@ -825,6 +832,7 @@ function getApplyAction({
   eligible?: boolean;
   isGuest?: boolean;
   hasNoTeam?: boolean;
+  isParticipantMember?: boolean;
   apply: (teamId: string) => Promise<unknown>;
   withdraw: () => Promise<unknown>;
   reasonCode?: string;
@@ -839,6 +847,8 @@ function getApplyAction({
   if (viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') {
     return applicationId ? withdraw : undefined;
   }
+  // 자기 팀 경기에는 신청할 대상이 없다 — 라벨(OWN_TEAM_MATCH_LABEL)과 같은 근거로 끊는다.
+  if (isParticipantMember) return undefined;
   // 이미 마감/확정/종료/취소된 매치는 신청할 게 없다 — 여기서 끊지 않으면 guest/무팀 사용자가
   // applyLabel()엔 '신청 불가'로 뜨는데 onApply는 여전히 로그인·팀만들기 리다이렉트를 반환해서
   // 파란 primary 버튼이 "신청 불가"라고 적힌 채 클릭되면 로그인 페이지로 튀는 상태였다

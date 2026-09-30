@@ -274,7 +274,8 @@ describe('TeamMatchDetailPageClient — GA events', () => {
 
     expect(screen.getByTestId('team-match-mode')).toHaveTextContent('default');
     expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('상대팀 확정');
-    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    // 모집 운영자는 아니지만 참가팀 멤버다(participantMember) — '신청 불가'가 아니라 자기 팀 경기로 읽힌다.
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('우리 팀 경기예요');
     expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
     expect(screen.getByTestId('team-match-away-logo')).toHaveTextContent('/uploads/away-logo.png');
     expect(screen.getByTestId('team-match-away-meta')).toHaveTextContent('팀 평점 4.5 · 7승');
@@ -328,6 +329,70 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('이 팀매치와 종목이 다른 팀이에요');
+  });
+});
+
+// L13 — 팀원이 자기 팀 경기를 열면 하단 고정 버튼이 회색 "신청 불가" 였다. 자기 팀 경기에는
+// '신청'이라는 말이 붙지 않아야 하고, 참가팀 멤버가 아닌 사람은 그대로여야 한다.
+describe('TeamMatchDetailPageClient — 참가팀 멤버가 자기 팀 경기를 볼 때 (L13)', () => {
+  function mockMatch(status: 'matched' | 'recruiting', participantMember: boolean) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        startsAt: '2026-10-01T10:00:00.000Z',
+        status,
+        displayState: status,
+        viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false, participantMember },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: status === 'matched' ? { teamId: 'team-away', name: '상대 팀' } : null,
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: {
+        teamMatchId: 'team-match-1',
+        requiresApproval: true,
+        requiresPayment: false,
+        teams: [{ teamId: 'team-mine', name: '내 팀', role: 'owner', eligible: true, reasonCode: '', applicationId: null }],
+      },
+      isSuccess: true,
+    });
+  });
+
+  it('상대가 정해진 자기 팀 경기는 "신청 불가" 대신 우리 팀 경기라고 말하고 누를 액션이 없다', () => {
+    mockMatch('matched', true);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('우리 팀 경기예요');
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+  });
+
+  it('모집 중인 자기 팀 경기에서도 신청 버튼이 나오지 않는다', () => {
+    mockMatch('recruiting', true);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('우리 팀 경기예요');
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 참가팀 멤버가 아니면 종전대로 "신청 불가"이고, 모집 중이면 신청할 수 있다', () => {
+    mockMatch('matched', false);
+    const { unmount } = render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    unmount();
+
+    mockMatch('recruiting', false);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('내 팀으로 신청');
+    expect(screen.getByRole('button', { name: '상대팀 신청' })).toBeInTheDocument();
   });
 });
 

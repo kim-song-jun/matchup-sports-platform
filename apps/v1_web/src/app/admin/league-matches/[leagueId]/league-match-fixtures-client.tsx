@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AlertTriangle, ChevronLeft, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AddLeagueTeam,
@@ -75,6 +76,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
   const { toasts, showToast } = useAdminToast();
+  const { confirm, ConfirmModal: confirmModal } = useConfirm();
+  // 대진이 이미 있을 때의 "대진 관리"(재생성) 접이식. 거의 안 쓰는 파괴적 조작이라 기본은 접혀 있다.
+  const [manageOpen, setManageOpen] = useState(false);
 
   // 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거.
   const addTeam = useV1AddLeagueTeam(leagueId);
@@ -308,6 +312,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       return;
     }
     if (!validateTimingInputs()) return;
+    // 만든 대진은 삭제할 수 없다(경기에 게임·감사 기록이 바로 붙는다). 바로잡으려면 취소하고 다시
+    // 만들어야 하므로, 잘못 눌러도 되돌릴 수 있는 척하지 않고 미리 알린다.
+    const ok = await confirm({
+      title: '라운드로빈 대진을 만들까요?',
+      message: '만든 대진은 지울 수 없고 취소만 할 수 있어요. 주차·요일·시각을 한 번 더 확인해 주세요.',
+      confirmLabel: '대진 만들기',
+    });
+    if (!ok) return;
     try {
       const result = await generateFixtures.mutateAsync(buildFixtureFormPayload());
       showToast(appendFixtureWarnings(`대진 ${result.createdCount}경기를 만들었어요.`, result.warnings), 'success');
@@ -362,7 +374,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               ? `${item.label}을(를) 추가했어요.`
               : leagueHasOfficialResult
                 ? `${item.label}을(를) 추가했어요. 다만 이 리그는 이미 확정된 결과가 있어 대진 재생성이 불가능해요 — 이 팀은 순위표에만 표시돼요.`
-                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 "대진 재생성"을 눌러 주세요.`,
+                : `${item.label}을(를) 추가했어요. 대진에 반영하려면 표 아래 "대진 관리"에서 "대진 재생성"을 눌러 주세요.`,
             'success',
           );
         },
@@ -591,7 +603,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
         <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">참가팀 관리</p>
         <p className="mb-3 text-xs text-[var(--text-muted)]">
-          팀을 추가하거나 뺄 수 있어요. 대진이 이미 있으면 재생성해야 새 구성이 반영돼요.
+          팀을 추가하거나 뺄 수 있어요. 대진이 이미 있으면 표 아래 "대진 관리"에서 재생성해야 새 구성이 반영돼요.
         </p>
         <ul className="mb-3 flex flex-wrap gap-2">
           {(teamsData?.teams ?? []).map((team) => (
@@ -805,107 +817,6 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {/* R13: 대진 재생성 — 기존 대진을 전부 취소하고 같은 팀 로스터로 새로 만드는
-              파괴적 조작이라, 위 생성 폼과 시각 구분되게 amber 톤 카드에 담는다. */}
-          <div className="tm-on-tint rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
-            <p className="mb-2 text-sm font-semibold text-[var(--orange700)]">대진 재생성</p>
-            <p className="mb-3 text-xs text-[var(--text-muted)]">
-              팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
-              취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
-            </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label htmlFor="regen-weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
-                <input
-                  id="regen-weeks-count"
-                  type="number"
-                  min={1}
-                  max={52}
-                  value={weeksCount}
-                  onChange={(e) => setWeeksCount(Number(e.target.value))}
-                  className={`${inputClass} w-24`}
-                />
-              </div>
-              <div>
-                <label htmlFor="regen-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
-                <select
-                  id="regen-day-of-week"
-                  value={dayOfWeek}
-                  onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
-                  className={`${inputClass} w-40`}
-                >
-                  <option value="">시작일 그대로</option>
-                  {WEEKDAY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작 시각</label>
-                <input
-                  id="regen-time"
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  disabled={dayOfWeek === ''}
-                  className={`${inputClass} w-36 disabled:opacity-50`}
-                />
-              </div>
-              <FixtureTimingFields
-                idPrefix="regen"
-                dayOfWeekUnset={dayOfWeek === ''}
-                endTime={endTime}
-                onEndTimeChange={setEndTime}
-                gameDurationMinutes={gameDurationMinutes}
-                onGameDurationChange={setGameDurationMinutes}
-                breakMinutes={breakMinutes}
-                onBreakMinutesChange={setBreakMinutes}
-                gamesPerTeamPerDay={gamesPerTeamPerDay}
-                onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
-              />
-              <div>
-                <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
-                <input
-                  id="regen-place-name"
-                  type="text"
-                  placeholder="장소 미정"
-                  value={placeName}
-                  onChange={(e) => setPlaceName(e.target.value)}
-                  className={`${inputClass} w-48`}
-                />
-              </div>
-              {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
-                  대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
-                  전에 먼저 보여준다. */}
-              <button
-                type="button"
-                onClick={onPreview}
-                disabled={previewFixtures.isPending || !hasLeagueStartsOn}
-                className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
-              >
-                미리보기
-              </button>
-              <button
-                type="button"
-                onClick={() => setRegenerateModalOpen(true)}
-                disabled={!hasLeagueStartsOn}
-                className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
-              >
-                대진 재생성
-              </button>
-            </div>
-            {!hasLeagueStartsOn && <MissingStartsOnNotice />}
-            <div className="mt-3 flex flex-col gap-3">
-              <TimingSuggestionRow
-                suggestion={timingSuggestion}
-                showNoFit={showTimingNoFit}
-                onApply={(games) => setGamesPerTeamPerDay(String(games))}
-              />
-              {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
-            </div>
-            <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
-          </div>
-
           <AdminDataTable<V1LeagueFixture>
             rows={series.fixtures}
             keyExtractor={(row) => row.teamMatchId}
@@ -1136,6 +1047,134 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               { key: 'status', header: '상태', render: (row) => <AdminStatusPill status={row.status} /> },
             ]}
           />
+
+          {/* 대진 관리 — 거의 안 쓰는 파괴적 조작(재생성)을 표 아래 접이식으로 내렸다. 예전엔 주황
+              채움 상자가 대진 목록 바로 위에서 평소 할 일(결과 입력·운영)보다 눈에 띄었다. */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+            <button
+              type="button"
+              onClick={() => setManageOpen((open) => !open)}
+              aria-expanded={manageOpen}
+              aria-controls="fixture-manage-panel"
+              className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-2xl px-4 py-2 text-left focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <span className="min-w-0">
+                <span className="block text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">대진 관리</span>
+                <span className="block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                  팀 구성이 바뀌었을 때만 열어요. 대진을 다시 만들 수 있어요.
+                </span>
+              </span>
+              <ChevronDown
+                size={18}
+                aria-hidden="true"
+                className={['shrink-0 text-[var(--text-muted)] transition-transform', manageOpen ? 'rotate-180' : ''].join(' ')}
+              />
+            </button>
+            {manageOpen ? (
+              <div id="fixture-manage-panel" className="px-4 pb-4">
+              {/* R13: 대진 재생성 — 기존 대진을 전부 취소하고 같은 팀 로스터로 새로 만드는
+                  파괴적 조작이라, 위 생성 폼과 시각 구분되게 amber 톤 카드에 담는다. */}
+              <div className="tm-on-tint rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
+                <p className="mb-2 text-sm font-semibold text-[var(--orange700)]">대진 재생성</p>
+                <p className="mb-3 text-xs text-[var(--text-muted)]">
+                  팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
+                  취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label htmlFor="regen-weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
+                    <input
+                      id="regen-weeks-count"
+                      type="number"
+                      min={1}
+                      max={52}
+                      value={weeksCount}
+                      onChange={(e) => setWeeksCount(Number(e.target.value))}
+                      className={`${inputClass} w-24`}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="regen-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
+                    <select
+                      id="regen-day-of-week"
+                      value={dayOfWeek}
+                      onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
+                      className={`${inputClass} w-40`}
+                    >
+                      <option value="">시작일 그대로</option>
+                      {WEEKDAY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작 시각</label>
+                    <input
+                      id="regen-time"
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      disabled={dayOfWeek === ''}
+                      className={`${inputClass} w-36 disabled:opacity-50`}
+                    />
+                  </div>
+                  <FixtureTimingFields
+                    idPrefix="regen"
+                    dayOfWeekUnset={dayOfWeek === ''}
+                    endTime={endTime}
+                    onEndTimeChange={setEndTime}
+                    gameDurationMinutes={gameDurationMinutes}
+                    onGameDurationChange={setGameDurationMinutes}
+                    breakMinutes={breakMinutes}
+                    onBreakMinutesChange={setBreakMinutes}
+                    gamesPerTeamPerDay={gamesPerTeamPerDay}
+                    onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+                  />
+                  <div>
+                    <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
+                    <input
+                      id="regen-place-name"
+                      type="text"
+                      placeholder="장소 미정"
+                      value={placeName}
+                      onChange={(e) => setPlaceName(e.target.value)}
+                      className={`${inputClass} w-48`}
+                    />
+                  </div>
+                  {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
+                      대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
+                      전에 먼저 보여준다. */}
+                  <button
+                    type="button"
+                    onClick={onPreview}
+                    disabled={previewFixtures.isPending || !hasLeagueStartsOn}
+                    className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
+                  >
+                    미리보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegenerateModalOpen(true)}
+                    disabled={!hasLeagueStartsOn}
+                    className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
+                  >
+                    대진 재생성
+                  </button>
+                </div>
+                {!hasLeagueStartsOn && <MissingStartsOnNotice />}
+                <div className="mt-3 flex flex-col gap-3">
+                  <TimingSuggestionRow
+                    suggestion={timingSuggestion}
+                    showNoFit={showTimingNoFit}
+                    onApply={(games) => setGamesPerTeamPerDay(String(games))}
+                  />
+                  {dailyPlan !== null && <DailyPlanCard plan={dailyPlan} />}
+                </div>
+                <FixturePreviewPanel result={previewResult} teamNameById={teamNameById} />
+              </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
 
@@ -1159,6 +1198,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       />
 
       <AdminToasts toasts={toasts} />
+      {confirmModal}
 
       {/* R12: 대진 취소 확인 — 되돌릴 수 없으므로 사유를 필수로 받는다. */}
       {/* R6/D-3: 종료 역전이 확인. 취소·재생성과 달리 되돌릴 수 있는 조작이라

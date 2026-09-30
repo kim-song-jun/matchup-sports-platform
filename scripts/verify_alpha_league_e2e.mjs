@@ -204,6 +204,8 @@ try {
       await page.fill('#weeks-count', '1');
       await page.fill('#fixture-place-name', '감사 E2E 구장');
       await genBtn.click();
+      // 대진 생성은 확인 창을 거친다(만든 대진은 지울 수 없다).
+      await page.getByRole('dialog').getByRole('button', { name: '대진 만들기' }).click();
       await page.waitForTimeout(6000);
       await shot(`league-${link.text.includes('1부') ? 'tier1' : 'tier2'}-fixtures`);
     } else {

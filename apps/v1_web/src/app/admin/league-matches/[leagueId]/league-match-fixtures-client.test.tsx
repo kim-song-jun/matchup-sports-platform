@@ -70,6 +70,19 @@ const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { parti
 const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
 const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
 
+/** 만든 대진은 지울 수 없어 생성은 확인 창을 거친다(F42) — 누르고 확인까지 한 번에. */
+async function generateAndConfirm() {
+  fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+  const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: '대진 만들기' }));
+}
+
+/** 대진이 이미 있는 리그의 "대진 관리" 접이식(재생성)을 연다(F51) — 기본은 접혀 있다. */
+function openFixtureManage() {
+  const trigger = screen.getByRole('button', { name: /^대진 관리/ });
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+}
+
 describe('LeagueMatchFixturesClient', () => {
   // datetime-local 표시값 검증은 UTC와 오프셋이 있는 타임존에서만 회귀를 잡는다
   // (예: CI가 UTC로 돌면 slice(0,16) 버그가 우연히 통과함) — 그래서 TZ를 명시 고정한다.
@@ -361,7 +374,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 7 }));
   });
@@ -422,7 +435,7 @@ describe('LeagueMatchFixturesClient', () => {
     fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '19:30' } });
     fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     // **서버는 요일을 모른다** — 화면이 날짜 목록으로 전개해 보내야 한다(Task 164 BE-2).
     // 정확한 날짜 계산은 시계를 주입하는 `lib/league-fixture-dates.test.ts` 가 고정하고,
@@ -484,9 +497,9 @@ describe('LeagueMatchFixturesClient', () => {
 
       // 같은 날 20:00 KST — 18:00 이 지났다. 폼 값은 아무것도 바꾸지 않아 재렌더도 없다.
       vi.setSystemTime(new Date('2026-09-04T11:00:00.000Z'));
-      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+      await generateAndConfirm();
 
-      expect(mutateAsync).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
       const payload = mutateAsync.mock.calls[0][0] as { schedule: { dates: string[] } };
       expect(payload.schedule.dates).toEqual(['2026-09-11']);
     } finally {
@@ -543,7 +556,7 @@ describe('LeagueMatchFixturesClient', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '잠실 종합운동장' }));
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
       weeksCount: 7,
@@ -759,6 +772,7 @@ describe('LeagueMatchFixturesClient', () => {
       </Providers>,
     );
 
+    openFixtureManage();
     fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
     expect(screen.getByText('대진을 다시 만들까요?')).toBeInTheDocument();
     expect(screen.getByText('A팀, B팀', { exact: false })).toBeInTheDocument();
@@ -778,6 +792,107 @@ describe('LeagueMatchFixturesClient', () => {
     await waitFor(() =>
       expect(regenMutate).toHaveBeenCalledWith({ weeksCount: 7, reason: '팀 로스터 변경으로 재생성' }, expect.anything()),
     );
+  });
+
+  // Task 180 G6(F42) — 만든 대진은 지울 수 없다(FIXTURE_NOT_DELETABLE). 확인 없이 만들지 않는다.
+  describe('라운드로빈 대진 생성 확인', () => {
+    function renderEmptyLeague() {
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+        isPending: false,
+      } as never);
+      const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', createdCount: 7, teamMatchIds: [], warnings: [] });
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+      return mutateAsync;
+    }
+
+    it('누르면 확인 창이 먼저 뜨고, 지울 수 없다는 사실을 알리며, 확인 전에는 아무것도 만들지 않는다', async () => {
+      const mutateAsync = renderEmptyLeague();
+
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+      const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
+      expect(dialog).toHaveTextContent('지울 수 없고 취소만 할 수 있어요');
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('확인 창에서 취소하면 대진을 만들지 않는다', async () => {
+      const mutateAsync = renderEmptyLeague();
+
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+      const dialog = await screen.findByRole('dialog', { name: '라운드로빈 대진을 만들까요?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('입력이 잘못됐으면 확인 창을 띄우지 않고 검증 안내를 먼저 보인다', async () => {
+      const mutateAsync = renderEmptyLeague();
+
+      fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+      fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+      expect(await screen.findByText(/경기 시간\(분\)을 입력/)).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // Task 180 G6(F51) — 거의 안 쓰는 파괴적 조작(재생성)이 대진 목록 위에서 가장 눈에 띄던 것을
+  // 표 아래 접이식으로 내렸다.
+  describe('대진 관리(재생성) 접이식', () => {
+    function renderWithFixtures() {
+      useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+      useV1AdminLeagueMatchMock.mockReturnValue({
+        data: {
+          leagueId: 'league-1', title: '가을 풋살 리그', state: 'active', teamIds: ['t1', 't2'],
+          startsOn: '2026-09-01T00:00:00.000Z',
+          fixtures: [
+            { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+          ],
+        },
+        isPending: false,
+      } as never);
+      useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+      render(
+        <Providers>
+          <LeagueMatchFixturesClient leagueId="league-1" />
+        </Providers>,
+      );
+    }
+
+    it('기본은 접혀 있어 재생성 버튼이 화면에 없고, 열면 나타난다', () => {
+      renderWithFixtures();
+
+      const trigger = screen.getByRole('button', { name: /^대진 관리/ });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
+      expect(screen.queryByLabelText('주차 수')).toBeNull();
+
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: '대진 재생성' })).toBeInTheDocument();
+
+      fireEvent.click(trigger);
+      expect(screen.queryByRole('button', { name: '대진 재생성' })).toBeNull();
+    });
+
+    it('접이식은 대진 표 아래에 있다', () => {
+      renderWithFixtures();
+
+      const table = screen.getAllByRole('table')[0];
+      const trigger = screen.getByRole('button', { name: /^대진 관리/ });
+      expect(table.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 
   // R13
@@ -1076,7 +1191,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     fireEvent.change(screen.getByLabelText('경기 시간(분)'), { target: { value: '15' } });
     fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
@@ -1225,6 +1340,7 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
       </Providers>,
     );
 
+    openFixtureManage();
     fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
     fireEvent.click(screen.getAllByRole('button', { name: '대진 재생성' })[0]);
     fireEvent.change(
@@ -1396,7 +1512,7 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '18:00' } });
     fireEvent.click(await screen.findByLabelText('2026-09-12'));
     fireEvent.click(screen.getByLabelText('2026-09-19'));
-    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+    await generateAndConfirm();
 
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(

@@ -46,6 +46,7 @@ import {
   isRosterMemberPlaced,
   addGuestToLineup,
   addRosterMemberToLineup,
+  findJerseyHolder,
   replaceEntries,
   removeEntry,
   resolveOwnTeamId,
@@ -72,7 +73,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const competitionGameQuery = useV1Game(lineupQuery.data?.gameId, { enabled: isCompetition && ownTeamId === null });
   const rosterQuery = useV1TeamMembers(ownTeamId, { limit: 100 }, { enabled: Boolean(ownTeamId) && !isCompetition });
   const rosterPool: RosterOption[] = useMemo(
-    () => (rosterQuery.data?.items ?? []).map((member) => ({ userId: member.userId, displayName: member.displayName, role: member.role })),
+    () => (rosterQuery.data?.items ?? []).map((member) => ({
+      userId: member.userId,
+      displayName: member.displayName,
+      role: member.role,
+      jerseyNumber: member.jerseyNumber ?? null,
+    })),
     [rosterQuery.data],
   );
 
@@ -440,6 +446,18 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           : `${resolved.applied.length}명을 불러왔어요 · 종목이 달라 배치는 새로 잡아 주세요.`),
     );
     setLoadSheetOpen(false);
+  }
+
+  /** 팀 등번호를 기본값으로 채우되, 명단의 다른 행이 이미 쓰는 번호면 비워 두고 알린다. */
+  function handleAddMember(member: RosterOption) {
+    if (state === null) return;
+    const holder = member.jerseyNumber == null ? null : findJerseyHolder(state, member.jerseyNumber);
+    setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev));
+    setLoadNotice(
+      holder === null || member.jerseyNumber == null
+        ? null
+        : `${member.displayName}님의 팀 등번호 ${member.jerseyNumber}번은 ${josa(holder, ['이', '가'])} 쓰고 있어서 비워 뒀어요. 등번호를 직접 넣어 주세요.`,
+    );
   }
 
   async function handleSavePreset(name: string) {
@@ -833,7 +851,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         <button
                           type="button"
                           className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
+                          onClick={() => handleAddMember(member)}
                         >
                           명단 추가
                         </button>

@@ -14,6 +14,7 @@ import {
   describeLineupPhase,
   describePublicationCountdown,
   extractConflictCurrentVersion,
+  findJerseyHolder,
   hydrateLineupEditorState,
   isRosterMemberPlaced,
   removeEntry,
@@ -156,6 +157,29 @@ describe('lineup.view-model', () => {
     const again = addRosterMemberToLineup(state, rosterMember);
     expect(again).toBe(state); // 참조 동일 — 아무 것도 바뀌지 않았다
     expect(again.participants).toHaveLength(1);
+  });
+
+  // L20 — 멤버 관리의 "팀에서 계속 쓰는 번호" 가 명단에 넣을 때 버려져 칸이 비어 있었다.
+  it('팀 등번호를 지정한 팀원은 그 번호로 명단에 들어간다', () => {
+    const state = addRosterMemberToLineup(createEmptyLineupEditorState(0), { ...rosterMember, jerseyNumber: 8 });
+    expect(state.participants[0].jerseyNumber).toBe(8);
+  });
+
+  it('팀 번호를 지정하지 않은 팀원은 빈칸으로 들어간다', () => {
+    expect(addRosterMemberToLineup(createEmptyLineupEditorState(0), rosterMember).participants[0].jerseyNumber).toBeNull();
+    expect(
+      addRosterMemberToLineup(createEmptyLineupEditorState(0), { ...rosterMember, jerseyNumber: null }).participants[0]
+        .jerseyNumber,
+    ).toBeNull();
+  });
+
+  it('그 번호를 명단의 다른 행이 이미 쓰면 빈칸으로 둔다 — 중복 번호로 제출이 막히지 않게', () => {
+    let state = addRosterMemberToLineup(createEmptyLineupEditorState(0), { ...rosterMember, jerseyNumber: 8 });
+    state = addRosterMemberToLineup(state, { ...rosterMember2, jerseyNumber: 8 });
+    expect(state.participants.map((entry) => entry.jerseyNumber)).toEqual([8, null]);
+    expect(validateLineupForSubmit(state)).toEqual([]);
+    expect(findJerseyHolder(state, 8)).toBe('홍길동');
+    expect(findJerseyHolder(state, 9)).toBeNull();
   });
 
   it('ignores a blank guest name and adds a trimmed one', () => {
@@ -691,6 +715,52 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByRole('button', { name: '이전 참석명단 불러오기' })).toBeInTheDocument();
     // 배치되고 나면 대기 목록에서 사라진다 — 같은 사람을 두 번 추가할 방법 자체가 없다.
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
+  });
+
+  it('멤버 관리에서 지정한 팀 등번호가 "명단 추가" 때 등번호 칸에 채워진다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 8 }] },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
+  });
+
+  it('팀 번호가 명단의 다른 행과 겹치면 비워 두고 누구와 겹치는지 알린다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 8 },
+          { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active', jerseyNumber: 8 },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+
+    expect(screen.getByLabelText('김철수 등번호')).toHaveValue(null);
+    expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
   });
 
   it('팀장·운영진은 참석 응답이 없는 활성 팀원도 참석명단에 직접 추가할 수 있다', () => {

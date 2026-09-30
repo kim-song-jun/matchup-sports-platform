@@ -27,6 +27,8 @@ export type RosterOption = {
   userId: string;
   displayName: string;
   role: 'owner' | 'manager' | 'member';
+  /** 멤버 관리에서 지정한 팀 고정 등번호. 명단에 넣을 때 기본값으로 쓴다. */
+  jerseyNumber?: number | null;
 };
 
 /**
@@ -249,14 +251,22 @@ export function isRosterMemberPlaced(state: LineupEditorState, member: RosterOpt
  * `next === state`로 이걸 직접 검증할 수 있다. */
 export function addRosterMemberToLineup(state: LineupEditorState, member: RosterOption): LineupEditorState {
   if (isPlaced(state, member)) return state;
+  // 팀 번호가 이미 명단의 다른 행에 있으면 빈칸으로 둔다 — 같은 번호를 채우면 제출 검증이 막는다.
+  const teamNumber = member.jerseyNumber ?? null;
+  const jerseyNumber = teamNumber !== null && findJerseyHolder(state, teamNumber) === null ? teamNumber : null;
   return {
     ...state,
     participants: [
       ...state.participants,
-      makeEntry({ userId: member.userId, displayName: member.displayName }),
+      makeEntry({ userId: member.userId, displayName: member.displayName, jerseyNumber }),
     ],
     dirty: true,
   };
+}
+
+/** 이 등번호를 이미 쓰는 명단 행의 이름. 없으면 null. */
+export function findJerseyHolder(state: LineupEditorState, jerseyNumber: number): string | null {
+  return state.participants.find((entry) => entry.jerseyNumber === jerseyNumber)?.displayName ?? null;
 }
 
 /** 로스터에 없는 사람(게스트·용병)을 이름만으로 명단에 넣는다. */

@@ -52,14 +52,20 @@ function setup(team: { status: string; deletedAt: Date | null }, options: { matc
 }
 
 describe('AdminService.changeTeamStatus — 보관은 해체 경로', () => {
-  it('막는 조건이 있으면 409 TEAM_DISSOLVE_BLOCKED 이고 상태도 로그도 바꾸지 않는다', async () => {
-    const { service, prisma } = setup({ status: 'active', deletedAt: null }, { matched: true });
+  it('막는 조건이 있으면 409 TEAM_DISSOLVE_BLOCKED + details.blockers 이고 상태·정리·로그를 하나도 바꾸지 않는다', async () => {
+    const { service, prisma, notifications } = setup({ status: 'active', deletedAt: null }, { matched: true });
     await expect(service.changeTeamStatus(ADMIN_USER, 'team-1', { status: 'archived', reason: '정책 위반' })).rejects.toMatchObject({
       status: 409,
-      response: { code: 'TEAM_DISSOLVE_BLOCKED' },
+      response: {
+        code: 'TEAM_DISSOLVE_BLOCKED',
+        details: { blockers: [{ kind: 'matched_team_match', items: [{ id: 'tm-1', title: '친선', opponentName: '합정' }] }] },
+      },
     });
     expect(prisma.v1Team.update).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
     expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
   });
 
   it('보관하면 해체 시각을 남기고 채팅방을 닫으며 팀원 전원(팀장 포함)에게 알린다', async () => {
@@ -71,7 +77,7 @@ describe('AdminService.changeTeamStatus — 보관은 해체 경로', () => {
     expect(prisma.v1Team.update.mock.calls[0][0].data).toMatchObject({ status: 'archived', deletedAt: expect.any(Date) });
     expect(prisma.v1ChatRoom.updateMany).toHaveBeenCalledWith({ where: { teamId: 'team-1' }, data: { status: 'archived' } });
     expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(['owner-user', 'member-1'], 'team_dissolved', 'team-1', expect.any(String));
-    // 팀 전이는 어드민 감사 로그 한 벌만 남는다.
+    // 팀 전이는 어드민 감사 로그 한 벌만 남는다 — actorType admin 이라 팀장 셀프 복구가 막힌다.
     expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledTimes(1);
     expect(prisma.v1StatusChangeLog.create.mock.calls[0][0].data).toMatchObject({ actorType: 'admin', toStatus: 'archived' });
   });

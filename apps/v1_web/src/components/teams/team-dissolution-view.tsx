@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Ban, CalendarX, Check, MessageSquareOff, Radio, Swords, Trophy, UserX } from 'lucide-react';
 import { AlertBanner, Card, TextField } from '@/components/v1-ui/primitives';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { dissolutionBlockerItemSummary, dissolutionBlockerTitle } from '@/lib/team-dissolution-blockers';
 import type { V1TeamDissolutionBlocker, V1TeamDissolutionPreview } from '@/types/api';
 
 type Tone = 'orange' | 'red';
@@ -174,13 +175,13 @@ type BlockerItem = V1TeamDissolutionBlocker['items'][number];
 function blockerCopy(kind: V1TeamDissolutionBlocker['kind'], count: number) {
   switch (kind) {
     case 'live_game':
-      return { icon: <Radio size={16} />, title: `진행 중인 경기 ${count}건`, desc: '경기가 끝나면 해체할 수 있어요.' };
+      return { icon: <Radio size={16} />, title: dissolutionBlockerTitle(kind, count), desc: '경기가 끝나면 해체할 수 있어요.' };
     case 'matched_team_match':
-      return { icon: <Swords size={16} />, title: `상대가 정해진 팀매치 ${count}건`, desc: '상대 팀이 정해진 경기예요. 취소하면 상대 팀 팀장·매니저에게 알림이 가요.' };
+      return { icon: <Swords size={16} />, title: dissolutionBlockerTitle(kind, count), desc: '상대 팀이 정해진 경기예요. 취소하면 상대 팀 팀장·매니저에게 알림이 가요.' };
     case 'league_entry':
-      return { icon: <Trophy size={16} />, title: `참가 중인 리그 ${count}건`, desc: '리그 대진에 들어간 팀은 직접 나갈 수 없어요. 참가 취소를 요청하면 리그 운영팀이 확인해요.' };
+      return { icon: <Trophy size={16} />, title: dissolutionBlockerTitle(kind, count), desc: '리그 대진에 들어간 팀은 직접 나갈 수 없어요. 참가 취소를 요청하면 리그 운영팀이 확인해요.' };
     case 'tournament_entry':
-      return { icon: <Trophy size={16} />, title: `참가 신청한 대회 ${count}건`, desc: '대회가 끝나거나 참가 신청을 취소하면 해체할 수 있어요.' };
+      return { icon: <Trophy size={16} />, title: dissolutionBlockerTitle(kind, count), desc: '대회가 끝나거나 참가 신청을 취소하면 해체할 수 있어요.' };
   }
 }
 
@@ -190,13 +191,6 @@ function blockerActionLabel(kind: V1TeamDissolutionBlocker['kind'], item: Blocke
   if (kind === 'tournament_entry') return '참가 신청 보러 가기';
   if (kind === 'matched_team_match' && (item.startAt === null || Date.parse(item.startAt) > now)) return '경기 취소하러 가기';
   return '경기 보러 가기';
-}
-
-function blockerItemMeta(item: BlockerItem) {
-  const when = [formatTournamentDateTimeShort(item.startAt), item.placeName].filter(Boolean).join(' ');
-  const head = item.opponentName ? `${item.title} · vs ${item.opponentName}` : item.title;
-  const status = item.registrationStatus === 'cancel_requested' ? '취소 요청 중' : null;
-  return [head, when || null, status].filter(Boolean).join(' · ');
 }
 
 export function TeamDissolutionBlockedView({
@@ -244,7 +238,7 @@ export function TeamDissolutionBlockedView({
                   </div>
                   {blocker.items.map((item) => (
                     <div key={item.id} style={{ marginTop: 12 }}>
-                      <div className="tm-text-caption" style={{ color: 'var(--text-strong)', overflowWrap: 'anywhere' }}>{blockerItemMeta(item)}</div>
+                      <div className="tm-text-caption" style={{ color: 'var(--text-strong)', overflowWrap: 'anywhere' }}>{dissolutionBlockerItemSummary(item)}</div>
                       {item.route ? (
                         <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={item.route} style={{ marginTop: 8 }}>
                           {blockerActionLabel(blocker.kind, item, now)}

@@ -561,7 +561,7 @@ export class ChatService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 운영진만 컨택 대화에 참여할 수 있어요.',
+        message: '팀장·매니저만 컨택 대화에 참여할 수 있어요.',
       });
     }
   }

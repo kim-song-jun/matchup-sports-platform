@@ -1585,8 +1585,8 @@ describe('TeamMembersPageClient — 운영진 5명 한도', () => {
 
     const promote = screen.getByRole('button', { name: '운영진 지정' });
     expect(promote).toBeDisabled();
-    expect(screen.getByText('운영진은 최대 5명이에요.')).toBeVisible();
-    expect(promote).toHaveAccessibleDescription('운영진은 최대 5명이에요.');
+    expect(screen.getByText('매니저는 최대 5명이에요.')).toBeVisible();
+    expect(promote).toHaveAccessibleDescription('매니저는 최대 5명이에요.');
     // 내보내기 등 나머지 관리 동작은 그대로 누를 수 있다.
     expect(screen.getByRole('button', { name: '내보내기' })).toBeEnabled();
   });
@@ -1598,7 +1598,7 @@ describe('TeamMembersPageClient — 운영진 5명 한도', () => {
     openManage('박서준');
 
     expect(screen.getByRole('button', { name: '운영진 지정' })).toBeEnabled();
-    expect(screen.queryByText('운영진은 최대 5명이에요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('매니저는 최대 5명이에요.')).not.toBeInTheDocument();
   });
 
   it('화면이 낡아 서버가 409 MANAGER_LIMIT_EXCEEDED 로 거절해도 이유를 화면에 올린다', async () => {
@@ -1622,7 +1622,7 @@ describe('TeamMembersPageClient — 운영진 5명 한도', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('운영진은 최대 5명이에요');
+    expect(alert).toHaveTextContent('매니저는 최대 5명이에요');
     expect(screen.queryByText(/Manager count/)).not.toBeInTheDocument();
     expect(alert.parentElement).toHaveFocus();
   });

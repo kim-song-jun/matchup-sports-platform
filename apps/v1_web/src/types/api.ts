@@ -608,11 +608,6 @@ export type V1Team = {
     displayName: string;
     profileImageUrl: string | null;
   };
-  /** 감독 — manager 역할 멤버가 없으면 null */
-  manager?: {
-    userId: string;
-    displayName: string;
-  } | null;
   viewerRole?: string;
   viewerJoinState?: string;
 };

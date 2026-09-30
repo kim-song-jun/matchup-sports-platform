@@ -108,7 +108,7 @@ describe('MyJoinApplicationsPageView — 보낸 가입 신청 상태 표시', ()
       status: 'requested',
       statusLabel: '승인 대기',
       statusTone: 'pending',
-      statusHint: '관리자가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
+      statusHint: '팀장·매니저가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
       message: null,
       dateLabel: '7월 1일',
       actionPending: false,

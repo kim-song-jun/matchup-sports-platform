@@ -759,7 +759,7 @@ export class TeamsService {
       });
     }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
-      throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
+      throw stateConflict('매니저는 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -771,7 +771,7 @@ export class TeamsService {
           data: { managerCount: { increment: 1 } },
         });
         if (capGuard.count !== 1) {
-          throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
+          throw stateConflict('매니저는 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
         }
       }
       const updated = await tx.v1TeamMembership.update({
@@ -2184,7 +2184,6 @@ export class TeamsService {
         displayName: team.ownerUser.profile?.nickname ?? team.ownerUser.profile?.displayName ?? '팀장',
         profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
       },
-      manager: this.findManager(team),
     };
   }
 
@@ -2194,17 +2193,6 @@ export class TeamsService {
       select: { profile: { select: { nickname: true, displayName: true } } },
     });
     return found?.profile?.nickname ?? found?.profile?.displayName ?? fallback;
-  }
-
-  private findManager(team: TeamWithRelations) {
-    const manager = team.memberships.find((membership) => membership.role === 'manager' && membership.status === 'active');
-    if (!manager) {
-      return null;
-    }
-    return {
-      userId: manager.userId,
-      displayName: manager.user.profile?.nickname ?? manager.user.profile?.displayName ?? '감독',
-    };
   }
 
   private getViewer(team: TeamWithRelations, user: V1AuthUser | null) {

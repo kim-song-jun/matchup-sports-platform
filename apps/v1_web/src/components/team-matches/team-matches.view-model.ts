@@ -150,9 +150,9 @@ export function getTeamMatchCreateViewModel(step: TeamMatchCreateStep): TeamMatc
     selectedTeam: '다이나믹 FS',
     selectedSport: '풋살',
     teams: [
-      { name: 'FC 발빠른놈들', sport: '축구', members: 24, role: '주장 권한' },
-      { name: '다이나믹 FS', sport: '풋살', members: 14, role: '주장 권한', selected: true },
-      { name: '강남 러너스', sport: '러닝', members: 12, role: '멤버 · 팀장 또는 관리자만 매치 생성 가능' },
+      { name: 'FC 발빠른놈들', sport: '축구', members: 24, role: '팀장' },
+      { name: '다이나믹 FS', sport: '풋살', members: 14, role: '매니저', selected: true },
+      { name: '강남 러너스', sport: '러닝', members: 12, role: '멤버 · 팀장·매니저만 매치 생성 가능' },
     ],
     sports: ['축구', '풋살', '러닝', '수영'],
     draft,

@@ -42,6 +42,7 @@ import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/l
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
+import { teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -311,7 +312,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         membershipId: member.membershipId,
         userId: member.userId,
         name: member.displayName,
-        role: roleLabel(member.role),
+        role: teamRoleLabel(member.role) ?? '멤버',
         // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
         // 뒤로가기가 팀 목록이 아니라 이 팀 상세로 돌아오도록 출처를 함께 넘긴다.
         profileHref: withFromPath(`/users/${member.userId}`, selfHref),
@@ -647,7 +648,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             canManageMembers,
             canDelegateOwner,
             promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRoleTo(member.membershipId, 'manager')),
-            promoteDisabledReason: (team.data?.managerCount ?? 0) >= TEAM_MANAGER_LIMIT ? `운영진은 최대 ${TEAM_MANAGER_LIMIT}명이에요.` : undefined,
+            promoteDisabledReason: (team.data?.managerCount ?? 0) >= TEAM_MANAGER_LIMIT ? `매니저는 최대 ${TEAM_MANAGER_LIMIT}명이에요.` : undefined,
             delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRoleTo(member.membershipId, 'owner')),
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRoleTo(member.membershipId, 'member')),
             openUnavailability:
@@ -1014,7 +1015,7 @@ function teamDetailCtaSuccessMessage(
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅으로 이동해요.';
   if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소했어요.';
   if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
-  if (eligibility?.eligible) return '가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.';
+  if (eligibility?.eligible) return '가입 신청을 보냈어요. 팀장·매니저가 승인하면 알림으로 알려드려요.';
   return undefined;
 }
 
@@ -1108,12 +1109,6 @@ function buildTeamOperations(
   ];
 }
 
-function roleLabel(role: string) {
-  if (role === 'owner') return '팀장';
-  if (role === 'manager' || role === 'admin') return '운영진';
-  return '멤버';
-}
-
 function isTeamMemberRole(role?: string | null) {
   return isTeamOperatorRole(role) || role === 'member';
 }
@@ -1162,7 +1157,7 @@ function toMemberModel(
 
   return {
     name: member.displayName,
-    role: roleLabel(member.role),
+    role: teamRoleLabel(member.role) ?? '멤버',
     // 등번호가 있으면 가입일과 함께 보여준다 — 라인업을 짤 때 누가 몇 번인지 여기서
     // 바로 확인할 수 있어야 팀원 화면과 라인업 화면이 따로 놀지 않는다.
     meta:
@@ -1178,7 +1173,7 @@ function toMemberModel(
     selfLeave: actions.selfLeave
       ? {
           disabled: !ownerCanLeave,
-          disabledReason: ownerCanLeave ? undefined : '팀장을 운영진에게 넘겨야 나갈 수 있어요. 운영진이 없으면 멤버 한 명을 먼저 운영진으로 지정해 주세요.',
+          disabledReason: ownerCanLeave ? undefined : '팀장을 매니저에게 넘겨야 나갈 수 있어요. 매니저가 없으면 멤버 한 명을 먼저 매니저로 지정해 주세요.',
           pending: actions.selfLeave.pending,
           error: actions.selfLeave.error,
           onSelect: actions.selfLeave.onSelect,

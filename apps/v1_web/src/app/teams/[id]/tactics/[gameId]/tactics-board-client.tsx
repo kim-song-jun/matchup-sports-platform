@@ -145,7 +145,7 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
       // 다른 운영진이 먼저 저장한 경우. 자동으로 다시 불러오지 않는다 — 지금 화면에는
       // 저장하지 못한 편집이 남아 있어서, 조용히 덮으면 그게 사라진다.
       if (caught instanceof V1ApiError && caught.statusCode === 409) {
-        setError('다른 운영진이 먼저 저장했어요. 새로고침해서 최신 배치를 불러온 뒤 다시 저장해 주세요.');
+        setError('다른 팀장·매니저가 먼저 저장했어요. 새로고침해서 최신 배치를 불러온 뒤 다시 저장해 주세요.');
         return;
       }
       setError(extractErrorMessage(caught, '전술을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'));

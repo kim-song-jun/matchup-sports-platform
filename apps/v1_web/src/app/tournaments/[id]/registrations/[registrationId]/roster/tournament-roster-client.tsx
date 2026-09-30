@@ -44,6 +44,7 @@ import {
   tournamentRosterClosedMessage,
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
+import { teamRoleLabel } from '@/lib/v1-status-labels';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
@@ -280,15 +281,6 @@ function createDraftPlayerForm(): DraftPlayerForm {
 function isValidBirthDate(v: string): boolean {
   if (!v) return true; // optional field — empty is valid
   return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
-
-/* Role label helper for the member picker */
-function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
-  switch (role) {
-    case 'owner': return '팀장';
-    case 'manager': return '관리자';
-    case 'member': return '멤버';
-  }
 }
 
 /** 대회 성별 구분이 요구하는 선수 성별. 서버 genderRequiredByCategory와 동일 판정. */
@@ -569,7 +561,7 @@ function AddPlayerForm({
                         : ` - ${memberMissingReason(m, genderCategory)}`;
                   return (
                     <option key={m.userId} value={m.userId} disabled={disabled}>
-                      {m.displayName} ({memberRoleLabel(m.role)})
+                      {m.displayName} ({teamRoleLabel(m.role)})
                       {suffix}
                     </option>
                   );

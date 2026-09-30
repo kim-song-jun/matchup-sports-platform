@@ -904,7 +904,7 @@ function TeamJoinPendingNotice({ requestedAtLabel }: { requestedAtLabel?: string
         {requestedAtLabel ? <span className="tm-text-caption">{requestedAtLabel}</span> : null}
       </div>
       <p className="tm-text-body tm-team-join-pending-body">
-        관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.
+        팀장·매니저가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.
       </p>
     </Card>
   );
@@ -1131,7 +1131,7 @@ function TeamJoinPolicyField({ form }: { form?: TeamFormViewModel['form'] }) {
     {
       value: 'approval_required' as const,
       label: '가입 신청 가능',
-      description: '새 멤버가 가입 신청을 보내고 운영진이 승인해요.',
+      description: '새 멤버가 가입 신청을 보내고 팀장·매니저가 승인해요.',
     },
     {
       value: 'closed' as const,
@@ -1583,7 +1583,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         <h2 className="tm-text-heading tm-hide-desktop">{model.teamName}</h2>
         <div className="tm-team-stat-grid" style={{ gridTemplateColumns: canManageMembers ? '1fr 1fr 1fr' : '1fr 1fr' }}>
           <Card pad={12}><KPIStat label="전체" value={model.summary.total} unit="명" /></Card>
-          <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
+          <Card pad={12}><KPIStat label="팀장·매니저" value={model.summary.managers} unit="명" /></Card>
           {canManageMembers ? <Card pad={12}><KPIStat label="가입 신청 대기" value={model.summary.pending} unit="명" /></Card> : null}
         </div>
         {model.selfNotice ? <div style={{ marginTop: 16 }}>{model.selfNotice}</div> : null}

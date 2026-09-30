@@ -809,7 +809,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           <section aria-labelledby="lineup-roster-heading" style={{ marginBottom: 16 }}>
             <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${addableWaitingMembers.length})`} />
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-              팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요. 별도의 참석 초대나 응답은 필요하지 않아요.
+              팀장·매니저가 활성 팀원을 참석명단에 바로 넣을 수 있어요. 별도의 참석 초대나 응답은 필요하지 않아요.
             </p>
             {unavailabilityQuery.isError ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>

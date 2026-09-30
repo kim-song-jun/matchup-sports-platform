@@ -817,7 +817,7 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
-    expect(screen.getByText('대회 신청은 팀장과 운영진이 진행할 수 있어요.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('대회 신청은 팀장·매니저가 진행할 수 있어요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('팀원은 미선택 상태로 진행하거나 추후 수정할 수 있어요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('입금 확인 후 대회 참가가 확정돼요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('선수단 확정')).toBeInTheDocument();

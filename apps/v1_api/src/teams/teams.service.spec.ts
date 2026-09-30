@@ -458,7 +458,7 @@ describe('TeamsService', () => {
   });
 
   describe('list', () => {
-    it('includes owner and active manager in each list item', async () => {
+    it('includes the owner in each list item', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([
         {
           ...teamRow(),
@@ -493,17 +493,15 @@ describe('TeamsService', () => {
         displayName: 'owner-nick',
         profileImageUrl: 'https://example.com/owner.png',
       });
-      expect(result.items[0].manager).toEqual({
-        userId: manager.id,
-        displayName: 'manager-nick',
-      });
+      // 목록 카드가 매니저 이름을 쓰지 않는다(G12 팀장 줄 제거) — 더는 내려 보내지 않는다.
+      expect(result.items[0]).not.toHaveProperty('manager');
       expect(result.pageInfo.total).toBe(1);
       expect(prisma.v1Team.count).toHaveBeenCalledWith({
         where: expect.objectContaining({ status: 'active', deletedAt: null }),
       });
     });
 
-    it('returns manager=null when the team has no active manager', async () => {
+    it('falls back to "팀장" when the owner has no profile name', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([
         {
           ...teamRow(),
@@ -535,7 +533,6 @@ describe('TeamsService', () => {
         displayName: '팀장',
         profileImageUrl: null,
       });
-      expect(result.items[0].manager).toBeNull();
     });
 
     it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {

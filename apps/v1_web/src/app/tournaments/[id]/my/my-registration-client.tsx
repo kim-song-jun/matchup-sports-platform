@@ -41,6 +41,7 @@ import type {
   V1MyTeam,
 } from '@/types/api';
 import { getRosterDeadlineState, isTournamentRosterMutable } from '@/lib/roster-editability';
+import { teamRoleLabel } from '@/lib/v1-status-labels';
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
   if (!data) return [];
@@ -1404,7 +1405,7 @@ function TeamRegistrationHub({
                       </span>
                       <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
                       {canManageTeam ? (
-                        <span className="tm-badge tm-badge-blue">{team.role === 'owner' ? '대표' : '관리자'}</span>
+                        <span className="tm-badge tm-badge-blue">{teamRoleLabel(team.role) ?? '매니저'}</span>
                       ) : (
                         <span className="tm-badge tm-badge-grey">멤버</span>
                       )}

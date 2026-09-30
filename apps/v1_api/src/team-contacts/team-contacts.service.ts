@@ -332,7 +332,7 @@ export class TeamContactsService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 운영진만 할 수 있어요.',
+        message: '팀장·매니저만 할 수 있어요.',
       });
     }
     return membership;

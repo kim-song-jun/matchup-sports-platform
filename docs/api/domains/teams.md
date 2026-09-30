@@ -83,6 +83,7 @@ CAUTION:
 - Team list, detail, `/me/teams` responses include `activityDays`, `activityFrequency`,
   `activityTimeSlots`, `activityTypes`, `activityMemo`, `activitySummary`, `memberGoalCount`.
   `activityAreaText`는 기존 `activity_note` 컬럼을 쓰는 호환/폴백 필드로 남아 있다.
+- 목록 항목은 `owner`(팀장 이름·사진)를 내려주고 매니저 이름은 내려주지 않는다 — 목록 카드가 팀장·매니저 줄을 쓰지 않는다(Task 180 G12·H2, 예전 `manager` 필드 제거).
 
 ## POST /teams (MutateTeamDto / CreateTeamDto)
 

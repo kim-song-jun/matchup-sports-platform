@@ -127,7 +127,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
             // 403 을 빈 목록으로 위장하면 안 된다 — 운영진이 아닌 사람에게 "차단한 팀이 없어요" 를
             // 보여주면 권한 문제를 데이터 없음으로 오해하고, 실제 차단이 있는데도 없는 줄 안다.
             blocksErrorCode === 'PERMISSION_DENIED' ? (
-              <EmptyState title="차단 목록을 볼 권한이 없어요" sub="팀장과 운영진만 볼 수 있어요." />
+              <EmptyState title="차단 목록을 볼 권한이 없어요" sub="팀장·매니저만 볼 수 있어요." />
             ) : (
               <EmptyState
                 title="차단 목록을 불러오지 못했어요"

@@ -37,7 +37,7 @@ const teams = [
     statusLabel: '검토 중',
     tags: ['중수', '평일 저녁', '리그 준비'],
     genderRule: '여',
-    intro: '평일 저녁 풋살 위주로 운영하는 팀이에요. 가입 신청은 운영진 검토 후 확정해요.',
+    intro: '평일 저녁 풋살 위주로 운영하는 팀이에요. 가입 신청은 팀장·매니저가 확인한 뒤 확정해요.',
     next: '가입 신청 검토 중',
   },
   {
@@ -93,8 +93,8 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     membersList: [],
   },
   pending: {
-    description: '가입 신청이 접수된 팀이에요. 운영진이 프로필, 활동 지역, 최근 매치 이력을 검토하고 있어요.',
-    activity: '평일 저녁 정기전 · 운영진 검토 후 가입',
+    description: '가입 신청이 접수된 팀이에요. 팀장·매니저가 프로필, 활동 지역, 최근 매치 이력을 검토하고 있어요.',
+    activity: '평일 저녁 정기전 · 팀장·매니저 확인 후 가입',
     condition: '풋살 중수 · 평일 저녁 참여 가능',
     schedule: '매주 화 20:00 · 강동 풋살파크',
     city: '서울',
@@ -233,7 +233,7 @@ export function getTeamMembersViewModel(): TeamMembersViewModel {
     summary: { total: 18, managers: 2, pending: 3 },
     members: [
       { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
-      { name: '박서준', role: '운영진', meta: 'GK · 가입 2024.05', actions: [] },
+      { name: '박서준', role: '매니저', meta: 'GK · 가입 2024.05', actions: [] },
       { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', actions: [] },
     ],
     requests: [

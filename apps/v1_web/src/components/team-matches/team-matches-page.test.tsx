@@ -1307,7 +1307,7 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
 describe('팀매치 상세 히어로 CTA — 안내와 실제 동작', () => {
   it('신청 중인데 실행할 액션이 없으면 CTA가 눌리지 않는다', () => {
     const model = getTeamMatchDetailViewModel('pending');
-    const label = '팀 운영진만 취소할 수 있어요';
+    const label = '팀장·매니저만 취소할 수 있어요';
     model.applyLabel = label;
     model.onApply = undefined;
 

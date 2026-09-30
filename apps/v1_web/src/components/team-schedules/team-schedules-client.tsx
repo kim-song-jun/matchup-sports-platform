@@ -166,7 +166,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     emptyTitle: '아직 등록된 일정이 없어요',
     emptySub: canManage
       ? '팀원과 함께할 첫 일정을 만들어 보세요.'
-      : '팀 운영진이 일정을 등록하면 여기서 확인할 수 있어요.',
+      : '팀장·매니저가 일정을 등록하면 여기서 확인할 수 있어요.',
   };
 
   return <ScheduleListPageView model={model} />;

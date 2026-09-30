@@ -605,7 +605,7 @@ function applyLabel(
     // 철회 대상을 못 찾은 경우(예: 신청 당시 팀에서 운영진 자격을 잃어 eligibility 목록에서
     // 빠짐) 이 CTA는 아무것도 못 한다 — 비활성 버튼에 '신청 취소'라고 적어두면 "여기서
     // 취소된다"는 거짓 안내가 된다. 응답이 아직 안 왔으면 기존 문구를 유지해 깜빡임을 막는다.
-    return eligibilityLoaded ? '팀 운영진만 취소할 수 있어요' : '신청 취소';
+    return eligibilityLoaded ? '팀장·매니저만 취소할 수 있어요' : '신청 취소';
   }
   if (viewerState === 'approved') return '승인 완료';
   if (isParticipantMember) return OWN_TEAM_MATCH_LABEL;

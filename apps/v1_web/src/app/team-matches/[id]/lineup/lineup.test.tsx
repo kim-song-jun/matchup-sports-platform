@@ -667,7 +667,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText(/팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/팀장·매니저가 활성 팀원을 참석명단에 바로 넣을 수 있어요/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /팀 일정에서 참석을 먼저 확인/ })).not.toBeInTheDocument();
   });
 

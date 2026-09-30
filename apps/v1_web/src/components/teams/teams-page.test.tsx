@@ -298,7 +298,7 @@ describe('TeamDetailPageView', () => {
     // 토스트는 사라지지만 이 안내는 남아야 한다 — 모바일/데스크톱 레이아웃 양쪽에 렌더된다.
     expect(screen.getAllByText('승인 대기 중').length).toBeGreaterThan(0);
     expect(
-      screen.getAllByText('관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.').length,
+      screen.getAllByText('팀장·매니저가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.').length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText('2026. 07. 20. 신청').length).toBeGreaterThan(0);
   });
@@ -631,7 +631,7 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     const button = screen.getByRole('button', { name: /팀 나가기/ });
     expect(button).toBeDisabled();
     // 이유는 aria-label 이 아니라 화면에 보이는 문장이고, 버튼이 그 문장을 설명으로 가리킨다.
-    const reason = screen.getByText(/팀장을 운영진에게 넘겨야 나갈 수 있어요/);
+    const reason = screen.getByText(/팀장을 매니저에게 넘겨야 나갈 수 있어요/);
     expect(reason).toBeVisible();
     expect(button).toHaveAccessibleDescription(reason.textContent ?? '');
   });

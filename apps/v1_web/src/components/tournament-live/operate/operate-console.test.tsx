@@ -215,6 +215,18 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     expect(list).toHaveTextContent('정우진');
   });
 
+  // Task 180 G6(F76) — 콘솔에서는 방금 한 일이 맨 위여야 어시스트를 잘못된 골에 다는 사고가 없다.
+  it('콘솔의 기록된 이벤트는 최신순이다 (맨 위가 가장 나중에 기록된 골)', () => {
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ liveEvents: [goal(1), { ...goal(2), clockMs: 9 * 60000 }, { ...goal(3), clockMs: 12 * 60000 }] }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9', '6']);
+    expect(screen.getByRole('heading', { name: /기록된 이벤트/ })).toHaveTextContent('최신순');
+  });
+
   it('FIELD_OPERATOR가 takeover를 보유하면 기록 수정 액션을 노출한다', () => {
     mocks.useTournamentOpsRole.mockReturnValue('FIELD_OPERATOR');
     mocks.useV1GameOperationsConsole.mockReturnValue(

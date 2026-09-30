@@ -186,6 +186,25 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     expect(screen.queryByText('세부 기록을 불러오지 못했어요')).toBeNull();
   });
 
+  // Task 180 G6(F76) — 콘솔만 최신순이다. 검토자는 경기 흐름대로(시간순) 읽는다.
+  it('경기 세부 기록은 시간순이다 — 콘솔의 최신순이 검토 화면으로 새지 않는다', () => {
+    const event = (sequence: number, clockMs: number) => ({
+      id: `e${sequence}`, gameId: GAME_ID, sequence, clientEventId: `c${sequence}`, payloadHash: 'h', type: 'GOAL',
+      sideId: 'side-home', participantId: null, assistParticipantId: null, period: 1, clockMs,
+      occurredAt: '2026-08-11T00:05:00.000Z', receivedAt: '2026-08-11T00:05:00.000Z',
+      actorUserId: 'a', reversesEventId: null, payload: {},
+    });
+    eventsMock.state = {
+      data: { events: [event(1, 1 * 60000), event(2, 7 * 60000), event(3, 13 * 60000)], lastSequence: 3, gap: null },
+      isPending: false, isError: false, error: null, refetch: () => {},
+    };
+
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows.map((row) => /전반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['1', '7', '13']);
+  });
+
   it('조회 실패를 미기록과 구분해 표시하고 재시도 경로를 준다', () => {
     eventsMock.state = {
       data: undefined, isPending: false, isError: true,

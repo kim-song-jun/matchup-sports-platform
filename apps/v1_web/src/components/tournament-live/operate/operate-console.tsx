@@ -1588,8 +1588,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           부정하는 상태다. 서버에 확정된 이벤트 로그를 먼저 보여주고, 큐는 아직 전송되지
           않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
       <section className="px-4">
-        <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">기록된 이벤트</h3>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">
+          기록된 이벤트 <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">· 최신순</span>
+        </h3>
         <RecordedEventList
+          order="newest-first"
           events={ops.liveEvents}
           sides={sides}
           lineups={lineups}

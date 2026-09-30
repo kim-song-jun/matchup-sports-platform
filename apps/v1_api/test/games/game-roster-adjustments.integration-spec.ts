@@ -228,6 +228,21 @@ describe('경기 명단 조정 API (Task 179)', () => {
         ['STAFF', true],
         ['STAFF', false],
       ]);
+      // 등번호 원본 신청 id 는 사이드 팀 owner·manager 에게만 — 등번호 저장 API 의 권한과 같다.
+      const registrationA = f.registrations.get(f.teamA.id)!;
+      expect(reads.map((res) => res.body.data.jerseyRegistrationId)).toEqual([
+        registrationA,
+        registrationA,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]);
+      const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registrationA } });
+      expect(
+        reads[0].body.data.participants.map((row: { userId: string; participantId: string }) => [row.userId, row.participantId]).sort(),
+      ).toEqual(players.map((player) => [player.userId, player.id]).sort());
       const histories = await Promise.all(readers.map((id) => getAs(`${sideA}/roster-adjustments`, id)));
       expect(histories.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200, 200]);
       // 상대팀 팀장·팀원·외부인은 A 사이드를 못 본다(사유는 팀 내부 정보다).

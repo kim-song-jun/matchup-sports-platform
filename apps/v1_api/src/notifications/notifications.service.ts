@@ -721,26 +721,44 @@ export class NotificationsService {
     this.dispatch([userId], type, targetId, body, options);
   }
 
-  /** 아직 처리 전인 "팀 초대 도착" 알림 — 사용자·팀이 같고 도착지가 초대함이며 읽지 않은 것. */
-  private pendingTeamInvitationNotifications(userId: string, teamId: string) {
+  /**
+   * 그 초대의 아직 처리 전인 "팀 초대 도착" 알림 — 사용자·팀이 같고 도착지가 초대함이며 읽지 않은 것 중 초대가 보내진
+   * 뒤에 만들어진 것. 초대 행은 다시 초대할 때 재사용되므로(팀·사람당 하나) 보낸 시각으로 옛 초대의 알림을 가른다.
+   */
+  private pendingTeamInvitationNotifications(userId: string, teamId: string, sentAt: Date) {
     return {
       recipientUserId: userId,
       targetType: 'team' as const,
       targetId: teamId,
       deepLink: TEAM_INVITATION_INBOX_LINK,
       readAt: null,
+      createdAt: { gte: sentAt },
     };
   }
 
   /**
-   * 초대를 수락·거절하면 그 초대의 도착 알림을 읽음 처리한다 — 처리한 뒤에도 안 읽음으로 남아
-   * 아직 할 일이 있는 것처럼 보이던 문제. 알림 실패는 이미 끝난 수락·거절을 깨지 않는다.
+   * 초대를 수락·거절하면 그 초대의 도착 알림을 결과 문구로 바꾸고 읽음 처리한다 — 그대로 두면 눌러서 들어간 초대함이
+   * 비어 있다. 수락은 팀 상세, 거절은 공개 팀 상세(같은 주소가 비멤버에게는 공개 화면)로 보낸다.
+   * 알림 실패는 이미 끝난 수락·거절을 깨지 않는다.
    */
-  async markTeamInvitationHandled(userId: string, teamId: string): Promise<void> {
+  async markTeamInvitationHandled(input: {
+    userId: string;
+    teamId: string;
+    teamName: string;
+    sentAt: Date;
+    result: 'accepted' | 'declined';
+  }): Promise<void> {
+    const { userId, teamId, teamName, sentAt, result } = input;
     try {
       await this.prisma.v1Notification.updateMany({
-        where: this.pendingTeamInvitationNotifications(userId, teamId),
-        data: { readAt: new Date() },
+        where: this.pendingTeamInvitationNotifications(userId, teamId, sentAt),
+        data: {
+          readAt: new Date(),
+          ...(result === 'accepted'
+            ? { title: '팀 초대를 수락했어요', body: `"${teamName}" 멤버가 됐어요.` }
+            : { title: '팀 초대를 거절했어요', body: `"${teamName}" 팀 초대를 거절했어요.` }),
+          deepLink: `/teams/${teamId}`,
+        },
       });
     } catch (err) {
       this.logger.warn({ userId, teamId, err }, '팀 초대 알림 읽음 처리 실패');
@@ -751,10 +769,10 @@ export class NotificationsService {
    * 초대가 취소되면 받은 사람의 도착 알림을 "취소됐어요"로 바꾸고 읽음 처리한다. 그대로 두면 눌러서
    * 들어간 내 초대함이 "초대가 없어요"만 말한다. 도착지는 초대함 대신 팀 상세로 옮긴다.
    */
-  async markTeamInvitationCancelled(userId: string, teamId: string, teamName: string): Promise<void> {
+  async markTeamInvitationCancelled(userId: string, teamId: string, teamName: string, sentAt: Date): Promise<void> {
     try {
       await this.prisma.v1Notification.updateMany({
-        where: this.pendingTeamInvitationNotifications(userId, teamId),
+        where: this.pendingTeamInvitationNotifications(userId, teamId, sentAt),
         data: {
           readAt: new Date(),
           title: '팀 초대가 취소됐어요',

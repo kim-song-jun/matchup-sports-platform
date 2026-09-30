@@ -104,6 +104,7 @@ function invitationRow(overrides: Record<string, unknown> = {}) {
     status: 'pending' as const,
     message: null,
     createdAt: new Date('2026-06-01'),
+    updatedAt: new Date('2026-06-10T09:00:00Z'),
     respondedAt: null,
     team: { id: 'team-1', name: '테스트팀', status: 'active', memberCount: 5 },
     invitedUser: { profile: { nickname: '초대받은이', displayName: null } },
@@ -2246,7 +2247,14 @@ describe('TeamsService', () => {
       expect(result.status).toBe('accepted');
       expect(result.alreadyProcessed).toBe(false);
       expect(result.membershipId).toBe('mem-new');
-      expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith(invitee.id, 'team-1');
+      // 그 초대의 도착 알림만 — 초대 행의 updatedAt(보낸 시각) 이후 것을 '수락했어요'로 바꾼다(W2-V5·V7).
+      expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith({
+        userId: invitee.id,
+        teamId: 'team-1',
+        teamName: '테스트팀',
+        sentAt: new Date('2026-06-10T09:00:00Z'),
+        result: 'accepted',
+      });
       // memberCount increment 가 호출됐어야 함
       expect(prisma.v1Team.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2364,7 +2372,13 @@ describe('TeamsService', () => {
           data: expect.objectContaining({ status: 'declined' }),
         }),
       );
-      expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith(invitee.id, 'team-1');
+      expect(notifications.markTeamInvitationHandled).toHaveBeenCalledWith({
+        userId: invitee.id,
+        teamId: 'team-1',
+        teamName: '테스트팀',
+        sentAt: new Date('2026-06-10T09:00:00Z'),
+        result: 'declined',
+      });
       // 초대한 사람에게만 '○○님이 초대를 거절했어요'(H1-invite-declined) — 거절한 본인은 받지 않는다.
       expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
       expect(notifications.emitNotification).toHaveBeenCalledWith(manager.id, 'team_invitation_declined', 'team-1', undefined, {
@@ -2416,6 +2430,7 @@ describe('TeamsService', () => {
         teamId: 'team-1',
         invitedUserId: invitee.id,
         status: 'pending',
+        updatedAt: new Date('2026-06-10T09:00:00Z'),
         team: { name: '테스트팀' },
       });
       prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'cancelled' });
@@ -2429,7 +2444,7 @@ describe('TeamsService', () => {
           data: { status: 'cancelled' },
         }),
       );
-      expect(notifications.markTeamInvitationCancelled).toHaveBeenCalledWith(invitee.id, 'team-1', '테스트팀');
+      expect(notifications.markTeamInvitationCancelled).toHaveBeenCalledWith(invitee.id, 'team-1', '테스트팀', new Date('2026-06-10T09:00:00Z'));
     });
 
     it('이미 cancelled 인 초대 취소 → alreadyCancelled=true (update skip)', async () => {

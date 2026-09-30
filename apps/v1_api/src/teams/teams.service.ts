@@ -1545,7 +1545,7 @@ export class TeamsService {
 
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
       where: { id: invitationId },
-      select: { id: true, teamId: true, invitedUserId: true, status: true, team: { select: { name: true } } },
+      select: { id: true, teamId: true, invitedUserId: true, status: true, updatedAt: true, team: { select: { name: true } } },
     });
     if (!invitation) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
@@ -1569,7 +1569,8 @@ export class TeamsService {
       data: { status: 'cancelled' },
       select: { id: true, status: true },
     });
-    void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name);
+    // 대기 중인 초대 행의 updatedAt 은 보낸(다시 보낸) 시각이다 — 그 뒤의 도착 알림만 이 초대의 것이다.
+    void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name, invitation.updatedAt);
 
     return { invitationId: updated.id, status: updated.status, alreadyCancelled: false };
   }
@@ -1689,6 +1690,7 @@ export class TeamsService {
         invitedUserId: true,
         invitedByUserId: true,
         status: true,
+        updatedAt: true,
         team: {
           select: {
             id: true,
@@ -1805,7 +1807,13 @@ export class TeamsService {
       return { updatedInvitation, membership, team };
     });
 
-    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
+    await this.notifications.markTeamInvitationHandled({
+      userId: user.id,
+      teamId: invitation.teamId,
+      teamName: invitation.team.name,
+      sentAt: invitation.updatedAt,
+      result: 'accepted',
+    });
     // 초대한 사람의 '초대 수락' 줄에 더한다(안 읽은 동안은 한 줄 — H1-join-burst).
     void this.notifications.recordTeamInvitationAccepted({
       inviterUserId: invitation.invitedByUserId,
@@ -1833,6 +1841,7 @@ export class TeamsService {
         invitedUserId: true,
         invitedByUserId: true,
         status: true,
+        updatedAt: true,
         team: { select: { name: true } },
         invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } },
       },
@@ -1859,7 +1868,13 @@ export class TeamsService {
       data: { status: 'declined', respondedAt: new Date() },
       select: { id: true, status: true },
     });
-    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
+    await this.notifications.markTeamInvitationHandled({
+      userId: user.id,
+      teamId: invitation.teamId,
+      teamName: invitation.team.name,
+      sentAt: invitation.updatedAt,
+      result: 'declined',
+    });
     void this.notifications.emitNotification(invitation.invitedByUserId, 'team_invitation_declined', invitation.teamId, undefined, {
       vars: { team: invitation.team.name, name: notificationPersonName(invitation.invitedUser.profile) },
     });

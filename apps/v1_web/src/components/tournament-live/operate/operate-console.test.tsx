@@ -822,6 +822,81 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     });
   });
 
+  // Task 180 G6(C-2) — 헤더의 진행 단계 스트립: 전반 · 하프타임 · 후반 · 종료 (끝난 뒤엔 예정 · 진행 · 결과 확인 · 확정).
+  describe('진행 단계 스트립', () => {
+    const strip = () => screen.queryByRole('list', { name: '경기 진행 단계' });
+    const current = () => {
+      const list = strip();
+      return list === null ? null : within(list).getByText((_, el) => el?.getAttribute('aria-current') === 'step').textContent;
+    };
+
+    it('전반이 뛰는 중이면 전반이 현재 단계다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
+        '전반', '하프타임', '후반', '종료',
+      ]);
+      expect(current()).toBe('전반');
+    });
+
+    it('하프타임 중이면 하프타임이, 후반 중이면 후반이 현재 단계다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+      ]);
+      const { unmount } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(current()).toBe('하프타임');
+      unmount();
+
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+      ]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(current()).toBe('후반');
+    });
+
+    it('정규 시간이 끝나 경기 종료만 남았으면 종료가 현재 단계다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+      ]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(current()).toBe('종료');
+    });
+
+    it('끝난 경기는 결과 단계 스트립으로 바뀌고, 공식 결과가 서기 전에는 결과 확인이 현재다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+      ]);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state: 'ENDED' },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
+        '예정', '진행', '결과 확인', '확정',
+      ]);
+      expect(current()).toBe('결과 확인');
+    });
+
+    it('시작 전 경기에는 스트립이 없다 — 그 자리는 킥오프 준비가 맡는다', () => {
+      gameWithPeriods('SCHEDULED', []);
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(strip()).toBeNull();
+    });
+  });
+
   // Task 180 G6(F78) — 종료 직후 콘솔은 "287ms" 한 줄이 아니라 결과 확정 카드로 이어진다.
   describe('종료 직후 결과 확정 카드', () => {
     const REGULATION_ENDED = [

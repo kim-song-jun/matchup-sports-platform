@@ -46,6 +46,8 @@ import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
 import { KickoffChecklist } from './kickoff-checklist';
+import { MatchProgressStrip } from './match-progress-strip';
+import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
 import { ConsoleNextSteps } from './console-next-steps';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { RestTimer } from './rest-timer';
@@ -1056,6 +1058,23 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 진행 조작 줄. "다음 걸음"은 진행 방향 명령 하나(시작·후반 시작·재개·전반/후반 종료)이고
   // 일시 중지·되돌리기는 그 곁의 보조다. 정규 시간 종료 뒤에는 "경기 종료"(동점 결선이면
   // "승부차기 시작")가 다음 걸음이 된다.
+  // 헤더의 진행 단계 스트립. 뛰는 동안은 전반 · 하프타임 · 후반 · 종료, 끝난 뒤에는 예정 · 진행 · 결과 확인 ·
+  // 확정. 시작 전에는 스트립 대신 "킥오프 준비"가 그 자리의 안내다.
+  const progressSteps =
+    gameState === 'LIVE' || gameState === 'PAUSED'
+      ? periodProgressSteps({
+          periods: (gameDetail.data?.periods ?? []).map((period) => ({
+            number: period.number,
+            label: periodLabel(period.number),
+          })),
+          livePeriodNumber: currentPeriod?.number ?? null,
+          halftimePeriodNumber: halftimePeriod?.number ?? null,
+          regulationEnded,
+        })
+      : gameState === 'ENDED'
+        ? resultProgressSteps({ official: resultOfficialized })
+        : [];
+
   const stepCommands = availableCommands.filter((command) => command !== 'end');
   const secondaryCommands = stepCommands.filter((command) => command === 'pause' || command === 'revert-period');
   const nextStepCommand = stepCommands.find((command) => command !== 'pause' && command !== 'revert-period') ?? null;
@@ -1243,6 +1262,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             </div>
           ) : null}
         </div>
+        <MatchProgressStrip steps={progressSteps} label="경기 진행 단계" />
         {/* UX 감사 item 6 — 경기장에서 가장 먼저 봐야 할 정보 중 하나인데 헤더에
             점수가 아예 없었다. 경과시간과 같은 위계(text-2xl font-bold)로,
             같은 행에 나란히 둔다. sides 배열 순서를 그대로 써서 위 제목

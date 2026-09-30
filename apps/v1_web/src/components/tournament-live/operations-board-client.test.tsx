@@ -142,7 +142,7 @@ describe('OperationsBoardClient', () => {
 
   /** 첫 번째(데스크톱 표) 행의 ⋯ 를 눌러 시트를 연다. 표와 카드가 둘 다 DOM 에 있어 이름이 겹친다. */
   function openRowMenu(title = '레드팀 vs 블루팀') {
-    fireEvent.click(screen.getAllByRole('button', { name: `${title} 더보기` })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: new RegExp(`^${title} .+ 더보기$`) })[0]);
     return screen.getByRole('dialog', { name: `${title} 더보기` });
   }
 
@@ -207,6 +207,34 @@ describe('OperationsBoardClient', () => {
       expect(within(sheet).getByRole('button', { name: /^결과 정정/ })).toBeEnabled();
     });
 
+    // G6-V2 — 리그 행 제목은 "N주차"라 같은 주의 두 경기가 같은 버튼 이름을 가졌다(스크린리더로 못 가름).
+    it('제목이 같은 두 행도 운영 콘솔 링크와 ⋯ 의 이름이 일정으로 갈린다', () => {
+      const untitled = { ...ITEM_A, round: null, fixtureNumber: null };
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: {
+          ...PAGE,
+          items: [
+            { ...untitled, fixtureId: 'tm-a', gameId: 'game-a', scheduledAt: '2026-09-29T16:10:00.000Z' },
+            { ...untitled, fixtureId: 'tm-b', gameId: 'game-b', scheduledAt: '2026-09-30T09:30:00.000Z' },
+          ],
+          liveWarnings: [],
+        },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      const table = screen.getByRole('table');
+      const consoleNames = within(table).getAllByRole('link', { name: /운영 콘솔$/ }).map((el) => el.getAttribute('aria-label'));
+      const menuNames = within(table).getAllByRole('button', { name: /더보기$/ }).map((el) => el.getAttribute('aria-label'));
+      for (const names of [consoleNames, menuNames]) {
+        expect(names).toHaveLength(2);
+        expect(new Set(names).size).toBe(2);
+      }
+    });
+
     it('아직 결과가 없는 경기(예정·진행 중, 제출 전)에는 결과 정정 항목이 없고, 넣을 항목이 없으면 ⋯ 자체가 없다', () => {
       mocks.useV1TournamentOperationsBoard.mockReturnValue({
         data: {
@@ -241,7 +269,7 @@ describe('OperationsBoardClient', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 
     expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: '레드팀 vs 블루팀 더보기' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^레드팀 vs 블루팀 .+ 더보기$/ })[0]);
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
 
     // 항목을 고르면 시트는 닫히고 인라인 패널이 열린다.
@@ -262,7 +290,7 @@ describe('OperationsBoardClient', () => {
       refetch: vi.fn().mockResolvedValue({ isSuccess: true, data: [{ state: 'OFFICIAL' }] }),
     });
     render(<OperationsBoardClient tournamentId="t-1" />);
-    await user.click(screen.getAllByRole('button', { name: '레드팀 vs 블루팀 더보기' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^레드팀 vs 블루팀 .+ 더보기$/ })[0]);
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
     await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
     expect(await screen.findByTestId('inline-correction-game-1')).toBeInTheDocument();
@@ -276,7 +304,7 @@ describe('OperationsBoardClient', () => {
       refetch: vi.fn().mockResolvedValue({ isSuccess: false, data: [{ state: 'OFFICIAL' }] }),
     });
     render(<OperationsBoardClient tournamentId="t-1" />);
-    await user.click(screen.getAllByRole('button', { name: '레드팀 vs 블루팀 더보기' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^레드팀 vs 블루팀 .+ 더보기$/ })[0]);
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^결과 정정/ }));
     await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
     expect(screen.getByRole('button', { name: '테스트 결과 확인' })).toBeInTheDocument();

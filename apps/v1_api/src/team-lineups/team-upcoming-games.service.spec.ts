@@ -59,6 +59,7 @@ function toTeamMatchRow(match: FakeMatch) {
   const isLeague = match.kind === 'LEAGUE';
   return {
     id: match.id,
+    title: isLeague ? '가을 정규 리그 1주차 1경기' : '토요일 친선 한 판',
     startAt: match.startAt,
     hostTeamId: match.hostTeamId,
     hostTeam: { name: match.hostName },

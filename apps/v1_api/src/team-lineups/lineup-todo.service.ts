@@ -48,7 +48,7 @@ export type LineupTodo = {
   tournamentTitle: string | null;
   /**
    * 화면·알림에 그대로 나가는 한 줄 라벨. 대회 경기는 "대회명 · 라운드", 리그 대진은
-   * "리그명 N주차", 리그가 아닌 친선 팀매치는 '팀 매치' 고정이다.
+   * "리그명 N주차", 친선 팀매치는 매치 제목(비어 있으면 '팀 매치')이다.
    *
    * 리그의 주차는 `V1TeamMatch.title`에 박제된 값을 쓰지 않는다 — 그 제목은 대진 생성
    * 시점에 굳고 재일정(`updateFixture`)에서 갱신되지 않아서, 그대로 쓰면 같은 경기를
@@ -206,8 +206,8 @@ export class LineupTodoService {
       },
       select: {
         id: true,
-        // `title`은 읽지 않는다 — 리그 대진의 라벨은 아래에서 리그명 + 파생 주차로 조립하고,
-        // 친선 팀매치의 제목은 모집 문구라 라벨로 쓰지 않는다.
+        // 친선 라벨에만 쓴다 — 리그 대진의 라벨은 아래에서 리그명 + 파생 주차로 조립한다.
+        title: true,
         startAt: true,
         hostTeamId: true,
         hostTeam: { select: { name: true } },
@@ -270,15 +270,20 @@ export class LineupTodoService {
       // 제목과 함께 굳어 재일정 뒤에는 실제 킥오프 순서와 어긋난다 — 틀린 순번을 말하느니
       // 말하지 않는 편이 낫고, 주차를 파생하는 다른 화면들도 순번은 말하지 않는다. 같은 날
       // 여러 행이 서면 카드 아래줄의 "vs 상대"가 그대로 구분자 역할을 한다.
-      // 친선 팀매치(leagueId 없음)는 사용자가 붙인 제목이 리그 맥락이 아니라 모집 문구라
-      // 예전처럼 '팀 매치'로 둔다.
+      // 친선 팀매치(leagueId 없음)는 매치 제목을 쓴다 — 고정 '팀 매치'면 같은 상대와 친선이
+      // 여럿일 때 구분할 단서가 시각뿐이다(W3-V6).
       const leagueTitle = match.league?.title ?? null;
       const tournamentTitle = match.tournament?.title ?? null;
       const competitionKind = isTournamentMatch ? 'TOURNAMENT' as const : leagueTitle === null ? 'FRIENDLY' as const : 'LEAGUE' as const;
       const weekNumber = weekNumberByTeamMatchId.get(match.id);
+      const friendlyTitle = match.title.trim();
       const title = isTournamentMatch
         ? [tournamentTitle, tournamentRoundLabel(match.tournamentDetails!.round)].filter(Boolean).join(' · ')
-        : leagueTitle === null || weekNumber === undefined ? '팀 매치' : `${leagueTitle} ${weekNumber}주차`;
+        : leagueTitle !== null && weekNumber !== undefined
+          ? `${leagueTitle} ${weekNumber}주차`
+          : competitionKind === 'FRIENDLY' && friendlyTitle !== ''
+            ? friendlyTitle
+            : '팀 매치';
       for (const side of sides) {
         if (side.teamId === null || side.teamName === null) continue;
         if (teamIds !== null && !teamIds.includes(side.teamId)) continue;

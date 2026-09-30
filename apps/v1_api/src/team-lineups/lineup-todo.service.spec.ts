@@ -18,8 +18,8 @@ jest.mock('../tournaments/discipline/team-game-order', () => ({
  * 라인업인지**를 말해주는지 못박는다.
  *
  * 배경: 리그 대진은 제목이 '팀 매치'로 고정돼 있어서, 여러 리그를 동시에 뛰는 팀장은
- * 목록만 보고는 어느 리그 몇 주차 경기인지 구분할 수 없었다. 친선 팀매치는 리그 맥락이
- * 없으므로 예전 그대로여야 한다(회귀 금지).
+ * 목록만 보고는 어느 리그 몇 주차 경기인지 구분할 수 없었다. 친선 팀매치도 같은 이유로
+ * 매치 제목을 싣는다(W3-V6) — 같은 상대와 친선이 여럿이면 고정 라벨로는 시각만 남는다.
  *
  * 주차는 대진 제목에 박제된 값이 아니라 `startAt`에서 파생한다 — 운영자가 대진을
  * 재일정하면 박제된 제목은 그대로 남기 때문에, 그 값을 그대로 쓰면 같은 경기를 공개
@@ -142,7 +142,7 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
     }
   });
 
-  it('친선 팀매치는 리그 맥락 없이 예전 그대로다', async () => {
+  it('친선 팀매치는 매치 제목을 라벨로 싣는다 (W3-V6)', async () => {
     const prisma = buildPrismaMock();
     const { service, moduleRef } = await buildService(prisma);
 
@@ -152,12 +152,35 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
 
       expect(friendlyTodo).toMatchObject({
         source: 'TEAM_MATCH',
+        competitionKind: 'FRIENDLY',
         tournamentId: null,
         tournamentTitle: null,
-        // 모집 문구가 아니라 예전과 같은 고정 라벨이어야 한다.
-        title: '팀 매치',
+        title: '주말에 한 판 하실 팀 구해요',
         opponentName: '연남 FC',
       });
+      // 가짜 DB 는 select 를 무시하고 행을 통째로 준다 — 실제 Prisma 가 제목을 돌려주려면 조회해야 한다.
+      expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ status: 'matched' }),
+        select: expect.objectContaining({ title: true }),
+      }));
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('친선 제목이 비어 있으면 예전 고정 라벨 "팀 매치"로 둔다', async () => {
+    const prisma = buildPrismaMock();
+    const rows = (await prisma.v1TeamMatch.findMany({ where: { status: 'matched' } })) as Array<Record<string, unknown>>;
+    prisma.v1TeamMatch.findMany.mockImplementation((args: { where?: { status?: string } }) =>
+      Promise.resolve(args?.where?.status === 'matched'
+        ? rows.map((row) => (row.id === 'match-friendly' ? { ...row, title: '   ' } : row))
+        : [{ leagueId, startAt: RESCHEDULED_KICKOFF }]),
+    );
+    const { service, moduleRef } = await buildService(prisma);
+
+    try {
+      const { items } = await service.listForUser({ id: userId } as never);
+      expect(items.find((item) => item.gameId === 'game-friendly')?.title).toBe('팀 매치');
     } finally {
       await moduleRef.close();
     }
@@ -170,6 +193,7 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
       Promise.resolve(args?.where?.status === 'matched'
         ? [{
             id: 'match-tournament',
+            title: '가을 컵 4강',
             startAt: RESCHEDULED_KICKOFF,
             hostTeamId: teamId,
             hostTeam: { name: '성수 FC' },
@@ -213,6 +237,7 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
       Promise.resolve(args?.where?.status === 'matched'
         ? [{
             id: 'match-incomplete-tournament',
+            title: '가을 컵 4강',
             startAt: RESCHEDULED_KICKOFF,
             hostTeamId: teamId,
             hostTeam: { name: '성수 FC' },
@@ -415,6 +440,7 @@ describe('LineupTodoService — 대회·리그는 할 일에서 빠진다(R1)', 
             ...rows,
             {
               id: 'match-tournament',
+              title: '가을 컵 8강',
               startAt: WEEK3_KICKOFF,
               hostTeamId: teamId,
               hostTeam: { name: '성수 FC' },
@@ -481,6 +507,7 @@ describe('LineupTodoService.listCompetitionRosterChecks — 전날 명단 확인
   function match(id: string, startAt: Date, away: string, kind: 'LEAGUE' | 'TOURNAMENT' | 'FRIENDLY') {
     return {
       id: `match-${id}`,
+      title: `${kind} ${id}`,
       startAt,
       hostTeamId: teamId,
       hostTeam: { name: '성수 FC' },

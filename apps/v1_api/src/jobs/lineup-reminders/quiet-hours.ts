@@ -1,5 +1,4 @@
-/** 한국 표준시는 UTC+9이고 서머타임이 없다 — 오프셋이 고정이라 이 상수 하나로 끝난다. */
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+import { KST_OFFSET_MS } from '../../common/kst-datetime';
 
 /** 알림을 보내지 않는 시간대(한국 시간). 21시부터 다음 날 9시 전까지. */
 export const QUIET_START_HOUR = 21;

@@ -29,6 +29,7 @@ function item(overrides: Partial<PublicUserRecordItem> = {}): PublicUserRecordIt
     opponentTeamName: '부산 FC',
     result: 'WON',
     goals: 1,
+    assists: 0,
     cards: { yellow: 0, red: 0 },
     minutesPlayed: 90,
     started: true,
@@ -176,5 +177,29 @@ describe('UserRecordsContent — "개인" 탭(본인 전용)', () => {
     );
 
     expect(screen.queryByRole('tab', { name: '개인' })).not.toBeInTheDocument();
+  });
+});
+
+describe('UserRecordsContent — 도움 표시', () => {
+  it('KPI 의 도움은 지금 탭의 합계이고, 각 행은 그 경기의 도움 수를 보인다', () => {
+    const base = data([item({ assists: 2 }), item({ id: 'record-2', assists: 0 })]);
+    const withAssists = {
+      ...base,
+      summary: {
+        ...base.summary,
+        assists: 5,
+        byType: { ...base.summary.byType, league: { ...base.summary.byType.league, assists: 3 } },
+      },
+    };
+
+    const { rerender } = render(<UserRecordsContent data={withAssists} activeType="all" onChangeType={vi.fn()} />);
+
+    expect(screen.getByText('도움').nextElementSibling).toHaveTextContent('5회');
+    // 행: 도움이 0 인 경기도 "0도움" 으로 정직하게 보인다(칸을 숨기지 않는다).
+    expect(screen.getByText(/1골 · 2도움/)).toBeInTheDocument();
+    expect(screen.getByText(/1골 · 0도움/)).toBeInTheDocument();
+
+    rerender(<UserRecordsContent data={withAssists} activeType="league" onChangeType={vi.fn()} />);
+    expect(screen.getByText('도움').nextElementSibling).toHaveTextContent('3회');
   });
 });

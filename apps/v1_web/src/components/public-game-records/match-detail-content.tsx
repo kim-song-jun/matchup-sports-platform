@@ -163,16 +163,28 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
  */
 function EventRow({ event }: { event: PublicMatchEvent }) {
   const presentation = eventPresentation(event);
+  // 두 열의 바깥쪽 가장자리에 붙는다 -- 홈은 오른쪽(가운데 시각 쪽), 원정은 왼쪽 정렬.
+  const alignItems = event.side === 'home' ? 'flex-end' : 'flex-start';
+  const assist = event.assist ?? null;
   const content = (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      {event.jerseyNumber !== null ? (
-        <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
-      ) : null}
-      <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        <ProfileLink href={event.profileHref}>
-          {presentGameEventParticipantName(event.type, event.participantName)}
-        </ProfileLink>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems, gap: 2 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {event.jerseyNumber !== null ? (
+          <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
+        ) : null}
+        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
+          <ProfileLink href={event.profileHref}>
+            {presentGameEventParticipantName(event.type, event.participantName)}
+          </ProfileLink>
+        </span>
       </span>
+      {assist !== null ? (
+        <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-caption)' }}>
+          도움 ·{' '}
+          {assist.jerseyNumber !== null ? <span className="tab-num">{assist.jerseyNumber} </span> : null}
+          <ProfileLink href={assist.profileHref}>{presentParticipantName(assist.participantName)}</ProfileLink>
+        </span>
+      ) : null}
     </span>
   );
   return (

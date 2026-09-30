@@ -530,6 +530,7 @@ export class PublicUserRecordsService {
           : null,
         result,
         goals: row.goals,
+        assists: row.assists,
         cards: { yellow: row.cardsYellow, red: row.cardsRed },
         minutesPlayed: row.minutesPlayed,
         started: row.started,

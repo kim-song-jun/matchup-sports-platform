@@ -437,6 +437,25 @@ identity/side itself:
   these two teams next appears" lookup, not a bracket-aware "next round"
   projection.
 
+### Assist on goal events and personal record rows (2026-09-30)
+
+- `GET /tournaments/:id/matches/:fixtureId` (and the league fixture record, same builder)
+  `events[].assist: { participantName, jerseyNumber, profileHref } | null`. Only `GOAL` rows can
+  carry one; `CARD`, `OWN_GOAL`, and goals with no recorded assist are `null`. Inside the object,
+  `null` fields mean "withheld", exactly as on the scorer -- the assister goes through the same
+  `resolveParticipantNameEligible` / `resolveParticipantDisplayName` /
+  `resolveParticipantProfileHref` functions (`presentEventAssist`), judged by the assister's own
+  consent when the gating switch is on. Nickname by default, real name only with that person's
+  `tournamentRealNameVisible`.
+- After the match ends, public goals come from the official revision's `goalEvents` snapshot,
+  which does not store assists. The assist is recovered by joining the snapshot goal `id` to the
+  `V1GameEvent` with the same id (the snapshot copies event ids at `end`). Snapshots without a
+  matching event -- league results entered by an operator as per-player totals, and team-match
+  shared records -- have no per-goal assist link, so their goals are `assist: null`. An assist
+  amended after `end` is visible here before its `ASSIST_SYNC` revision is approved.
+- `GET /users/:id/records` `items[].assists: number` -- the row's own assist count, same source
+  as `goals`; `summary.assists` (and `byType.*.assists`) already existed and is the sum of the rows.
+
 ### Personal record outcome -- shootouts (2026-08-20)
 
 `GET /users/:id/records` decides each row's `result` with the same

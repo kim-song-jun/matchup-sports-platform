@@ -142,7 +142,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
         </span>
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>
-        {item.goals}골 · 경고 {item.cards.yellow} · 퇴장 {item.cards.red}
+        {item.goals}골 · {item.assists}도움 · 경고 {item.cards.yellow} · 퇴장 {item.cards.red}
         {item.goalkeeper ? ' · 골키퍼' : ''}
         {item.started ? '' : ' · 교체 출전'}
       </div>
@@ -221,12 +221,13 @@ export function UserRecordsContent({
       ) : (
         <>
           <Card>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 12 }}>
               {/* "출전"이 아니라 "엔트리" — 이 숫자는 **명단에 이름이 오른 경기 수**다.
                   명단에 오르면 곧 참가자로 집계되므로(D3), 벤치에 있었어도 세어진다.
                   "출전"이라 부르면 뛰지 않은 경기까지 뛴 것처럼 말하게 된다. */}
               <KPIStat label="엔트리" value={activeTotals.appearances} unit="경기" />
               <KPIStat label="골" value={activeTotals.goals} unit="골" />
+              <KPIStat label="도움" value={activeTotals.assists} unit="회" />
               {/* 매치 MVP·대회 수상은 탭과 무관하게 **전체 기준**이다 — 대회 수상은 애초에
                   대회에만 있고, 매치 MVP 를 탭별로 쪼개면 '친선 MVP 0회' 같은 칸이 생긴다. */}
               <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />

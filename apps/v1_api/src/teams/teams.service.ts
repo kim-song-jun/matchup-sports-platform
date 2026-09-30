@@ -39,7 +39,7 @@ import {
   RejectTeamJoinApplicationDto,
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
-import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+import { MyTeamsQueryDto, TeamNameAvailabilityQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 
 /**
  * 정원 마감 안내 문구.
@@ -252,6 +252,7 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await this.assertTeamNameAvailable(tx, { name: dto.name, sportId: dto.sportId, regionId: dto.regionId });
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const team = await tx.v1Team.create({
         data: {
@@ -342,6 +343,9 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     this.assertMemberGoalFitsCurrentMembers(dto.memberGoalCount, team.memberCount);
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 이름·종목·지역이 그대로면 묻지 않는다 — 규칙 전부터 있던 중복 팀도 다른 항목은 고칠 수 있어야 한다.
+      const nameTarget = { name: dto.name, sportId: dto.sportId, regionId: dto.regionId, excludeTeamId: team.id };
+      if (!isSameTeamName(team, nameTarget)) await this.assertTeamNameAvailable(tx, nameTarget);
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const nextTeam = await tx.v1Team.update({
         where: { id: team.id },
@@ -426,6 +430,37 @@ export class TeamsService {
       membersVisibilityEnabled: updated.membersVisible,
       detailRoute: `/teams/${updated.id}`,
     };
+  }
+
+  /** 입력 중 이름 확인 — 가능/불가만 알려 주고 겹치는 팀이 어디인지는 말하지 않는다. */
+  async nameAvailability(user: V1AuthUser, query: TeamNameAvailabilityQueryDto) {
+    this.assertActiveAccount(user);
+    return { available: !(await this.hasTeamWithSameName(this.prisma, query)) };
+  }
+
+  private async assertTeamNameAvailable(tx: Prisma.TransactionClient, target: TeamNameTarget) {
+    // 같은 이름으로 동시에 만드는 두 요청이 둘 다 검사를 통과하지 않게 이름 단위로 줄 세운다(DB 유니크는 기존 중복 때문에 못 건다).
+    const scope = `team-name:${target.sportId}:${target.regionId}:${normalizeTeamName(target.name)}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
+    if (await this.hasTeamWithSameName(tx, target)) {
+      throw new ConflictException({ code: 'TEAM_NAME_TAKEN', message: 'Another team in the same sport and region already uses this name' });
+    }
+  }
+
+  /** 같은 종목·같은 지역에서 앞뒤 공백·대소문자를 무시하고 같은 이름인 팀. 해체(archived)·삭제된 팀은 세지 않는다. */
+  private async hasTeamWithSameName(client: Pick<Prisma.TransactionClient, 'v1Team'>, target: TeamNameTarget) {
+    const normalized = normalizeTeamName(target.name);
+    const sameArea = await client.v1Team.findMany({
+      where: {
+        sportId: target.sportId,
+        regionId: target.regionId,
+        status: { not: 'archived' },
+        deletedAt: null,
+        ...(target.excludeTeamId ? { id: { not: target.excludeTeamId } } : {}),
+      },
+      select: { name: true },
+    });
+    return sameArea.some((candidate) => normalizeTeamName(candidate.name) === normalized);
   }
 
   async members(user: V1AuthUser | null, teamId: string, query: TeamMembersQueryDto) {
@@ -2499,6 +2534,16 @@ function validationError(message: string, field: string) {
     message,
     details: { field },
   });
+}
+
+type TeamNameTarget = { name: string; sportId: string; regionId: string; excludeTeamId?: string };
+
+function normalizeTeamName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function isSameTeamName(team: { name: string; sportId: string; regionId: string }, target: TeamNameTarget) {
+  return normalizeTeamName(team.name) === normalizeTeamName(target.name) && team.sportId === target.sportId && team.regionId === target.regionId;
 }
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {

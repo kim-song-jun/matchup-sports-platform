@@ -146,7 +146,7 @@ describe('TeamsService', () => {
 
   beforeEach(async () => {
     prisma = {
-      v1Team: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn().mockResolvedValue(1), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
+      v1Team: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(1), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
       v1TeamProfile: { upsert: jest.fn() },
       v1TeamContactBlock: { findMany: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -352,6 +352,88 @@ describe('TeamsService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('팀 이름 중복 (H2)', () => {
+    // 같은 종목·지역·다른 지역·다른 종목·해체된 팀을 함께 둔 작은 표 — where 조건대로 거른다.
+    const existing = [
+      { id: 'team-a', sportId: 'sport-1', regionId: 'region-mapo', name: ' FC 서울 ', status: 'active', deletedAt: null },
+      { id: 'team-b', sportId: 'sport-1', regionId: 'region-gangnam', name: 'FC 강남', status: 'active', deletedAt: null },
+      { id: 'team-c', sportId: 'sport-2', regionId: 'region-mapo', name: 'FC 마포', status: 'active', deletedAt: null },
+      { id: 'team-d', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 해체', status: 'archived', deletedAt: null },
+      // 규칙 전부터 있던 중복 — team-a 와 같은 이름.
+      { id: 'team-e', sportId: 'sport-1', regionId: 'region-mapo', name: 'fc 서울', status: 'active', deletedAt: null },
+    ];
+    type Where = { sportId: string; regionId: string; status: { not: string }; deletedAt: null; id?: { not: string } };
+
+    beforeEach(() => {
+      prisma.v1Team.findMany.mockImplementation(({ where }: { where: Where }) =>
+        Promise.resolve(
+          existing.filter((team) =>
+            team.sportId === where.sportId &&
+            team.regionId === where.regionId &&
+            team.status !== where.status.not &&
+            team.deletedAt === where.deletedAt &&
+            (!where.id || team.id !== where.id.not),
+          ),
+        ),
+      );
+      prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+      prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-mapo' });
+      prisma.v1User.findUnique.mockResolvedValue({ phone: '01012345678', profile: { realName: '팀장', gender: 'male' } });
+      prisma.v1Team.create.mockResolvedValue(teamRow({ id: 'team-new' }));
+      prisma.v1TeamMembership.create.mockResolvedValue(membershipRow({ id: 'mem-new', teamId: 'team-new' }));
+      prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 2 });
+    });
+
+    const createAs = (sportId: string, regionId: string, name: string) =>
+      service.create(owner, { sportId, regionId, name, joinPolicy: 'approval_required' });
+
+    it('같은 종목·지역에서 앞뒤 공백·대소문자만 다른 이름은 409 TEAM_NAME_TAKEN 이고 팀을 만들지 않는다', async () => {
+      await expect(createAs('sport-1', 'region-mapo', 'fc 서울  ')).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_NAME_TAKEN' } });
+      expect(prisma.v1Team.create).not.toHaveBeenCalled();
+    });
+
+    it('다른 지역·다른 종목·해체된 팀의 같은 이름은 막지 않는다', async () => {
+      await expect(createAs('sport-1', 'region-mapo', 'FC 강남')).resolves.toMatchObject({ teamId: 'team-new' });
+      await expect(createAs('sport-1', 'region-mapo', 'FC 마포')).resolves.toMatchObject({ teamId: 'team-new' });
+      await expect(createAs('sport-1', 'region-mapo', 'FC 해체')).resolves.toMatchObject({ teamId: 'team-new' });
+      expect(prisma.v1Team.create).toHaveBeenCalledTimes(3);
+    });
+
+    function updateAs(teamId: string, current: { name: string; regionId: string }, name: string) {
+      const updatedAt = new Date('2026-06-01T00:00:00.000Z');
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ id: teamId, name: current.name, sportId: 'sport-1', regionId: current.regionId, updatedAt }),
+        memberships: [membershipRow({ teamId, role: 'owner', userId: owner.id })],
+      });
+      // 막힌 호출은 update 까지 가지 않으므로 Once 로 쌓으면 다음 호출이 앞 팀의 값을 받는다.
+      prisma.v1Team.update.mockResolvedValue(teamRow({ id: teamId, updatedAt: new Date('2026-06-02T00:00:00.000Z') }));
+      prisma.v1TeamProfile.upsert.mockResolvedValue({ teamId });
+      return service.update(owner, teamId, {
+        version: updatedAt.toISOString(), sportId: 'sport-1', regionId: 'region-mapo', name,
+        logoUrl: null, coverImageUrl: null, introduction: null, activityAreaText: null, activityDays: [], activityFrequency: null,
+        activityTimeSlots: [], activityTypes: [], activityMemo: null, skillLevelText: null, minLevelCode: null, maxLevelCode: null,
+        genderRule: null, joinPolicy: 'approval_required', memberGoalCount: null, membersVisibilityEnabled: true,
+      });
+    }
+
+    it('이미 있던 중복 팀도 이름을 그대로 두면 다른 항목을 고칠 수 있다', async () => {
+      await expect(updateAs('team-e', { name: 'fc 서울', regionId: 'region-mapo' }, 'FC 서울')).resolves.toMatchObject({ teamId: 'team-e' });
+    });
+
+    it('수정으로 다른 팀의 이름을 가져가거나, 같은 이름이 있는 지역으로 옮기면 막는다', async () => {
+      await expect(updateAs('team-x', { name: 'FC 새 이름', regionId: 'region-mapo' }, 'FC 서울')).rejects.toMatchObject({ response: { code: 'TEAM_NAME_TAKEN' } });
+      await expect(updateAs('team-y', { name: 'FC 서울', regionId: 'region-gangnam' }, 'FC 서울')).rejects.toMatchObject({ response: { code: 'TEAM_NAME_TAKEN' } });
+      // 대조군: 옮겨 간 지역에 그 이름이 없으면 된다.
+      await expect(updateAs('team-b', { name: 'FC 강남', regionId: 'region-gangnam' }, 'FC 강남')).resolves.toMatchObject({ teamId: 'team-b' });
+    });
+
+    it('이름 확인 조회는 가능/불가만 답하고, 수정 중인 팀 자신은 세지 않는다', async () => {
+      await expect(service.nameAvailability(owner, { name: 'FC 서울', sportId: 'sport-1', regionId: 'region-mapo' })).resolves.toEqual({ available: false });
+      await expect(service.nameAvailability(owner, { name: 'FC 서울', sportId: 'sport-1', regionId: 'region-gangnam' })).resolves.toEqual({ available: true });
+      await expect(service.nameAvailability(owner, { name: 'FC 강남', sportId: 'sport-1', regionId: 'region-gangnam', excludeTeamId: 'team-b' })).resolves.toEqual({ available: true });
     });
   });
 

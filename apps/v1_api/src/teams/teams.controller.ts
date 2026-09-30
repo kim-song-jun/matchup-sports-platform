@@ -21,7 +21,7 @@ import {
   RejectTeamJoinApplicationDto,
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
-import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+import { MyTeamsQueryDto, TeamNameAvailabilityQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 import { TeamsService } from './teams.service';
 
 @Controller()
@@ -32,6 +32,13 @@ export class TeamsController {
   @UseGuards(OptionalV1AuthGuard)
   list(@CurrentUser() user: V1AuthUser | undefined, @Query() query: TeamsQueryDto) {
     return this.teamsService.list(user ?? null, query);
+  }
+
+  // 'teams/:teamId' 보다 먼저 등록해야 'name-availability' 가 팀 id 로 잡히지 않는다.
+  @Get('teams/name-availability')
+  @UseGuards(V1AuthGuard)
+  nameAvailability(@CurrentUser() user: V1AuthUser, @Query() query: TeamNameAvailabilityQueryDto) {
+    return this.teamsService.nameAvailability(user, query);
   }
 
   @Get('teams/:teamId')

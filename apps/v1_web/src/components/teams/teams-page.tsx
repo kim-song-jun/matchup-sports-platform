@@ -12,6 +12,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { FieldErrorText } from '@/components/v1-ui/create-form-fields';
 import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
@@ -1025,7 +1026,7 @@ export function TeamFormPageView({
             </>
           ) : null}
           {form?.error ? <div ref={errorRef} tabIndex={-1} role="alert"><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
-          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
+          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" error={form?.nameError} onChange={(value) => form?.onFieldChange('name', value)} />
           {edit || logoPickerOpen ? (
             <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           ) : (
@@ -2110,8 +2111,22 @@ function TeamCapacityField({ value, min, onChange }: { value: number; min?: numb
   );
 }
 
-function CreateField({ label, value, placeholder, suffix, multiline, rows, inputClassName, type = 'text', onChange }: { label: string; value: string; placeholder?: string; suffix?: string; multiline?: boolean; rows?: number; inputClassName?: string; type?: string; onChange?: (value: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''} ${inputClassName ?? ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" rows={rows} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
+function CreateField({ label, value, placeholder, suffix, multiline, rows, inputClassName, type = 'text', error, onChange }: { label: string; value: string; placeholder?: string; suffix?: string; multiline?: boolean; rows?: number; inputClassName?: string; type?: string; error?: string; onChange?: (value: string) => void }) {
+  const errorId = useId();
+  const described = error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {};
+  // 오류 문구는 label 밖에 둔다 — 안에 두면 입력칸 이름에 문구까지 섞여 읽힌다.
+  return (
+    <>
+      <label className="tm-create-field">
+        <div className="tm-text-label">{label}</div>
+        <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''} ${error ? 'tm-create-input-error' : ''} ${inputClassName ?? ''}`}>
+          {onChange ? (multiline ? <textarea className="tm-create-native-input" rows={rows} value={value} placeholder={placeholder} {...described} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value} placeholder={placeholder} {...described} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>}
+          {suffix ? <span className="tm-text-caption">{suffix}</span> : null}
+        </div>
+      </label>
+      <FieldErrorText id={errorId} message={error} />
+    </>
+  );
 }
 
 function RegionSelect({

@@ -14,6 +14,7 @@ const {
   useV1MasterSportsMock,
   useV1ProfileMock,
   useV1TeamDetailMock,
+  useV1TeamNameAvailabilityMock,
 } = vi.hoisted(() => ({
   confirmMock: vi.fn(),
   createTeamMutateAsync: vi.fn(),
@@ -22,6 +23,7 @@ const {
   useV1MasterSportsMock: vi.fn(),
   useV1ProfileMock: vi.fn(),
   useV1TeamDetailMock: vi.fn(),
+  useV1TeamNameAvailabilityMock: vi.fn(),
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -54,6 +56,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Profile: useV1ProfileMock,
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1TeamDetail: useV1TeamDetailMock,
+  useV1TeamNameAvailability: useV1TeamNameAvailabilityMock,
   useV1UpdateTeam: () => ({ mutateAsync: updateTeamMutateAsync, isPending: false }),
 }));
 
@@ -77,6 +80,7 @@ vi.mock('./teams-page', () => ({
         <output data-testid="region-id">{form.regionId}</output>
         <output data-testid="region-prefilled">{String(Boolean(form.regionPrefilled))}</output>
         <button type="button" onClick={() => form.onRegionChange('region-seoul')}>서울 전체 고르기</button>
+        {form.nameError ? <p data-testid="name-error">{form.nameError}</p> : null}
         {form.error ? <p role="alert">{form.error}</p> : null}
         {form.sports.map((sport) => (
           <button
@@ -102,6 +106,7 @@ describe('Team form client contracts', () => {
     vi.clearAllMocks();
     navigation.searchParams = new URLSearchParams();
     useV1ProfileMock.mockReturnValue({ data: { regions: [] }, isPending: false });
+    useV1TeamNameAvailabilityMock.mockReturnValue({ data: undefined });
     useV1MasterSportsMock.mockReturnValue({
       data: [
         { id: 'sport-soccer', code: 'soccer', name: '축구', levels: [] },
@@ -425,6 +430,60 @@ describe('Team form client contracts', () => {
     it('나가기 then goes to the profile edit page', async () => {
       await submitDirtyWithoutProfile([true, true]);
       await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/my/profile/edit?returnTo=%2Fteams%2Fnew'));
+    });
+  });
+
+  describe('팀 이름 중복 (H2)', () => {
+    // 가짜 서버: 풋살·서울에 '마포 FC' 가 이미 있다(앞뒤 공백·대소문자 무시).
+    beforeEach(() => {
+      useV1TeamNameAvailabilityMock.mockImplementation((params: { name: string; sportId: string; regionId: string } | null) => ({
+        data: params ? { available: !(params.sportId === 'sport-futsal' && params.regionId === 'region-seoul' && params.name.trim().toLowerCase() === '마포 fc') } : undefined,
+      }));
+    });
+
+    it('만들기: 입력을 멈추면 같은 종목·지역의 같은 이름을 알려 주고, 다른 이름이면 안내가 없다', async () => {
+      render(<TeamCreatePageClient />);
+      fireEvent.click(screen.getByRole('button', { name: '풋살' }));
+      fireEvent.click(screen.getByRole('button', { name: '서울 전체 고르기' }));
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: ' 마포 fc ' } });
+
+      expect(await screen.findByTestId('name-error')).toHaveTextContent('같은 종목·지역에 같은 이름의 팀이 있어요.');
+
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '마포 FC 2' } });
+      await waitFor(() => expect(useV1TeamNameAvailabilityMock).toHaveBeenLastCalledWith(expect.objectContaining({ name: '마포 FC 2' })));
+      expect(screen.queryByTestId('name-error')).toBeNull();
+    });
+
+    it('만들기: 종목이 다르면 같은 이름이어도 막지 않는다', async () => {
+      render(<TeamCreatePageClient />);
+      fireEvent.click(screen.getByRole('button', { name: '서울 전체 고르기' }));
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '마포 FC' } });
+
+      await waitFor(() => expect(useV1TeamNameAvailabilityMock).toHaveBeenLastCalledWith(expect.objectContaining({ name: '마포 FC', sportId: 'sport-soccer' })));
+      expect(screen.queryByTestId('name-error')).toBeNull();
+    });
+
+    it('수정: 이름·종목·지역이 처음 그대로면 묻지 않고, 바꾸면 자기 팀을 빼고 묻는다', async () => {
+      render(<TeamEditPageClient teamId="team-futsal" />);
+      await waitFor(() => expect(screen.getByLabelText('팀 이름')).toHaveValue('기존 풋살 팀'));
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '기존 풋살 팀 ' } });
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      expect(useV1TeamNameAvailabilityMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: expect.any(String) }));
+
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '마포 FC' } });
+      expect(await screen.findByTestId('name-error')).toBeInTheDocument();
+      expect(useV1TeamNameAvailabilityMock).toHaveBeenLastCalledWith(expect.objectContaining({ name: '마포 FC', excludeTeamId: 'team-futsal' }));
+    });
+
+    it('만들기 저장이 409 TEAM_NAME_TAKEN 이면 영어 서버 문구 대신 같은 안내를 보인다', async () => {
+      createTeamMutateAsync.mockRejectedValueOnce(
+        new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_NAME_TAKEN', message: 'Another team in the same sport and region already uses this name', timestamp: '2026-10-01T00:00:00.000Z' }),
+      );
+      render(<TeamCreatePageClient />);
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '동시에 만든 팀' } });
+      fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('같은 종목·지역에 같은 이름의 팀이 있어요.');
     });
   });
 });

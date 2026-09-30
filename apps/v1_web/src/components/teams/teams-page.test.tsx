@@ -490,6 +490,17 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
     };
   }
 
+  it('같은 이름의 팀이 있으면 이름 칸이 그 이유를 설명으로 달고, 없으면 멀쩡하다 (H2)', () => {
+    const { rerender } = render(<TeamFormPageView model={formModel({ nameError: '같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.' })} />);
+    const input = screen.getByRole('textbox', { name: '팀 이름' });
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription('같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.');
+
+    rerender(<TeamFormPageView model={formModel({})} />);
+    expect(screen.getByRole('textbox', { name: '팀 이름' })).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText(/같은 이름의 팀이 있어요/)).toBeNull();
+  });
+
   it('minCapacity 아래로는 고를 수 없고 이유를 알려 준다', () => {
     const onFieldChange = vi.fn();
     render(<TeamFormPageView model={formModel({ minCapacity: 12, onFieldChange }, 12)} />);

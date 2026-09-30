@@ -8,6 +8,7 @@
 |---|---|---|---|
 | GET | `/teams` | Optional | 팀 목록 |
 | GET | `/teams/:teamId` | Optional | 팀 상세 |
+| GET | `/teams/name-availability` | Yes | 팀 이름 확인(같은 종목·지역에 같은 이름이 있는지) |
 | POST | `/teams` | Yes | 팀 생성 |
 | PATCH | `/teams/:teamId` | Yes(manager+) | 팀 수정 |
 | GET | `/teams/:teamId/join-eligibility` | Yes | 가입 신청 가능 여부 |
@@ -117,6 +118,13 @@ CAUTION:
 - `skillLevelText`는 표시/레거시 설명용이고, 필터와 `levelLabel`은 `minSportLevelId`, `maxSportLevelId` FK를 기준으로 계산한다.
 - 생성 시 트랜잭션으로 owner 멤버십(`role=owner`, `status=active`)이 자동 생성된다.
 - 팀 생성은 프로필 `realName`, `phone`, `gender`가 있어야 하며 없으면 `422 PROFILE_COMPLETION_REQUIRED`다. 신청/관리 엔드포인트는 이 검사에서 제외된다.
+- **팀 이름 중복 금지**(Task 180 H2): 같은 `sportId`·같은 `regionId` 안에서 앞뒤 공백·대소문자를 무시하고 같은 이름의 팀이 있으면 `409 TEAM_NAME_TAKEN`. 해체(`status=archived`)·삭제(`deletedAt`)된 팀은 세지 않고, 규칙 전부터 있던 중복은 그대로 둔다. DB 유니크 제약은 없고 서비스가 이름 단위 advisory lock 안에서 검사한다.
+
+## GET /teams/name-availability (TeamNameAvailabilityQueryDto)
+
+- 인증 필요. 쿼리 `name`(max 50, 빈 값 불가) · `sportId`(uuid) · `regionId` · `excludeTeamId?`(수정 중인 팀 자신을 빼고 센다).
+- 응답 `{ available: boolean }` — 겹치는 팀이 어디인지는 주지 않는다. 판정 규칙은 위 생성·수정의 `TEAM_NAME_TAKEN` 과 같다.
+- 라우트는 `GET /teams/:teamId` 보다 먼저 등록돼 있어야 한다(아니면 `name-availability` 가 팀 id 로 잡힌다).
 
 ## GET /teams/:teamId — 컨택 관련 필드
 
@@ -128,6 +136,7 @@ CAUTION:
 
 - 권한: manager 이상
 - create 필드와 동일 계약(`PartialType` 기반), 미전달 필드는 유지
+- 이름·종목·지역을 바꿔 다른 팀과 겹치면 `409 TEAM_NAME_TAKEN`(자기 자신은 세지 않는다). 셋 다 그대로면 검사하지 않아 이미 있던 중복 팀도 다른 항목을 고칠 수 있다.
 
 ## 가입 신청 / 멤버십
 

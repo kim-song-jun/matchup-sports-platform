@@ -522,6 +522,7 @@ export const v1MswHandlers = [
       : teamsBySport;
     return ok(page(teams));
   }),
+  http.get(`${api}/teams/name-availability`, () => ok({ available: true })),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
   http.get(`${api}/teams/:teamId/members`, () => ok({
     items: [

@@ -177,6 +177,8 @@ export type TeamFormViewModel = {
     minCapacity?: number;
     /** 만들기 화면에서 활동 지역을 내 프로필 지역으로 채웠고 아직 바꾸지 않았다. */
     regionPrefilled?: boolean;
+    /** 같은 종목·지역에 같은 이름의 팀이 있으면 이름 칸 아래 안내(H2). */
+    nameError?: string;
     onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
     onSportChange: (sportId: string) => void;
     onRegionChange: (regionId: string) => void;

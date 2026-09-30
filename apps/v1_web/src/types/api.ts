@@ -770,6 +770,9 @@ export type V1TeamJoinEligibility = {
   immediateJoinSupported: boolean;
 };
 
+/** GET /teams/name-availability — 같은 종목·지역에 같은 이름의 팀이 있는지만(H2). */
+export type V1TeamNameAvailability = { available: boolean };
+
 export type V1TeamJoinApplicationResult = {
   applicationId: string;
   teamId: string;

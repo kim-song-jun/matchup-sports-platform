@@ -1,7 +1,11 @@
 import { extractErrorCode, extractErrorDetails, extractErrorMessage } from '@/lib/error-message';
 
+/** 팀 만들기·수정 입력 중 확인과 저장 거절(409 TEAM_NAME_TAKEN)이 같은 말을 쓴다. */
+export const TEAM_NAME_TAKEN_MESSAGE = '같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.';
+
 /** 팀 수정·멤버 관리 쓰기가 돌려주는 에러 코드 → 사용자 문구. 서버 message 는 영어라 화면에 그대로 내지 않는다. */
 const TEAM_ERROR_MESSAGES: Record<string, string> = {
+  TEAM_NAME_TAKEN: TEAM_NAME_TAKEN_MESSAGE,
   PERMISSION_DENIED: '팀장·매니저만 할 수 있어요. 필요하면 팀장에게 알려 주세요.',
   MANAGER_LIMIT_EXCEEDED: '매니저는 최대 5명이에요. 다른 매니저를 멤버로 내린 뒤 지정해 주세요.',
   CONCURRENT_UPDATE: '처리하는 사이 팀 상태가 바뀌었어요. 새로 불러온 뒤 다시 시도해 주세요.',

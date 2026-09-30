@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamContactSettingsPageClient } from './team-contact-settings-client';
@@ -74,6 +74,51 @@ describe('TeamContactSettingsPageClient', () => {
       { contactPolicy: 'closed' },
       expect.objectContaining({ onError: expect.any(Function) }),
     );
+  });
+
+  describe('즉시 저장 안내 (H9 A-2)', () => {
+    function renderWithRerender() {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
+      return rtlRender(<TeamContactSettingsPageClient teamId="team-1" />, { wrapper });
+    }
+
+    it('저장이 끝나고 팀 상세가 새 값으로 다시 읽히면 카드 안에 결과 한 줄을 남긴다', () => {
+      updatePolicyMutate.mockImplementation((_body, options: { onSuccess?: () => void }) => options.onSuccess?.());
+      const view = renderWithRerender();
+
+      fireEvent.click(screen.getByRole('radio', { name: /받지 않기/ }));
+      // 아직 팀 상세는 옛 값(open) — 라디오와 다른 값을 말하지 않는다.
+      expect(screen.getByRole('status')).toHaveTextContent('');
+
+      useV1TeamDetailMock.mockReturnValue({ data: { name: '우리 팀', contactPolicy: 'closed' }, isLoading: false });
+      view.rerender(<TeamContactSettingsPageClient teamId="team-1" />);
+
+      expect(screen.getByRole('status')).toHaveTextContent('저장했어요. 이제 다른 팀은 컨택을 보낼 수 없어요.');
+      expect(screen.getByRole('radio', { name: /받지 않기/ })).toBeChecked();
+    });
+
+    it('저장이 실패하면 저장 안내 대신 오류를 알린다', () => {
+      updatePolicyMutate.mockImplementation((_body, options: { onError?: (err: unknown) => void }) =>
+        options.onError?.(new Error('컨택 설정을 바꿀 권한이 없어요.')),
+      );
+      renderWithRerender();
+
+      fireEvent.click(screen.getByRole('radio', { name: /모집 중일 때만/ }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent('컨택 설정을 바꿀 권한이 없어요.');
+      expect(screen.getByRole('status')).not.toHaveTextContent('저장했어요');
+    });
+  });
+
+  it('카드 묶음은 셸 가로 여백 토큰만큼 화면 가장자리에서 떨어진다', () => {
+    const { container } = render(<TeamContactSettingsPageClient teamId="team-1" />);
+    const stack = container.firstElementChild as HTMLElement;
+
+    expect(stack.style.paddingLeft).toBe('var(--v1-shell-page-x)');
+    expect(stack.style.paddingRight).toBe('var(--v1-shell-page-x)');
   });
 
   it('차단 목록이 비었을 때 빈 상태가 보인다', () => {

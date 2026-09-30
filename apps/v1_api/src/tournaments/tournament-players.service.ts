@@ -54,8 +54,37 @@ import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/ros
 /** 팀 명단 관리 권한 — 명단 편집과 선수 개인정보(실명·생년월일·성별) 열람이 같은 선에서 갈린다. */
 const ROSTER_MANAGEMENT_ROLES: readonly V1TeamMembershipRole[] = ['owner', 'manager'];
 
-/** 어드민 명단 CSV 의 선수 열 — 팀별·전체 CSV 가 같은 순서를 쓴다. */
+/** 팀별 명단 CSV 의 선수 열. */
 const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber';
+
+/** 전체 명단 CSV(운영자가 엑셀로 여는 파일)의 팀 블록 머리글. */
+const FULL_ROSTER_CSV_HEADER = '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고';
+
+// 전체 명단 CSV 의 값 라벨 — 어드민 화면과 같은 말을 쓴다. 신청 상태는 신청 카드의 상태 배지
+// (`components/admin/admin-status-pill.tsx`), 선출 여부·성별은 명단 검토 모달
+// (`admin/tournaments/[id]/tournament-detail-shared.tsx`)의 라벨이다. 모르는 값은 원문 그대로.
+const REGISTRATION_STATUS_LABEL: Record<string, string> = {
+  submitted: '운영진 확인',
+  awaiting_payment: '입금 대기',
+  payment_checking: '명단 확인 중',
+  paid: '결제 완료',
+  confirmed: '참가 확정',
+  waitlisted: '대기',
+  cancel_requested: '취소 요청',
+};
+const ELIGIBILITY_LABEL: Record<string, string> = { non_pro: '아마추어', pro: '프로', needs_review: '검토 필요' };
+const GENDER_LABEL: Record<string, string> = { male: '남성', female: '여성' };
+
+/** KST 기준 `YYYY-MM-DD HH:mm` — sv-SE 로캘이 ISO 모양 날짜를 준다. */
+const KST_MINUTE = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
 
 @Injectable()
 export class TournamentPlayersService {
@@ -681,12 +710,24 @@ export class TournamentPlayersService {
   }
 
   /**
-   * 대회(또는 리그) 전체 명단 CSV — 팀별 `exportCsv` 를 팀 수만큼 누르던 것을 한 파일로.
-   * PII 포함 — 어드민 게이트 필수. 열은 팀별 CSV 앞에 팀명·신청 상태를 붙인 것이다.
+   * 대회(또는 리그) 전체 명단 CSV — 운영자가 엑셀로 열어 보는 파일이라 **팀별 블록**으로 나눈다.
+   * PII 포함 — 어드민 게이트 필수.
    *
-   * 임시저장(draft)·취소(cancelled) 신청은 뺀다 — 대회에 나오지 않는 팀의 명단이 섞이면
-   * "전체 명단"으로 쓸 수 없다. 그 외 상태는 확정 전이어도 명단 검토 대상이라 넣고,
-   * 신청 상태 열로 거를 수 있게 한다.
+   * ```
+   * 가을 풋살컵 전체 명단
+   * 내려받은 시각,2026-09-30 23:40
+   * 신청 팀,2팀 · 선수 12명
+   *
+   * [1] 번개팀 · 참가 확정 · 11명
+   * 순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고
+   * 1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장
+   *
+   * [2] 천둥팀 · 입금 대기 · 명단 미등록
+   * ```
+   *
+   * 임시저장(draft)·취소(cancelled) 신청은 뺀다 — 대회에 나오지 않는 팀이 섞이면 "전체 명단"으로
+   * 쓸 수 없다. 그 외 상태는 확정 전이어도 명단 검토 대상이라 넣고 블록 제목에 상태를 적는다.
+   * 명단이 빈 팀도 블록을 남긴다 — 운영자가 "누가 아직 안 냈는지"를 이 파일에서 본다.
    */
   async exportTournamentCsv(user: V1AuthUser, tournamentId: string) {
     const admin = await this.adminContext.getActiveAdmin(user.id);
@@ -700,33 +741,60 @@ export class TournamentPlayersService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
-    const players = await this.prisma.v1TournamentPlayer.findMany({
-      where: {
-        removedAt: null,
-        registration: { tournamentId, status: { notIn: ['draft', 'cancelled'] } },
+    // ponytail: 상한 없이 한 번에 읽는다 — 대회 수십 팀 × 팀당 수십 명(수천 행, 수백 KB)이 현실 규모다.
+    // 신청 탭 상한(1,000건)까지 차도 수만 행·수 MB 라 한 응답으로 충분하다. 그 이상이 오면 cursor 배치로.
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId, status: { notIn: ['draft', 'cancelled'] } },
+      select: {
+        status: true,
+        team: { select: { name: true, ownerUserId: true } },
+        players: {
+          where: { removedAt: null },
+          include: { user: { select: { profile: { select: { nickname: true } } } } },
+          // 등번호 순(없으면 뒤) → 같은 번호·번호 없음은 팀이 넣은 순서.
+          orderBy: [{ jerseyNumber: { sort: 'asc', nulls: 'last' } }, { addedAt: 'asc' }],
+        },
       },
-      include: {
-        user: { select: { profile: { select: { nickname: true } } } },
-        registration: { select: { status: true, team: { select: { name: true } } } },
-      },
-      // 신청 순 → 팀 안에서는 팀별 CSV 와 같은 추가 순. 같은 시각 신청은 id 로 묶어 팀이 섞이지 않게.
-      // ponytail: 상한 없이 한 번에 읽는다 — 대회 수십 팀 × 팀당 수십 명(수천 행, 수백 KB)이 현실 규모다.
-      // 신청 탭 상한(1,000건)까지 차도 수만 행·수 MB 라 한 응답으로 충분하다. 그 이상이 오면 cursor 배치로.
-      orderBy: [{ registration: { createdAt: 'asc' } }, { registrationId: 'asc' }, { addedAt: 'asc' }],
+      // 신청 순. 같은 시각 신청은 id 로 고정해 내려받을 때마다 순서가 바뀌지 않게.
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
-    const rows = players.map((p) =>
-      [
-        this.escapeCsvField(p.registration.team.name),
-        this.escapeCsvField(p.registration.status),
-        ...this.playerCsvColumns(p),
-      ].join(','),
-    );
-    const csv = [`teamName,registrationStatus,${PLAYER_CSV_HEADER}`, ...rows].join('\n');
-    const filename = `players_${tournament.title.replace(/\s+/g, '_')}_all_${tournamentId.slice(0, 8)}.csv`;
+    const stamp = KST_MINUTE.format(new Date());
+    const playerCount = registrations.reduce((sum, reg) => sum + reg.players.length, 0);
+    const lines = [
+      this.escapeCsvField(`${tournament.title} 전체 명단`),
+      `내려받은 시각,${stamp}`,
+      `신청 팀,${registrations.length}팀 · 선수 ${playerCount}명`,
+    ];
+    registrations.forEach((reg, index) => {
+      const status = REGISTRATION_STATUS_LABEL[reg.status] ?? reg.status;
+      const size = reg.players.length > 0 ? `${reg.players.length}명` : '명단 미등록';
+      // 팀명은 사용자 입력이다 — 제목 칸 전체를 이스케이프해 쉼표·따옴표가 칸을 가르지 않게.
+      lines.push('', this.escapeCsvField(`[${index + 1}] ${reg.team.name} · ${status} · ${size}`));
+      if (reg.players.length === 0) return;
+      lines.push(FULL_ROSTER_CSV_HEADER);
+      reg.players.forEach((p, order) => {
+        lines.push(
+          [
+            String(order + 1),
+            String(p.jerseyNumber ?? ''),
+            this.escapeCsvField(p.realName),
+            this.escapeCsvField(p.birthDateSnapshot ?? ''),
+            GENDER_LABEL[p.genderSnapshot ?? ''] ?? this.escapeCsvField(p.genderSnapshot ?? ''),
+            ELIGIBILITY_LABEL[p.eligibilityStatus] ?? p.eligibilityStatus,
+            this.escapeCsvField(p.user.profile?.nickname ?? ''),
+            p.userId === reg.team.ownerUserId ? '팀장' : '',
+          ].join(','),
+        );
+      });
+    });
 
-    await this.logRosterExport(admin, 'tournament', tournamentId, players.length);
-    return { filename, csv };
+    // 파일 이름에 못 쓰는 문자는 빼고 공백은 밑줄로. 날짜는 내려받은 날(KST).
+    const safeTitle = tournament.title.replace(/[\\/:*?"<>|]/g, '').trim().replace(/\s+/g, '_');
+    const filename = `${safeTitle}_전체명단_${stamp.slice(0, 10).replace(/-/g, '')}.csv`;
+
+    await this.logRosterExport(admin, 'tournament', tournamentId, playerCount);
+    return { filename, csv: lines.join('\n') };
   }
 
   /**

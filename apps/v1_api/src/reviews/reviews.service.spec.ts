@@ -1558,6 +1558,134 @@ describe('ReviewsService', () => {
     });
   });
 
+  // F88: 작성자 자격도 대상과 같은 "최신 라인업"으로 판정한다. 명단이 있는 사이드에서는 경기별 명단
+  // 조정으로 빠진 팀원이 후기 의무(pending)를 받거나 제출까지 통과하면 안 되고, 명단이 없는 사이드는
+  // 기존처럼 활성 팀원 전원이 작성자다(2026-08-18 정책). 모든 케이스에 빠진 선수(memberA)와 뛴 선수
+  // (memberB)를 같은 경기에 둔다 — 대조군이 없으면 "전원 차단"도 통과한다.
+  describe('작성자 명단 게이트 — 명단에서 빠진 팀원 (F88)', () => {
+    const opponentA = 'away-player-a';
+    const lineupWorld = () => teamMatchWorld(
+      [
+        { userId: memberAId, teamId: hostTeamId, role: 'member' },
+        { userId: memberBId, teamId: hostTeamId, role: 'member' },
+      ],
+      [],
+      [opponentA],
+      [],
+      [memberBId], // 홈 사이드 최신 라인업에는 memberB 만 있다 — memberA 는 명단에서 빠졌다.
+    );
+    const playerDto = {
+      sourceType: 'team_match' as const,
+      sourceId: teamSourceId,
+      targetType: 'user' as const,
+      targetUserId: opponentA,
+      rating: 4,
+      tagCodes: ['manner'],
+    };
+
+    it('pending: 빠진 팀원에게는 뜨지 않고 명단에 있는 팀원에게는 그대로 뜬다', async () => {
+      const { prisma } = lineupWorld();
+      const service = makeService(prisma);
+
+      const benched = await service['pendingTeamReviews'](authUser(memberAId), 20);
+      const played = await service['pendingTeamReviews'](authUser(memberBId), 20);
+
+      expect(benched).toEqual([]);
+      expect(played).toHaveLength(1);
+      expect(played[0]).toMatchObject({ sourceId: teamSourceId, remainingCount: 2, reviewerTeam: { teamId: hostTeamId } });
+    });
+
+    it('상세: 빠진 팀원은 NOT_ACTUAL_PARTICIPANT(403), 명단에 있는 팀원은 상대 팀과 선수를 받는다', async () => {
+      const { prisma } = lineupWorld();
+      const service = makeService(prisma);
+
+      const error = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId })
+        .catch((err: unknown) => err);
+      const played = await service.source(authUser(memberBId), { sourceType: 'team_match', sourceId: teamSourceId });
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'NOT_ACTUAL_PARTICIPANT' });
+      expect(played.targets.map((target) => target.targetType)).toEqual(['team', 'user']);
+    });
+
+    it('제출: 빠진 팀원의 팀 후기·선수 후기는 403 이고 아무것도 저장되지 않는다', async () => {
+      const { prisma, createMock } = lineupWorld();
+      const service = makeService(prisma);
+
+      const teamError = await service.submit(authUser(memberAId), teamReviewDto(5)).catch((err: unknown) => err);
+      const playerError = await service.submit(authUser(memberAId), playerDto).catch((err: unknown) => err);
+
+      for (const error of [teamError, playerError]) {
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'NOT_ACTUAL_PARTICIPANT' });
+      }
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('제출: 명단에 있는 팀원은 같은 경기에서 팀 후기와 선수 후기를 그대로 저장한다', async () => {
+      const { prisma, createMock } = lineupWorld();
+      const service = makeService(prisma);
+
+      const teamResult = await service.submit(authUser(memberBId), teamReviewDto(5));
+      const playerResult = await service.submit(authUser(memberBId), playerDto);
+
+      expect(teamResult.alreadySubmitted).toBe(false);
+      expect(playerResult.alreadySubmitted).toBe(false);
+      expect(createMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('작성자 사이드에 라인업이 없으면 활성 팀원 전원이 그대로 작성자다', async () => {
+      // 상대 사이드에만 라인업이 있다 — 작성자(홈) 사이드는 명단이 없으니 게이트가 걸리지 않는다.
+      const { prisma, createMock } = teamMatchWorld(
+        [
+          { userId: memberAId, teamId: hostTeamId, role: 'member' },
+          { userId: memberBId, teamId: hostTeamId, role: 'member' },
+        ],
+        [],
+        [opponentA],
+      );
+      const service = makeService(prisma);
+
+      for (const userId of [memberAId, memberBId]) {
+        const pending = await service['pendingTeamReviews'](authUser(userId), 20);
+        expect(pending).toHaveLength(1);
+      }
+      const source = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId });
+      expect(source.targets.map((target) => target.targetType)).toEqual(['team', 'user']);
+      const result = await service.submit(authUser(memberAId), playerDto);
+      expect(result.alreadySubmitted).toBe(false);
+      expect(createMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('양 팀 겸직자가 한쪽 사이드 명단에서만 빠지면 그 방향만 닫힌다', async () => {
+      // memberA 는 홈·원정 양쪽 팀원. 홈 명단에는 없고(빠짐) 원정 명단에는 있다.
+      const { prisma, createMock } = teamMatchWorld(
+        [
+          { userId: memberAId, teamId: hostTeamId, role: 'member' },
+          { userId: memberAId, teamId: awayTeamId, role: 'member' },
+        ],
+        [],
+        [memberAId, opponentA],
+        [],
+        [memberBId],
+      );
+      const service = makeService(prisma);
+
+      const source = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId });
+      const teamTarget = source.targets.find((target) => target.targetType === 'team');
+      // 원정 팀원으로서 홈 팀을 평가하는 방향만 남는다 — 홈 팀원으로서 원정 팀을 평가하는 방향은 닫힌다.
+      expect(new Set(source.targets.map((target) => target.reviewerTeam?.teamId))).toEqual(new Set([awayTeamId]));
+      expect(teamTarget?.targetTeamId).toBe(hostTeamId);
+      expect(source.targets.filter((target) => target.targetType === 'user').map((target) => target.targetUserId))
+        .toEqual([memberBId]);
+
+      const error = await service.submit(authUser(memberAId), teamReviewDto(5)).catch((err: unknown) => err);
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'NOT_ACTUAL_PARTICIPANT' });
+      expect(createMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('recalculateTeamTrust — 팀 평균 1표 환산', () => {
     it('A팀 3명(평균 2점) + B팀 1명(5점) → 3.5점, reviewCount는 팀 수(2)', async () => {
       const now = new Date('2026-07-19T00:00:00Z');
@@ -1811,6 +1939,11 @@ function teamMatchWorld(
    * 평가 대상으로 새는 회귀를 재현하기 위한 픽스처. 비우면 라인업 revision이 1개뿐이다.
    */
   staleAwayRosterUserIds: string[] = [],
+  /**
+   * 홈(작성자) 사이드 최신 라인업에 실린 userId 목록 — F88: 명단이 있는 사이드의 팀원만 작성자다.
+   * null 이면 홈 사이드에 라인업이 없다(예전 기본 동작), 빈 배열이면 라인업은 있으나 아무도 안 실렸다.
+   */
+  homeRosterUserIds: string[] | null = null,
 ) {
   const membershipRows: FakeRow[] = memberships.map((membership) => ({
     ...membership,
@@ -1834,16 +1967,19 @@ function teamMatchWorld(
   // 원정팀 사이드에 연동 팀원이 실린 라인업. 서비스는 "최신 revision 라인업"의 lineupId로
   // 참가자를 모아 userId가 있는 행만 후기 대상으로 쓴다 — gameId+sideId만으로 조회하면 지워지지
   // 않는 옛 revision 참가자까지 섞인다(finding 재현용으로 staleAwayRosterUserIds를 별도 revision에 둔다).
+  const homeSideId = 'side-home';
   const awaySideId = 'side-away';
   const gameRow = {
     id: 'game-1',
     teamMatchId: teamSourceId,
     sides: [
-      { id: 'side-home', teamId: hostTeamId },
+      { id: homeSideId, teamId: hostTeamId },
       { id: awaySideId, teamId: awayTeamId },
     ],
   };
   const hasAwayLineup = awayRosterUserIds.length > 0 || staleAwayRosterUserIds.length > 0;
+  const hasHomeLineup = homeRosterUserIds !== null;
+  const homeLineupId = 'lineup-home-rev1';
   const staleLineupId = 'lineup-away-rev1';
   const latestLineupId = hasAwayLineup ? (staleAwayRosterUserIds.length ? 'lineup-away-rev2' : 'lineup-away-rev1') : null;
   const lineupRows: FakeRow[] = hasAwayLineup
@@ -1854,6 +1990,9 @@ function teamMatchWorld(
         ]
       : [{ id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1, invalidatedAt: null }]
     : [];
+  if (hasHomeLineup) {
+    lineupRows.push({ id: homeLineupId, gameId: gameRow.id, sideId: homeSideId, revision: 1, invalidatedAt: null });
+  }
   const gameParticipantRows: FakeRow[] = [
     // 옛 revision에만 남은, 최종 명단에서 빠진 선수 — 최신 revision으로 스코프하면 제외돼야 한다.
     ...staleAwayRosterUserIds.map((userId) => ({
@@ -1869,6 +2008,14 @@ function teamMatchWorld(
       gameId: gameRow.id,
       sideId: awaySideId,
       lineupId: latestLineupId,
+      userId,
+      displayNameSnapshot: `선수-${userId}`,
+    })),
+    ...(homeRosterUserIds ?? []).map((userId) => ({
+      id: `participant-${userId}`,
+      gameId: gameRow.id,
+      sideId: homeSideId,
+      lineupId: homeLineupId,
       userId,
       displayNameSnapshot: `선수-${userId}`,
     })),
@@ -1909,7 +2056,8 @@ function teamMatchWorld(
   const userReputationUpsert = jest.fn().mockResolvedValue({});
   const teamMatchFindUnique = jest.fn().mockResolvedValue(teamMatchRow);
   const teamMembershipFindMany = jest.fn(async ({ where }: { where: FakeRow }) => membershipRows.filter((row) => matchesWhere(row, where)));
-  const gameFindUnique = jest.fn().mockResolvedValue(hasAwayLineup ? gameRow : null);
+  const hasGame = hasAwayLineup || hasHomeLineup;
+  const gameFindUnique = jest.fn().mockResolvedValue(hasGame ? gameRow : null);
   const gameLineupFindMany = jest.fn(async ({ where }: { where: FakeRow }) =>
     lineupRows
       .filter((row) => matchesWhere(row, where))
@@ -1917,7 +2065,7 @@ function teamMatchWorld(
   );
   const gameParticipantFindMany = jest.fn(async ({ where }: { where: FakeRow }) => gameParticipantRows.filter((row) => matchesWhere(row, where)));
   const userFindMany = jest.fn().mockResolvedValue(
-    [...awayRosterUserIds, ...staleAwayRosterUserIds].map((userId) => ({
+    [...awayRosterUserIds, ...staleAwayRosterUserIds, ...(homeRosterUserIds ?? [])].map((userId) => ({
       id: userId,
       profile: { nickname: `선수-${userId}`, profileImageUrl: null },
     })),
@@ -1943,7 +2091,7 @@ function teamMatchWorld(
     // 0명이라 팀 후기 경로만 남는다.
     v1Game: {
       findUnique: gameFindUnique,
-      findMany: jest.fn().mockResolvedValue(hasAwayLineup ? [{ ...gameRow, teamMatchId: teamSourceId }] : []),
+      findMany: jest.fn().mockResolvedValue(hasGame ? [{ ...gameRow, teamMatchId: teamSourceId }] : []),
     },
     // where 절을 실제로 해석한다 — mock이 인자를 무시하고 고정 배열을 돌려주면 "최신 revision
     // lineupId로 좁히는지"를 잡을 수 없다(finding: gameId/sideId만으로 조회해 옛 revision까지 샌 회귀).

@@ -751,6 +751,7 @@ describe('TeamMatchLineupPageClient', () => {
         items: [
           { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 8 },
           { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active', jerseyNumber: 8 },
+          { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: 9 },
         ],
       },
       isLoading: false,
@@ -759,9 +760,14 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(8);
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
 
     expect(screen.getByLabelText('김철수 등번호')).toHaveValue(null);
+    expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
+
+    // 겹치지 않는 사람을 이어서 넣어도 떠 있던 안내는 남는다.
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    expect(screen.getByLabelText('이영희 등번호')).toHaveValue(9);
     expect(screen.getByText(/김철수님의 팀 등번호 8번은 홍길동이 쓰고 있어서 비워 뒀어요/)).toBeInTheDocument();
   });
 

@@ -457,11 +457,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     if (state === null) return;
     const holder = member.jerseyNumber == null ? null : findJerseyHolder(state, member.jerseyNumber);
     setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev));
-    setLoadNotice(
-      holder === null || member.jerseyNumber == null
-        ? null
-        : `${member.displayName}님의 팀 등번호 ${member.jerseyNumber}번은 ${josa(holder, ['이', '가'])} 쓰고 있어서 비워 뒀어요. 등번호를 직접 넣어 주세요.`,
-    );
+    // 충돌이 없으면 떠 있던 안내(불러오기 결과 등)를 그대로 둔다.
+    if (holder !== null && member.jerseyNumber != null) {
+      setLoadNotice(
+        `${member.displayName}님의 팀 등번호 ${member.jerseyNumber}번은 ${josa(holder, ['이', '가'])} 쓰고 있어서 비워 뒀어요. 등번호를 직접 넣어 주세요.`,
+      );
+    }
   }
 
   async function handleSavePreset(name: string) {

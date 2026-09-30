@@ -144,8 +144,8 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 
 일반 팀매치 완료 알림 `team_match_completed`는 후기 작성 화면(`/my/reviews/team_match/:id`)으로 연결되므로 수신자를
 후기 작성 자격과 같은 판정으로 거른다 — 명단(계정 연결 참가자 1명 이상)이 있는 사이드는 명단에 있는 팀장·매니저만 받고,
-명단이 없는 사이드는 팀장·매니저 전원이 받는다. 리그 `league_team_match_completed`는 결과 영수증 화면으로 가므로
-팀장·매니저 전원이 받는다.
+명단이 없는 사이드는 팀장·매니저 전원이 받는다. 리그 `league_team_match_completed`·대회 `tournament_match_completed`
+결과 확정 알림의 수신자·문구는 아래 "경기 알림 수신자·문구"를 따른다.
 
 ## 경기 알림 수신자·문구 (Task 180 G7)
 
@@ -159,6 +159,8 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 
 | 경기 전날 `game_day_before_reminder` | 출전자(대회·리그 팀장·매니저는 기존 "명단 확인"을 받으므로 제외) | `9/30 (수) 01:10 경기가 있어요` / `vs (상대) · (장소). 출전 명단은 경기 전까지 바뀔 수 있어요.` | 공개 경기 상세 |
 | 킥오프 2시간 전 `game_kickoff_reminder` | 출전자 + 팀장·매니저 | 2시간 뒤 경기가 시작돼요 / `01:10 vs (상대) · (장소). 지금 출전 명단에 있어요.` — 출전자가 아닌 팀장·매니저는 마지막 문장 없음 | 공개 경기 상세 |
+| 리그 결과 확정 `league_team_match_completed` | 팀장·매니저 + 그 공식 결과의 출전자 | 경기 결과가 확정됐어요 / `(리그명) N주차 · 마포 FC 2 : 1 합정 유나이티드 · 승리. 내 기록 1골이에요.` | `/team-matches/:id/result` |
+| 대회 결과 확정 `tournament_match_completed` | 〃 | 대회 경기 결과가 확정됐어요 / `(대회명) · (라운드) · 홈 2 : 1 원정 · 승리.` (+ 개인 기록) | `/tournaments/:id/matches/:teamMatchId` |
 
 - 한 사람에게 한 건 — 참가 명단에 든 팀장·매니저는 팀장 문구만 받는다.
 - 시각은 KST 날짜·요일·시각으로 쓰고 "내일" 같은 상대 표현을 쓰지 않는다. 와/과는 상대팀 이름의 받침으로 고른다.
@@ -171,6 +173,13 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 - 수신 설정은 "경기·대회"(`teamMatchEnabled`)를 따른다. 기존 팀장·매니저 "명단 확인"·참석명단 알림은 `teamEnabled` 그대로다.
 - 공개 경기 상세: 대회는 `targetType=tournament`, targetId `{tournamentId}:{teamMatchId}` → `/tournaments/:id/matches/:teamMatchId`,
   리그·친선은 `targetType=team_match` → `/team-matches/:id`(리그 대진은 리그 경기 상세로 redirect).
+- **결과 확정**(리그·대회만, 친선 팀매치 완료 알림은 그대로): 공식 결과 참가자 행이 있는 사람이 출전자다 — 명단에서 빠져
+  결과 행이 없는 선수, 확정 시점에 팀을 나간 출전자, 계정이 없는 참가자는 받지 않는다. 승패는 받는 사람 팀 기준이고
+  (승부차기로 갈리면 `(승부차기 3 : 4)` 를 붙이고 그 결과로 판정), "내 기록 N골 M도움이에요." 는 골·도움이 있는 출전자에게만 붙는다.
+  경기명은 리그 `(리그명) N주차`(경기일 순번), 대회 `(대회명) · (라운드)`. businessKey
+  `team-match-completed:{teamMatchId}:{userId}` · `tournament-fixture-completed:{teamMatchId}:{userId}` 로 정정 재확정에도 한 번이다.
+  수신 설정은 리그 `teamMatchEnabled`, 대회 `activityEnabled`(기존 축 유지). 대회 결과 알림의 targetId 는 대회 id 에서
+  `{tournamentId}:{teamMatchId}` 로 바뀌었다(딥링크는 같다).
 
 ## Delivery Architecture
 

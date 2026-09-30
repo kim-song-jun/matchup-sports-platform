@@ -1,9 +1,13 @@
+import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { canReviewFromLineup, readTeamMatchLineupUserIds } from '../games/roster/team-match-lineup-accounts';
+import { resolveLeagueWeekNumbers } from '../league-matches/league-week-number';
 import { notificationCopyFor } from '../notifications/notifications.service';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
+import { loadOfficialResultRecipients, loadResultTeamNames, officialResultNoticeBody } from './official-result-notice';
+import { parseOfficialScore } from './parse-official-score';
 
 /**
  * 리그 감사 그룹 A / R1: `team_match_completed` 알림 타입은
@@ -32,11 +36,9 @@ import type { OfficialRevisionRow } from './game-result-official-projection.type
  * **리그 알림 문구 전용화(2026-08-25)**: 리그 대진(`teamMatch.leagueId !== null`)은
  * 일반 팀매치와 문구·딥링크가 다르다 — 일반 팀매치는 "완료됐어요, 리뷰를 남겨보세요"로
  * 후기 작성 화면으로 보내지만, 리그는 순위에 반영되는 "확정" 이벤트라 결과 영수증
- * 화면(`/team-matches/:id/result`)으로 보낸다. 이
- * 갈림은 `notifications.service.ts`의 `NotificationEventType`
- * `team_match_completed` vs `league_team_match_completed` 두 항목의 title/body/
- * deepLink와 정확히 같은 문구를 쓴다(그 파일이 단일 소스) — 여기서 문구를 고치면
- * 그 파일도 같은 커밋에서 고친다. 일반 팀매치 쪽 문구·링크는 이 갈림으로 인해
+ * 화면(`/team-matches/:id/result`)으로 보낸다. 제목·딥링크는 `notifications.service.ts`
+ * `notificationCopyFor` 가 단일 소스다. 리그는 팀장·매니저 + 공식 결과의 출전자가 받고, 본문(스코어·승패·
+ * 개인 기록)은 대회 알림과 같은 `official-result-notice.ts` 가 조립한다(Task 180 G7). 일반 팀매치 쪽 문구·링크는 이 갈림으로 인해
  * 한 글자도 바뀌지 않는다(기존 리비전 정정 재알림 회피 등 나머지 로직은 두 경로가
  * 공유한다 — businessKey 형식도 그대로: 팀매치 하나는 생애주기 내내 리그 아니면
  * 일반 중 하나로 고정이라 리그 여부로 businessKey 네임스페이스를 나눌 이유가 없다).
@@ -54,6 +56,8 @@ import type { OfficialRevisionRow } from './game-result-official-projection.type
  * 없거나 claim.afterCommit이 없으면 즉시 발송으로 폴백해 기존 스펙의 동작을 보존한다.
  */
 export class TeamMatchCompletionNotificationService {
+  private readonly logger = new Logger(TeamMatchCompletionNotificationService.name);
+
   constructor(private readonly webPush?: WebPushService) {}
 
   async project(
@@ -68,7 +72,14 @@ export class TeamMatchCompletionNotificationService {
       select: {
         teamMatchId: true,
         teamMatch: {
-          select: { title: true, hostTeamId: true, approvedApplicantTeamId: true, leagueId: true },
+          select: {
+            title: true,
+            hostTeamId: true,
+            approvedApplicantTeamId: true,
+            leagueId: true,
+            startAt: true,
+            league: { select: { title: true } },
+          },
         },
       },
     });
@@ -79,84 +90,130 @@ export class TeamMatchCompletionNotificationService {
     // return here prevents the same canonical game from also receiving friendly/team copy.
     if (revision.tournamentTeamMatchId !== null) return;
 
-    const teamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId].filter(
-      (id): id is string => id !== null,
-    );
-    if (teamIds.length === 0) return;
+    const rows =
+      teamMatch.leagueId === null
+        ? await this.friendlyRows(tx, teamMatchId, teamMatch)
+        : await this.leagueRows(tx, revision, teamMatchId, { ...teamMatch, leagueId: teamMatch.leagueId });
+    await this.deliver(tx, teamMatchId, rows, claim);
+  }
 
+  /**
+   * 일반 팀매치 알림의 목적지는 후기 작성 화면이다 — 후기 작성 자격과 같은 판정(canReviewFromLineup)으로
+   * 거르지 않으면 명단 밖 팀장·매니저가 눌렀을 때 403 막다른 길이다.
+   */
+  private async friendlyRows(
+    tx: Prisma.TransactionClient,
+    teamMatchId: string,
+    teamMatch: { title: string; hostTeamId: string | null; approvedApplicantTeamId: string | null },
+  ): Promise<CompletionRow[]> {
+    const teamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId].filter((id): id is string => id !== null);
+    if (teamIds.length === 0) return [];
     const memberships = await tx.v1TeamMembership.findMany({
       where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
       select: { userId: true, teamId: true },
     });
-    const isLeagueFixture = teamMatch.leagueId !== null;
-    // 일반 팀매치 알림의 목적지는 후기 작성 화면이다 — 후기 작성 자격과 같은 판정(canReviewFromLineup)으로
-    // 거르지 않으면 명단 밖 팀장·매니저가 눌렀을 때 403 막다른 길이다. 리그는 결과 영수증 화면이라 전원에게 간다.
-    const lineupUserIdsByTeam = isLeagueFixture
-      ? null
-      : (await readTeamMatchLineupUserIds(tx, [teamMatchId])).get(teamMatchId);
-    const eligibleMemberships = lineupUserIdsByTeam === null
-      ? memberships
-      : memberships.filter((m) => canReviewFromLineup(lineupUserIdsByTeam?.get(m.teamId) ?? [], m.userId));
-    const recipients = [...new Set(eligibleMemberships.map((m) => m.userId))];
-    if (recipients.length === 0) return;
-
-    // 선호도 필터: NotificationsService.createNotificationWithPrefCheck와 동일하게
-    // 선호도 행이 없으면 기본 활성으로 취급한다.
-    const preferences = await tx.v1NotificationPreference.findMany({ where: { userId: { in: recipients } }, select: { userId: true, teamMatchEnabled: true } });
-    const preferenceEnabledByUser = new Map(preferences.map((preference) => [preference.userId, preference.teamMatchEnabled] as const));
-    const filteredRecipients = recipients.filter((userId) => preferenceEnabledByUser.get(userId) !== false);
-    if (filteredRecipients.length === 0) return;
-
-    // 제목·딥링크는 notifications.service.ts 의 단일 소스에서 읽는다 — 처음엔 여기 주석으로
-    // "그 파일이 단일 소스다"라고만 적고 문자열을 복사해 뒀는데, 적대 리뷰가 그 복사본이
-    // 컴파일·테스트 어느 것으로도 결속되지 않아 조용히 갈라질 수 있음을 지적했다.
-    // body 만 동적(경기 제목 인용)이라 여기서 만든다 — 호출부 body 덮어쓰기는
-    // notifications.service.ts 가 문서화한 관례다. Task 166 이 이의 경로를 없애면서
-    // "N일 안에 이의를 제기할 수 있어요" 를 뺐다 — 없는 기능을 안내하면 안 된다.
-    const copy = notificationCopyFor(
-      isLeagueFixture ? 'league_team_match_completed' : 'team_match_completed',
-      'team_match',
-      teamMatchId,
-    );
-    const title = copy.title;
-    // body 는 **문구 테이블의 `defaultBody` 를 단일 소스로** 쓴다. 여기서 문장을 다시
-    // 조립하면(예전 방식) 테이블만 고쳤을 때 발송 문구가 조용히 갈린다 — 실제로
-    // Task 166 에서 테이블에 "문의는 리그 운영자에게" 를 넣었는데 여기 복사본엔 빠져
-    // 두 문구가 어긋났다(Copilot 리뷰). 동적인 부분은 경기 제목 인용 하나뿐이라
-    // 그것만 앞에 붙인다.
+    const lineupUserIdsByTeam = (await readTeamMatchLineupUserIds(tx, [teamMatchId])).get(teamMatchId);
+    const recipients = [
+      ...new Set(
+        memberships
+          .filter((m) => canReviewFromLineup(lineupUserIdsByTeam?.get(m.teamId) ?? [], m.userId))
+          .map((m) => m.userId),
+      ),
+    ];
+    const copy = notificationCopyFor('team_match_completed', 'team_match', teamMatchId);
     const body = `"${teamMatch.title}" ${copy.defaultBody}`;
-    const deepLink = copy.deepLink;
-    const businessKeyFor = (userId: string) => `team-match-completed:${teamMatchId}:${userId}`;
+    return recipients.map((userId) => ({ userId, title: copy.title, body, deepLink: copy.deepLink }));
+  }
 
+  /** 리그: 팀장·매니저 + 그 공식 결과의 출전자. 본문은 받는 사람 팀 기준 스코어·승패와 출전자의 개인 기록. */
+  private async leagueRows(
+    tx: Prisma.TransactionClient,
+    revision: OfficialRevisionRow,
+    teamMatchId: string,
+    teamMatch: { leagueId: string; startAt: Date | null; league: { title: string } | null },
+  ): Promise<CompletionRow[]> {
+    if (teamMatch.league === null || teamMatch.startAt === null) {
+      throw new Error('League fixture completion notification requires its league and startAt');
+    }
+    const leagueTitle = teamMatch.league.title;
+    const [recipients, names, siblings] = await Promise.all([
+      loadOfficialResultRecipients(tx, {
+        revisionId: revision.revisionId,
+        gameId: revision.gameId,
+        homeTeamId: revision.homeTeamId,
+        awayTeamId: revision.awayTeamId,
+      }),
+      loadResultTeamNames(tx, revision.homeTeamId, revision.awayTeamId),
+      // 주차는 저장된 제목이 아니라 경기일 순번으로 파생한다(league-week-number.ts) — 취소된 대진도 센다.
+      tx.v1TeamMatch.findMany({ where: { leagueId: teamMatch.leagueId, deletedAt: null }, select: { startAt: true } }),
+    ]);
+    const week = resolveLeagueWeekNumbers(
+      new Map([[teamMatch.leagueId, siblings.flatMap((sibling) => (sibling.startAt === null ? [] : [sibling.startAt]))]]),
+      [{ id: teamMatchId, leagueId: teamMatch.leagueId, startAt: teamMatch.startAt }],
+    ).get(teamMatchId)!;
+    const copy = notificationCopyFor('league_team_match_completed', 'team_match', teamMatchId);
+    const score = parseOfficialScore(revision.score);
+    return recipients.map((recipient) => ({
+      userId: recipient.userId,
+      title: copy.title,
+      body: officialResultNoticeBody({
+        label: `${leagueTitle} ${week}주차`,
+        ...names,
+        score,
+        side: recipient.side,
+        record: recipient.record,
+      }),
+      deepLink: copy.deepLink,
+    }));
+  }
+
+  /**
+   * businessKey 로 (팀매치, 수신자)당 한 번 — CORRECTION 리비전이 다시 OFFICIAL 로 만들어도 재알림하지 않는다.
+   * 수신 설정은 teamMatchEnabled(선호도 행이 없으면 활성). 푸시는 커밋 확정 뒤에만(클래스 docblock 참조).
+   */
+  private async deliver(
+    tx: Prisma.TransactionClient,
+    teamMatchId: string,
+    rows: CompletionRow[],
+    claim: GameOperationClaim | undefined,
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const preferences = await tx.v1NotificationPreference.findMany({
+      where: { userId: { in: rows.map((row) => row.userId) } },
+      select: { userId: true, teamMatchEnabled: true },
+    });
+    const optedOut = new Set(preferences.filter((preference) => preference.teamMatchEnabled === false).map((preference) => preference.userId));
+    const enabled = rows.filter((row) => !optedOut.has(row.userId));
+    if (enabled.length === 0) return;
+
+    const businessKeyFor = (userId: string) => `team-match-completed:${teamMatchId}:${userId}`;
     const alreadyDelivered = await tx.v1Notification.findMany({
-      where: { businessKey: { in: filteredRecipients.map(businessKeyFor) } },
+      where: { businessKey: { in: enabled.map((row) => businessKeyFor(row.userId)) } },
       select: { businessKey: true },
     });
     const alreadyDeliveredKeys = new Set(alreadyDelivered.map((n) => n.businessKey));
 
     await tx.v1Notification.createMany({
-      data: filteredRecipients.map((userId) => ({
-        recipientUserId: userId,
+      data: enabled.map((row) => ({
+        recipientUserId: row.userId,
         targetType: 'team_match' as const,
         targetId: teamMatchId,
-        title,
-        body,
-        deepLink,
-        businessKey: businessKeyFor(userId),
+        title: row.title,
+        body: row.body,
+        deepLink: row.deepLink,
+        businessKey: businessKeyFor(row.userId),
       })),
       skipDuplicates: true,
     });
 
-    const newlyDelivered = filteredRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
-    for (const userId of newlyDelivered) {
+    for (const row of enabled.filter((candidate) => !alreadyDeliveredKeys.has(businessKeyFor(candidate.userId)))) {
       const send = () =>
         void this.webPush
-          ?.sendToUser(userId, { title, body, url: deepLink ?? undefined })
-          .catch(() => {
-            // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지된다.
+          ?.sendToUser(row.userId, { title: row.title, body: row.body, url: row.deepLink ?? undefined })
+          .catch((error: unknown) => {
+            // Best-effort — 알림 row 는 이미 커밋 경로에 있다. 조용히 삼키지 않고 추적만 남긴다.
+            this.logger.warn(`web push failed for team match completion (teamMatch=${teamMatchId}): ${String(error)}`);
           });
-      // 커밋 확정 뒤에만 보낸다(위 클래스 docblock 참조). claim이 없거나
-      // afterCommit 훅이 없는 호출부(유닛 스펙)는 즉시 실행으로 폴백한다.
       if (claim?.afterCommit === undefined) {
         send();
       } else {
@@ -165,3 +222,5 @@ export class TeamMatchCompletionNotificationService {
     }
   }
 }
+
+type CompletionRow = { userId: string; title: string; body: string; deepLink: string | null };

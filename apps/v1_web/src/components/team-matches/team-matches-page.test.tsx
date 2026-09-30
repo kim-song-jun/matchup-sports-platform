@@ -1396,10 +1396,10 @@ describe('팀매치 상세 히어로 CTA — 안내와 실제 동작', () => {
     };
 
     const applyModel = getTeamMatchDetailViewModel('default');
-    applyModel.applyLabel = '알파FC으로 신청';
+    applyModel.applyLabel = '알파FC로 신청';
     applyModel.onApply = vi.fn().mockResolvedValue(applied);
     const applyView = renderPage(<TeamMatchDetailPageView model={applyModel} />);
-    fireEvent.click(screen.getAllByRole('button', { name: '알파FC으로 신청' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '알파FC로 신청' })[0]);
     expect(await screen.findByText('신청을 완료했어요.')).toBeInTheDocument();
     applyView.unmount();
 

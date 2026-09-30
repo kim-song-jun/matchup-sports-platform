@@ -16,6 +16,9 @@ const DIGIT_HAS_BATCHIM: Readonly<Record<string, boolean>> = {
   '9': false,
 };
 
+const RIEUL_FINAL = 8;
+const RIEUL_DIGITS: ReadonlySet<string> = new Set(['1', '7', '8']);
+
 /**
  * 한국어 조사 선택 — 마지막 글자의 받침 유무로 [받침 있음, 받침 없음] 중 하나를 붙여 반환한다.
  * 예: josa('김민준', ['을', '를']) → '김민준을' / josa('활성커버', ['은', '는']) → '활성커버는'
@@ -29,5 +32,8 @@ export function josa(word: string, [withBatchim, withoutBatchim]: [string, strin
   const hasBatchim = isHangul
     ? (last - 0xac00) % 28 !== 0
     : (DIGIT_HAS_BATCHIM[lastChar] ?? false);
-  return word + (hasBatchim ? withBatchim : withoutBatchim);
+  // '으로/로' 는 ㄹ 받침을 받침 없음처럼 취급한다(서울로, 라이벌로). 일·칠·팔로 읽히는 1·7·8 도 같다.
+  const endsWithRieul = isHangul ? (last - 0xac00) % 28 === RIEUL_FINAL : RIEUL_DIGITS.has(lastChar);
+  const isRoPair = withBatchim === '으로' && withoutBatchim === '로';
+  return word + (hasBatchim && !(isRoPair && endsWithRieul) ? withBatchim : withoutBatchim);
 }

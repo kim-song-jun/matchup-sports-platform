@@ -28,6 +28,7 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import type { CursorListSeed } from '@/lib/public-list-seed';
 import { extractErrorMessage } from '@/lib/error-message';
+import { josa } from '@/lib/korean';
 import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
@@ -609,7 +610,7 @@ function applyLabel(
   if (isGuest) return '로그인하고 신청하기';
   // 팀 없음: 팀 만들기 유도 (#13)
   if (hasNoTeam) return '팀 만들고 신청하기';
-  if (team?.eligible) return `${team.name}으로 신청`;
+  if (team?.eligible) return `${josa(team.name, ['으로', '로'])} 신청`;
   return reasonLabel(team?.reasonCode);
 }
 

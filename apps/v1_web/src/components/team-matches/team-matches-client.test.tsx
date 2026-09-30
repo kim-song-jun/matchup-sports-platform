@@ -284,6 +284,29 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.queryByText('내가 만든 팀매치')).not.toBeInTheDocument();
   });
 
+  // L1 — "합정 유나이티드으로 신청": 받침 없는 이름에도 '으로' 가 붙었다.
+  it.each([
+    ['합정 유나이티드', '합정 유나이티드로 신청'],
+    ['마포 FC', '마포 FC로 신청'],
+    ['한강 러너스', '한강 러너스로 신청'],
+    ['서울 팀', '서울 팀으로 신청'],
+    ['라이벌', '라이벌로 신청'],
+  ])('신청 버튼의 조사는 팀 이름 받침을 따른다: %s', (name, expected) => {
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: {
+        teamMatchId: 'team-match-1',
+        requiresApproval: true,
+        requiresPayment: false,
+        teams: [{ teamId: 'team-mine', name, role: 'owner', eligible: true, reasonCode: '', applicationId: null }],
+      },
+      isSuccess: true,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent(expected);
+  });
+
   it('종목이 다른 팀만 있으면 "팀 만들기" 유도 대신 종목이 다르다는 사유를 보여준다', () => {
     // status는 beforeEach 기준 'recruiting'이라 신청 마감 분기(status !== 'recruiting')를
     // 타지 않고 reasonLabel(reasonCode)까지 도달한다. eligible:false + SPORT_MISMATCH인

@@ -213,9 +213,25 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     });
     myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
     const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
-    expect(container.textContent).toContain('팀별 대회 신청');
     expect(container.textContent).not.toContain('정원');
     expect(container.textContent).not.toContain('더 신청할 수 있어요');
+  });
+
+  it('신청 허브 제목은 리그면 "팀별 리그 참가", 대회면 "팀별 대회 신청"이다', () => {
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'in_progress' }),
+      isLoading: false,
+    });
+    const league = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(league.getByText('팀별 리그 참가')).toBeInTheDocument();
+    expect(league.queryByText('팀별 대회 신청')).toBeNull();
+    league.unmount();
+
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(), isLoading: false });
+    const tournament = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(tournament.getByText('팀별 대회 신청')).toBeInTheDocument();
+    expect(tournament.queryByText('팀별 리그 참가')).toBeNull();
   });
 
   it('참가비가 있는 대회의 목록 카드에는 결제 수단·상태가 그대로 나온다 (위 부재 단언이 공허하지 않음을 증명)', () => {

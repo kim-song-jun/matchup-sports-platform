@@ -209,6 +209,48 @@ describe('friendly match shared score sheet (real DB)', () => {
     }
   });
 
+  // H5 결정 A — 명단 밖 팀장·매니저 권한과 첫 기록 뒤 "추가만".
+  async function addTeamMember(teamId: string, role: 'manager' | 'member', nickname: string) {
+    const id = randomUUID();
+    await prisma.v1User.create({ data: {
+      id, email: `record-${id}@example.test`, accountStatus: 'active', onboardingStatus: 'completed', phoneVerifiedAt: new Date(),
+      profile: { create: { nickname } },
+    } });
+    await prisma.v1TeamMembership.create({ data: { teamId, userId: id, role, status: 'active' } });
+    return id;
+  }
+
+  it('[H5] a manager outside the lineup records and confirms for their own side; a plain member outside it is refused', async () => {
+    const f = await createSharedRecordFixture(prisma);
+    const coach = await addTeamMember(f.teams[0].id, 'manager', '벤치 코치');
+    const bench = await addTeamMember(f.teams[0].id, 'member', '벤치 멤버');
+    expect(await records.read(user(coach), f.match.id)).toMatchObject({ teamAuthority: true, canEdit: true, ownSideId: f.sides[0].id });
+    const added = await records.mutate(user(coach), f.match.id, cmd('add', 0, { sideId: f.sides[0].id, participantId: f.participants[0].id }));
+    expect(added.history[0].actorName).toBe('벤치 코치 · 팀장 권한');
+    const confirmed = await records.mutate(user(coach), f.match.id, cmd('confirm', 1));
+    expect(confirmed.confirmations).toEqual([expect.objectContaining({ sideId: f.sides[0].id })]);
+    await expect(records.mutate(user(bench), f.match.id, cmd('add', 2, { sideId: f.sides[0].id }))).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('[H5] a late arrival joins the submitted lineup after the first goal without moving existing ids; removals stay locked', async () => {
+    const f = await createSharedRecordFixture(prisma);
+    const late = await addTeamMember(f.teams[0].id, 'member', '늦게 온 선수');
+    const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
+    const owner = user(f.userIds[0]);
+    const goal = await records.mutate(user(f.userIds[1]), f.match.id, cmd('add', 0, { sideId: f.sides[0].id, participantId: f.participants[0].id }));
+
+    expect(await lineups.getLineup(owner, f.match.id)).toMatchObject({ lockReason: 'records_exist', lateAdditionAllowed: true });
+    const result = await lineups.addLateParticipant(owner, f.match.id, randomUUID(), { userId: late, jerseyNumber: 21 });
+
+    const view = await records.read(user(f.userIds[1]), f.match.id);
+    expect(view.participants.map((participant) => participant.id)).toEqual(expect.arrayContaining([f.participants[0].id, f.participants[1].id, result.participantId]));
+    expect(view.goals[0]).toMatchObject({ id: goal.goals[0].id, participantId: f.participants[0].id });
+    expect(view.history[0]).toMatchObject({ action: 'participant_add', after: expect.objectContaining({ name: '늦게 온 선수', jerseyNumber: 21 }) });
+    expect(view.version).toBe(2);
+    await expect(lineups.saveLineup(owner, f.match.id, randomUUID(), { expectedVersion: 1, participants: [{ userId: f.userIds[0] }] }))
+      .rejects.toMatchObject({ status: 409, response: { code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' } });
+  });
+
   it('groups shared goals into optional submatches and finalizes one aggregate game result', async () => {
     const f = await createSharedRecordFixture(prisma);
     const host = user(f.userIds[1]); const away = user(f.userIds[3]);

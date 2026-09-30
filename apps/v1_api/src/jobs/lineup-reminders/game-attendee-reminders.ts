@@ -47,7 +47,10 @@ export interface ReminderRow {
   readonly businessKey: string;
 }
 
-/** `startAt` 조건에 드는 상대가 정해진 경기의 사이드들. 리그 대진은 leagueId 가 판별자다(대회 id 를 함께 가질 수 있다). */
+/**
+ * `startAt` 조건에 드는 상대가 정해진 경기의 사이드들. 리그 대진은 leagueId 가 판별자다(대회 id 를 함께 가질 수 있다).
+ * 호출자가 하루·30분 창으로만 부르므로 건수 상한을 두지 않는다 — 상한을 두면 초과분 경기의 알림이 조용히 빠진다.
+ */
 export async function loadReminderGameSides(tx: Tx, startAt: Prisma.DateTimeNullableFilter): Promise<ReminderGameSide[]> {
   const matches = await tx.v1TeamMatch.findMany({
     where: {
@@ -70,7 +73,6 @@ export async function loadReminderGameSides(tx: Tx, startAt: Prisma.DateTimeNull
       game: { select: { id: true, sides: { select: { id: true, teamId: true } } } },
     },
     orderBy: { startAt: 'asc' },
-    take: 500,
   });
 
   const sides: ReminderGameSide[] = [];

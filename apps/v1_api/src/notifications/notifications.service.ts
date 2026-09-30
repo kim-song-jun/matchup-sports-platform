@@ -340,6 +340,10 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
+  // 초대받은 사람이 수락·거절하는 곳은 팀 상세가 아니라 내 초대함이다. targetId 는 팀 id 그대로다.
+  if (type === 'team_invitation_received') {
+    return '/my/invitations';
+  }
   // team_contact_* — 컨택 = 채팅방(스펙 §1 결정 1). targetId 는 이제 contactId 가 아니라
   // roomId 다(TeamContactsService.notifyTeamManagers 가 roomId 를 넘긴다). targetType 도
   // 'chat' 으로 바뀌었지만 ROUTE_BASE_BY_TARGET_TYPE 에 'chat' 항목이 없어 폴백하면

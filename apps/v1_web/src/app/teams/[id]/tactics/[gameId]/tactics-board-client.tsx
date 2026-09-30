@@ -150,6 +150,10 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        // 좌우는 셸 표준 여백 — 없으면 390 에서 코트 옆 대기 칩이 화면 끝에 붙어 잘린다(W3-V4).
+        paddingTop: 16,
+        paddingLeft: 'var(--v1-shell-page-x)',
+        paddingRight: 'var(--v1-shell-page-x)',
         // 하단 고정 저장 바(.tm-fixed-cta)가 본문 끝을 덮지 않게 그 높이만큼 비운다.
         paddingBottom: canEdit ? 112 : 16,
       }}

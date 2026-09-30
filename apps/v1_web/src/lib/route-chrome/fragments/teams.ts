@@ -58,6 +58,8 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
       activeTab: 'teams',
       bottomNav: false,
       backHref: (p) => `/teams/${p.id}`,
+      // 데스크톱은 상단바가 숨어 제목·뒤로가기가 사라진다 — 팀 전적·컨택 설정과 같은 페이지 머리를 쓴다.
+      desktopHead: true,
     },
   },
   {

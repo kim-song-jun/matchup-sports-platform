@@ -145,6 +145,17 @@ describe('TacticsBoardClient — 처음 여는 풋살 보드', () => {
   });
 });
 
+describe('TacticsBoardClient — 페이지 여백', () => {
+  it('좌우는 셸 표준 여백이다 — 390 에서 대기 칩이 화면 끝에 붙지 않게 (W3-V4)', () => {
+    mockMembers([member('u1', '선수01', 1)]);
+    const { container } = render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    const page = container.firstElementChild as HTMLElement;
+    expect(page).toContainElement(screen.getByRole('application', { name: '코트 배치 보드' }));
+    expect(page.style.paddingLeft).toBe('var(--v1-shell-page-x)');
+    expect(page.style.paddingRight).toBe('var(--v1-shell-page-x)');
+  });
+});
+
 describe('TacticsBoardClient — 번호는 팀 등번호', () => {
   it('저장 당시 번호(7)가 아니라 지금 팀 등번호(10)를 보이고, 그 번호로 저장한다', async () => {
     mockMembers([member('u1', '김선발', 10)]);

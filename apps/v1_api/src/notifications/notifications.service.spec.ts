@@ -842,6 +842,16 @@ describe('NotificationsService', () => {
       expect(data).toMatchObject({ targetType: 'team', targetId: 'team-1', title, body, deepLink });
     });
 
+    it('팀매치 신청 도착은 제목에 신청한 팀, 본문 맨 앞에 우리 팀을 싣고 팀매치 상세로 간다(H1-teammatch-applied)', async () => {
+      const data = await rendered('team_match_application_received', 'tm-1', { name: '합정 유나이티드', team: '마포 FC', when: '9/30 (수) 01:10' });
+      expect(data).toMatchObject({
+        targetType: 'team_match',
+        title: '합정 유나이티드 팀이 팀매치를 신청했어요',
+        body: '"마포 FC" · 친선 팀매치 · 9/30 (수) 01:10 · 승인하거나 거절해 주세요.',
+        deepLink: '/team-matches/tm-1',
+      });
+    });
+
     it('문구의 자리를 채우지 못하면 "{team}" 이 보이는 알림을 만들지 않는다', async () => {
       await rendered('team_owner_changed', 'team-1', { team: '마포 FC' });
 

@@ -751,8 +751,8 @@ export const v1NotificationsFixture = {
     {
       notificationId: 'notification-2',
       type: 'team_match',
-      title: '팀매치 신청 도착',
-      body: '상대팀 신청이 들어왔어요. 조건을 확인해 주세요.',
+      title: '합정 유나이티드 팀이 팀매치를 신청했어요',
+      body: '"마포 FC" · 친선 팀매치 · 5/30 (토) 19:00 · 승인하거나 거절해 주세요.',
       target: { type: 'team_match', id: 'team-match-1', route: '/team-matches/team-match-1' },
       status: 'created',
       readAt: null,

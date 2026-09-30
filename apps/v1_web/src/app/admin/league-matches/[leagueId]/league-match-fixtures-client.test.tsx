@@ -1339,6 +1339,27 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
     );
   });
 
+  it('F40: 라운드가 주차에 안 나눠지면 요약이 마지막 주에 다시 열리는 라운드를 알린다', () => {
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    const REPEAT = /첫 라운드 대진이 한 번 더 열려요/;
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 4팀 단일 3라운드 · 하루 2경기 → 2주 4라운드: 서버는 1라운드 대진을 한 번 더 만든다.
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '2' } });
+    expect(screen.getByText(/2주차 · 8경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.getByText(REPEAT)).toBeInTheDocument();
+
+    // 대조군: 하루 3경기면 1주에 3라운드가 딱 들어가 다시 여는 라운드가 없다.
+    fireEvent.change(screen.getByLabelText('팀당 하루 경기'), { target: { value: '3' } });
+    expect(screen.getByText(/1주차 · 6경기가 만들어져요/)).toBeInTheDocument();
+    expect(screen.queryByText(/한 번 더 열려요/)).not.toBeInTheDocument();
+  });
+
   it('이용 종료 시각까지 넣으면 팀당 경기 수를 역산 제안하고 "이대로 적용"이 값을 채운다', () => {
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
 

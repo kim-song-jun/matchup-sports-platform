@@ -21,6 +21,16 @@ export function suggestedWeeks(teamCount: number, legs: RoundRobinLegs, gamesPer
   return Math.max(1, Math.ceil(roundRobinRounds(teamCount, legs) / Math.max(1, gamesPerTeamPerDay)));
 }
 
+/**
+ * 제안 주차가 라운드를 딱 담지 못해 서버가 처음 라운드부터 다시 돌리는 라운드 수. 남는 칸은
+ * 팀당 하루 경기 수보다 적어 전부 마지막 주에 들어간다 — 예: 4팀 단일·하루 2경기 → 2주 4라운드 중 1개.
+ */
+export function repeatedRounds(teamCount: number, legs: RoundRobinLegs, gamesPerTeamPerDay = 1): number {
+  const rounds = roundRobinRounds(teamCount, legs);
+  if (rounds === 0) return 0;
+  return suggestedWeeks(teamCount, legs, gamesPerTeamPerDay) * Math.max(1, gamesPerTeamPerDay) - rounds;
+}
+
 export function resolveWeeksCount(plan: WeeksPlan, teamCount: number, gamesPerTeamPerDay = 1): number {
   if (plan.kind === 'custom') return plan.weeks;
   return suggestedWeeks(teamCount, plan.kind === 'double' ? 2 : 1, gamesPerTeamPerDay);

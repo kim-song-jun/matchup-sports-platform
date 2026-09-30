@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { plannedGameCount, resolveWeeksCount, suggestedWeeks } from './league-round-robin-plan';
+import { plannedGameCount, repeatedRounds, resolveWeeksCount, suggestedWeeks } from './league-round-robin-plan';
 
 describe('팀 수로 주차 수 제안(F40) — 서버 라운드로빈과 같은 셈', () => {
   it('2팀이면 단일 1주·홈앤어웨이 2주 — 옛 기본값 7(같은 대진 7번)이 아니다', () => {
@@ -22,9 +22,20 @@ describe('팀 수로 주차 수 제안(F40) — 서버 라운드로빈과 같은
     expect(plannedGameCount(6, 5)).toBe(15);
   });
 
-  it('팀당 하루 여러 경기면 주차가 그만큼 줄어든다(올림)', () => {
+  it('팀당 하루 여러 경기면 주차가 그만큼 줄어든다(올림) — 남는 칸은 서버가 앞 라운드를 다시 돌려 채운다', () => {
+    // 4팀 단일 3라운드 · 하루 2경기 → 2주 = 4라운드: 서버가 4라운드째에 1라운드 대진을 한 번 더 만든다(6 + 2경기).
     expect(suggestedWeeks(4, 1, 2)).toBe(2);
     expect(plannedGameCount(4, 2, 2)).toBe(8);
+    expect(repeatedRounds(4, 1, 2)).toBe(1);
+    // 홈앤어웨이 6라운드 · 하루 4경기 → 2주 = 8라운드: 2개가 다시 열린다.
+    expect(repeatedRounds(4, 2, 4)).toBe(2);
+  });
+
+  it('라운드가 주차에 딱 나눠지면 다시 여는 라운드가 없다', () => {
+    expect(repeatedRounds(4, 1, 1)).toBe(0);
+    expect(repeatedRounds(4, 1, 3)).toBe(0);
+    expect(repeatedRounds(4, 2, 2)).toBe(0);
+    expect(repeatedRounds(1, 1, 2)).toBe(0);
   });
 
   it('직접 입력한 주차는 그대로 쓰고, 기본은 단일 제안값이다', () => {

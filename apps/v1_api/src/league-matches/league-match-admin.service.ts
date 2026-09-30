@@ -42,6 +42,7 @@ import {
 } from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
+import { loadFirstGamePlayerNotices } from './league-fixture-scheduled-notice';
 import {
   AddLeagueTeamDto,
   CancelLeagueFixtureDto,
@@ -575,7 +576,7 @@ export class LeagueMatchAdminService {
 
     // 리그 감사 그룹 A / R2: 대진 배정 알림 — 트랜잭션 커밋 후, 대진(수십 건)이 아니라
     // 팀 단위로 한 번씩만 보낸다. 근거는 notifyFixturesScheduled의 doc comment 참고.
-    if (createdIds.length > 0) this.notifyFixturesScheduled(leagueId, league.title, schedule);
+    if (createdIds.length > 0) this.notifyFixturesScheduled(leagueId, league.title, schedule, createdIds);
 
     // 그룹 B 감사 결함 2: 홀수 팀이면 매주 한 팀이 조용히 bye였다 — teamIds는 이 라운드로빈
     // 계산에 실제로 쓰인 팀 수라 여기서 판정한다(league.teams.length와 항상 같다).
@@ -1073,7 +1074,7 @@ export class LeagueMatchAdminService {
     });
 
     // 리그 감사 그룹 A / R2: 재생성도 새 대진 배정이므로 동일하게 알린다.
-    if (result.ids.length > 0) this.notifyFixturesScheduled(leagueId, league.title, schedule);
+    if (result.ids.length > 0) this.notifyFixturesScheduled(leagueId, league.title, schedule, result.ids);
     // 그룹 B 감사 결함 4: 옛 주석은 "cancelFixture 경로가 이미 team_match_cancelled를
     // 담당한다"고 적혀 있었지만 사실이 아니었다 — 리그 대진은 leagueId가 있어
     // team-matches.service.ts의 자가취소가 하드 거부하므로(599-604행) 그 알림에 절대
@@ -1769,7 +1770,12 @@ export class LeagueMatchAdminService {
    * 없고, 이 서비스의 다른 알림들(cancelFixture 없음, team-matches.service.ts의 기존
    * 호출부들)도 전부 트랜잭션이 resolve된 뒤에 부른다.
    */
-  private notifyFixturesScheduled(leagueId: string, leagueTitle: string, schedule: RoundRobinFixture[]): void {
+  private notifyFixturesScheduled(
+    leagueId: string,
+    leagueTitle: string,
+    schedule: RoundRobinFixture[],
+    fixtureIds: readonly string[],
+  ): void {
     const fixtureCountByTeamId = new Map<string, number>();
     for (const fixture of schedule) {
       fixtureCountByTeamId.set(fixture.homeTeamId, (fixtureCountByTeamId.get(fixture.homeTeamId) ?? 0) + 1);
@@ -1789,6 +1795,29 @@ export class LeagueMatchAdminService {
         `"${leagueTitle}" 리그 대진이 확정됐어요. 이번 시즌 ${fixtureCount}경기가 배정됐어요.`,
       );
     }
+    this.notifyFirstGameToPlayers(leagueId, leagueTitle, fixtureIds);
+  }
+
+  /**
+   * 시즌 참가 명단 선수에게는 팀장·매니저용 "N경기 배정" 대신 자기 팀의 첫 경기 일정을 알린다.
+   * 팀장·매니저는 위 알림으로 이미 받으므로 대상에서 빠진다(한 사람에게 한 건).
+   * 명단·일정 조회가 실패해도 대진 생성 응답에는 영향이 없다.
+   */
+  private notifyFirstGameToPlayers(leagueId: string, leagueTitle: string, fixtureIds: readonly string[]): void {
+    void loadFirstGamePlayerNotices(this.prisma, { leagueId, leagueTitle, fixtureIds })
+      .then((notices) => {
+        for (const notice of notices) {
+          this.notifications.emitToManyDeferred(
+            async () => notice.userIds,
+            'league_fixture_scheduled',
+            leagueId,
+            notice.body,
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(`리그 첫 경기 알림 준비 실패 (league=${leagueId}): ${String(error)}`);
+      });
   }
 
   /**

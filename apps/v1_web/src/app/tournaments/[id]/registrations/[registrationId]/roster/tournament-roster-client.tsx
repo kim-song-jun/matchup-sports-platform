@@ -173,7 +173,7 @@ export function TournamentRosterDeadlineCard({
   const rosterEditMessage = !canManageRoster
     ? '선수 명단은 확인할 수 있어요. 추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요.'
     : isTournamentRosterClosed
-    ? tournamentRosterClosedMessage(tournamentStatus, season ? 'regular_league' : null)
+    ? tournamentRosterClosedMessage(tournamentStatus, season ? 'regular_league' : null, season?.endAt, nowMs)
       : isRosterLocked
         ? '선수 명단이 운영진에 의해 마감됐어요.'
         : isRosterEditBlockedByStatus
@@ -1463,7 +1463,7 @@ export function TournamentRosterPageClient({
         */}
         {isTournamentRosterClosed ? (
           <div style={{ marginBottom: 16 }}>
-            <AlertBanner message={tournamentRosterClosedMessage(tournament?.status, tournament?.kind)} tone="info" />
+            <AlertBanner message={tournamentRosterClosedMessage(tournament?.status, tournament?.kind, tournament?.scheduledEndAt)} tone="info" />
           </div>
         ) : isRosterLocked && rosterDeadlineState.overridden ? (
           <div style={{ marginBottom: 16 }}>

@@ -128,7 +128,7 @@ describe('TournamentRosterDeadlineCard', () => {
       expect(screen.queryByText(/종료/)).not.toBeInTheDocument();
     });
 
-    it('종료된 리그는 리그 말투로 종료를 알린다', () => {
+    it('시즌이 끝난 뒤 종료된 리그는 리그 말투로 종료를 알린다', () => {
       render(
         <TournamentRosterDeadlineCard
           deadlineAt={null}
@@ -138,6 +138,7 @@ describe('TournamentRosterDeadlineCard', () => {
           isRosterLocked={false}
           isRosterEditBlockedByStatus={false}
           isRosterDeadlineBlocked={false}
+          nowMs={new Date('2026-12-15T00:00:00+09:00').getTime()}
         />,
       );
 
@@ -147,6 +148,27 @@ describe('TournamentRosterDeadlineCard', () => {
         screen.getByText('리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'),
       ).toBeInTheDocument();
       expect(screen.queryByText(/대회가/)).not.toBeInTheDocument();
+    });
+
+    it('시즌이 남았는데 종료된 리그는 종료 처리된 이유를 말한다', () => {
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={null}
+          season={season('completed')}
+          isTournamentRosterClosed
+          tournamentStatus="completed"
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+          nowMs={new Date('2026-10-15T00:00:00+09:00').getTime()}
+        />,
+      );
+
+      expect(screen.getByText('종료')).toBeInTheDocument();
+      expect(
+        screen.getByText('모든 경기 결과가 확정돼 리그가 종료 처리됐어요. 더 이상 선수 명단을 수정할 수 없어요.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/종료되었거나 취소돼/)).not.toBeInTheDocument();
     });
 
     it('대조군: season 을 안 넘기는 대회는 기존 신청 마감 표시 그대로다', () => {

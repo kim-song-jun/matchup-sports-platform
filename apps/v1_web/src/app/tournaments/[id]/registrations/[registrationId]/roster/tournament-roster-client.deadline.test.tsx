@@ -730,7 +730,15 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
   });
 
-  function mockCompetition(kind: 'regular_league' | 'regular_tournament', status: string) {
+  // 시즌 종료일은 실제 시계와 무관하게 먼 미래/과거로 고정한다.
+  const SEASON_LEFT_END = '2099-11-30T14:59:59.999Z';
+  const SEASON_OVER_END = '2020-11-30T14:59:59.999Z';
+
+  function mockCompetition(
+    kind: 'regular_league' | 'regular_tournament',
+    status: string,
+    scheduledEndAt = '2026-11-30T14:59:59.999Z',
+  ) {
     useV1TournamentMock.mockReturnValue({
       data: {
         kind,
@@ -741,7 +749,7 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
         // 리그 거울 행은 신청 마감이 없고 기간은 scheduledAt/scheduledEndAt 에 있다.
         registrationDeadlineAt: kind === 'regular_league' ? null : '2099-01-01T00:00:00.000Z',
         scheduledAt: '2026-09-29T15:00:00.000Z',
-        scheduledEndAt: '2026-11-30T14:59:59.999Z',
+        scheduledEndAt,
       },
     } as unknown as ReturnType<typeof useV1Tournament>);
   }
@@ -759,8 +767,8 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     expect(container.textContent).not.toContain('대회 신청 마감');
   });
 
-  it('종료된 리그: 종료 안내는 남기되 "대회" 가 아니라 "리그" 로 말한다', () => {
-    mockCompetition('regular_league', 'completed');
+  it('시즌이 끝난 뒤 종료된 리그: 종료 안내는 남기되 "대회" 가 아니라 "리그" 로 말한다', () => {
+    mockCompetition('regular_league', 'completed', SEASON_OVER_END);
 
     const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
 
@@ -769,8 +777,28 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     expect(screen.getByText('리그 기간')).toBeInTheDocument();
   });
 
+  it('시즌이 남았는데 종료된 리그: 모든 경기가 확정돼 종료 처리됐다는 이유를 말한다', () => {
+    mockCompetition('regular_league', 'completed', SEASON_LEFT_END);
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(
+      screen.getByText('모든 경기 결과가 확정돼 리그가 종료 처리됐어요. 더 이상 선수 명단을 수정할 수 없어요.'),
+    ).toBeInTheDocument();
+    expect(container.textContent).not.toContain('종료되었거나 취소돼');
+  });
+
+  it('대조군: 시즌이 남은 리그라도 취소됐으면 기존 리그 문구 그대로다', () => {
+    mockCompetition('regular_league', 'cancelled', SEASON_LEFT_END);
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(screen.getAllByText('리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('종료 처리됐어요');
+  });
+
   it('대조군: 종료된 대회는 기존 "대회" 문구와 신청 마감 표시 그대로다', () => {
-    mockCompetition('regular_tournament', 'completed');
+    mockCompetition('regular_tournament', 'completed', SEASON_LEFT_END);
 
     render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
 

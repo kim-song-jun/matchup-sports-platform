@@ -81,6 +81,30 @@ describe('tournamentRosterClosedMessage', () => {
     expect(tournamentRosterClosedMessage('completed', 'regular_tournament')).toContain('대회가 종료되었거나');
     expect(tournamentRosterClosedMessage('completed', null)).toContain('대회가 종료되었거나');
   });
+
+  // 시즌이 남은 completed 는 "진행 중인데 종료?" 로 읽힌다 — 서버가 모든 경기 확정 시 자동 전이한 것이므로 그 이유를 말한다.
+  describe('시즌 종료일이 아직 오지 않은 completed 리그', () => {
+    const REASON = '모든 경기 결과가 확정돼 리그가 종료 처리됐어요. 더 이상 선수 명단을 수정할 수 없어요.';
+    const seasonEnd = '2026-11-30T14:59:59.999Z';
+    const before = new Date('2026-10-15T00:00:00+09:00').getTime();
+    const after = new Date('2026-12-01T00:00:00+09:00').getTime();
+
+    it('이유를 말한다', () => {
+      expect(tournamentRosterClosedMessage('completed', 'regular_league', seasonEnd, before)).toBe(REASON);
+    });
+
+    it('대조군: 시즌 종료일이 지났으면 기존 리그 문구 그대로다', () => {
+      expect(tournamentRosterClosedMessage('completed', 'regular_league', seasonEnd, after)).toBe(
+        '리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.',
+      );
+    });
+
+    it('대조군: 취소된 리그·종료일 모르는 리그·대회는 이유 문구를 쓰지 않는다', () => {
+      expect(tournamentRosterClosedMessage('cancelled', 'regular_league', seasonEnd, before)).toContain('리그가 종료되었거나 취소돼');
+      expect(tournamentRosterClosedMessage('completed', 'regular_league', null, before)).toContain('리그가 종료되었거나 취소돼');
+      expect(tournamentRosterClosedMessage('completed', 'regular_tournament', seasonEnd, before)).toContain('대회가 종료되었거나 취소돼');
+    });
+  });
 });
 
 // 감사 finding #49: 명단 추가 화면이 실명·생년월일·휴대폰만 보고 "선택 가능"으로 표시해,

@@ -856,6 +856,7 @@ function PlayerRow({
   onToggleEdit,
   isPrimary,
   onUpdateJersey,
+  showGameRosterName,
 }: {
   player: V1TournamentRosterPlayer;
   onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
@@ -874,6 +875,11 @@ function PlayerRow({
   isPrimary: boolean;
   /** 등번호만 고치는 경로 — 자격과 서버 엔드포인트가 다르다. */
   onUpdateJersey: (playerId: string, jerseyNumber: number | null) => Promise<unknown>;
+  /**
+   * 팀장·매니저 화면에서만 실명 옆에 경기 명단·기록에 나가는 이름(닉네임)을 함께 보인다 — 번호를 넣는 사람이
+   * 경기 명단의 누구인지 대조하지 않도록. 일반 팀원은 서버가 남의 실명을 비워 이미 닉네임만 보므로 그대로 둔다.
+   */
+  showGameRosterName: boolean;
 }) {
   const [draftEligibility, setDraftEligibility] = useState<V1PlayerEligibilityStatus>(player.eligibilityStatus);
   // 문자열로 든다 — 빈 값("번호 없음")과 `0` 을 숫자로는 못 가른다.
@@ -993,6 +999,11 @@ function PlayerRow({
           {player.personalInfoVisible ? (
             <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
               {formatRosterBirthDate(player.birthDateSnapshot)}
+            </div>
+          ) : null}
+          {showGameRosterName && player.realName !== null && player.nickname !== null && player.nickname !== player.realName ? (
+            <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+              경기 명단 이름 <strong style={{ color: 'var(--text-strong)' }}>{player.nickname}</strong>
             </div>
           ) : null}
         </div>
@@ -1635,6 +1646,7 @@ export function TournamentRosterPageClient({
                 isEditing={editingPlayerId === player.id}
                 onToggleEdit={() => handleToggleEdit(player.id)}
                 isPrimary={draftForms.length === 0 && editingPlayerId === player.id}
+                showGameRosterName={canManageRoster}
               />
             ))}
           </Card>

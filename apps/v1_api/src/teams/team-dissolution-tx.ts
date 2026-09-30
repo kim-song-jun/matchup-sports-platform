@@ -31,7 +31,10 @@ function actorFields(actor: DissolutionActor) {
 
 async function lockTeam(tx: Tx, teamId: string) {
   await tx.$queryRaw`SELECT id FROM v1_teams WHERE id = ${teamId} FOR UPDATE`;
-  const team = await tx.v1Team.findUnique({ where: { id: teamId }, select: { id: true, name: true, status: true, deletedAt: true } });
+  const team = await tx.v1Team.findUnique({
+    where: { id: teamId },
+    select: { id: true, name: true, sportId: true, regionId: true, status: true, deletedAt: true },
+  });
   if (!team) throw new NotFoundException({ code: 'NOT_FOUND', message: '팀을 찾을 수 없어요.' });
   return team;
 }
@@ -191,7 +194,7 @@ export async function restoreTeamInTx(
   input: {
     teamId: string;
     toStatus: Exclude<V1TeamStatus, 'archived'>;
-    guard?: (team: { deletedAt: Date | null }) => void | Promise<void>;
+    guard?: (team: Awaited<ReturnType<typeof lockTeam>>) => void | Promise<void>;
   },
 ) {
   const team = await lockTeam(tx, input.teamId);

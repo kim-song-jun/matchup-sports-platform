@@ -17,6 +17,7 @@ import {
   loadDissolutionCleanupPreview,
   restoreTeamInTx,
 } from './team-dissolution-tx';
+import { hasTeamWithSameName, lockTeamNameScope } from './team-name';
 
 /**
  * 팀 해체(보관)·복구. 해체와 30일 셀프 복구는 팀장만 한다 — 멤버가 있는 팀도 팀장 한 명의 결정으로
@@ -90,7 +91,16 @@ export class TeamDissolutionService {
 
     await this.prisma.$transaction(async (tx) => {
       // 잠금 뒤 다시 본다 — 위 판정과 잠금 사이에 기간 경계를 넘거나 운영팀이 풀었다 다시 보관할 수 있다.
-      await restoreTeamInTx(tx, { teamId, toStatus: 'active', guard: (locked) => assertSelfRestorable(tx, teamId, locked.deletedAt) });
+      // 이름 잠금을 먼저 잡아 팀 만들기·수정과 줄을 세운다 — 기간 판정과 이름 확인이 같은 시점을 본다.
+      await restoreTeamInTx(tx, {
+        teamId,
+        toStatus: 'active',
+        guard: async (locked) => {
+          await lockTeamNameScope(tx, locked);
+          await assertSelfRestorable(tx, teamId, locked.deletedAt);
+          await assertRestoredNameFree(tx, locked);
+        },
+      });
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team',
@@ -185,6 +195,20 @@ async function assertSelfRestorable(db: Prisma.TransactionClient, teamId: string
     });
   }
   assertRestoreWindow(dissolvedAt);
+}
+
+/**
+ * 복구 기간 동안은 이름을 예약해 두지만, 규칙 전부터 있던 같은 이름의 팀이나 여러 서버의 시계 차이로
+ * 기간 경계에서 먼저 생긴 팀이 있을 수 있다. 같은 이름 두 팀이 되게 두지 않는다.
+ */
+async function assertRestoredNameFree(tx: Prisma.TransactionClient, team: { id: string; name: string; sportId: string; regionId: string }) {
+  const target = { name: team.name, sportId: team.sportId, regionId: team.regionId, excludeTeamId: team.id };
+  if (await hasTeamWithSameName(tx, target, new Date())) {
+    throw new ConflictException({
+      code: 'TEAM_RESTORE_NAME_TAKEN',
+      message: '같은 종목·지역에 같은 이름의 팀이 있어 직접 복구할 수 없어요. 운영팀에 문의해 주세요.',
+    });
+  }
 }
 
 function assertRestoreWindow(dissolvedAt: Date | null) {

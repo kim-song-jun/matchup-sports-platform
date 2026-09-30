@@ -123,7 +123,7 @@ describe('TeamsService', () => {
     v1TeamJoinApplication: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
-    v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock; findMany: jest.Mock };
     // 팀 이탈 시 대회 명단도 함께 정리한다(roster-cleanup).
     v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
     // 멤버십이 바뀌면 팀원 기준(폴백) 리그 명단 재계산 이벤트를 남긴다.
@@ -177,7 +177,7 @@ describe('TeamsService', () => {
         findUniqueOrThrow: jest.fn(),
       },
       v1User: { findUnique: jest.fn() },
-      v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
+      v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       v1Sport: { findFirst: jest.fn() },
@@ -356,16 +356,28 @@ describe('TeamsService', () => {
   });
 
   describe('팀 이름 중복 (H2)', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysAgo = (days: number) => new Date(Date.now() - days * DAY);
     // 같은 종목·지역·다른 지역·다른 종목·해체된 팀을 함께 둔 작은 표 — where 조건대로 거른다.
     const existing = [
       { id: 'team-a', sportId: 'sport-1', regionId: 'region-mapo', name: ' FC 서울 ', status: 'active', deletedAt: null },
       { id: 'team-b', sportId: 'sport-1', regionId: 'region-gangnam', name: 'FC 강남', status: 'active', deletedAt: null },
       { id: 'team-c', sportId: 'sport-2', regionId: 'region-mapo', name: 'FC 마포', status: 'active', deletedAt: null },
+      // 해체 시각이 없는 옛 보관 행(운영팀 보관).
       { id: 'team-d', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 해체', status: 'archived', deletedAt: null },
       // 규칙 전부터 있던 중복 — team-a 와 같은 이름.
       { id: 'team-e', sportId: 'sport-1', regionId: 'region-mapo', name: 'fc 서울', status: 'active', deletedAt: null },
+      // 팀장이 해체한 팀: 복구 기간 안 / 지남, 운영팀이 보관한 팀(H3).
+      { id: 'team-f', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 방금 해체', status: 'archived', deletedAt: daysAgo(29) },
+      { id: 'team-g', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 오래 해체', status: 'archived', deletedAt: daysAgo(31) },
+      { id: 'team-h', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 운영 보관', status: 'archived', deletedAt: daysAgo(1) },
     ];
-    type Where = { sportId: string; regionId: string; status: { not: string }; deletedAt: null; id?: { not: string } };
+    const archivedByActor: Record<string, 'user' | 'admin'> = { 'team-f': 'user', 'team-g': 'user', 'team-h': 'admin' };
+    type StatusClause = { status: string | { not: string }; deletedAt?: null };
+    type Where = { sportId: string; regionId: string; OR: StatusClause[]; id?: { not: string } };
+    const matchesStatus = (team: (typeof existing)[number], clause: StatusClause) =>
+      (typeof clause.status === 'string' ? team.status === clause.status : team.status !== clause.status.not) &&
+      (clause.deletedAt === undefined || team.deletedAt === clause.deletedAt);
 
     beforeEach(() => {
       prisma.v1Team.findMany.mockImplementation(({ where }: { where: Where }) =>
@@ -373,10 +385,14 @@ describe('TeamsService', () => {
           existing.filter((team) =>
             team.sportId === where.sportId &&
             team.regionId === where.regionId &&
-            team.status !== where.status.not &&
-            team.deletedAt === where.deletedAt &&
+            where.OR.some((clause) => matchesStatus(team, clause)) &&
             (!where.id || team.id !== where.id.not),
           ),
+        ),
+      );
+      prisma.v1StatusChangeLog.findMany.mockImplementation(({ where }: { where: { targetId: { in: string[] } } }) =>
+        Promise.resolve(
+          where.targetId.in.flatMap((targetId) => (archivedByActor[targetId] ? [{ targetId, actorType: archivedByActor[targetId] }] : [])),
         ),
       );
       prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
@@ -395,11 +411,20 @@ describe('TeamsService', () => {
       expect(prisma.v1Team.create).not.toHaveBeenCalled();
     });
 
-    it('다른 지역·다른 종목·해체된 팀의 같은 이름은 막지 않는다', async () => {
+    it('다른 지역·다른 종목의 같은 이름과, 복구 기간이 지났거나 운영팀이 보관한 팀의 이름은 막지 않는다', async () => {
       await expect(createAs('sport-1', 'region-mapo', 'FC 강남')).resolves.toMatchObject({ teamId: 'team-new' });
       await expect(createAs('sport-1', 'region-mapo', 'FC 마포')).resolves.toMatchObject({ teamId: 'team-new' });
       await expect(createAs('sport-1', 'region-mapo', 'FC 해체')).resolves.toMatchObject({ teamId: 'team-new' });
-      expect(prisma.v1Team.create).toHaveBeenCalledTimes(3);
+      await expect(createAs('sport-1', 'region-mapo', 'fc 오래 해체')).resolves.toMatchObject({ teamId: 'team-new' });
+      await expect(createAs('sport-1', 'region-mapo', 'FC 운영 보관')).resolves.toMatchObject({ teamId: 'team-new' });
+      expect(prisma.v1Team.create).toHaveBeenCalledTimes(5);
+    });
+
+    it('팀장이 해체해 아직 직접 복구할 수 있는 팀은 이름을 계속 차지한다(H3 30일)', async () => {
+      await expect(createAs('sport-1', 'region-mapo', ' fc 방금 해체')).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_NAME_TAKEN' } });
+      await expect(service.nameAvailability(owner, { name: 'FC 방금 해체', sportId: 'sport-1', regionId: 'region-mapo' })).resolves.toEqual({ available: false });
+      await expect(updateAs('team-x', { name: 'FC 새 이름', regionId: 'region-mapo' }, 'FC 방금 해체')).rejects.toMatchObject({ response: { code: 'TEAM_NAME_TAKEN' } });
+      expect(prisma.v1Team.create).not.toHaveBeenCalled();
     });
 
     function updateAs(teamId: string, current: { name: string; regionId: string }, name: string) {

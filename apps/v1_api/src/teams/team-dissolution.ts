@@ -19,6 +19,11 @@ export function isWithinRestoreWindow(dissolvedAt: Date | null, now: Date): bool
 /** 누가 보관했나. 팀장이 해체한 팀만 셀프 복구 대상이고, 운영팀이 보관한 팀은 운영팀만 푼다. */
 export type TeamArchivedBy = 'owner' | 'admin';
 
+/** 팀장이 해체했고 아직 복구 기간 안인가 — 셀프 복구(`canRestore`)와 팀 이름 예약이 이 판정 하나를 쓴다. */
+export function isSelfRestorable(archivedBy: TeamArchivedBy | null, dissolvedAt: Date | null, now: Date): boolean {
+  return archivedBy === 'owner' && isWithinRestoreWindow(dissolvedAt, now);
+}
+
 /**
  * 팀마다 마지막 `toStatus: 'archived'` 상태 변경 기록으로 가른다. 보관 경로는 팀장 해체(actorType
  * user)와 어드민 팀 상태 변경(admin) 둘뿐이라, 기록이 없거나 user 가 아닌 보관은 전부 운영팀 보관이다.
@@ -41,12 +46,12 @@ export async function loadTeamArchivedBy(db: Db, teamIds: string[]): Promise<(te
  * `archivedBy` 가 null 이면 이 viewer 에게 알리지 않는다(운영팀 조치를 공개 상세에 드러내지 않는다).
  */
 export function buildDissolutionInfo(dissolvedAt: Date | null, archivedBy: TeamArchivedBy | null, viewerIsOwner: boolean, now: Date) {
-  const selfRestorable = archivedBy === 'owner';
+  const dissolvedByOwner = archivedBy === 'owner';
   return {
     dissolvedAt,
     archivedBy,
-    restoreDeadlineAt: selfRestorable && dissolvedAt !== null ? restoreDeadlineOf(dissolvedAt) : null,
-    canRestore: viewerIsOwner && selfRestorable && isWithinRestoreWindow(dissolvedAt, now),
+    restoreDeadlineAt: dissolvedByOwner && dissolvedAt !== null ? restoreDeadlineOf(dissolvedAt) : null,
+    canRestore: viewerIsOwner && isSelfRestorable(archivedBy, dissolvedAt, now),
   };
 }
 

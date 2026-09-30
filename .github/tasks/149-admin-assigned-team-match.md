@@ -19,6 +19,8 @@ Progress: implementation in isolated worktree; no shared-root WIP modified. Brow
 
 PR #1365 targets dev. Expand-contract gate PASS after using a nullable server-derived unique review key (old rows remain NULL). Copilot review attempts failed twice before reviewing with GitHub CAPIError 400 "The requested model is not supported" (runs 36677340867, 36677550174). No review approval is claimed. User asked whether to hold deployment or permit DEV-only deployment after CI with these two checks explicitly deferred.
 
+2026-09-30 user approved proceeding with DEV-only deployment after CI, explicitly deferring Copilot and authenticated visual QA. CI revealed missing schema digest repins and three unsized admin links; fixed without weakening either gate. Historical schema hashes remain accepted for rollback; the M11 migration binding is unchanged.
+
 Date: 2026-09-19
 Owner: codex
 Status: in_progress

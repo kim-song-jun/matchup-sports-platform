@@ -1189,9 +1189,10 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
 
     // 대진에는 팀 id 만 실려 온다 — 이름이 붙었다는 것은 lookup 이 동작했다는 뜻이다.
     expect(await screen.findByRole('group', { name: '강남 유나이티드 대 종로 FC' })).toBeInTheDocument();
-    // 리그 어휘로 그려진다. 대회 카드였다면 status 'matched' 가 어느 분기에도 안 걸려
-    // '예정'(대회의 scheduled 라벨)으로 떨어졌을 것이다.
-    expect(screen.getByText('매칭됨')).toBeInTheDocument();
+    // 리그 어휘로 그려진다 — 킥오프가 지난 matched 는 리그 규칙으로 '결과 대기'다. 대회 카드였다면
+    // status 'matched' 가 어느 분기에도 안 걸려 '예정'(대회의 scheduled 라벨)으로 떨어졌을 것이다.
+    expect(screen.getByText('결과 대기')).toBeInTheDocument();
+    expect(screen.queryByText('예정')).toBeNull();
     expect(screen.getByText('올림픽공원 풋살장 A')).toBeInTheDocument();
   });
 

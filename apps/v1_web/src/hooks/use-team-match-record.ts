@@ -17,11 +17,14 @@ export type SharedRecord = {
   teamMatchId: string; title: string; startsAt: string | null; phase: 'scheduled' | 'live' | 'official' | 'cancelled' | 'legacy' | 'managed';
   version: number; serverTime: string; canEdit: boolean; participant: boolean; ownSideId: string | null;
   operator: boolean;
+  /** 명단 밖 팀장·매니저가 자기 팀 쪽으로 기록·종료 확인 중이다(친선만, H5). */
+  teamAuthority?: boolean;
   lineupReady: boolean;
   missingSides: { sideId: string; sideKey: 'HOME' | 'AWAY'; teamName: string }[];
   sides: { id: string; key: 'HOME' | 'AWAY'; name: string; score: number | null }[];
   subMatches: SharedSubMatch[];
-  participants: { id: string; sideId: string; name: string; jerseyNumber: number | null; profileImageUrl: string | null }[];
+  /** `guest` — 계정 없는 출전자(개인 기록에 안 남는다). */
+  participants: { id: string; sideId: string; name: string; jerseyNumber: number | null; profileImageUrl: string | null; guest?: boolean }[];
   goals: SharedGoal[]; goalEvents?: SharedPublicGoalEvent[]; history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
 };
 export type RecordCommand = {

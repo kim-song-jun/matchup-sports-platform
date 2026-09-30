@@ -227,6 +227,36 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByRole('link', { name: '채팅 목록으로' })).not.toBeInTheDocument();
   });
 
+  it('F62·F63: 경기 채팅방 카드는 "경기 채팅 · 경기 상세 보기"이고, 차단 관리는 방 맨 위가 아니라 ⋯ 채팅방 메뉴 안에 있다', () => {
+    hooks.chatRoom.mockReturnValue({
+      data: {
+        roomId: 'room-league',
+        roomType: 'team_match',
+        status: 'active',
+        title: '(QA0929) 마포 주말 리그 1주차',
+        linkedTarget: { type: 'team_match', id: 'tm-1', title: '(QA0929) 마포 주말 리그 1주차', route: '/team-matches/tm-1' },
+        me: { participantId: 'participant-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+        participants: [],
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    hooks.chatMessages.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null } }, isPending: false, isError: false, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-league" />);
+
+    expect(screen.getByText('경기 채팅 · 경기 상세 보기')).toBeInTheDocument();
+    expect(screen.queryByText(/팀매치 채팅/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '채팅 차단 관리' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '채팅방 메뉴' }));
+    fireEvent.click(screen.getByRole('button', { name: /채팅 차단 관리/ }));
+
+    expect(screen.queryByRole('dialog', { name: '채팅방 메뉴' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: '채팅 차단 관리' })).toBeInTheDocument();
+  });
+
   it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {
     hooks.chatRoom.mockReturnValue({
       data: {
@@ -401,6 +431,36 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
     expect(screen.getByText('수락됨')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '수락' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '컨택 철회' })).not.toBeInTheDocument();
+  });
+
+  // Enter 경로는 버튼의 disabled 가 없어 onSend 가드(공백·전송 중)만이 빈/중복 전송을 막는다 — 여기서 고정한다.
+  it('Enter 는 앞뒤 공백을 뺀 내용을 보내고, 공백뿐이면 보내지 않는다', () => {
+    const mutate = vi.fn();
+    hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate });
+    hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+    renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+    const input = screen.getByLabelText('메시지 입력');
+
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: ' 안녕\n반가워요 ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ content: '안녕\n반가워요' }, expect.anything());
+  });
+
+  it('전송 중에는 Enter 를 다시 눌러도 보내지 않는다', () => {
+    const mutate = vi.fn();
+    hooks.sendChatMessage.mockReturnValue({ isPending: true, isError: false, mutate });
+    hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+    renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+    const input = screen.getByLabelText('메시지 입력');
+
+    fireEvent.change(input, { target: { value: '안녕' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).not.toHaveBeenCalled();
   });
 });
 

@@ -1,11 +1,17 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 import { TeamMatchResultEntry } from './team-match-result-entry';
 
 const recordMock = vi.hoisted(() => vi.fn());
+const detail = vi.hoisted(() => ({ viewer: {} as Record<string, boolean>, resolveChat: vi.fn(), push: vi.fn() }));
 
 vi.mock('@/hooks/use-team-match-record', () => ({ useTeamMatchRecord: recordMock }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: detail.push }) }));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TeamMatch: () => ({ data: { viewer: detail.viewer } }),
+  useV1ResolveChatRoom: () => ({ mutate: detail.resolveChat, isPending: false, isError: false, error: null }),
+}));
 vi.mock('./team-match-result-client', () => ({
   TeamMatchResultPageClient: () => <div>결과 화면</div>,
   TeamMatchResultApprovalPageClient: () => <div>승인 화면</div>,
@@ -69,5 +75,53 @@ describe('TeamMatchResultEntry — 명단이 빈 팀이 있을 때', () => {
     render(<TeamMatchResultEntry teamMatchId="tm-1" />);
 
     expect(screen.getByText('결과 화면')).toBeInTheDocument();
+  });
+});
+
+// H5 D-3 — 우리는 냈는데 상대가 안 낸 친선: 기록은 막힌 채 다음 행동 세 개를 준다.
+describe('TeamMatchResultEntry — 상대 팀 참석명단을 기다릴 때 (H5 D-3)', () => {
+  const waiting = () => record({
+    phase: 'live',
+    sides: [
+      { id: 'side-home', key: 'HOME', name: '마포 FC', score: null },
+      { id: 'side-away', key: 'AWAY', name: '합정 유나이티드', score: null },
+    ],
+    missingSides: [{ sideId: 'side-away', sideKey: 'AWAY', teamName: '합정 유나이티드' }],
+  });
+
+  beforeEach(() => {
+    recordMock.mockReset();
+    detail.resolveChat.mockReset();
+    detail.push.mockReset();
+  });
+
+  it('팀장·매니저는 상대 팀장 채팅·우리 참석명단·경기 상세로 갈 수 있고, 두 팀의 제출 상태를 본다', () => {
+    detail.viewer = { manageableHostTeam: true };
+    recordMock.mockReturnValue({ data: waiting() });
+    render(<TeamMatchResultEntry teamMatchId="tm-1" />);
+
+    expect(screen.getByRole('heading', { name: '상대 팀 참석명단을 기다리고 있어요' })).toBeInTheDocument();
+    expect(screen.getByText('마포 FC · 제출 완료')).toBeInTheDocument();
+    expect(screen.getByText('합정 유나이티드 · 미제출')).toBeInTheDocument();
+    expect(screen.getByText('상대가 킥오프 뒤에 내도 바로 기록을 시작할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '우리 참석명단 보기' })).toHaveAttribute('href', '/team-matches/tm-1/lineup');
+    expect(screen.getByRole('link', { name: '경기 상세로' })).toHaveAttribute('href', '/team-matches/tm-1?view=detail');
+
+    fireEvent.click(screen.getByRole('button', { name: '상대 팀장에게 채팅 보내기' }));
+    expect(detail.resolveChat).toHaveBeenCalledWith({ targetType: 'team_match', targetId: 'tm-1' }, expect.anything());
+    detail.resolveChat.mock.calls[0][1].onSuccess({ roomId: 'room-1', route: null });
+    expect(detail.push).toHaveBeenCalledWith(expect.stringContaining('room-1'));
+    expect(screen.queryByRole('link', { name: '참석명단 등록하기' })).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 명단에 든 선수(팀장·매니저 아님)는 채팅·참석명단 입구 없이 경기 상세로만 간다', () => {
+    detail.viewer = { participantMember: true };
+    recordMock.mockReturnValue({ data: waiting() });
+    render(<TeamMatchResultEntry teamMatchId="tm-1" />);
+
+    expect(screen.getByRole('heading', { name: '상대 팀 참석명단을 기다리고 있어요' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '상대 팀장에게 채팅 보내기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '우리 참석명단 보기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '경기 상세로' })).toBeInTheDocument();
   });
 });

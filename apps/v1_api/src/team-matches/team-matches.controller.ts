@@ -19,6 +19,7 @@ import {
   WithdrawTeamMatchApplicationDto,
 } from './dto/team-match-application.dto';
 import {
+  AddLateTeamMatchLineupParticipantDto,
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
   SubmitTeamMatchLineupDto,
@@ -174,6 +175,23 @@ export class TeamMatchesController {
   @UseGuards(V1AuthGuard)
   lineup(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
     return this.teamMatchLineupService.getLineup(user, teamMatchId);
+  }
+
+  @Get('team-matches/:teamMatchId/lineup/opponent')
+  @UseGuards(V1AuthGuard)
+  opponentLineup(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
+    return this.teamMatchLineupService.getOpponentLineup(user, teamMatchId);
+  }
+
+  @Post('team-matches/:teamMatchId/lineup/late-additions')
+  @UseGuards(V1AuthGuard)
+  addLateLineupParticipant(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamMatchId') teamMatchId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: AddLateTeamMatchLineupParticipantDto,
+  ) {
+    return this.teamMatchLineupService.addLateParticipant(user, teamMatchId, idempotencyKey, dto);
   }
 
   @Put('team-matches/:teamMatchId/lineup')

@@ -850,6 +850,8 @@
        클래스보다 우선하므로 CSS 가 값을 넘겨주는 형태여야 덮어쓸 수 있다. */
     --tm-pitch-max-h: clamp(260px, calc(100dvh - 64px - 304px - 87px - 24px), 560px);
     --tm-pitch-max-width: min(420px, calc(var(--tm-pitch-max-h) / 1.54412));
+    /* 풋살 코트(1:2, 전술보드)도 같은 높이 상한에 폭을 묶는다. 인라인 flex-basis 가 읽는다. */
+    --tm-court-max-width: min(320px, calc(var(--tm-pitch-max-h) / 2));
     max-height: var(--tm-pitch-max-h);
   }
 }

@@ -1659,8 +1659,8 @@ export type V1GameRevisionMutationResult = {
 };
 
 // ── 팀 매치 라인업 (Task 14/15) ──
-// GET .../lineup 은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 상대팀 라인업을 읽는
-// 엔드포인트는 없다(정정 요청은 내용을 보지 않고 사유만 남기는 blind 액션).
+// GET .../lineup 은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다. 상대 참석명단은 공개 시각 뒤
+// GET .../lineup/opponent 로만 번호·이름을 읽는다(H5) — 그 전엔 `opponent.submitted` 만 보인다.
 export type V1TeamMatchLineupRole = 'team_owner' | 'team_manager';
 export type V1TeamMatchLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 export type V1TeamMatchLineupLockReason =
@@ -1747,6 +1747,11 @@ export type V1TeamMatchLineup = {
   gameState?: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
   /** @deprecated `editable`/`lockReason`을 사용한다. */
   hasRecordedEvents?: boolean;
+  /** 첫 기록 뒤 결과 확정 전 — 빼기·번호 변경 없이 늦게 온 선수 추가만 열린다(H5). */
+  lateAdditionAllowed?: boolean;
+  ownTeamName?: string;
+  /** 상대 참석명단 요약 — 공개 전에는 제출 여부만, 공개 뒤에는 인원까지. */
+  opponent?: V1TeamMatchLineupOpponentSummary;
   version: number;
   // 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치.
   formation: string | null;
@@ -1762,7 +1767,45 @@ export type V1TeamMatchLineup = {
     displayName: string;
     jerseyNumber: number | null;
     attending: boolean;
+    /** 이 경기 팀 일정 응답(팀장 참고용, 읽기 전용). 연결된 일정이 없으면 null. */
+    rsvpStatus?: V1TeamMatchRsvpStatus | null;
   }>;
+};
+
+export type V1TeamMatchRsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' | 'NO_RESPONSE';
+
+export type V1TeamMatchLineupOpponentSummary = {
+  teamName: string | null;
+  submitted: boolean;
+  published: boolean;
+  /** 공개 뒤에만 숫자다. */
+  participantCount: number | null;
+};
+
+/** GET .../lineup/opponent — 공개 뒤 상대 참석명단(번호·이름만). 공개 전 403, 미제출 404. */
+export type V1TeamMatchOpponentLineup = {
+  teamMatchId: string;
+  teamName: string | null;
+  publicLineupAt: string;
+  participants: Array<{ jerseyNumber: number | null; displayName: string }>;
+};
+
+/** POST .../lineup/late-additions — 현재 제출본에 붙은 행. */
+export type V1TeamMatchLateAdditionPayload = {
+  userId?: string;
+  displayName?: string;
+  jerseyNumber?: number;
+  goalkeeper?: boolean;
+};
+
+export type V1TeamMatchLateAdditionResult = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  lineupId: string;
+  participantId: string;
+  addedAt: string;
+  replayed: boolean;
 };
 
 // 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는

@@ -933,7 +933,7 @@ describe('TeamMatchesService', () => {
       expect.any(Function),
       'team_match_application_rejected',
       'tm-1',
-      expect.stringContaining('상대팀이 확정'),
+      expect.stringContaining('다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.'),
     );
   });
 

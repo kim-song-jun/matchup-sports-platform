@@ -21,7 +21,7 @@ export type ScheduleListItemModel = {
   /** 캘린더 그루핑용 로컬 날짜 키 (YYYY-MM-DD) */
   dateKey: string;
   dateTimeLabel: string;
-  attendanceSummary: string;
+  attendanceSummary: string | null;
   visibilityLabel: string;
   href: string;
 };
@@ -99,8 +99,8 @@ export type ScheduleGuestRecruitmentModel = {
     onEdit: () => void;
     pending: boolean;
     exists: boolean;
-    /** 예정된 일정만 새 모집을 열 수 있다 — 취소·종료된 일정은 서버도 거절한다. */
-    canCreate: boolean;
+    /** 예정된 일정만 모집을 열고 고칠 수 있다 — 취소·종료된 일정은 서버가 SCHEDULE_TERMINAL 로 거절한다. */
+    scheduleActive: boolean;
     editPanel?: {
       open: boolean;
       slots: string;
@@ -155,6 +155,11 @@ export type ScheduleAttendanceModel = {
   pending: boolean;
   error: string | null;
   onSetStatus: (status: 'GOING' | 'MAYBE' | 'NOT_GOING') => void;
+  /**
+   * 친선 경기 일정이면 응답을 "올 수 있어요? (팀장 참고용)"으로 부른다 — 출전은 참석명단이 정하므로
+   * 둘 다 "참석"이면 겹쳐 읽혔다(H5 결정 6). 훈련·모임·대회·리그 일정은 "참석/미정/불참" 그대로다.
+   */
+  friendlyMatch: boolean;
 };
 
 export type ScheduleAttendeeItem = {
@@ -230,6 +235,14 @@ export type ScheduleDetailViewModel = {
   capacityLabel: string | null;
   /** MATCH 타입이 확정됐고(matchConfirmed) 상대팀 이름을 불러왔을 때만 채워진다. */
   opponent: { teamName: string; placeName: string | null; teamMatchHref: string } | null;
+  /** 친선 확정 경기의 참석명단(누가 뛰나) 요약 — 참석 응답(올 수 있나)과 이름을 나눈다. 그 밖엔 null. */
+  roster: {
+    /** 명단 조회가 팀장·매니저만 되므로 멤버에게는 null(인원·포함 여부 없이 설명만). */
+    count: number | null;
+    viewerIncluded: boolean | null;
+    /** 참석명단 관리 화면 — 팀장·매니저만. */
+    href: string | null;
+  } | null;
   version: number;
   conflictBanner: string | null;
   onDismissConflict: () => void;

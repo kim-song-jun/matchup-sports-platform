@@ -144,6 +144,12 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     expect(record?.params).toEqual({ id: 'tm-1' });
   });
 
+  it('/team-matches/:id/lineup/opponent — 상대 참석명단도 셸(제목·뒤로가기)을 받는다', () => {
+    const opponent = resolveRouteChrome('/team-matches/tm-1/lineup/opponent');
+    expect(opponent?.chrome.title).toBe('상대 참석명단');
+    expect(opponent?.params).toEqual({ id: 'tm-1' });
+  });
+
   it('패턴 충돌 쌍: /my/schedule(U30) vs /my/settings류(U37) — 서로 다른 title로 겹치지 않는다', () => {
     expect(resolveRouteChrome('/my/schedule')?.chrome.title).toBe('내 일정');
     expect(resolveRouteChrome('/my/settings')?.chrome.title).toBe('설정');

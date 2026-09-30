@@ -135,7 +135,6 @@
   --size-control-md: 44px;
   --size-control-lg: 48px;   /* 기존 50px */
   --size-control-icon: 44px;
-  --size-input-compact-number: 64px; /* 등번호처럼 두 자리 안팎 숫자 입력 — 스핀 버튼이 없어도 3자리까지 들어간다 */
 
   /* ==========================================================================
      ELEVATION — 역할 기반 이름으로 통일

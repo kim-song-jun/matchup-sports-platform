@@ -45,11 +45,17 @@ vi.mock('next/navigation', () => ({
 const resolveChatRoomMutateMock = vi.hoisted(() => vi.fn());
 // 명단 입구 계산용 내 팀 목록. 기본은 소속 팀 없음 — 명단 입구 스위트만 채운다.
 const myTeamsRef = vi.hoisted(() => ({ current: undefined as { items: Array<{ teamId: string; role: string }> } | undefined }));
+// 호스트의 신청 목록과 내 팀 참석명단 — 기본은 비어 있다. H6 스위트만 채운다.
+const applicationsRef = vi.hoisted(() => ({ current: undefined as { items: unknown[] } | undefined }));
+const applicationsFailedRef = vi.hoisted(() => ({ current: false }));
+const refetchApplications = vi.hoisted(() => vi.fn());
+const lineupRef = vi.hoisted(() => ({ current: undefined as Record<string, unknown> | undefined }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1TeamMatchEligibility: useV1TeamMatchEligibilityMock,
-  useV1TeamMatchApplications: () => ({ data: undefined, isPending: false }),
+  useV1TeamMatchApplications: () => ({ data: applicationsRef.current, isPending: false, isError: applicationsFailedRef.current, refetch: refetchApplications }),
+  useV1TeamMatchLineup: () => ({ data: lineupRef.current, isSuccess: lineupRef.current !== undefined }),
   useV1MyTeams: () => ({ data: myTeamsRef.current, isPending: false }),
   useV1ApplyTeamMatch: () => ({ mutateAsync: applyTeamMatchMutateAsync, isPending: false }),
   useV1ApproveTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
@@ -85,6 +91,20 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-away-meta">{model.match.applicantTeams[0]?.meta}</span>
       <span data-testid="team-match-away-trust">{model.match.applicantTeams[0]?.trustState}</span>
       <span data-testid="team-match-host-actions">{model.hostActions?.map((action) => action.label).join(',')}</span>
+      <span data-testid="team-match-host-action-details">{JSON.stringify(model.hostActions?.map((action) => ({ label: action.label, description: action.description, confirm: action.confirm ?? null })) ?? null)}</span>
+      <span data-testid="team-match-next-action">{model.nextAction?.label}</span>
+      <span data-testid="team-match-status-caption">{model.statusCaption}</span>
+      <span data-testid="team-match-manage-menu">{JSON.stringify(model.manageMenu ?? null)}</span>
+      <span data-testid="team-match-progress">{JSON.stringify(model.progress ?? null)}</span>
+      <span data-testid="team-match-my-application-team">{model.myApplicationTeam?.name}</span>
+      {model.applicationsError ? <button onClick={model.applicationsError.retry}>신청 목록 다시 불러오기</button> : null}
+      <span data-testid="team-match-applicants">{JSON.stringify(model.match.applicantTeams.map(({ name, applicationStatus, appliedByName, message }) => ({ name, applicationStatus, appliedByName, message })))}</span>
+      {model.applyTeamPicker ? (
+        <div data-testid="team-match-apply-picker" data-default-team={model.applyTeamPicker.defaultTeamId}>
+          {model.applyTeamPicker.teams.map((team) => `${team.name}:${team.roleLabel}:${team.eligible ? '' : team.reason}`).join('|')}
+          <button onClick={() => { void model.applyTeamPicker?.submit('team-b', '한마디'); }}>시트로 신청</button>
+        </div>
+      ) : null}
       <span data-testid="team-match-cancel-confirm">{JSON.stringify(model.hostActions?.find((action) => action.label === '팀매치 취소')?.confirm ?? null)}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
@@ -1410,5 +1430,245 @@ describe('TeamMatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
     expect(screen.getByTestId('team-match-detail-back-href')).toHaveTextContent('/notifications');
+  });
+});
+
+// H6 — 상세 맨 위 "지금 할 일" 카드와 ⋯ 메뉴에 들어가는 모델. 화면(team-matches-page)은 모킹했으니
+// 여기서는 서버 응답 → 모델 계약만 본다.
+describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메뉴 모델 (H6)', () => {
+  const FUTURE = '2099-08-01T10:00:00.000Z';
+  function application(id: string, status: string, extra: Record<string, unknown> = {}) {
+    return {
+      applicationId: id,
+      status,
+      message: null,
+      createdAt: '2026-09-30T09:00:00.000Z',
+      reviewedAt: status === 'requested' ? null : '2026-09-30T10:00:00.000Z',
+      applicantTeam: { teamId: `team-${id}`, name: `${id}팀`, logoUrl: null, sportName: '풋살', levelLabel: null, trustState: 'none', ratingScore: 4.5, ratingCount: 2, wins: 3, score: null, matchCount: 5 },
+      appliedBy: { userId: `user-${id}`, displayName: `${id} 팀장`, profileImageUrl: null },
+      canApprove: status === 'requested',
+      canReject: status === 'requested',
+      ...extra,
+    };
+  }
+  function mockHost(data: Record<string, unknown>) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'tm-h6',
+        teamMatchId: 'tm-h6',
+        title: '팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: FUTURE,
+        status: 'recruiting',
+        viewer: { state: 'host_team', manageableHostTeam: true },
+        hostTeam: { teamId: 'team-host', name: '마포 FC' },
+        ...data,
+      },
+      isError: false,
+    });
+  }
+  const json = (testId: string) => JSON.parse(screen.getByTestId(testId).textContent ?? 'null');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+  afterEach(() => {
+    applicationsRef.current = undefined;
+    applicationsFailedRef.current = false;
+    lineupRef.current = undefined;
+    myTeamsRef.current = undefined;
+  });
+
+  it('신청 목록 조회가 실패하면 모델이 실패를 싣고, 다시 불러오기는 그 조회를 다시 부른다', () => {
+    mockHost({});
+    applicationsFailedRef.current = true;
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '신청 목록 다시 불러오기' }));
+    expect(refetchApplications).toHaveBeenCalledTimes(1);
+  });
+
+  it('조회에 성공한 0건은 실패가 아니다', () => {
+    mockHost({});
+    applicationsRef.current = { items: [] };
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.queryByRole('button', { name: '신청 목록 다시 불러오기' })).not.toBeInTheDocument();
+  });
+
+  it('모집 중 — 신청 팀의 신청자·한마디를 싣고, 마감은 끝나는 팀 수를 말하며 확인을 받는다', () => {
+    mockHost({});
+    applicationsRef.current = { items: [
+      application('a', 'requested', { message: '  저녁 경기 좋아요.  ' }),
+      application('b', 'requested'),
+      application('c', 'rejected'),
+    ] };
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(json('team-match-applicants')).toEqual([
+      { name: 'a팀', applicationStatus: 'requested', appliedByName: 'a 팀장', message: '저녁 경기 좋아요.' },
+      { name: 'b팀', applicationStatus: 'requested', appliedByName: 'b 팀장', message: null },
+      { name: 'c팀', applicationStatus: 'rejected', appliedByName: 'c 팀장', message: null },
+    ]);
+    const [close, cancel] = json('team-match-host-action-details');
+    expect(close).toMatchObject({ label: '모집 마감', description: '대기 중인 신청 2팀이 종료돼요.', confirm: { tone: 'default' } });
+    expect(close.confirm.message).toContain('대기 중인 신청 2팀이 종료되고 알림이 가요.');
+    expect(cancel).toMatchObject({ label: '팀매치 취소', description: '취소하면 되돌릴 수 없어요.' });
+    expect(json('team-match-manage-menu')).toMatchObject({ edit: { href: '/team-matches/tm-h6/edit' }, history: [{ name: 'c팀', statusLabel: '거절' }] });
+    expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('매치 수정');
+    expect(screen.getByTestId('team-match-status-caption')).toHaveTextContent('모집 상태');
+    expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('모집 중 · 신청 2팀');
+  });
+
+  it('대기 신청이 없으면 마감은 확인 없이 바로 실행된다', () => {
+    mockHost({});
+    applicationsRef.current = { items: [] };
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(json('team-match-host-action-details')[0]).toEqual({ label: '모집 마감', description: '더 이상 신청을 받지 않아요.', confirm: null });
+  });
+
+  it('신청 마감 시각만 지난 매치(api recruiting · 화면 closed)는 재개가 아니라 마감·수정이 열린다 — 서버 판정과 같다', () => {
+    mockHost({ status: 'recruiting', displayState: 'closed' });
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 마감,팀매치 취소');
+    expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('매치 수정');
+  });
+
+  it('직접 마감한 매치는 재개가 다음 할 일이고 수정은 이유와 함께 잠긴다', () => {
+    mockHost({ status: 'closed', displayState: 'closed' });
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 재개,팀매치 취소');
+    expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('모집 재개');
+    expect(json('team-match-manage-menu').edit.lockedReason).toContain('모집을 다시 열면');
+  });
+
+  it('상대 확정 뒤 — 진행 체크리스트(확정 시각·명단 제출·잠금 안내)와 하단 바 참석명단 관리', () => {
+    mockHost({
+      status: 'matched',
+      gameId: 'game-1',
+      approvedOpponentTeam: { teamId: 'team-a', name: 'a팀', applicationId: 'a' },
+    });
+    myTeamsRef.current = { items: [{ teamId: 'team-host', role: 'owner' }] };
+    applicationsRef.current = { items: [application('a', 'approved'), application('b', 'rejected', { reviewedAt: '2026-09-30T10:00:00.050Z' })] };
+    const starter = (id: string) => ({ id, userId: id, displayName: id, jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null });
+    lineupRef.current = {
+      state: 'SUBMITTED', revision: 2, publicLineupAt: null, starters: [starter('p1'), starter('p2')], bench: [],
+      opponent: { teamName: 'a팀', submitted: true, published: true, participantCount: 5 },
+    };
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    const progress = json('team-match-progress');
+    expect(progress).toMatchObject({ opponentName: 'a팀', lineupSubmitted: true });
+    // 참석명단 칸이 우리 인원과 상대 명단 입구를 함께 싣는다(H5 D-1 을 체크리스트 안으로).
+    expect(progress.attendance).toMatchObject({
+      ownCount: 2,
+      opponent: { name: 'a팀', badge: { label: '공개됨 · 5명' }, viewHref: '/team-matches/tm-h6/lineup/opponent' },
+    });
+    expect(progress.confirmedAtLabel).toMatch(/19:00$/);
+    expect(progress.lockNote).toContain('상대팀이 정해진 뒤에는 바꿀 수 없어요');
+    expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('참석명단 관리');
+    expect(screen.getByTestId('team-match-status-caption')).toHaveTextContent('경기 준비');
+    expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('참석명단 제출 완료');
+    const menu = json('team-match-manage-menu');
+    expect(menu.edit.lockedReason).toContain('상대팀이 정해져서');
+    expect(menu.history.map((item: { statusLabel: string }) => item.statusLabel)).toEqual(['승인 완료', '자동 종료']);
+    expect(json('team-match-host-action-details')[0].description).toBe('취소하면 a팀에 알림이 가요.');
+  });
+
+  it('신청 팀 쪽 운영진은 홈팀을 상대로 보고, 호스트용 잠금 안내·관리 메뉴는 받지 않는다', () => {
+    mockHost({
+      status: 'matched',
+      viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true },
+      approvedOpponentTeam: { teamId: 'team-a', name: 'a팀', applicationId: 'a' },
+    });
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(json('team-match-progress')).toMatchObject({ opponentName: '마포 FC', confirmedAtLabel: null, lockNote: null });
+    expect(json('team-match-manage-menu')).toBeNull();
+  });
+});
+
+describe('TeamMatchDetailPageClient — 여러 팀 팀장의 신청 팀 선택 (H6 N-1)', () => {
+  function mockViewer(teams: Array<{ teamId: string; name: string; role: string; eligible: boolean; reasonCode: string }>, viewerState = 'none') {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'tm-n1',
+        teamMatchId: 'tm-n1',
+        title: '팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: '2099-08-01T10:00:00.000Z',
+        status: 'recruiting',
+        viewerState,
+        viewer: { state: viewerState },
+        hostTeam: { teamId: 'team-host', name: '마포 FC' },
+      },
+      isError: false,
+    });
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: { teamMatchId: 'tm-n1', requiresApproval: true, requiresPayment: false, teams: teams.map((team) => ({ ...team, applicationId: team.reasonCode === 'ALREADY_REQUESTED' ? `app-${team.teamId}` : null })) },
+      isSuccess: true,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    applyTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-new', status: 'requested' });
+  });
+  afterEach(() => window.localStorage.clear());
+
+  it('신청 가능한 팀이 2개면 시트를 쓰고, 마지막으로 신청한 팀이 기본이며 못 하는 팀은 이유와 함께 잠긴다', () => {
+    window.localStorage.setItem('teameet.v1.lastTeamMatchApplyTeamId', 'team-b');
+    mockViewer([
+      { teamId: 'team-a', name: 'A팀', role: 'owner', eligible: true, reasonCode: 'OK' },
+      { teamId: 'team-b', name: 'B팀', role: 'manager', eligible: true, reasonCode: 'OK' },
+      { teamId: 'team-c', name: 'C팀', role: 'owner', eligible: false, reasonCode: 'SPORT_MISMATCH' },
+    ]);
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
+    const picker = screen.getByTestId('team-match-apply-picker');
+    expect(picker).toHaveAttribute('data-default-team', 'team-b');
+    expect(picker).toHaveTextContent('A팀:팀장:|B팀:매니저:|C팀:팀장:이 팀매치와 종목이 다른 팀이에요');
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청하기');
+  });
+
+  it('경계 — 신청 가능한 팀이 1개면 시트 없이 지금처럼 그 팀으로 바로 신청한다', () => {
+    mockViewer([
+      { teamId: 'team-a', name: 'A팀', role: 'owner', eligible: true, reasonCode: 'OK' },
+      { teamId: 'team-c', name: 'C팀', role: 'owner', eligible: false, reasonCode: 'SPORT_MISMATCH' },
+    ]);
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
+    expect(screen.queryByTestId('team-match-apply-picker')).not.toBeInTheDocument();
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('A팀으로 신청');
+  });
+
+  it('시트로 신청하면 고른 팀과 한마디를 보내고, 그 팀을 다음 기본값으로 기억한다', async () => {
+    mockViewer([
+      { teamId: 'team-a', name: 'A팀', role: 'owner', eligible: true, reasonCode: 'OK' },
+      { teamId: 'team-b', name: 'B팀', role: 'manager', eligible: true, reasonCode: 'OK' },
+    ]);
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '시트로 신청' }));
+
+    await waitFor(() => expect(applyTeamMatchMutateAsync).toHaveBeenCalledWith({ applicantTeamId: 'team-b', message: '한마디' }));
+    await waitFor(() => expect(window.localStorage.getItem('teameet.v1.lastTeamMatchApplyTeamId')).toBe('team-b'));
+  });
+
+  it('승인 대기 중인 신청 팀은 히어로 "우리 팀" 자리에 그 팀을 싣고, 시트는 없다', () => {
+    mockViewer([
+      { teamId: 'team-a', name: 'A팀', role: 'owner', eligible: false, reasonCode: 'ALREADY_REQUESTED' },
+      { teamId: 'team-b', name: 'B팀', role: 'owner', eligible: false, reasonCode: 'ALREADY_REQUESTED_WITH_ANOTHER_TEAM' },
+    ], 'requested');
+    render(<TeamMatchDetailPageClient teamMatchId="tm-n1" />);
+
+    expect(screen.getByTestId('team-match-my-application-team')).toHaveTextContent('A팀');
+    expect(screen.queryByTestId('team-match-apply-picker')).not.toBeInTheDocument();
   });
 });

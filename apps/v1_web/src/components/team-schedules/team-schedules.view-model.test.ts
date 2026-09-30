@@ -169,6 +169,14 @@ describe('team-schedules view-model — list item / labels', () => {
     expect(attendanceSummaryText(20, 3, 20)).toBe('참석 20/20명 · 대기 3명');
     expect(attendanceSummaryText(4, 0, null)).toBe('참석 4명');
   });
+
+  it('F67: 아무도 답하지 않은 정원 없는 일정은 "참석 0명" 대신 요약이 없다 (대조군: 1명·대기·정원이 있으면 그대로)', () => {
+    expect(attendanceSummaryText(0, 0, null)).toBeNull();
+    expect(toScheduleListItemModel(schedule({ goingCount: 0, waitlistedCount: 0, capacity: null }), 't').attendanceSummary).toBeNull();
+    expect(attendanceSummaryText(1, 0, null)).toBe('참석 1명');
+    expect(attendanceSummaryText(0, 2, null)).toBe('참석 0명 · 대기 2명');
+    expect(attendanceSummaryText(0, 0, 10)).toBe('참석 0/10명');
+  });
 });
 
 // 매치 ↔ 팀일정 연동(레인 schedule): "가확정(상대팀 모집 중, 반투명) vs 확정(상대팀 확정)"은

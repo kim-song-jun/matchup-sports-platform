@@ -147,10 +147,11 @@ export function postV1GameCommand(
   gameId: string,
   command: GameCommandName,
   body: GameCommandRequest,
+  options: { signal?: AbortSignal } = {},
 ): Promise<GameMutationResult | GameRevisionMutationResult> {
   return v1Post<GameMutationResult | GameRevisionMutationResult>(
     `/games/${gameId}/commands/${command}`,
     body,
-    { headers: { 'Idempotency-Key': body.clientCommandId } },
+    { headers: { 'Idempotency-Key': body.clientCommandId }, signal: options.signal },
   );
 }

@@ -142,6 +142,7 @@ export class TeamsService {
     const team = await this.getPublicTeam(teamId, user);
     const viewer = this.getViewer(team, user);
     const canViewMembers = this.canViewMembers(team, viewer);
+    const canSendContact = await this.canSendContactTo(user, team, viewer);
 
     return {
       id: team.id,
@@ -165,6 +166,8 @@ export class TeamsService {
       // 운영진 한정 노출로 화면 요구사항은 그대로 충족된다.
       contactPolicy:
         viewer.role === 'owner' || viewer.role === 'manager' ? team.contactPolicy : undefined,
+      // 컨택 보내기 버튼용 합산값 — 차단 / closed / 모집 중 아님을 한 값으로 합쳐 사유를 드러내지 않는다.
+      canSendContact,
       trustState: team.trustScore?.trustState ?? 'none',
       version: team.updatedAt.toISOString(),
       profile: {
@@ -2243,6 +2246,54 @@ export class TeamsService {
       disabledReason: team.joinPolicy !== 'approval_required' ? 'JOIN_CLOSED' : full ? 'TEAM_FULL' : null,
       manageRoute: null,
     };
+  }
+
+  /**
+   * 내 팀 중 하나라도 이 팀에 컨택을 보낼 수 있는가. 보낼 수 없는 사유 셋(차단·closed·모집 중 아님)을
+   * 한 값으로 합치므로 발신자가 컨택 거절 뒤 알게 되는 것과 정보량이 같다(스펙 §8(b)) — 원시
+   * contactPolicy 는 여전히 운영진에게만 내려간다. 조회는 사유와 무관하게 같은 횟수로 돌린다.
+   * 보낼 팀이 없는 비로그인·팀원 viewer 에게는 undefined 라 버튼 자체가 없다.
+   */
+  private async canSendContactTo(
+    user: V1AuthUser | null,
+    team: TeamWithRelations,
+    viewer: ReturnType<TeamsService['getViewer']>,
+  ): Promise<boolean | undefined> {
+    if (!user || viewer.role !== 'none') return undefined;
+    const senders = await this.prisma.v1TeamMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+        teamId: { not: team.id },
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { teamId: true },
+    });
+    if (senders.length === 0) return undefined;
+
+    const senderIds = senders.map((sender) => sender.teamId);
+    const [blocks, recruiting] = await Promise.all([
+      this.prisma.v1TeamContactBlock.findMany({
+        where: {
+          OR: [
+            { teamId: team.id, blockedTeamId: { in: senderIds } },
+            { teamId: { in: senderIds }, blockedTeamId: team.id },
+          ],
+        },
+        select: { teamId: true, blockedTeamId: true },
+      }),
+      this.prisma.v1TeamMatch.findFirst({
+        where: { hostTeamId: team.id, status: 'recruiting' },
+        select: { id: true },
+      }),
+    ]);
+
+    const policyAccepts =
+      team.contactPolicy === 'open' || (team.contactPolicy === 'recruiting_only' && recruiting !== null);
+    if (!policyAccepts) return false;
+    const blockedSenders = new Set(blocks.flatMap((block) => [block.teamId, block.blockedTeamId]));
+    return senderIds.some((senderId) => !blockedSenders.has(senderId));
   }
 
   private canViewMembers(

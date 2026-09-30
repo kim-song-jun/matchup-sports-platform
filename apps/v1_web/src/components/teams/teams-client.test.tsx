@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1AuthMe } from '@/types/api';
@@ -853,6 +853,50 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
 
     expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
     expect(screen.getAllByRole('button', { name: '가입이 마감된 팀이에요.' })[0]).toBeDisabled();
+  });
+
+  describe('컨택 보내기 — 서버가 합산한 canSendContact', () => {
+    afterEach(() => {
+      teamApiMocks.useV1MyTeams.mockReturnValue({ data: undefined });
+    });
+
+    function renderAsOperator(canSendContact: boolean | undefined) {
+      const detail = seededDetail();
+      teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
+      teamApiMocks.useV1MyTeams.mockReturnValue({ data: [{ teamId: 'my-team', role: 'owner' }] } as never);
+      teamApiMocks.useV1TeamDetail.mockReturnValue({
+        data: { ...detail, ...(canSendContact === undefined ? {} : { canSendContact }), viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } },
+        isError: false,
+        isPlaceholderData: false,
+      });
+      teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: '가입 신청할 수 있어요.' }, isError: false });
+      render(<TeamDetailPageClient teamId="team-1" />);
+    }
+
+    it('보낼 수 있으면 작성 화면으로 가는 링크', () => {
+      renderAsOperator(true);
+
+      const [link] = screen.getAllByRole('link', { name: '컨택 보내기' });
+      expect(link).toHaveAttribute('href', '/teams/team-1/contact/new');
+      expect(screen.queryByText('이 팀은 지금 컨택을 받지 않고 있어요.')).toBeNull();
+    });
+
+    it('값이 없으면(구버전 응답) 링크를 그대로 둔다 — 서버가 컨택 생성 때 다시 막는다', () => {
+      renderAsOperator(undefined);
+
+      expect(screen.getAllByRole('link', { name: '컨택 보내기' }).length).toBeGreaterThan(0);
+    });
+
+    it('받지 않는 팀이면 링크 대신 이유와 함께 비활성 버튼', () => {
+      renderAsOperator(false);
+
+      expect(screen.queryByRole('link', { name: '컨택 보내기' })).toBeNull();
+      const [button] = screen.getAllByRole('button', { name: '컨택 보내기' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription('이 팀은 지금 컨택을 받지 않고 있어요.');
+      // 컨택이 막혀도 가입 신청 같은 주 CTA 는 그대로 누를 수 있다.
+      expect(screen.getAllByRole('button', { name: '가입 신청' })[0]).toBeEnabled();
+    });
   });
 
   it('authenticated eligibility errors do not invoke the join mutation', () => {

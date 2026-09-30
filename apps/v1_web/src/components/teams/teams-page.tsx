@@ -738,11 +738,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
           {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 8 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
-            {model.contactHref ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
-                  컨택 보내기
-                </Link>
+            {model.contactHref || model.contactUnavailableReason ? (
+              <TeamContactRow href={model.contactHref} unavailableReason={model.contactUnavailableReason}>
                 <button
                   className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
                   type="button"
@@ -751,7 +748,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 >
                   {model.ctaPending ? '처리 중' : cta}
                 </button>
-              </div>
+              </TeamContactRow>
             ) : (
               <button
                 className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
@@ -847,15 +844,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 8 }}>{heroMessage}</div> : null}
-        {model.contactHref ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
-              컨택 보내기
-            </Link>
+        {model.contactHref || model.contactUnavailableReason ? (
+          <TeamContactRow href={model.contactHref} unavailableReason={model.contactUnavailableReason}>
             <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
               {model.ctaPending ? '처리 중' : cta}
             </button>
-          </div>
+          </TeamContactRow>
         ) : (
           <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
             {model.ctaPending ? '처리 중' : cta}
@@ -884,6 +878,32 @@ function TeamJoinPendingNotice({ requestedAtLabel }: { requestedAtLabel?: string
         관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.
       </p>
     </Card>
+  );
+}
+
+/** 컨택 보내기 + 주 CTA 한 줄. 보낼 수 없는 팀이면 링크 대신 이유를 가리키는 비활성 버튼과 그 이유를 보여준다. */
+function TeamContactRow({ href, unavailableReason, children }: { href?: string; unavailableReason?: string; children: ReactNode }) {
+  const reasonId = useId();
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+        {unavailableReason || !href ? (
+          <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled aria-describedby={reasonId}>
+            컨택 보내기
+          </button>
+        ) : (
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={href}>
+            컨택 보내기
+          </Link>
+        )}
+        {children}
+      </div>
+      {unavailableReason ? (
+        <p id={reasonId} className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+          {unavailableReason}
+        </p>
+      ) : null}
+    </>
   );
 }
 

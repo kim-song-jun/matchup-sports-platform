@@ -117,6 +117,8 @@ describe('TeamsService', () => {
   let prisma: {
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
+    v1TeamContactBlock: { findMany: jest.Mock };
+    v1TeamMatch: { findFirst: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
     v1TeamJoinApplication: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
@@ -146,9 +148,11 @@ describe('TeamsService', () => {
     prisma = {
       v1Team: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn().mockResolvedValue(1), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
       v1TeamProfile: { upsert: jest.fn() },
+      v1TeamContactBlock: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(null) },
       v1TeamMembership: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
         create: jest.fn(),
         upsert: jest.fn(),
@@ -683,6 +687,107 @@ describe('TeamsService', () => {
       const result = await service.detail(member, 'team-1');
 
       expect(result.contactPolicy).toBeUndefined();
+    });
+  });
+
+  // 컨택 보내기 버튼용 canSendContact — 세 거절 사유를 한 값으로 합쳐 내려야 한다(스펙 §8(b)).
+  describe('canSendContact', () => {
+    const outsider = { ...member, id: 'outsider-1' };
+
+    function targetTeam(contactPolicy: string) {
+      return {
+        ...teamRow({ contactPolicy }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [
+          {
+            ...membershipRow({ id: 'owner-membership', role: 'owner', userId: owner.id }),
+            user: { profile: { nickname: 'owner', displayName: null, profileImageUrl: null } },
+          },
+        ],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: { nickname: 'owner', displayName: null, profileImageUrl: null } },
+      };
+    }
+
+    function setup(options: {
+      policy: string;
+      senders?: string[];
+      blocks?: Array<{ teamId: string; blockedTeamId: string }>;
+      recruiting?: boolean;
+    }) {
+      prisma.v1Team.findFirst.mockResolvedValueOnce(targetTeam(options.policy));
+      prisma.v1TeamMembership.findMany.mockResolvedValue((options.senders ?? ['my-team']).map((teamId) => ({ teamId })));
+      // 조회 조건(OR)을 실제로 평가한다 — 방향 하나를 빼먹으면 막힌 팀이 안 막힌 것으로 나온다.
+      type Cond = { teamId: string | { in: string[] }; blockedTeamId: string | { in: string[] } };
+      const hit = (cond: string | { in: string[] }, value: string) => (typeof cond === 'string' ? cond === value : cond.in.includes(value));
+      prisma.v1TeamContactBlock.findMany.mockImplementation(async ({ where }: { where: { OR: Cond[] } }) =>
+        (options.blocks ?? []).filter((row) => where.OR.some((cond) => hit(cond.teamId, row.teamId) && hit(cond.blockedTeamId, row.blockedTeamId))),
+      );
+      prisma.v1TeamMatch.findFirst.mockResolvedValue(options.recruiting ? { id: 'tm-1' } : null);
+    }
+
+    it('받는 상태(open)이고 막힌 팀이 없으면 true', async () => {
+      setup({ policy: 'open' });
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(true);
+    });
+
+    it('closed·차단·모집 중 아님 세 사유는 모두 같은 false 로 합쳐진다', async () => {
+      setup({ policy: 'closed' });
+      const closed = await service.detail(outsider, 'team-1');
+
+      setup({ policy: 'open', blocks: [{ teamId: 'team-1', blockedTeamId: 'my-team' }] });
+      const blockedByThem = await service.detail(outsider, 'team-1');
+
+      setup({ policy: 'recruiting_only', recruiting: false });
+      const notRecruiting = await service.detail(outsider, 'team-1');
+
+      expect([closed, blockedByThem, notRecruiting].map((result) => result.canSendContact)).toEqual([false, false, false]);
+      // 사유를 가를 수 있는 원시 값은 여전히 내려가지 않는다.
+      expect([closed, blockedByThem, notRecruiting].map((result) => result.contactPolicy)).toEqual([undefined, undefined, undefined]);
+    });
+
+    it('내가 차단한 쪽도 막힌 것으로 보고, 모집 중이면 recruiting_only 도 true', async () => {
+      setup({ policy: 'open', blocks: [{ teamId: 'my-team', blockedTeamId: 'team-1' }] });
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(false);
+
+      setup({ policy: 'recruiting_only', recruiting: true });
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(true);
+    });
+
+    it('내 팀이 여럿이면 하나라도 보낼 수 있을 때 true, 전부 막혔을 때만 false', async () => {
+      setup({ policy: 'open', senders: ['a', 'b'], blocks: [{ teamId: 'team-1', blockedTeamId: 'a' }] });
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(true);
+
+      setup({
+        policy: 'open',
+        senders: ['a', 'b'],
+        blocks: [{ teamId: 'team-1', blockedTeamId: 'a' }, { teamId: 'b', blockedTeamId: 'team-1' }],
+      });
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(false);
+    });
+
+    it('보낼 팀이 없는 사람·비로그인·이 팀 멤버에게는 값을 내리지 않는다', async () => {
+      setup({ policy: 'closed', senders: [] });
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBeUndefined();
+
+      prisma.v1Team.findFirst.mockResolvedValueOnce(targetTeam('closed'));
+      expect((await service.detail(null, 'team-1')).canSendContact).toBeUndefined();
+
+      // 이 팀 멤버가 다른 팀의 운영진이어도 자기 팀에는 컨택을 보내지 않는다.
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'my-team' }]);
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...targetTeam('closed'),
+        memberships: [
+          {
+            ...membershipRow({ id: 'member-membership', role: 'member', userId: member.id }),
+            user: { profile: { nickname: 'member', displayName: null, profileImageUrl: null } },
+          },
+        ],
+      });
+      expect((await service.detail(member, 'team-1')).canSendContact).toBeUndefined();
     });
   });
 

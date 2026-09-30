@@ -287,6 +287,8 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
     : query.data.profile.joinPolicy === 'closed' ? 'closed' : 'default';
   const canViewMembers = query.data.canViewMembers && (query.data.membersVisibilityEnabled || authVerified);
 
+  // 컨택 진입점 자체가 보이는 조건 — 여기서 서버의 canSendContact 로 보낼 수 있는지가 갈린다.
+  const contactEntry = authVerified && !seeding && detailMode !== 'mine' && operatorTeamCount > 0;
   const model: TeamDetailViewModel = {
     ...fallback,
     team: {
@@ -406,10 +408,9 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
     onShare: () => shareTeam(query.data),
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
-    contactHref:
-      authVerified && !seeding && detailMode !== 'mine' && operatorTeamCount > 0
-        ? `/teams/${teamId}/contact/new`
-        : undefined,
+    contactHref: contactEntry && query.data.canSendContact !== false ? `/teams/${teamId}/contact/new` : undefined,
+    contactUnavailableReason:
+      contactEntry && query.data.canSendContact === false ? '이 팀은 지금 컨택을 받지 않고 있어요.' : undefined,
     myLeagues,
     myLeaguesLoading: myLeaguesQuery.isLoading,
     // 통신 오류를 "리그 0개"로 위장시키지 않기 위한 3번째 상태 — TeamMyLeaguesSection이

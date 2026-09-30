@@ -114,6 +114,8 @@ export type TeamDetailViewModel = {
    * 계산 위치: `TeamDetailPageClient`(teams-client.tsx).
    */
   contactHref?: string;
+  /** 보낼 수 없는 팀이라 "컨택 보내기"를 비활성으로 두는 이유. contactHref 대신 채워진다. */
+  contactUnavailableReason?: string;
   /**
    * 승인 대기 중일 때만 채워진다(mode === 'pending'). 토스트는 2초 뒤 사라지므로
    * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.

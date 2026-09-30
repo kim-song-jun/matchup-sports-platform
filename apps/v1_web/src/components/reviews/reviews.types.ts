@@ -32,10 +32,11 @@ export type ReviewsPageModel = {
 export type ReviewMetricDraft = { skill: number; manner: number; punctuality: number; safety: number };
 
 export type ReviewTargetDraft = {
-  rating: number;
+  /** null = 아직 별을 고르지 않음. 기본 점수가 없어서 눌러야만 값이 생긴다. */
+  rating: number | null;
   tagCodes: string[];
-  /** 사람 대상에만 존재. 기본값은 종합 별점과 같게 시작해 제출 마찰을 늘리지 않는다. */
-  metricScores?: ReviewMetricDraft;
+  /** 사람 대상에서 사용자가 직접 바꾼 세부 항목만. 없는 항목은 제출할 때 종합 별점을 따른다. */
+  metricOverrides?: Partial<ReviewMetricDraft>;
 };
 
 export const REVIEW_METRIC_FIELDS = [
@@ -47,8 +48,6 @@ export const REVIEW_METRIC_FIELDS = [
 
 export type ReviewSourcePageModel = V1ReviewSourceResponse & {
   sourceMeta: string;
-  progressLabel: string;
-  progressStats: ReviewStat[];
 };
 
 export type ReviewTargetViewModel = V1ReviewTarget & {
@@ -75,10 +74,3 @@ export type ReviewsReceivedPageModel = {
   userGroups: ReceivedReviewGroup[];
   teamGroups: ReceivedReviewGroup[];
 };
-
-/**
- * 아직 손대지 않은 리뷰 대상의 별점 초기값. 한때 이 값이 4로 **네 군데에 각각** 적혀
- * 있었다(초기 draft 생성 · 태그 토글 · 제출 · 렌더 fallback) — 한 곳만 고치면 화면에
- * 보이는 별과 실제로 전송되는 별이 갈린다. 값을 바꿀 일이 생기면 여기 한 곳만 고친다.
- */
-export const DEFAULT_REVIEW_RATING = 5;

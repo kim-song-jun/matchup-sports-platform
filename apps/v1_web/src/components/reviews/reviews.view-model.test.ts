@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel, toReviewsReceivedPageModel, toTargetViewModel } from './reviews.view-model';
+import {
+  REVIEW_TAG_OPTIONS,
+  formatReviewProgress,
+  getReviewProgress,
+  incompleteHint,
+  incompleteNote,
+  reviewDraftStatus,
+  sourceTypeLabel,
+  toReviewsPageModel,
+  toReviewsReceivedPageModel,
+  toTargetViewModel,
+} from './reviews.view-model';
 import type { V1ReviewTarget } from '@/types/api';
 
 /**
@@ -163,5 +174,84 @@ describe('reviews view model — 잠김 사유 문구', () => {
 
   it('잠기지 않은 대상은 사유 문구가 없다', () => {
     expect(toTargetViewModel(target()).lockReasonLabel).toBeNull();
+  });
+});
+
+describe('reviews view model — 작성 현황과 제출 대상', () => {
+  const target = (id: string, overrides: Partial<V1ReviewTarget> = {}): V1ReviewTarget => ({
+    targetType: 'user',
+    targetUserId: id,
+    targetTeamId: null,
+    reviewerTeam: null,
+    name: `선수${id}`,
+    imageUrl: null,
+    subtitle: '참가자',
+    alreadySubmitted: false,
+    review: null,
+    locked: false,
+    lockReason: null,
+    ...overrides,
+  });
+  const team = target('opp', { targetType: 'team', targetUserId: null, targetTeamId: 'opp', name: '상대팀' });
+
+  it('별과 태그가 모두 있어야 ready 이고, 하나만 있는 draft 는 어느 쪽이 빠졌는지 남는다', () => {
+    expect(reviewDraftStatus({ rating: null, tagCodes: [] })).toBe('empty');
+    expect(reviewDraftStatus({ rating: 4, tagCodes: [] })).toBe('needsTags');
+    expect(reviewDraftStatus({ rating: null, tagCodes: ['manner'] })).toBe('needsRating');
+    expect(reviewDraftStatus({ rating: 4, tagCodes: ['manner'] })).toBe('ready');
+  });
+
+  it('부분 입력은 제출 목록에서 조용히 빠지지 않고 incomplete 로 분리된다', () => {
+    const progress = getReviewProgress([team, target('1'), target('2'), target('3')], {
+      'team:opp': { rating: 5, tagCodes: ['manner'] },
+      'user:1': { rating: 3, tagCodes: [] },
+      'user:2': { rating: null, tagCodes: ['teamwork'] },
+    });
+
+    expect(progress.ready.map((item) => item.target.name)).toEqual(['상대팀']);
+    expect(progress.incomplete.map((item) => [item.target.name, item.missing])).toEqual([
+      ['선수1', 'tags'],
+      ['선수2', 'rating'],
+    ]);
+    // 손대지 않은 선수3 만 "남은 대상" 이다.
+    expect(progress).toMatchObject({ submitted: 0, inProgress: 3, remaining: 1 });
+  });
+
+  it('이미 보낸 대상과 잠긴 대상은 작성 중·남은 대상에 섞이지 않는다', () => {
+    const progress = getReviewProgress(
+      [target('1', { alreadySubmitted: true, locked: true }), target('2', { locked: true, lockReason: 'X' }), target('3')],
+      { 'user:2': { rating: 4, tagCodes: ['manner'] } },
+    );
+
+    expect(progress).toMatchObject({ submitted: 1, inProgress: 0, remaining: 1 });
+    expect(progress.ready).toEqual([]);
+  });
+
+  it('세부 항목은 사람 대상에만 실리고, 직접 바꾸지 않은 항목은 그 draft 의 종합 별점을 따른다', () => {
+    const progress = getReviewProgress([team, target('1')], {
+      'team:opp': { rating: 4, tagCodes: ['manner'], metricOverrides: { skill: 1 } },
+      'user:1': { rating: 3, tagCodes: ['manner'], metricOverrides: { manner: 5 } },
+    });
+
+    const [teamSubmission, playerSubmission] = progress.ready;
+    expect(teamSubmission.metricScores).toBeUndefined();
+    expect(playerSubmission.metricScores).toEqual({ skill: 3, manner: 5, punctuality: 3, safety: 3 });
+  });
+
+  it('현황 문구는 보낸 인원이 있을 때만 앞에 붙인다', () => {
+    expect(formatReviewProgress({ submitted: 0, inProgress: 2, remaining: 5, ready: [], incomplete: [] })).toBe('작성 중 2명 · 남은 대상 5명');
+    expect(formatReviewProgress({ submitted: 1, inProgress: 0, remaining: 3, ready: [], incomplete: [] })).toBe('작성 완료 1명 · 작성 중 0명 · 남은 대상 3명');
+  });
+
+  it('덜 끝난 대상이 하나면 그 이름과 빠진 것을, 여럿이면 첫 이름과 건수를 말한다', () => {
+    const one = [{ target: target('1'), missing: 'rating' as const }];
+    expect(incompleteHint(one)).toBe('선수1의 별점을 골라 주세요');
+    expect(incompleteNote(one)).toBe('별점이 빠진 1건은 아직 보낼 수 없어요');
+
+    const many = [...one, { target: target('2'), missing: 'tags' as const }];
+    expect(incompleteHint(many)).toBe('선수1 외 1건의 별점·태그가 비어 있어요');
+    expect(incompleteNote(many)).toBe('별점이나 태그가 빠진 2건은 아직 보낼 수 없어요');
+    expect(incompleteHint([])).toBeNull();
+    expect(incompleteNote([])).toBeNull();
   });
 });

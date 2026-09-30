@@ -4,7 +4,10 @@ import type { CompetitionRosterCheck, LineupTodo, LineupTodoService } from '../.
 import type { WebPushService } from '../../notifications/web-push.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
+import { collectAttendeeReminderRows, type ReminderRow } from './game-attendee-reminders';
 import { isQuietHour, kstMidnight, kstParts } from './quiet-hours';
+
+const deliveryLogger = new Logger('LineupReminderDelivery');
 
 /** 스캔 주기. 슬롯 경계로 정규화해 재예약 키를 만들기 때문에, 재시도가 겹쳐도 같은
  * 슬롯에는 outbox 행이 하나만 생긴다. */
@@ -27,7 +30,8 @@ type ReminderMessage = {
 /**
  * 친선 팀매치 참석명단을 아직 넣지 않은 팀에게 알리고, 대회·리그 경기는 전날 양 팀
  * owner·manager 에게 "명단 확인"을 한 번 보낸다(Task 179 R1 — 대회·리그 명단은 계산되므로
- * 제출 재촉이 없다).
+ * 제출 재촉이 없다). 출전자에게는 전날 일정과 킥오프 2시간 전 알림을 보낸다(Task 180 G7,
+ * `game-attendee-reminders.ts`).
  *
  * **왜 예약이 아니라 주기 스캔인가.** 대회 일정은 운영 중에 바뀐다(경기 시간 조정, 대진
  * 확정 지연). 미리 T-24h 같은 시점에 발송을 예약해두면 일정이 바뀔 때마다 예약을
@@ -90,20 +94,15 @@ export class LineupReminderService {
     for (const message of messages) {
       await this.deliver(tx, message, claim);
     }
+    // 경기 알림은 "경기·대회" 수신 설정(teamMatchEnabled)을 따른다 — 위 팀 운영 알림(teamEnabled)과 축이 다르다.
+    await deliverReminderRows(tx, await collectAttendeeReminderRows(tx, now), {
+      prefField: 'teamMatchEnabled',
+      webPush: this.webPush,
+      claim,
+    });
   }
 
-  /**
-   * 한 건의 알림을 그 팀의 owner·manager 전원에게 보낸다.
-   *
-   * 전달 순서는 기존 리마인더(schedule-reminder.service.ts)와 같다: 알림 선호도를 확인하고,
-   * 이미 받은 사람을 먼저 조회한 뒤, durable한 알림 행을 만들고, **이번에 새로 만들어진
-   * 사람에게만** 웹푸시를 던진다. 푸시는 best-effort라 실패해도 알림 행을 되돌리지 않는다.
-   *
-   * 웹 푸시는 `claim.afterCommit`에 담아 워커 트랜잭션이 실제로 커밋된 뒤에만 보낸다
-   * (2026-08-27 감사 41/44 — schedule-reminder.service.ts의 같은 수정과 동일한 이유:
-   * 이 스캔이 이 메시지를 보낸 뒤에도 다른 팀 메시지를 계속 처리하다 실패하면 트랜잭션
-   * 전체가 롤백돼 방금 나간 푸시를 되돌릴 수 없다).
-   */
+  /** 한 건의 팀 알림을 그 팀의 owner·manager 전원에게 보낸다(팀 운영 알림이라 teamEnabled 축). */
   private async deliver(
     tx: Prisma.TransactionClient,
     message: ReminderMessage & { teamId: string },
@@ -113,49 +112,70 @@ export class LineupReminderService {
       where: { teamId: message.teamId, status: 'active', role: { in: ['owner', 'manager'] } },
       select: { userId: true },
     });
-    const recipients = managers.map((membership) => membership.userId);
-    if (recipients.length === 0) return;
+    const rows: ReminderRow[] = managers.map(({ userId }) => ({
+      userId,
+      targetType: 'team',
+      targetId: message.targetId,
+      title: message.title,
+      body: message.body,
+      deepLink: message.deepLink,
+      businessKey: `${message.keyPrefix}:${userId}`,
+    }));
+    await deliverReminderRows(tx, rows, { prefField: 'teamEnabled', webPush: this.webPush, claim });
+  }
+}
 
-    const preferences = await tx.v1NotificationPreference.findMany({
-      where: { userId: { in: recipients } },
-      select: { userId: true, teamEnabled: true },
-    });
-    const teamEnabledByUser = new Map(preferences.map((preference) => [preference.userId, preference.teamEnabled]));
-    const enabled = recipients.filter((userId) => teamEnabledByUser.get(userId) !== false);
-    if (enabled.length === 0) return;
+/**
+ * 알림 행을 워커 트랜잭션으로 쓴다. 전달 순서는 schedule-reminder.service.ts 와 같다: 수신 설정을 거르고,
+ * 이미 받은 사람을 먼저 조회한 뒤 행을 만들고(businessKey unique + skipDuplicates), **이번에 새로 만든
+ * 사람에게만** 웹 푸시를 보낸다. 푸시는 `claim.afterCommit` 으로 커밋 뒤에만 나간다(2026-08-27 감사 41/44 —
+ * 뒤이은 처리가 실패해 트랜잭션이 롤백되면 이미 나간 푸시를 되돌릴 수 없다).
+ */
+export async function deliverReminderRows(
+  tx: Prisma.TransactionClient,
+  rows: readonly ReminderRow[],
+  options: { prefField: 'teamEnabled' | 'teamMatchEnabled'; webPush?: WebPushService; claim?: GameOperationClaim },
+): Promise<void> {
+  if (rows.length === 0) return;
+  const preferences = await tx.v1NotificationPreference.findMany({
+    where: { userId: { in: [...new Set(rows.map((row) => row.userId))] } },
+    select: { userId: true, teamEnabled: true, teamMatchEnabled: true },
+  });
+  const optedOut = new Set(preferences.filter((preference) => preference[options.prefField] === false).map((preference) => preference.userId));
+  const enabled = rows.filter((row) => !optedOut.has(row.userId));
+  if (enabled.length === 0) return;
 
-    const businessKeyFor = (userId: string): string => `${message.keyPrefix}:${userId}`;
-    const alreadyDelivered = await tx.v1Notification.findMany({
-      where: { businessKey: { in: enabled.map(businessKeyFor) } },
-      select: { businessKey: true },
-    });
-    const deliveredKeys = new Set(alreadyDelivered.map((notification) => notification.businessKey));
+  const alreadyDelivered = await tx.v1Notification.findMany({
+    where: { businessKey: { in: enabled.map((row) => row.businessKey) } },
+    select: { businessKey: true },
+  });
+  const deliveredKeys = new Set(alreadyDelivered.map((notification) => notification.businessKey));
 
-    await tx.v1Notification.createMany({
-      data: enabled.map((userId) => ({
-        recipientUserId: userId,
-        targetType: 'team' as const,
-        targetId: message.targetId,
-        title: message.title,
-        body: message.body,
-        deepLink: message.deepLink,
-        businessKey: businessKeyFor(userId),
-      })),
-      skipDuplicates: true,
-    });
+  await tx.v1Notification.createMany({
+    data: enabled.map((row) => ({
+      recipientUserId: row.userId,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      title: row.title,
+      body: row.body,
+      deepLink: row.deepLink,
+      businessKey: row.businessKey,
+    })),
+    skipDuplicates: true,
+  });
 
-    for (const userId of enabled.filter((candidate) => !deliveredKeys.has(businessKeyFor(candidate)))) {
-      const send = () =>
-        void this.webPush
-          ?.sendToUser(userId, { title: message.title, body: message.body, url: message.deepLink })
-          .catch(() => {
-            // 알림 행은 이미 durable하다 — 푸시 실패가 그걸 되돌리거나 잡을 실패시켜서는 안 된다.
-          });
-      if (claim.afterCommit === undefined) {
-        send();
-      } else {
-        claim.afterCommit.push(send);
-      }
+  for (const row of enabled.filter((candidate) => !deliveredKeys.has(candidate.businessKey))) {
+    const send = () =>
+      void options.webPush
+        ?.sendToUser(row.userId, { title: row.title, body: row.body, url: row.deepLink ?? undefined })
+        .catch((error: unknown) => {
+          // 알림 행은 이미 durable 하다 — 푸시 실패가 그걸 되돌리거나 잡을 실패시키지 않는다.
+          deliveryLogger.warn(`web push failed for reminder ${row.businessKey}: ${String(error)}`);
+        });
+    if (options.claim?.afterCommit === undefined) {
+      send();
+    } else {
+      options.claim.afterCommit.push(send);
     }
   }
 }

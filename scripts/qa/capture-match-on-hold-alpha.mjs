@@ -17,6 +17,8 @@ try {
   await page.goto('https://alpha.teameet.co.kr/matches/7bb12840-33b4-46b6-b200-ea0eb677a104',{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForFunction(() => document.body.innerText.includes('종료 확인 중') || document.body.innerText.includes('보류 · 진행 결정 대기'),{},{timeout:60000});
   if(phase==='after')await page.getByRole('heading',{name:'보류 · 진행 결정 대기'}).waitFor();
+  await page.locator('.tm-match-detail-title').waitFor({state:'visible'});
+  await page.waitForTimeout(1500); // Let the existing route entrance animation finish before capturing.
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
   const text=await page.locator('body').innerText();
   await page.screenshot({path:`${out}/match-${width}.png`,fullPage:true});

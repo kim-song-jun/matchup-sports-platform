@@ -1605,6 +1605,39 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     expect(seongsu.onReject).not.toHaveBeenCalled();
   });
 
+  it('시작 시각이 지나 승인할 수 없는 신청만 남으면 승인을 약속하지 않고, 거절만 열어 둔다', () => {
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('합정', { onApprove: undefined }), applicant('성수', { onApprove: undefined })])} />);
+
+    const card = screen.getByRole('region', { name: '신청 2팀이 대기 중이에요' });
+    expect(card).toHaveTextContent('경기 시작 시각이 지나서 승인할 수 없어요. 거절하면 신청 팀에 알림이 가요.');
+    expect(card).not.toHaveTextContent(/승인을 기다려요|승인하면/);
+    expect(within(card).queryByRole('button', { name: '합정 신청 승인' })).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '합정 신청 거절' })).toBeInTheDocument();
+  });
+
+  it('신청 목록 조회가 실패하면 "신청 없음"이 아니라 실패를 말하고, 히어로도 신청 수를 지어내지 않는다', () => {
+    const retry = vi.fn();
+    const model = hostModel([]);
+    model.applicationsError = { retry };
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('아직 신청한 팀이 없어요')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-team-vs-row')).not.toHaveTextContent('신청 후 승인');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('신청 목록을 불러오지 못했어요');
+    expect(alert).toHaveTextContent('대기 중인 신청이 있을 수 있어요.');
+    fireEvent.click(within(alert).getByRole('button', { name: '다시 불러오기' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('대조군 — 조회에 성공했고 대기 신청이 0건이면 "아직 신청한 팀이 없어요"', () => {
+    const { container } = renderPage(<TeamMatchDetailPageView model={hostModel([])} />);
+
+    expect(screen.getByRole('region', { name: '아직 신청한 팀이 없어요' })).toBeInTheDocument();
+    expect(within(container.querySelector<HTMLElement>('.tm-team-vs-row')!).getByText('신청 후 승인')).toBeInTheDocument();
+    expect(screen.queryByText('신청 목록을 불러오지 못했어요')).not.toBeInTheDocument();
+  });
+
   it('신청이 3팀 이상이면 2팀만 펼치고 나머지는 더 보기로 연다', () => {
     renderPage(<TeamMatchDetailPageView model={hostModel([applicant('A'), applicant('B'), applicant('C')])} />);
 

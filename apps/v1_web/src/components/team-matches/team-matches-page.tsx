@@ -30,7 +30,7 @@ import { buildTeamMatchSummaryLabel } from './team-matches.card-model';
 import { teamMatchStepHref } from './team-matches.routes';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { josa } from '@/lib/korean';
-import { HostApplicationsCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
+import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
@@ -176,7 +176,7 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
 }
 
 /** 상대팀 이름 아래 한 줄 — 그 팀의 상태만. 매치 상태(취소·종료 등)는 히어로 배지가 말한다(W2-V8). */
-function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']): string | null {
+function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], applicationsFailed: boolean): string | null {
   if (mode === 'cancelled') return null;
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') {
@@ -188,7 +188,9 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
     if (approvedOpponent) return '참가 확정';
     // 신청이 들어온 사실을 히어로가 먼저 말한다(H6 A-1).
     const requested = match.applicantTeams.filter((team) => team.applicationStatus === 'requested').length;
-    return requested > 0 ? `신청 ${requested}팀 대기` : '신청 후 승인';
+    if (requested > 0) return `신청 ${requested}팀 대기`;
+    // 목록을 못 받았으면 신청 수를 모른다 — '신청 후 승인'(아직 없음)으로 떨어뜨리지 않는다.
+    return applicationsFailed ? null : '신청 후 승인';
   }
   if (match.status === 'closed') return match.applicantTeams.some((team) => team.status === '승인 완료') ? '참가 확정' : null;
   return '신청 후 승인';
@@ -464,7 +466,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       <span className="tm-badge" style={{ background: 'var(--static-white)', color: 'var(--static-ink)' }}>{heroStatus}</span>
     </div>
   ) : null;
-  const opponentSub = teamMatchOpponentSub(mode, match);
+  const opponentSub = teamMatchOpponentSub(mode, match, Boolean(model.applicationsError));
   // 취소·모집 마감·수정은 화면 본문이 아니라 히어로 ⋯ 메뉴에 둔다(H6 manage-menu A).
   const manageMenuButton = mode === 'mine' && model.manageMenu ? (
     <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="매치 관리 메뉴" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
@@ -479,7 +481,9 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       : mode === 'mine'
         ? (requestedTeams.length > 0
           ? <HostApplicationsCard teams={requestedTeams} error={match.applicantActionError} onApprove={(team) => { void approveApplicant(team); }} onReject={(team) => { void rejectApplicant(team); }} />
-          : model.applicationsPending ? null : <HostWaitingCard apiStatus={match.apiStatus} />)
+          : model.applicationsError
+            ? <HostApplicationsErrorCard onRetry={model.applicationsError.retry} />
+            : model.applicationsPending ? null : <HostWaitingCard apiStatus={match.apiStatus} />)
         : mode === 'pending'
           ? <PendingApplicationCard hostTeamName={match.hostTeam} team={model.myApplicationTeam} />
           : mode === 'approved'

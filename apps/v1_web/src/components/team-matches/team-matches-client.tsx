@@ -488,6 +488,9 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }),
     progress,
     applicationsPending: canManageMatchListing && applications.isPending,
+    applicationsError: canManageMatchListing && applications.isError
+      ? { retry: () => { void applications.refetch(); } }
+      : undefined,
     myApplicationTeam: viewerState === 'requested' && selectedEligibility?.applicationId
       ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name }
       : null,
@@ -678,9 +681,8 @@ function toApplicantTeamsWithActions(
     }));
   }
 
-  // 아직 신청팀이 없거나(정말 0건) applications가 로딩 중이면 목업 신청팀 목록(fallback)으로
-  // 채우지 않는다 — 실제로 신청한 적 없는 팀 이름이 화면에 뜨는 회귀였다. 빈 배열이면
-  // team-matches-page.tsx가 신청팀 카드를 비워서 보여준다(별도 안내 문구 없음, .map() 결과만 없음).
+  // 0건·로딩 중·조회 실패 모두 빈 배열이다(목업 신청팀으로 채우지 않는다). 셋 중 무엇인지는
+  // applicationsPending·applicationsError 가 가른다 — 빈 배열만 보고 "신청 없음"이라 하지 않는다.
   return [];
 }
 

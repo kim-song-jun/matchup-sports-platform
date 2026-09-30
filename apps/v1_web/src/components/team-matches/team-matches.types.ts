@@ -186,6 +186,8 @@ export type TeamMatchDetailViewModel = {
   }>;
   /** 호스트의 신청 목록을 아직 받는 중 — 알림으로 들어온 호스트에게 "신청 없음"을 먼저 보이지 않는다. */
   applicationsPending?: boolean;
+  /** 호스트의 신청 목록 조회가 실패했다 — 빈 목록이 아니라 모르는 상태라 "신청 없음"을 말하지 않는다. */
+  applicationsError?: { retry: () => void };
   /** 히어로 ⋯ 메뉴의 나머지 두 행 — 정보 수정(잠겼으면 이유)과 처리된 신청 기록. */
   manageMenu?: {
     edit: { href: string; lockedReason?: undefined } | { href?: undefined; lockedReason: string };

@@ -47,12 +47,14 @@ const resolveChatRoomMutateMock = vi.hoisted(() => vi.fn());
 const myTeamsRef = vi.hoisted(() => ({ current: undefined as { items: Array<{ teamId: string; role: string }> } | undefined }));
 // 호스트의 신청 목록과 내 팀 참석명단 — 기본은 비어 있다. H6 스위트만 채운다.
 const applicationsRef = vi.hoisted(() => ({ current: undefined as { items: unknown[] } | undefined }));
+const applicationsFailedRef = vi.hoisted(() => ({ current: false }));
+const refetchApplications = vi.hoisted(() => vi.fn());
 const lineupRef = vi.hoisted(() => ({ current: undefined as { state: string } | undefined }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1TeamMatchEligibility: useV1TeamMatchEligibilityMock,
-  useV1TeamMatchApplications: () => ({ data: applicationsRef.current, isPending: false }),
+  useV1TeamMatchApplications: () => ({ data: applicationsRef.current, isPending: false, isError: applicationsFailedRef.current, refetch: refetchApplications }),
   useV1TeamMatchLineup: () => ({ data: lineupRef.current, isSuccess: lineupRef.current !== undefined }),
   useV1MyTeams: () => ({ data: myTeamsRef.current, isPending: false }),
   useV1ApplyTeamMatch: () => ({ mutateAsync: applyTeamMatchMutateAsync, isPending: false }),
@@ -95,6 +97,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-manage-menu">{JSON.stringify(model.manageMenu ?? null)}</span>
       <span data-testid="team-match-progress">{JSON.stringify(model.progress ?? null)}</span>
       <span data-testid="team-match-my-application-team">{model.myApplicationTeam?.name}</span>
+      {model.applicationsError ? <button onClick={model.applicationsError.retry}>신청 목록 다시 불러오기</button> : null}
       <span data-testid="team-match-applicants">{JSON.stringify(model.match.applicantTeams.map(({ name, applicationStatus, appliedByName, message }) => ({ name, applicationStatus, appliedByName, message })))}</span>
       {model.applyTeamPicker ? (
         <div data-testid="team-match-apply-picker" data-default-team={model.applyTeamPicker.defaultTeamId}>
@@ -1473,8 +1476,26 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
   });
   afterEach(() => {
     applicationsRef.current = undefined;
+    applicationsFailedRef.current = false;
     lineupRef.current = undefined;
     myTeamsRef.current = undefined;
+  });
+
+  it('신청 목록 조회가 실패하면 모델이 실패를 싣고, 다시 불러오기는 그 조회를 다시 부른다', () => {
+    mockHost({});
+    applicationsFailedRef.current = true;
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '신청 목록 다시 불러오기' }));
+    expect(refetchApplications).toHaveBeenCalledTimes(1);
+  });
+
+  it('조회에 성공한 0건은 실패가 아니다', () => {
+    mockHost({});
+    applicationsRef.current = { items: [] };
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.queryByRole('button', { name: '신청 목록 다시 불러오기' })).not.toBeInTheDocument();
   });
 
   it('모집 중 — 신청 팀의 신청자·한마디를 싣고, 마감은 끝나는 팀 수를 말하며 확인을 받는다', () => {

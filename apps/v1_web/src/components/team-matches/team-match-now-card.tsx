@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useId, useState, type ReactNode } from 'react';
 import { Check, ChevronRight, Lock } from 'lucide-react';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { josa } from '@/lib/korean';
 import type { TeamMatchDetailViewModel } from './team-matches.types';
 
 /**
  * 팀매치 상세 맨 위 "지금 할 일" 카드(H6 A안). 같은 자리가 상태마다 바뀐다 —
- * 호스트: 신청 도착(승인·거절) / 신청 없음 · 신청 팀: 승인 대기 · 참가팀: 상대 확정 뒤 진행 체크리스트.
+ * 호스트: 신청 도착(승인·거절) / 신청 없음 / 목록 못 불러옴 · 신청 팀: 승인 대기 · 참가팀: 상대 확정 뒤 진행 체크리스트.
  */
 type ApplicantTeam = TeamMatchDetailViewModel['match']['applicantTeams'][number];
 
@@ -63,12 +64,16 @@ export function HostApplicationsCard({ teams, error, onApprove, onReject }: {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? teams : teams.slice(0, VISIBLE_APPLICANTS);
   const hiddenCount = teams.length - visible.length;
+  // 서버는 경기 시작 시각이 지나면 승인만 막고 거절은 계속 연다(canApprove·canReject) — 그때는 승인을 약속하지 않는다.
+  const approvable = teams.some((team) => team.onApprove);
   return (
     <NowCard
       tone="blue"
       badge="지금 할 일"
-      title={`신청 ${teams.length}팀이 승인을 기다려요`}
-      caption={teams.length > 1 ? '한 팀을 승인하면 나머지 신청은 자동으로 종료돼요.' : '승인하면 이 팀과 경기가 확정돼요.'}
+      title={approvable ? `신청 ${teams.length}팀이 승인을 기다려요` : `신청 ${teams.length}팀이 대기 중이에요`}
+      caption={!approvable
+        ? '경기 시작 시각이 지나서 승인할 수 없어요. 거절하면 신청 팀에 알림이 가요.'
+        : teams.length > 1 ? '한 팀을 승인하면 나머지 신청은 자동으로 종료돼요.' : '승인하면 이 팀과 경기가 확정돼요.'}
     >
       {error ? <p className="tm-text-micro" role="alert" style={{ marginTop: 8, color: 'var(--red700)' }}>{error}</p> : null}
       {visible.map((team) => (
@@ -165,6 +170,20 @@ export function HostWaitingCard({ apiStatus }: { apiStatus?: string }) {
       title="아직 신청한 팀이 없어요"
       caption="신청이 오면 알림으로 알려드리고, 여기서 바로 승인할 수 있어요."
     />
+  );
+}
+
+/** 신청 목록을 못 받은 호스트 — 0건과 구별한다. 대기 신청이 있을 수 있어 다시 불러오게 한다. */
+export function HostApplicationsErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Card pad={0} style={{ marginTop: 12 }}>
+      <ErrorState
+        title="신청 목록을 불러오지 못했어요"
+        message="대기 중인 신청이 있을 수 있어요. 다시 불러와서 확인해 주세요."
+        onRetry={onRetry}
+        retryLabel="다시 불러오기"
+      />
+    </Card>
   );
 }
 

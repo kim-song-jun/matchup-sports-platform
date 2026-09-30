@@ -70,6 +70,7 @@ import {
   toAdminInquiryRow,
 } from './fixtures';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
+import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 
 const api = '*/api/v1';
 
@@ -201,6 +202,7 @@ function teamDetail(teamId: string) {
       disabledReason: null,
       manageRoute: null,
     },
+    dissolution: null,
   };
 }
 
@@ -420,6 +422,7 @@ const v1TournamentFields = [
 
 export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
+  ...v1TeamDissolutionMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {

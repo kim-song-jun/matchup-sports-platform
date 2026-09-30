@@ -1951,6 +1951,11 @@ label.tm-btn:focus-within {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
+/* 팀매치 신청 팀 선택 행 — sr-only radio 를 감싼 label 이 키보드 포커스 링을 대신 그린다(마우스 클릭엔 안 뜬다). */
+.tm-apply-team-option:has(input:focus-visible) {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
 /* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
 .v1-button:focus-visible {
   outline: 2px solid var(--blue500);

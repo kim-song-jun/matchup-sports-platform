@@ -1190,6 +1190,8 @@ export function useV1ApproveTeamJoinApplication(teamId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-applications'] });
+      // 홈 응답이 대기 가입 신청 수(배너)를 싣는다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }
@@ -1202,6 +1204,7 @@ export function useV1RejectTeamJoinApplication(teamId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-applications'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }
@@ -2252,6 +2255,8 @@ export type V1TeamUpcomingGame = {
   lineupState: 'MISSING' | 'DRAFT' | 'DONE';
   /** 대회·리그 경기의 계산된 명단 요약. 친선과 확정 명단이 없는 팀은 null. */
   rosterSummary: V1GameRosterSummary | null;
+  /** 보는 사람이 이 경기에 출전하는지(서버 판정). "내 출전" 칩만 이 값을 읽는다. */
+  viewerParticipating: boolean;
 };
 
 export type V1GameRosterSummary = {
@@ -5097,6 +5102,8 @@ export function useV1AcceptTeamInvitation() {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       // 서버가 그 초대의 도착 알림을 읽음 처리한다.
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
+      // 홈 응답이 받은 초대 수(배너)·팀 소속·다음 경기를 싣는다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }
@@ -5110,6 +5117,7 @@ export function useV1DeclineTeamInvitation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }

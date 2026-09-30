@@ -29,6 +29,7 @@
 
 import type { ConfirmTone } from '@/components/v1-ui/confirm-modal';
 import { formatMatchClock } from '@/lib/game-operations-clock';
+import { josa } from '@/lib/korean';
 import type { GameCommandName, GameLineup, GameSide } from '@/types/game-operations';
 import type { EventCaptureCommitInput } from './action-target-picker';
 import { periodLabel } from './period-label';
@@ -111,13 +112,13 @@ export function commitActionConfirmCopy(
   if (clockWarningPeriodMinutes !== null) {
     return {
       title: '기록 시각을 확인해주세요',
-      message: `${target} · ${when}에 ${noun}을(를) 기록해요. 이 피리어드는 보통 ${clockWarningPeriodMinutes}분이에요 — 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요. 그대로 기록할까요?`,
+      message: `${target} · ${when}에 ${josa(noun, ['을', '를'])} 기록해요. 이 피리어드는 보통 ${clockWarningPeriodMinutes}분이에요 — 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요. 그대로 기록할까요?`,
       confirmLabel: '그대로 기록',
       tone: 'danger',
     };
   }
   return {
-    title: `${noun}을(를) 기록할까요?`,
+    title: `${josa(noun, ['을', '를'])} 기록할까요?`,
     message: `${target} · ${when}에 기록해요.`,
     confirmLabel: `${noun} 기록`,
     tone,

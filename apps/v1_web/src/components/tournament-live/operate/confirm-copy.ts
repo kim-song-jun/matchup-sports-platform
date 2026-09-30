@@ -145,6 +145,11 @@ export function commandConfirmCopy(
      * 반면, 마지막 피리어드 종료는 정규 시간을 끝내고 되돌릴 수 없다. 다른
      * 커맨드에서는 무시된다. */
     readonly isFinalPeriod?: boolean;
+    /** 정규 시간이 끝나도 지금 스코어로 승부차기가 열리는가(토너먼트 knockout 동점).
+     * 리그·조별 경기는 동점이어도 승부차기가 없으니 문구에서 승부차기를 빼야 한다. */
+    readonly penaltyShootoutPossible: boolean;
+    /** 이 경기가 교체를 기록하는가. 롤링 교체 종목은 기록하지 않아 "교체 확인"이 헛말이다. */
+    readonly substitutionTracked: boolean;
   },
 ): ConfirmCopy {
   const teamNames = ctx.sides.map((side) => side.displayNameSnapshot).join(' vs ') || '경기';
@@ -168,7 +173,7 @@ export function commandConfirmCopy(
       return ctx.isFinalPeriod === true
         ? {
             title: `${label}할까요?`,
-            message: `${scoreText ?? '현재 스코어'}로 정규 시간을 마쳐요. 이 단계는 되돌릴 수 없어요 — 다만 경기 결과는 아직 확정되지 않아요(다음 단계에서 승부차기 입력 또는 경기 종료).`,
+            message: `${scoreText ?? '현재 스코어'}로 정규 시간을 마쳐요. 이 단계는 되돌릴 수 없어요 — 다만 경기 결과는 아직 확정되지 않아요(다음 단계에서 ${ctx.penaltyShootoutPossible ? '승부차기 입력 또는 ' : ''}경기 종료).`,
             confirmLabel: label,
             tone: 'danger',
           }
@@ -188,7 +193,7 @@ export function commandConfirmCopy(
     case 'end':
       return {
         title: '경기를 종료할까요?',
-        message: `${scoreText ?? '지금 스코어'}로 경기를 종료해요. 종료하면 되돌릴 수 없어요 — 기록한 골·카드·교체를 먼저 확인해주세요.`,
+        message: `${scoreText ?? '지금 스코어'}로 경기를 종료해요. 종료하면 되돌릴 수 없어요 — 기록한 ${ctx.substitutionTracked ? '골·카드·교체' : '골·카드'}를 먼저 확인해주세요.`,
         confirmLabel: label,
         tone: 'danger',
       };

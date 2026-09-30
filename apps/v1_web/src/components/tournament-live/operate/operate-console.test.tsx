@@ -1223,6 +1223,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
       /** 서버가 대회 설정에서 해석해 내려주는 승부차기 종료 정책. 생략하면 서버가
        *  이 필드를 안 보낸 상태(레거시 응답)를 그대로 재현한다. */
       penaltyShootoutPolicy?: { earlyStop: boolean };
+      substitutionPolicy?: { mode: 'limited' | 'rolling'; maxSubstitutions: number | null };
     } = {},
   ) {
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
@@ -1240,6 +1241,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
         sides: PENALTY_SIDES,
         lineups: [],
         penaltyShootoutPolicy: overrides.penaltyShootoutPolicy,
+        substitutionPolicy: overrides.substitutionPolicy,
       },
       isLoading: false, isError: false, refetch: vi.fn(),
     });
@@ -1275,6 +1277,43 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(screen.getByText(/승부차기 결과를 입력해주세요/)).toBeInTheDocument();
     // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+  });
+
+  describe('종료 확인 문구가 경기 종류를 따른다', () => {
+    const LIVE_FINAL_PERIOD = { ...FINAL_PERIOD, state: 'LIVE', endedAt: null };
+
+    it('"후반 종료" 확인: 승부차기가 열리는 knockout 동점 경기는 승부차기 단계를 안내한다', async () => {
+      setup({ periods: [FIRST_PERIOD, LIVE_FINAL_PERIOD] });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '후반 종료' }));
+
+      expect(await screen.findByRole('dialog')).toHaveTextContent('승부차기 입력 또는 경기 종료');
+    });
+
+    it('"후반 종료" 확인: 조별 경기는 동점이어도 승부차기를 말하지 않는다', async () => {
+      setup({ isKnockoutFixture: false, periods: [FIRST_PERIOD, LIVE_FINAL_PERIOD] });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '후반 종료' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('다음 단계에서 경기 종료');
+      expect(dialog).not.toHaveTextContent('승부차기');
+    });
+
+    it('"경기 종료" 확인: 롤링 교체 경기는 교체를 확인하라고 하지 않고, 제한 교체 경기는 그대로 안내한다', async () => {
+      setup({ isKnockoutFixture: false, substitutionPolicy: { mode: 'rolling', maxSubstitutions: null } });
+      const { unmount } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+      const rolling = await screen.findByRole('dialog');
+      expect(rolling).toHaveTextContent('기록한 골·카드를 먼저 확인해주세요');
+      expect(rolling).not.toHaveTextContent('교체');
+      unmount();
+
+      setup({ isKnockoutFixture: false, substitutionPolicy: { mode: 'limited', maxSubstitutions: 5 } });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+      expect(await screen.findByRole('dialog')).toHaveTextContent('기록한 골·카드·교체를 먼저 확인해주세요');
+    });
   });
 
   it('knockout이 아니면(조별리그) 동점이어도 "승부차기 시작"이 보이지 않고 평소처럼 "경기 종료"가 보인다', () => {

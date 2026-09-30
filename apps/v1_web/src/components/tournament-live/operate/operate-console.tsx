@@ -876,11 +876,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         // 되돌릴 수 있음)와 "후반 종료"(정규 시간이 끝남, 되돌릴 수 없음)는
         // 사용자에게 전혀 다른 일이다 — 문구가 그 차이를 정확히 말해야 한다.
         isFinalPeriod: !hasNextPeriod,
+        penaltyShootoutPossible: knockoutTied,
+        substitutionTracked,
       });
       if (!(await confirm(copy))) return;
       await handleRunCommand(command);
     },
-    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, handleRunCommand],
+    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand],
   );
 
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는

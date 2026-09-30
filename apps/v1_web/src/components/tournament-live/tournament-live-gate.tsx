@@ -220,6 +220,9 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
     if (queryFromAdmin) saveTournamentOpsOrigin(tournamentId, 'admin');
   }, [queryFromAdmin, tournamentId]);
   const origin = onAdminSurface || queryFromAdmin ? 'admin' : getTournamentOpsOrigin(tournamentId);
+  // 셸의 어드민 복귀 목적지(대회 관리 / 리그 관리)를 가른다. 조회 중이면 `undefined`(셸이 링크를
+  // 잠시 숨김), 끝났으면 종류 — 실패하면 `null` 이라 예전처럼 대회 관리로 간다.
+  const tournamentKind = tournament.isPending ? undefined : (tournament.data?.kind ?? null);
 
   if (
     authMe.isPending ||
@@ -259,7 +262,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
           tournamentTitle={tournament.data?.title}
           tournamentCoverImageUrl={tournament.data?.coverImageUrl}
           origin={origin}
-          tournamentKind={tournament.data?.kind}
+          tournamentKind={tournamentKind}
         >
           {children}
         </TournamentOpsShell>
@@ -295,7 +298,7 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
         tournamentTitle={tournament.data?.title}
         tournamentCoverImageUrl={tournament.data?.coverImageUrl}
         origin={origin}
-        tournamentKind={tournament.data?.kind}
+        tournamentKind={tournamentKind}
       >
         {children}
       </TournamentOpsShell>

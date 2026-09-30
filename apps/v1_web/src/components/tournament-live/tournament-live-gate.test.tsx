@@ -30,7 +30,7 @@ vi.mock('next/navigation', () => ({
 // role/origin/children을 정확히 전달하는지만 확인할 수 있게 얇게 대체한다.
 vi.mock('@/components/tournament-ops/tournament-ops-shell', () => ({
   TournamentOpsShell: ({ children, role, origin, tournamentKind }: { children: React.ReactNode; role: string; origin: string; tournamentKind?: string | null }) => (
-    <div data-testid="shell" data-role={role} data-origin={origin} data-kind={tournamentKind ?? ''}>
+    <div data-testid="shell" data-role={role} data-origin={origin} data-kind={String(tournamentKind)}>
       {children}
     </div>
   ),
@@ -519,5 +519,25 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
       </TournamentLiveGate>,
     );
     expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'regular_league');
+  });
+
+  it('공개 상세 조회 중이면 종류를 undefined 로, 실패하면 null(대회 관리로 복귀)로 넘긴다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    mocks.useV1Tournament.mockReturnValue({ data: undefined, isPending: true });
+    const { unmount } = render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentLiveGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'undefined');
+    unmount();
+
+    mocks.useV1Tournament.mockReturnValue({ data: undefined, isPending: false, isError: true });
+    render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentLiveGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'null');
   });
 });

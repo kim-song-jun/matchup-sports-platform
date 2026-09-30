@@ -13,7 +13,7 @@ beforeEach(() => {
 describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
   it('origin="admin" → "대회 관리로 돌아가기" → /admin/tournaments/:id', () => {
     render(
-      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin">
+      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin" tournamentKind="regular_tournament">
         <div>content</div>
       </TournamentOpsShell>,
     );
@@ -46,7 +46,7 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
 
   it('복귀 링크는 본문 맨 위 한 곳뿐이다 — 사이드바 하단에 같은 링크를 또 두지 않는다', () => {
     render(
-      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin">
+      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin" tournamentKind="regular_tournament">
         <div data-testid="content">content</div>
       </TournamentOpsShell>,
     );
@@ -55,6 +55,24 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     expect(link.closest('main')).not.toBeNull();
     // 본문보다 앞에 있어야 화면 맨 위에 보인다.
     expect(link.compareDocumentPosition(screen.getByTestId('content')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('종류 조회 중(undefined)이면 어드민 복귀 링크를 숨긴다 — 리그 어드민이 대회 관리로 잘못 가지 않게', () => {
+    render(
+      <TournamentOpsShell tournamentId="league-1" role="PLATFORM_OPS" origin="admin">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(screen.queryByRole('link', { name: /돌아가기/ })).not.toBeInTheDocument();
+  });
+
+  it('kind 가 null 인 옛 대회 행은 대회 관리로 돌아간다 — 링크가 사라지지 않는다', () => {
+    render(
+      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin" tournamentKind={null}>
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(screen.getByRole('link', { name: '대회 관리로 돌아가기' })).toHaveAttribute('href', '/admin/tournaments/t-1');
   });
 });
 

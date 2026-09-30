@@ -191,7 +191,10 @@ interface TournamentOpsShellProps {
   role: V1TournamentStaffRole;
   /** T6-2 — admin에서 들어왔으면 복귀 링크가 그리로 향한다(`_gate.tsx`가 계산해 내려준다). */
   origin: TournamentOpsOrigin;
-  /** 리그면 어드민 복귀가 리그 관리로 간다. 모르면(공개 상세 조회 전·실패) 대회 관리로 본다. */
+  /**
+   * 리그면 어드민 복귀가 리그 관리로 간다. `undefined` = 아직 모름(공개 상세 조회 중) → 어드민 복귀
+   * 링크를 잠시 숨긴다. `null` = 옛 대회 행(`kind` 미기입은 대회 쪽이다) 또는 조회 실패 → 대회 관리.
+   */
   tournamentKind?: V1CompetitionKind | null;
 }
 
@@ -203,6 +206,9 @@ interface TournamentOpsShellProps {
  */
 function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: V1CompetitionKind | null) {
   if (origin === 'home') return { href: '/home', label: '서비스로 돌아가기' };
+  // 종류를 알기 전에 대회 관리 링크를 그리면 리그 어드민이 그걸 눌러 열리지 않는 화면으로 간다.
+  // `null`(옛 대회 행)까지 숨기면 그 대회들에서 링크가 영영 사라지므로 `undefined` 만 본다.
+  if (kind === undefined) return null;
   const id = encodeURIComponent(tournamentId);
   return kind === 'regular_league'
     ? { href: `/admin/league-matches/${id}`, label: '리그 관리로 돌아가기' }
@@ -477,14 +483,17 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">
             {/* 복귀 링크는 본문 맨 위 한 곳 — 예전엔 사이드바 맨 아래·모바일 메뉴 안에만 있어 "뒤로가기가
                 없다"는 제보가 나왔다. 대회 관리 상세의 "대회 목록으로"와 같은 자리·같은 모양이다. */}
-            <div className="mb-4">
-              <Link
-                href={back.href}
-                className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-              >
-                <ChevronLeft size={14} aria-hidden="true" />
-                {back.label}
-              </Link>
+            {/* 종류 조회 중에도 자리(44px)는 잡아 둬서 링크가 생길 때 본문이 밀리지 않게 한다. */}
+            <div className="mb-4 min-h-[44px]">
+              {back ? (
+                <Link
+                  href={back.href}
+                  className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                >
+                  <ChevronLeft size={14} aria-hidden="true" />
+                  {back.label}
+                </Link>
+              ) : null}
             </div>
             {children}
           </div>

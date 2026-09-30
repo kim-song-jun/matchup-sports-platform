@@ -333,6 +333,51 @@ describe('ChatRoomPageClient', () => {
   });
 });
 
+describe('ChatRoomPageClient — 입장 전 대화 안내 (H2)', () => {
+  const NOTICE = '들어오기 전 대화는 보이지 않아요';
+
+  function roomOf(roomType: 'team' | 'team_contact' | 'match') {
+    return {
+      roomId: 'room-1', roomType, status: 'active', title: '성수 풋살 크루', teamContact: null,
+      linkedTarget: { type: 'team', id: 'team-1', title: '성수 풋살 크루', route: '/teams/team-1' },
+      me: { participantId: 'p-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+      participants: [],
+    };
+  }
+
+  function renderRoom(roomType: 'team' | 'team_contact' | 'match', hasNext = false) {
+    hooks.chatRoom.mockReturnValue({ data: roomOf(roomType), isPending: false, isError: false, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({
+      data: { items: [], nextCursor: null, pageInfo: { nextCursor: hasNext ? 'older' : null, hasNext } },
+      isPending: false, isError: false, refetch: vi.fn(),
+    });
+    renderWithClient(<ChatRoomPageClient roomId="room-1" />);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.chatRooms.mockReturnValue({ data: { items: [] }, isPending: false, isError: false, refetch: vi.fn() });
+    hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
+    hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn() });
+    hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  it('팀 채팅은 대화 맨 위에 입장 전 대화가 안 보인다고 알린다 — 비어 보여도 이유를 안다', () => {
+    renderRoom('team');
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+  });
+
+  it('처음부터 다 보이는 방(팀컨택·매치)에는 붙이지 않는다', () => {
+    renderRoom('team_contact');
+    expect(screen.queryByText(NOTICE)).toBeNull();
+  });
+
+  it('더 오래된 메시지가 남아 있으면 여기가 맨 위가 아니라 붙이지 않는다', () => {
+    renderRoom('team', true);
+    expect(screen.queryByText(NOTICE)).toBeNull();
+  });
+});
+
 function contactRoomDetail(status: 'requested' | 'accepted' | 'declined', mySide: 'from' | 'to') {
   return {
     roomId: 'room-contact',

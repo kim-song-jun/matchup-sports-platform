@@ -198,6 +198,11 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           ref={threadRef}
           className={`tm-chat-thread${model.messages.length === 0 ? ' tm-list-empty' : ''}`}
         >
+          {model.historyNotice && model.status === 'ready' ? (
+            <div className="tm-chat-system-message">
+              <span>{model.historyNotice}</span>
+            </div>
+          ) : null}
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && model.messages.length === 0 ? (
             <ErrorState

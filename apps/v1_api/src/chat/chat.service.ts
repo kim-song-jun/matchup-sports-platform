@@ -631,14 +631,28 @@ export class ChatService {
 
   private async ensureEntered(userId: string, room: Awaited<ReturnType<ChatService['getActiveParticipantRoom']>>) {
     const participant = room.participants[0];
-    if (participant.visibleFromAt) return room;
+    // 팀매치 방은 참가자 전원이 방 생성 시각부터 본다(팀 컨택 방과 같은 불변식) — 상대 팀장이 먼저
+    // 보낸 메시지를 나중에 들어온 사람이 못 보면 안 된다. 다른 방은 입장 시점부터만 보인다.
+    const sharedHistoryFrom = room.teamMatchId ? room.createdAt : null;
+    if (participant.visibleFromAt) {
+      if (sharedHistoryFrom && participant.visibleFromAt > sharedHistoryFrom) {
+        // 이 규칙 이전에 입장 시각으로 잡힌 참가자 — 백필 없이 접근 시점에 당긴다.
+        await this.prisma.v1ChatRoomParticipant.updateMany({
+          where: { id: participant.id, visibleFromAt: { gt: sharedHistoryFrom } },
+          data: { visibleFromAt: sharedHistoryFrom },
+        });
+        participant.visibleFromAt = sharedHistoryFrom;
+      }
+      return room;
+    }
 
     const enteredAt = new Date();
+    const visibleFromAt = sharedHistoryFrom ?? enteredAt;
     const displayName = participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자';
     await this.prisma.$transaction(async (tx) => {
       const entered = await tx.v1ChatRoomParticipant.updateMany({
         where: { id: participant.id, visibleFromAt: null },
-        data: { visibleFromAt: enteredAt },
+        data: { visibleFromAt },
       });
       if (entered.count === 0) return;
       const notice = await tx.v1ChatMessage.create({
@@ -662,7 +676,7 @@ export class ChatService {
       where: { id: participant.id },
       select: { visibleFromAt: true },
     });
-    participant.visibleFromAt = current?.visibleFromAt ?? enteredAt;
+    participant.visibleFromAt = current?.visibleFromAt ?? visibleFromAt;
     return room;
   }
 

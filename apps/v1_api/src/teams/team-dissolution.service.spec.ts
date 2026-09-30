@@ -9,6 +9,7 @@ import { TeamDissolutionService } from './team-dissolution.service';
 
 const OWNER = 'owner-user';
 const TEAM = 'team-1';
+const INVITATION_SENT_AT = new Date('2026-09-28T03:00:00Z');
 const FUTURE = new Date('2026-10-10T11:00:00.000Z');
 const PAST = new Date('2026-09-01T11:00:00.000Z');
 const user = (id: string) => ({ id, email: `${id}@t.v1`, accountStatus: 'active' as const, onboardingStatus: 'completed' as const });
@@ -62,7 +63,7 @@ function setup(state: {
       count: jest.fn().mockResolvedValue(1),
     },
     v1TeamInvitation: {
-      findMany: jest.fn().mockResolvedValue([{ id: 'inv-1', invitedUserId: 'invitee-1' }]),
+      findMany: jest.fn().mockResolvedValue([{ id: 'inv-1', invitedUserId: 'invitee-1', updatedAt: INVITATION_SENT_AT }]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       count: jest.fn().mockResolvedValue(1),
     },
@@ -185,7 +186,8 @@ describe('TeamDissolutionService.dissolve — 자동 정리와 알림', () => {
       ['team_match_cancelled', 'tm-open'],
       ['team_match_application_withdrawn', 'tm-other'],
     ]);
-    expect(notifications.markTeamInvitationCancelled).toHaveBeenCalledWith('invitee-1', TEAM, '마포 FC');
+    // 초대 알림 정리는 그 초대를 보낸 시각 뒤의 알림만 — 같은 팀의 옛 초대 알림은 건드리지 않는다.
+    expect(notifications.markTeamInvitationCancelled).toHaveBeenCalledWith('invitee-1', TEAM, '마포 FC', INVITATION_SENT_AT);
   });
 
   it('혼자 남은 팀은 해체 알림을 보낼 팀원이 없다', async () => {

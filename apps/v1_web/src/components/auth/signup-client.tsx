@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,7 @@ import {
   readSignupTermsDocumentIds,
 } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
+import { useDuplicateCheck, type DuplicateCheckStatus } from './use-duplicate-check';
 import {
   formatBirthDate,
   formatPhone,
@@ -37,14 +38,13 @@ import {
 } from './signup-profile-validation';
 
 type WizardStep = 'account' | 'verify' | 'profile';
-type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
 
 const STEP_ORDER: WizardStep[] = ['account', 'verify', 'profile'];
 
 const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
   account: {
     title: '가입 정보를\n확인해 주세요',
-    sub: '닉네임과 이메일은 먼저 중복 확인이 필요해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
+    sub: '닉네임과 이메일은 입력하면 중복을 바로 확인해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
   },
   verify: {
     title: '본인인증을\n먼저 해주세요',
@@ -102,12 +102,22 @@ export function SignupClient() {
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [acceptedTermsDocumentIds, setAcceptedTermsDocumentIds] = useState<string[]>([]);
   const [termsReady, setTermsReady] = useState(false);
-  const [nicknameError, setNicknameError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
-  const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
+  const nicknameHelperId = useId();
+  const emailHelperId = useId();
+  const normalizedNickname = nickname.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+  const nicknameCheck = useDuplicateCheck({
+    value: normalizedNickname,
+    isCheckable: (value) => value.length >= 2,
+    check: checkNickname.mutateAsync,
+  });
+  const emailCheck = useDuplicateCheck({
+    value: normalizedEmail,
+    isCheckable: (value) => value.includes('@'),
+    check: checkEmail.mutateAsync,
+  });
   /** 인증 완료 → 다음 단계 자동 이동 타이머. 언마운트 시 정리해 사라진 화면에 setState 하지 않는다. */
   const advanceTimerRef = useRef<number | null>(null);
 
@@ -132,63 +142,25 @@ export function SignupClient() {
 
   const stepIndex = STEP_ORDER.indexOf(step);
   const copy = STEP_COPY[step];
-  const normalizedNickname = nickname.trim();
-  const normalizedEmail = email.trim().toLowerCase();
-  const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname;
-  const emailVerified = emailCheck.status === 'available' && emailCheck.value === normalizedEmail;
+  const nicknameError = duplicateFieldError(nicknameCheck.status, {
+    taken: '이미 사용 중인 닉네임이에요.',
+    invalid: '닉네임은 2자 이상 입력해 주세요.',
+  });
+  const emailError = duplicateFieldError(emailCheck.status, {
+    taken: '이미 가입된 이메일이에요.',
+    invalid: '이메일 형식을 확인해 주세요.',
+  });
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
-  const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
+  const accountReady = nicknameCheck.verified && emailCheck.verified && passwordLongEnough && passwordMatch;
   // normalizeSeparatedDigits 는 하이픈·공백만 걷어내므로 'ROLLING10ab' 같은 값도 길이 11이 된다.
   // 길이만 보고 인증을 열면 문자가 섞인 값으로 유료 SMS 발송을 시도하게 되므로 숫자 11자리만 허용한다.
   const isSendablePhone = /^\d{11}$/.test(phoneDigits);
   const profileDraft = { displayName: realName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
   const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
-
-  const runNicknameCheck = () => {
-    setNicknameError(null);
-    setError(null);
-    if (normalizedNickname.length < 2) {
-      setNicknameError('닉네임은 2자 이상 입력해 주세요.');
-      setNicknameCheck({ status: 'idle', value: '' });
-      return;
-    }
-
-    checkNickname.mutate(normalizedNickname, {
-      onSuccess: (result) => {
-        setNicknameCheck({ status: result.available ? 'available' : 'taken', value: normalizedNickname });
-        setNicknameError(result.available ? null : '이미 사용 중인 닉네임이에요.');
-      },
-      onError: () => {
-        setNicknameCheck({ status: 'error', value: normalizedNickname });
-        setNicknameError('중복 확인에 실패했어요. 다시 시도해 주세요.');
-      },
-    });
-  };
-
-  const runEmailCheck = () => {
-    setEmailError(null);
-    setError(null);
-    if (!normalizedEmail.includes('@')) {
-      setEmailError('이메일 형식을 확인해 주세요.');
-      setEmailCheck({ status: 'idle', value: '' });
-      return;
-    }
-
-    checkEmail.mutate(normalizedEmail, {
-      onSuccess: (result) => {
-        setEmailCheck({ status: result.available ? 'available' : 'taken', value: normalizedEmail });
-        setEmailError(result.available ? null : '이미 가입된 이메일이에요.');
-      },
-      onError: () => {
-        setEmailCheck({ status: 'error', value: normalizedEmail });
-        setEmailError('중복 확인에 실패했어요. 다시 시도해 주세요.');
-      },
-    });
-  };
 
   const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -330,18 +302,16 @@ export function SignupClient() {
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
         if (nextError.code === 'NICKNAME_CONFLICT') {
-          setNicknameCheck({ status: 'taken', value: normalizedNickname });
+          nicknameCheck.markTaken(normalizedNickname);
           setStep('account');
-          setNicknameError('이미 사용 중인 닉네임이에요.');
           return;
         }
         if (nextError.code === 'PHONE_CONFLICT') {
           setProfileError('이미 가입된 휴대폰 번호예요.');
           return;
         }
-        setEmailCheck({ status: 'taken', value: normalizedEmail });
+        emailCheck.markTaken(normalizedEmail);
         setStep('account');
-        setEmailError('이미 가입된 이메일이에요.');
         return;
       }
       if (nextError instanceof V1ApiError && nextError.code === 'PHONE_NOT_VERIFIED') {
@@ -364,7 +334,7 @@ export function SignupClient() {
     step === 'account'
       ? {
           label: '본인인증 하기',
-          disabled: checkNickname.isPending || checkEmail.isPending || !accountReady,
+          disabled: !accountReady,
           onClick: goVerify,
         }
       : step === 'verify'
@@ -382,10 +352,10 @@ export function SignupClient() {
 
   const disabledHint: string | null = primary.disabled
     ? step === 'account'
-      ? !nicknameVerified
-        ? '닉네임 중복 확인 후 다음으로 넘어갈 수 있어요.'
-        : !emailVerified
-          ? '이메일 중복 확인 후 다음으로 넘어갈 수 있어요.'
+      ? !nicknameCheck.verified
+        ? duplicateHint('닉네임', nicknameCheck.waiting)
+        : !emailCheck.verified
+          ? duplicateHint('이메일', emailCheck.waiting)
           : !passwordLongEnough
             ? '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
@@ -468,67 +438,35 @@ export function SignupClient() {
             <>
               <label className="tm-auth-field">
                 <span className="tm-text-label">닉네임<RequiredMark /></span>
-                <span className="tm-auth-field-with-action">
-                  <input
-                    className={`tm-input tm-auth-input ${nicknameError ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
-                    minLength={2}
-                    maxLength={40}
-                    autoFocus
-                    onChange={(event) => {
-                      setNickname(event.target.value);
-                      setNicknameCheck({ status: 'idle', value: '' });
-                      setNicknameError(null);
-                    }}
-                    placeholder="활동 닉네임"
-                    type="text"
-                    value={nickname}
-                    aria-invalid={nicknameError ? true : undefined}
-                    aria-describedby={nicknameError || nicknameVerified ? 'signup-nickname-helper' : undefined}
-                  />
-                  <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button">
-                    {checkNickname.isPending ? '확인 중' : '중복 확인'}
-                  </button>
-                </span>
-                {nicknameError || nicknameVerified ? (
-                  <span
-                    id="signup-nickname-helper"
-                    role={nicknameError ? 'alert' : undefined}
-                    className={`tm-text-caption tm-auth-field-helper ${nicknameError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-                  >
-                    {nicknameError ?? '사용 가능한 닉네임이에요.'}
-                  </span>
-                ) : null}
+                <input
+                  className={`tm-input tm-auth-input ${nicknameError ? 'tm-auth-input-error' : nicknameCheck.verified ? 'tm-auth-input-success' : ''}`}
+                  minLength={2}
+                  maxLength={40}
+                  autoFocus
+                  onChange={(event) => setNickname(event.target.value)}
+                  onBlur={nicknameCheck.onBlur}
+                  placeholder="활동 닉네임"
+                  type="text"
+                  value={nickname}
+                  aria-invalid={nicknameError ? true : undefined}
+                  aria-describedby={nicknameError || nicknameCheck.status === 'checking' || nicknameCheck.verified ? nicknameHelperId : undefined}
+                />
+                <DuplicateHelper id={nicknameHelperId} status={nicknameCheck.status} error={nicknameError} availableMessage="사용 가능한 닉네임이에요." />
               </label>
 
               <label className="tm-auth-field">
                 <span className="tm-text-label">이메일<RequiredMark /></span>
-                <span className="tm-auth-field-with-action">
-                  <input
-                    className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailVerified ? 'tm-auth-input-success' : ''}`}
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      setEmailCheck({ status: 'idle', value: '' });
-                      setEmailError(null);
-                    }}
-                    placeholder="예: name@email.com"
-                    type="email"
-                    value={email}
-                    aria-invalid={emailError ? true : undefined}
-                    aria-describedby={emailError || emailVerified ? 'signup-email-helper' : undefined}
-                  />
-                  <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button">
-                    {checkEmail.isPending ? '확인 중' : '중복 확인'}
-                  </button>
-                </span>
-                {emailError || emailVerified ? (
-                  <span
-                    id="signup-email-helper"
-                    role={emailError ? 'alert' : undefined}
-                    className={`tm-text-caption tm-auth-field-helper ${emailError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-                  >
-                    {emailError ?? '사용 가능한 이메일이에요.'}
-                  </span>
-                ) : null}
+                <input
+                  className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailCheck.verified ? 'tm-auth-input-success' : ''}`}
+                  onChange={(event) => setEmail(event.target.value)}
+                  onBlur={emailCheck.onBlur}
+                  placeholder="예: name@email.com"
+                  type="email"
+                  value={email}
+                  aria-invalid={emailError ? true : undefined}
+                  aria-describedby={emailError || emailCheck.status === 'checking' || emailCheck.verified ? emailHelperId : undefined}
+                />
+                <DuplicateHelper id={emailHelperId} status={emailCheck.status} error={emailError} availableMessage="사용 가능한 이메일이에요." />
               </label>
 
               <label className="tm-auth-field">
@@ -742,6 +680,41 @@ export function SignupClient() {
       </div>
     </AuthFrame>
   );
+}
+
+const DUPLICATE_CHECK_FAILED_MESSAGE = '중복 확인에 실패했어요. 다시 시도해 주세요.';
+
+function duplicateFieldError(
+  status: DuplicateCheckStatus,
+  messages: { taken: string; invalid: string },
+): string | null {
+  if (status === 'taken') return messages.taken;
+  if (status === 'invalid') return messages.invalid;
+  if (status === 'error') return DUPLICATE_CHECK_FAILED_MESSAGE;
+  return null;
+}
+
+/** 자동 확인이라 "결과를 기다리는 중"과 "다른 값을 넣어야 함"이 갈린다. */
+function duplicateHint(label: string, waiting: boolean) {
+  return waiting ? `${label}을 확인하고 있어요.` : `사용할 수 있는 ${label}을 입력해 주세요.`;
+}
+
+function DuplicateHelper({ id, status, error, availableMessage }: {
+  id: string;
+  status: DuplicateCheckStatus;
+  error: string | null;
+  availableMessage: string;
+}) {
+  if (error) {
+    return <span id={id} role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">{error}</span>;
+  }
+  if (status === 'checking') {
+    return <span id={id} role="status" className="tm-text-caption tm-auth-field-helper">확인하고 있어요.</span>;
+  }
+  if (status === 'available') {
+    return <span id={id} className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">{availableMessage}</span>;
+  }
+  return null;
 }
 
 function initials(value: string) {

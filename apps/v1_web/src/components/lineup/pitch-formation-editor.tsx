@@ -400,11 +400,12 @@ export function PitchFormationEditor({
         </button>
       </div>
 
-      {liveGuidance !== null ? (
+      {/* 칩을 고를 때 안내가 새로 끼어들면 코트가 밀려 다음 탭이 어긋난다 — 대기 선수가 있으면 두 줄 자리를 늘 잡아 둔다. */}
+      {liveGuidance !== null || (editable && waiting.length > 0) ? (
         <div
           role="status"
           className="tm-text-caption"
-          style={{ color: 'var(--blue700)', fontWeight: 700, lineHeight: 1.5 }}
+          style={{ color: 'var(--blue700)', fontWeight: 700, lineHeight: 1.5, minHeight: '3em' }}
         >
           {liveGuidance}
           {selectedWaitingEntry !== null ? (

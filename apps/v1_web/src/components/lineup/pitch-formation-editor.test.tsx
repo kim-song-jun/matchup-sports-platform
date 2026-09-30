@@ -118,6 +118,9 @@ describe('PitchFormationEditor — 대기 칩 한 번 누르기', () => {
 
   it('자유 배치에서는 칩이 "고르기"다 — 코트를 눌러야 놓인다', () => {
     const props = renderEditor({ formation: null, waiting: waitingTwo });
+    // 안내 자리는 고르기 전부터 있다 — 고를 때 새로 끼어들면 코트가 밀려 다음 탭이 어긋난다.
+    const slotBefore = screen.getByRole('status');
+    expect(slotBefore).toHaveTextContent('');
     const chip = screen.getByRole('button', { name: '선수다섯(5번) 코트에 놓기' });
     fireEvent.click(chip);
     expect(chip).toHaveAttribute('aria-pressed', 'true');
@@ -126,9 +129,12 @@ describe('PitchFormationEditor — 대기 칩 한 번 누르기', () => {
     expect(status).toHaveTextContent('선수다섯 선수를 놓을 자리를 코트에서 눌러 주세요.');
     expect(isBefore(status, screen.getByRole('application', { name: '코트 배치 보드' }))).toBe(true);
 
+    expect(status).toBe(slotBefore);
+
     fireEvent.click(within(status).getByRole('button', { name: '선택 취소' }));
     expect(chip).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBe(slotBefore);
+    expect(slotBefore).toHaveTextContent('');
   });
 
   it('코트 위 선수의 × 는 코트 밖으로 뺀다', () => {

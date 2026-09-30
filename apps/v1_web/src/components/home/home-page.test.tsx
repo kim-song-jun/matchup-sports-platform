@@ -254,6 +254,41 @@ describe('HomePageView — 팀 초대·가입 신청 유도 배너 (Task 180 G7)
     expect(screen.queryByText('팀 초대 2건이 와 있어요')).not.toBeInTheDocument();
   });
 
+  it('팀이 없는데 초대가 와 있으면 초대 배너가 "먼저 해 볼 일"보다 위다 (W3-V7)', () => {
+    render(
+      <HomePageView
+        model={buildModel({
+          teamActivity: { ...teamActivity, hasTeam: false, pendingJoinRequests: null },
+          bannerDecision: { showPhoneVerify: false, nudge: 'teamInvitation', deferred: [] },
+        })}
+      />,
+    );
+    const invitation = screen.getByRole('link', { name: '팀 초대 2건이 와 있어요 — 확인하기' });
+    const starter = screen.getByRole('region', { name: '먼저 해 볼 일' });
+    expect(invitation.compareDocumentPosition(starter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('팀이 있으면 다음 경기 카드가 초대 배너보다 위 그대로다 (대조군)', () => {
+    const nextGame = {
+      gameId: 'g-1', teamMatchId: 'tm-1', competitionKind: 'FRIENDLY' as const, competitionId: null,
+      title: '토요일 친선', opponentName: '합정 유나이티드', scheduledAt: '2026-10-03T10:00:00.000Z',
+      placeName: null, teamId: 't-1', teamName: '성수 FC', viewerCanManage: false,
+      viewerParticipating: true, participantCount: null,
+    };
+    render(
+      <HomePageView
+        model={buildModel({
+          teamActivity: { ...teamActivity, nextGame },
+          bannerDecision: { showPhoneVerify: false, nudge: 'teamInvitation', deferred: [] },
+        })}
+      />,
+    );
+    const nextGameHeading = screen.getByRole('heading', { name: 'vs 합정 유나이티드' });
+    const invitation = screen.getByRole('link', { name: '팀 초대 2건이 와 있어요 — 확인하기' });
+    expect(nextGameHeading.compareDocumentPosition(invitation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('region', { name: '먼저 해 볼 일' })).not.toBeInTheDocument();
+  });
+
   it('초대·신청이 있어도 이번 방문에 선택된 배너가 다른 것이면 그리지 않는다(상한 1)', () => {
     render(<HomePageView model={buildModel({ teamActivity })} />);
     // buildModel 의 기본 선택은 공개 동의 배너다.

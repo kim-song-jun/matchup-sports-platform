@@ -1108,6 +1108,73 @@ describe('TeamMatchLineupPageClient', () => {
   });
 });
 
+// L9 — 풋살 5:5 매치에서 프리셋 이름 예시가 "주전 4-4-2"(11인제)였고, 제출한 뒤에도
+// "'…' 프리셋으로 저장했어요." 안내가 화면에 남았다.
+describe('TeamMatchLineupPageClient — 프리셋 저장 (L9)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), sport: { sportId: 'sport-futsal', name: '풋살' } },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' }] },
+      isLoading: false,
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({ revision: 3 }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+  });
+
+  function openPresetDialog() {
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '프리셋으로 저장' }));
+    return screen.getByRole('dialog', { name: '프리셋으로 저장' });
+  }
+
+  it('이름 예시가 이 매치의 종목에 맞다 — 풋살이면 11인제 표기를 보이지 않는다', () => {
+    const dialog = openPresetDialog();
+
+    expect(within(dialog).getByLabelText('프리셋 이름')).toHaveAttribute('placeholder', '예: 5:5 기본 멤버');
+  });
+
+  it('제출이 끝나면 제출 전 프리셋 저장 안내가 사라진다', async () => {
+    const dialog = openPresetDialog();
+    fireEvent.change(within(dialog).getByLabelText('프리셋 이름'), { target: { value: '평일 멤버' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText("'평일 멤버' 프리셋으로 저장했어요.")).toBeInTheDocument();
+
+    // 변경 없이 곧바로 제출하면 저장 없이 제출로 이어진다 — 저장이 먼저 필요하면 그 ack 뒤에 제출된다.
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 4 }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+
+    expect(screen.queryByText("'평일 멤버' 프리셋으로 저장했어요.")).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 제출이 실패하면 안내는 그대로 남는다', async () => {
+    const dialog = openPresetDialog();
+    fireEvent.change(within(dialog).getByLabelText('프리셋 이름'), { target: { value: '평일 멤버' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(await screen.findByText("'평일 멤버' 프리셋으로 저장했어요.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 4 }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onError(new Error('boom')));
+
+    expect(screen.getByText("'평일 멤버' 프리셋으로 저장했어요.")).toBeInTheDocument();
+  });
+});
+
 describe('TeamMatchLineupPageClient — 배치는 이 화면에 없다 (Task 163, 정본 §3)', () => {
   // 셋업을 여기서 다시 한다 — 앞 describe 의 beforeEach 는 이 블록에 걸리지 않으므로,
   // 없으면 앞 테스트가 남긴 mock 값에 얹혀 **실행 순서에 따라 결과가 달라진다**(`-t` 로

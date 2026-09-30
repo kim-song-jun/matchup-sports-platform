@@ -5,7 +5,7 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { LoadLineupSheet, type LoadableLineup } from '@/components/lineup/load-lineup-sheet';
 import { SavePresetDialog } from '@/components/lineup/save-preset-dialog';
 import {
-  buildRecentJerseyMap, describeSkipped, resolveJerseyNumber, resolveLoadableEntries,
+  buildRecentJerseyMap, describeSkipped, presetNamePlaceholder, resolveJerseyNumber, resolveLoadableEntries,
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
@@ -252,7 +252,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     submitMutation.mutate(
       { idempotencyKey: randomUuid(), expectedVersion },
       {
-        onSuccess: () => setLastSubmittedRevision(expectedVersion),
+        onSuccess: () => {
+          setLastSubmittedRevision(expectedVersion);
+          // 불러오기·프리셋 저장 결과 안내는 제출 전 작업의 것이다 — 제출 뒤에도 남으면 지금 상태처럼 읽힌다.
+          setLoadNotice(null);
+        },
         onError: (error) => {
           if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
             setConflict(true);
@@ -967,6 +971,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         saving={createPreset.isPending || updatePreset.isPending}
         error={presetError}
         onSave={(name) => void handleSavePreset(name)}
+        namePlaceholder={presetNamePlaceholder(formationSupportedSportName)}
       />
     </>
   );

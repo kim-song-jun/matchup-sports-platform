@@ -664,6 +664,39 @@ describe('NotificationsService', () => {
     });
   });
 
+  // ─── 팀 사건 알림 문구·착지(H1) ───────────────────────────────────────────
+
+  describe('팀 사건 알림 문구·착지', () => {
+    async function rendered(
+      type: Parameters<NotificationsService['emitNotification']>[1],
+      targetId: string,
+      vars: Record<string, string>,
+    ) {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+      await service.emitNotification('user-1', type, targetId, undefined, { vars });
+      await new Promise(setImmediate);
+      return prisma.v1Notification.create.mock.calls.at(-1)?.[0].data;
+    }
+
+    it.each([
+      ['team_manager_assigned', {}, '매니저가 되었어요', '"마포 FC" · 가입 신청과 팀 일정을 관리할 수 있어요.', '/teams/team-1'],
+      ['team_manager_revoked', {}, '매니저에서 멤버로 바뀌었어요', '"마포 FC" · 팀 관리 메뉴는 더 보이지 않아요.', '/teams/team-1'],
+      ['team_owner_received', {}, '팀장이 되었어요', '"마포 FC" · 팀장을 넘겨받았어요. 멤버 관리와 팀 정보를 바꿀 수 있어요.', '/teams/team-1/members'],
+      ['team_owner_changed', { name: '새팀장' }, '팀장이 바뀌었어요', '"마포 FC" · 새 팀장은 새팀장님이에요.', '/teams/team-1'],
+    ] as const)('%s', async (type, extra, title, body, deepLink) => {
+      const data = await rendered(type, 'team-1', { team: '마포 FC', ...extra });
+      expect(data).toMatchObject({ targetType: 'team', targetId: 'team-1', title, body, deepLink });
+    });
+
+    it('문구의 자리를 채우지 못하면 "{team}" 이 보이는 알림을 만들지 않는다', async () => {
+      await rendered('team_owner_changed', 'team-1', { team: '마포 FC' });
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
+    });
+  });
+
   // ─── 팀 초대 도착 알림의 후속 처리 ─────────────────────────────────────────
 
   describe('팀 초대 도착 알림 처리', () => {

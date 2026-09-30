@@ -139,6 +139,7 @@ describe('TeamsService', () => {
   };
   let notifications: {
     emitNotification: jest.Mock;
+    emitNotificationToMany: jest.Mock;
     emitToManyDeferred: jest.Mock;
     markTeamInvitationHandled: jest.Mock;
     markTeamInvitationCancelled: jest.Mock;
@@ -206,6 +207,7 @@ describe('TeamsService', () => {
 
     notifications = {
       emitNotification: jest.fn().mockResolvedValue(undefined),
+      emitNotificationToMany: jest.fn().mockResolvedValue(undefined),
       emitToManyDeferred: jest.fn(),
       markTeamInvitationHandled: jest.fn().mockResolvedValue(undefined),
       markTeamInvitationCancelled: jest.fn().mockResolvedValue(undefined),
@@ -1423,6 +1425,64 @@ describe('TeamsService', () => {
       response: expect.objectContaining({ code: 'CONCURRENT_UPDATE' }),
     });
     expect(prisma.v1Team.update).not.toHaveBeenCalled();
+  });
+
+  // ─── 역할 변경 알림(H1-roles) ─────────────────────────────────────────────
+
+  describe('역할 변경 알림', () => {
+    const flush = () => new Promise(setImmediate);
+
+    function arrangeRoleChange(fromRole: 'member' | 'manager') {
+      prisma.v1TeamMembership.findFirst
+        .mockResolvedValueOnce(membershipRow({ id: 'mem-t', role: fromRole, userId: 'target-user', team: teamRow({ name: '마포 FC', managerCount: 2 }) }))
+        .mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1Team.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1Team.findUniqueOrThrow.mockResolvedValue(teamRow({ managerCount: 3 }));
+      prisma.v1Team.update.mockResolvedValue(teamRow({ managerCount: 1 }));
+      prisma.v1TeamMembership.update.mockResolvedValue({ id: 'mem-t', teamId: 'team-1', role: fromRole === 'member' ? 'manager' : 'member' });
+    }
+
+    it('매니저로 지정하면 지정된 본인에게만 "매니저가 되었어요"', async () => {
+      arrangeRoleChange('member');
+      await service.changeMembershipRole(owner, 'mem-t', { role: 'manager' });
+
+      expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+      expect(notifications.emitNotification).toHaveBeenCalledWith('target-user', 'team_manager_assigned', 'team-1', undefined, {
+        vars: { team: '마포 FC' },
+      });
+    });
+
+    it('멤버로 내리면 본인에게 "매니저에서 멤버로 바뀌었어요"', async () => {
+      arrangeRoleChange('manager');
+      await service.changeMembershipRole(owner, 'mem-t', { role: 'member' });
+
+      expect(notifications.emitNotification).toHaveBeenCalledWith('target-user', 'team_manager_revoked', 'team-1', undefined, {
+        vars: { team: '마포 FC' },
+      });
+    });
+
+    it('팀장을 넘기면 새 팀장과 나머지 매니저가 받고, 넘긴 본인은 받지 않는다', async () => {
+      prisma.v1TeamMembership.findFirst
+        .mockResolvedValueOnce(membershipRow({ id: 'mem-new', role: 'manager', userId: 'new-owner', team: teamRow({ name: '마포 FC' }) }))
+        .mockResolvedValueOnce({ role: 'owner' })
+        .mockResolvedValueOnce({ id: 'mem-owner', userId: owner.id, teamId: 'team-1' });
+      prisma.v1TeamMembership.updateMany.mockResolvedValue({ count: 1 });
+      prisma.v1TeamMembership.update.mockResolvedValue({ id: 'mem-new', teamId: 'team-1', role: 'owner' });
+      prisma.v1Team.update.mockResolvedValue(teamRow());
+      // 발송 시점의 매니저: 방금 내려온 전 팀장 + 다른 매니저 한 명
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: owner.id }, { userId: 'manager-2' }]);
+      prisma.v1User.findUnique.mockResolvedValue({ profile: { nickname: '새팀장', displayName: null } });
+
+      await service.changeMembershipRole(owner, 'mem-new', { role: 'owner' });
+      await flush();
+
+      expect(notifications.emitNotification).toHaveBeenCalledWith('new-owner', 'team_owner_received', 'team-1', undefined, {
+        vars: { team: '마포 FC' },
+      });
+      expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(['manager-2'], 'team_owner_changed', 'team-1', undefined, {
+        vars: { team: '마포 FC', name: '새팀장' },
+      });
+    });
   });
 
   // ─── approveJoinApplication: 닫힌 팀에는 승인 불가 → 409 STATE_CONFLICT ──────

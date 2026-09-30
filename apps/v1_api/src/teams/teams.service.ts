@@ -89,6 +89,11 @@ type TeamWithRelations = V1Team & {
   };
 };
 
+/** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
+function notificationDisplayName(profile: { nickname: string | null; displayName: string | null } | null | undefined): string {
+  return profile?.nickname ?? profile?.displayName ?? '팀원';
+}
+
 type TeamCapacityLike = {
   memberCount: number;
   profile?: { memberGoalCount: number | null } | null;
@@ -740,6 +745,7 @@ export class TeamsService {
 
         return { delegatedOwner, team };
       });
+      this.notifyOwnerDelegated(target.teamId, target.team.name, target.userId, user.id);
 
       return {
         membershipId: result.delegatedOwner.id,
@@ -801,6 +807,13 @@ export class TeamsService {
 
       return { updated, team };
     });
+    void this.notifications.emitNotification(
+      target.userId,
+      dto.role === 'manager' ? 'team_manager_assigned' : 'team_manager_revoked',
+      target.teamId,
+      undefined,
+      { vars: { team: target.team.name } },
+    );
 
     return {
       membershipId: result.updated.id,
@@ -808,6 +821,34 @@ export class TeamsService {
       role: result.updated.role,
       managerCount: result.team.managerCount,
     };
+  }
+
+  /**
+   * 팀장 넘기기 뒤: 새 팀장에게 '팀장이 되었어요', 나머지 매니저에게 '팀장이 바뀌었어요'. 넘긴 사람은 방금
+   * 매니저가 됐지만 자기가 한 일이라 받지 않는다. 수신자는 발송 시점의 매니저 명단이다.
+   */
+  private notifyOwnerDelegated(teamId: string, teamName: string, newOwnerUserId: string, previousOwnerUserId: string): void {
+    void this.notifications.emitNotification(newOwnerUserId, 'team_owner_received', teamId, undefined, {
+      vars: { team: teamName },
+    });
+    void (async () => {
+      const [managers, newOwner] = await Promise.all([
+        this.prisma.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: 'manager' },
+          select: { userId: true },
+        }),
+        this.prisma.v1User.findUnique({
+          where: { id: newOwnerUserId },
+          select: { profile: { select: { nickname: true, displayName: true } } },
+        }),
+      ]);
+      const recipients = managers
+        .map((membership) => membership.userId)
+        .filter((userId) => userId !== previousOwnerUserId && userId !== newOwnerUserId);
+      await this.notifications.emitNotificationToMany(recipients, 'team_owner_changed', teamId, undefined, {
+        vars: { team: teamName, name: notificationDisplayName(newOwner?.profile) },
+      });
+    })().catch((err: unknown) => this.logger.warn(`owner delegation notification failed team=${teamId}: ${String(err)}`));
   }
 
   async removeMembership(

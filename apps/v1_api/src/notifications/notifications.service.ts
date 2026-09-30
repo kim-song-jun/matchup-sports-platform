@@ -46,6 +46,11 @@ export type NotificationEventType =
   | 'tournament_award_received'
   | 'team_invitation_received'
   | 'team_invitation_accepted'
+  // 팀 역할 변경(Task 180 H1-roles): 바뀐 본인에게, 팀장이 바뀌면 나머지 매니저에게도.
+  | 'team_manager_assigned'
+  | 'team_manager_revoked'
+  | 'team_owner_received'
+  | 'team_owner_changed'
   | 'team_contact_received'
   | 'team_contact_accepted'
   | 'team_contact_declined'
@@ -143,15 +148,38 @@ type NotificationPrefField = keyof Pick<
  */
 const NIGHT_HELD_PREF_FIELDS: ReadonlySet<NotificationPrefField> = new Set(['teamEnabled', 'teamMatchEnabled']);
 
+/** 팀 멤버십이 바뀐 사건 알림(Task 180 H1). targetType 'team' · targetId teamId · 수신 설정 teamEnabled. */
+const TEAM_MEMBERSHIP_EVENTS: ReadonlySet<NotificationEventType> = new Set([
+  'team_manager_assigned',
+  'team_manager_revoked',
+  'team_owner_received',
+  'team_owner_changed',
+]);
+
 /** targetId 가 "${teamId}:${scheduleId}" 인 일정 알림 — 야간 예외 판정에 일정 시작 시각을 읽는다. */
 const SCHEDULE_TARGET_EVENTS: ReadonlySet<NotificationEventType> = new Set([
   'schedule_rsvp_deadline_reminder',
   'schedule_guest_recruitment_close_reminder',
 ]);
 
-/** 호출부가 기본 문구 대신 넣는 값. 제목에 사람·팀 이름이 들어가는 알림이 쓴다. */
+/**
+ * 문구 표(EVENT_TITLES·EVENT_BODIES)의 `{name}` 같은 자리에 들어갈 값. 호출부는 값만 넘기고 문장은 표가 정한다.
+ * 채우지 못한 자리가 남으면 그 알림은 만들지 않는다(`{team}` 이 사용자에게 보이면 안 된다).
+ */
+export type NotificationCopyVars = Readonly<
+  Partial<Record<'name' | 'team' | 'count' | 'title' | 'when' | 'reason' | 'matchup', string>>
+>;
+
 export interface NotificationEmitOptions {
-  readonly title?: string;
+  readonly vars?: NotificationCopyVars;
+}
+
+export function renderNotificationCopy(template: string, vars: NotificationCopyVars = {}): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const value = vars[key as keyof NotificationCopyVars];
+    if (value === undefined) throw new Error(`notification copy var missing: ${key}`);
+    return value;
+  });
 }
 
 /** Preference field in V1NotificationPreference that gates the event type. */
@@ -171,6 +199,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
   ) {
     return 'matchEnabled';
   }
+  if (TEAM_MEMBERSHIP_EVENTS.has(type)) return 'teamEnabled';
   if (
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
@@ -265,6 +294,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     return 'chat';
   }
   if (
+    TEAM_MEMBERSHIP_EVENTS.has(type) ||
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
     type === 'team_join_application_rejected' ||
@@ -353,10 +383,11 @@ export function notificationCopyFor(
   type: NotificationEventType,
   targetType: V1NotificationTargetType,
   targetId: string | null,
+  vars?: NotificationCopyVars,
 ): { title: string; defaultBody: string; deepLink: string | null } {
   return {
-    title: EVENT_TITLES[type],
-    defaultBody: EVENT_BODIES[type],
+    title: renderNotificationCopy(EVENT_TITLES[type], vars),
+    defaultBody: renderNotificationCopy(EVENT_BODIES[type], vars),
     deepLink: deepLinkForEvent(type, targetType, targetId),
   };
 }
@@ -370,6 +401,10 @@ function deepLinkForEvent(
   targetId: string | null,
 ): string | null {
   if (type === 'team_join_application_received' && targetId) {
+    return `/teams/${targetId}/members`;
+  }
+  // 새 팀장은 바로 멤버 관리로 — 나머지 역할 알림은 기본 팀 상세로 간다.
+  if (type === 'team_owner_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
   // 초대받은 사람이 수락·거절하는 곳은 팀 상세가 아니라 내 초대함이다. targetId 는 팀 id 그대로다.
@@ -508,6 +543,10 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
+  team_manager_assigned: '매니저가 되었어요',
+  team_manager_revoked: '매니저에서 멤버로 바뀌었어요',
+  team_owner_received: '팀장이 되었어요',
+  team_owner_changed: '팀장이 바뀌었어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -570,6 +609,10 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_announcement_published: '공지를 확인해 보세요.',
   team_invitation_received: '팀 초대를 확인해 보세요.',
   team_invitation_accepted: '팀 초대를 수락했어요.',
+  team_manager_assigned: '"{team}" · 가입 신청과 팀 일정을 관리할 수 있어요.',
+  team_manager_revoked: '"{team}" · 팀 관리 메뉴는 더 보이지 않아요.',
+  team_owner_received: '"{team}" · 팀장을 넘겨받았어요. 멤버 관리와 팀 정보를 바꿀 수 있어요.',
+  team_owner_changed: '"{team}" · 새 팀장은 {name}님이에요.',
   inquiry_answered: '답변 내용을 확인해 주세요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
@@ -704,13 +747,19 @@ export class NotificationsService {
   ): void {
     if (userIds.length === 0) return;
     const targetType = targetTypeForEvent(type);
-    const message = {
-      targetType,
-      targetId,
-      title: options?.title ?? EVENT_TITLES[type],
-      body: body ?? EVENT_BODIES[type],
-      deepLink: deepLinkForEvent(type, targetType, targetId),
-    };
+    let message: { targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string; deepLink: string | null };
+    try {
+      message = {
+        targetType,
+        targetId,
+        title: renderNotificationCopy(EVENT_TITLES[type], options?.vars),
+        body: body ?? renderNotificationCopy(EVENT_BODIES[type], options?.vars),
+        deepLink: deepLinkForEvent(type, targetType, targetId),
+      };
+    } catch (err) {
+      this.logger.warn({ type, targetId, err }, '알림 문구를 채우지 못해 발송하지 않습니다');
+      return;
+    }
     const prefField = preferenceFieldForEvent(type);
     void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
       for (const userId of userIds) {

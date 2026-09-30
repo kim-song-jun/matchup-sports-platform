@@ -405,7 +405,8 @@ export function MatchDetailContent({
             </span>
             {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} /> : null}
           </div>
-          {data.pendingProjection ? (
+          {/* 서버의 pendingProjection 은 진행 중(live)에도 켜진다 — 확정을 "기다리는" 문장은 경기가 끝난 뒤에만 맞다. */}
+          {data.pendingProjection && data.status !== 'live' ? (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--blue700)', textAlign: 'center' }}>
               경기 결과가 공식 확정을 기다리고 있어요.
             </p>

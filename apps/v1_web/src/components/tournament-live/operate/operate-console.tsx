@@ -45,6 +45,8 @@ import { AssistPickerSheet } from './assist-picker-sheet';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
 import { ArrivalCheckinPanel } from './arrival-checkin-panel';
 import { ConsoleMoreSheet, type ConsoleMoreAction } from './console-more-sheet';
+import { ConsoleNextSteps } from './console-next-steps';
+import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { RestTimer } from './rest-timer';
 import { PenaltyShootoutPanel } from './penalty-shootout-panel';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
@@ -1441,6 +1443,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           </div>
         )}
       </div>
+
+      {/* 경기가 끝나면 콘솔이 그 자리에서 결과 확정 카드로 이어진다 — 종료 뒤 "다음에 뭘 해야 하는지"가
+          화면에 없던 막다른 길을 없앤다. 확정 권한이 없는 역할의 안내와 서버 권한 검사는 패널이 맡는다. */}
+      {gameEnded ? (
+        <div className="px-4">
+          <GameResultReviewPanel
+            key={gameId}
+            variant="console"
+            gameId={gameId}
+            tournamentId={tournamentId}
+            confirmedFooter={<ConsoleNextSteps tournamentId={tournamentId} fixtureId={fixtureId} />}
+          />
+        </div>
+      ) : null}
 
       {/* 휴식 타이머(하프타임·부상 중단) — 경기가 SCHEDULED 이전(아직 시작 전)이나
           이미 ENDED/CANCELLED된 뒤에는 의미가 없으므로 LIVE/PAUSED에서만 보여준다.

@@ -45,6 +45,18 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   gameOperationsErrorMessage: (code: string) => `오류(${code})`,
   isRetryableGameOperationsErrorCode: () => true,
 }));
+// 종료 직후 콘솔이 끼우는 결과 확정 카드 — 카드 자체(권한별 표시·확정 흐름)는 패널 스위트가 검증한다.
+// 여기서는 콘솔이 언제, 어떤 경기에 대해 그 카드를 마운트하는지만 본다.
+vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
+  GameResultReviewPanel: (props: { gameId: string; variant?: string; tournamentId?: string }) => (
+    <div
+      data-testid="result-confirm-card"
+      data-game-id={props.gameId}
+      data-variant={props.variant}
+      data-tournament-id={props.tournamentId}
+    />
+  ),
+}));
 vi.mock('@/components/tournament-ops/role-context', () => ({
   useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
 }));
@@ -683,6 +695,56 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       expect(screen.queryByRole('button', { name: '더보기' })).toBeNull();
       expect(screen.queryByRole('group', { name: '경기 진행 조작' })).toBeNull();
+    });
+  });
+
+  // Task 180 G6(F78) — 종료 직후 콘솔은 "287ms" 한 줄이 아니라 결과 확정 카드로 이어진다.
+  describe('종료 직후 결과 확정 카드', () => {
+    const REGULATION_ENDED = [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+    ];
+
+    function endedGame(state: 'LIVE' | 'ENDED') {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state } }));
+    }
+
+    it('경기가 ENDED 이면 이 경기의 확정 카드를 콘솔 모드로 마운트한다', () => {
+      endedGame('ENDED');
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      const card = screen.getByTestId('result-confirm-card');
+      expect(card).toHaveAttribute('data-game-id', 'game-1');
+      expect(card).toHaveAttribute('data-variant', 'console');
+      expect(card).toHaveAttribute('data-tournament-id', 't-1');
+    });
+
+    it('아직 끝나지 않은 경기(정규 시간 종료 직후 포함)에는 확정 카드가 없다', () => {
+      endedGame('LIVE');
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByTestId('result-confirm-card')).toBeNull();
+    });
+
+    it('명령 왕복 시간(ms)을 더 이상 보여주지 않는다', async () => {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '경기 종료' }));
+      await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalled());
+      // 성공 뒤 재조회·상태 갱신까지 흘려보낸 다음에도 화면에 시간이 없어야 한다.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(screen.queryByText(/\d+\s*ms/)).toBeNull();
     });
   });
 });

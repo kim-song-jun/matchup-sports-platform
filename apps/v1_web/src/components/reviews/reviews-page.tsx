@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { KeyboardEvent } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
@@ -424,7 +425,7 @@ function ReviewTargetCard({
         </div>
       </div>
       {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8, overflowWrap: 'anywhere' }}>{target.lockReasonLabel}</div> : null}
-      <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
+      <StarRating disabled={locked} label={`${target.name} 총점`} rating={draft.rating} onChange={onUpdateRating} />
       {/* 4항목 채점 -- 사람 대상에만. 이 값이 상대 선수 카드의 실력·매너·시간약속을
           만들고, 후기 3개로 능력치가·10개로 카드 모양이 열린다(Task 155 해금의 원천).
           기본값은 종합 별점과 같아 세부를 안 만져도 제출 마찰이 늘지 않는다. */}
@@ -436,6 +437,7 @@ function ReviewTargetCard({
               <StarRating
                 compact
                 disabled={locked}
+                label={`${target.name} ${field.label}`}
                 rating={draft.metricScores?.[field.key] ?? draft.rating}
                 onChange={(score) => onUpdateMetricScore(field.key, score)}
               />
@@ -465,7 +467,29 @@ function ReviewTargetCard({
   );
 }
 
-function StarRating({ compact, disabled, onChange, rating }: { compact?: boolean; disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
+const STAR_VALUES = [1, 2, 3, 4, 5] as const;
+
+// radiogroup 방향키 계약: 오른쪽·아래 = 다음, 왼쪽·위 = 이전(끝에서 처음으로 순환), Home·End = 양 끝.
+function nextStarValue(key: string, current: number): number | null {
+  const last = STAR_VALUES.length;
+  if (key === 'ArrowRight' || key === 'ArrowDown') return current === last ? 1 : current + 1;
+  if (key === 'ArrowLeft' || key === 'ArrowUp') return current === 1 ? last : current - 1;
+  if (key === 'Home') return 1;
+  if (key === 'End') return last;
+  return null;
+}
+
+function StarRating({ compact, disabled, label, onChange, rating }: { compact?: boolean; disabled?: boolean; label: string; onChange: (rating: number) => void; rating: number }) {
+  // 방향키는 점수를 바꾸고 포커스도 따라간다 — 선택된 별만 탭 정지점(roving tabindex)이라
+  // 포커스가 남으면 화면에 보이는 점수와 포커스가 어긋난다.
+  const onStarKeyDown = (event: KeyboardEvent<HTMLButtonElement>, value: number) => {
+    const next = nextStarValue(event.key, value);
+    if (next === null) return;
+    event.preventDefault();
+    onChange(next);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next - 1]?.focus();
+  };
+
   return (
     <div
       className="tm-review-stars"
@@ -479,16 +503,22 @@ function StarRating({ compact, disabled, onChange, rating }: { compact?: boolean
         padding: 0,
       }}
       data-compact={compact ? 'true' : undefined}
-      aria-label={`${rating}점`}
+      role="radiogroup"
+      aria-label={label}
+      aria-disabled={disabled || undefined}
     >
-      {[1, 2, 3, 4, 5].map((value) => (
+      {STAR_VALUES.map((value) => (
         <button
           key={value}
+          role="radio"
+          aria-checked={value === rating}
           aria-label={`${value}점`}
           className="tm-review-star"
           data-active={value <= rating}
           disabled={disabled}
           onClick={() => onChange(value)}
+          onKeyDown={(event) => onStarKeyDown(event, value)}
+          tabIndex={value === rating ? 0 : -1}
           type="button"
         >
           {value <= rating ? '★' : '☆'}

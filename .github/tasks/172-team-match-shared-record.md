@@ -39,6 +39,16 @@
   점수/기록 편집을 잠그지 않는다. 기존 양 팀 종료 확인이 완료될 때까지 `matched` 계약을 유지한다.
 
 ## Progress snapshot
+- 2026-09-30 own-goal follow-up: player rows and history labels use the participant's actual side;
+  own goals separately state which team receives the goal. Score and public timeline placement remain
+  credited-side based. Unknown own-goal participants show unknown affiliation instead of the credited team.
+  Validation: 23 component tests passed; web typecheck passed. Headed Playwright fixture QA passed at
+  375/768/1440px (no horizontal overflow or browser page errors); after screenshots are in
+  `output/playwright/visual-audit/own-goal-team-label/`. No before screenshot was available: initial
+  alpha browser inspection was blocked by the browser runtime, so this verifies the local after-state.
+  API responses were intercepted fixtures, not live authenticated participant data. Local SSR site-info
+  fetch logged ECONNREFUSED because no backend was started; this does not validate the backend.
+  Browser and owned port-3013 dev server were closed. No deployment performed for this follow-up.
 - 2026-09-21: origin/dev a02af4aff 기준 /tmp/teameet-shared-record, feat/team-match-shared-record.
 - 기존 호스트 제출/상대 승인 결과 흐름과 리그 운영 흐름을 확인. 구현 완료. 실제 DB 통합 11/11, API 단위 144/144, 웹 관련 회귀 172/172, 타입/패턴 검사 통과. 3폭 36개 흐름 + 변경 전 6개 화면을 촬영했다.
 

@@ -30,9 +30,10 @@ import styles from './team-match-shared-record.module.css';
 function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
   if (!goal) return '기록 없음';
   const player = data.participants.find((p) => p.id === goal.participantId);
-  const side = data.sides.find((s) => s.id === goal.sideId);
+  const side = data.sides.find((s) => s.id === (player?.sideId ?? (goal.ownGoal ? null : goal.sideId)));
+  const creditedSide = data.sides.find((s) => s.id === goal.sideId);
   const subMatch = data.subMatches?.find((row) => row.id === goal.subMatchId);
-  return `${subMatch ? `${subMatch.title} · ` : ''}${side?.name ?? ''} · ${player?.name ?? '득점자 미상'}${goal.ownGoal ? ' (자책골)' : ''}${goal.minute === null ? '' : ` · ${goal.minute}분`}`;
+  return `${subMatch ? `${subMatch.title} · ` : ''}${side?.name ?? '소속팀 미상'} · ${player?.name ?? '득점자 미상'}${goal.ownGoal ? ` (자책골 · ${creditedSide?.name ?? '상대팀'} 득점으로 반영)` : ''}${goal.minute === null ? '' : ` · ${goal.minute}분`}`;
 }
 
 function subMatchScore(data: SharedRecord, subMatch: SharedSubMatch, sideKey: 'HOME' | 'AWAY') {
@@ -422,7 +423,8 @@ function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
   return <div className={styles.goalList}>{goals.map((goal) => {
     const participant = data.participants.find((row) => row.id === goal.participantId);
     const participantName = participant?.name ?? '득점자 미상';
-    const sideName = data.sides.find((side) => side.id === goal.sideId)?.name ?? '팀 미상';
+    const sideName = data.sides.find((side) => side.id === (participant?.sideId ?? (goal.ownGoal ? null : goal.sideId)))?.name ?? '소속팀 미상';
+    const creditedSideName = data.sides.find((side) => side.id === goal.sideId)?.name ?? '상대팀';
     return <div className={styles.goalRow} key={goal.id} role="group" aria-label={`${participantName} 득점 기록`}>
     <div className={styles.goalPlayer}>
       <ProfileAvatar imageUrl={participant?.profileImageUrl} initials={playerInitials(participantName)} size={40} />
@@ -438,6 +440,7 @@ function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
           <span aria-hidden="true">·</span>
           <span>{goal.ownGoal ? '자책골' : '득점'}</span>
         </p>
+        {goal.ownGoal ? <p className={styles.goalMeta}>{creditedSideName} 득점으로 반영</p> : null}
       </div>
     </div>
     {canEdit && <div className={styles.goalActions} role="group" aria-label={`${participantName} 득점 관리`}>

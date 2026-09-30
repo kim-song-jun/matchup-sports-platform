@@ -48,6 +48,32 @@ describe('shared record participant flow', () => {
     expect(state.replace).not.toHaveBeenCalled();
     expect(screen.getByText(/공동 기록 대상이 아니에요/)).toBeInTheDocument();
   });
+  it.each(['live', 'official'] as const)('%s: 자책골 선수는 실제 소속과 상대팀 득점 반영을 구분한다', (phase) => {
+    state.data.phase = phase;
+    state.data.canEdit = phase === 'live';
+    state.data.goals = [
+      { id: 'og', sideId: 'away', participantId: 'h1', ownGoal: true, minute: 12, subMatchId: null },
+      { id: 'goal', sideId: 'away', participantId: 'a1', ownGoal: false, minute: 20, subMatchId: null },
+    ];
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    const ownGoalRow = within(screen.getByRole('group', { name: '김민수 득점 기록' }));
+    expect(ownGoalRow.getByText('한강')).toBeInTheDocument();
+    expect(ownGoalRow.getByText('자책골')).toBeInTheDocument();
+    expect(ownGoalRow.getByText('마포 득점으로 반영')).toBeInTheDocument();
+    expect(ownGoalRow.queryByText('마포', { exact: true })).not.toBeInTheDocument();
+    const normalGoalRow = within(screen.getByRole('group', { name: '박지훈 득점 기록' }));
+    expect(normalGoalRow.getByText('마포')).toBeInTheDocument();
+    expect(normalGoalRow.queryByText(/득점으로 반영/)).not.toBeInTheDocument();
+  });
+
+  it('자책골 선수가 미지정이면 득점을 얻은 팀을 선수 소속으로 표시하지 않는다', () => {
+    state.data.goals = [{ id: 'og', sideId: 'away', participantId: null, ownGoal: true, minute: null, subMatchId: null }];
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    const row = within(screen.getByRole('group', { name: '득점자 미상 득점 기록' }));
+    expect(row.getByText('소속팀 미상')).toBeInTheDocument();
+    expect(row.getByText('마포 득점으로 반영')).toBeInTheDocument();
+  });
+
   // 2026-09-29: "← 매치 상세" 카드 링크는 제거했다 — 뒤로가기는 매치 상세를 거치지 않고
   // 이 화면이 받은 출처로 곧장 돌아간다(활동기록 등). 출처가 아예 없을 때만(공유 링크로
   // 바로 들어온 경우) route-chrome 의 정적 backHref가 `?view=detail`로 매치 상세를 대신 가리킨다.

@@ -10,6 +10,7 @@ import { resultChipStyle } from './result-emphasis';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { RECORD_TYPE_TABS, recordEmptyCopy, type RecordTypeFilter } from './record-category-tabs';
 import { PersonalMatchRecordsSection } from './personal-match-records-section';
+import { competitionLabel, matchupLabel } from './record-consent-preview';
 import { withFromPath } from '@/lib/session-storage';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
 
@@ -60,20 +61,6 @@ function OwnerVisibilityBanner() {
   );
 }
 
-/**
- * F6 -- 행 상단 캡션에 붙일 대회/리그 이름. 대회 경기는 예전처럼 대회명을, 정규 리그
- * 대진은 리그명을 같은 자리에 같은 표기(` · 이름`)로 보여준다 -- 리그 경기가 친선
- * 팀매치와 구분 없이 이름 없는 행으로 남던 것이 이 결함(F6)이었다. 리그가 아닌 친선
- * 팀매치는 예전 그대로 아무것도 붙지 않는다(회귀 금지).
- *
- * 서버 계약상 `tournamentId`가 있는 경기는 `leagueId`가 항상 null이라(대회의 "리그 방식"
- * 포맷도 분류상 `tournament`) 둘이 동시에 채워지는 행은 없지만, 우선순위는 백엔드
- * 판정 함수(`classifyTeamRecordCategory`)와 같은 순서로 고정해 둔다.
- */
-function competitionLabel(item: PublicUserRecordItem): string | null {
-  return item.tournamentTitle ?? item.leagueTitle ?? null;
-}
-
 function userRecordHref(item: PublicUserRecordItem, fromHref: string): string | null {
   // 뒤로가기가 이 활동 기록으로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
   if (item.leagueId && item.teamMatchId) {
@@ -90,7 +77,12 @@ function userRecordHref(item: PublicUserRecordItem, fromHref: string): string | 
   return null;
 }
 
-function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
+/**
+ * `privateBadge` 는 아직 공개되지 않은 내 기록에 "나만 보여요"를 붙이는 자리다 -- 공개 동의를
+ * 묻는 화면(설정)이 같은 행을 재사용하면서 이 기록이 지금 남에게 안 보인다는 사실을 색이 아니라
+ * 아이콘+글자로 함께 전한다.
+ */
+export function UserRecordRow({ item, privateBadge = false }: { item: PublicUserRecordItem; privateBadge?: boolean }) {
   const competition = competitionLabel(item);
   return (
     <div
@@ -119,6 +111,26 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
           {formatTournamentDateShort(item.officialAt) ?? ''}
           {competition ? ` · ${competition}` : ''}
         </span>
+        {privateBadge ? (
+          <span
+            className="tm-on-tint"
+            style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 'var(--font-size-caption)',
+              fontWeight: 700,
+              color: 'var(--blue700)',
+              background: 'var(--blue50)',
+              borderRadius: 'var(--radius-tight)',
+              padding: '2px 8px',
+            }}
+          >
+            <EyeOff size={12} strokeWidth={2} aria-hidden="true" />
+            나만 보여요
+          </span>
+        ) : null}
         {item.mvp ? (
           <span
             style={{
@@ -138,7 +150,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <span style={resultChipStyle(item.result)}>{userRecordResultLabel(item.result)}</span>
         <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
-          {item.teamName ?? '소속 미상'} vs {item.opponentTeamName ?? '상대 미상'}
+          {matchupLabel(item)}
         </span>
       </div>
       <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>

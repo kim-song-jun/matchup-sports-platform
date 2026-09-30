@@ -19,6 +19,8 @@ import { cssUrl } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
+import { userRecordResultLabel } from '@/components/public-game-records/format';
+import { resultChipStyle } from '@/components/public-game-records/result-emphasis';
 import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
@@ -442,10 +444,11 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
  * 아래 줄로 분리. 390px 에서 한 줄에 다 넣으면 문구 자리가 남지 않는다는 그쪽 주석의
  * 판단이 여기서도 그대로 적용된다.
  *
- * 다른 점은 **문구가 아니라 숫자로 이유를 준다**는 것이다. "공개할까요?" 만으로는 왜 지금
- * 나에게 뜨는지 알 수 없고, 켜고 나서 뭐가 달라지는지도 모른다. 서버가 계산한
- * `pendingCount`(지금 켜면 즉시 공개될 경기 수)를 앞세워 그 둘을 한 번에 답한다 --
- * 이 숫자가 0 인 사용자에겐 배너 자체가 뜨지 않으므로 "0경기" 는 렌더되지 않는다.
+ * 다른 점은 **문구가 아니라 숫자와 실제 기록으로 이유를 준다**는 것이다. "공개할까요?" 만으로는
+ * 왜 지금 나에게 뜨는지 알 수 없고, 켜고 나서 뭐가 달라지는지도 모른다. 서버가 계산한
+ * `pendingCount`(지금 켜면 즉시 공개될 경기 수)와 가장 최근 대기 기록 한 줄을 앞세워 그 둘을
+ * 한 번에 답한다 -- 이 숫자가 0 인 사용자에겐 배너 자체가 뜨지 않으므로 "0경기" 는 렌더되지 않는다.
+ * X 는 "지금 대기 중인 경기만 넘김"이라 새 경기가 생기면 다시 뜬다.
  */
 function RecordConsentNudgeBanner({
   recordConsentNudge,
@@ -476,7 +479,9 @@ function RecordConsentNudgeBanner({
             {recordConsentNudge.pendingCount}경기가 공개를 기다려요
           </div>
           <div className="tm-text-caption" style={{ marginTop: 2 }}>
-            공개하면 내 출전·득점이 프로필에 표시돼요.
+            {recordConsentNudge.mentionsRanking
+              ? '공개하면 프로필과 득점·도움 순위에 내 이름이 나와요.'
+              : '공개하면 프로필에 내 기록이 나와요.'}
           </div>
         </div>
         <button
@@ -489,6 +494,34 @@ function RecordConsentNudgeBanner({
           <X size={18} aria-hidden="true" />
         </button>
       </div>
+      {recordConsentNudge.latestRecord ? (
+        <div
+          className="tm-on-tint"
+          style={{
+            marginTop: 12,
+            padding: 12,
+            borderRadius: 'var(--radius-control)',
+            background: 'var(--surface-soft)',
+          }}
+        >
+          <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-body)' }}>
+            {recordConsentNudge.latestRecord.caption}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            {recordConsentNudge.latestRecord.result ? (
+              <span style={resultChipStyle(recordConsentNudge.latestRecord.result)}>
+                {userRecordResultLabel(recordConsentNudge.latestRecord.result)}
+              </span>
+            ) : null}
+            <span style={{ fontSize: 'var(--font-size-body-sm)', fontWeight: 600, color: 'var(--text-strong)' }}>
+              {recordConsentNudge.latestRecord.matchup}
+            </span>
+          </div>
+          <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-body)', marginTop: 4, fontWeight: 600 }}>
+            {recordConsentNudge.latestRecord.stats}
+          </div>
+        </div>
+      ) : null}
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         {/* 무엇이 공개되는지 확인할 경로를 항상 함께 둔다 -- 개인정보 공개를 "보지 않고
             버튼 한 번"으로 켜게 만들지 않기 위한 것이다. */}

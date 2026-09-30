@@ -1699,7 +1699,7 @@ export function RecordConsentSettingsPageClient() {
                     {update.isPending
                       ? '저장하는 중이에요…'
                       : granted
-                        ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
+                        ? '지금 공개돼 있어요. 끄면 바로 모두 비공개로 돌아가요.'
                         : '지금은 비공개예요.'}
                   </div>
                 </div>

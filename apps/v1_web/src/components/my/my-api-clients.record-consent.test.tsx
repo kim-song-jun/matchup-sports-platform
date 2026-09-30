@@ -84,6 +84,9 @@ describe('RecordConsentSettingsPageClient', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('ON')).toBeInTheDocument();
     expect(screen.getByText(/부터 공개하고 있어요/)).toBeInTheDocument();
+    // 서버는 끄는 즉시 연결된 모든 기록을 비공개로 돌린다(새 경기부터가 아니다) -- 문구가 그 동작을 말한다.
+    expect(screen.getByText(/끄면 바로 모두 비공개로 돌아가요/)).toBeInTheDocument();
+    expect(screen.queryByText(/새 경기부터/)).not.toBeInTheDocument();
   });
 
   it('저장에 실패하면 조용히 넘어가지 않고 이유를 알린다', async () => {

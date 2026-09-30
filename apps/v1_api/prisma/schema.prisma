@@ -211,6 +211,7 @@ enum V1PostEventReviewSourceType {
   match
   team_match
   tournament_fixture
+  platform_team_match
 }
 
 enum V1PostEventReviewTargetType {
@@ -1650,6 +1651,8 @@ model V1TeamTrustScore {
 
 model V1PostEventReview {
   id             String                      @id @default(uuid())
+  // Institutional review scope: match + target kind + target id. Existing peer rows stay NULL.
+  platformReviewKey String?                   @unique @map("platform_review_key")
   reviewerUserId String                      @map("reviewer_user_id")
   reviewerTeamId String?                     @map("reviewer_team_id")
   sourceType     V1PostEventReviewSourceType @map("source_type")

@@ -352,6 +352,14 @@ export default function AdminTeamMatchDetailPage() {
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="팀매치 운영 요약">
+          {teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament && teamMatch.hasGame && adminMe?.capabilities.includes('status:write') && (
+            <section className="tm-card p-4 flex flex-col gap-3" aria-label="공동 경기 운영">
+              <h2 className="tm-text-body-lg">양 팀과 함께 운영</h2>
+              <p className="tm-text-caption">양 팀의 기록·종료 확인·상호 리뷰는 그대로 유지돼요.</p>
+              <Link className="tm-btn tm-btn-md tm-btn-primary" href={`/admin/team-matches/${teamMatchId}/record`}>공동 경기 기록</Link>
+              {teamMatch.status === 'completed' && <Link className="tm-btn tm-btn-md tm-btn-outline" href={`/admin/team-matches/${teamMatchId}/reviews`}>운영 리뷰 남기기</Link>}
+            </section>
+          )}
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">

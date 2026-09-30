@@ -47,7 +47,9 @@ export function ReviewSourcePageClient({
   complete,
   sourceId,
   sourceType,
+  admin = false,
 }: {
+  admin?: boolean;
   complete: boolean;
   sourceId: string;
   sourceType: V1ReviewSourceType;
@@ -158,7 +160,10 @@ export function ReviewSourcePageClient({
           ...(target.targetType === 'user' && draft.metricScores ? { metricScores: draft.metricScores } : {}),
         });
       }
-      router.replace(`/my/reviews/${sourceType}/${sourceId}?complete=1`);
+      if (admin) {
+        await query.refetch();
+        setMessage(null);
+      } else router.replace(`/my/reviews/${sourceType}/${sourceId}?complete=1`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '리뷰 전송에 실패했어요. 다시 시도해 주세요.');
     }
@@ -166,6 +171,7 @@ export function ReviewSourcePageClient({
 
   return (
     <ReviewSourcePageView
+      admin={admin}
       drafts={drafts}
       errorMessage={query.error instanceof Error ? query.error.message : null}
       loading={query.isLoading}

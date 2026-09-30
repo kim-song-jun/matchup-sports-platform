@@ -98,7 +98,7 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
   return {
     stats: [
       { label: '받은 리뷰', value: `${items.length}건` },
-      { label: '평균', value: averageRating(items) },
+      { label: '참가자 평균', value: averageRating(items.filter((review) => review.sourceType !== 'platform_team_match')) },
       { label: '태그', value: `${tagCount}개` },
     ],
     userGroups: groupReceivedReviews(userReviews),
@@ -112,6 +112,8 @@ export function sourceTypeLabel(sourceType: V1ReviewSourceType) {
       return '개인 매치';
     case 'team_match':
       return '팀매치';
+    case 'platform_team_match':
+      return '운영 평가 · 참가자 평점과 별도';
     case 'tournament_fixture':
       return '대회 경기';
   }

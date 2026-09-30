@@ -1,5 +1,9 @@
 # Teameet QA Scenario Index
 
+## 2026-09-30 — 플랫폼 팀매치 공동 운영
+
+[Task 149](../../.github/tasks/149-admin-assigned-team-match.md) · [검증 시나리오](./friendly-team-match-screen-flow.md): 기존 양 팀 협업을 유지하며 운영자 공동 기록·단방향 운영 리뷰 추가. 로컬 회귀/타입 검사 진행, 실제 DB CI 및 Alpha 시각 검증 대기. DEV만 배포하며 main은 변경하지 않는다.
+
 ## 2026-09-22 — 팀매치 참석명단 경기 전 Alpha QA
 
 [팀매치 참석명단 경기 전 갤러리](./team-match-attendance-roster-pre-match-gallery.md): 마포 레인저스 모집 → 송파 유나이티드 신청·승인 → 양 팀 6명 참석 확정 → 양 팀 참석명단 등록·GK 지정·제출을 실제 Alpha에서 완료했다. 1440×900/390×844 스크린샷 20장, console/page/API 오류와 가로 넘침 0건. 팀매치 전용 문구만 `참석명단`으로 바뀌며 대회·리그의 `라인업`은 유지된다.

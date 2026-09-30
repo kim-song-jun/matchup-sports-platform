@@ -5,7 +5,7 @@ import type { CompetitionFilterOption, CompetitionFilterSheetModel } from './com
  *
  * ## 상태값이 축마다 다르다 — 여기서 한 번만 옮긴다
  * ```
- * 리그 축(V1LeagueState)   draft · active · completed
+ * 리그 축(LeagueStateKey)  draft · active · completed
  * 대회 축(목록 status)      draft · open · closed · in_progress · completed
  * ```
  * `/league-matches` 리다이렉트가 고른 상태를 넘길 때 `active` 를 그대로 주면 **서버가 400**

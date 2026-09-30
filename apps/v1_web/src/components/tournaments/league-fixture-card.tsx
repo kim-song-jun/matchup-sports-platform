@@ -1,7 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { fixtureResultLabel, fixtureStatusMeta } from '@/lib/league-fixture-meta';
+import { fixtureResultLabel } from '@/lib/league-fixture-meta';
+import { leagueFixturePhase, matchPhaseChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import { formatTournamentDateMedium, formatKstTime } from '@/lib/date-utils';
 import type { V1LeagueFixture } from '@/types/league-match';
 import {
@@ -26,12 +28,8 @@ import {
  *   최소 하루는 정상적으로 발생한다.
  * - **몰수는 점수를 지우지 않고 뱃지로 가른다.** 몰수는 1:0 으로 기록돼 실제 1:0 승리와
  *   화면에서 완전히 같아 보인다.
- * - **배지**(`fixtureStatusMeta`)는 상태 6개를 각각 다른 라벨로 적는다
- *   (`recruiting 모집 중 | closed 마감 | matched 매칭됨 | cancelled 취소됨 |
- *   completed 완료 | expired 기한 만료`). 3개만 다루면 나머지가 기본값으로 떨어진다.
- *   반면 **결과 문구**(`fixtureResultLabel`)는 상태로 6분기하지 않는다 — 취소 / 점수 있음 /
- *   그 외(킥오프 지남 여부)의 **세 갈래**다. 두 함수는 답하는 질문이 다르다:
- *   전자는 "대진이 어느 단계인가", 후자는 "결과가 어디까지 왔는가".
+ * - **배지는 경기 단계 칩 하나**(`lib/competition-status.ts`) — 리그 경기 목록·상세와 같은 칩이다.
+ *   리그 대진은 원래 매칭된 경기라 "매칭됨" 같은 기본 상태는 칩으로 싣지 않는다.
  */
 
 /**
@@ -67,13 +65,13 @@ export function LeagueFixtureCard({
   homeLabel: string;
   awayLabel: string;
 }) {
-  const statusMeta = fixtureStatusMeta(fixture.status);
+  const phaseChip = matchPhaseChip(leagueFixturePhase(fixture));
   const result = fixtureResultLabel(fixture);
 
   return (
     <CompetitionFixtureCard
       header={leagueFixtureHeader(fixture)}
-      badge={<span className={`tm-badge ${statusMeta.badgeClass}`}>{statusMeta.label}</span>}
+      badge={<StatusChip chip={phaseChip} size="md" />}
       homeLabel={homeLabel}
       awayLabel={awayLabel}
       center={
@@ -95,7 +93,7 @@ export function LeagueFixtureCard({
           </div>
         )
       }
-      caption={leagueFixtureCaption(fixture, result)}
+      caption={leagueFixtureCaption(fixture, result, phaseChip.label)}
     />
   );
 }
@@ -116,10 +114,11 @@ export function LeagueFixtureCard({
 function leagueFixtureCaption(
   fixture: V1LeagueFixture,
   result: ReturnType<typeof fixtureResultLabel>,
+  chipLabel: string,
 ): ReactNode | undefined {
-  // 점수가 없을 때의 결과 문구('결과 대기'·'집계 제외')는 가운데 칸이 'vs' 를 그리느라
-  // 자리를 못 잡는다 — 여기서 싣는다. '예정' 은 뱃지·날짜와 겹치므로 뺀다.
-  const note = !result.hasScore && result.text !== '예정' ? result.text : null;
+  // 점수가 없을 때의 결과 문구('집계 제외'·'점수 비공개')는 가운데 칸이 'vs' 를 그리느라
+  // 자리를 못 잡는다 — 여기서 싣는다. 단계 칩과 같은 말('예정'·'결과 대기')은 뺀다.
+  const note = !result.hasScore && result.text !== chipLabel ? result.text : null;
   const venue = fixture.placeName || null;
   if (venue === null && note === null && !result.isForfeit) return undefined;
 

@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
+import { TeamMatchClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
+import { useV1TeamMatch } from '@/hooks/use-v1-api';
 import {
   useTeamMatchRecord,
   useMutateTeamMatchRecord,
@@ -234,7 +236,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
         <h1>함께 쓰는 경기 기록</h1>
         <p className={styles.muted}>{data.title}</p>
       </div>
-      <span className="tm-badge tm-badge-green">{sharedRecordPhaseLabel(data.phase)}</span>
+      <span className={`tm-badge ${data.phase === 'cancelled' ? 'tm-badge-grey' : 'tm-badge-green'}`}>{sharedRecordPhaseLabel(data.phase)}</span>
     </header>
 
     <div role="status" className="sr-only">{announcement}</div>
@@ -373,7 +375,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       </div>
 
       <aside className={styles.stack}>
-        {data.participant && <section className={styles.section}>
+        {data.participant && data.phase !== 'cancelled' && <section className={styles.section}>
           <h2>경기 종료 확인</h2>
           <p className={styles.muted}>각 팀에서 한 명씩 현재 기록을 확인하면 팀매치 한 경기의 최종 결과로 확정돼요. 기록을 수정하면 이전 확인은 취소돼요.</p>
           {data.sides.map((side) => <div className={styles.row} key={side.id}>
@@ -408,7 +410,17 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
         </details>}
       </aside>
     </div>
+    {/* 이름만 올라간 게스트를 본인으로 연결하는 입구 — 리그 경기 상세와 같은 컴포넌트다. 경기 기록이 생긴 뒤에만 뜻이 있다. */}
+    {!admin && (data.phase === 'live' || data.phase === 'official') ? <TeamMatchClaimEntry teamMatchId={teamMatchId} /> : null}
   </main>;
+}
+
+/** 참가팀 소속으로 확인된 사람에게만 — 비참가자는 모달을 연 뒤에야 403 을 받으므로 입구부터 숨긴다. */
+function TeamMatchClaimEntry({ teamMatchId }: { teamMatchId: string }) {
+  const viewer = useV1TeamMatch(teamMatchId).data?.viewer;
+  const isParticipant =
+    viewer?.manageableHostTeam === true || viewer?.manageableOpponentTeam === true || viewer?.participantMember === true;
+  return isParticipant ? <TeamMatchClaimMyRecordSection teamMatchId={teamMatchId} /> : null;
 }
 
 function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {

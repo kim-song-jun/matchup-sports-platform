@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRecentJerseyMap,
   describeSkipped,
+  presetNamePlaceholder,
   resolveJerseyNumber,
   resolveLoadableEntries,
   type EligibleMember,
@@ -217,5 +218,18 @@ describe('describeSkipped', () => {
     ]);
 
     expect(message).toBe('13명 중 10명을 불러왔어요 · 홍길동·김철수(참석 응답이 없어요), 이영희(지금은 팀에 없어요)');
+  });
+});
+
+describe('presetNamePlaceholder', () => {
+  it('종목의 경기 방식에 맞는 예시를 준다 — 풋살에 11인제 예시를 보이지 않는다', () => {
+    expect(presetNamePlaceholder('풋살')).toBe('예: 5:5 기본 멤버');
+    expect(presetNamePlaceholder('축구')).toBe('예: 11:11 기본 멤버');
+    expect(presetNamePlaceholder('풋살')).not.toContain('11');
+  });
+
+  it('종목을 모르거나 다른 종목이면 종목 표기 없는 예시를 준다', () => {
+    expect(presetNamePlaceholder(null)).toBe('예: 기본 멤버');
+    expect(presetNamePlaceholder('러닝')).toBe('예: 기본 멤버');
   });
 });

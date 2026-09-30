@@ -1143,6 +1143,77 @@ describe('TournamentPlayersService', () => {
     expect(result.csv).toContain("'@악성닉");
   });
 
+  it('exportCsv: 등번호는 마지막 열 — 기존 열 위치를 밀지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({ id: 'reg-1', team: { name: '번개팀' } });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ jerseyNumber: 7 }), user: { profile: { nickname: '번개맨' } } },
+      { ...playerRow({ id: 'player-2', realName: '김철수', jerseyNumber: null }), user: { profile: null } },
+    ]);
+
+    const { csv } = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(csv.split('\n')).toEqual([
+      'realName,birthDate,gender,eligibility,nickname,jerseyNumber',
+      '홍길동,1995-03-15,male,needs_review,번개맨,7',
+      '김철수,1995-03-15,male,needs_review,,',
+    ]);
+  });
+
+  // ─── 전체 명단 CSV (대회·리그 단위) ─────────────────────────────────────────
+  describe('exportTournamentCsv', () => {
+    it('non-admin → 403', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+
+      await expect(service.exportTournamentCsv(nonManager, 'tournament-1')).rejects.toThrow(ForbiddenException);
+      expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+    });
+
+    it('없는 대회 → 404 TOURNAMENT_NOT_FOUND', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+      await expect(service.exportTournamentCsv(adminUser, 'ghost')).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_FOUND' },
+      });
+    });
+
+    it('팀명·신청 상태를 앞에 붙이고, 임시저장·취소 신청은 뺀다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({ title: '가을 풋살컵' });
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+        {
+          ...playerRow({ jerseyNumber: 10 }),
+          user: { profile: { nickname: '번개맨' } },
+          registration: { status: 'confirmed', team: { name: '번개팀' } },
+        },
+        {
+          ...playerRow({ id: 'player-2', registrationId: 'reg-2', realName: '이영희', genderSnapshot: 'female', jerseyNumber: null }),
+          user: { profile: { nickname: '영희' } },
+          registration: { status: 'payment_checking', team: { name: '=HYPERLINK("x")' } },
+        },
+      ]);
+
+      const result = await service.exportTournamentCsv(adminUser, 'tournament-1');
+
+      expect(result.filename).toBe('players_가을_풋살컵_all_tourname.csv');
+      expect(result.csv.split('\n')).toEqual([
+        'teamName,registrationStatus,realName,birthDate,gender,eligibility,nickname,jerseyNumber',
+        '번개팀,confirmed,홍길동,1995-03-15,male,needs_review,번개맨,10',
+        // 팀명도 사용자 입력이다 — 수식 인젝션 차단·RFC 4180 따옴표 규칙을 똑같이 탄다.
+        `"'=HYPERLINK(""x"")",payment_checking,이영희,1995-03-15,female,needs_review,영희,`,
+      ]);
+      expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            removedAt: null,
+            registration: { tournamentId: 'tournament-1', status: { notIn: ['draft', 'cancelled'] } },
+          },
+        }),
+      );
+    });
+  });
+
   // ─── listEligiblePlayersForAdmin ────────────────────────────────────────────
   //
   // 이 목록의 존재 이유는 "고를 수 있는데 서버가 거부하는" 폼을 없애는 것이다. 따라서

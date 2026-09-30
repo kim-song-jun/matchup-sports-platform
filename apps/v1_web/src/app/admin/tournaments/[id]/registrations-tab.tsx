@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
-import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
+import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
@@ -304,25 +304,30 @@ export function RosterModal({
   );
 }
 
-// ── Export CSV button (one hook instance per row) ─────────────────────────
+// ── Export CSV buttons (팀별 = 행마다 훅 하나, 전체 = 탭에 하나) ────────────
 
-function ExportCsvButton({
-  registrationId,
+function CsvExportButton({
+  exportCsv,
+  label,
+  fallbackFilename,
+  disabled,
   showToast,
 }: {
-  registrationId: string;
+  exportCsv: ReturnType<typeof useV1ExportRosterCsv>;
+  label: string;
+  fallbackFilename: string;
+  disabled?: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
-  const exportCsv = useV1ExportRosterCsv(registrationId);
-
   const handleClick = () => {
     exportCsv.mutate(undefined, {
       onSuccess: (res) => {
-        const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' });
+        // BOM 이 없으면 Windows 엑셀이 UTF-8 을 CP949 로 읽어 한글(팀명·실명)이 깨진다.
+        const blob = new Blob(['\uFEFF', res.csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = res.filename || `roster_${registrationId}.csv`;
+        a.download = res.filename || fallbackFilename;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -337,10 +342,50 @@ function ExportCsvButton({
   return (
     <ActionButton
       onClick={handleClick}
-      disabled={exportCsv.isPending}
+      disabled={disabled || exportCsv.isPending}
       icon={<Download size={13} />}
-      label={exportCsv.isPending ? '…' : 'CSV'}
+      label={exportCsv.isPending ? '…' : label}
       tone="gray"
+    />
+  );
+}
+
+function ExportCsvButton({
+  registrationId,
+  showToast,
+}: {
+  registrationId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const exportCsv = useV1ExportRosterCsv(registrationId);
+  return (
+    <CsvExportButton
+      exportCsv={exportCsv}
+      label="CSV"
+      fallbackFilename={`roster_${registrationId}.csv`}
+      showToast={showToast}
+    />
+  );
+}
+
+/** 대회(리그) 전체 명단 — 팀별 CSV 를 팀 수만큼 누르지 않게. 임시저장·취소 신청은 서버가 뺀다. */
+function ExportAllCsvButton({
+  tournamentId,
+  disabled,
+  showToast,
+}: {
+  tournamentId: string;
+  disabled: boolean;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const exportCsv = useV1ExportTournamentRosterCsv(tournamentId);
+  return (
+    <CsvExportButton
+      exportCsv={exportCsv}
+      label="전체 명단 CSV"
+      fallbackFilename={`roster_${tournamentId}_all.csv`}
+      disabled={disabled}
+      showToast={showToast}
     />
   );
 }
@@ -652,42 +697,49 @@ export function RegistrationsTab({
           신청이 1,000건을 넘어 일부만 불러왔어요. 아래 목록과 카운트가 전체보다 적을 수 있어요.
         </p>
       )}
-      {/* P1-2: 상태 필터 칩 */}
-      <div className="tm-content-enter flex items-center gap-2 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
-        {REGISTRATION_STATUS_FILTERS.map((opt) => {
-          const active = statusFilter === opt.value;
-          const count = statusCounts[opt.value] ?? 0;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => changeStatusFilter(opt.value)}
-              aria-pressed={active}
-              className={[
-                'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                active
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
-              ].join(' ')}
-            >
-              {opt.label}
-              {opt.value !== 'all' && count > 0 && (
-                <span
-                  className={[
-                    'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[length:var(--font-size-caption)] font-semibold tabular-nums',
-                    // active 상태의 카운트 배지는 파란 칩(bg-blue-500, 테마 불변) 위에 얹히는
-                    // 반투명 흰 원이라 --static-white 를 써야 한다 — --card-surface 는 다크에서
-                    // 거의 검정이라 파란 칩 위에서 탁하게 죽는 회귀가 있었다(전수검수 발견).
-                    active ? 'bg-[var(--static-white)]/25 text-white' : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)]',
-                  ].join(' ')}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* P1-2: 상태 필터 칩 + 전체 명단 CSV(필터와 무관한 탭 단위 액션이라 필터 그룹 밖에 둔다) */}
+      <div className="tm-content-enter flex items-start justify-between gap-2 flex-wrap mb-3">
+        <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="신청 상태 필터">
+          {REGISTRATION_STATUS_FILTERS.map((opt) => {
+            const active = statusFilter === opt.value;
+            const count = statusCounts[opt.value] ?? 0;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => changeStatusFilter(opt.value)}
+                aria-pressed={active}
+                className={[
+                  'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                  active
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
+                ].join(' ')}
+              >
+                {opt.label}
+                {opt.value !== 'all' && count > 0 && (
+                  <span
+                    className={[
+                      'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[length:var(--font-size-caption)] font-semibold tabular-nums',
+                      // active 상태의 카운트 배지는 파란 칩(bg-blue-500, 테마 불변) 위에 얹히는
+                      // 반투명 흰 원이라 --static-white 를 써야 한다 — --card-surface 는 다크에서
+                      // 거의 검정이라 파란 칩 위에서 탁하게 죽는 회귀가 있었다(전수검수 발견).
+                      active ? 'bg-[var(--static-white)]/25 text-white' : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)]',
+                    ].join(' ')}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <ExportAllCsvButton
+          tournamentId={tournamentId}
+          disabled={registrations.length === 0}
+          showToast={showToast}
+        />
       </div>
 
       {/* P1-2: 처리 대기 주의 배너 */}

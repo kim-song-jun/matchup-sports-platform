@@ -109,6 +109,15 @@ export class TournamentPlayersAdminController {
     return this.playersService.exportCsv(user, registrationId);
   }
 
+  /** 대회(리그) 전체 명단 CSV — PII 포함, 응답 형태는 팀별 export 와 같다. */
+  @Get('tournaments/:tournamentId/players/export')
+  exportTournamentCsv(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+  ) {
+    return this.playersService.exportTournamentCsv(user, tournamentId);
+  }
+
   @Patch('players/:playerId/eligibility')
   updateEligibility(
     @CurrentUser() user: V1AuthUser,

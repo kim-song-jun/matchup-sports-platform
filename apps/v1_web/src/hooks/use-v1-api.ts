@@ -4670,6 +4670,14 @@ export function useV1ExportRosterCsv(registrationId: string) {
   });
 }
 
+/** 대회(리그) 전체 명단 CSV — 팀별 export 와 같은 lazy 방식·같은 응답 형태. */
+export function useV1ExportTournamentRosterCsv(tournamentId: string) {
+  return useMutation({
+    mutationFn: () =>
+      v1Get<V1ExportRosterCsvResult>(`/admin/tournaments/${tournamentId}/players/export`),
+  });
+}
+
 /**
  * @param registrationId 자격을 바꾼 선수가 속한 신청. 명단 캐시 키가 registrationId 기준이라
  *   이걸 모르면 방금 바꾼 자격이 화면에 반영되지 않는다 — 서버는 바뀌고 토스트도 뜨는데

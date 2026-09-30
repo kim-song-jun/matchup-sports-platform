@@ -50,6 +50,9 @@ import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/ros
  * **직접** 넘겨 카운터가 호출부 수와 1:1 이 되게 한다(Copilot 리뷰 지적).
  */
 
+/** 어드민 명단 CSV 의 선수 열 — 팀별·전체 CSV 가 같은 순서를 쓴다. */
+const PLAYER_CSV_HEADER = 'realName,birthDate,gender,eligibility,nickname,jerseyNumber';
+
 @Injectable()
 export class TournamentPlayersService {
   constructor(
@@ -647,24 +650,78 @@ export class TournamentPlayersService {
     });
 
     // CSV 생성 — PII 포함
-    const header = 'realName,birthDate,gender,eligibility,nickname';
-    const rows = players.map((p) => {
-      const nickname = p.user.profile?.nickname ?? '';
-      const cols = [
-        this.escapeCsvField(p.realName),
-        this.escapeCsvField(p.birthDateSnapshot ?? ''),
-        this.escapeCsvField(p.genderSnapshot ?? ''),
-        this.escapeCsvField(p.eligibilityStatus),
-        this.escapeCsvField(nickname),
-      ];
-      return cols.join(',');
-    });
-    const csv = [header, ...rows].join('\n');
+    const rows = players.map((p) => this.playerCsvColumns(p).join(','));
+    const csv = [PLAYER_CSV_HEADER, ...rows].join('\n');
 
     const teamName = registration.team.name;
     const filename = `players_${teamName.replace(/\s+/g, '_')}_${registrationId.slice(0, 8)}.csv`;
 
     return { filename, csv };
+  }
+
+  /**
+   * 대회(또는 리그) 전체 명단 CSV — 팀별 `exportCsv` 를 팀 수만큼 누르던 것을 한 파일로.
+   * PII 포함 — 어드민 게이트 필수. 열은 팀별 CSV 앞에 팀명·신청 상태를 붙인 것이다.
+   *
+   * 임시저장(draft)·취소(cancelled) 신청은 뺀다 — 대회에 나오지 않는 팀의 명단이 섞이면
+   * "전체 명단"으로 쓸 수 없다. 그 외 상태는 확정 전이어도 명단 검토 대상이라 넣고,
+   * 신청 상태 열로 거를 수 있게 한다.
+   */
+  async exportTournamentCsv(user: V1AuthUser, tournamentId: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+
+    // 신청 탭은 대회·리그가 함께 쓴다(리그는 tournamentId = leagueId).
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+      where: { id: tournamentId },
+      select: { title: true },
+    });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    const players = await this.prisma.v1TournamentPlayer.findMany({
+      where: {
+        removedAt: null,
+        registration: { tournamentId, status: { notIn: ['draft', 'cancelled'] } },
+      },
+      include: {
+        user: { select: { profile: { select: { nickname: true } } } },
+        registration: { select: { status: true, team: { select: { name: true } } } },
+      },
+      // 신청 순 → 팀 안에서는 팀별 CSV 와 같은 추가 순. 같은 시각 신청은 id 로 묶어 팀이 섞이지 않게.
+      orderBy: [{ registration: { createdAt: 'asc' } }, { registrationId: 'asc' }, { addedAt: 'asc' }],
+    });
+
+    const rows = players.map((p) =>
+      [
+        this.escapeCsvField(p.registration.team.name),
+        this.escapeCsvField(p.registration.status),
+        ...this.playerCsvColumns(p),
+      ].join(','),
+    );
+    const csv = [`teamName,registrationStatus,${PLAYER_CSV_HEADER}`, ...rows].join('\n');
+    const filename = `players_${tournament.title.replace(/\s+/g, '_')}_all_${tournamentId.slice(0, 8)}.csv`;
+
+    return { filename, csv };
+  }
+
+  private playerCsvColumns(p: {
+    realName: string;
+    birthDateSnapshot: string | null;
+    genderSnapshot: string | null;
+    eligibilityStatus: string;
+    jerseyNumber: number | null;
+    user: { profile: { nickname: string } | null };
+  }): string[] {
+    return [
+      this.escapeCsvField(p.realName),
+      this.escapeCsvField(p.birthDateSnapshot ?? ''),
+      this.escapeCsvField(p.genderSnapshot ?? ''),
+      this.escapeCsvField(p.eligibilityStatus),
+      this.escapeCsvField(p.user.profile?.nickname ?? ''),
+      // 정본 §3 "명단은 등번호와 이름" — 뒤에 붙여 기존 열 위치는 그대로 둔다.
+      p.jerseyNumber === null ? '' : String(p.jerseyNumber),
+    ];
   }
 
   // ─── 어드민: 선출여부 확정 ────────────────────────────────────────────────────

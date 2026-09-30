@@ -25,6 +25,7 @@ const EXPIRED = dissolvedTeamItem({
   dissolvedAt: '2026-08-01T03:00:00.000Z',
   canRestore: false,
 });
+const OPS_ARCHIVED = dissolvedTeamItem({ teamId: 'team-ops', name: '합정 야간 FC', dissolvedAt: '2026-09-28T03:00:00.000Z', archivedBy: 'admin' });
 
 let server: ReturnType<typeof setupServer>;
 let mock: ReturnType<typeof createV1TeamDissolutionMswHandlers>;
@@ -105,6 +106,34 @@ describe('내 팀 — 해체한 팀과 30일 복구', () => {
 
     expect(await card.findByRole('alert')).toHaveTextContent('해체하고 30일이 지나 직접 복구할 수 없어요');
     expect(await card.findByRole('link', { name: '운영팀에 문의하기' })).toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('운영팀이 보관한 팀은 기간 안이어도 복구 버튼 대신 운영팀 문의로 안내하고, 팀장이 해체한 팀은 그대로 복구할 수 있다', async () => {
+    start([OPS_ARCHIVED, IN_WINDOW]);
+    renderPage();
+
+    const ops = await teamCard('합정 야간 FC');
+    expect(ops.getByText(/9월 28일 \(월\) 운영팀 보관/)).toBeInTheDocument();
+    expect(ops.getByText('운영팀이 보관한 팀이라 직접 복구할 수 없어요. 다시 열어야 하면 운영팀에 문의해 주세요.')).toBeInTheDocument();
+    expect(ops.getByRole('link', { name: '운영팀에 문의하기' })).toHaveAttribute('href', '/my/inquiries/new');
+    expect(ops.queryByRole('button', { name: /복구/ })).not.toBeInTheDocument();
+
+    const own = await teamCard('망원 새벽 FC');
+    expect(own.getByRole('button', { name: '망원 새벽 FC 복구' })).toBeInTheDocument();
+  });
+
+  it('목록을 받은 뒤 운영팀이 보관했으면 403 이유를 보여 주고 문의 안내로 바뀐다', async () => {
+    start([IN_WINDOW]);
+    renderPage();
+
+    const card = await teamCard('망원 새벽 FC');
+    mock.state.dissolvedTeams = [{ ...IN_WINDOW, archivedBy: 'admin', canRestore: false, restoreDeadlineAt: null }];
+    fireEvent.click(card.getByRole('button', { name: '망원 새벽 FC 복구' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '복구' }));
+
+    expect(await card.findByRole('alert')).toHaveTextContent('운영팀이 보관한 팀은 직접 복구할 수 없어요');
+    expect(await card.findByText('운영팀이 보관한 팀이라 직접 복구할 수 없어요. 다시 열어야 하면 운영팀에 문의해 주세요.')).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
   });
 

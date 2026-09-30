@@ -23,9 +23,10 @@ function teamRow(status: 'active' | 'archived', deletedAt: Date | null) {
   };
 }
 
-function setup(row: ReturnType<typeof teamRow>) {
+function setup(row: ReturnType<typeof teamRow>, archivedByActor: 'user' | 'admin' = 'user') {
   const prisma = {
     v1Team: { findFirst: jest.fn().mockResolvedValue(row) },
+    v1StatusChangeLog: { findMany: jest.fn().mockResolvedValue([{ targetId: 'team-1', actorType: archivedByActor }]) },
     v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamContactBlock: { findMany: jest.fn().mockResolvedValue([]) },
@@ -61,16 +62,24 @@ describe('TeamsService.detail — 해체된 팀', () => {
     expect(result.contactPolicy).toBeUndefined();
     expect(result.dissolution).toEqual({
       dissolvedAt,
+      archivedBy: 'owner',
       restoreDeadlineAt: new Date('2026-10-20T00:00:00.000Z'),
       canRestore: true,
     });
   });
 
-  it('팀원·비로그인에게는 복구 버튼이 켜지지 않는다', async () => {
+  it('운영팀이 보관한 팀은 팀장에게도 기간 안 복구 버튼이 켜지지 않는다', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-01T00:00:00.000Z'), doNotFake: ['nextTick', 'setImmediate'] });
+    const { service } = setup(teamRow('archived', new Date('2026-09-20T00:00:00.000Z')), 'admin');
+    expect((await service.detail(OWNER, 'team-1')).dissolution).toMatchObject({ archivedBy: 'admin', canRestore: false, restoreDeadlineAt: null });
+  });
+
+  it('팀원·비로그인에게는 복구 버튼도, 누가 보관했는지도 알리지 않는다', async () => {
     const dissolvedAt = new Date();
     for (const viewer of [MEMBER, null]) {
-      const { service } = setup(teamRow('archived', dissolvedAt));
-      expect((await service.detail(viewer, 'team-1')).dissolution?.canRestore).toBe(false);
+      const { service, prisma } = setup(teamRow('archived', dissolvedAt));
+      expect((await service.detail(viewer, 'team-1')).dissolution).toMatchObject({ archivedBy: null, canRestore: false });
+      expect(prisma.v1StatusChangeLog.findMany).not.toHaveBeenCalled();
     }
   });
 

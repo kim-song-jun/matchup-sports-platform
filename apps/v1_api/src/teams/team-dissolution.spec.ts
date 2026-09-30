@@ -5,6 +5,7 @@ import {
   findDissolutionBlockers,
   isOpenCompetitionEntry,
   isWithinRestoreWindow,
+  loadTeamArchivedBy,
   restoreDeadlineOf,
 } from './team-dissolution';
 
@@ -92,9 +93,40 @@ describe('복구 기간(30일)', () => {
     expect(isWithinRestoreWindow(null, dissolvedAt)).toBe(false);
   });
 
-  it('복구 버튼은 팀장에게만 켜진다', () => {
-    expect(buildDissolutionInfo(dissolvedAt, true, dissolvedAt).canRestore).toBe(true);
-    expect(buildDissolutionInfo(dissolvedAt, false, dissolvedAt).canRestore).toBe(false);
+  it('복구 버튼은 팀장이 해체한 팀의 팀장에게만 켜지고, 운영팀 보관은 기간 안이어도 꺼진다', () => {
+    expect(buildDissolutionInfo(dissolvedAt, 'owner', true, dissolvedAt)).toMatchObject({
+      canRestore: true,
+      restoreDeadlineAt: new Date('2026-10-01T09:00:00.000Z'),
+    });
+    expect(buildDissolutionInfo(dissolvedAt, 'owner', false, dissolvedAt).canRestore).toBe(false);
+    expect(buildDissolutionInfo(dissolvedAt, 'admin', true, dissolvedAt)).toMatchObject({
+      archivedBy: 'admin',
+      canRestore: false,
+      restoreDeadlineAt: null,
+    });
+  });
+});
+
+describe('loadTeamArchivedBy — 누가 보관했나', () => {
+  function db(logs: Array<{ targetId: string; actorType: string }>) {
+    return { v1StatusChangeLog: { findMany: jest.fn().mockResolvedValue(logs) } };
+  }
+
+  it('팀마다 마지막 보관 기록의 주체로 가르고, 기록이 없는 옛 보관 행은 운영팀 보관이다', async () => {
+    const fake = db([
+      { targetId: 'by-owner', actorType: 'user' },
+      { targetId: 'by-admin', actorType: 'admin' },
+      { targetId: 'by-system', actorType: 'system' },
+    ]);
+    const archivedBy = await loadTeamArchivedBy(fake as never, ['by-owner', 'by-admin', 'by-system', 'no-log']);
+    expect(['by-owner', 'by-admin', 'by-system', 'no-log'].map(archivedBy)).toEqual(['owner', 'admin', 'admin', 'admin']);
+    expect(fake.v1StatusChangeLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { targetType: 'team', targetId: { in: ['by-owner', 'by-admin', 'by-system', 'no-log'] }, toStatus: 'archived' },
+        orderBy: { createdAt: 'desc' },
+        distinct: ['targetId'],
+      }),
+    );
   });
 });
 

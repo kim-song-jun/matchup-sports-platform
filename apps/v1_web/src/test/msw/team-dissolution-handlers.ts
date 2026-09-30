@@ -9,7 +9,7 @@ import type {
 
 /**
  * 팀 해체(보관)·복구(Task 180 H3) — `docs/api/domains/teams.md` "팀 해체(보관)·복구" 계약을 따르는 상태형 핸들러.
- * 이름 확인(앞뒤 공백 무시)·막는 조건 409·30일 복구 409 를 서버와 같은 코드로 돌려준다.
+ * 이름 확인(앞뒤 공백 무시)·막는 조건 409·운영팀 보관 복구 403·30일 복구 409 를 서버와 같은 코드로 돌려준다.
  */
 const api = '*/api/v1';
 const NOW = '2026-10-01T00:00:00.000Z';
@@ -47,6 +47,7 @@ export function teamDissolutionPreview(overrides: Partial<V1TeamDissolutionPrevi
 export function dissolvedTeamItem(overrides: Partial<V1MyDissolvedTeams['items'][number]> = {}): V1MyDissolvedTeams['items'][number] {
   const teamId = overrides.teamId ?? TEAM_DISSOLUTION_MSW.teamId;
   const dissolvedAt = overrides.dissolvedAt ?? '2026-09-20T06:00:00.000Z';
+  const archivedBy = overrides.archivedBy ?? 'owner';
   return {
     teamId,
     name: TEAM_DISSOLUTION_MSW.teamName,
@@ -54,8 +55,9 @@ export function dissolvedTeamItem(overrides: Partial<V1MyDissolvedTeams['items']
     sportName: '풋살',
     memberCount: 1,
     dissolvedAt,
-    restoreDeadlineAt: dissolvedAt ? new Date(Date.parse(dissolvedAt) + 30 * DAY_MS).toISOString() : null,
-    canRestore: true,
+    archivedBy,
+    restoreDeadlineAt: archivedBy === 'owner' && dissolvedAt ? new Date(Date.parse(dissolvedAt) + 30 * DAY_MS).toISOString() : null,
+    canRestore: archivedBy === 'owner',
     detailRoute: `/teams/${teamId}`,
     ...overrides,
   };
@@ -101,6 +103,7 @@ export function createV1TeamDissolutionMswHandlers(init: {
         teamId,
         status: 'archived',
         dissolvedAt: NOW,
+        archivedBy: 'owner',
         restoreDeadlineAt: new Date(Date.parse(NOW) + 30 * DAY_MS).toISOString(),
         canRestore: true,
         cancelledTeamMatchCount: state.preview.cleanup.recruitingTeamMatchCount,
@@ -115,6 +118,9 @@ export function createV1TeamDissolutionMswHandlers(init: {
       const teamId = String(params.teamId);
       const team = state.dissolvedTeams.find((item) => item.teamId === teamId);
       if (!team) return fail(409, 'TEAM_NOT_DISSOLVED', '해체된 팀이 아니에요.');
+      if (team.archivedBy !== 'owner') {
+        return fail(403, 'TEAM_RESTORE_ADMIN_ONLY', '운영팀이 보관한 팀은 직접 복구할 수 없어요. 운영팀에 문의해 주세요.');
+      }
       if (!team.canRestore) {
         return fail(409, 'TEAM_RESTORE_WINDOW_EXPIRED', '해체하고 30일이 지나 직접 복구할 수 없어요. 운영팀에 문의해 주세요.');
       }

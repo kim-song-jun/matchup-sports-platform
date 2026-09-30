@@ -188,13 +188,17 @@ async function cancelUpcomingTeamSchedulesInTx(tx: Tx, teamId: string, now: Date
  */
 export async function restoreTeamInTx(
   tx: Tx,
-  input: { teamId: string; toStatus: Exclude<V1TeamStatus, 'archived'>; guard?: (team: { deletedAt: Date | null }) => void },
+  input: {
+    teamId: string;
+    toStatus: Exclude<V1TeamStatus, 'archived'>;
+    guard?: (team: { deletedAt: Date | null }) => void | Promise<void>;
+  },
 ) {
   const team = await lockTeam(tx, input.teamId);
   if (team.status !== 'archived') {
     throw new ConflictException({ code: 'TEAM_NOT_DISSOLVED', message: '해체된 팀이 아니에요.' });
   }
-  input.guard?.(team);
+  await input.guard?.(team);
   await tx.v1Team.update({ where: { id: team.id }, data: { status: input.toStatus, deletedAt: null } });
   await tx.v1ChatRoom.updateMany({ where: { teamId: team.id }, data: { status: 'active' } });
   return team;

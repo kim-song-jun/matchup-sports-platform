@@ -40,7 +40,7 @@ import {
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
 import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
-import { buildDissolutionInfo } from './team-dissolution';
+import { buildDissolutionInfo, loadTeamArchivedBy } from './team-dissolution';
 
 /**
  * 정원 마감 안내 문구.
@@ -143,10 +143,12 @@ export class TeamsService {
     const team = await this.getPublicTeam(teamId, user, { includeDissolved: true });
     // 해체된 팀은 지난 경기의 팀 링크가 끊기지 않도록 읽기 전용으로 보여 준다. 누구에게나
     // 비회원 viewer 를 주어 기존 운영 화면(수정·멤버 관리·컨택)이 전부 닫히게 하고, 팀장에게만
-    // 복구 가능 여부를 dissolution 으로 알린다.
+    // 누가 보관했는지와 복구 가능 여부를 dissolution 으로 알린다.
     const dissolved = team.status === 'archived';
     const actualViewer = this.getViewer(team, user);
+    const viewerIsOwner = actualViewer.role === 'owner';
     const viewer = dissolved ? dissolvedTeamViewer() : actualViewer;
+    const archivedBy = dissolved && viewerIsOwner ? (await loadTeamArchivedBy(this.prisma, [team.id]))(team.id) : null;
     const canViewMembers = !dissolved && this.canViewMembers(team, viewer);
     const canSendContact = dissolved ? undefined : await this.canSendContactTo(user, team, viewer);
 
@@ -225,7 +227,7 @@ export class TeamsService {
         score: team.trustScore?.mannerScore ? Number(team.trustScore.mannerScore) : null,
       },
       viewer,
-      dissolution: dissolved ? buildDissolutionInfo(team.deletedAt, actualViewer.role === 'owner', new Date()) : null,
+      dissolution: dissolved ? buildDissolutionInfo(team.deletedAt, archivedBy, viewerIsOwner, new Date()) : null,
     };
   }
 

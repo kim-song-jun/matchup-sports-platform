@@ -89,7 +89,7 @@ function renderPage() {
   );
 }
 
-const EXPIRED: V1TeamDissolutionInfo = { dissolvedAt: '2026-08-01T03:00:00.000Z', restoreDeadlineAt: '2026-08-31T03:00:00.000Z', canRestore: false };
+const EXPIRED: V1TeamDissolutionInfo = { dissolvedAt: '2026-08-01T03:00:00.000Z', archivedBy: 'owner', restoreDeadlineAt: '2026-08-31T03:00:00.000Z', canRestore: false };
 
 describe('해체된 팀 페이지', () => {
   it('읽기 전용으로 팀 이름·해체일을 보여 주고, 가입·운영 입구 없이 전적으로 가는 길을 남긴다', async () => {
@@ -115,7 +115,7 @@ describe('해체된 팀 페이지', () => {
   });
 
   it('30일 안의 팀장에게만 복구 안내와 해체한 팀 목록 링크를 준다', async () => {
-    start(dissolvedTeam({ dissolvedAt: '2026-09-20T06:00:00.000Z', restoreDeadlineAt: '2026-10-20T06:00:00.000Z', canRestore: true }));
+    start(dissolvedTeam({ dissolvedAt: '2026-09-20T06:00:00.000Z', archivedBy: 'owner', restoreDeadlineAt: '2026-10-20T06:00:00.000Z', canRestore: true }));
     renderPage();
 
     expect(await screen.findByText('잘못 해체했나요?')).toBeInTheDocument();

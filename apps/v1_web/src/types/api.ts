@@ -722,13 +722,16 @@ export type V1TeamDetail = {
   };
   /**
    * 해체(보관)된 팀일 때만 채워진다(Task 180 H3). 이때 `status` 는 'archived' 이고 viewer 는
-   * 누구에게나 비회원 형태라 운영 화면이 닫힌다. `canRestore` 는 30일 안의 팀장에게만 true.
+   * 누구에게나 비회원 형태라 운영 화면이 닫힌다. `canRestore` 는 팀장이 해체한 팀의 팀장에게 30일 안만 true.
    */
   dissolution?: V1TeamDissolutionInfo | null;
 };
 
 export type V1TeamDissolutionInfo = {
   dissolvedAt: string | null;
+  /** 팀장 해체(owner)만 셀프 복구 대상이고 운영팀 보관(admin)은 운영팀만 푼다. 팀장이 아닌 viewer 에게는 null. */
+  archivedBy: 'owner' | 'admin' | null;
+  /** 셀프 복구 기한. 운영팀 보관이면 null. */
   restoreDeadlineAt: string | null;
   canRestore: boolean;
 };
@@ -779,7 +782,7 @@ export type V1DissolveTeamResult = V1TeamDissolutionInfo & {
 /** `POST /teams/:teamId/restore` — 30일 안이면 팀과 팀 채팅방만 다시 연다. */
 export type V1RestoreTeamResult = { teamId: string; status: 'active'; detailRoute: string };
 
-/** `GET /me/dissolved-teams` — 내가 팀장인 해체한 팀. 기간이 지난 팀도 canRestore=false 로 온다. */
+/** `GET /me/dissolved-teams` — 내가 팀장인 보관 팀. 기간이 지났거나 운영팀이 보관한 팀도 canRestore=false 로 온다. */
 export type V1MyDissolvedTeams = {
   items: Array<V1TeamDissolutionInfo & {
     teamId: string;

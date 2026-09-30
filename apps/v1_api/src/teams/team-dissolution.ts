@@ -16,12 +16,37 @@ export function isWithinRestoreWindow(dissolvedAt: Date | null, now: Date): bool
   return now.getTime() <= restoreDeadlineOf(dissolvedAt).getTime();
 }
 
-/** 팀 상세·해체한 팀 목록이 함께 쓰는 해체 정보. 복구 가능 여부는 팀장에게만 참이다. */
-export function buildDissolutionInfo(dissolvedAt: Date | null, viewerIsOwner: boolean, now: Date) {
+/** 누가 보관했나. 팀장이 해체한 팀만 셀프 복구 대상이고, 운영팀이 보관한 팀은 운영팀만 푼다. */
+export type TeamArchivedBy = 'owner' | 'admin';
+
+/**
+ * 팀마다 마지막 `toStatus: 'archived'` 상태 변경 기록으로 가른다. 보관 경로는 팀장 해체(actorType
+ * user)와 어드민 팀 상태 변경(admin) 둘뿐이라, 기록이 없거나 user 가 아닌 보관은 전부 운영팀 보관이다.
+ */
+export async function loadTeamArchivedBy(db: Db, teamIds: string[]): Promise<(teamId: string) => TeamArchivedBy> {
+  const logs = teamIds.length === 0
+    ? []
+    : await db.v1StatusChangeLog.findMany({
+        where: { targetType: 'team', targetId: { in: teamIds }, toStatus: 'archived' },
+        orderBy: { createdAt: 'desc' },
+        distinct: ['targetId'],
+        select: { targetId: true, actorType: true },
+      });
+  const ownerArchived = new Set(logs.filter((log) => log.actorType === 'user').map((log) => log.targetId));
+  return (teamId) => (ownerArchived.has(teamId) ? 'owner' : 'admin');
+}
+
+/**
+ * 팀 상세·해체한 팀 목록이 함께 쓰는 해체 정보. 복구 가능 여부는 팀장이 해체한 팀의 팀장에게만 참이다.
+ * `archivedBy` 가 null 이면 이 viewer 에게 알리지 않는다(운영팀 조치를 공개 상세에 드러내지 않는다).
+ */
+export function buildDissolutionInfo(dissolvedAt: Date | null, archivedBy: TeamArchivedBy | null, viewerIsOwner: boolean, now: Date) {
+  const selfRestorable = archivedBy === 'owner';
   return {
     dissolvedAt,
-    restoreDeadlineAt: dissolvedAt === null ? null : restoreDeadlineOf(dissolvedAt),
-    canRestore: viewerIsOwner && isWithinRestoreWindow(dissolvedAt, now),
+    archivedBy,
+    restoreDeadlineAt: selfRestorable && dissolvedAt !== null ? restoreDeadlineOf(dissolvedAt) : null,
+    canRestore: viewerIsOwner && selfRestorable && isWithinRestoreWindow(dissolvedAt, now),
   };
 }
 

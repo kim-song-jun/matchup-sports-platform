@@ -26,6 +26,8 @@ function setup(state: {
   roles?: Record<string, string>;
   candidates?: unknown[];
   members?: string[];
+  /** 마지막 보관 기록의 주체. 기본은 팀장 해체. */
+  archivedByActor?: 'user' | 'admin';
 } = {}) {
   const team = state.team === undefined ? { id: TEAM, name: '마포 FC', status: 'active', deletedAt: null } : state.team;
   const roles = state.roles ?? { [OWNER]: 'owner', 'manager-1': 'manager', 'member-1': 'member' };
@@ -70,7 +72,13 @@ function setup(state: {
     },
     v1ScheduleGuestRecruitment: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     v1ChatRoom: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-    v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
+    v1StatusChangeLog: {
+      create: jest.fn(),
+      createMany: jest.fn(),
+      findMany: jest.fn(({ where }) =>
+        Promise.resolve(where.targetId.in.map((targetId: string) => ({ targetId, actorType: state.archivedByActor ?? 'user' }))),
+      ),
+    },
     $transaction: jest.fn(),
   };
   prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => unknown) => cb(prisma));
@@ -210,6 +218,25 @@ describe('TeamDissolutionService.restore — 30일 경계', () => {
     expect(prisma.v1Team.update).not.toHaveBeenCalled();
   });
 
+  it('운영팀이 보관한 팀은 기간 안이어도 403 TEAM_RESTORE_ADMIN_ONLY 이고 아무것도 되살리지 않는다', async () => {
+    jest.useFakeTimers({ now: new Date('2026-09-02T09:00:00.000Z'), doNotFake: ['nextTick', 'setImmediate'] });
+    const { service, prisma } = setup({ team: archived, archivedByActor: 'admin' });
+    await expect(service.restore(user(OWNER), TEAM)).rejects.toMatchObject({ status: 403, response: { code: 'TEAM_RESTORE_ADMIN_ONLY' } });
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('판정과 잠금 사이에 운영팀이 다시 보관했으면 잠금 뒤 판정이 막는다', async () => {
+    jest.useFakeTimers({ now: new Date('2026-09-02T09:00:00.000Z'), doNotFake: ['nextTick', 'setImmediate'] });
+    const { service, prisma } = setup({ team: archived });
+    prisma.v1StatusChangeLog.findMany
+      .mockResolvedValueOnce([{ targetId: TEAM, actorType: 'user' }])
+      .mockResolvedValueOnce([{ targetId: TEAM, actorType: 'admin' }]);
+    await expect(service.restore(user(OWNER), TEAM)).rejects.toMatchObject({ status: 403, response: { code: 'TEAM_RESTORE_ADMIN_ONLY' } });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
+  });
+
   it('해체되지 않은 팀은 409 TEAM_NOT_DISSOLVED', async () => {
     const { service } = setup();
     await expect(service.restore(user(OWNER), TEAM)).rejects.toMatchObject({ response: { code: 'TEAM_NOT_DISSOLVED' } });
@@ -217,7 +244,7 @@ describe('TeamDissolutionService.restore — 30일 경계', () => {
 });
 
 describe('TeamDissolutionService.myDissolvedTeams', () => {
-  it('내가 팀장인 보관 팀을 최근 해체 순으로, 기간이 지난 팀은 복구 불가로 준다', async () => {
+  it('내가 팀장인 보관 팀을 최근 해체 순으로, 기간이 지났거나 운영팀이 보관한 팀은 복구 불가로 준다', async () => {
     jest.useFakeTimers({ now: new Date('2026-10-01T00:00:00.000Z'), doNotFake: ['nextTick', 'setImmediate'] });
     const { service, prisma } = setup();
     const row = (id: string, deletedAt: string | null) => ({
@@ -226,14 +253,21 @@ describe('TeamDissolutionService.myDissolvedTeams', () => {
     prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
       row('old', '2026-08-01T00:00:00.000Z'),
       row('recent', '2026-09-25T00:00:00.000Z'),
+      row('admin-recent', '2026-09-28T00:00:00.000Z'),
       row('legacy', null),
+    ]);
+    prisma.v1StatusChangeLog.findMany.mockResolvedValueOnce([
+      { targetId: 'old', actorType: 'user' },
+      { targetId: 'recent', actorType: 'user' },
+      { targetId: 'admin-recent', actorType: 'admin' },
     ]);
     const result = await service.myDissolvedTeams(user(OWNER));
     jest.useRealTimers();
-    expect(result.items.map((item) => [item.teamId, item.canRestore])).toEqual([
-      ['recent', true],
-      ['old', false],
-      ['legacy', false],
+    expect(result.items.map((item) => [item.teamId, item.archivedBy, item.canRestore])).toEqual([
+      ['admin-recent', 'admin', false],
+      ['recent', 'owner', true],
+      ['old', 'owner', false],
+      ['legacy', 'admin', false],
     ]);
     expect(prisma.v1TeamMembership.findMany.mock.calls[0][0].where).toEqual({
       userId: OWNER, status: 'active', role: 'owner', team: { status: 'archived' },

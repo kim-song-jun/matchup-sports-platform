@@ -5,6 +5,7 @@
  * 막고, 혼자 정리할 수 있는 것만 서버가 정리한다"는 경계와 "기록은 남는다"를 행 단위로 확인한다.
  */
 import type { INestApplication } from '@nestjs/common';
+import { AdminService } from '../../src/admin/admin.service';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { PublicTeamRecordsService } from '../../src/games/public-records/public-team-records.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -20,7 +21,9 @@ const memberId = `${PREFIX}-member`;
 const applicantId = `${PREFIX}-applicant`;
 const inviteeId = `${PREFIX}-invitee`;
 const rivalOwnerId = `${PREFIX}-rival-owner`;
-const userIds = [ownerId, managerId, memberId, applicantId, inviteeId, rivalOwnerId];
+const opsUserId = `${PREFIX}-ops`;
+const opsAdminId = `${PREFIX}-ops-admin`;
+const userIds = [ownerId, managerId, memberId, applicantId, inviteeId, rivalOwnerId, opsUserId];
 const teamId = `${PREFIX}-team`;
 const rivalTeamId = `${PREFIX}-rival`;
 const regionId = `${PREFIX}-region`;
@@ -44,6 +47,7 @@ describe('팀 해체(보관)·복구 계약', () => {
   let teams: TeamsService;
   let records: PublicTeamRecordsService;
   let profile: ProfileService;
+  let admin: AdminService;
 
   beforeAll(async () => {
     ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
@@ -52,6 +56,7 @@ describe('팀 해체(보관)·복구 계약', () => {
     teams = app.get(TeamsService);
     records = app.get(PublicTeamRecordsService);
     profile = app.get(ProfileService);
+    admin = app.get(AdminService);
   });
 
   afterAll(async () => {
@@ -76,8 +81,10 @@ describe('팀 해체(보관)·복구 계약', () => {
     await prisma.v1TeamInvitation.deleteMany({ where: { teamId } });
     await prisma.v1TeamJoinApplication.deleteMany({ where: { teamId } });
     await prisma.v1StatusChangeLog.deleteMany({
-      where: { OR: [{ actorUserId: { in: userIds } }, { targetId: { in: [teamId, ...userIds] } }] },
+      where: { OR: [{ actorUserId: { in: userIds } }, { adminUserId: opsAdminId }, { targetId: { in: [teamId, ...userIds] } }] },
     });
+    await prisma.v1AdminActionLog.deleteMany({ where: { adminUserId: opsAdminId } });
+    await prisma.v1AdminUser.deleteMany({ where: { id: opsAdminId } });
     await prisma.v1TeamMembership.deleteMany({ where: { teamId: { in: [teamId, rivalTeamId] } } });
     await prisma.v1TeamProfile.deleteMany({ where: { teamId: { in: [teamId, rivalTeamId] } } });
     await prisma.v1Team.deleteMany({ where: { id: { in: [teamId, rivalTeamId] } } });
@@ -102,6 +109,7 @@ describe('팀 해체(보관)·복구 계약', () => {
     await prisma.v1User.createMany({
       data: userIds.map((id) => ({ id, email: `${id}@integration.test`, accountStatus: 'active' as const, onboardingStatus: 'completed' as const })),
     });
+    await prisma.v1AdminUser.create({ data: { id: opsAdminId, userId: opsUserId, adminRole: 'ops' } });
     await prisma.v1Team.createMany({
       data: [
         { id: teamId, name: '해체 테스트팀', sportId, regionId, ownerUserId: ownerId, status: 'active', memberCount: 3, managerCount: 1 },
@@ -256,5 +264,40 @@ describe('팀 해체(보관)·복구 계약', () => {
     });
     const mine = await dissolution.myDissolvedTeams(asUser(ownerId));
     expect(mine.items.find((item) => item.teamId === teamId)).toMatchObject({ canRestore: false });
+  });
+
+  const archiveByOps = () => admin.changeTeamStatus(asUser(opsUserId), teamId, { status: 'archived', reason: '정책 위반' });
+
+  it('운영팀이 보관한 팀은 기간 안에도 팀장이 복구할 수 없고, 목록·상세에 운영팀 보관으로 보인다', async () => {
+    await archiveByOps();
+    await expect(dissolution.restore(asUser(ownerId), teamId)).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'TEAM_RESTORE_ADMIN_ONLY' },
+    });
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('archived');
+    const mine = await dissolution.myDissolvedTeams(asUser(ownerId));
+    expect(mine.items.find((item) => item.teamId === teamId)).toMatchObject({ archivedBy: 'admin', canRestore: false });
+    expect((await teams.detail(asUser(ownerId), teamId)).dissolution).toMatchObject({ archivedBy: 'admin', canRestore: false });
+  });
+
+  it('마지막 보관 기록이 기준이다 — 운영팀이 풀어 준 뒤 팀장이 다시 해체하면 직접 복구할 수 있다', async () => {
+    await archiveByOps();
+    await admin.changeTeamStatus(asUser(opsUserId), teamId, { status: 'active', reason: '복구 요청' });
+    await dissolve();
+    await expect(dissolution.restore(asUser(ownerId), teamId)).resolves.toMatchObject({ status: 'active' });
+  });
+
+  it('운영팀 보관도 막는 조건이 있으면 409 + details.blockers 이고 아무것도 바꾸지 않는다', async () => {
+    await seedMatchedFriendly();
+    await expect(archiveByOps()).rejects.toMatchObject({
+      status: 409,
+      response: {
+        code: 'TEAM_DISSOLVE_BLOCKED',
+        details: { blockers: [{ kind: 'matched_team_match', items: [{ id: matchedMatchId, opponentName: '상대 테스트팀' }] }] },
+      },
+    });
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('active');
+    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: recruitingMatchId } })).status).toBe('recruiting');
+    expect(await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } })).toBe(0);
   });
 });

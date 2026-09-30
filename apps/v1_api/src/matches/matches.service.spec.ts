@@ -1219,7 +1219,7 @@ describe('MatchesService — on-hold lifecycle', () => {
   const makeService = (row: ReturnType<typeof matchRow>, count = 1, history = 0) => {
     const db: any = {
       v1Match: { findFirst: jest.fn().mockImplementation(async () => row.deletedAt ? null : row), update: jest.fn().mockImplementation(async ({ data }) => Object.assign(row, data)) },
-      v1MatchParticipant: { upsert: jest.fn().mockResolvedValue({ id: 'host-participant' }), count: jest.fn().mockImplementation(async ({ where }) => where.role ? Math.max(0, count - 1) : count), findMany: jest.fn().mockResolvedValue(count > 1 ? [{ userId: otherUser.id }] : []) },
+      v1MatchParticipant: { upsert: jest.fn().mockResolvedValue({ id: 'host-participant' }), count: jest.fn().mockImplementation(async ({ where }) => where.role === 'host' ? (count > 0 ? 1 : 0) : where.role === 'participant' ? Math.max(0, count - 1) : count), findMany: jest.fn().mockResolvedValue(count > 1 ? [{ userId: otherUser.id }] : []) },
       v1MatchApplication: { count: jest.fn().mockResolvedValue(history), findMany: jest.fn().mockResolvedValue([]) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -1232,6 +1232,19 @@ describe('MatchesService — on-hold lifecycle', () => {
   it('past match with no confirmed applicants is editable on hold', async () => {
     const { service } = makeService(matchRow({ startAt: PAST }));
     expect(await service.edit(host, 'match-1')).toMatchObject({ editable: true, status: 'on_hold' });
+  });
+
+  it('zero participants in a one-person recruitment stays on hold and can be deleted', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, maxParticipants: 1 }), 0);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ editable: true, status: 'on_hold' });
+    await expect(service.confirmProceed(host, 'match-1')).rejects.toBeInstanceOf(ConflictException);
+    expect(await service.remove(host, 'match-1')).toEqual({ matchId: 'match-1', deleted: true });
+  });
+
+  it('a nonparticipating host can confirm one active guest below capacity', async () => {
+    const { service, db } = makeService(matchRow({ deadlineAt: PAST }), 1);
+    db.v1MatchParticipant.count.mockImplementation(async ({ where }: any) => where.role === 'host' ? 0 : 1);
+    expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'scheduled' });
   });
 
   it('pending applications do not permit proceeding without confirmed participants', async () => {

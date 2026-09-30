@@ -256,7 +256,7 @@ export class TeamMatchesService {
       deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
-      lifecycle: { canEdit: !teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId, canDelete: Boolean(viewer.manageRoute) && !teamMatch.approvedApplicantTeamId && ['recruiting', 'closed', 'cancelled'].includes(teamMatch.status) && await this.prisma.v1TeamMatchApplication.count({ where: { teamMatchId } }) === 0, onHoldReason: this.getApiStatus(teamMatch) === 'on_hold' ? 'NO_OPPONENT' : null },
+      lifecycle: { canEdit: !teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId, canDelete: !teamMatch.leagueId && !teamMatch.tournamentId && Boolean(viewer.manageRoute) && !teamMatch.approvedApplicantTeamId && ['recruiting', 'closed', 'cancelled'].includes(teamMatch.status) && await this.prisma.v1TeamMatchApplication.count({ where: { teamMatchId } }) === 0, onHoldReason: this.getApiStatus(teamMatch) === 'on_hold' ? 'NO_OPPONENT' : null },
       isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
       costNote: teamMatch.costNote,
       // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
@@ -880,7 +880,7 @@ export class TeamMatchesService {
       await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatchId} FOR UPDATE`;
       const match = await tx.v1TeamMatch.findFirst({ where: { id: teamMatchId, deletedAt: null } });
-      if (!match || match.approvedApplicantTeamId || !['recruiting', 'closed', 'cancelled'].includes(match.status)) throw stateConflict('Team match cannot be deleted');
+      if (!match || match.leagueId || match.tournamentId || match.approvedApplicantTeamId || !['recruiting', 'closed', 'cancelled'].includes(match.status)) throw stateConflict('Team match cannot be deleted');
       if (await tx.v1TeamMatchApplication.count({ where: { teamMatchId } })) throw stateConflict('신청 이력이 있어 삭제할 수 없어요. 팀매치 취소를 이용해 주세요.');
       await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatchId, 'host_deleted');
       await tx.v1Game.updateMany({ where: { teamMatchId, state: 'SCHEDULED' }, data: { state: 'CANCELLED', version: { increment: 1 } } });

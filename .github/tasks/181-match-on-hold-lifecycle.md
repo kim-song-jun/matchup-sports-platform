@@ -54,3 +54,5 @@ Root agent only. 기존 shared-tree WIP 보존. 2026-10-01 사용자 dev 배포 
 - PR 참조 증거: docs/screenshots/task181-match-on-hold/{alpha-before,panel}-{390,768,1440}.png. 배포 후 전체 실제 route after 추가 예정.
 
 - 최종 API 139/139 PASS(보류 complete 우회 차단 포함). 최종 Web client/panel 34/34 PASS, 앞선 관련 102/102 PASS. 웹 타입 PASS 및 radius token 수정 후 pattern PASS. 최신 dev API surface PASS.
+
+- 최종 후속: 실제 신고 매치와 같은 0/1 모집의 보류·진행 차단·삭제와 주최자 불참 + 확정 참가자 1명의 진행 선택을 회귀 테스트로 추가. API 141/141 PASS. 리그/대회 매치 주최팀 삭제 우회 차단. PR #1388(base dev), CI 및 Copilot 검토 진행 중.

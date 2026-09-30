@@ -60,12 +60,16 @@ export function MemberUnavailabilitySheet({
     exitMs: 220, // .tm-filter-sheet.is-closing 과 같은 길이.
   });
 
-  useEffect(() => {
-    if (!open) return;
+  function resetForm() {
     const today = toKstDateString(new Date());
     setReason(null);
     setStartDate(today);
     setEndDate(today);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    resetForm();
     setNotice(null);
   }, [open, userId]);
 
@@ -84,7 +88,8 @@ export function MemberUnavailabilitySheet({
         endsAt: new Date(period.endsAtMs).toISOString(),
         ...(reason === null ? {} : { reason }),
       });
-      setReason(null);
+      // 같은 값으로 다시 누르면 같은 기간이 중복 등록되므로(서버는 겹침을 허용한다) 입력을 초기값으로 되돌린다.
+      resetForm();
       setNotice({ tone: 'info', message: '결장 기간을 등록했어요.' });
     } catch (caught) {
       setNotice({ tone: 'error', message: gameRosterErrorMessage(caught, '결장 기간을 등록하지 못했어요. 잠시 후 다시 시도해 주세요.') });
@@ -95,7 +100,14 @@ export function MemberUnavailabilitySheet({
     setNotice(null);
     try {
       await revoke.mutateAsync(item.id);
-      setNotice({ tone: 'info', message: '결장 기간을 취소했어요. 그 기간 경기에 다시 출전으로 들어가요.' });
+      // 겹치는 다른 결장 기간이 남아 있으면 그 기간에 걸린 경기는 취소 뒤에도 계속 빠진다.
+      const stillCovered = active.some((other) => other.id !== item.id && overlaps(other, item));
+      setNotice({
+        tone: 'info',
+        message: stillCovered
+          ? '결장 기간을 취소했어요. 다른 결장 기간에 걸린 경기는 계속 빠져요.'
+          : '결장 기간을 취소했어요. 그 기간 경기에 다시 출전으로 들어가요.',
+      });
     } catch (caught) {
       setNotice({ tone: 'error', message: gameRosterErrorMessage(caught, '결장 기간을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.') });
     }
@@ -256,6 +268,11 @@ export function countAffectedGames(matrix: V1TeamRosterMatrix | undefined, userI
     if (!(period.startsAtMs <= at && at < period.endsAtMs)) return false;
     return player !== undefined && player.cells[index]?.status !== 'NOT_IN_ROSTER';
   }).length;
+}
+
+/** 두 기간이 반열림 구간 [startsAt, endsAt) 으로 겹치는가. */
+function overlaps(a: V1MemberUnavailability, b: V1MemberUnavailability): boolean {
+  return Date.parse(a.startsAt) < Date.parse(b.endsAt) && Date.parse(b.startsAt) < Date.parse(a.endsAt);
 }
 
 /** 취소되지 않았고 아직 끝나지 않은 기간. */

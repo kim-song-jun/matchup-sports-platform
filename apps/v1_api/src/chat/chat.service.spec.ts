@@ -131,6 +131,7 @@ describe('ChatService', () => {
     v1MatchParticipant: { findFirst: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock };
+    v1UploadAsset: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
   const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
@@ -171,6 +172,7 @@ describe('ChatService', () => {
       v1MatchParticipant: { findFirst: jest.fn() },
       v1TeamMembership: { findFirst: jest.fn() },
       v1TeamMatch: { findFirst: jest.fn() },
+      v1UploadAsset: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     };
     // Default $transaction: pass-through (runs the callback with the same prisma stub)
@@ -288,6 +290,54 @@ describe('ChatService', () => {
         ]),
       }),
     );
+  });
+
+  describe('sendMessage: 사진 (Task 181)', () => {
+    const roomWithRecipient = () => ({
+      ...makeRoom(),
+      participants: [
+        { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
+      ],
+    });
+
+    it('자기 이미지 업로드면 image 메시지로 저장하고, 미리보기 body 는 "사진"·알림은 "사진을 보냈어요"', async () => {
+      const sentAt = new Date('2026-06-21T10:00:00Z');
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithRecipient());
+      prisma.v1UploadAsset.findFirst.mockResolvedValue({ id: 'asset-1', url: '/uploads/2026/10/a.jpg' });
+      prisma.v1ChatMessage.create.mockResolvedValue({ id: 'msg-img', chatRoomId: 'room-1', senderUserId: userA.id, body: '사진', status: 'sent', messageType: 'image', sentAt });
+      prisma.v1ChatRoom.update.mockResolvedValue({});
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: userB.id }]);
+
+      const result = await service.sendMessage(userA, 'room-1', { imageUrl: '/uploads/2026/10/a.jpg' });
+
+      // 소유자·종류까지 걸어 찾는다 — 남의 업로드·영상은 못 싣는다.
+      expect(prisma.v1UploadAsset.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { url: '/uploads/2026/10/a.jpg', ownerUserId: userA.id, kind: 'image' } }),
+      );
+      expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ body: '사진', messageType: 'image', attachmentAssetId: 'asset-1' }),
+      });
+      expect(result).toMatchObject({ messageId: 'msg-img', messageType: 'image', content: '사진', imageUrl: '/uploads/2026/10/a.jpg' });
+      expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [expect.objectContaining({ recipientUserId: userB.id, body: '사진을 보냈어요' })] }),
+      );
+    });
+
+    it('남의 업로드·없는 URL 이면 400 이고 메시지를 만들지 않는다', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithRecipient());
+      prisma.v1UploadAsset.findFirst.mockResolvedValue(null);
+
+      await expect(service.sendMessage(userA, 'room-1', { imageUrl: '/uploads/2026/10/other.jpg' })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'imageUrl' } },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('content 와 imageUrl 을 함께 보내거나 둘 다 없으면 400', async () => {
+      await expect(service.sendMessage(userA, 'room-1', { content: '안녕', imageUrl: '/uploads/a.jpg' })).rejects.toThrow(BadRequestException);
+      await expect(service.sendMessage(userA, 'room-1', {})).rejects.toThrow(BadRequestException);
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
   });
 
   it('sendMessage: muted active participants are excluded from chat notifications', async () => {

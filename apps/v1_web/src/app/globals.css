@@ -5096,6 +5096,126 @@ textarea.tm-chat-input-placeholder::placeholder {
   color: var(--text-caption);
 }
 
+/* ── + 패널(Task 181 A안 — 카카오톡식) ─────────────────────────────────────
+ * + 를 누르면 입력바 아래로 칸이 펼쳐진다(모바일은 키보드 자리). + 는 45° 돌아 × 가 된다.
+ * 패널이 열리면 입력바의 하단 안전영역 여백은 패널이 대신 가진다. */
+.tm-chat-plus-toggle svg {
+  transition: transform var(--duration-fast, 150ms) ease;
+}
+
+.tm-chat-plus-toggle.is-open svg {
+  transform: rotate(45deg);
+}
+
+.tm-chat-inputbar.is-panel-open {
+  padding-bottom: 8px;
+}
+
+.tm-chat-plus-panel {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 8px var(--v1-shell-page-x) calc(16px + var(--v1-shell-safe-bottom));
+  background: var(--bg);
+}
+
+.tm-chat-plus-tile {
+  min-height: 44px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-body);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.tm-chat-plus-tile:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-chat-plus-tile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tm-chat-plus-tile-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-field);
+  background: var(--grey100);
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 사진 말풍선 — 크기를 고정한 정사각 썸네일. 사진이 늦게 떠도 대화가 밀리지 않아
+   마지막 메시지가 가려지지 않는다. 누르면 전체 화면으로 본다. */
+.tm-chat-bubble.tm-chat-bubble-image {
+  padding: 0;
+  overflow: hidden;
+  background: var(--grey100);
+  box-shadow: none;
+}
+
+.tm-chat-image-button {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.tm-chat-image-button:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: -2px;
+}
+
+.tm-chat-image {
+  display: block;
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+}
+
+.tm-chat-image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.tm-chat-image-viewer-panel {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.tm-chat-image-viewer-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 32px);
+  object-fit: contain;
+}
+
+.tm-chat-image-viewer-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--static-white);
+  background: rgba(0, 0, 0, 0.4);
+}
+
 .tm-notification-list {
   padding: 20px var(--v1-shell-page-x) calc(96px + var(--v1-shell-safe-bottom));
 }

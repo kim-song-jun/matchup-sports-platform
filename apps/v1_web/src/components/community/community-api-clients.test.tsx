@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
@@ -24,6 +24,7 @@ const hooks = vi.hoisted(() => ({
   chatRoom: vi.fn(),
   chatMessages: vi.fn(),
   sendChatMessage: vi.fn(),
+  uploadImages: vi.fn(),
   updateMyChatRoom: vi.fn(),
 }));
 
@@ -71,6 +72,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
     useV1ChatRoom: hooks.chatRoom,
     useV1ChatMessages: hooks.chatMessages,
     useV1SendChatMessage: hooks.sendChatMessage,
+    useV1UploadImages: hooks.uploadImages,
     useV1UpdateMyChatRoom: hooks.updateMyChatRoom,
   };
 });
@@ -419,6 +421,70 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate).toHaveBeenCalledWith({ content: '안녕\n반가워요' }, expect.anything());
+  });
+
+  describe('사진 보내기 (Task 181)', () => {
+    const photos = (count: number) => Array.from({ length: count }, (_, i) => new File([`p${i}`], `p${i}.jpg`, { type: 'image/jpeg' }));
+    function arrange(uploadMutateAsync: ReturnType<typeof vi.fn>) {
+      const sendMutateAsync = vi.fn().mockResolvedValue({});
+      hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn(), mutateAsync: sendMutateAsync });
+      hooks.uploadImages.mockReturnValue({ mutateAsync: uploadMutateAsync });
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+      fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+      return { sendMutateAsync };
+    }
+
+    it('고른 사진을 한 번에 올리고 사진마다 메시지 하나로 보낸다', async () => {
+      const upload = vi.fn().mockResolvedValue({ urls: ['/uploads/a.jpg', '/uploads/b.jpg'] });
+      const { sendMutateAsync } = arrange(upload);
+      const files = photos(2);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
+
+      await waitFor(() => expect(sendMutateAsync).toHaveBeenCalledTimes(2));
+      expect(upload).toHaveBeenCalledWith(files);
+      expect(sendMutateAsync).toHaveBeenNthCalledWith(1, { imageUrl: '/uploads/a.jpg' });
+      expect(sendMutateAsync).toHaveBeenNthCalledWith(2, { imageUrl: '/uploads/b.jpg' });
+    });
+
+    it('6장 이상 고르면 앞 5장만 올리고 알려 준다', async () => {
+      const upload = vi.fn().mockResolvedValue({ urls: ['1', '2', '3', '4', '5'].map((n) => `/uploads/${n}.jpg`) });
+      arrange(upload);
+      const files = photos(6);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
+
+      expect(await screen.findByText('사진은 한 번에 5장까지 보낼 수 있어요. 앞의 5장만 보냈어요.')).toBeInTheDocument();
+      expect(upload).toHaveBeenCalledWith(files.slice(0, 5));
+    });
+
+    it('업로드가 실패하면 보내지 않고 서버가 준 이유(용량 초과 등)를 보여 준다', async () => {
+      const upload = vi.fn().mockRejectedValue(new V1ApiError({
+        status: 'error',
+        statusCode: 400,
+        code: 'UPLOAD_FILE_TOO_LARGE',
+        message: '파일 크기가 5MB를 초과했어요. (p0.jpg)',
+        details: null,
+        requestId: 'req-1',
+        timestamp: '2026-10-01T00:00:00.000Z',
+      } as ConstructorParameters<typeof V1ApiError>[0]));
+      const { sendMutateAsync } = arrange(upload);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(1) } });
+
+      expect(await screen.findByText('파일 크기가 5MB를 초과했어요. (p0.jpg)')).toBeInTheDocument();
+      expect(sendMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('이유를 모르는 실패는 기본 안내 문구', async () => {
+      const upload = vi.fn().mockRejectedValue({});
+      arrange(upload);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(1) } });
+
+      expect(await screen.findByText('사진을 보내지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+    });
   });
 
   it('전송 중에는 Enter 를 다시 눌러도 보내지 않는다', () => {

@@ -1967,9 +1967,11 @@ export type V1ChatMessage = {
     displayName: string;
     profileImageUrl: string | null;
   };
-  messageType?: 'text' | 'system';
+  messageType?: 'text' | 'system' | 'image';
   systemEventType?: 'joined' | 'left' | null;
   content: string | null;
+  /** 사진 메시지의 업로드 경로(`/uploads/...`). 숨김·삭제 메시지이거나 업로드가 지워졌으면 null (Task 181). */
+  imageUrl?: string | null;
   status: string;
   sentAt: string;
   mine: boolean;
@@ -2008,7 +2010,9 @@ export type V1ChatRoomResolveResult = {
 export type V1ChatMessageSendResult = {
   messageId: string;
   roomId: string;
+  messageType?: 'text' | 'image';
   content: string;
+  imageUrl?: string | null;
   status: string;
   sentAt: string;
 };

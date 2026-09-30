@@ -1,4 +1,5 @@
 import type { Prisma, V1GameState } from '@prisma/client';
+import { compareRosterOrder } from '../../common/roster-order';
 import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
 import { readSuspensionVerdicts, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
@@ -69,14 +70,12 @@ export async function loadCompetitionRosterBase(
   };
 }
 
-/** 명단 화면·요약·계산 목록이 이 순서를 그대로 쓴다 — 등번호 오름차순, 번호 없는 선수는 뒤에 이름순. */
+/** 명단 화면·요약·계산 목록이 이 순서를 그대로 쓴다 — 규칙은 `compareRosterOrder` 한 곳에 있다. */
 function rosterOrder(a: GameRosterBaseEntry, b: GameRosterBaseEntry): number {
-  if (a.jerseyNumber !== b.jerseyNumber) {
-    if (a.jerseyNumber === null) return 1;
-    if (b.jerseyNumber === null) return -1;
-    return a.jerseyNumber - b.jerseyNumber;
-  }
-  return a.displayNameSnapshot.localeCompare(b.displayNameSnapshot, 'ko') || a.userId.localeCompare(b.userId);
+  return compareRosterOrder(
+    { jerseyNumber: a.jerseyNumber, name: a.displayNameSnapshot, id: a.userId },
+    { jerseyNumber: b.jerseyNumber, name: b.displayNameSnapshot, id: b.userId },
+  );
 }
 
 export interface GameRosterSideContext extends CompetitionTeamScope {

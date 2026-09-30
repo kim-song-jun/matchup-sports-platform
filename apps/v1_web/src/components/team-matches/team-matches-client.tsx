@@ -38,6 +38,7 @@ import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, 
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
+import { buildAttendanceSummary } from './team-match-attendance-summary';
 import {
   buildNextAction,
   formatApplicationTime,
@@ -364,6 +365,9 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         confirmedAtLabel: formatApplicationTime(applications.data?.items.find((item) => item.status === 'approved')?.reviewedAt),
         lineupSubmitted,
         lockNote: canManageMatchListing && apiStatus === 'matched' ? MATCHED_LOCK_NOTE : null,
+        attendance: lineupAction?.kind === 'attendance' && attendanceLineup.data
+          ? buildAttendanceSummary(teamMatchId, attendanceLineup.data, query.data.startsAt, Date.now())
+          : null,
       }
     : undefined;
   const submitApplication = (teamId: string, message: string | null) =>

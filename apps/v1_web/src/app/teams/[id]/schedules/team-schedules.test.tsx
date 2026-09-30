@@ -350,6 +350,27 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1');
   });
 
+  // H5 결정 6 — 친선 경기 일정만 응답 이름을 나눈다. 리그·대회 경기로 이어진 일정은 그대로다.
+  it.each([
+    ['친선 경기 일정', { teamMatchId: 'tm-1', tournamentId: null, leagueId: null }, '올 수 있어요'],
+    ['리그 경기 일정', { teamMatchId: 'tm-1', tournamentId: null, leagueId: 'league-1' }, '참석'],
+    ['대회 경기 일정', { teamMatchId: 'tm-1', tournamentId: 'tournament-1', leagueId: null }, '참석'],
+    ['경기와 이어지지 않은 일정', null, '참석'],
+  ])('%s의 응답 버튼 이름', async (_label, linkedMatch, goingLabel) => {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({ type: 'MATCH', linkedMatch, matchConfirmed: false }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+
+    expect(screen.getByRole('button', { name: goingLabel })).toBeInTheDocument();
+    expect(screen.queryByText('(팀장 참고용)') !== null).toBe(goingLabel === '올 수 있어요');
+  });
+
   describe('참석명단 요약 (H9 D-1)', () => {
     function confirmedMatchSchedule(linkedMatch: { tournamentId: string | null; leagueId: string | null }) {
       scheduleApiMocks.useV1TeamSchedule.mockReturnValue({

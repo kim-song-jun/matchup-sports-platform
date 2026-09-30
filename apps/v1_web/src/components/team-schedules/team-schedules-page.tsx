@@ -6,6 +6,8 @@ import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { Check } from 'lucide-react';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { josa } from '@/lib/korean';
+import { friendlyRsvpLabel } from '@/lib/v1-status-labels';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { scheduleTypeLabel, weekdayHeaders } from './team-schedules.view-model';
@@ -312,7 +314,11 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
             model.roster ? <ScheduleRosterSummary key="roster" model={model.roster} /> : null,
             attendance.visible ? (
               <div key="attendance">
-                <div className="tm-text-label" style={{ marginBottom: 8 }}>내 참석</div>
+                <div className="tm-text-label" style={{ marginBottom: 8 }}>
+                  {attendance.friendlyMatch ? (
+                    <>올 수 있어요? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(팀장 참고용)</span></>
+                  ) : '내 참석'}
+                </div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                   {(['GOING', 'MAYBE', 'NOT_GOING'] as const).map((status) => (
                     <button
@@ -321,18 +327,27 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                       aria-pressed={attendance.myStatus === status}
                       disabled={attendance.disabled || attendance.pending}
                       className={`tm-btn tm-btn-sm ${attendance.myStatus === status ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-                      style={{ minHeight: 44 }}
+                      style={{ minHeight: 44, fontWeight: attendance.myStatus === status ? 700 : undefined }}
                       onClick={() => attendance.onSetStatus(status)}
                     >
-                      {status === 'GOING' ? '참석' : status === 'MAYBE' ? '미정' : '불참'}
+                      {/* 잠긴(취소·마감) 일정은 비활성 배경이 색을 덮어 내 응답이 안 보였다(W2-V3) — 체크로도 표시한다. */}
+                      {attendance.myStatus === status ? <Check size={16} strokeWidth={2.4} aria-hidden="true" /> : null}
+                      {attendance.friendlyMatch ? friendlyRsvpLabel(status) : ATTENDEE_STATUS_LABEL[status]}
                     </button>
                   ))}
                 </div>
+                {/* 위 참석명단 요약이 "나가는 사람은 명단으로 정해진다"를 이미 말하면 되풀이하지 않는다 —
+                    요약은 상대가 확정된 뒤에만 있어, 그 전엔 이 한 줄이 같은 구분을 맡는다. */}
+                {attendance.friendlyMatch && !model.roster ? (
+                  <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    이 응답은 출전을 정하지 않아요. 출전 선수는 팀장·매니저가 참석명단으로 정해요.
+                  </div>
+                ) : null}
                 {attendance.myStatus === 'WAITLISTED' ? (
                   <div className="tm-text-caption" role="status">대기 {attendance.waitlistPosition}번째예요.</div>
                 ) : null}
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                  참석 {attendance.counts.going}명
+                  {attendance.friendlyMatch ? '올 수 있어요' : '참석'} {attendance.counts.going}명
                   {attendance.counts.waitlisted > 0 ? ` · 대기 ${attendance.counts.waitlisted}명` : ''}
                 </div>
                 {attendance.deadlineLabel ? (
@@ -346,8 +361,8 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                 {attendance.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={attendance.error} /></div> : null}
               </div>
             ) : null,
-            model.attendees.visible ? <ScheduleAttendeeSection key="attendees" model={model.attendees} /> : null,
-            guestRecruitment.visible || guestRecruitment.manage ? (
+            model.attendees.visible ? <ScheduleAttendeeSection key="attendees" model={model.attendees} friendlyMatch={attendance.friendlyMatch} /> : null,
+            showsGuestRecruitment(guestRecruitment) ? (
               <GuestRecruitmentSection key="guest" model={guestRecruitment} />
             ) : null,
             manage.visible ? (
@@ -517,9 +532,10 @@ const ATTENDEE_STATUS_BADGE_CLASS: Record<string, string> = {
 /** 원본 목업(preview.html "02 · 일정 상세와 참석 현황")의 전체/참석/미응답 탭 명단 —
  * 매니저가 "누가 오는지"를 한 명씩 보고 미응답자를 식별할 수 있어야 한다는 설계였는데,
  * 실제 구현은 그동안 goingCount 등 집계 숫자와 내 참석 여부만 보여줬다. */
-function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['attendees'] }) {
+function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDetailViewModel['attendees']; friendlyMatch: boolean }) {
   const [tab, setTab] = useState<'all' | 'going' | 'no_response'>('all');
   if (!model.visible) return null;
+  const statusLabel = (status: string) => (friendlyMatch ? friendlyRsvpLabel(status) : ATTENDEE_STATUS_LABEL[status] ?? status);
 
   const filtered =
     tab === 'going'
@@ -530,13 +546,13 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
 
   return (
     <div>
-      <div className="tm-text-label" style={{ marginBottom: 8 }}>참석 현황</div>
+      <div className="tm-text-label" style={{ marginBottom: 8 }}>{friendlyMatch ? '응답 현황' : '참석 현황'}</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button type="button" className={`tm-btn tm-btn-sm ${tab === 'all' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('all')}>
           전체 {model.counts.all}
         </button>
         <button type="button" className={`tm-btn tm-btn-sm ${tab === 'going' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('going')}>
-          참석 {model.counts.going}
+          {statusLabel('GOING')} {model.counts.going}
         </button>
         <button type="button" className={`tm-btn tm-btn-sm ${tab === 'no_response' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('no_response')}>
           미응답 {model.counts.noResponse}
@@ -592,14 +608,14 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
                   className="tm-btn tm-btn-sm tm-btn-neutral"
                   style={{ minHeight: 44 }}
                   disabled={model.proxyPendingUserId !== null}
-                  aria-label={`${item.nickname} 참석으로 대신 표시`}
+                  aria-label={`${item.nickname} ${josa(statusLabel('GOING'), ['으로', '로'])} 대신 표시`}
                   onClick={() => model.onProxyGoing(item.userId)}
                 >
-                  {model.proxyPendingUserId === item.userId ? '처리 중…' : '참석 대신 표시'}
+                  {model.proxyPendingUserId === item.userId ? '처리 중…' : `${statusLabel('GOING')} 대신 표시`}
                 </button>
               ) : null}
               <span className={`tm-badge ${ATTENDEE_STATUS_BADGE_CLASS[item.status] ?? 'tm-badge-grey'}`}>
-                {ATTENDEE_STATUS_LABEL[item.status] ?? item.status}
+                {statusLabel(item.status)}
               </span>
             </div>
           ))}
@@ -609,8 +625,16 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
   );
 }
 
+/**
+ * 취소·종료된 일정은 모집을 열 수도 고칠 수도 없다 — 열린 적 없는 모집을 "아직"이라 말하지 않고 칸을 없앤다(W2-V4).
+ * 부모가 구분선 칸을 만들기 전에 판정해야 빈 칸이 남지 않는다.
+ */
+function showsGuestRecruitment(model: ScheduleDetailViewModel['guestRecruitment']): boolean {
+  return model.visible || Boolean(model.manage?.scheduleActive);
+}
+
 function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['guestRecruitment'] }) {
-  if (!model.visible && !model.manage) return null;
+  const scheduleActive = model.manage?.scheduleActive ?? false;
 
   return (
     <div>
@@ -632,14 +656,12 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
         <div className="tm-text-caption">아직 용병 모집이 열려 있지 않아요.</div>
       )}
 
-      {model.manage ? (
+      {model.manage && scheduleActive ? (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {!model.manage.exists ? (
-            model.manage.canCreate ? (
-              <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" disabled={model.manage.pending} onClick={model.manage.onCreate}>
-                용병 모집 열기
-              </button>
-            ) : null
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" disabled={model.manage.pending} onClick={model.manage.onCreate}>
+              용병 모집 열기
+            </button>
           ) : (
             <>
               <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" disabled={model.manage.pending} onClick={model.manage.onEdit}>

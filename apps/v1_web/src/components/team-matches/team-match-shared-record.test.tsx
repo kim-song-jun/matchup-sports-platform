@@ -14,12 +14,25 @@ vi.mock('@/hooks/use-team-match-record', () => ({
 }));
 // 신원 연결 입구는 리그 경기 상세와 같은 컴포넌트다(자체 테스트 있음) — 여기서는 노출 조건만 본다.
 const claim = vi.hoisted(() => ({ viewer: undefined as Record<string, unknown> | undefined }));
-vi.mock('@/hooks/use-v1-api', () => ({ useV1TeamMatch: () => ({ data: claim.viewer === undefined ? undefined : { viewer: claim.viewer } }) }));
+// 늦게 온 선수 추가(H5 A-4)는 참석명단 응답의 lateAdditionAllowed 로 열린다 — 팀장·매니저일 때만 조회한다.
+const lineup = vi.hoisted(() => ({ data: undefined as Record<string, unknown> | undefined, calls: [] as Array<{ enabled?: boolean }>, add: vi.fn() }));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TeamMatch: () => ({ data: claim.viewer === undefined ? undefined : { viewer: claim.viewer } }),
+  useV1TeamMatchLineup: (_id: string, options?: { enabled?: boolean }) => {
+    lineup.calls.push(options ?? {});
+    // 꺼 둔 쿼리도 캐시가 있으면 data 를 준다 — 화면이 역할을 다시 확인하는지 보려고 캐시처럼 늘 돌려준다.
+    return { data: lineup.data };
+  },
+  useV1AddLateTeamMatchLineupParticipant: () => ({ mutate: lineup.add, isPending: false, isError: false, error: null }),
+}));
 vi.mock('@/components/public-game-records/claim-my-record', () => ({
   TeamMatchClaimMyRecordSection: ({ teamMatchId }: { teamMatchId: string }) => <button type="button">명단에서 나 찾기 ({teamMatchId})</button>,
 }));
 beforeEach(() => {
   claim.viewer = undefined;
+  lineup.data = undefined;
+  lineup.calls = [];
+  lineup.add.mockReset();
   state.mutate.mockReset().mockResolvedValue({});
   state.replace.mockReset();
   state.search = '';
@@ -351,5 +364,104 @@ describe('shared record participant flow', () => {
     fireEvent.click(screen.getByRole('button', { name: '서브매치 만들기' }));
     await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'submatch_add', title: '전반전', expectedVersion: 3 })));
     expect(screen.getByRole('button', { name: '우리 팀 종료 확인' })).toBeInTheDocument();
+  });
+});
+
+describe('H5 — 기록 화면의 팀장 권한·게스트·공개 득점·늦게 온 선수', () => {
+  it('명단 밖 팀장·매니저는 "팀장 권한" 표시를 보고, 명단 안 참가자에게는 없다(대조군)', () => {
+    state.data = { ...state.data, teamAuthority: true };
+    const { unmount } = render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByText('팀장 권한')).toBeInTheDocument();
+    expect(screen.getByText(/명단에 없어도 기록하고 종료를 확인할 수 있어요/)).toBeInTheDocument();
+    unmount();
+
+    state.data = { ...state.data, teamAuthority: false };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.queryByText('팀장 권한')).not.toBeInTheDocument();
+  });
+
+  it('L22: 게스트 득점자는 칩과 "개인 기록엔 안 남아요"로 구분하고, 계정 있는 선수에게는 붙이지 않는다', () => {
+    state.data.participants = [
+      { id: 'h1', sideId: 'home', name: '김민수', jerseyNumber: 7, profileImageUrl: null, guest: false },
+      { id: 'hg', sideId: 'home', name: '선수07게스트', jerseyNumber: null, profileImageUrl: null, guest: true },
+    ];
+    state.data.goals = [
+      { id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 3, subMatchId: null },
+      { id: 'g2', sideId: 'home', participantId: 'hg', ownGoal: false, minute: 8, subMatchId: null },
+    ];
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    const guestRow = within(screen.getByRole('group', { name: '선수07게스트 득점 기록' }));
+    expect(guestRow.getByText('게스트')).toBeInTheDocument();
+    expect(guestRow.getByText('개인 기록엔 안 남아요')).toBeInTheDocument();
+    const memberRow = within(screen.getByRole('group', { name: '김민수 득점 기록' }));
+    expect(memberRow.queryByText('게스트')).not.toBeInTheDocument();
+  });
+
+  it('W2-V9: 명단 밖 팀원·관전자는 확정 득점을 읽기 전용으로 보고, 편집·변경 이력은 여전히 없다', () => {
+    state.data = {
+      ...state.data,
+      phase: 'official', canEdit: false, participant: false, officialAt: state.data.serverTime,
+      participants: [], goals: [], history: [],
+      sides: [{ id: 'home', key: 'HOME', name: '한강', score: 1 }, { id: 'away', key: 'AWAY', name: '마포', score: 1 }],
+      goalEvents: [
+        { sideId: 'home', participantName: '선수07게스트', minute: 8, ownGoal: false, subMatchId: null },
+        { sideId: 'away', participantName: '박지훈', minute: 20, ownGoal: false, subMatchId: null },
+      ],
+    };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('listitem', { name: '홈 8분 선수07게스트 골' })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: '원정 20분 박지훈 골' })).toBeInTheDocument();
+    expect(screen.queryByText('참가자들의 공동 기록으로 점수가 갱신돼요.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /수정|삭제|득점 추가|종료 확인/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/변경 이력/)).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 참가자는 공개 목록이 아니라 편집할 수 있는 득점 행을 본다', () => {
+    state.data.goals = [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 3, subMatchId: null }];
+    state.data.goalEvents = [{ sideId: 'home', participantName: '김민수', minute: 3, ownGoal: false, subMatchId: null }];
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('group', { name: '김민수 득점 기록' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: /김민수 골/ })).not.toBeInTheDocument();
+  });
+
+  const lateLineup = (overrides: Record<string, unknown> = {}) => ({
+    sideId: 'home', lateAdditionAllowed: true,
+    starters: [{ id: 'h1', userId: 'u-1', displayName: '김민수', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null }],
+    bench: [],
+    eligibleMembers: [
+      { userId: 'u-1', displayName: '김민수', jerseyNumber: 7, attending: true },
+      { userId: 'u-2', displayName: '늦은 선수', jerseyNumber: 7, attending: true },
+      { userId: 'u-3', displayName: '다른 선수', jerseyNumber: 5, attending: true },
+    ],
+    ...overrides,
+  });
+
+  it('A-4: 팀장·매니저는 경기 중 "늦게 온 선수 추가"로 명단에 없는 팀원만 고르고, 겹치는 번호는 싣지 않는다', () => {
+    claim.viewer = { manageableHostTeam: true };
+    lineup.data = lateLineup();
+    state.data = { ...state.data, participant: true, teamAuthority: true };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+
+    expect(screen.getByRole('heading', { name: '우리 팀 명단 1명' })).toBeInTheDocument();
+    expect(screen.getByText('나는 이 경기 명단에 없어요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '늦게 온 선수 추가' }));
+    const sheet = within(screen.getByRole('dialog', { name: '늦게 온 선수 추가' }));
+    expect(sheet.queryByRole('button', { name: '김민수 명단에 추가' })).not.toBeInTheDocument();
+    // 다른 선수(5번)가 번호순으로 먼저, 김민수와 번호가 겹치는 늦은 선수는 번호 없이 붙는다(서버 422 회피).
+    const names = sheet.getAllByRole('button', { name: /명단에 추가$/ }).map((button) => button.getAttribute('aria-label'));
+    expect(names).toEqual(['다른 선수 명단에 추가', '늦은 선수 명단에 추가', '게스트 명단에 추가']);
+    fireEvent.click(sheet.getByRole('button', { name: '늦은 선수 명단에 추가' }));
+    expect(lineup.add).toHaveBeenCalledWith(expect.objectContaining({ payload: { userId: 'u-2' } }), expect.anything());
+  });
+
+  it.each([
+    ['팀장·매니저가 아니면 명단을 조회하지도 않는다', { participantMember: true }, lateLineup()],
+    ['추가 창이 닫혀 있으면(결과 확정 등) 입구가 없다', { manageableHostTeam: true }, lateLineup({ lateAdditionAllowed: false })],
+  ])('대조군 — %s', (_label, viewer, data) => {
+    claim.viewer = viewer;
+    lineup.data = data;
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.queryByRole('button', { name: '늦게 온 선수 추가' })).not.toBeInTheDocument();
+    if (!('manageableHostTeam' in viewer)) expect(lineup.calls.every((call) => call.enabled === false)).toBe(true);
   });
 });

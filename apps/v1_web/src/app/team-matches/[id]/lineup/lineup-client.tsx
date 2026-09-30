@@ -10,9 +10,13 @@ import {
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { GameRosterStatusBadge } from '@/components/game-roster/game-roster-player-row';
+import { GameRosterPlayerRow } from '@/components/game-roster/game-roster-player-row';
+import { LineupJerseySheet, type LineupJerseyScope } from '@/components/lineup/lineup-jersey-sheet';
+import { LateLineupAdditionSheet } from '@/components/team-matches/late-lineup-addition-sheet';
 import { useV1TeamUnavailability } from '@/hooks/use-v1-game-roster';
+import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
 import {
+  useV1ChangeMembershipJersey,
   useV1MyTeams,
   useV1SaveTeamMatchLineup,
   useV1SubmitTeamMatchLineup,
@@ -27,22 +31,30 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { formatTournamentDateShort, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { josa } from '@/lib/korean';
+import { friendlyRsvpLabel } from '@/lib/v1-status-labels';
 import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { randomUuid } from '@/lib/uuid';
-import type { LineupEditorState, LineupEntryDraft, RosterOption } from './lineup.view-model';
+import type { V1TeamMatchLineup } from '@/types/api';
+import type { LineupEditorState, LineupEntryDraft, LineupNotice, RosterOption } from './lineup.view-model';
 import {
+  addAllRosterMembersToLineup,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
+  compareByJersey,
   competitionRosterHref,
-  deriveLineupCounts,
+  describeGoalkeeperNotice,
   describeLineupPhase,
+  describeLineupSizeNotice,
   describePublicationCountdown,
-  extractConflictCurrentVersion,
+  describePublicationNotice,
+  describeRemaining,
+  formatPublicationTime,
   hydrateLineupEditorState,
   isCompetitionLineupRoute,
+  serverRosterEntries,
   isRosterMemberPlaced,
   addGuestToLineup,
   addRosterMemberToLineup,
@@ -50,6 +62,7 @@ import {
   replaceEntries,
   removeEntry,
   resolveOwnTeamId,
+  resolvePublicLineupAt,
   restoreEntry,
   setGoalkeeper,
   setJerseyNumber,
@@ -60,6 +73,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const teamMatchQuery = useV1TeamMatch(teamMatchId);
   const myTeamsQuery = useV1MyTeams();
   const lineupQuery = useV1TeamMatchLineup(teamMatchId);
+  // 1440(D-4)은 요약·제출이 목록 옆 카드로 간다 — 같은 글을 두 번 그리지 않게 한쪽만 렌더한다.
+  const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
 
   const ownTeamId = useMemo(
     () => resolveOwnTeamId(teamMatchQuery.data, myTeamsQuery.data),
@@ -72,15 +87,25 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   });
   const competitionGameQuery = useV1Game(lineupQuery.data?.gameId, { enabled: isCompetition && ownTeamId === null });
   const rosterQuery = useV1TeamMembers(ownTeamId, { limit: 100 }, { enabled: Boolean(ownTeamId) && !isCompetition });
-  const rosterPool: RosterOption[] = useMemo(
-    () => (rosterQuery.data?.items ?? []).map((member) => ({
-      userId: member.userId,
-      displayName: member.displayName,
-      role: member.role,
-      jerseyNumber: member.jerseyNumber ?? null,
-    })),
-    [rosterQuery.data],
+  const rsvpByUserId = useMemo(
+    () => new Map((lineupQuery.data?.eligibleMembers ?? []).map((member) => [member.userId, member.rsvpStatus ?? null])),
+    [lineupQuery.data],
   );
+  const rosterPool: RosterOption[] = useMemo(
+    () =>
+      (rosterQuery.data?.items ?? [])
+        .map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName,
+          role: member.role,
+          jerseyNumber: member.jerseyNumber ?? null,
+          membershipId: member.membershipId,
+          rsvpStatus: rsvpByUserId.get(member.userId) ?? null,
+        }))
+        .sort(compareByJersey),
+    [rosterQuery.data, rsvpByUserId],
+  );
+  const changeTeamJersey = useV1ChangeMembershipJersey(ownTeamId);
 
   const [loadSheetOpen, setLoadSheetOpen] = useState(false);
   const [loadNotice, setLoadNotice] = useState<string | null>(null);
@@ -143,9 +168,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         lineupQuery.data.editable === true,
         lineupQuery.data.lockReason ?? null,
         matchCancelled,
+        lineupQuery.data.lateAdditionAllowed === true,
       )
     : null;
   const editable = Boolean(phase?.editable) && isOnline;
+  // 첫 기록 뒤: 편집은 닫히고 늦게 온 선수 추가만 열린다(H5 결정 A).
+  const addOnly = !matchCancelled && lineupQuery.data?.lateAdditionAllowed === true && !phase?.editable && isOnline;
   // 친선 참석명단은 결장 기간으로 자동으로 빼지 않는다(제출하는 명단이다) — 고를 때 보이게만 한다(Task 179).
   const kickoffIso = kickoffAt && Number.isFinite(Date.parse(kickoffAt)) ? new Date(kickoffAt).toISOString() : null;
   const unavailabilityQuery = useV1TeamUnavailability(ownTeamId, kickoffIso, {
@@ -294,6 +322,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   const [guestName, setGuestName] = useState('');
+  const [lateSheetOpen, setLateSheetOpen] = useState(false);
+  const [jerseyTargetKey, setJerseyTargetKey] = useState<string | null>(null);
+  const [jerseyError, setJerseyError] = useState<string | null>(null);
 
   // insane review(P1-3, 2026-08 GPT Pro): "제외" 버튼은 실제로는 완전 삭제(moveEntry의
   // 선발↔후보 이동과 다르다) — 등번호·GK 지정·피치 좌표가 전부 소실되고, 재수화된 뒤라면
@@ -373,34 +404,44 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     return <PageSkeleton variant="detail" />;
   }
 
-  const counts = deriveLineupCounts(state, rosterPool);
+  const lineup = lineupQuery.data;
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  const addableWaitingMembers = waitingMembers;
   const unavailableByUser = new Map((unavailabilityQuery.data?.items ?? []).map((item) => [item.userId, item]));
+  // 편집할 수 없을 때는 서버가 가진 명단 그대로 — 추가만 모드에서 늦게 온 선수가 붙으면 바로 보인다.
+  const rosterRows = (editable ? state.participants : serverRosterEntries(lineup)).slice().sort(compareByJersey);
+  const sizeNotice = editable ? describeLineupSizeNotice(state.participants.length, lineup.lineupConfig) : null;
+  const goalkeeperNotice = editable ? describeGoalkeeperNotice(state.participants.filter((entry) => entry.goalkeeper).length) : null;
+  const publicAt = resolvePublicLineupAt(lineup.publicLineupAt, kickoffAt);
+  // 공개 안내는 공개 전에만 — 공개 뒤에는 카운트다운 줄이 "공개됐어요"를 말한다.
+  const publicationNotice =
+    matchCancelled || publicAt === null || Date.parse(publicAt) <= now ? null : describePublicationNotice(publicAt, kickoffAt, now);
+  const lateCandidates = rosterPool.filter((member) => !rosterRows.some((row) => row.userId === member.userId));
 
-  const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? []).map((item) => ({
-    key: `history:${item.lineupId}`,
-    kind: 'history',
-    title: item.sourceLabel,
-    subtitle: [
-      item.opponentName !== null ? `vs ${item.opponentName}` : null,
-      formatMonthDay(item.playedAt),
-    ]
-      .filter((part): part is string => part !== null && part !== undefined)
-      .join(' · '),
-    sportName: item.sportName,
-    formation: item.formation,
-    starterCount: item.starterCount,
-    entries: item.participants,
-  }));
+  // 불러오기 목록(L8): "9/30 (수) vs 합정 유나이티드 · 8명", 편집 중인 이 경기 자신은 뺀다.
+  const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? [])
+    .filter((item) => item.gameId !== lineup.gameId)
+    .map((item) => ({
+      key: `history:${item.lineupId}`,
+      kind: 'history',
+      title: [
+        formatTournamentDateShort(item.playedAt),
+        item.opponentName !== null ? `vs ${item.opponentName}` : null,
+      ]
+        .filter((part): part is string => part !== null)
+        .join(' ')
+        .concat(` · ${item.participants.length}명`),
+      subtitle: item.sourceLabel,
+      sportName: item.sportName,
+      formation: item.formation,
+      entries: item.participants,
+    }));
   const loadablePresets: LoadableLineup[] = (presetsQuery.data?.items ?? []).map((preset) => ({
     key: `preset:${preset.presetId}`,
     kind: 'preset',
     title: preset.name,
-    subtitle: `선발 ${preset.starterCount}명 · 후보 ${preset.benchCount}명`,
+    subtitle: `${preset.entries.length}명`,
     sportName: preset.sportName,
     formation: preset.formation,
-    starterCount: preset.starterCount,
     entries: preset.entries,
   }));
 
@@ -450,6 +491,43 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           : `${resolved.applied.length}명을 불러왔어요 · 종목이 달라 배치는 새로 잡아 주세요.`),
     );
     setLoadSheetOpen(false);
+  }
+
+  /** 아직 없는 팀원을 번호순으로 한 번에 넣는다(A-1). 겹치는 팀 번호는 비워 두고 누구인지 알린다. */
+  function handleAddAll() {
+    if (state === null) return;
+    const result = addAllRosterMembersToLineup(state, rosterPool);
+    setState(result.state);
+    setLoadNotice(
+      result.clearedJersey.length === 0
+        ? null
+        : `${result.clearedJersey.join(', ')}님은 팀 등번호가 다른 선수와 겹쳐 비워 뒀어요. 등번호를 직접 넣어 주세요.`,
+    );
+  }
+
+  const jerseyTarget = jerseyTargetKey === null ? null : state.participants.find((entry) => entry.key === jerseyTargetKey) ?? null;
+  const jerseyMember = jerseyTarget?.userId ? rosterPool.find((member) => member.userId === jerseyTarget.userId) ?? null : null;
+
+  /** 번호 시트(D-5): 이 경기만이면 초안만, 팀 번호도 함께면 팀 번호를 먼저 저장한 뒤 초안까지 바꾼다. */
+  function handleSaveJersey(jerseyNumber: number | null, scope: LineupJerseyScope) {
+    if (jerseyTarget === null) return;
+    const key = jerseyTarget.key;
+    const applyToDraft = () => {
+      setState((prev) => (prev ? setJerseyNumber(prev, key, jerseyNumber) : prev));
+      setJerseyTargetKey(null);
+    };
+    setJerseyError(null);
+    if (scope === 'match' || jerseyMember?.membershipId === undefined) {
+      applyToDraft();
+      return;
+    }
+    changeTeamJersey.mutate(
+      { membershipId: jerseyMember.membershipId, jerseyNumber },
+      {
+        onSuccess: applyToDraft,
+        onError: (error) => setJerseyError(extractErrorMessage(error, '팀 번호를 바꾸지 못했어요. 이 경기만 바꾸거나 다시 시도해 주세요.')),
+      },
+    );
   }
 
   /** 팀 등번호를 기본값으로 채우되, 명단의 다른 행이 이미 쓰는 번호면 비워 두고 알린다. */
@@ -503,7 +581,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     }
   }
   const validationErrors = validateLineupForSubmit(state);
-  const publicationLabel = matchCancelled ? null : describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
+  const publicationLabel = matchCancelled ? null : describePublicationCountdown(publicAt, now);
   const submittedWithoutChanges =
     !state.dirty &&
     (lineupQuery.data.state === 'SUBMITTED' ||
@@ -532,9 +610,24 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     submitWithVersion(state.baseRevision);
   }
 
+  const title = teamMatchQuery.data?.title ?? '팀매치';
+  const badgeClass = `tm-badge ${phase.editable ? 'tm-badge-blue' : 'tm-badge-grey'}`;
+  const submitButtons = editable ? (
+    <SubmitButtons
+      dirty={state.dirty}
+      saving={saveStatus === 'saving'}
+      submitPending={submitMutation.isPending}
+      submitFlowPending={submitFlowPending}
+      blocked={validationErrors.length > 0}
+      submittedWithoutChanges={submittedWithoutChanges}
+      onSave={() => runQueuedSave()}
+      onSubmit={handleSubmit}
+    />
+  ) : null;
+
   return (
     <>
-      <div style={{ padding: '16px 20px 168px' }}>
+      <div className="tm-attendance-lineup-page">
         {!isOnline ? (
           <div style={{ marginBottom: 12 }}>
             <AlertBanner tone="warning" message="오프라인 상태예요. 연결이 끊긴 동안 변경사항은 저장되지 않아요." />
@@ -561,7 +654,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           <div style={{ marginBottom: 12 }}>
             <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <p role="status" aria-live="polite" className="tm-text-caption" style={{ color: 'var(--text-muted)', flex: 1, margin: 0 }}>
-                {pendingRemoval.entry.displayName} 선수를 명단에서 제거했어요.
+                {pendingRemoval.entry.displayName} 선수를 명단에서 뺐어요.
               </p>
               <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={handleUndoRemoval}>
                 실행 취소
@@ -570,12 +663,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           </div>
         ) : null}
 
+        {/* 1440 은 목록 560px + 옆 요약(D-4) — 모바일 리듬을 그대로 두고 남는 자리에 제출 요약을 둔다. */}
+        <div className="tm-attendance-lineup-layout">
+        <div>
+        {isDesktop ? null : (
         <Card pad={16} style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <div className="tm-text-body-lg" style={{ fontWeight: 700 }}>
-              {teamMatchQuery.data?.title ?? '팀매치'}
-            </div>
-            <span className={`tm-badge ${phase.editable ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{phase.label}</span>
+            <div className="tm-text-body-lg" style={{ fontWeight: 700 }}>{title}</div>
+            <span className={badgeClass}>{phase.label}</span>
           </div>
           {kickoffAt ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
@@ -587,12 +682,18 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               {phase.helperText}
             </p>
           ) : null}
+          {publicationNotice ? (
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.6 }}>
+              {publicationNotice}
+            </p>
+          ) : null}
           {publicationLabel ? (
-            <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginTop: 4, fontWeight: 600 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginTop: 4, fontWeight: 600, lineHeight: 1.6 }}>
               {publicationLabel}
             </p>
           ) : null}
         </Card>
+        )}
 
         {/* 순서가 중요하다: 저장 실패는 dirty와 동시에 참이므로 먼저 걸러야 하고, "저장했어요"는
             **마지막 저장 이후 편집이 없을 때만** 참이다 — 예전에는 saveStatus만 보고 그렸기
@@ -618,10 +719,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           ) : null}
         </div>
 
-        {/* 지난 경기와 같은 명단을 매번 처음부터 다시 채우지 않도록. 팀 매치는 명단 자체를
-            팀장이 정하므로, 대회 경기와 달리 불러오기가 명단을 통째로 대신 채운다. */}
-        {editable && ownTeamId !== null ? (
+        {/* 빈 명단은 아래 시작 카드가 같은 두 행동을 크게 보인다(A-1) — 여기 툴바는 명단이 있을 때만. */}
+        {editable && ownTeamId !== null && state.participants.length > 0 ? (
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {waitingMembers.length > 0 ? (
+              <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={handleAddAll} style={{ minHeight: 44 }}>
+                <PlusIcon size={16} aria-hidden="true" /> 팀원 전원 추가
+              </button>
+            ) : null}
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-outline"
@@ -630,19 +735,24 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             >
               이전 참석명단 불러오기
             </button>
-            {state.participants.length > 0 ? (
-              <button
-                type="button"
-                className="tm-btn tm-btn-sm tm-btn-outline"
-                onClick={() => {
-                  setPresetError(null);
-                  setSavePresetOpen(true);
-                }}
-                style={{ minHeight: 44 }}
-              >
-                프리셋으로 저장
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-outline"
+              onClick={() => {
+                setPresetError(null);
+                setSavePresetOpen(true);
+              }}
+              style={{ minHeight: 44 }}
+            >
+              프리셋으로 저장
+            </button>
+          </div>
+        ) : null}
+        {addOnly ? (
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => setLateSheetOpen(true)} style={{ minHeight: 44 }}>
+              <PlusIcon size={16} aria-hidden="true" /> 늦게 온 선수 추가
+            </button>
           </div>
         ) : null}
         {loadNotice !== null ? (
@@ -651,166 +761,87 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           </div>
         ) : null}
 
-        {/* Task 163: 선발/후보 두 섹션을 **하나**로 합쳤다 — 명단 = 출전자(정본 §3). */}
+        {/* 명단 = 출전자(정본 §3) — 한 섹션, 번호순. 행은 번호 칩 · 이름(+결장) · GK·빼기 한 줄(L6). */}
         <section aria-labelledby="lineup-roster-list-heading" style={{ marginBottom: 16 }}>
-          <SectionTitle id="lineup-roster-list-heading" title={`참석명단 (${counts.participantCount})`} />
-          {state.participants.length === 0 ? (
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-              참석명단이 비어 있어요.
-            </p>
+          <div className="tm-section-title" style={{ alignItems: 'flex-start' }}>
+            <div>
+              <div id="lineup-roster-list-heading" className="tm-text-body-lg">{`참석명단 (${rosterRows.length})`}</div>
+              {sizeNotice ? <NoticeLine notice={sizeNotice} /> : null}
+              {goalkeeperNotice ? <NoticeLine notice={goalkeeperNotice} /> : null}
+            </div>
+          </div>
+          {rosterRows.length === 0 ? (
+            editable ? (
+              <EmptyLineupStart
+                memberCount={waitingMembers.length}
+                canLoad={ownTeamId !== null}
+                onAddAll={handleAddAll}
+                onLoad={() => setLoadSheetOpen(true)}
+              />
+            ) : (
+              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
+                참석명단이 비어 있어요.
+              </p>
+            )
           ) : (
-            <>
-              {/* 행마다 숫자만 덩그러니 보이면 등번호인지 알 수 없다(QA 지적) — 열 이름을
-                  붙여 시각적으로만 표시한다. 스크린리더는 각 행의 aria-label(예: "영동
-                  등번호")로 이미 문맥을 얻으므로 헤더 자체는 장식으로 숨긴다. */}
-              <div
-                aria-hidden="true"
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', marginTop: 8 }}
-              >
-                <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 44 }}>
-                  GK
-                </span>
-                <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  이름
-                </span>
-                <span
-                  className="tm-text-micro"
-                  style={{ width: 'var(--size-input-compact-number)', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
-                >
-                  등번호
-                </span>
-              </div>
-              <Card pad={0} style={{ marginTop: 4 }}>
-              {state.participants.map((entry, index) => (
-                <div
-                  key={entry.key}
-                  style={{
-                    padding: 12,
-                    ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* 예전엔 네이티브 라디오 + "선택됐을 때만 보이는 GK 텍스트"였는데, 브라우저
-                        기본 라디오가 작고(터치 타겟 미달) 밋밋해서 "이게 뭘 누르는 버튼인지"
-                        한눈에 안 읽힌다는 지적(QA)을 받았다. 항상 "GK" 글자가 보이는 토글 칩으로
-                        바꿔 미지정 상태도 눈에 띄게 하고, 색은 피치 배치 화면의 골키퍼 토큰 색과
-                        맞춰 두 화면에서 같은 의미가 같은 색으로 읽히게 한다. orange50 배경 위
-                        orange500 텍스트는 대비 ~1.97:1로 WCAG AA 크게 미달(2026-08 QA 실측) —
-                        orange700(~4.92:1)으로 교체.
-                        [알파 감사 E] 미지정 상태도 얇은 실선 테두리라 선발 전원의 칩이 거의
-                        똑같아 보여 "전원 골키퍼로 표시된다"는 알파 실측 지적을 받았다 — 같은
-                        화면 계열인 대회 fixture 라인업(lineup-client.tsx, 2026-08-11)에서 이미
-                        적용한 "미지정=점선 아웃라인, 지정=orange700 채움"을 그대로 옮겨 두
-                        화면이 같은 의미를 같은 형태로 전달하게 한다.
-
-                        **글자는 지정된 행에만 넣는다**(2026-09-08 사용자 확정). 항상 "GK" 를
-                        띄우니 이번엔 반대로 **글자가 값으로 읽혀** QA 가 두 라운드 연속
-                        "전원이 GK" 로 보고했다. 라벨을 지우면 못 찾고, 항상 띄우면 값으로
-                        읽힌다 — 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 열 헤더('GK')가
-                        이 열이 무엇인지 말하고, 각 버튼의 aria-label 이 스크린리더에 같은
-                        문맥을 준다. 피치 배치 화면도 지정된 선수에게만 GK 를 붙인다.
-
-                        **미지정 행에만 "+" 아이콘을 더한다**(2026-09-29 사용자 확정, A/B/C
-                        3안 중 C). 빈 점선 원이 "눌러야 하나?" 라는 지적을 받았다 — "GK" 글자를
-                        다시 항상 띄우면(B안) 위 QA 재발 위험이 있어, 값이 아닌 **일반적인
-                        "추가 가능" 기호**(+)만 얹는다. 지정된 행은 그대로 두므로(오렌지 채움
-                        + "GK") 이 결정이 위 계약을 뒤집지 않는다 — editable 이 아니면(열람
-                        전용) 누를 수 없는데 "+" 가 남아 있으면 거짓 신호라 그때는 이전처럼
-                        빈 원으로 되돌린다. */}
-                    <button
-                      type="button"
-                      aria-pressed={entry.goalkeeper}
-                      disabled={!editable}
-                      onClick={() =>
-                        setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))
-                      }
-                      // 조사는 이름의 받침에 따라 갈린다 — 고정하면 "김철수을" 이 그대로
-                      // 스크린리더로 읽힌다. 화면엔 글자가 없으니 이 라벨이 유일한 안내다.
-                      aria-label={
-                        entry.goalkeeper
-                          ? `${entry.displayName}, 골키퍼 지정 해제`
-                          : `${josa(entry.displayName, ['을', '를'])} 골키퍼로 지정`
-                      }
-                      style={{
-                        flexShrink: 0,
-                        minWidth: 44,
-                        minHeight: 44,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 'var(--radius-pill)',
-                        border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
-                        background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
-                        color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',
-                        fontSize: 12,
-                        fontWeight: entry.goalkeeper ? 800 : 600,
-                        cursor: editable ? 'pointer' : 'default',
-                      }}
-                    >
-                      {entry.goalkeeper ? 'GK' : editable ? <PlusIcon size={16} /> : null}
-                    </button>
-                    <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>
-                      {entry.displayName}
-                      {entry.position ? (
-                        <span
-                          className="tm-text-micro"
-                          style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400 }}
-                        >
-                          {entry.position}
-                        </span>
-                      ) : null}
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      aria-label={`${entry.displayName} 등번호`}
-                      className="tm-input tm-input-compact-number"
-                      value={entry.jerseyNumber ?? ''}
-                      disabled={!editable}
-                      onChange={(event) =>
-                        setState((prev) =>
-                          prev
-                            ? setJerseyNumber(
-                                prev,
-                                entry.key,
-                                event.target.value === '' ? null : Number(event.target.value),
-                              )
-                            : prev,
-                        )
-                      }
-                    />
-                    {editable ? (
-                      <>
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-sm tm-btn-ghost"
-                          aria-label={`${entry.displayName} 참석명단에서 제거`}
-                          onClick={() => handleRemoveEntry(entry, index)}
-                        >
-                          명단에서 제거
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                  {entry.userId !== null && unavailableByUser.has(entry.userId) ? (
-                    // 이름 칸(GK 44 + 간격 12) 아래 줄 — 이름 옆에 두면 390 에서 "명단에서 제거" 가 두 줄로 밀린다.
-                    <div style={{ marginTop: 4, paddingLeft: 56 }}>
-                      <GameRosterStatusBadge status="UNAVAILABLE" reason={unavailableByUser.get(entry.userId)?.reason} />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-              </Card>
-            </>
+            <Card pad={0}>
+              <ul style={{ listStyle: 'none', margin: 0, padding: '0 12px' }}>
+                {rosterRows.map((entry, index) => {
+                  const away = entry.userId === null ? undefined : unavailableByUser.get(entry.userId);
+                  return (
+                    <li key={entry.key} style={index < rosterRows.length - 1 ? { borderBottom: '1px solid var(--border)' } : undefined}>
+                      <GameRosterPlayerRow
+                        jerseyNumber={entry.jerseyNumber}
+                        displayName={entry.displayName}
+                        accountLinked={entry.userId !== null}
+                        status={away === undefined ? undefined : 'UNAVAILABLE'}
+                        reason={away?.reason}
+                        onJerseyPress={
+                          editable
+                            ? () => {
+                                setJerseyError(null);
+                                setJerseyTargetKey(entry.key);
+                              }
+                            : undefined
+                        }
+                        trailing={
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <GoalkeeperToggle
+                              displayName={entry.displayName}
+                              goalkeeper={entry.goalkeeper}
+                              editable={editable}
+                              onToggle={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
+                            />
+                            {editable ? (
+                              <button
+                                type="button"
+                                className="tm-btn tm-btn-sm tm-btn-ghost"
+                                style={{ minHeight: 44, padding: '0 8px' }}
+                                aria-label={`${entry.displayName} 참석명단에서 빼기`}
+                                onClick={() => handleRemoveEntry(entry, state.participants.indexOf(entry))}
+                              >
+                                빼기
+                              </button>
+                            ) : null}
+                          </div>
+                        }
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
           )}
+          {editable && rosterRows.length === 0 && waitingMembers.length > 0 ? (
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '12px 0 0', lineHeight: 1.6 }}>
+              팀에 없는 게스트는 목록이 채워진 뒤 이름만으로 추가할 수 있어요.
+            </p>
+          ) : null}
         </section>
 
-        {editable ? (
+        {editable && rosterRows.length > 0 ? (
           <section aria-labelledby="lineup-roster-heading" style={{ marginBottom: 16 }}>
-            <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${addableWaitingMembers.length})`} />
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-              팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요. 별도의 참석 초대나 응답은 필요하지 않아요.
-            </p>
+            <SectionTitle id="lineup-roster-heading" title={`추가할 팀원 (${waitingMembers.length})`} />
             {unavailabilityQuery.isError ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                 <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>
@@ -831,128 +862,113 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </p>
             ) : waitingMembers.length === 0 ? (
               <div style={{ marginTop: 8 }}>
-                <EmptyState
-                  title="추가할 수 있는 팀원이 없어요"
-                  sub="모든 팀원이 이미 배치됐거나 활성 팀원이 없어요. 게스트를 추가할 수 있어요."
-                />
+                <EmptyState title="추가할 수 있는 팀원이 없어요" sub="모든 팀원이 명단에 있어요. 게스트는 아래에서 추가할 수 있어요." />
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {addableWaitingMembers.map((member) => {
+                {waitingMembers.map((member) => {
                   const away = unavailableByUser.get(member.userId);
                   return (
                     <Card key={member.userId} pad={12}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                          <span className="tm-text-label" style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
-                            {member.displayName}
-                          </span>
-                          {away === undefined ? null : <GameRosterStatusBadge status="UNAVAILABLE" reason={away.reason} />}
-                        </div>
-                        {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
-                            선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
-                            outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() => handleAddMember(member)}
-                        >
-                          명단 추가
-                        </button>
-                      </div>
+                      <GameRosterPlayerRow
+                        jerseyNumber={member.jerseyNumber ?? null}
+                        displayName={member.displayName}
+                        accountLinked
+                        status={away === undefined ? undefined : 'UNAVAILABLE'}
+                        reason={away?.reason}
+                        extraBadges={member.rsvpStatus ? <RsvpChip status={member.rsvpStatus} /> : null}
+                        trailing={
+                          // 행마다 반복되는 버튼이라 outline — 목록이 파랗게 차면 주 행동(제출)이 묻힌다.
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-sm tm-btn-outline"
+                            style={{ minHeight: 44 }}
+                            aria-label={`${member.displayName} 참석명단에 추가`}
+                            onClick={() => handleAddMember(member)}
+                          >
+                            추가
+                          </button>
+                        }
+                      />
                     </Card>
                   );
                 })}
               </div>
             )}
-
-            <Card pad={12} style={{ marginTop: 12 }}>
-              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8 }}>
-                팀에 소속되지 않은 게스트를 이름만으로 추가할 수 있어요. 게스트는 팀 기록에만 반영되고 개인 기록에는 남지 않아요.
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <label htmlFor="lineup-guest-name" className="sr-only">게스트 이름</label>
-                <input
-                  id="lineup-guest-name"
-                  type="text"
-                  className="tm-input"
-                  style={{ flex: 1 }}
-                  placeholder="게스트 이름"
-                  value={guestName}
-                  onChange={(event) => setGuestName(event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="tm-btn tm-btn-sm tm-btn-outline"
-                  aria-label="게스트 추가"
-                  onClick={() => {
-                    setState((prev) => (prev ? addGuestToLineup(prev, guestName) : prev));
-                    setGuestName('');
-                  }}
-                >
-                  <PlusIcon size={16} aria-hidden="true" /> 추가
-                </button>
-              </div>
-            </Card>
+            <GuestAddCard guestName={guestName} onChange={setGuestName} onAdd={() => {
+              setState((prev) => (prev ? addGuestToLineup(prev, guestName) : prev));
+              setGuestName('');
+            }} />
           </section>
         ) : null}
-        </div>
+        {editable && rosterRows.length === 0 && waitingMembers.length === 0 && !rosterQuery.isLoading ? (
+          <GuestAddCard guestName={guestName} onChange={setGuestName} onAdd={() => {
+            setState((prev) => (prev ? addGuestToLineup(prev, guestName) : prev));
+            setGuestName('');
+          }} />
+        ) : null}
 
-        {validationErrors.length > 0 && editable ? (
-          <div style={{ marginBottom: 96 }}>
+        {validationErrors.length > 0 && editable && rosterRows.length > 0 ? (
+          <div style={{ marginBottom: 16 }}>
             <AlertBanner tone="warning" message={validationErrors.join(' ')} />
           </div>
         ) : null}
+        </div>
 
-      {editable ? (
+        {isDesktop ? (
+        <aside className="tm-attendance-lineup-aside" aria-label="참석명단 요약">
+          <Card pad={16}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+              <div className="tm-text-body-lg" style={{ fontWeight: 700 }}>{title}</div>
+              <span className={badgeClass}>{phase.label}</span>
+            </div>
+            <SummaryRow label="킥오프" value={kickoffAt ? formatTournamentDateTimeLong(kickoffAt) : '일정 미정'} />
+            <SummaryRow label="상대 공개" value={describePublicationSummary(publicAt, now)} />
+            <SummaryRow label="상대 팀 제출" value={<OpponentSubmittedBadge lineup={lineup} />} />
+            {phase.helperText ? (
+              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.6 }}>
+                {phase.helperText}
+              </p>
+            ) : null}
+            {submitButtons ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{submitButtons}</div> : null}
+          </Card>
+        </aside>
+        ) : null}
+        </div>
+      </div>
+
+      {submitButtons && !isDesktop ? (
         <div className="tm-fixed-cta">
-          {/* 저장은 명시적이다(2026-08 사용자 요청: "바로바로 실시간 저장 말고 저장 눌렀을 때").
-              예전에는 편집이 멈추고 900ms 뒤 자동저장이 돌았는데, 피치에서 토큰을 드래그하는
-              동안 좌표가 매 포인터 이벤트마다 새 저장을 예약했다 저장을 취소하기를 반복해
-              "저장이 되는 건지 안 되는 건지 모르겠다"는 상태가 됐다. 이제 사용자가 누른
-              그 순간에만 서버로 나간다.
-
-              직렬화(saveInFlightRef)는 자동저장 시절 그대로 유지한다 — 저장 버튼을 연타하면
-              같은 expectedVersion을 든 두 요청이 겹쳐 자기 자신 때문에 409 VERSION_CONFLICT를
-              받고, 그 복구(전체 재로드)가 방금 만든 편집을 통째로 버린다. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <button
-              type="button"
-              className="tm-btn tm-btn-lg tm-btn-neutral"
-              disabled={!state.dirty || saveStatus === 'saving' || submitFlowPending}
-              onClick={() => runQueuedSave()}
-            >
-              {saveStatus === 'saving' ? '저장 중…' : state.dirty ? '저장' : '저장됨'}
-            </button>
-            {/* insane review(P0-1, 2026-08 GPT Pro): 편집 중(dirty)에는 제출 버튼을 그냥 막지
-                않는다 — 대신 클릭 자체를 "flush-then-submit" 트리거로 쓴다: handleSubmit이
-                dirty를 보면 즉시 저장을 밀어넣고, 그 ack로 받은 새 revision으로 이어서
-                제출한다(submitFlowPending이 true인 동안). 저장을 깜빡한 채 제출해도 옛
-                revision이 실려 나가지 않는다. 저장이 실패·충돌하면 submitFlowPending이 즉시
-                풀리고 제출은 나가지 않는다(runQueuedSave의 onError) — saveErrorMessage로
-                이유를 보여준다. */}
-            <button
-              type="button"
-              className="tm-btn tm-btn-lg tm-btn-primary"
-              disabled={
-                validationErrors.length > 0 ||
-                submitMutation.isPending ||
-                submitFlowPending ||
-                submittedWithoutChanges
-              }
-              onClick={handleSubmit}
-            >
-              {submitMutation.isPending
-                ? '제출 중…'
-                : submitFlowPending
-                  ? '변경사항 저장 중…'
-                  : submittedWithoutChanges
-                    ? '제출 완료'
-                    : '참석명단 제출하기'}
-            </button>
-          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>{submitButtons}</div>
         </div>
       ) : null}
+
+      {jerseyTarget !== null ? (
+        <LineupJerseySheet
+          open
+          onClose={() => setJerseyTargetKey(null)}
+          target={{
+            displayName: jerseyTarget.displayName,
+            jerseyNumber: jerseyTarget.jerseyNumber,
+            teamJerseyNumber: jerseyMember?.jerseyNumber ?? null,
+            canChangeTeamNumber: jerseyMember?.membershipId !== undefined,
+          }}
+          holderOf={(jerseyNumber) =>
+            state.participants.find((entry) => entry.key !== jerseyTarget.key && entry.jerseyNumber === jerseyNumber)?.displayName ?? null
+          }
+          pending={changeTeamJersey.isPending}
+          error={jerseyError}
+          onSave={handleSaveJersey}
+        />
+      ) : null}
+
+      <LateLineupAdditionSheet
+        open={lateSheetOpen}
+        onClose={() => setLateSheetOpen(false)}
+        teamMatchId={teamMatchId}
+        candidates={lateCandidates.map((member) => ({ userId: member.userId, displayName: member.displayName, jerseyNumber: member.jerseyNumber ?? null }))}
+        takenNumbers={new Set(rosterRows.flatMap((row) => (row.jerseyNumber === null ? [] : [row.jerseyNumber])))}
+      />
 
       <LoadLineupSheet
         open={loadSheetOpen}
@@ -976,6 +992,204 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       />
     </>
   );
+}
+
+/**
+ * 저장·제출 두 버튼 — 모바일 고정 CTA 와 데스크톱 요약 카드가 같은 것을 쓴다.
+ * 저장은 누른 순간에만 나간다(2026-08 사용자 요청). 제출은 dirty 면 먼저 저장을 밀어넣고 그 ack 의
+ * revision 으로 이어 제출한다(flush-then-submit — 옛 revision 이 제출돼 잠기지 않게).
+ */
+function SubmitButtons(props: {
+  dirty: boolean;
+  saving: boolean;
+  submitPending: boolean;
+  submitFlowPending: boolean;
+  blocked: boolean;
+  submittedWithoutChanges: boolean;
+  onSave: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="tm-btn tm-btn-lg tm-btn-neutral"
+        disabled={!props.dirty || props.saving || props.submitFlowPending}
+        onClick={props.onSave}
+      >
+        {props.saving ? '저장 중…' : props.dirty ? '저장' : '저장됨'}
+      </button>
+      <button
+        type="button"
+        className="tm-btn tm-btn-lg tm-btn-primary"
+        disabled={props.blocked || props.submitPending || props.submitFlowPending || props.submittedWithoutChanges}
+        onClick={props.onSubmit}
+      >
+        {props.submitPending
+          ? '제출 중…'
+          : props.submitFlowPending
+            ? '변경사항 저장 중…'
+            : props.submittedWithoutChanges
+              ? '제출 완료'
+              : '참석명단 제출하기'}
+      </button>
+    </>
+  );
+}
+
+/** 막지 않는 안내 한 줄(L28) — 모자람만 강조를 주황으로, 넘침·GK 는 참고 톤. */
+function NoticeLine({ notice }: { notice: LineupNotice }) {
+  return (
+    <p className="tm-text-caption" style={{ margin: '4px 0 0', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+      {notice.before}
+      <span style={{ fontWeight: 700, color: notice.tone === 'warn' ? 'var(--orange700)' : 'var(--text-strong)' }}>
+        {notice.emphasis}
+      </span>
+      {notice.after}
+    </p>
+  );
+}
+
+/** 빈 명단의 시작(A-1): 한 명씩 누르는 대신 전원 넣고 빼거나, 지난 경기 명단으로 채운다. */
+function EmptyLineupStart({
+  memberCount,
+  canLoad,
+  onAddAll,
+  onLoad,
+}: {
+  memberCount: number;
+  canLoad: boolean;
+  onAddAll: () => void;
+  onLoad: () => void;
+}) {
+  return (
+    <Card pad={20} style={{ textAlign: 'center' }}>
+      <div className="tm-text-body-lg" style={{ fontWeight: 700 }}>참석명단이 비어 있어요</div>
+      <p className="tm-text-label" style={{ color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
+        {memberCount > 0
+          ? `팀원 ${memberCount}명을 한 번에 넣고, 오지 않는 사람만 빼면 돼요.`
+          : '지난 경기 명단을 불러오거나 게스트를 이름으로 넣어 주세요.'}
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+        {memberCount > 0 ? (
+          <button type="button" className="tm-btn tm-btn-lg tm-btn-primary" style={{ minHeight: 44, width: '100%' }} onClick={onAddAll}>
+            <PlusIcon size={18} aria-hidden="true" /> 팀원 {memberCount}명 모두 넣기
+          </button>
+        ) : null}
+        {canLoad ? (
+          <button type="button" className="tm-btn tm-btn-lg tm-btn-outline" style={{ minHeight: 44, width: '100%' }} onClick={onLoad}>
+            지난 경기 명단으로 채우기
+          </button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * GK 토글 — "GK" 글자는 지정된 행에만(항상 띄우면 값으로 읽혀 "전원 GK" 로 오독됐다, 2026-09-08 확정), 미지정
+ * 행은 누를 수 있을 때만 "+"(2026-09-29 확정). 지정 = orange700 채움, 미지정 = 점선 테두리.
+ */
+function GoalkeeperToggle({
+  displayName,
+  goalkeeper,
+  editable,
+  onToggle,
+}: {
+  displayName: string;
+  goalkeeper: boolean;
+  editable: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={goalkeeper}
+      disabled={!editable}
+      onClick={onToggle}
+      // 화면엔 글자가 없을 수 있어 이 라벨이 유일한 안내다 — 조사는 받침에 따라 갈린다.
+      aria-label={goalkeeper ? `${displayName}, 골키퍼 지정 해제` : `${josa(displayName, ['을', '를'])} 골키퍼로 지정`}
+      style={{
+        flexShrink: 0,
+        minWidth: 44,
+        minHeight: 44,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 'var(--radius-pill)',
+        border: goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
+        background: goalkeeper ? 'var(--orange700)' : 'transparent',
+        color: goalkeeper ? 'var(--static-white)' : 'var(--text-caption)',
+        fontSize: 'var(--font-size-caption)',
+        fontWeight: goalkeeper ? 800 : 600,
+        cursor: editable ? 'pointer' : 'default',
+      }}
+    >
+      {goalkeeper ? 'GK' : editable ? <PlusIcon size={16} /> : null}
+    </button>
+  );
+}
+
+/** 팀 일정 응답 — 팀장 참고용 읽기 전용 칩(A-3). 미응답만 주황으로 눈에 띄게. */
+function RsvpChip({ status }: { status: string }) {
+  return (
+    <span className={`tm-badge tm-badge-sm ${status === 'NO_RESPONSE' ? 'tm-badge-orange' : 'tm-badge-grey'}`}>
+      {friendlyRsvpLabel(status)}
+    </span>
+  );
+}
+
+function GuestAddCard({ guestName, onChange, onAdd }: { guestName: string; onChange: (value: string) => void; onAdd: () => void }) {
+  return (
+    <Card pad={12} style={{ marginTop: 12 }}>
+      <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8 }}>
+        팀에 소속되지 않은 게스트를 이름만으로 추가할 수 있어요. 게스트는 팀 기록에만 반영되고 개인 기록에는 남지 않아요.
+      </p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <label htmlFor="lineup-guest-name" className="sr-only">게스트 이름</label>
+        <input
+          id="lineup-guest-name"
+          type="text"
+          className="tm-input"
+          style={{ flex: 1 }}
+          placeholder="게스트 이름"
+          value={guestName}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" style={{ minHeight: 44 }} aria-label="게스트 추가" onClick={onAdd}>
+          <PlusIcon size={16} aria-hidden="true" /> 추가
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+      <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="tm-text-label" style={{ textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
+
+function OpponentSubmittedBadge({ lineup }: { lineup: V1TeamMatchLineup }) {
+  const opponent = lineup.opponent;
+  if (opponent === undefined || opponent.teamName === null) return <>상대 확정 전</>;
+  return (
+    <span className={`tm-badge tm-badge-sm ${opponent.submitted ? 'tm-badge-green' : 'tm-badge-grey'}`}>
+      {opponent.submitted ? '제출 완료' : '제출 전'}
+    </span>
+  );
+}
+
+/** "오후 8:00 · 4시간 3분 남음" / "10/7 (수) 오후 8:00" / "오후 8:00 · 공개됨" — 데스크톱 요약 한 칸. */
+function describePublicationSummary(publicAt: string | null, now: number): string {
+  const time = formatPublicationTime(publicAt, now);
+  if (time === null) return '킥오프 1시간 전';
+  const remaining = describeRemaining(publicAt, now);
+  if (remaining === null) return `${time} · 공개됨`;
+  return remaining === 'days' || remaining === undefined ? time : `${time} · ${remaining} 남음`;
 }
 
 /** 대회·리그 경기로 열렸을 때 편집기 대신 경기 명단 화면을 안내한다. 자동 이동은 하지 않는다. */

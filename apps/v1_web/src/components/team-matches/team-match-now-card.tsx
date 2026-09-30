@@ -217,7 +217,7 @@ export function PendingApplicationCard({ hostTeamName, team }: {
   );
 }
 
-type ProgressStep = { key: string; label: string; done: boolean; status: string | null; href?: string };
+type ProgressStep = { key: string; label: string; done: boolean; status: string | null; href?: string; detail?: ReactNode };
 
 /**
  * A-3 — 상대가 정해진 뒤 참가팀이 보는 진행 체크리스트. 예전 "매치 관리" 카드(명단·결과·후기 입구)를
@@ -235,7 +235,15 @@ export function MatchProgressCard({ model }: { model: TeamMatchDetailViewModel }
   ];
   if (lineup?.kind === 'attendance') {
     const submitted = progress.lineupSubmitted;
-    steps.push({ key: 'lineup', label: '참석명단 제출', done: submitted === true, status: submitted === null ? null : submitted ? '제출 완료' : '제출 전', href: lineup.href });
+    const ownCount = progress.attendance?.ownCount ?? null;
+    steps.push({
+      key: 'lineup',
+      label: '참석명단 제출',
+      done: submitted === true,
+      status: submitted === null ? null : submitted ? (ownCount === null ? '제출 완료' : `제출 완료 · ${ownCount}명`) : '제출 전',
+      href: lineup.href,
+      detail: progress.attendance?.opponent ? <OpponentLineupLine opponent={progress.attendance.opponent} /> : null,
+    });
   } else if (lineup) {
     // 리그 경기 명단은 참가 명단에서 계산돼 이미 채워져 있다 — 빠지는 선수만 조정한다(Task 179).
     steps.push({ key: 'lineup', label: '경기 명단', done: true, status: '참가 명단 기준', href: lineup.href });
@@ -277,6 +285,7 @@ export function MatchProgressCard({ model }: { model: TeamMatchDetailViewModel }
             ) : (
               <div style={STEP_ROW}><StepContent step={step} /></div>
             )}
+            {step.detail}
           </li>
         ))}
       </ol>
@@ -308,5 +317,33 @@ function StepContent({ step }: { step: ProgressStep }) {
       </span>
       {step.status ? <span className="tm-text-micro" style={{ color: 'var(--text-caption)', textAlign: 'right' }}>{step.status}</span> : null}
     </>
+  );
+}
+
+type OpponentLineup = NonNullable<NonNullable<NonNullable<TeamMatchDetailViewModel['progress']>['attendance']>['opponent']>;
+
+/** 참석명단 칸 아래 상대 명단 줄 — 우리 제출 여부는 위 칸이 말하므로 여기선 상대만(H5 D-1). */
+function OpponentLineupLine({ opponent }: { opponent: OpponentLineup }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 32, paddingBottom: 12 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>상대</span>
+          <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{opponent.name}</span>
+          <span className={`tm-badge tm-badge-sm tm-badge-${opponent.badge.tone}`}>{opponent.badge.label}</span>
+        </div>
+        <p className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)', lineHeight: 1.5 }}>{opponent.note}</p>
+      </div>
+      {opponent.viewHref ? (
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-outline"
+          href={opponent.viewHref}
+          aria-label="상대 참석명단 보기"
+          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+        >
+          보기
+        </Link>
+      ) : null}
+    </div>
   );
 }

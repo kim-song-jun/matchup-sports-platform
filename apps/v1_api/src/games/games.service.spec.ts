@@ -625,6 +625,8 @@ describe('GamesService.confirmSideArrival', () => {
     side?: { id: string; teamId: string | null } | null;
     lineups?: Array<{ id: string; sideId: string; revision: number; state: string }>;
     participants?: Array<{ id: string; sideId: string; lineupId: string; arrivedAt: Date | null }>;
+    /** 갱신 결과 count 를 강제한다. 기본은 넘긴 id 수 그대로(경합 없음). */
+    updatedCount?: number;
   } = {}) {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -636,7 +638,9 @@ describe('GamesService.confirmSideArrival', () => {
       v1GameLineup: { findMany: jest.fn().mockResolvedValue(options.lineups ?? []) },
       v1GameParticipant: {
         findMany: jest.fn().mockResolvedValue(options.participants ?? []),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        updateMany: jest.fn(async (args: { where: { id: { in: string[] } } }) => ({
+          count: options.updatedCount ?? args.where.id.in.length,
+        })),
       },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: unknown) => unknown) => callback(tx)) };
@@ -670,6 +674,46 @@ describe('GamesService.confirmSideArrival', () => {
     expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['p-2', 'p-3'] }, arrivedAt: null },
       data: { arrivedAt: expect.any(Date) },
+    });
+  });
+
+  // 좁히는 쿼리라 `gameId`·`sideId`·`invalidatedAt` 하나만 빠져도 다른 경기·다른 팀·대체된 리비전의 참가자를
+  // 도착으로 표시한다. 가짜 tx 는 조건을 무시하고 고정 데이터를 돌려주므로 인자를 직접 잰다.
+  it('사이드·라인업·참가자 조회는 이 경기와 이 사이드로 좁히고, 대체된 리비전은 제외한다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(tx.v1GameSide.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'side-home', gameId: 'game-1' } }),
+    );
+    expect(tx.v1GameLineup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gameId: 'game-1', sideId: 'side-home', invalidatedAt: null } }),
+    );
+    expect(tx.v1GameParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gameId: 'game-1', sideId: 'side-home' } }),
+    );
+    // 경기 행을 잡아(FOR SHARE) 명단 재계산과 엇갈리지 않게 한다 — 잠금 대상이 이 경기인지까지 본다.
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw.mock.calls[0].slice(1)).toEqual(['game-1']);
+  });
+
+  it('이번에 새로 채운 수는 조회한 미검인 수가 아니라 갱신이 실제로 바꾼 행 수다 — 그 사이 개별 검인이 끼어든 경우', async () => {
+    const { service } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [
+        { id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-2', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+      ],
+      updatedCount: 1,
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      participantCount: 2,
+      newlyArrivedCount: 1,
     });
   });
 

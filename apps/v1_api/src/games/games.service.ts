@@ -2654,14 +2654,17 @@ export class GamesService {
       ]);
       const shown = selectLineupParticipantsWithDraftFallback(participants, lineups);
       const pendingIds = shown.filter((participant) => participant.arrivedAt === null).map((participant) => participant.id);
+      let newlyArrivedCount = 0;
       if (pendingIds.length > 0) {
         // `arrivedAt: null` 조건을 다시 건다 — 위 조회와 갱신 사이에 개별 검인이 끼어들어도 그 시각을 덮지 않는다.
-        await tx.v1GameParticipant.updateMany({
+        // 그 경우 실제로 바뀐 행은 조회한 미검인 수보다 적으므로, 이번에 새로 채운 수는 갱신 결과의 count 다.
+        const updated = await tx.v1GameParticipant.updateMany({
           where: { id: { in: pendingIds }, arrivedAt: null },
           data: { arrivedAt: new Date() },
         });
+        newlyArrivedCount = updated.count;
       }
-      return { sideId, participantCount: shown.length, newlyArrivedCount: pendingIds.length };
+      return { sideId, participantCount: shown.length, newlyArrivedCount };
     });
   }
 

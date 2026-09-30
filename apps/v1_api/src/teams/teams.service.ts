@@ -32,6 +32,7 @@ import {
   UpdateTeamDto,
 } from './dto/mutate-team.dto';
 import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
+import type { TeamNameAvailabilityQueryDto } from './dto/teams-query.dto';
 import {
   ApproveTeamJoinApplicationDto,
   CreateTeamJoinApplicationDto,
@@ -39,7 +40,7 @@ import {
   RejectTeamJoinApplicationDto,
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
-import { MyTeamsQueryDto, TeamNameAvailabilityQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 
 /**
  * 정원 마감 안내 문구.

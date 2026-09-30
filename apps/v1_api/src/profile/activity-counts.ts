@@ -1,8 +1,10 @@
 import type { PrismaService } from '../prisma/prisma.service';
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
 /**
- * 활동 집계의 "이번 달" — UTC 달의 [시작, 다음 달 시작). 마이 활동 요약·공개 프로필·홈 통계가 같은
- * 경계를 써야 두 화면의 "이번 달 경기"가 갈리지 않는다(Task 180 F85).
+ * 활동 집계의 "이번 달" — KST 달의 [시작, 다음 달 시작). 마이 활동 요약·공개 프로필·홈 통계가 같은
+ * 경계를 써야 화면마다 "이번 달 경기"가 갈리지 않는다(Task 180 F85).
  */
 export interface ActivityMonth {
   readonly monthStart: Date;
@@ -10,9 +12,12 @@ export interface ActivityMonth {
 }
 
 export function activityMonth(now: Date): ActivityMonth {
+  const kst = new Date(now.getTime() + KST_OFFSET_MS);
+  const year = kst.getUTCFullYear();
+  const month = kst.getUTCMonth();
   return {
-    monthStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
-    nextMonthStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
+    monthStart: new Date(Date.UTC(year, month, 1) - KST_OFFSET_MS),
+    nextMonthStart: new Date(Date.UTC(year, month + 1, 1) - KST_OFFSET_MS),
   };
 }
 

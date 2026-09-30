@@ -16,9 +16,10 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
-import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { fixtureResultLabel, fixtureStatusMeta } from '@/lib/league-fixture-meta';
+import { fixtureResultLabel } from '@/lib/league-fixture-meta';
+import { leagueFixturePhase, leagueStateChip, matchPhaseChip, shouldOfferRecordClaim } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { V1LeagueFixture, V1LeagueStandingRow } from '@/types/league-match';
 
@@ -123,7 +124,6 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     teamIds: [fixture?.homeTeamId ?? null, fixture?.awayTeamId ?? null],
     gameId: recordQuery.data?.gameId ?? teamMatchQuery.data?.gameId ?? null,
   });
-  const rosterCard = <MatchTeamRosterCard team={rosterTeam} />;
 
   const rowByTeam = useMemo(() => {
     const map = new Map<string, V1LeagueStandingRow>();
@@ -184,8 +184,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     );
   }
 
-  const stateMeta = LEAGUE_STATE_META[series.state];
-  const statusMeta = fixtureStatusMeta(fixture.status);
+  // 공개 대진에는 운영 상태가 없어 진행 중은 기록(record) 응답으로만 안다.
+  const phase = recordQuery.data?.status === 'live' ? 'live' : leagueFixturePhase(fixture);
+  const phaseChip = matchPhaseChip(phase, { withSubject: true });
   const result = fixtureResultLabel(fixture);
   const round = roundLabel(series.fixtures, fixture);
   const homeRow = rowByTeam.get(fixture.homeTeamId);
@@ -217,6 +218,17 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     (viewer?.manageableHostTeam === true ||
       viewer?.manageableOpponentTeam === true ||
       viewer?.participantMember === true);
+  // "내 기록 연결"은 우리 팀 출전 카드 아래 한 줄 — 경기가 시작된 뒤 계정이 연결되지 않은 사람에게만(F61).
+  const rosterCard = (
+    <MatchTeamRosterCard
+      team={rosterTeam}
+      footer={({ view, viewerRow }) =>
+        canClaimMyRecord && shouldOfferRecordClaim({ gameState: view.gameState, viewerRow }) ? (
+          <LeagueClaimMyRecordSection leagueId={leagueId} teamMatchId={fixtureId} variant="link" />
+        ) : null
+      }
+    />
+  );
   // 서버 assertCanUseTeamMatchChat(chat.service.ts)과 정확히 같은 기준으로 바꾼다 — 양 팀
   // owner/manager. 예전엔 host_team/approved(=신청서를 낸 사람 한 명)만 봐서, 리그 대진의
   // 신청서를 운영자가 대신 내는 원정팀 owner/manager는 canChat이 영원히 false였다(alpha
@@ -240,7 +252,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
       {/* 리그 문맥 — 어느 리그의 몇 주차 경기인지. 리그명 전체를 그대로 싣는다(팀매치
           상세의 말줄임 배지가 "이상한 글씨"로 읽히던 문제의 반대 방향). */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
+        {/* 리그 상태와 경기 상태를 대상이 적힌 칩 둘로 가른다(F59) — "진행 중"이 경기 상태로 읽히지 않게. */}
+        <StatusChip chip={leagueStateChip(series.state, { withSubject: true })} />
+        <StatusChip chip={phaseChip} />
         <Link href={parentHref} className="tm-pressable text-sm font-semibold text-[var(--text-strong)] underline underline-offset-2">
           {series.title}
         </Link>
@@ -256,15 +270,11 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               MatchDetailContent 는 자체 좌우 패딩(20px)을 가진다 — 이 컨테이너의 px-4 와
               겹쳐 본문만 안으로 밀리지 않게 음수 마진으로 상쇄한다. */}
           <div className="-mx-4">
-            <MatchDetailContent data={recordQuery.data} from={selfHref} afterHeader={rosterCard} />
+            <MatchDetailContent data={recordQuery.data} from={selfHref} afterHeader={rosterCard} showInlineStatus={false} />
           </div>
           {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
               반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}
           <AttestRequestsSection gameId={recordQuery.data.gameId} />
-          {/* 대회 경기 상세와 같은 "내 기록 연결" 배너 (claim 의 리그 판). 기록 본문이
-              뜨는 경우에만 싣는다 — 게임 미공개(404 폴백) 대진은 연결할 기록 자체가
-              화면에 없어 배너가 맥락을 잃는다. 조회는 모달을 연 뒤에만 나간다. */}
-          {canClaimMyRecord ? <LeagueClaimMyRecordSection leagueId={leagueId} teamMatchId={fixtureId} /> : null}
           {/* 리그 고유 문맥 — 대회 본문에는 없는 순위·전적. 팀 상세로 가는 통로이기도 하다. */}
           {(recordLine(homeRow) || recordLine(awayRow)) && (
             <Card pad={16}>
@@ -313,10 +323,12 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               {result.hasScore ? (
                 <span className="text-2xl font-bold text-[var(--text-strong)]">{result.text}</span>
               ) : (
-                <span className="text-sm font-semibold text-[var(--text-muted)]">{result.text}</span>
+                <span className="text-sm font-semibold text-[var(--text-muted)]">
+                  {/* 단계는 위 경기 칩이 말한다 — 여기는 그와 다른 말('집계 제외'·'점수 비공개')만. */}
+                  {result.text === matchPhaseChip(phase).label ? 'vs' : result.text}
+                </span>
               )}
               {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-orange">몰수</span> : null}
-              <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
             </div>
             <TeamSide teamId={fixture.awayTeamId} name={awayName} logoUrl={awayRow?.teamLogoUrl ?? null} record={recordLine(awayRow)} align="right" from={selfHref} />
           </div>

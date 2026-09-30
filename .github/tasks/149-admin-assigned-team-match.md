@@ -1,5 +1,22 @@
 # 149. Admin Team Match Recruitment
 
+## 2026-09-30 — Additive platform match collaboration
+
+Scope: API, Web, Prisma, docs; branch `feat/platform-team-match-collaboration`, base `46833467c`; DEV/alpha only.
+
+- [x] Preserve both-team editing, confirmation and mutual reviews.
+- [x] Add active non-revoked owner/ops as additional record writers for standalone platform matches only.
+- [x] Keep team confirmations participant-only; edits reset confirmations; preserve version/idempotency and actor audit.
+- [x] Add one-way platform reviews for both assigned teams and actual latest-lineup account players, excluding self.
+- [x] Separate platform source from peer scores and reciprocal reveal; immediate received visibility, institutional author, one review per match/target across admins.
+- [x] Add admin-shell record/review entry points using existing components.
+- [x] Local API regression 82/82 and Web 39/39; API/Web typechecks PASS. Five real-DB collaboration scenarios added; execution pending PR CI (no local PostgreSQL).
+- [x] API/scenario docs and changeset; diff/debt review.
+- [ ] PR to dev, review/CI, DEV deployment and Alpha visual verification (390/768/1440).
+
+Decisions: operator status does not create a lineup entry or review target. Admins actually playing retain their ordinary participant rights. Operational reviews do not alter existing peer reputation. Completed records remain locked; existing correction workflow is unchanged.
+Progress: implementation in isolated worktree; no shared-root WIP modified. Browser connector failed twice with kernel exit and QA_PASSWORD is unavailable; Alpha authenticated visual QA pending credentials. No baseline screenshots could be captured.
+
 Date: 2026-09-19
 Owner: codex
 Status: in_progress

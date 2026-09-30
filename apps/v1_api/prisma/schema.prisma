@@ -211,6 +211,7 @@ enum V1PostEventReviewSourceType {
   match
   team_match
   tournament_fixture
+  platform_team_match
 }
 
 enum V1PostEventReviewTargetType {

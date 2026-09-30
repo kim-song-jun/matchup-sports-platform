@@ -1,5 +1,18 @@
 # Domain Contract — Supporting Domains
 
+## 플랫폼 팀매치 운영 리뷰 (Task 149, 2026-09-30)
+
+- 기존 리뷰 source/submit DTO의 `sourceType`에 `platform_team_match` 추가:
+  `GET /reviews/sources/platform_team_match/:sourceId`, `POST /reviews`.
+- 두 엔드포인트는 V1AuthGuard 후 서비스에서 해당 매치의 `platformManaged`, 독립 친선 범위, active·미회수 owner/ops와 연결 계정 상태를 재검증한다. 일반 사용자·support는 403 `PLATFORM_OPERATOR_REQUIRED`.
+- `completed` + current official revision `OFFICIAL` + completedAt 필수(409 `SOURCE_NOT_COMPLETED`). 기존 관리자 설정 리뷰 기간을 적용(410 `REVIEW_WINDOW_CLOSED`).
+- 대상은 양 팀과 최신 유효 제출 라인업에서 실제 계정으로 해석되는 선수. 자기 자신·비출전자·연결되지 않은 게스트는 불가(403 `TARGET_NOT_REVIEWABLE`). 기존 rating/tags/개인 4항목 DTO 검증을 유지한다.
+- 매치/대상별 플랫폼 전체 1건: 게임 잠금 및 DB partial unique index로 어드민 간 중복·동시 제출을 방지한다. 재제출은 기존 결과와 `alreadySubmitted: true` 반환. 숨김/삭제된 리뷰도 중복 제한을 유지한다.
+- `GET /reviews/received`에 바로 공개한다. 작성자는 `{userId:null,name:"Teameet 운영",imageUrl:null}`; 실제 작성자는 DB와 관리자 감사 로그에 보관한다.
+- 운영 리뷰는 별도 source이며 기존 상호 리뷰, reciprocal reveal, 개인/팀 평판·요약에는 영향을 주지 않는다. 운영 권한만으로 어드민이 평가 대상으로 추가되지 않는다.
+- 작성 내역은 관리자 매치 리뷰 화면에서 확인한다. 일반 `tab=written`에는 운영 리뷰를 섞지 않는다. 기존 관리자 리뷰 hide/unhide 경로를 그대로 사용할 수 있다.
+- 마이그레이션은 enum 확장 후 별도 migration에서 partial unique indexes를 추가한다. 기존 행 변환·삭제는 없다.
+
 ## 범위
 
 낮은 호출 빈도지만 프론트 통합 시 누락되기 쉬운 지원 도메인 계약을 정리한다.

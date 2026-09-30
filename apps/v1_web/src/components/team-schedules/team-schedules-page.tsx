@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { Check } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { scheduleTypeLabel, weekdayHeaders } from './team-schedules.view-model';
@@ -308,6 +309,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                 ))}
               </div>
             ) : null,
+            model.roster ? <ScheduleRosterSummary key="roster" model={model.roster} /> : null,
             attendance.visible ? (
               <div key="attendance">
                 <div className="tm-text-label" style={{ marginBottom: 8 }}>내 참석</div>
@@ -412,6 +414,47 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
         <ScheduleCancelConfirm model={model.cancelModal} recruitmentOpen={guestRecruitment.isOpen} />
       </div>
     </>
+  );
+}
+
+/** 친선 경기의 참석명단(누가 뛰나) 요약 — 아래 참석 응답(올 수 있나)과 이름으로 나눈다(H9 D-1). */
+function ScheduleRosterSummary({ model }: { model: NonNullable<ScheduleDetailViewModel['roster']> }) {
+  const summary =
+    model.count === null
+      ? '팀장·매니저가 정해요'
+      : model.count === 0
+        ? '아직 정하지 않았어요 · 팀장·매니저가 정해요'
+        : `${model.count}명 · 팀장·매니저가 정해요`;
+  const row = (
+    <>
+      {model.viewerIncluded === true ? (
+        <span className="tm-badge tm-badge-green" style={{ gap: 4 }}>
+          <Check size={14} strokeWidth={2.4} aria-hidden="true" />
+          명단에 있어요
+        </span>
+      ) : model.viewerIncluded === false ? (
+        <span className="tm-badge tm-badge-grey">명단에 없어요</span>
+      ) : null}
+      <span className="tm-text-body" style={{ flex: 1, minWidth: 0 }}>{summary}</span>
+      {model.href ? (
+        <ChevronRightIcon size={18} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--text-caption)', flexShrink: 0 }} />
+      ) : null}
+    </>
+  );
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 } as const;
+
+  return (
+    <div>
+      <div className="tm-text-label" style={{ marginBottom: 4 }}>참석명단</div>
+      {model.href ? (
+        <Link href={model.href} style={{ ...rowStyle, color: 'inherit' }}>
+          {row}
+        </Link>
+      ) : (
+        <div style={rowStyle}>{row}</div>
+      )}
+      <div className="tm-text-caption">경기에 나가는 사람은 이 명단으로 정해져요.</div>
+    </div>
   );
 }
 

@@ -33,6 +33,7 @@ function buildModel(
     visibilityLabel: '팀 전체',
     capacityLabel: null,
     opponent: null,
+    roster: null,
     version: 1,
     conflictBanner: null,
     onDismissConflict: () => undefined,
@@ -258,6 +259,50 @@ describe('일정 상세 — 취소 확인 창 (H9 A-3)', () => {
   it('취소 요청이 실패하면 창을 연 채로 사유를 알린다', () => {
     renderPage(<ScheduleDetailPageView model={withCancel({ reason: '우천', error: '이미 다른 사람이 일정을 바꿨어요.' })} />);
     expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('이미 다른 사람이 일정을 바꿨어요.');
+  });
+});
+
+describe('일정 상세 — 참석명단 요약 (H9 D-1)', () => {
+  function withRoster(roster: ScheduleDetailViewModel['roster']) {
+    return { ...buildModel({}), roster };
+  }
+
+  it('친선 확정 경기가 아니면 참석명단 줄이 없다', () => {
+    renderPage(<ScheduleDetailPageView model={withRoster(null)} />);
+    expect(screen.queryByText('참석명단')).not.toBeInTheDocument();
+  });
+
+  it('멤버에게는 인원·포함 여부 없이 누가 정하는지와 무엇을 정하는지만 알린다', () => {
+    renderPage(<ScheduleDetailPageView model={withRoster({ count: null, viewerIncluded: null, href: null })} />);
+    expect(screen.getByText('참석명단')).toBeInTheDocument();
+    expect(screen.getByText('팀장·매니저가 정해요')).toBeInTheDocument();
+    expect(screen.getByText('경기에 나가는 사람은 이 명단으로 정해져요.')).toBeInTheDocument();
+    expect(screen.queryByText(/명단에 (있어요|없어요)/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀장·매니저가 정해요/ })).not.toBeInTheDocument();
+  });
+
+  it('팀장·매니저에게는 인원·내 포함 여부를 보여 주고 참석명단 관리로 잇는다', () => {
+    renderPage(
+      <ScheduleDetailPageView
+        model={withRoster({ count: 8, viewerIncluded: true, href: '/team-matches/tm-1/lineup?from=x' })}
+      />,
+    );
+    const link = screen.getByRole('link', { name: /8명 · 팀장·매니저가 정해요/ });
+    expect(link).toHaveAttribute('href', '/team-matches/tm-1/lineup?from=x');
+    expect(link).toHaveTextContent('명단에 있어요');
+  });
+
+  it('명단에 빠졌거나 아직 비어 있으면 그대로 말한다', () => {
+    const view = renderPage(<ScheduleDetailPageView model={withRoster({ count: 8, viewerIncluded: false, href: '/x' })} />);
+    expect(screen.getByText('명단에 없어요')).toBeInTheDocument();
+
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <ScheduleDetailPageView model={withRoster({ count: 0, viewerIncluded: null, href: '/x' })} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('아직 정하지 않았어요 · 팀장·매니저가 정해요')).toBeInTheDocument();
+    expect(screen.queryByText(/명단에 (있어요|없어요)/)).not.toBeInTheDocument();
   });
 });
 

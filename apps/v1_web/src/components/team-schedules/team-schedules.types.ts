@@ -230,6 +230,14 @@ export type ScheduleDetailViewModel = {
   capacityLabel: string | null;
   /** MATCH 타입이 확정됐고(matchConfirmed) 상대팀 이름을 불러왔을 때만 채워진다. */
   opponent: { teamName: string; placeName: string | null; teamMatchHref: string } | null;
+  /** 친선 확정 경기의 참석명단(누가 뛰나) 요약 — 참석 응답(올 수 있나)과 이름을 나눈다. 그 밖엔 null. */
+  roster: {
+    /** 명단 조회가 팀장·매니저만 되므로 멤버에게는 null(인원·포함 여부 없이 설명만). */
+    count: number | null;
+    viewerIncluded: boolean | null;
+    /** 참석명단 관리 화면 — 팀장·매니저만. */
+    href: string | null;
+  } | null;
   version: number;
   conflictBanner: string | null;
   onDismissConflict: () => void;

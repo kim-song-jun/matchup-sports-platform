@@ -8,6 +8,7 @@
 import type { TeamListViewModel, TeamModel } from './teams.types';
 import type { V1Team } from '@/types/api';
 import { formatProvinceWide } from '@/lib/v1-regions';
+import { teamRecruitmentLabel } from '@/lib/v1-status-labels';
 
 export function toTeam(team: V1Team): TeamModel {
   const id = team.teamId ?? team.id;
@@ -15,7 +16,7 @@ export function toTeam(team: V1Team): TeamModel {
   const regionName = formatTeamRegion(team.region, team.regionName);
   const levelTag = formatTeamLevelTag(team);
   const genderRule = team.genderRule ?? '';
-  const full = isTeamAtCapacity(team.memberCount, team.memberGoalCount);
+  const recruitment = teamRecruitmentLabel(team);
 
   return {
     id,
@@ -28,8 +29,8 @@ export function toTeam(team: V1Team): TeamModel {
     region: regionName,
     members: team.memberCount,
     capacity: team.memberGoalCount ?? 0,
-    status: team.joinPolicy === 'closed' || full ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
+    status: recruitment === '가입 가능' ? 'open' : 'closed',
+    statusLabel: recruitment,
     tags: [levelTag, genderRule].filter(Boolean),
     genderRule,
     // 소개가 없으면 **빈 값으로 둔다.** 예전엔 `{지역}에서 활동하는 {종목} 팀이에요.` 를
@@ -62,10 +63,6 @@ export function splitTeamRegion(region?: { name: string; parentName?: string | n
   const [city, ...countyParts] = trimmed.split(/\s+/);
   if (countyParts.length === 0) return { city, county: '전체' };
   return { city, county: countyParts.join(' ') };
-}
-
-export function isTeamAtCapacity(memberCount: number, memberGoalCount?: number | null) {
-  return memberGoalCount != null && memberCount >= memberGoalCount;
 }
 
 /**

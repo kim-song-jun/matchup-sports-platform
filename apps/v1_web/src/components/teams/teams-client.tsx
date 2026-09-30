@@ -42,7 +42,7 @@ import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/l
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
-import { teamRoleLabel } from '@/lib/v1-status-labels';
+import { teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -57,7 +57,6 @@ import {
   buildTeamSportChips,
   deriveTeamScope,
   formatTeamRegion,
-  isTeamAtCapacity,
   splitTeamRegion,
   toTeam,
 } from './teams.card-model';
@@ -916,8 +915,7 @@ function countTeamFilters(
 // 직접 유닛 커버리지를 붙이려고 export 한다(card-model 의 toTeamMatch 와 같은 관행).
 export function toTeamDetail(team: V1TeamDetail): TeamModel {
   const levelLabel = formatTeamDetailLevel(team);
-  const full = isTeamAtCapacity(team.memberCount, team.profile.memberGoalCount);
-  const recruitmentLabel = team.profile.joinPolicy === 'closed' ? '마감' : full ? '정원 마감' : '모집 중';
+  const recruitmentLabel = teamRecruitmentLabel({ joinPolicy: team.profile.joinPolicy, memberCount: team.memberCount, memberGoalCount: team.profile.memberGoalCount });
   const regionName = formatTeamRegion(team.region);
   const genderRule = team.profile.genderRule ?? '';
   // 목업(teams.view-model.ts)을 fallback 으로 받지 않는다. `...fallback` 스프레드는 여기서
@@ -937,7 +935,7 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
     region: regionName,
     members: team.memberCount,
     capacity: team.profile.memberGoalCount ?? 0,
-    status: team.profile.joinPolicy === 'closed' || full ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
+    status: recruitmentLabel !== '가입 가능' ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
     statusLabel: recruitmentLabel,
     genderRule,
     intro: team.profile.introduction ?? `${regionName}에서 활동하는 ${team.sport.name} 팀이에요.`,

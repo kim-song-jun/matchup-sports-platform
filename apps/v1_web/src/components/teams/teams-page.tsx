@@ -452,7 +452,7 @@ function TeamBasicInfoCard({ team, capacity }: { team: TeamDetailViewModel['team
             <InfoRow label="레벨" value={team.level} />
             <InfoRow label="성별 조건" value={team.genderRule} />
             <InfoRow label="정원" value={capacity} />
-            <InfoRow label="모집 여부" value={team.statusLabel} />
+            <InfoRow label="가입 신청" value={team.statusLabel} />
           </div>
         </div>
         <div className="tm-team-detail-info-group">
@@ -643,7 +643,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <h2 className="tm-text-heading" style={{ color: 'var(--static-white)' }}>{team.name}</h2>
               <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+                {/* 기본 상태 '가입 가능'은 칩 없이 두고 예외(가입 닫힘·정원 마감)만 알린다(H2·G13). */}
+                {team.status === 'closed' ? <span className="tm-badge tm-badge-grey">{team.statusLabel}</span> : null}
                 <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
               </div>
             </div>
@@ -712,7 +713,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <aside className="tm-team-detail-desktop-sidebar">
           {/* 핵심 결정단서: 정원·모집상태·정기일정 — 가입 전 즉시 판단에 필요한 3가지 */}
           <div className="tm-team-detail-sidebar-meta">
-            <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+            {/* 기본 상태 '가입 가능'은 칩 없이 두고 예외(가입 닫힘·정원 마감)만 알린다(H2·G13). */}
+            {team.status === 'closed' ? <span className="tm-badge tm-badge-grey">{team.statusLabel}</span> : null}
             <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
           </div>
           {team.activity ? (
@@ -783,7 +785,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <div className="tm-text-heading" style={{ color: 'var(--static-white)' }} aria-hidden="true">{team.name}</div>
             <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-              <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+              {/* 기본 상태 '가입 가능'은 칩 없이 두고 예외(가입 닫힘·정원 마감)만 알린다(H2·G13). */}
+              {team.status === 'closed' ? <span className="tm-badge tm-badge-grey">{team.statusLabel}</span> : null}
               <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
             </div>
           </div>
@@ -935,13 +938,6 @@ function TeamContactRow({ href, unavailableReason, children }: { href?: string; 
       ) : null}
     </>
   );
-}
-
-function teamDetailStatusBadgeClass(mode: TeamDetailViewModel['mode']) {
-  if (mode === 'pending') return 'tm-badge-orange';
-  if (mode === 'mine') return 'tm-badge-green';
-  if (mode === 'closed') return 'tm-badge-grey';
-  return 'tm-badge-blue';
 }
 
 function teamHeroStyle(team: Pick<TeamModel, 'coverImageUrl'>): CSSProperties {
@@ -1131,20 +1127,21 @@ function TeamJoinPolicyField({ form }: { form?: TeamFormViewModel['form'] }) {
   const options = [
     {
       value: 'approval_required' as const,
-      label: '가입 신청 가능',
-      description: '새 멤버가 가입 신청을 보내고 팀장·매니저가 승인해요.',
+      label: '가입 가능',
+      description: '가입 가능 · 새 멤버가 가입 신청을 보내고 팀장·매니저가 승인해요.',
     },
     {
       value: 'closed' as const,
       label: '가입 닫힘',
-      description: '신규 가입 신청을 받지 않아요.',
+      // 서버는 닫힌 팀의 승인을 막는다(거절은 된다) — '이미 낸 신청도 처리할 수 있다'고 쓰면 틀린 말이 된다.
+      description: '가입 닫힘 · 새 가입 신청을 받지 않아요. 기다리는 신청은 다시 열어야 승인할 수 있어요.',
     },
   ];
 
   return (
     <div className="tm-create-field">
-      <div className="tm-text-label">가입 신청 상태</div>
-      <div className="tm-team-form-chip-row" role="group" aria-label="가입 신청 상태 선택">
+      <div className="tm-text-label">가입 신청</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label="가입 신청 선택">
         {options.map((option) => {
           const active = form?.joinPolicy === option.value;
           return (
@@ -1958,7 +1955,7 @@ function TeamCard({ team }: { team: TeamModel }) {
                 <span className="tm-team-tag-text">{tag}</span>
               </span>
             ))}
-            {/* '가입 신청 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
+            {/* '가입 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
                 50팀 중 50팀이 같은 값이었고, 머리말에도 "50팀 · 가입 가능 50" 이 이미 있다.
                 그 한 줄을 위해 구분선 + 49px 를 쓰고 있었다. 예외(가입 닫힘·정원 마감)만 알린다.
                 예전 자리는 aria-hidden 이라 스크린리더에는 아예 안 읽혔다 — 배지로 옮기며 읽히게 된다. */}
@@ -2104,7 +2101,11 @@ function TeamCapacityField({ value, min, onChange }: { value: number; min?: numb
         </select>
         <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
       </div>
-      {floor > 2 ? <div className="tm-text-caption" style={{ marginTop: 8 }}>지금 팀원이 {floor}명이라 그보다 적게 정할 수 없어요.</div> : null}
+      {min !== undefined ? (
+        <div className="tm-text-caption" style={{ marginTop: 8 }}>
+          {floor > 2 ? `지금 팀원이 ${floor}명이라 그보다 적게 정할 수 없어요.` : `지금 팀원이 ${min}명이에요.`} 정원이 다 차면 자동으로 “정원 마감”으로 보여요.
+        </div>
+      ) : null}
     </div>
   );
 }

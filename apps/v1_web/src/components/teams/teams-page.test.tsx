@@ -177,6 +177,30 @@ describe('TeamListPageView', () => {
   });
 });
 
+describe('TeamDetailPageView — 가입 상태 낱말 (H2 S-1)', () => {
+  function infoRowValue(label: string) {
+    const row = screen.getAllByText(label).map((node) => node.closest('.tm-team-info-row')).find(Boolean);
+    return row?.lastElementChild?.textContent;
+  }
+
+  it('가입을 닫은 팀은 배지와 표가 같은 말(가입 닫힘)을 쓴다', () => {
+    const base = getTeamDetailViewModel('default');
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'closed', statusLabel: '가입 닫힘' } }} />);
+
+    expect(screen.getAllByText('가입 닫힘', { selector: '.tm-badge' }).length).toBeGreaterThan(0);
+    expect(infoRowValue('가입 신청')).toBe('가입 닫힘');
+    expect(screen.queryByText('모집 여부')).toBeNull();
+  });
+
+  it('가입 가능은 기본 상태라 배지 없이 표에만 적는다', () => {
+    const base = getTeamDetailViewModel('default');
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'open', statusLabel: '가입 가능' } }} />);
+
+    expect(screen.queryByText('가입 가능', { selector: '.tm-badge' })).toBeNull();
+    expect(infoRowValue('가입 신청')).toBe('가입 가능');
+  });
+});
+
 describe('TeamDetailPageView', () => {
   it('preserves line breaks in the team introduction', () => {
     const introduction = '첫 번째 소개\n두 번째 소개';
@@ -193,7 +217,7 @@ describe('TeamDetailPageView', () => {
         members: 7,
         capacity: 12,
         status: 'open',
-        statusLabel: '가입 신청 가능',
+        statusLabel: '가입 가능',
         tags: [],
         genderRule: '성별 무관',
         intro: introduction,
@@ -244,7 +268,7 @@ describe('TeamDetailPageView', () => {
         members: 7,
         capacity: 12,
         status: 'open',
-        statusLabel: '가입 신청 가능',
+        statusLabel: '가입 가능',
         tags: [],
         genderRule: '성별 무관',
         intro: '',
@@ -303,7 +327,7 @@ describe('TeamDetailPageView', () => {
     expect(screen.getAllByText('2026. 07. 20. 신청').length).toBeGreaterThan(0);
   });
 
-  it('가입 신청 가능 상태에서는 승인 대기 안내를 띄우지 않는다', () => {
+  it('가입 가능 상태에서는 승인 대기 안내를 띄우지 않는다', () => {
     render(<TeamDetailPageView model={getTeamDetailViewModel('default')} />);
 
     expect(screen.queryByText('승인 대기 중')).not.toBeInTheDocument();
@@ -434,8 +458,9 @@ describe('TeamFormPageView', () => {
 
     render(<TeamFormPageView model={model} />);
 
-    expect(screen.getByText('가입 신청 상태')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '가입 신청 가능' })).toHaveAttribute('aria-pressed', 'true');
+    // 폼도 배지·표·목록과 같은 두 낱말(H2 S-2).
+    expect(screen.getByRole('group', { name: '가입 신청 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '가입 가능' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
 
@@ -473,7 +498,7 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
     const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value));
     expect(Math.min(...values)).toBe(12);
     expect(screen.getByRole('button', { name: '정원 한 명 줄이기' })).toBeDisabled();
-    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요.')).toBeInTheDocument();
+    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요. 정원이 다 차면 자동으로 “정원 마감”으로 보여요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '정원 한 명 늘리기' }));
     expect(onFieldChange).toHaveBeenCalledWith('capacity', 13);
@@ -959,7 +984,7 @@ describe('TeamDetailPageView — 내 리그 섹션', () => {
  * 팀 카드 밀도 (2026-09-07 alpha 실측 · 사용자 A안 확정).
  *
  * 카드 217px 중 맨 아래 49px(구분선 + 액션 행)이 '활동 일정'과 '가입 상태'를 담고 있었는데,
- * 상태 문구는 **50팀 중 50팀이 같은 값**('가입 신청 가능')이었다. 머리말에도
+ * 상태 문구는 **50팀 중 50팀이 같은 값**('가입 가능')이었다. 머리말에도
  * "50팀 · 가입 가능 50" 이 이미 있어, 그 49px 은 정보량 0 이었다.
  *
  * 그래서 ① 가입 가능은 안 쓰고 예외만 배지로 알리고 ② 활동 일정은 있을 때만 한 줄로 쓴다.
@@ -977,16 +1002,16 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
   }
 
   it('구분선이 있던 액션 행 자체를 그리지 않는다', () => {
-    const { container } = render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+    const { container } = render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 가능' })} />);
 
     expect(container.querySelector('.tm-team-card-action-row')).toBeNull();
     expect(container.querySelector('.tm-team-card-action-status')).toBeNull();
   });
 
   it("가입 가능한 팀에는 상태 배지를 붙이지 않는다 — 목록에서 전부 같은 값이다", () => {
-    render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+    render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 가능' })} />);
 
-    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
+    expect(screen.queryByText('가입 가능')).not.toBeInTheDocument();
   });
 
   it('가입이 막힌 팀에만 상태 배지를 붙이고, 스크린리더에도 읽힌다', () => {

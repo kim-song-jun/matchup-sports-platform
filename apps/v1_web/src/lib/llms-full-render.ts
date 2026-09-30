@@ -2,6 +2,7 @@ import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong 
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
+import { teamRecruitmentLabel } from '@/lib/v1-status-labels';
 import type { V1Match, V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 /**
@@ -175,7 +176,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     t.sport?.name ?? t.sportName,
     t.regionName && `활동 지역 ${inline(t.regionName, 30)}`,
     `멤버 ${t.memberCount}명`,
-    t.joinPolicy === 'approval_required' ? '가입 신청 받는 중' : '가입 신청 닫힘',
+    teamRecruitmentLabel(t),
   ])) ?? null;
 
   const venues = new Map<string, string[]>();

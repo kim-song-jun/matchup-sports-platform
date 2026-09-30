@@ -40,6 +40,18 @@ export function teamRoleLabel(role: string | null | undefined): '팀장' | '매�
   return null;
 }
 
+export type TeamRecruitmentLabel = '가입 가능' | '가입 닫힘' | '정원 마감';
+
+/**
+ * 팀이 가입을 받는 상태 — 폼·배지·표·목록이 이 세 낱말만 쓴다(H2). 팀장이 닫은 것(가입 닫힘)과
+ * 정원이 찬 것(정원 마감)은 다른 상태다. 정원은 memberGoalCount 가 있을 때만 찬다.
+ */
+export function teamRecruitmentLabel(team: { joinPolicy?: string | null; memberCount: number; memberGoalCount?: number | null }): TeamRecruitmentLabel {
+  if (team.joinPolicy === 'closed') return '가입 닫힘';
+  if (team.memberGoalCount != null && team.memberCount >= team.memberGoalCount) return '정원 마감';
+  return '가입 가능';
+}
+
 export function teamJoinApplicationStatusLabel(status: string): string {
   return TEAM_JOIN_APPLICATION_STATUS[status] ?? '처리됨';
 }

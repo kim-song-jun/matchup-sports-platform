@@ -4,7 +4,7 @@
 // 여기서는 그 view-model이 실제 라우트/컴포넌트에 올바르게 배선됐는지만 확인한다.
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamDetail, V1TeamScheduleDetail, V1TeamScheduleSummary } from '@/types/api';
@@ -448,12 +448,13 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     render(page);
 
     fireEvent.click(screen.getByRole('button', { name: '일정 취소' }));
-    fireEvent.change(screen.getByLabelText('취소 사유'), { target: { value: '우천으로 취소' } });
-    fireEvent.click(screen.getByRole('button', { name: '취소 확정' }));
+    const dialog = screen.getByRole('dialog', { name: '일정을 취소할까요?' });
+    fireEvent.change(within(dialog).getByLabelText('취소 사유'), { target: { value: '우천으로 취소' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '일정 취소' }));
 
-    // 상단 배너와 취소 모달의 필드 에러 두 곳에 같은 메시지가 렌더링된다.
-    const conflictMessages = await screen.findAllByText(/새로고침/);
-    expect(conflictMessages.length).toBeGreaterThan(0);
+    // 상단 배너와 취소 확인 창(연 채로 남는다) 두 곳에 같은 메시지가 렌더링된다.
+    expect(await within(dialog).findByText(/새로고침/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('취소 사유')).toHaveValue('우천으로 취소');
     expect(detailRefetch).toHaveBeenCalledOnce();
   });
 });

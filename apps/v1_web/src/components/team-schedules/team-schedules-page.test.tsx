@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -207,25 +207,57 @@ describe('일정 상세 — 접근 불가', () => {
   });
 });
 
-describe('일정 상세 — 취소 패널', () => {
-  it('일정 취소를 누르면 화면 밖에 펼쳐지는 패널로 스크롤하고 포커스를 옮긴다', () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
+describe('일정 상세 — 취소 확인 창 (H9 A-3)', () => {
+  function withCancel(cancel: Partial<ScheduleDetailViewModel['cancelModal']>, recruitmentOpen = false) {
     const base = buildModel({});
-    const closed = { ...base };
-    const opened = { ...base, cancelModal: { ...base.cancelModal, open: true } };
+    return {
+      ...base,
+      guestRecruitment: { ...base.guestRecruitment, isOpen: recruitmentOpen },
+      cancelModal: { ...base.cancelModal, open: true, ...cancel },
+    };
+  }
 
-    const view = renderPage(<ScheduleDetailPageView model={closed} />);
-    expect(scrollIntoView).not.toHaveBeenCalled();
+  it('닫혀 있으면 화면 아래 인라인 패널 없이 운영 관리 버튼만 있다', () => {
+    renderPage(<ScheduleDetailPageView model={buildModel({})} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '취소 사유' })).not.toBeInTheDocument();
+  });
+
+  it('사유가 비어 있으면 일정 취소 버튼이 꺼져 있고, 사유를 쓰면 켜져 요청을 보낸다', () => {
+    const onReasonChange = vi.fn();
+    const view = renderPage(<ScheduleDetailPageView model={withCancel({ reason: '  ', onReasonChange })} />);
+
+    const dialog = screen.getByRole('dialog', { name: '일정을 취소할까요?' });
+    const confirmButton = within(dialog).getByRole('button', { name: '일정 취소' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '취소 사유' }), { target: { value: '우천' } });
+    expect(onReasonChange).toHaveBeenCalledWith('우천');
+
+    const onConfirm = vi.fn();
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <ScheduleDetailPageView model={withCancel({ reason: '우천', onConfirm })} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '일정 취소' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('용병 모집이 열려 있을 때만 함께 닫힌다고 알린다', () => {
+    const view = renderPage(<ScheduleDetailPageView model={withCancel({}, true)} />);
+    expect(screen.getByRole('dialog')).toHaveTextContent('열려 있는 용병 모집도 함께 닫혀요');
 
     view.rerender(
       <QueryClientProvider client={new QueryClient()}>
-        <ScheduleDetailPageView model={opened} />
+        <ScheduleDetailPageView model={withCancel({}, false)} />
       </QueryClientProvider>,
     );
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('용병 모집');
+  });
 
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('group', { name: '일정을 취소할까요?' })).toHaveFocus();
+  it('취소 요청이 실패하면 창을 연 채로 사유를 알린다', () => {
+    renderPage(<ScheduleDetailPageView model={withCancel({ reason: '우천', error: '이미 다른 사람이 일정을 바꿨어요.' })} />);
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('이미 다른 사람이 일정을 바꿨어요.');
   });
 });
 

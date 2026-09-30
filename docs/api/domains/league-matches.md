@@ -43,6 +43,9 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   reports `false`. Standings keep counting the official facts.
 - `GET /api/v1/league-matches/:leagueId/standings` returns standings and
   fixtures.
+- `GET /api/v1/admin/league-matches/:leagueId` 의 각 `fixtures[]` 는 결과 진행 단계 `resultStage` 와 별개로 경기(Game)의
+  진행 상태 `gameState`(`SCHEDULED|LIVE|PAUSED|ENDED|CANCELLED`, 경기가 아직 없으면 `null`)를 싣는다. 결과 단계는 진행 중과
+  시작 전을 둘 다 `not_entered` 로 말해서, 어드민 "지금 할 일" 카드가 뛰는 중인 경기를 찾는 유일한 근거다.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual` creates one
   fixture with `homeTeamId`, `awayTeamId`, `startsAt`, and optional
   `durationMinutes`, `placeName`, and `title`.

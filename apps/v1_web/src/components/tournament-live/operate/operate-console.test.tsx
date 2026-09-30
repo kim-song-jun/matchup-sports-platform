@@ -1,6 +1,6 @@
 import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OperateConsole } from './operate-console';
+import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
 
 /**
@@ -147,6 +147,9 @@ beforeEach(() => {
   mocks.postV1GameCommand.mockClear();
   mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
 });
+
+// 진행 명령은 응답 제한 시간을 걸 수 있게 abort 신호를 함께 넘긴다.
+const COMMAND_OPTIONS = { signal: expect.any(AbortSignal) };
 
 const SIDE_ID = 'side-home';
 
@@ -379,7 +382,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state } }));
   }
 
-  it('진행 중인 피리어드가 없으면 액션 버튼을 막고 안내 문구를 보여준다', () => {
+  // G6-V3 — 시작 전엔 패드가 전부 비활성이라 자리만 차지해 폰에서 킥오프 준비를 첫 화면 밖으로 밀었다.
+  // 하프타임처럼 뛰는 도중 잠시 막히는 패드는 그대로 보인다(아래 '하프타임' 참고).
+  it('시작 전에는 이벤트 패드와 팀 파울 줄 없이 시작 안내만 보인다', () => {
     gameWithPeriods('SCHEDULED', [
       { number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
@@ -388,13 +393,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByText('경기를 시작해 주세요.')).toBeInTheDocument();
-    // 액션 우선 리오더: 골/카드/파울 버튼이 곧 예전 "선수 탭" 진입점의 자리를
-    // 대신한다 — 여전히 진행 중인 피리어드가 없으면 막혀야 한다.
-    const goalButton = screen.getByRole('button', { name: /^골/ });
-    expect(goalButton).toBeDisabled();
-
-    fireEvent.click(goalButton);
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^파울/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: /팀 파울/ })).toBeNull();
   });
 
   it('모든 피리어드가 끝났으면 마지막 완료 피리어드의 팀 파울을 보여준다', () => {
@@ -481,7 +482,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
   // ENDED·스코어 산출·결과 리비전 제출을 한 트랜잭션에서 다 했다. 이제
   // 마지막 피리어드도 "후반 종료"로 먼저 닫고, "경기 종료"는 그다음
   // 단계에서만 보인다.
-  it('마지막 피리어드가 진행 중이면 "후반 종료"를 보여주고, "경기 종료"는 아직 보여주지 않는다', () => {
+  it('마지막 피리어드가 진행 중이면 주 조작은 "후반 종료"이고, "경기 종료"는 주 조작 줄에 없다', () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
       { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
@@ -512,7 +513,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '후반 종료' }));
 
     await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything()),
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
     );
     // 전반 종료에는 붙는 되돌리기 토스트가 여기서는 붙지 않는다.
     await waitFor(() => expect(screen.queryByRole('button', { name: '되돌리기' })).toBeNull());
@@ -537,7 +538,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '전반 종료' }));
 
     await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything()),
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
     );
   });
 
@@ -606,7 +607,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '후반 시작' }));
 
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start-period', expect.anything()),
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start-period', expect.anything(), COMMAND_OPTIONS),
       );
     });
 
@@ -621,7 +622,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       // 교정 행동이라 확인 다이얼로그를 거치지 않는다.
       expect(screen.queryByRole('dialog')).toBeNull();
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything()),
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything(), COMMAND_OPTIONS),
       );
     });
   });
@@ -667,7 +668,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       fireEvent.click(within(confirmDialog).getByRole('button', { name: '경기 종료' }));
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything()),
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything(), COMMAND_OPTIONS),
       );
     });
 
@@ -815,7 +816,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
       fireEvent.click(within(dialog).getByRole('button', { name: '경기 시작' }));
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start', expect.anything()),
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start', expect.anything(), COMMAND_OPTIONS),
       );
 
       // 서버가 LIVE 로 옮기면 체크리스트 자리는 이벤트 기록이 차지한다.
@@ -944,6 +945,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(card).toHaveAttribute('data-tournament-id', 't-1');
     });
 
+    // G6-V7 — 종료 뒤엔 기록할 수 없는 패드·팀 파울 줄이 확정 카드 아래 한 화면 가까이를 채웠다.
+    it('경기가 ENDED 이면 이벤트 패드와 팀 파울 줄 없이 확정 카드와 기록 목록만 남는다', () => {
+      endedGame('ENDED');
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByTestId('result-confirm-card')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
+      expect(screen.queryByRole('group', { name: /팀 파울/ })).toBeNull();
+      expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+    });
+
     it('아직 끝나지 않은 경기(정규 시간 종료 직후 포함)에는 확정 카드가 없다', () => {
       endedGame('LIVE');
       render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
@@ -965,6 +977,127 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       });
 
       expect(screen.queryByText(/\d+\s*ms/)).toBeNull();
+    });
+  });
+
+  // Task 180 G6 alpha 확인 후속 — V5(후반 ⋯)·V6(끊김과 겹친 재개가 표시 없이 사라짐).
+  describe('후반 진행 중 조작과 연결 끊김', () => {
+    const SECOND_HALF = [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+    ];
+    const HELD = { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 };
+
+    function secondHalf(state: 'LIVE' | 'PAUSED', overrides: Record<string, unknown> = {}) {
+      gameWithPeriods('LIVE', SECOND_HALF);
+      mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), data: { ...mocks.useV1Game().data, state } });
+      mocks.useV1GameOperationsConsole.mockReturnValue(
+        consoleState({ gameSnapshot: { version: 2, state }, takeover: HELD, ...overrides }),
+      );
+    }
+
+    /** 일시 중지 상태에서 재개 확인 창을 연 뒤, 창이 떠 있는 동안 콘솔 상태를 바꾸고 확인을 누른다. */
+    async function confirmResumeAfter(change: Record<string, unknown>) {
+      secondHalf('PAUSED');
+      const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '재개' }));
+      const dialog = await screen.findByRole('dialog');
+      secondHalf('PAUSED', change);
+      view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      fireEvent.click(within(dialog).getByRole('button', { name: '재개' }));
+    }
+
+    it('후반이 뛰는 중에도 ⋯ 시트로 조기 종료와 몰수·중단 종료에 닿는다', () => {
+      secondHalf('LIVE');
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '후반 종료' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
+      expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+    });
+
+    it('연결이 끊긴 동안에는 재개와 ⋯ 을 잠그고 다시 연결하는 중이라고 알리되, 이벤트 기록은 막지 않는다', () => {
+      secondHalf('PAUSED', { connectionStatus: 'disconnected' });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '재개' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
+      expect(screen.getByText(/실시간 연결이 끊겨 다시 연결하는 중이에요/)).toBeInTheDocument();
+      // 골·카드는 이 기기 큐에 모였다가 연결되면 나간다 — 잠그는 건 진행 명령뿐이다.
+      expect(screen.getByRole('button', { name: /^골/ })).toBeEnabled();
+    });
+
+    it('확인 창이 떠 있는 사이 연결이 끊기면 재개를 보내지 않고, 보내지 않았다고 알린다', async () => {
+      await confirmResumeAfter({ connectionStatus: 'disconnected' });
+
+      expect(
+        await screen.findByText('실시간 연결이 끊겨 있어 ‘재개’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.'),
+      ).toBeInTheDocument();
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    });
+
+    it('확인 창이 떠 있는 사이 운영 권한이 만료되면 재개를 보내지 않고, 그 이유를 알린다', async () => {
+      await confirmResumeAfter({ takeover: { status: 'expired' } });
+
+      expect(
+        await screen.findByText('운영 권한을 다시 확인하는 중이라 ‘재개’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.'),
+      ).toBeInTheDocument();
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    });
+
+    it('확인 창이 떠 있는 사이 운영 권한이 다시 발급되면 창을 열 때의 토큰이 아니라 새 토큰으로 보낸다', async () => {
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      await confirmResumeAfter({ takeover: { ...HELD, token: 'tok-2' } });
+
+      await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+      expect(mocks.postV1GameCommand.mock.calls[0][1]).toBe('resume');
+      expect(mocks.postV1GameCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok-2' }));
+    });
+
+    // 망이 먹통이면 fetch 가 끝나지 않아 버튼이 "처리 중"에 멈춘다 — 끊겨도 실패로 드러나야 다시 보낼 수 있다.
+    it('응답 없이 걸린 재개는 제한 시간이 지나면 재시도로 드러나고, 재시도는 같은 요청 본문을 다시 보낸다', async () => {
+      vi.useFakeTimers();
+      try {
+        secondHalf('PAUSED');
+        mocks.postV1GameCommand
+          .mockImplementationOnce(
+            (_gameId: string, _command: string, _body: unknown, options: { signal: AbortSignal }) =>
+              new Promise((_resolve, reject) => {
+                options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+              }),
+          )
+          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3 });
+        render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+        fireEvent.click(screen.getByRole('button', { name: '재개' }));
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '재개' }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2_000);
+        });
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS);
+        });
+        expect(screen.getByText(/재개 요청의 서버 응답을 받지 못했어요/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '같은 요청 재시도' }));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2);
+        // 같은 clientCommandId(=Idempotency-Key) — 첫 요청이 사실 처리됐다면 서버가 그 결과를 재생한다.
+        expect(mocks.postV1GameCommand.mock.calls[1][2]).toEqual(mocks.postV1GameCommand.mock.calls[0][2]);
+        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+          expect.objectContaining({ state: 'LIVE', version: 3 }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
@@ -1226,7 +1359,7 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
 
     await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything()),
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything(), COMMAND_OPTIONS),
     );
 
     // UX 감사 — 명령 응답이 그 자리에서 gameSnapshot에 반영돼야 한다.
@@ -1276,7 +1409,11 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
   });
 
   it('종료 POST가 성공한 뒤 상세 재조회가 실패해도 이미 저장된 명령을 재시도하지 않는다', async () => {
-    const refetch = vi.fn().mockRejectedValue(new Error('refresh unavailable'));
+    // React Query 의 refetch 는 throwOnError 없이는 실패해도 resolve 한다 — 그 계약대로 흉내 낸다.
+    const refreshError = new Error('refresh unavailable');
+    const refetch = vi.fn((options?: { throwOnError?: boolean }) =>
+      options?.throwOnError ? Promise.reject(refreshError) : Promise.resolve({ isError: true, error: refreshError }),
+    );
     mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), refetch });
     mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
 
@@ -1827,6 +1964,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
             penalties: { home: 3, away: 0, firstKickSideKey: 'HOME', takenHome: 3, takenAway: 2 },
           },
         }),
+        COMMAND_OPTIONS,
       ),
     );
   });
@@ -1886,6 +2024,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
             },
           },
         }),
+        COMMAND_OPTIONS,
       ),
     );
   });

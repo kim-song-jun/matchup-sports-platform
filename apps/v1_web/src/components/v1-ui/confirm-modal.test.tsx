@@ -38,45 +38,8 @@ describe('ConfirmModal acknowledgement', () => {
   });
 });
 
-describe('ConfirmModal confirmation phrase', () => {
-  it('requires an exact phrase before confirming a destructive action', async () => {
-    const user = userEvent.setup();
-    const onConfirm = vi.fn();
-
-    render(
-      <ConfirmModal
-        open
-        title="멤버 내보내기"
-        message="선택한 멤버를 팀에서 내보낼까요?"
-        confirmLabel="내보내기"
-        tone="danger"
-        confirmationPhrase="확인했습니다"
-        onConfirm={onConfirm}
-        onCancel={() => undefined}
-      />,
-    );
-
-    const input = screen.getByRole('textbox', { name: /확인했습니다/ });
-    const confirmButton = screen.getByRole('button', { name: '내보내기' });
-    expect(confirmButton).toBeDisabled();
-
-    await user.type(input, '확인했어요');
-    expect(confirmButton).toBeDisabled();
-    expect(onConfirm).not.toHaveBeenCalled();
-
-    await user.clear(input);
-    await user.type(input, ' 확인했습니다 ');
-    expect(confirmButton).toBeDisabled();
-
-    await user.clear(input);
-    await user.type(input, '확인했습니다');
-    expect(confirmButton).toBeEnabled();
-    await user.click(confirmButton);
-
-    expect(onConfirm).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps existing confirmations usable when no phrase is configured', async () => {
+describe('ConfirmModal default', () => {
+  it('confirms right away when neither acknowledgement nor reason is configured', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
 
@@ -141,6 +104,49 @@ describe('ConfirmModal reason field', () => {
     expect(screen.getByRole('button', { name: '일정 취소' })).toBeDisabled();
     expect(screen.getByRole('textbox', { name: '취소 사유' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('일정을 취소하지 못했어요.');
+  });
+});
+
+describe('ConfirmModal acknowledgement with a reason field', () => {
+  function AckReasonHost({ onConfirm, busy = false }: { onConfirm: () => void; busy?: boolean }) {
+    const [reason, setReason] = useState('');
+    return (
+      <ConfirmModal
+        open
+        title="팀장 넘기기"
+        message="되돌릴 수 없어요."
+        confirmLabel="넘기기"
+        acknowledgement="이해했어요"
+        reasonField={{ label: '넘기는 이유', value: reason, onChange: setReason, required: true }}
+        busy={busy}
+        onConfirm={onConfirm}
+        onCancel={() => undefined}
+      />
+    );
+  }
+
+  it('needs both the check and a reason before confirming', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    render(<AckReasonHost onConfirm={onConfirm} />);
+    const confirmButton = screen.getByRole('button', { name: '넘기기' });
+
+    fireEvent.change(screen.getByRole('textbox', { name: '넘기는 이유' }), { target: { value: '이사' } });
+    expect(confirmButton).toBeDisabled();
+
+    await user.click(screen.getByRole('checkbox', { name: '이해했어요' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '넘기는 이유' }), { target: { value: '' } });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: '넘기는 이유' }), { target: { value: '이사' } });
+    await user.click(confirmButton);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks the check box together with the reason while busy', () => {
+    render(<AckReasonHost onConfirm={() => undefined} busy />);
+    expect(screen.getByRole('checkbox', { name: '이해했어요' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: '넘기는 이유' })).toBeDisabled();
   });
 });
 

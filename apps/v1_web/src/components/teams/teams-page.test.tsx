@@ -699,6 +699,7 @@ describe('TeamMembersPageClient — 팀 나가기 (self-leave)', () => {
 
     expect(screen.queryByRole('button', { name: '김도윤 관리' })).toBeNull();
     expect(screen.queryByText(/넘겨야/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/팀 나가기는 쓸 수 없어요/)).toHaveLength(1);
   });
 
   it('다른 멤버가 있는 단독 팀장은 "팀 나가기"가 비활성이고, 매니저가 없으면 지정부터 하라고 알려 준다', () => {

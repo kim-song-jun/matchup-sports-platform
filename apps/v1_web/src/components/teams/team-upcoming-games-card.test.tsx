@@ -30,10 +30,12 @@ function game(overrides: Record<string, unknown> = {}) {
     title: '(테스트) 가을 리그 1주차',
     opponentName: '망원 FC',
     scheduledAt: '2026-09-02T13:00:00.000Z',
-    tournamentId: null,
+    // 리그 경기면 리그 id 가 이 자리에 온다(서버 `TeamUpcomingGame.tournamentId`).
+    tournamentId: 'league-1',
     tournamentTitle: null,
     lineupState: 'MISSING' as const,
     rosterSummary: { participating: 11, excluded: 1, unavailable: 0, suspended: 0 },
+    viewerParticipating: false,
     ...overrides,
   };
 }
@@ -112,14 +114,40 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 179 팀 A)', ()
     }
   });
 
-  it('팀원은 요약만 보고 명단 버튼은 없다 — 전술보드(읽기)는 그대로 들어간다', () => {
+  it('팀원도 경기 상세·명단 보기(보기 전용)로 들어간다 — 팀장 전용인 친선 참석명단만 없다', () => {
     show(items);
     render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters={false} />);
 
     expect(screen.getByText('10명 출전 · 1명 빠짐')).toBeInTheDocument();
-    expect(screen.getByText('참석명단 미제출')).toBeInTheDocument();
+    const tournament = within(row('번개FC'));
+    expect(tournament.getByRole('link', { name: 'vs 번개FC 경기 상세' })).toHaveAttribute(
+      'href',
+      `/tournaments/league-1/matches/team-match-1?from=%2Fteams%2F${TEAM_ID}`,
+    );
+    expect(tournament.getByRole('link', { name: 'vs 번개FC 명단 보기' })).toHaveAttribute('href', `/teams/${TEAM_ID}/games/g-t/roster`);
+    expect(within(row('한강유나이티드')).getByRole('link', { name: 'vs 한강유나이티드 경기 상세' })).toHaveAttribute(
+      'href',
+      `/league-matches/league-1/fixtures/team-match-1?from=%2Fteams%2F${TEAM_ID}`,
+    );
+
+    const friendly = within(row('성수FS'));
+    expect(friendly.getByText('참석명단 미제출')).toBeInTheDocument();
+    expect(friendly.getByRole('link', { name: 'vs 성수FS 경기 상세' })).toHaveAttribute('href', `/team-matches/tm-f?from=%2Fteams%2F${TEAM_ID}`);
+    expect(friendly.queryByRole('link', { name: /참석명단|명단 보기/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /명단$/ })).toBeNull();
     expect(screen.getAllByRole('link', { name: /전술$/ })).toHaveLength(3);
+  });
+
+  it('"내 출전" 칩은 출전하는 경기에만 — 빠진 경기는 칩도 "빠졌다" 문구도 없다', () => {
+    show([
+      game({ gameId: 'g-in', opponentName: '번개FC', viewerParticipating: true }),
+      game({ gameId: 'g-out', opponentName: '한강유나이티드', viewerParticipating: false }),
+    ]);
+    render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters={false} />);
+
+    expect(within(row('번개FC')).getByText('내 출전')).toBeInTheDocument();
+    expect(within(row('한강유나이티드')).queryByText('내 출전')).toBeNull();
+    expect(within(row('한강유나이티드')).queryByText(/명단에 없어요|빠졌/)).toBeNull();
   });
 
   it('제출한 친선은 "참석명단 제출", 명단이 확정 전인 대회 경기는 명단 버튼 없이 안내만', () => {

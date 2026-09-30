@@ -1,5 +1,6 @@
 import type { HomeBannerDecision } from '@/lib/home-banner-policy';
 import type { PendingRecordLine } from '@/components/public-game-records/record-consent-preview';
+import type { V1HomeTeamActivity } from '@/types/api';
 
 export type HomeMatchCard = {
   id: string;
@@ -86,6 +87,11 @@ export type HomeViewModel = {
   stats: HomeStats;
   /** 홈 요약을 아직 못 받은 상태. true면 통계 자리에 스켈레톤을 그린다(목업 숫자·'-' 대신). */
   statsLoading?: boolean;
+  /**
+   * 내 팀 쪽 정보(다음 경기 · 팀 유무). undefined/null 이면 그리지 않는다 -- null 은 서버가
+   * 계산하지 못한 경우라 "팀이 없다"고 읽어 빈 상태를 띄우면 안 된다.
+   */
+  teamActivity?: V1HomeTeamActivity | null;
   featuredMatch: HomeMatchCard | null;
   recommendedMatches: HomeMatchCard[];
   quickActions: HomeQuickAction[];

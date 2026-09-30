@@ -12,7 +12,7 @@ const user = (id: string): V1AuthUser => ({ id, email: null, accountStatus: 'act
 
 type Membership = { userId: string; teamId: string; role: 'owner' | 'manager' | 'member' };
 
-function createFake(options: { leagueId?: string | null; memberships: Membership[] }) {
+function createFake(options: { leagueId?: string | null; tournamentId?: string | null; memberships: Membership[] }) {
   const changes: Array<{ version: number; actorUserId: string; actorName: string; action: string }> = [];
   const game = {
     id: 'game-1',
@@ -20,7 +20,7 @@ function createFake(options: { leagueId?: string | null; memberships: Membership
     state: 'SCHEDULED',
     teamMatch: {
       id: 'tm-1', title: '친선', status: 'matched', startAt: new Date(Date.now() - 10 * 60_000), deletedAt: null,
-      hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: options.leagueId ?? null, tournamentId: null,
+      hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: options.leagueId ?? null, tournamentId: options.tournamentId ?? null,
       platformManaged: false,
     },
     sides: [
@@ -125,8 +125,11 @@ describe('TeamMatchRecordService — 명단 밖 팀장 권한 (H5 결정 A, 친�
     await expect(service.mutate(user('both'), 'tm-1', confirm())).rejects.toMatchObject({ status: 403 });
   });
 
-  it('대회·리그 경기에서는 팀장이 기록·종료 확인을 보내도 403 이다(정본 §4)', async () => {
-    const { service, changes } = createFake({ leagueId: 'league-1', memberships: [{ userId: 'coach', teamId: 'team-home', role: 'owner' }] });
+  it.each([
+    ['리그', { leagueId: 'league-1' }],
+    ['대회', { tournamentId: 'tournament-1' }],
+  ])('%s 경기에서는 팀장이 기록·종료 확인을 보내도 403 이다(정본 §4)', async (_label, competition) => {
+    const { service, changes } = createFake({ ...competition, memberships: [{ userId: 'coach', teamId: 'team-home', role: 'owner' }] });
 
     await expect(service.mutate(user('coach'), 'tm-1', addGoal('side-home'))).rejects.toMatchObject({
       status: 403,

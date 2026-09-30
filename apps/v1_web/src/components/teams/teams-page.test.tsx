@@ -607,7 +607,18 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
 
     const button = screen.getByRole('button', { name: /팀 나가기/ });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('title', '마지막 소유자는 소유권을 먼저 이전해주세요');
+    // 이유는 aria-label 이 아니라 화면에 보이는 문장이고, 버튼이 그 문장을 설명으로 가리킨다.
+    const reason = screen.getByText(/팀장을 운영진에게 넘겨야 나갈 수 있어요/);
+    expect(reason).toBeVisible();
+    expect(button).toHaveAccessibleDescription(reason.textContent ?? '');
+  });
+
+  it('나갈 수 있는 팀장에게는 비활성 이유를 보여주지 않는다', () => {
+    mockOwnerMembersPage(2);
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(screen.queryByText(/넘겨야 나갈 수 있어요/)).not.toBeInTheDocument();
   });
 
   it('다른 active owner가 있는 공동 owner는 확인 후 "팀 나가기"를 실행할 수 있다', async () => {

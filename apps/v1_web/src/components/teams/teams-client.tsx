@@ -36,7 +36,8 @@ import { trackEvent } from '@/lib/analytics';
 import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
-import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { teamErrorMessage } from '@/lib/team-error-messages';
+import { isTeamOperatorRole, normalizeMyTeamsResponse, TEAM_MANAGER_LIMIT } from '@/lib/team-role';
 import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
@@ -465,6 +466,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
   const cancellingInvitations = usePendingIds();
 
@@ -489,6 +491,23 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           }
         },
       },
+    );
+  }
+
+  // 승격·강등·위임·내보내기는 확인 창 뒤에 조용히 실패하기 쉬워 — 서버가 거절하면 이유를 화면에 올린다.
+  function changeRoleTo(membershipId: string, role: 'owner' | 'manager' | 'member') {
+    setActionError(null);
+    changeRole.mutate(
+      { membershipId, role },
+      { onError: (err) => setActionError(teamErrorMessage(err, '역할을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')) },
+    );
+  }
+
+  function removeMembership(membershipId: string) {
+    setActionError(null);
+    removeMember.mutate(
+      { membershipId, reason: 'removed_from_v1_web_member_page' },
+      { onError: (err) => setActionError(teamErrorMessage(err, '멤버를 내보내지 못했어요. 잠시 후 다시 시도해 주세요.')) },
     );
   }
 
@@ -553,6 +572,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       managers: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0,
       pending: requestItems.length,
     },
+    actionError,
     selfNotice:
       !canManageMembers && viewerUserId !== null ? <MyUnavailabilityNotice teamId={teamId} userId={viewerUserId} /> : undefined,
     members: memberItems.length
@@ -561,9 +581,10 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             actionPending,
             canManageMembers,
             canDelegateOwner,
-            promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
-            delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
-            demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+            promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRoleTo(member.membershipId, 'manager')),
+            promoteDisabledReason: (team.data?.managerCount ?? 0) >= TEAM_MANAGER_LIMIT ? `운영진은 최대 ${TEAM_MANAGER_LIMIT}명이에요.` : undefined,
+            delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRoleTo(member.membershipId, 'owner')),
+            demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRoleTo(member.membershipId, 'member')),
             openUnavailability:
               canManageMembers && member.status === 'active' && member.membershipId !== viewerMembershipId
                 ? () => {
@@ -582,7 +603,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
               confirmLabel: '내보내기',
               tone: 'danger',
               confirmationPhrase: '확인했습니다',
-            }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
+            }, () => removeMembership(member.membershipId)),
             selfLeave:
               viewerMembershipId && member.membershipId === viewerMembershipId
                 ? {
@@ -1040,6 +1061,8 @@ function toMemberModel(
     canManageMembers: boolean;
     canDelegateOwner: boolean;
     promote: () => void;
+    /** 운영진이 한도까지 찼을 때 "운영진 지정"을 막는 이유. 서버가 최종 판정한다. */
+    promoteDisabledReason?: string;
     delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
@@ -1052,7 +1075,7 @@ function toMemberModel(
 ): TeamMembersViewModel['members'][number] {
   const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
   if (actions.canManageMembers && member.canChangeRole && member.role === 'member') {
-    itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
+    itemActions.push({ label: '운영진 지정', disabledReason: actions.promoteDisabledReason, onSelect: actions.promote });
   }
   if (actions.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
     itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
@@ -1090,7 +1113,7 @@ function toMemberModel(
     selfLeave: actions.selfLeave
       ? {
           disabled: !ownerCanLeave,
-          disabledReason: ownerCanLeave ? undefined : '마지막 소유자는 소유권을 먼저 이전해주세요',
+          disabledReason: ownerCanLeave ? undefined : '팀장을 운영진에게 넘겨야 나갈 수 있어요. 운영진이 없으면 멤버 한 명을 먼저 운영진으로 지정해 주세요.',
           pending: actions.selfLeave.pending,
           error: actions.selfLeave.error,
           onSelect: actions.selfLeave.onSelect,

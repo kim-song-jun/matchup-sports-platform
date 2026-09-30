@@ -4,6 +4,7 @@ import { extractErrorCode, extractErrorDetails, extractErrorMessage } from '@/li
 const TEAM_ERROR_MESSAGES: Record<string, string> = {
   PERMISSION_DENIED: '팀장·매니저만 할 수 있어요. 필요하면 팀장에게 알려 주세요.',
   MANAGER_LIMIT_EXCEEDED: '운영진은 최대 5명이에요. 다른 운영진을 멤버로 바꾼 뒤 지정해 주세요.',
+  CONCURRENT_UPDATE: '처리하는 사이 팀 상태가 바뀌었어요. 새로 불러온 뒤 다시 시도해 주세요.',
   VERSION_CONFLICT: '다른 사람이 먼저 팀 정보를 바꿨어요. 새로 불러온 뒤 다시 저장해 주세요.',
 };
 

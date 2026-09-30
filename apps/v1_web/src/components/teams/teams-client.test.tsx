@@ -1321,3 +1321,111 @@ describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
     expect(screen.queryByRole('button', { name: '결장 기간' })).toBeNull();
   });
 });
+
+describe('TeamMembersPageClient — 운영진 5명 한도', () => {
+  const changeRoleMutate = vi.fn();
+
+  function setup(managerCount: number) {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: {
+        name: '성수 풋살 크루',
+        canViewMembers: true,
+        managerCount,
+        viewer: { role: 'owner', membershipId: 'membership-owner' },
+      },
+      isError: false,
+    });
+    const row = (overrides: Record<string, unknown>) => ({
+      status: 'active',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: false,
+      canRemove: false,
+      ...overrides,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [
+          row({ membershipId: 'membership-owner', userId: 'user-owner', displayName: '김도윤', role: 'owner' }),
+          row({ membershipId: 'membership-2', userId: 'user-2', displayName: '박서준', role: 'member', canChangeRole: true, canRemove: true }),
+        ],
+        summary: { ownerCount: 1, managerCount, memberCount: 2 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: changeRoleMutate });
+    for (const hook of [
+      teamApiMocks.useV1RemoveTeamMembership,
+      teamApiMocks.useV1ApproveTeamJoinApplication,
+      teamApiMocks.useV1RejectTeamJoinApplication,
+      teamApiMocks.useV1SendTeamInvitation,
+      teamApiMocks.useV1CancelTeamInvitation,
+      teamApiMocks.useV1LeaveTeam,
+    ]) {
+      hook.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    }
+  }
+
+  function openManage(name: string) {
+    const card = screen.getByText(name).closest('.tm-card') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: '관리' }));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('운영진이 5명 차 있으면 "운영진 지정"을 이유와 함께 비활성으로 둔다', () => {
+    setup(5);
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    openManage('박서준');
+
+    const promote = screen.getByRole('button', { name: '운영진 지정' });
+    expect(promote).toBeDisabled();
+    expect(screen.getByText('운영진은 최대 5명이에요.')).toBeVisible();
+    expect(promote).toHaveAccessibleDescription('운영진은 최대 5명이에요.');
+    // 내보내기 등 나머지 관리 동작은 그대로 누를 수 있다.
+    expect(screen.getByRole('button', { name: '내보내기' })).toBeEnabled();
+  });
+
+  it('4명이면 아직 지정할 수 있다', () => {
+    setup(4);
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    openManage('박서준');
+
+    expect(screen.getByRole('button', { name: '운영진 지정' })).toBeEnabled();
+    expect(screen.queryByText('운영진은 최대 5명이에요.')).not.toBeInTheDocument();
+  });
+
+  it('화면이 낡아 서버가 409 MANAGER_LIMIT_EXCEEDED 로 거절해도 이유를 화면에 올린다', async () => {
+    setup(4);
+    changeRoleMutate.mockImplementation((_vars, options) => {
+      options?.onError?.(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 409,
+          code: 'MANAGER_LIMIT_EXCEEDED',
+          message: 'Manager count cannot exceed 5',
+          timestamp: '2026-09-30T00:00:00.000Z',
+        }),
+      );
+    });
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    openManage('박서준');
+    fireEvent.click(screen.getByRole('button', { name: '운영진 지정' }));
+    const dialog = await screen.findByRole('dialog', { name: '운영진 지정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('운영진은 최대 5명이에요');
+    expect(screen.queryByText(/Manager count/)).not.toBeInTheDocument();
+    expect(alert.parentElement).toHaveFocus();
+  });
+});

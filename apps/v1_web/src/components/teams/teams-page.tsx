@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
-import { Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -1463,6 +1463,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           {canManageMembers ? <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card> : null}
         </div>
         {model.selfNotice ? <div style={{ marginTop: 16 }}>{model.selfNotice}</div> : null}
+        <ActionErrorNotice message={model.actionError} />
         {canManageMembers ? (
           <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
             <div className="tm-text-label">권한 규칙</div>
@@ -1491,6 +1492,20 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         ) : null}
       </div>
     </>
+  );
+}
+
+/** 목록 어디서 눌렀든 거절 이유가 화면 밖 위쪽에 묻히지 않게, 생길 때 끌어와 읽힌다. */
+function ActionErrorNotice({ message }: { message?: string | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (message) revealAndFocus(ref.current);
+  }, [message]);
+  if (!message) return null;
+  return (
+    <div ref={ref} tabIndex={-1} style={{ marginTop: 16 }}>
+      <AlertBanner message={message} />
+    </div>
   );
 }
 
@@ -1969,13 +1984,16 @@ function MemberCard({
   sub: string;
   role: string;
   profileHref?: string;
-  actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
+  actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
   actionPending?: boolean;
   selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; error?: string | null; onSelect: () => void };
 }) {
   const [open, setOpen] = useState(false);
+  const reasonIdBase = useId();
   const hasActions = actions.length > 0;
   const disabled = actionPending || !hasActions;
+  const leaveReasonId = `${reasonIdBase}-leave`;
+  const leaveReasonShown = Boolean(selfLeave?.disabled && selfLeave.disabledReason);
 
   return (
     <Card pad={16}>
@@ -1987,19 +2005,30 @@ function MemberCard({
       ) : null}
       {open && !disabled ? (
         <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 12 }}>
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                action.onSelect();
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
+          {actions.map((action, index) => {
+            const reasonId = `${reasonIdBase}-action-${index}`;
+            return (
+              <div key={action.label}>
+                <button
+                  className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
+                  type="button"
+                  disabled={Boolean(action.disabledReason)}
+                  aria-describedby={action.disabledReason ? reasonId : undefined}
+                  onClick={() => {
+                    setOpen(false);
+                    action.onSelect();
+                  }}
+                >
+                  {action.label}
+                </button>
+                {action.disabledReason ? (
+                  <p id={reasonId} className="tm-text-caption" style={{ margin: '4px 0 0' }}>
+                    {action.disabledReason}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : null}
       {selfLeave ? (
@@ -2008,12 +2037,16 @@ function MemberCard({
           style={{ marginTop: 12, minHeight: 44 }}
           type="button"
           disabled={selfLeave.disabled || selfLeave.pending}
-          title={selfLeave.disabled ? selfLeave.disabledReason : undefined}
-          aria-label={selfLeave.disabled && selfLeave.disabledReason ? `팀 나가기 — ${selfLeave.disabledReason}` : '팀 나가기'}
+          aria-describedby={leaveReasonShown ? leaveReasonId : undefined}
           onClick={selfLeave.onSelect}
         >
           {selfLeave.pending ? '나가는 중…' : '팀 나가기'}
         </button>
+      ) : null}
+      {leaveReasonShown ? (
+        <p id={leaveReasonId} className="tm-text-caption" style={{ marginTop: 8 }}>
+          {selfLeave?.disabledReason}
+        </p>
       ) : null}
       {selfLeave?.error ? (
         <p role="alert" className="tm-text-caption" style={{ marginTop: 8, color: 'var(--red700)' }}>

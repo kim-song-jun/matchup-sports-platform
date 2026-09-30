@@ -5,6 +5,9 @@ import type { V1MyTeam, V1MyTeamsResponse } from '@/types/api';
  * teams-client.tsx 와 my-api-clients.tsx 에 같은 함수가 각각 로컬로 중복돼 있던 것을
  * 팀 컨택이 세 번째 소비처가 되면서 공유 유틸로 올린 것이다.
  */
+/** 팀당 운영진(manager) 최대 인원 — 서버가 같은 값으로 `MANAGER_LIMIT_EXCEEDED` 를 낸다. */
+export const TEAM_MANAGER_LIMIT = 5;
+
 export function isTeamOperatorRole(role?: string | null) {
   return role === 'owner' || role === 'manager' || role === 'admin';
 }

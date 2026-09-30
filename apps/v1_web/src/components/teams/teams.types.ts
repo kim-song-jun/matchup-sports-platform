@@ -194,6 +194,8 @@ export type TeamMembersViewModel = {
   summary: { total: number; managers: number; pending: number };
   /** 팀원 본인에게만 보이는 안내(내 결장 기간 등). 멤버 탭 위에 놓인다. */
   selfNotice?: ReactNode;
+  /** 역할 변경·내보내기가 서버에서 거절됐을 때의 이유. 목록 위에 뜨고 화면으로 끌어온다. */
+  actionError?: string | null;
   members: Array<{
     name: string;
     role: string;
@@ -201,7 +203,8 @@ export type TeamMembersViewModel = {
     profileHref?: string;
     manageLabel?: string;
     locked?: boolean;
-    actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
+    /** disabledReason 이 있으면 버튼을 비활성으로 두고 그 이유를 버튼 아래에 보여준다. */
+    actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
     actionPending?: boolean;
     /** 본인 행에만 노출되는 "팀 나가기" 버튼. owner는 소유권 이전 전까지 disabled + 툴팁. */
     selfLeave?: {

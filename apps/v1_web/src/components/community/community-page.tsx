@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { Check, Pin, Send } from 'lucide-react';
+import { Check, MoreHorizontal, Pin, Send } from 'lucide-react';
+import { ActionSheet } from '@/components/v1-ui/action-sheet';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -111,6 +112,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
   const prevSendingRef = useRef(model.sending);
   const threadRef = useRef<HTMLDivElement>(null);
   const [justSent, setJustSent] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const lastMessageId = model.messages.at(-1)?.id;
 
   useLayoutEffect(() => {
@@ -144,7 +146,14 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
   // 셸 승격(U34): 채팅방 제목은 fetch 의존(§1.9 "fetch된 제목" 유형) — 테이블(community.ts)엔
   // 로딩 중 기본값만 있고, 실제 값(model.title — room.data.title 또는 로딩 placeholder)은
   // 여기서 override로 밀어넣는다.
-  useShellOverride({ title: model.title });
+  // 차단 관리는 대화보다 먼저 보일 말이 아니라 방 ⋯ 메뉴에 둔다(F62).
+  const onManageBlocked = model.onManageBlocked;
+  const roomMenuButton = onManageBlocked ? (
+    <button type="button" className="tm-btn tm-btn-icon tm-btn-ghost" aria-label="채팅방 메뉴" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+      <MoreHorizontal size={21} strokeWidth={2} aria-hidden="true" />
+    </button>
+  ) : undefined;
+  useShellOverride({ title: model.title, topbarActions: roomMenuButton });
 
   return (
     <>
@@ -167,10 +176,10 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+        {roomMenuButton ? <div className="ml-auto">{roomMenuButton}</div> : null}
       </div>
       <div className="tm-chat-room">
         <div className="tm-chat-context">
-          {model.onManageBlocked ? <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={model.onManageBlocked}>채팅 차단 관리</button> : null}
           {model.teamContact ? (
             <TeamContactStatusCard contact={model.teamContact} />
           ) : (
@@ -281,6 +290,24 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       </div>
         </section>
       </div>
+      {onManageBlocked ? (
+        <ActionSheet
+          open={menuOpen}
+          title="채팅방 메뉴"
+          onClose={() => setMenuOpen(false)}
+          actions={[
+            {
+              key: 'manage-blocked',
+              label: '채팅 차단 관리',
+              description: '차단한 사용자를 확인하고 풀 수 있어요.',
+              onSelect: () => {
+                setMenuOpen(false);
+                onManageBlocked();
+              },
+            },
+          ]}
+        />
+      ) : null}
     </>
   );
 }

@@ -3,6 +3,40 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmModal } from './confirm-modal';
 
+describe('ConfirmModal acknowledgement', () => {
+  function renderAck(open: boolean, onConfirm = vi.fn()) {
+    return (
+      <ConfirmModal
+        open={open}
+        title="팀장 넘기기"
+        message="김하나님이 새 팀장이 되고, 나는 매니저가 돼요."
+        confirmLabel="팀장 넘기기"
+        acknowledgement="이해했어요"
+        onConfirm={onConfirm}
+        onCancel={() => undefined}
+      />
+    );
+  }
+
+  it('keeps confirm off until the box is checked, and starts unchecked again on the next opening', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const { rerender } = render(renderAck(true, onConfirm));
+
+    const confirmButton = screen.getByRole('button', { name: '팀장 넘기기' });
+    expect(confirmButton).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: '이해했어요' }));
+    expect(confirmButton).toBeEnabled();
+    await user.click(confirmButton);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+
+    rerender(renderAck(false, onConfirm));
+    rerender(renderAck(true, onConfirm));
+    expect(screen.getByRole('checkbox', { name: '이해했어요' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: '팀장 넘기기' })).toBeDisabled();
+  });
+});
+
 describe('ConfirmModal confirmation phrase', () => {
   it('requires an exact phrase before confirming a destructive action', async () => {
     const user = userEvent.setup();

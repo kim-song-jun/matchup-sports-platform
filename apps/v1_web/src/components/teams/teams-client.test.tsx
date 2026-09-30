@@ -1650,3 +1650,76 @@ describe('TeamMembersPageClient — 매니저 5명 한도', () => {
     expect(alert.parentElement).toHaveFocus();
   });
 });
+
+describe('TeamMembersPageClient — 확인 강도 (H2)', () => {
+  const changeRoleMutate = vi.fn();
+  const removeMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: true, managerCount: 1, viewer: { role: 'owner', membershipId: 'membership-owner' } },
+      isError: false,
+    });
+    const row = (membershipId: string, displayName: string, role: string) => ({
+      membershipId, userId: `u-${membershipId}`, displayName, role, status: 'active', joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: role !== 'owner', canRemove: role !== 'owner',
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [row('membership-owner', '김도윤', 'owner'), row('membership-manager', '박매니', 'manager'), row('membership-member', '이멤버', 'member')],
+        summary: { ownerCount: 1, managerCount: 1, memberCount: 3 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: changeRoleMutate });
+    teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: removeMutate });
+    for (const hook of [
+      teamApiMocks.useV1ApproveTeamJoinApplication,
+      teamApiMocks.useV1RejectTeamJoinApplication,
+      teamApiMocks.useV1SendTeamInvitation,
+      teamApiMocks.useV1CancelTeamInvitation,
+      teamApiMocks.useV1LeaveTeam,
+    ]) {
+      hook.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    }
+  });
+
+  function chooseFromSheet(name: string, action: string) {
+    fireEvent.click(screen.getByRole('button', { name: `${name} 관리` }));
+    fireEvent.click(within(screen.getByRole('dialog', { name })).getByRole('button', { name: new RegExp(`^${action}`) }));
+  }
+
+  it('팀장 넘기기는 결과 문장을 읽고 "이해했어요"를 체크해야 버튼이 켜진다', async () => {
+    render(<TeamMembersPageClient teamId="team-1" />);
+    chooseFromSheet('박매니', '팀장 넘기기');
+
+    const dialog = await screen.findByRole('dialog', { name: '팀장 넘기기' });
+    expect(dialog).toHaveTextContent('박매니님이 새 팀장이 되고, 나는 매니저가 돼요.');
+    const confirmButton = within(dialog).getByRole('button', { name: '팀장 넘기기' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+    expect(changeRoleMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '이해했어요' }));
+    fireEvent.click(confirmButton);
+    await waitFor(() => expect(changeRoleMutate).toHaveBeenCalledWith({ membershipId: 'membership-manager', role: 'owner' }, expect.anything()));
+  });
+
+  it('내보내기는 글자 입력 없이 결과 한 줄을 읽고 바로 확인한다', async () => {
+    render(<TeamMembersPageClient teamId="team-1" />);
+    chooseFromSheet('이멤버', '팀에서 내보내기');
+
+    const dialog = await screen.findByRole('dialog', { name: '팀에서 내보내기' });
+    expect(dialog).toHaveTextContent('이멤버님이 팀에서 빠져요.');
+    expect(within(dialog).queryByRole('textbox')).toBeNull();
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: '내보내기' }));
+    await waitFor(() => expect(removeMutate).toHaveBeenCalledWith(expect.objectContaining({ membershipId: 'membership-member' }), expect.anything()));
+  });
+});

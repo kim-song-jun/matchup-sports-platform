@@ -19,6 +19,8 @@ export interface ConfirmOptions {
   tone?: ConfirmTone;
   /** 정확히 입력해야 확인 버튼이 활성화되는 문구. 비가역 작업의 이중 확인에 사용 */
   confirmationPhrase?: string;
+  /** 체크해야 확인 버튼이 켜지는 한 줄(예: '이해했어요') — 글자 입력보다 가볍고 단순 확인보다 무거운 단계(H2). */
+  acknowledgement?: string;
 }
 
 interface ConfirmState extends ConfirmOptions {
@@ -87,6 +89,7 @@ export function useConfirm() {
       cancelLabel={state?.cancelLabel}
       tone={state?.tone}
       confirmationPhrase={state?.confirmationPhrase}
+      acknowledgement={state?.acknowledgement}
       onConfirm={() => handleResolve(true)}
       onCancel={() => handleResolve(false)}
     />
@@ -109,6 +112,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
+  acknowledgement?: string;
   confirmationPhrase?: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -126,6 +130,7 @@ export function ConfirmModal({
   confirmLabel = '확인',
   cancelLabel = '취소',
   tone = 'default',
+  acknowledgement,
   confirmationPhrase,
   onConfirm,
   onCancel,
@@ -135,13 +140,16 @@ export function ConfirmModal({
   const messageId = `${idPrefix}-confirm-message`;
   const phraseId = `${idPrefix}-confirm-phrase`;
   const [confirmationInput, setConfirmationInput] = useState('');
-  const confirmationMatched =
+  const [acknowledged, setAcknowledged] = useState(false);
+  const acknowledgementMissing = acknowledgement !== undefined && !acknowledged;
+  const confirmationMatched = acknowledgementMissing ? false :
     confirmationPhrase === undefined || confirmationInput === confirmationPhrase;
   // 초기 포커스는 패널의 첫 컨트롤 — 입력 확인이 있으면 입력창, 없으면 취소 버튼(실수로 확인하지 않게).
   const { dialogRef, onBackdropClick } = useModalA11y({ open, onClose: onCancel, exitMs: 0 }); // 닫히면 즉시 렌더를 떼므로 잠금·포커스 복원도 즉시.
 
   useEffect(() => {
     if (open) setConfirmationInput('');
+    if (open) setAcknowledged(false);
   }, [open]);
 
   if (!open) return null;
@@ -205,6 +213,20 @@ export function ConfirmModal({
                 style={{ width: '100%', minHeight: 44 }}
               />
             </div>
+          ) : null}
+          {acknowledgement ? (
+            <label
+              className="tm-text-label"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, marginTop: 16, color: 'var(--text-strong)', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+                style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--blue500)' }}
+              />
+              {acknowledgement}
+            </label>
           ) : null}
         </div>
 

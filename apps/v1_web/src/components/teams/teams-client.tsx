@@ -656,6 +656,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           message: `${member.displayName}님이 새 팀장이 되고, 나는 매니저가 돼요. 다시 팀장이 되려면 ${member.displayName}님이 넘겨줘야 해요.`,
           confirmLabel: '팀장 넘기기',
           tone: 'danger',
+          // 나 혼자서는 되돌릴 수 없어 단순 확인보다 한 단계 무겁게(H2 확인 강도).
+          acknowledgement: '이해했어요',
         }, () => changeRoleTo(member.membershipId, 'owner')),
         demote: () => confirmAction(confirm, {
           title: '멤버로 내리기',
@@ -676,10 +678,9 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         }),
         remove: () => confirmAction(confirm, {
           title: '팀에서 내보내기',
-          message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지돼요.`,
+          message: `${member.displayName}님이 팀에서 빠져요. 팀에 남긴 활동 기록은 그대로이고, 다시 초대할 수 있어요.`,
           confirmLabel: '내보내기',
           tone: 'danger',
-          confirmationPhrase: '확인했습니다',
         }, () => removeMembership(member.membershipId)),
         leave: {
           activeOwnerCount: members.data?.summary.ownerCount,

@@ -14,7 +14,7 @@ import { cssUrl } from '@/lib/assets';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
 import { NotificationDetailSheet } from './notification-detail-sheet';
-import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
+import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 import { TeamContactStatusCard, contactStatusLabel } from './team-contact-status-card';
 
@@ -606,6 +606,7 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
  * 링크가 아니라 다이얼로그를 여는 버튼이 정확한 시맨틱이다.
  */
 function NotificationCard({ notification, onOpen }: { notification: NotificationModel; onOpen: (notification: NotificationModel) => void }) {
+  const visualType = notificationVisualType(notification.type, notification.href);
   return (
     <button
       type="button"
@@ -614,12 +615,12 @@ function NotificationCard({ notification, onOpen }: { notification: Notification
       onClick={() => onOpen(notification)}
     >
       <div className="tm-notification-icon" aria-hidden="true">
-        <NotificationTypeIcon type={notification.type} size={18} />
+        <NotificationTypeIcon type={visualType} size={18} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* 종류와 읽음 상태를 아이콘·컬러 외에 텍스트로도 전달 — 컬러만 의존 금지 */}
         <span className="sr-only">
-          {notificationTypeLabel(notification.type)}
+          {notificationTypeLabel(visualType)}
           {notification.unread ? ', 읽지 않음' : ''}
         </span>
         <div className="tm-notification-card-title">

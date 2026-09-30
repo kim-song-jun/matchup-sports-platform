@@ -23,6 +23,7 @@ const ICON_BY_TYPE: Record<string, (size: number) => ReactNode> = {
   team_match: (size) => <TeamMatchIcon size={size} />,
   chat: (size) => <ChatIcon size={size} />,
   tournament: (size) => <TrophyIcon size={size} />,
+  league: (size) => <TrophyIcon size={size} />,
   notice: (size) => <InfoCircleIcon size={size} />,
   system: (size) => <InfoCircleIcon size={size} />,
   inquiry: (size) => <InfoCircleIcon size={size} />,
@@ -44,6 +45,7 @@ const LABEL_BY_TYPE: Record<string, string> = {
   team_match: '팀매치 알림',
   chat: '채팅 알림',
   tournament: '대회 알림',
+  league: '리그 알림',
   notice: '공지 알림',
   system: '시스템 알림',
   inquiry: '문의 답변 알림',
@@ -51,4 +53,16 @@ const LABEL_BY_TYPE: Record<string, string> = {
 
 export function notificationTypeLabel(type?: string | null): string {
   return (type && LABEL_BY_TYPE[type]) || '알림';
+}
+
+const LEAGUE_ROUTE = /^\/(league-matches|leagues)\//;
+
+/**
+ * 아이콘·종류 이름을 고를 때 쓰는 종류. 한 리그의 소식이 서버 targetType 으로는 대진(`team_match`)과
+ * 명단(`tournament`)으로 갈려 두 갈래로 보였다(F44) — 서버가 종류를 싣기 전까지 착지 경로로 리그를
+ * 알아본다. 원본 `type` 은 분석 이벤트가 그대로 쓰므로 바꾸지 않는다.
+ */
+export function notificationVisualType(type: string | null | undefined, href: string | null | undefined): string | null {
+  if (href && LEAGUE_ROUTE.test(href)) return 'league';
+  return type ?? null;
 }

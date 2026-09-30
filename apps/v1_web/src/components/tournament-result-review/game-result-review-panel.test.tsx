@@ -436,6 +436,37 @@ describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', ()
     expect(officializeMutate.mock.calls[0][0]).toMatchObject({ revisionId: 'revision-1', score: { home: 2, away: 1 } });
   });
 
+  // 서버는 감독관의 확정을 `DIRECTOR_OFFICIALIZE` 플래그가 켜진 동안에만 받는다(꺼져 있으면 403).
+  // 미리 읽을 방법이 없어 화면은 그 403 을 받은 뒤에야 버튼을 숨긴다 — 결과 검토 화면과 같은 규칙이다.
+  it('감독관이 확정하다 플래그 꺼짐(403)을 만나면 확정 버튼을 숨기고 안내하며, "다시 확인"으로 되살린다', async () => {
+    setup({ actorRole: 'tournament_director' });
+    officializeMutate.mockImplementation(
+      (_input: unknown, callbacks: { onError?: (error: unknown) => void }) =>
+        callbacks.onError?.({ code: 'DIRECTOR_OFFICIALIZE_DISABLED' }),
+    );
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '2 : 1 결과 확정' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }));
+
+    expect(await screen.findByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '2 : 1 결과 확정' })).toBeNull();
+    // 고쳐서 다시 제출하는 길은 막지 않는다.
+    expect(screen.getByRole('button', { name: '고치고 확정' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 확인' }));
+    expect(screen.getByRole('button', { name: '2 : 1 결과 확정' })).toBeInTheDocument();
+    expect(screen.queryByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeNull();
+  });
+
+  it('플랫폼 운영자에게는 확정이 항상 열려 있다 — 감독관 게이트 안내를 만들지 않는다', () => {
+    setup({ actorRole: 'platform_ops' });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    expect(screen.getByRole('button', { name: '2 : 1 결과 확정' })).toBeEnabled();
+    expect(screen.queryByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeNull();
+  });
+
   it('어시스트가 비면 확정에 영향 없다는 안내를 카드 안에 보여준다', () => {
     setup({
       revision: {

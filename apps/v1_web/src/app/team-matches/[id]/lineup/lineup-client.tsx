@@ -29,6 +29,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { josa } from '@/lib/korean';
+import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { randomUuid } from '@/lib/uuid';
 import type { LineupEditorState, LineupEntryDraft, RosterOption } from './lineup.view-model';
 import {
@@ -129,11 +130,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [lastSubmittedRevision, setLastSubmittedRevision] = useState<number | null>(null);
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
+  const matchCancelled = teamMatchQuery.data ? getStatus(teamMatchQuery.data) === 'cancelled' : false;
   const phase = lineupQuery.data
     ? describeLineupPhase(
         lineupQuery.data.state,
         lineupQuery.data.editable === true,
         lineupQuery.data.lockReason ?? null,
+        matchCancelled,
       )
     : null;
   const editable = Boolean(phase?.editable) && isOnline;
@@ -477,7 +480,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     }
   }
   const validationErrors = validateLineupForSubmit(state);
-  const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
+  const publicationLabel = matchCancelled ? null : describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
   const submittedWithoutChanges =
     !state.dirty &&
     (lineupQuery.data.state === 'SUBMITTED' ||

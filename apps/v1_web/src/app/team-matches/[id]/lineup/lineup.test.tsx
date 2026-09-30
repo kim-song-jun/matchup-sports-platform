@@ -320,6 +320,18 @@ describe('lineup.view-model', () => {
     expect(describeLineupPhase('DRAFT', false, null).editable).toBe(false);
   });
 
+  // L30 — 서버 lockReason 'terminal' 은 종료와 취소를 구분하지 않는다. 취소는 매치 상태로 가른다.
+  it('취소된 경기는 "경기 종료" 가 아니라 취소로 잠긴다', () => {
+    expect(describeLineupPhase('LOCKED', false, 'terminal', true)).toMatchObject({
+      editable: false,
+      label: '취소됨 · 잠김',
+      helperText: '취소된 경기의 참석명단은 수정할 수 없어요.',
+    });
+    // 대조군 — 끝난 경기는 그대로 종료로 잠긴다.
+    expect(describeLineupPhase('LOCKED', false, 'terminal', false).label).toBe('경기 종료 · 잠김');
+    expect(describeLineupPhase('LOCKED', false, 'terminal').label).toBe('경기 종료 · 잠김');
+  });
+
   it('resolves which team is "mine" for this match from host/opponent + my memberships', () => {
     const teamMatch = { hostTeamId: 'team-host', approvedOpponentTeam: { teamId: 'team-away' } };
     expect(resolveOwnTeamId(teamMatch, [{ teamId: 'team-away', role: 'manager' }])).toBe('team-away');
@@ -516,6 +528,46 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: '참석명단을 수정할까요?' })).not.toBeInTheDocument();
     expect(hoisted.saveMutate).not.toHaveBeenCalled();
+  });
+
+  // L30 — 취소된 경기에서 "N시간 후 공개돼요" 카운트다운이 남고 배지가 "경기 종료"로 읽혔다.
+  describe('취소된 경기의 참석명단 (L30)', () => {
+    const lockedLineup = () => baseLineup({
+      state: 'SUBMITTED',
+      editable: false,
+      lockReason: 'terminal',
+      publicLineupAt: futureIso(200),
+    });
+
+    function renderWith(matchStatus: string) {
+      hoisted.useV1TeamMatchMock.mockReturnValue({
+        data: { ...baseTeamMatch(), status: matchStatus, displayState: matchStatus },
+        isLoading: false,
+        isError: false,
+      });
+      hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+        data: lockedLineup(),
+        isLoading: false,
+        isError: false,
+        refetch: hoisted.refetchLineup,
+      });
+      render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    }
+
+    it('배지는 취소로 잠기고 공개 카운트다운은 숨긴다', () => {
+      renderWith('cancelled');
+
+      expect(screen.getByText('취소됨 · 잠김')).toBeInTheDocument();
+      expect(screen.queryByText('경기 종료 · 잠김')).not.toBeInTheDocument();
+      expect(screen.queryByText(/후 공개돼요/)).not.toBeInTheDocument();
+    });
+
+    it('대조군 — 같은 잠금이라도 끝난 경기는 종료 배지와 카운트다운을 그대로 보인다', () => {
+      renderWith('completed');
+
+      expect(screen.getByText('경기 종료 · 잠김')).toBeInTheDocument();
+      expect(screen.getByText(/후 공개돼요/)).toBeInTheDocument();
+    });
   });
 
   /**

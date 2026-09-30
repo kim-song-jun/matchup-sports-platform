@@ -234,7 +234,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
         <h1>함께 쓰는 경기 기록</h1>
         <p className={styles.muted}>{data.title}</p>
       </div>
-      <span className="tm-badge tm-badge-green">{sharedRecordPhaseLabel(data.phase)}</span>
+      <span className={`tm-badge ${data.phase === 'cancelled' ? 'tm-badge-grey' : 'tm-badge-green'}`}>{sharedRecordPhaseLabel(data.phase)}</span>
     </header>
 
     <div role="status" className="sr-only">{announcement}</div>
@@ -373,7 +373,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       </div>
 
       <aside className={styles.stack}>
-        {data.participant && <section className={styles.section}>
+        {data.participant && data.phase !== 'cancelled' && <section className={styles.section}>
           <h2>경기 종료 확인</h2>
           <p className={styles.muted}>각 팀에서 한 명씩 현재 기록을 확인하면 팀매치 한 경기의 최종 결과로 확정돼요. 기록을 수정하면 이전 확인은 취소돼요.</p>
           {data.sides.map((side) => <div className={styles.row} key={side.id}>

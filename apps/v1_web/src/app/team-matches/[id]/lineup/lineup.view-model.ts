@@ -2,6 +2,7 @@ import { GOALKEEPER_SLOT_CODE, type FormationSlot } from '@/components/lineup/fo
 import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { randomUuid } from '@/lib/uuid';
+import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 import type {
   V1TeamMatchLineup,
   V1TeamMatchLineupParticipantInput,
@@ -456,8 +457,17 @@ export function describeLineupPhase(
   state: V1TeamMatchLineupState,
   editable: boolean,
   lockReason: V1TeamMatchLineupLockReason,
+  /** 서버 lockReason 'terminal' 은 종료·취소·보관을 한 값으로 묶는다 — 취소는 매치 상태로 가른다. */
+  matchCancelled = false,
 ): { label: string; editable: boolean; helperText: string } {
   if (!editable) {
+    if (matchCancelled) {
+      return {
+        label: `${TEAM_MATCH_CANCELLED_LABEL} · 잠김`,
+        editable: false,
+        helperText: '취소된 경기의 참석명단은 수정할 수 없어요.',
+      };
+    }
     if (lockReason === 'records_exist') {
       return {
         label: '기록 시작 · 잠김',

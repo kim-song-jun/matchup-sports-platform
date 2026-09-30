@@ -234,6 +234,19 @@ describe('shared record participant flow', () => {
     rerender(<TeamMatchSharedRecord teamMatchId="match" />);
     expect(screen.getByRole('button', { name: '이 기록으로 종료 확인' })).toBeDisabled();
   });
+  // L30 — 취소된 경기의 공동 기록 화면에 "경기 종료 확인 · 확인 대기" 카드가 남았다.
+  it('취소된 경기에는 종료 확인 카드가 없고 배지는 취소로 읽힌다', () => {
+    state.data = { ...state.data, phase: 'cancelled', canEdit: false };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByText('취소된 경기')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '경기 종료 확인' })).not.toBeInTheDocument();
+    expect(screen.queryByText('확인 대기')).not.toBeInTheDocument();
+  });
+  it('대조군 — 진행 중인 경기의 참가자는 종료 확인 카드를 본다', () => {
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('heading', { name: '경기 종료 확인' })).toBeInTheDocument();
+    expect(screen.getAllByText('확인 대기')).toHaveLength(2);
+  });
   it('removes all mutation controls when official or spectator', () => {
     state.data = { ...state.data, phase: 'official', canEdit: false, officialAt: state.data.serverTime };
     const { rerender } = render(<TeamMatchSharedRecord teamMatchId="match" />);

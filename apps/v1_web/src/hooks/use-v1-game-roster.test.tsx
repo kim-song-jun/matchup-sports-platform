@@ -11,7 +11,12 @@ import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createV1GameRosterMswHandlers, GAME_ROSTER_MSW } from '@/test/msw/game-roster-handlers';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
-import { useV1FixtureLineup, useV1GameOperationsLineup, useV1SetParticipantArrival } from './use-v1-game-operations';
+import {
+  useV1ConfirmSideArrival,
+  useV1FixtureLineup,
+  useV1GameOperationsLineup,
+  useV1SetParticipantArrival,
+} from './use-v1-game-operations';
 import { usePublicLeagueFixtureRecord, usePublicMatch } from '@/components/public-game-records/use-public-game-records';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import {
@@ -39,6 +44,9 @@ let upcomingFetches = 0;
 /** 명단을 읽는 다른 화면의 GET — 경로별 횟수. */
 let readerFetches: Record<string, number>;
 let arrivalFailure: { status: number; code: string } | null;
+/** "전원 도착" 일괄 검인 요청 경로 기록 + 실패 주입. */
+let confirmAllRequests: string[];
+let confirmAllFailure: { status: number; code: string } | null;
 
 const T_ID = GAME_ROSTER_MSW.tournamentId;
 const READERS = {
@@ -68,6 +76,8 @@ beforeEach(() => {
   upcomingFetches = 0;
   readerFetches = {};
   arrivalFailure = null;
+  confirmAllRequests = [];
+  confirmAllFailure = null;
   const countedReader = (data: unknown) => ({ request }: { request: Request }) => {
     const path = new URL(request.url).pathname;
     readerFetches[path] = (readerFetches[path] ?? 0) + 1;
@@ -91,6 +101,19 @@ beforeEach(() => {
             { status: arrivalFailure.status },
           ),
     ),
+    http.post('*/api/v1/games/:gameId/sides/:sideId/arrival/confirm-all', ({ request }) => {
+      confirmAllRequests.push(new URL(request.url).pathname);
+      return confirmAllFailure === null
+        ? HttpResponse.json({
+            status: 'success',
+            data: { sideId: G1.sideId, participantCount: 3, newlyArrivedCount: 2 },
+            timestamp: 'x',
+          })
+        : HttpResponse.json(
+            { status: 'error', statusCode: confirmAllFailure.status, code: confirmAllFailure.code, message: '권한이 없어요.', timestamp: 'x' },
+            { status: confirmAllFailure.status },
+          );
+    }),
     http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
   );
   server.listen({ onUnhandledRequest: 'error' });
@@ -241,6 +264,41 @@ describe('운영 콘솔 검인', () => {
     await act(() => result.current.arrival.mutateAsync({ participantId: 'p-1', arrived: true }).catch(() => undefined));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(fetched(READERS.fixtureLineup)).toBe(1);
+  });
+});
+
+describe('운영 콘솔 전원 도착(일괄 검인)', () => {
+  function renderConfirmAll() {
+    return renderHook(
+      () => ({
+        fixtureLineup: useV1FixtureLineup(T_ID, 'fixture-1'),
+        ops: useV1GameOperationsLineup(G1.gameId),
+        confirmAll: useV1ConfirmSideArrival(G1.gameId, { tournamentId: T_ID, fixtureId: 'fixture-1' }),
+      }),
+      { wrapper: wrapper() },
+    );
+  }
+
+  it('사이드 하나를 지목한 요청 한 번만 보내고, 콘솔이 읽는 두 라인업을 다시 받는다', async () => {
+    const { result } = renderConfirmAll();
+    await waitFor(() => expect(result.current.fixtureLineup.isSuccess && result.current.ops.isSuccess).toBe(true));
+
+    await act(() => result.current.confirmAll.mutateAsync(G1.sideId));
+
+    expect(confirmAllRequests).toEqual([`/api/v1/games/${G1.gameId}/sides/${G1.sideId}/arrival/confirm-all`]);
+    await waitFor(() => expect(fetched(READERS.fixtureLineup)).toBe(2));
+    await waitFor(() => expect(fetched(READERS.opsLineup1)).toBe(2));
+  });
+
+  it('실패해도 화면이 옛 명단에 머물지 않게 다시 받는다', async () => {
+    confirmAllFailure = { status: 403, code: 'PERMISSION_DENIED' };
+    const { result } = renderConfirmAll();
+    await waitFor(() => expect(result.current.fixtureLineup.isSuccess && result.current.ops.isSuccess).toBe(true));
+
+    await act(() => result.current.confirmAll.mutateAsync(G1.sideId).catch(() => undefined));
+
+    await waitFor(() => expect(fetched(READERS.fixtureLineup)).toBe(2));
+    await waitFor(() => expect(fetched(READERS.opsLineup1)).toBe(2));
   });
 });
 

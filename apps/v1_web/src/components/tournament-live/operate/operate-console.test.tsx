@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
     isError: false,
   })),
   useTournamentOpsRole: vi.fn(),
+  confirmSideArrival: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -39,6 +40,8 @@ vi.mock('@/hooks/use-v1-game-operations', () => ({
   // 명단 검인 토글 — 이 스위트는 검인 동작 자체를 검증하지 않지만(전용 스위트가 있다),
   // 콘솔이 매 렌더 호출하는 훅이라 모듈 목에 반드시 있어야 한다.
   useV1SetParticipantArrival: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+  // 팀별 "전원 도착" 일괄 검인 — 호출 인자만 본다(서버 계약은 API 스펙이 검증한다).
+  useV1ConfirmSideArrival: () => ({ mutate: mocks.confirmSideArrival, isPending: false, variables: undefined }),
 }));
 vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
@@ -695,6 +698,51 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       expect(screen.queryByRole('button', { name: '더보기' })).toBeNull();
       expect(screen.queryByRole('group', { name: '경기 진행 조작' })).toBeNull();
+    });
+  });
+
+  // Task 180 G6(F56) — 킥오프 전 검인: 기본은 전원 미확인이고, 팀별 "전원 도착" 한 번으로 그 팀을 채운다.
+  describe('킥오프 전 명단 검인 — 팀별 전원 도착', () => {
+    function scheduledWithRosters() {
+      gameWithPeriods('SCHEDULED', []);
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+      const row = (id: string, sideId: string, lineupId: string, name: string) => ({
+        id, gameId: 'game-1', sideId, lineupId, displayNameSnapshot: name, jerseyNumber: 1,
+        position: null, arrivedAt: null, createdAt: '', updatedAt: '',
+      });
+      mocks.useV1FixtureLineup.mockReturnValue({
+        data: {
+          gameId: 'game-1',
+          lineups: [
+            { id: 'l-home', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null,
+              participants: [row('h-1', 'side-home', 'l-home', '홈선수1')] },
+            { id: 'l-away', sideId: 'side-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null,
+              participants: [row('a-1', 'side-away', 'l-away', '원정선수1')] },
+          ],
+        },
+        isLoading: false, isError: false, error: null, refetch: vi.fn(),
+      });
+    }
+
+    it('"전원 도착"은 누른 팀의 sideId 로 일괄 검인을 요청하고, 다른 팀은 건드리지 않는다', () => {
+      mocks.confirmSideArrival.mockClear();
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '성수 풋살 클럽 전원 도착 확인' }));
+
+      expect(mocks.confirmSideArrival).toHaveBeenCalledTimes(1);
+      expect(mocks.confirmSideArrival.mock.calls[0][0]).toBe('side-away');
+      // 기본값은 전원 미확인 — 버튼을 누르기 전에 도착으로 그려지는 사람이 없다.
+      expect(screen.getByRole('switch', { name: /홈선수1/ })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('경기가 시작된 뒤에는 검인 패널(과 전원 도착 버튼)이 없다', () => {
+      scheduledWithRosters();
+      gameWithPeriods('LIVE', [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByRole('button', { name: /전원 도착/ })).toBeNull();
     });
   });
 

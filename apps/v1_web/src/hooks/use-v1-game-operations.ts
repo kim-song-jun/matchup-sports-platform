@@ -72,14 +72,7 @@ export function useV1SetParticipantArrival(
   scope: { tournamentId: string; fixtureId: string } | null,
 ) {
   const queryClient = useQueryClient();
-  const refreshLineups = () => {
-    if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameOperationsLineup(gameId) });
-    if (scope) {
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.fixtureLineup(scope.tournamentId, scope.fixtureId),
-      });
-    }
-  };
+  const refreshLineups = () => invalidateArrivalLineups(queryClient, gameId, scope);
   return useMutation({
     mutationFn: (vars: { participantId: string; arrived: boolean }) =>
       v1Patch<{ id: string; sideId: string; arrivedAt: string | null }>(
@@ -93,6 +86,38 @@ export function useV1SetParticipantArrival(
       if (code === 'GAME_PARTICIPANT_SUPERSEDED' || code === 'GAME_PARTICIPANT_NOT_FOUND') refreshLineups();
     },
   });
+}
+
+/**
+ * "전원 도착" — 한 팀의 명단 검인을 한 번에 채운다(`POST /games/:gameId/sides/:sideId/arrival/confirm-all`).
+ * 개별 검인과 같은 권한·같은 무효화 규칙이고, 서버가 한 트랜잭션으로 처리하므로 참가자 수만큼 왕복하지 않는다.
+ */
+export function useV1ConfirmSideArrival(
+  gameId: string | null,
+  scope: { tournamentId: string; fixtureId: string } | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sideId: string) =>
+      v1Post<{ sideId: string; participantCount: number; newlyArrivedCount: number }>(
+        `/games/${gameId}/sides/${sideId}/arrival/confirm-all`,
+      ),
+    // 실패해도 다시 받는다 — 그 사이 명단이 바뀌었으면 화면이 옛 명단을 보고 있다.
+    onSettled: () => invalidateArrivalLineups(queryClient, gameId, scope),
+  });
+}
+
+function invalidateArrivalLineups(
+  queryClient: ReturnType<typeof useQueryClient>,
+  gameId: string | null,
+  scope: { tournamentId: string; fixtureId: string } | null,
+) {
+  if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameOperationsLineup(gameId) });
+  if (scope) {
+    queryClient.invalidateQueries({
+      queryKey: v1Keys.fixtureLineup(scope.tournamentId, scope.fixtureId),
+    });
+  }
 }
 
 /**

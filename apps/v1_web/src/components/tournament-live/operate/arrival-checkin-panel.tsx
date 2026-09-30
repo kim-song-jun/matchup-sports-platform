@@ -31,17 +31,27 @@ export interface ArrivalCheckinPanelProps {
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
   readonly onToggleArrival: (input: { participantId: string; arrived: boolean }) => void;
+  /**
+   * 한 팀을 통째로 도착 처리한다("전원 도착"). 기본값이 전원 미확인인 이유는 검인이 "확인한
+   * 것"이어야 하기 때문이다 — 그래서 기본을 뒤집지 않고, 다 온 팀만 한 번에 채우는 버튼을 준다.
+   * 개별 탭은 그대로 남는다(안 온 사람 예외 처리용).
+   */
+  readonly onConfirmSide?: (sideId: string) => void;
   readonly disabled?: boolean;
   /** 낙관적 표시 없이 서버 응답을 기다리는 동안 그 행만 잠근다. */
   readonly pendingParticipantId?: string | null;
+  /** "전원 도착"을 서버에 보낸 팀 — 응답 전까지 그 버튼만 잠근다. */
+  readonly pendingSideId?: string | null;
 }
 
 export function ArrivalCheckinPanel({
   sides,
   lineups,
   onToggleArrival,
+  onConfirmSide,
   disabled = false,
   pendingParticipantId = null,
+  pendingSideId = null,
 }: ArrivalCheckinPanelProps) {
   const sections = sides.map((side) => ({
     side,
@@ -78,7 +88,24 @@ export function ArrivalCheckinPanel({
 
       {sections.map(({ side, participants }) => (
         <div key={side.id} className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
+            {onConfirmSide && participants.length > 0 ? (
+              participants.every((participant) => participant.arrivedAt !== null) ? (
+                <p className="shrink-0 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">전원 도착 확인됨</p>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`${side.displayNameSnapshot} 전원 도착 확인`}
+                  disabled={disabled || pendingSideId === side.id}
+                  onClick={() => onConfirmSide(side.id)}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-[var(--border)] px-3 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  전원 도착
+                </button>
+              )
+            ) : null}
+          </div>
           {participants.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">제출된 명단이 없어요.</p>
           ) : (

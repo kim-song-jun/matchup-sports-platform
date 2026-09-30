@@ -23,6 +23,7 @@ import {
   useV1FixtureLineup,
   useV1Game,
   useV1SetParticipantArrival,
+  useV1ConfirmSideArrival,
   postV1GameCommand,
 } from '@/hooks/use-v1-game-operations';
 import { readGameResultScore } from '@/lib/game-result-score';
@@ -217,6 +218,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const fixtureLineup = useV1FixtureLineup(tournamentId, fixtureId);
   const setArrival = useV1SetParticipantArrival(fixtureLineup.data?.gameId ?? null, {
+    tournamentId,
+    fixtureId,
+  });
+  const confirmSideArrival = useV1ConfirmSideArrival(fixtureLineup.data?.gameId ?? null, {
     tournamentId,
     fixtureId,
   });
@@ -1552,6 +1557,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           lineups={lineups}
           disabled={!canOperate || commandBlocked}
           pendingParticipantId={setArrival.isPending ? setArrival.variables?.participantId ?? null : null}
+          pendingSideId={confirmSideArrival.isPending ? confirmSideArrival.variables ?? null : null}
+          onConfirmSide={(sideId) =>
+            confirmSideArrival.mutate(sideId, {
+              onError: (err) => showToast(extractErrorMessage(err, '전원 도착을 저장하지 못했어요.')),
+            })
+          }
           onToggleArrival={({ participantId, arrived }) => {
             setArrival.mutate(
               { participantId, arrived },

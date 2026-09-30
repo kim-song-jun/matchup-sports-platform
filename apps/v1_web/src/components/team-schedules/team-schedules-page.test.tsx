@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -34,6 +34,7 @@ function buildModel(
     visibilityLabel: '팀 전체',
     capacityLabel: null,
     opponent: null,
+    roster: null,
     version: 1,
     conflictBanner: null,
     onDismissConflict: () => undefined,
@@ -210,25 +211,101 @@ describe('일정 상세 — 접근 불가', () => {
   });
 });
 
-describe('일정 상세 — 취소 패널', () => {
-  it('일정 취소를 누르면 화면 밖에 펼쳐지는 패널로 스크롤하고 포커스를 옮긴다', () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
+describe('일정 상세 — 취소 확인 창 (H9 A-3)', () => {
+  function withCancel(cancel: Partial<ScheduleDetailViewModel['cancelModal']>, recruitmentOpen = false) {
     const base = buildModel({});
-    const closed = { ...base };
-    const opened = { ...base, cancelModal: { ...base.cancelModal, open: true } };
+    return {
+      ...base,
+      guestRecruitment: { ...base.guestRecruitment, isOpen: recruitmentOpen },
+      cancelModal: { ...base.cancelModal, open: true, ...cancel },
+    };
+  }
 
-    const view = renderPage(<ScheduleDetailPageView model={closed} />);
-    expect(scrollIntoView).not.toHaveBeenCalled();
+  it('닫혀 있으면 화면 아래 인라인 패널 없이 운영 관리 버튼만 있다', () => {
+    renderPage(<ScheduleDetailPageView model={buildModel({})} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '취소 사유' })).not.toBeInTheDocument();
+  });
+
+  it('사유가 비어 있으면 일정 취소 버튼이 꺼져 있고, 사유를 쓰면 켜져 요청을 보낸다', () => {
+    const onReasonChange = vi.fn();
+    const view = renderPage(<ScheduleDetailPageView model={withCancel({ reason: '  ', onReasonChange })} />);
+
+    const dialog = screen.getByRole('dialog', { name: '일정을 취소할까요?' });
+    const confirmButton = within(dialog).getByRole('button', { name: '일정 취소' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '취소 사유' }), { target: { value: '우천' } });
+    expect(onReasonChange).toHaveBeenCalledWith('우천');
+
+    const onConfirm = vi.fn();
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <ScheduleDetailPageView model={withCancel({ reason: '우천', onConfirm })} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '일정 취소' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('용병 모집이 열려 있을 때만 함께 닫힌다고 알린다', () => {
+    const view = renderPage(<ScheduleDetailPageView model={withCancel({}, true)} />);
+    expect(screen.getByRole('dialog')).toHaveTextContent('열려 있는 용병 모집도 함께 닫혀요');
 
     view.rerender(
       <QueryClientProvider client={new QueryClient()}>
-        <ScheduleDetailPageView model={opened} />
+        <ScheduleDetailPageView model={withCancel({}, false)} />
       </QueryClientProvider>,
     );
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('용병 모집');
+  });
 
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('group', { name: '일정을 취소할까요?' })).toHaveFocus();
+  it('취소 요청이 실패하면 창을 연 채로 사유를 알린다', () => {
+    renderPage(<ScheduleDetailPageView model={withCancel({ reason: '우천', error: '이미 다른 사람이 일정을 바꿨어요.' })} />);
+    expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('이미 다른 사람이 일정을 바꿨어요.');
+  });
+});
+
+describe('일정 상세 — 참석명단 요약 (H9 D-1)', () => {
+  function withRoster(roster: ScheduleDetailViewModel['roster']) {
+    return { ...buildModel({}), roster };
+  }
+
+  it('친선 확정 경기가 아니면 참석명단 줄이 없다', () => {
+    renderPage(<ScheduleDetailPageView model={withRoster(null)} />);
+    expect(screen.queryByText('참석명단')).not.toBeInTheDocument();
+  });
+
+  it('멤버에게는 인원·포함 여부 없이 누가 정하는지와 무엇을 정하는지만 알린다', () => {
+    renderPage(<ScheduleDetailPageView model={withRoster({ count: null, viewerIncluded: null, href: null })} />);
+    expect(screen.getByText('참석명단')).toBeInTheDocument();
+    expect(screen.getByText('팀장·매니저가 정해요')).toBeInTheDocument();
+    expect(screen.getByText('경기에 나가는 사람은 이 명단으로 정해져요.')).toBeInTheDocument();
+    expect(screen.queryByText(/명단에 (있어요|없어요)/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀장·매니저가 정해요/ })).not.toBeInTheDocument();
+  });
+
+  it('팀장·매니저에게는 인원·내 포함 여부를 보여 주고 참석명단 관리로 잇는다', () => {
+    renderPage(
+      <ScheduleDetailPageView
+        model={withRoster({ count: 8, viewerIncluded: true, href: '/team-matches/tm-1/lineup?from=x' })}
+      />,
+    );
+    const link = screen.getByRole('link', { name: /8명 · 팀장·매니저가 정해요/ });
+    expect(link).toHaveAttribute('href', '/team-matches/tm-1/lineup?from=x');
+    expect(link).toHaveTextContent('명단에 있어요');
+  });
+
+  it('명단에 빠졌거나 아직 비어 있으면 그대로 말한다', () => {
+    const view = renderPage(<ScheduleDetailPageView model={withRoster({ count: 8, viewerIncluded: false, href: '/x' })} />);
+    expect(screen.getByText('명단에 없어요')).toBeInTheDocument();
+
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <ScheduleDetailPageView model={withRoster({ count: 0, viewerIncluded: null, href: '/x' })} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('아직 정하지 않았어요 · 팀장·매니저가 정해요')).toBeInTheDocument();
+    expect(screen.queryByText(/명단에 (있어요|없어요)/)).not.toBeInTheDocument();
   });
 });
 
@@ -286,12 +363,23 @@ describe('일정 상세 — 친선 경기 응답 이름 (H5 A-3)', () => {
     expect(screen.queryByText('내 참석')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '올 수 있어요', pressed: true })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '못 가요', pressed: false })).toBeInTheDocument();
-    expect(screen.getByText('이 응답은 출전을 정하지 않아요. 출전 선수는 팀장이 참석명단으로 정해요.')).toBeInTheDocument();
+    expect(screen.getByText('이 응답은 출전을 정하지 않아요. 출전 선수는 팀장·매니저가 참석명단으로 정해요.')).toBeInTheDocument();
     expect(screen.getByText('올 수 있어요 7명')).toBeInTheDocument();
     expect(screen.getByText('응답 현황')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '올 수 있어요 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '선수03 올 수 있어요로 대신 표시' })).toBeInTheDocument();
     expect(screen.queryByText(/^참석/)).not.toBeInTheDocument();
+  });
+
+  // H9 D-1 요약과 함께 설 때 — "나가는 사람은 명단이 정한다"를 요약 한 곳에서만 말한다.
+  it('참석명단 요약이 있으면 응답 칸은 이름만 나누고 같은 설명을 되풀이하지 않는다', () => {
+    const model = { ...buildModel({ visible: false }, attendees, { ...attendance, friendlyMatch: true }), roster: { count: 8, viewerIncluded: true, href: null } };
+    renderPage(<ScheduleDetailPageView model={model} />);
+
+    expect(screen.getByText('경기에 나가는 사람은 이 명단으로 정해져요.')).toBeInTheDocument();
+    expect(screen.getByText('(팀장 참고용)')).toBeInTheDocument();
+    expect(screen.queryByText(/출전을 정하지 않아요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '올 수 있어요', pressed: true })).toBeInTheDocument();
   });
 
   it('대조군 — 훈련·모임·대회·리그 일정은 "내 참석 · 참석/미정/불참" 그대로다', () => {

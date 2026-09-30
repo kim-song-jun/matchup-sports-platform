@@ -71,9 +71,10 @@ const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, {
 const useV1TeamsMock = vi.mocked(useV1Teams, { partial: true });
 
 /** 만든 대진은 지울 수 없어 생성은 확인 창을 거친다(F42) — 누르고 확인까지 한 번에. */
-/** 표와 모바일 카드가 같은 행을 둘 다 그려 ⋯ 가 두 벌이다 — 첫 번째로 시트를 열고 dialog 를 돌려준다. */
+/** 표에서 그 제목(주차 라벨)의 행을 찾아 ⋯ 시트를 열고 dialog 를 돌려준다. ⋯ 의 이름은 매치업·일시다. */
 function openRowMenu(fixtureTitle = '가을 풋살 리그 1주차') {
-  fireEvent.click(screen.getAllByRole('button', { name: `${fixtureTitle} 더보기` })[0]);
+  const row = within(screen.getByRole('table')).getByText(`${fixtureTitle} · `, { exact: false }).closest('tr');
+  fireEvent.click(within(row as HTMLElement).getByRole('button', { name: /더보기$/ }));
   return screen.getByRole('dialog');
 }
 
@@ -1823,15 +1824,32 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     ]);
 
     const table = screen.getByRole('table');
-    expect(within(table).getByRole('link', { name: '1주차 콘솔 열기' })).toHaveAttribute(
-      'href',
-      '/admin/live/league-1/fixtures/tm-1/operate',
-    );
-    expect(within(table).queryByRole('link', { name: '2주차 콘솔 열기' })).toBeNull();
-    expect(within(table).queryByRole('link', { name: '3주차 콘솔 열기' })).toBeNull();
+    const links = within(table).getAllByRole('link', { name: /콘솔 열기$/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/admin/live/league-1/fixtures/tm-1/operate');
     // 예전 행 안의 버튼들은 표에서 물러났다.
     expect(within(table).queryByRole('button', { name: /몰수패 처리|취소$/ })).toBeNull();
     expect(within(table).queryByRole('link', { name: /결과 입력/ })).toBeNull();
+  });
+
+  // G6-V2 — 수동으로 더한 경기는 주차 제목이 기존 경기와 같아진다. 버튼 이름이 제목뿐이면 스크린리더로 두 행을 못 가른다.
+  it('같은 주차에 같은 두 팀이 두 번 붙어도 행 버튼 이름이 매치업과 일시로 갈린다', () => {
+    renderLeague([
+      { ...base, teamMatchId: 'tm-a', title: '1주차', startAt: '2026-09-29T16:10:00.000Z' },
+      { ...base, teamMatchId: 'tm-b', title: '1주차', startAt: '2026-09-30T09:30:00.000Z' },
+    ]);
+
+    const table = screen.getByRole('table');
+    for (const suffix of ['콘솔 열기', '더보기']) {
+      const names = within(table)
+        .getAllByRole(suffix === '더보기' ? 'button' : 'link', { name: new RegExp(`${suffix}$`) })
+        .map((element) => element.getAttribute('aria-label'));
+      expect(names).toHaveLength(2);
+      expect(names).toEqual(expect.arrayContaining([
+        expect.stringMatching(new RegExp(`^마포 FC vs 합정 유나이티드 .*01:10 ${suffix}$`)),
+        expect.stringMatching(new RegExp(`^마포 FC vs 합정 유나이티드 .*18:30 ${suffix}$`)),
+      ]));
+    }
   });
 
   it('⋯ 시트에는 일정 수정·몰수패·대진 취소가 있고, 부전승 행에는 몰수패가 없다', () => {

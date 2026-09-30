@@ -402,6 +402,36 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
     expect(screen.queryByRole('button', { name: '수락' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '컨택 철회' })).not.toBeInTheDocument();
   });
+
+  // Enter 경로는 버튼의 disabled 가 없어 onSend 가드(공백·전송 중)만이 빈/중복 전송을 막는다 — 여기서 고정한다.
+  it('Enter 는 앞뒤 공백을 뺀 내용을 보내고, 공백뿐이면 보내지 않는다', () => {
+    const mutate = vi.fn();
+    hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate });
+    hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+    renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+    const input = screen.getByLabelText('메시지 입력');
+
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: ' 안녕\n반가워요 ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ content: '안녕\n반가워요' }, expect.anything());
+  });
+
+  it('전송 중에는 Enter 를 다시 눌러도 보내지 않는다', () => {
+    const mutate = vi.fn();
+    hooks.sendChatMessage.mockReturnValue({ isPending: true, isError: false, mutate });
+    hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+    renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+    const input = screen.getByLabelText('메시지 입력');
+
+    fireEvent.change(input, { target: { value: '안녕' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).not.toHaveBeenCalled();
+  });
 });
 
 describe('ChatListPageClient — 팀컨택 필터·배지', () => {

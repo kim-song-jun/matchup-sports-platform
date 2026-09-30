@@ -37,6 +37,40 @@ export interface LineupConfigPosition {
 }
 
 /** 서버 lineupConfig.formations 행 — 슬롯 좌표는 서버(T1-5)가 이미 확정해 내려준다. */
+export interface LineupConfigFormation {
+  code: string;
+  label: string;
+  outfield: number;
+  slots: Array<{ position: string; x: number; y: number }>;
+}
+
+/**
+ * 서버 사전 → 대형 목록. `outfield` 가 주어지면 그 필드 인원(경기 인원 − GK) 대형만 남긴다 —
+ * 5:5 경기에 필드 5명 대형이 섞이면 고를 때마다 한 자리가 남거나 모자란다.
+ * `keepCode` 는 이미 저장된 대형이 인원 필터에 걸려도 목록에 남긴다(저장본을 그대로 읽기 위해).
+ * 슬롯 표시는 포지션 약칭(FX·AL·PV)이다 — 44px 빈 자리 원 안에 들어가는 길이.
+ */
+export function presetsFromLineupConfig(
+  config: { positions: readonly LineupConfigPosition[]; formations: readonly LineupConfigFormation[] },
+  outfield: number | null,
+  keepCode: string | null = null,
+): FormationPreset[] {
+  const shortByCode = new Map(config.positions.map((position) => [position.code, position.short]));
+  return config.formations
+    .filter((formation) => outfield === null || formation.outfield === outfield || formation.code === keepCode)
+    .map((formation) => ({
+      code: formation.code,
+      label: formation.label,
+      outfield: formation.outfield,
+      slots: formation.slots.map((slot) => ({
+        positionCode: slot.position,
+        label: shortByCode.get(slot.position) ?? slot.position,
+        x: slot.x,
+        y: slot.y,
+      })),
+    }));
+}
+
 /** 골키퍼 슬롯은 좌표가 (50,6) 고정이라 서버 프리셋 slots 배열에 담기지 않는다(현행
  * 동작 유지, T1-5) — 이 함수가 항상 앞에 붙인다. 원본 preset.slots는 건드리지 않고
  * 새 배열을 만들어 돌려준다.

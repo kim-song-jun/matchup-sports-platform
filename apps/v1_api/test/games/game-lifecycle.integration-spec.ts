@@ -323,6 +323,28 @@ describe('Task 6 L1 game lifecycle', () => {
     expect(started.state).toBe(V1GameState.LIVE);
     expect(replay).toEqual({ ...started, replayed: true });
 
+    // 응답을 놓친 사이 takeover 가 다시 발급돼도 재생은 처음 본문 그대로여야 한다 — 멱등 조회가 토큰 검증보다
+    // 먼저이고 토큰도 해시에 들어간다. 웹 운영 콘솔의 "같은 요청 재시도"가 이 순서에 기댄다.
+    const regrantedToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
+    const replayAfterRegrant = await service.executeCommand(
+      authUser(ids.operatorUser),
+      tournamentGameId,
+      'start',
+      start.clientCommandId,
+      start,
+    );
+    expect(replayAfterRegrant).toEqual({ ...started, replayed: true });
+    const swappedToken = await captureFailure(() =>
+      service.executeCommand(
+        authUser(ids.operatorUser),
+        tournamentGameId,
+        'start',
+        start.clientCommandId,
+        { ...start, takeoverToken: regrantedToken },
+      ),
+    );
+    expectHttpCode(swappedToken, 409, 'IDEMPOTENCY_PAYLOAD_CONFLICT');
+
     const mismatch = await captureFailure(() =>
       service.executeCommand(
         authUser(ids.operatorUser),

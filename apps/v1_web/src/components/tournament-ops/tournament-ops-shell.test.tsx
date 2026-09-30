@@ -132,3 +132,32 @@ describe('TournamentOpsShell nav 표면 (M5)', () => {
     }
   });
 });
+
+describe('TournamentOpsShell 모바일 상단 제목 (Task 180 G6-V4)', () => {
+  // 콘솔 경로는 nav 항목에 없어서 상단 제목이 종류별 기본값으로 떨어진다.
+  const mobileTitle = () => screen.getByRole('button', { name: '메뉴 열기' }).closest('header')?.textContent;
+
+  it.each([
+    ['regular_league', '리그 운영'],
+    ['regular_tournament', '대회 운영'],
+    [null, '대회 운영'],
+  ] as const)('경기 콘솔에서 종류가 %s 면 상단 제목은 %s', (kind, title) => {
+    pathnameMock.value = '/admin/live/c-1/fixtures/f-1/operate';
+    render(
+      <TournamentOpsShell tournamentId="c-1" role="PLATFORM_OPS" origin="admin" tournamentKind={kind}>
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(mobileTitle()).toBe(title);
+  });
+
+  it('nav 항목 화면에서는 종류와 무관하게 그 항목 이름이다', () => {
+    pathnameMock.value = '/admin/live/c-1/operations';
+    render(
+      <TournamentOpsShell tournamentId="c-1" role="PLATFORM_OPS" origin="admin" tournamentKind="regular_league">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(mobileTitle()).toBe('운영 보드');
+  });
+});

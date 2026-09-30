@@ -430,7 +430,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
                 : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
             ) : null}
-            {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
+            {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 12 }}>
               <div className="tm-text-body-lg">참가자</div>
               <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
@@ -518,7 +518,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
               : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
           ) : null}
-          {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
+          {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 12 }}>
             <div className="tm-text-body-lg">참가자</div>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>

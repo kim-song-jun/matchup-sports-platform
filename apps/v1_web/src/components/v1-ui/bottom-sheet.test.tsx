@@ -169,3 +169,37 @@ describe('BottomSheet 닫기와 히스토리', () => {
     expect(decideBackAction('/matches')).toBe('back');
   });
 });
+
+// 부모 상태로 여는 시트(상세 ⋯ 메뉴 등) — URL 을 건드리지 않고 onClose 로만 닫는다.
+describe('BottomSheet onClose 모드', () => {
+  const renderLocal = (onClose: () => void) =>
+    render(
+      <BottomSheet open onClose={onClose} title="매치 관리">
+        <p>내용</p>
+      </BottomSheet>,
+    );
+
+  it.each([
+    ['✕ 버튼', () => fireEvent.click(screen.getByRole('button', { name: '닫기' }))],
+    ['scrim', () => fireEvent.click(document.querySelector('.tm-filter-scrim')!)],
+    ['ESC', () => fireEvent.keyDown(document, { key: 'Escape' })],
+    ['임계치를 넘는 드래그', () => drag(screen.getByRole('dialog', { name: '매치 관리' }), ABOVE_THRESHOLD_OFFSET)],
+  ])('%s 로 닫으면 onClose 만 부르고 라우터는 건드리지 않는다', (_, close) => {
+    const onClose = vi.fn();
+    renderLocal(onClose);
+    close();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('제목을 넘기면 dialog 이름이 되고 드래그 손잡이도 함께 그린다', () => {
+    renderLocal(vi.fn());
+    const dialog = screen.getByRole('dialog', { name: '매치 관리' });
+    expect(dialog.querySelector('.tm-filter-sheet-handle')).not.toBeNull();
+    // scrim 은 링크가 아니다 — 닫힐 URL 이 없다.
+    expect(screen.queryByRole('link', { name: '필터 닫기' })).not.toBeInTheDocument();
+  });
+});

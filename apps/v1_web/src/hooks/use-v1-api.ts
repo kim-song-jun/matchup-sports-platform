@@ -2284,6 +2284,11 @@ export type V1TacticsBoard = {
   updatedByUserId: string | null;
   starterCount: number;
   benchCount: number;
+  /** Task 180 H7 — 코트 모양·대형 목록의 근거. optional 은 API/Web 순차 배포 창의 구버전 응답용. */
+  sportCode?: string | null;
+  /** GK 포함 한 팀 경기 인원. 친선은 경기방식("5:5"), 대회·리그는 출전 인원. */
+  playersPerSide?: number;
+  lineupConfig?: import('@/types/api').V1LineupConfig;
   entries: V1TacticsBoardEntry[];
 };
 

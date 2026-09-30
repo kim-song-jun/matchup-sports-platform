@@ -1,15 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { Check } from 'lucide-react';
-import { ChevronLeftIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { josa } from '@/lib/korean';
 import { friendlyRsvpLabel } from '@/lib/v1-status-labels';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
+import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { scheduleTypeLabel, weekdayHeaders } from './team-schedules.view-model';
 import type {
   MyScheduleViewModel,
@@ -311,6 +311,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                 ))}
               </div>
             ) : null,
+            model.roster ? <ScheduleRosterSummary key="roster" model={model.roster} /> : null,
             attendance.visible ? (
               <div key="attendance">
                 <div className="tm-text-label" style={{ marginBottom: 8 }}>
@@ -335,9 +336,11 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                     </button>
                   ))}
                 </div>
-                {attendance.friendlyMatch ? (
+                {/* 위 참석명단 요약이 "나가는 사람은 명단으로 정해진다"를 이미 말하면 되풀이하지 않는다 —
+                    요약은 상대가 확정된 뒤에만 있어, 그 전엔 이 한 줄이 같은 구분을 맡는다. */}
+                {attendance.friendlyMatch && !model.roster ? (
                   <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    이 응답은 출전을 정하지 않아요. 출전 선수는 팀장이 참석명단으로 정해요.
+                    이 응답은 출전을 정하지 않아요. 출전 선수는 팀장·매니저가 참석명단으로 정해요.
                   </div>
                 ) : null}
                 {attendance.myStatus === 'WAITLISTED' ? (
@@ -423,48 +426,84 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           ) : null;
         })()}
 
-        {model.cancelModal.open ? <ScheduleCancelPanel model={model.cancelModal} /> : null}
+        <ScheduleCancelConfirm model={model.cancelModal} recruitmentOpen={guestRecruitment.isOpen} />
       </div>
     </>
   );
 }
 
-/** 버튼 카드 아래(화면 밖)에 펼쳐지므로, 열리는 순간 뷰로 끌어와 눌렀는데 반응 없는 버튼처럼 보이지 않게 한다. */
-function ScheduleCancelPanel({ model }: { model: ScheduleDetailViewModel['cancelModal'] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  useEffect(() => {
-    revealAndFocus(ref.current);
-  }, []);
+/** 친선 경기의 참석명단(누가 뛰나) 요약 — 아래 참석 응답(올 수 있나)과 이름으로 나눈다(H9 D-1). */
+function ScheduleRosterSummary({ model }: { model: NonNullable<ScheduleDetailViewModel['roster']> }) {
+  const summary =
+    model.count === null
+      ? '팀장·매니저가 정해요'
+      : model.count === 0
+        ? '아직 정하지 않았어요 · 팀장·매니저가 정해요'
+        : `${model.count}명 · 팀장·매니저가 정해요`;
+  const row = (
+    <>
+      {model.viewerIncluded === true ? (
+        <span className="tm-badge tm-badge-green" style={{ gap: 4 }}>
+          <Check size={14} strokeWidth={2.4} aria-hidden="true" />
+          명단에 있어요
+        </span>
+      ) : model.viewerIncluded === false ? (
+        <span className="tm-badge tm-badge-grey">명단에 없어요</span>
+      ) : null}
+      <span className="tm-text-body" style={{ flex: 1, minWidth: 0 }}>{summary}</span>
+      {model.href ? (
+        <ChevronRightIcon size={18} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--text-caption)', flexShrink: 0 }} />
+      ) : null}
+    </>
+  );
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 } as const;
 
   return (
-    <div ref={ref} tabIndex={-1} role="group" aria-labelledby={titleId}>
-      <Card pad={16} style={{ marginTop: 12 }}>
-        <div id={titleId} className="tm-text-label" style={{ marginBottom: 8 }}>일정을 취소할까요?</div>
-        <TextField
-          label="취소 사유"
-          multiline
-          rows={3}
-          value={model.reason}
-          onChange={(e) => model.onReasonChange(e.target.value)}
-          disabled={model.pending}
-          error={model.error}
-        />
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={model.onDismiss} disabled={model.pending}>
-            닫기
-          </button>
-          <button
-            type="button"
-            className="tm-btn tm-btn-sm tm-btn-danger"
-            onClick={model.onConfirm}
-            disabled={model.pending || model.reason.trim().length === 0}
-          >
-            {model.pending ? '취소하는 중…' : '취소 확정'}
-          </button>
-        </div>
-      </Card>
+    <div>
+      <div className="tm-text-label" style={{ marginBottom: 4 }}>참석명단</div>
+      {model.href ? (
+        <Link href={model.href} style={{ ...rowStyle, color: 'inherit' }}>
+          {row}
+        </Link>
+      ) : (
+        <div style={rowStyle}>{row}</div>
+      )}
+      <div className="tm-text-caption">경기에 나가는 사람은 이 명단으로 정해져요.</div>
     </div>
+  );
+}
+
+/** 서버 CancelScheduleDto 의 cancelReason @MaxLength(500) 과 같다. */
+const CANCEL_REASON_MAX_LENGTH = 500;
+
+function ScheduleCancelConfirm({
+  model,
+  recruitmentOpen,
+}: {
+  model: ScheduleDetailViewModel['cancelModal'];
+  recruitmentOpen: boolean;
+}) {
+  return (
+    <ConfirmModal
+      open={model.open}
+      title="일정을 취소할까요?"
+      message={`취소하면 이 일정은 "취소됨"으로 바뀌고 되돌릴 수 없어요.${recruitmentOpen ? ' 열려 있는 용병 모집도 함께 닫혀요.' : ''}`}
+      confirmLabel={model.pending ? '취소하는 중…' : '일정 취소'}
+      cancelLabel="닫기"
+      tone="danger"
+      reasonField={{
+        label: '취소 사유',
+        value: model.reason,
+        onChange: model.onReasonChange,
+        required: true,
+        maxLength: CANCEL_REASON_MAX_LENGTH,
+        hint: '변경 이력에 남아 이 일정을 보는 모두에게 보여요.',
+      }}
+      busy={model.pending}
+      error={model.error}
+      onConfirm={model.onConfirm}
+      onCancel={model.onDismiss}
+    />
   );
 }
 

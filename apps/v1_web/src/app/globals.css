@@ -1951,6 +1951,11 @@ label.tm-btn:focus-within {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
+/* 팀매치 신청 팀 선택 행 — sr-only radio 를 감싼 label 이 키보드 포커스 링을 대신 그린다(마우스 클릭엔 안 뜬다). */
+.tm-apply-team-option:has(input:focus-visible) {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
 /* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
 .v1-button:focus-visible {
   outline: 2px solid var(--blue500);
@@ -4976,6 +4981,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: inherit;
 }
 
+/* 여러 줄 메시지(Shift+Enter)는 보낸 줄바꿈 그대로 보인다. 긴 URL 은 말풍선 안에서 끊는다. */
+.tm-chat-bubble .tm-text-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ── 메시지 그룹핑(카카오톡/토스 관례) ──────────────────────────────────────
  * 같은 발신자가 연달아 보낸 메시지는 좁은 간격(-mid)으로 붙이고, 발신자가
  * 바뀌거나 그룹이 끝나면 넓은 간격(-end)으로 시각적으로 분리한다. */
@@ -5039,6 +5050,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   border-top: 1px solid var(--grey100);
   background: var(--bg);
   display: flex;
+  /* 입력칸이 여러 줄로 자라도 + · 전송 버튼은 마지막 줄 옆(아래)에 남는다. */
+  align-items: flex-end;
   gap: 8px;
 }
 
@@ -5053,6 +5066,23 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 0 16px;
   font-size: var(--font-size-body-sm); /* 14px — R-T2 토큰 */
   font-weight: 600;
+}
+
+/* 여러 줄 입력칸 — 한 줄이면 44px, 내용만큼 자라다 5줄이 넘으면 스크롤. 높이는 컴포넌트가
+   scrollHeight 로 맞춘다. 알약 모양은 여러 줄에서 타원이 되므로 필드 모서리를 쓴다.
+   전역 border-box 라 max-height 에 위아래 padding 이 들어간다: 5줄(20×5) + 24 = 124px. */
+textarea.tm-chat-input-placeholder {
+  display: block;
+  padding: 12px 16px;
+  line-height: 20px;
+  max-height: 124px;
+  overflow-y: auto;
+  border-radius: var(--radius-field);
+  color: var(--text-strong);
+}
+
+textarea.tm-chat-input-placeholder::placeholder {
+  color: var(--text-caption);
 }
 
 .tm-notification-list {

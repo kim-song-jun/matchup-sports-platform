@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1ChatRoomTeamContact } from '@/types/api';
@@ -56,10 +56,27 @@ describe('TeamContactStatusCard', () => {
     navigation.search = '';
   });
 
-  it('받는 팀 운영진: 수락 클릭 → accept mutate', () => {
+  it('받는 팀: 수락은 결과를 알리는 확인 창을 거치고, 창에서 취소하면 요청하지 않는다', async () => {
     renderCard(<TeamContactStatusCard contact={contact()} />);
     fireEvent.click(screen.getByRole('button', { name: '수락' }));
-    expect(mutations.accept).toHaveBeenCalledTimes(1);
+
+    const dialog = await screen.findByRole('dialog', { name: '가팀의 컨택을 수락할까요?' });
+    expect(dialog).toHaveTextContent('가팀 팀장·매니저에게도 알림이 가요');
+    expect(dialog).toHaveTextContent('수락한 컨택은 되돌릴 수 없어요');
+    expect(mutations.accept).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mutations.accept).not.toHaveBeenCalled();
+  });
+
+  it('받는 팀: 확인 창에서 수락하기를 누르면 accept mutate', async () => {
+    renderCard(<TeamContactStatusCard contact={contact()} />);
+    fireEvent.click(screen.getByRole('button', { name: '수락' }));
+    const dialog = await screen.findByRole('dialog', { name: '가팀의 컨택을 수락할까요?' });
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '수락하기' }));
+    await waitFor(() => expect(mutations.accept).toHaveBeenCalledTimes(1));
   });
 
   it('받는 팀 운영진: 거절은 사유 입력을 거쳐 reason 을 넘긴다', () => {

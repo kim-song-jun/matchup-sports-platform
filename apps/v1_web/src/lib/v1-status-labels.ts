@@ -121,6 +121,23 @@ export function inquiryReportReasonLabel(reason: V1InquiryReportReason): string 
 /** 취소된 팀매치 — 상세 화면 히어로·하단 상태와 참석명단 배지가 함께 쓴다. */
 export const TEAM_MATCH_CANCELLED_LABEL = '취소됨';
 
+/**
+ * 팀매치 신청 상태 — 호스트(검토자) 관점. '승인 완료'는 상세 히어로가 상대팀을 찾는 표식이라 바꾸지 않는다.
+ * 승인하면 서버가 나머지 대기 신청을 같은 트랜잭션에서 rejected 로 바꾼다 — 그건 `autoClosed` 로 가른다.
+ */
+const TEAM_MATCH_APPLICATION_STATUS: Record<string, string> = {
+  requested: '승인 대기',
+  approved: '승인 완료',
+  rejected: '거절',
+  withdrawn: '신청 취소',
+  expired: '마감 종료',
+};
+
+export function teamMatchApplicationStatusLabel(status: string, options?: { autoClosed?: boolean }): string {
+  if (status === 'rejected' && options?.autoClosed) return '자동 종료';
+  return TEAM_MATCH_APPLICATION_STATUS[status] ?? '처리됨';
+}
+
 /** 친선 팀매치 공동 기록 상태와 변경 이력. */
 const phaseLabel: Record<string, string> = { scheduled: '경기 시작 전', live: '진행 중', official: '경기 종료 · 결과 확정', cancelled: '취소된 경기', legacy: '기존 경기 결과', managed: '운영자 기록 경기' };
 const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소', submatch_add: '서브매치 추가', submatch_edit: '서브매치 이름 수정', submatch_delete: '서브매치 삭제', participant_add: '늦게 온 선수 추가' };

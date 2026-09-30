@@ -19,6 +19,7 @@ import {
   useV1TeamMatch,
   useV1TeamMatchApplications,
   useV1TeamMatchEligibility,
+  useV1TeamMatchLineup,
   useV1TeamMatches,
   useV1WithdrawTeamMatchApplication,
 } from '@/hooks/use-v1-api';
@@ -29,7 +30,7 @@ import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '
 import type { CursorListSeed } from '@/lib/public-list-seed';
 import { extractErrorMessage } from '@/lib/error-message';
 import { josa } from '@/lib/korean';
-import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
+import { TEAM_MATCH_CANCELLED_LABEL, teamMatchApplicationStatusLabel } from '@/lib/v1-status-labels';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 // 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
@@ -37,6 +38,17 @@ import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, 
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
+import { buildAttendanceSummary } from './team-match-attendance-summary';
+import {
+  buildNextAction,
+  formatApplicationTime,
+  pickDefaultApplyTeamId,
+  readLastApplyTeamId,
+  rememberApplyTeamId,
+  teamMatchEditLockReason,
+  teamRoleLabel,
+  toApplicationHistory,
+} from './team-match-next-step';
 import { TeamMatchDetailPageSkeleton, TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -303,6 +315,10 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // resolveOwnTeamId가 라인업 페이지 자체의 권한 판정과 동일한 규칙으로 "내 팀"을 고른다.
   const myTeamsQuery = useV1MyTeams(undefined, { enabled: canManageHostTeam || canManageOpponentTeam });
   const ownTeamId = useMemo(() => resolveOwnTeamId(query.data, myTeamsQuery.data), [query.data, myTeamsQuery.data]);
+  // 진행 체크리스트의 "참석명단 제출" 칸 — 상대가 정해진 친선 팀매치에서 내 팀 명단 입구가 있을 때만 읽는다.
+  const attendanceLineup = useV1TeamMatchLineup(teamMatchId, {
+    enabled: Boolean(query.data) && !query.isPlaceholderData && !isCancelled && opponentAssigned && ownTeamId !== null && !query.data?.league,
+  });
 
   useEffect(() => {
     if (!query.data || !chatAvailable || autoResolvedChatRef.current === teamMatchId) return;
@@ -328,6 +344,62 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // 뷰어 상태·신청 팀 목록이 없으므로 상태 라벨과 행동 버튼을 잠근다.
   const seeding = query.isPlaceholderData;
   const isLeagueFixture = Boolean(query.data.league);
+  const displayStatus = getStatus(query.data);
+  // 수정·마감·재개는 서버 api status 로 판정한다 — displayState 는 신청 마감 시각이 지나면
+  // 'closed' 로 보이지만 서버는 여전히 recruiting 으로 보고 재개를 409 로 거부한다.
+  // V1TeamMatch 는 V1Match 의 status 타입을 물려받아 좁다 — getStatus() 와 같은 캐스트다.
+  const apiStatus = query.data.status as V1TeamMatchApiStatus;
+  const requestedCount = applications.data?.items.filter((item) => item.status === 'requested').length ?? 0;
+  const approvedOpponent = query.data.approvedOpponentTeam ?? null;
+  const lineupAction = isCancelled ? undefined : buildLineupAction(teamMatchId, ownTeamId, query.data.gameId ?? null, isLeagueFixture, chainFrom);
+  const resultAction = seeding ? undefined : buildResultAction(teamMatchId, displayStatus, canManageHostTeam, canManageOpponentTeam, isLeagueFixture, chainFrom);
+  const reviewAction = buildReviewAction(teamMatchId, displayStatus, isParticipantMember);
+  const scheduleLabel = seeding ? null : modelScheduleLabel(query.data);
+  const manageHref = canManageMatchListing ? withFromPath(`/team-matches/${teamMatchId}/edit`, chainFrom) : undefined;
+  const lineupState = attendanceLineup.data?.state;
+  const lineupSubmitted = lineupAction?.kind === 'attendance' && attendanceLineup.isSuccess ? lineupState === 'SUBMITTED' || lineupState === 'LOCKED' : null;
+  // 진행 체크리스트는 자기 편을 아는 참가팀 팀장·매니저에게만 — 일반 팀원은 하단 바의 후기 입구로 충분하다.
+  const progress: TeamMatchDetailViewModel['progress'] = !seeding && !isCancelled && approvedOpponent && (canManageHostTeam || canManageOpponentTeam)
+    ? {
+        opponentName: canManageHostTeam ? approvedOpponent.name : query.data.hostTeam?.name ?? query.data.hostTeamName ?? '홈팀',
+        confirmedAtLabel: formatApplicationTime(applications.data?.items.find((item) => item.status === 'approved')?.reviewedAt),
+        lineupSubmitted,
+        lockNote: canManageMatchListing && apiStatus === 'matched' ? MATCHED_LOCK_NOTE : null,
+        attendance: lineupAction?.kind === 'attendance' && attendanceLineup.data
+          ? buildAttendanceSummary(teamMatchId, attendanceLineup.data, query.data.startsAt, Date.now())
+          : null,
+      }
+    : undefined;
+  const submitApplication = (teamId: string, message: string | null) =>
+    applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message }).then((result) => {
+      trackEvent('team_match_apply_complete', { teamMatchId });
+      rememberApplyTeamId(teamId);
+      return result;
+    });
+  // N-1: 신청 가능한 팀이 2개 이상일 때만 팀을 고른다. 살아 있는 신청이 있으면 CTA 는 철회라 시트가 없다.
+  const eligibleTeamCount = eligibility.data?.teams.filter((team) => team.eligible).length ?? 0;
+  const defaultApplyTeamId = eligibility.data ? pickDefaultApplyTeamId(eligibility.data.teams, readLastApplyTeamId()) : null;
+  const applyTeamPicker: TeamMatchDetailViewModel['applyTeamPicker'] = !seeding
+    && eligibility.data
+    && defaultApplyTeamId
+    && eligibleTeamCount >= 2
+    && displayStatus === 'recruiting'
+    && viewerState !== 'requested'
+    && selectedEligibility?.reasonCode !== 'ALREADY_REQUESTED'
+    && !isParticipantMember
+    ? {
+        teams: eligibility.data.teams.map((team) => ({
+          teamId: team.teamId,
+          name: team.name,
+          roleLabel: teamRoleLabel(team.role),
+          eligible: team.eligible,
+          reason: team.eligible ? null : reasonLabel(team.reasonCode),
+        })),
+        defaultTeamId: defaultApplyTeamId,
+        submit: submitApplication,
+      }
+    : undefined;
+  const editLockReason = teamMatchEditLockReason(apiStatus);
 
   const model: TeamMatchDetailViewModel = {
     ...fallback,
@@ -351,7 +423,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
       league: query.data.league ?? null,
       applicantActionError: actionError,
-      manageHref: canManageMatchListing ? withFromPath(`/team-matches/${teamMatchId}/edit`, chainFrom) : undefined,
+      manageHref,
       applicantTeams: toApplicantTeamsWithActions(
         query.data,
         applications.data,
@@ -372,14 +444,20 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         approveApplication.isPending || rejectApplication.isPending,
       ),
     },
-    mode: toDetailMode(viewerState, getStatus(query.data)),
+    mode: toDetailMode(viewerState, displayStatus),
     detailBackHref: fromPath ?? '/team-matches',
-    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess, isParticipantMember),
+    applyLabel: seeding
+      ? '불러오는 중'
+      : applyTeamPicker
+        ? '신청하기'
+        : applyLabel(viewerState, displayStatus, selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess, isParticipantMember),
     // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
     applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
     hostActions: !seeding && canManageMatchListing
       ? buildHostActions({
-          status: getStatus(query.data),
+          status: apiStatus,
+          requestedCount,
+          opponentName: approvedOpponent?.name ?? null,
           // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
           // 거부한다(team-matches.service.ts cancel()) — 눌러서 실패를 봐야만 알 수 있게
           // 두지 않고 애초에 버튼을 노출하지 않는다.
@@ -390,10 +468,49 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
         })
       : undefined,
-    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture, chainFrom),
-    reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
-    statusLabel: seeding ? undefined : modelScheduleLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
-    statusLabelKind: !seeding && modelScheduleLabel(query.data) ? 'match' : 'application',
+    // manageHref 는 모집을 운영하는 호스트에게만 있다(canManageMatchListing).
+    manageMenu: !seeding && manageHref
+      ? {
+          edit: editLockReason ? { lockedReason: editLockReason } : { href: manageHref },
+          history: toApplicationHistory(applications.data?.items ?? []),
+        }
+      : undefined,
+    nextAction: seeding
+      ? undefined
+      : buildNextAction({
+          cancelled: isCancelled,
+          listingHost: canManageMatchListing,
+          apiStatus,
+          opponentAssigned,
+          matchPhase: scheduleLabel !== null,
+          completed: displayStatus === 'completed',
+          manageHref,
+          reopen: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
+          lineupAction,
+          resultAction,
+          reviewAction,
+        }),
+    progress,
+    applicationsPending: canManageMatchListing && applications.isPending,
+    applicationsError: canManageMatchListing && applications.isError
+      ? { retry: () => { void applications.refetch(); } }
+      : undefined,
+    myApplicationTeam: viewerState === 'requested' && selectedEligibility?.applicationId
+      ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name }
+      : null,
+    applyTeamPicker,
+    resultAction,
+    reviewAction,
+    ...(seeding ? { statusLabel: undefined, statusLabelKind: 'application' as const } : statusMeta({
+      scheduleLabel,
+      fallback: statusLabel(viewerState, displayStatus),
+      listingHost: canManageMatchListing,
+      displayStatus,
+      opponentAssigned,
+      requestedCount,
+      progress,
+      attendance: lineupAction?.kind === 'attendance',
+    })),
     chatLabel: chatLabel(chatAvailable),
     chatPending: resolveChatRoom.isPending,
     chatError,
@@ -410,21 +527,17 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }
       : undefined,
     onShare: () => shareTeamMatch(query.data),
-    lineupAction: isCancelled ? undefined : buildLineupAction(teamMatchId, ownTeamId, query.data.gameId ?? null, isLeagueFixture, chainFrom),
+    lineupAction,
     onApply: seeding ? undefined : getApplyAction({
       viewerState,
-      status: getStatus(query.data),
+      status: displayStatus,
       selectedTeamId: selectedEligibility?.teamId,
       applicationId: selectedEligibility?.applicationId,
       eligible: selectedEligibility?.eligible,
       isGuest,
       hasNoTeam,
       isParticipantMember,
-      apply: (teamId) =>
-        applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }).then((result) => {
-          trackEvent('team_match_apply_complete', { teamMatchId });
-          return result;
-        }),
+      apply: (teamId) => submitApplication(teamId, null),
       withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
       reasonCode: selectedEligibility?.reasonCode,
       redirectTo: (href) => router.push(href),
@@ -543,6 +656,7 @@ function toApplicantTeamsWithActions(
       trustState: match.approvedOpponentTeam.trustState ?? null,
       href: `/teams/${match.approvedOpponentTeam.teamId}`,
       applicationId: match.approvedOpponentTeam.applicationId,
+      applicationStatus: 'approved',
     }];
   }
 
@@ -554,22 +668,25 @@ function toApplicantTeamsWithActions(
         app.applicantTeam.ratingScore == null ? null : `팀 평점 ${app.applicantTeam.ratingScore.toFixed(1)}`,
         `${app.applicantTeam.wins}승`,
       ].filter((value): value is string => value !== null).join(' · '),
-      status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인 완료' : app.status === 'rejected' ? '미승인' : app.status,
+      status: teamMatchApplicationStatusLabel(app.status),
       logoUrl: app.applicantTeam.logoUrl,
       sportName: app.applicantTeam.sportName,
       levelLabel: app.applicantTeam.levelLabel,
       trustState: app.applicantTeam.trustState,
       href: `/teams/${app.applicantTeam.teamId}`,
       applicationId: app.applicationId,
+      applicationStatus: app.status,
+      appliedByName: app.appliedBy.displayName,
+      appliedAtLabel: formatApplicationTime(app.createdAt),
+      message: app.message?.trim() || null,
       actionPending,
       onApprove: app.canApprove ? () => onApprove(app.applicationId) : undefined,
       onReject: app.canReject ? () => onReject(app.applicationId) : undefined,
     }));
   }
 
-  // 아직 신청팀이 없거나(정말 0건) applications가 로딩 중이면 목업 신청팀 목록(fallback)으로
-  // 채우지 않는다 — 실제로 신청한 적 없는 팀 이름이 화면에 뜨는 회귀였다. 빈 배열이면
-  // team-matches-page.tsx가 신청팀 카드를 비워서 보여준다(별도 안내 문구 없음, .map() 결과만 없음).
+  // 0건·로딩 중·조회 실패 모두 빈 배열이다(목업 신청팀으로 채우지 않는다). 셋 중 무엇인지는
+  // applicationsPending·applicationsError 가 가른다 — 빈 배열만 보고 "신청 없음"이라 하지 않는다.
   return [];
 }
 
@@ -596,7 +713,8 @@ function applyLabel(
   isParticipantMember?: boolean,
 ) {
   if (status === 'cancelled') return '취소된 팀매치예요';
-  if (viewerState === 'host_team') return '매치 관리';
+  // 호스트의 하단 버튼은 보통 nextAction(매치 수정·모집 재개·참석명단 관리)이 그린다 — 이 라벨은 할 일이 없을 때의 상태다.
+  if (viewerState === 'host_team') return status === 'expired' ? '경기 시간이 지났어요' : status === 'completed' ? '경기 종료' : '매치 수정';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') {
     // 라벨과 액션은 같은 `team`에서 나와야 한다(getApplyAction도 이 팀의 applicationId를 쓴다).
     // 여러 팀을 관리하는 사용자에게 "어느 팀 신청을 취소하는지"를 밝혀야 신청 CTA
@@ -634,6 +752,41 @@ function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApi
   return '신청 가능';
 }
 
+const MATCHED_LOCK_NOTE = '시간·장소는 상대팀이 정해진 뒤에는 바꿀 수 없어요. 바꿔야 하면 채팅으로 상의해요.';
+
+/**
+ * 하단 바 상태 줄. 경기 진행 상태가 있으면 그것이 먼저고, 상대가 정해진 참가팀 운영진은 경기 준비를,
+ * 모집 중인 호스트는 모집 상황(신청 수 포함)을 말한다. 나머지는 신청 흐름 라벨(statusLabel) 그대로다.
+ */
+function statusMeta({ scheduleLabel, fallback, listingHost, displayStatus, opponentAssigned, requestedCount, progress, attendance }: {
+  scheduleLabel: string | null;
+  fallback: string;
+  listingHost: boolean;
+  displayStatus: V1TeamMatchApiStatus;
+  opponentAssigned: boolean;
+  requestedCount: number;
+  progress: TeamMatchDetailViewModel['progress'];
+  attendance: boolean;
+}): Pick<TeamMatchDetailViewModel, 'statusLabel' | 'statusLabelKind' | 'statusCaption'> {
+  if (scheduleLabel) return { statusLabel: scheduleLabel, statusLabelKind: 'match' };
+  if (progress) {
+    if (displayStatus === 'completed') return { statusLabel: '경기 종료', statusLabelKind: 'match' };
+    const submitted = attendance ? progress.lineupSubmitted : null;
+    return {
+      statusLabel: submitted === null ? '상대팀 확정' : submitted ? '참석명단 제출 완료' : '참석명단 제출 전',
+      statusLabelKind: 'application',
+      statusCaption: '경기 준비',
+    };
+  }
+  if (listingHost && !opponentAssigned && displayStatus !== 'cancelled') {
+    const label = displayStatus === 'recruiting'
+      ? (requestedCount > 0 ? `모집 중 · 신청 ${requestedCount}팀` : '모집 중')
+      : displayStatus === 'closed' ? '모집 마감' : displayStatus === 'expired' ? '모집 종료' : fallback;
+    return { statusLabel: label, statusLabelKind: 'application', statusCaption: '모집 상태' };
+  }
+  return { statusLabel: fallback, statusLabelKind: 'application' };
+}
+
 function chatLabel(chatAvailable: boolean) {
   return chatAvailable ? '채팅' : '승인 후 채팅';
 }
@@ -663,13 +816,18 @@ function canOpenTeamMatchChat(
 
 function buildHostActions({
   status,
+  requestedCount,
+  opponentName,
   isLeagueFixture,
   closeTeamMatch,
   reopenTeamMatch,
   cancelTeamMatch,
   pending,
 }: {
+  /** 서버 api status — close()/reopen() 이 보는 값과 같아야 눌러서 409 를 보지 않는다. */
   status: V1TeamMatchApiStatus;
+  requestedCount: number;
+  opponentName: string | null;
   isLeagueFixture: boolean;
   closeTeamMatch: () => Promise<unknown>;
   reopenTeamMatch: () => Promise<unknown>;
@@ -680,20 +838,38 @@ function buildHostActions({
   // LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN) — 모집 마감/재개는 leagueId 가드가 없어 그대로 둔다.
   const cancelAction: NonNullable<TeamMatchDetailViewModel['hostActions']>[number] = {
     label: '팀매치 취소',
+    description: opponentName ? `취소하면 ${opponentName}에 알림이 가요.` : '취소하면 되돌릴 수 없어요.',
     tone: 'danger',
     pending,
     confirm: TEAM_MATCH_CANCEL_CONFIRM,
     onClick: cancelTeamMatch,
   };
   if (status === 'recruiting') {
+    // 마감하면 서버가 대기 신청을 전부 expired 로 끝낸다(close()) — 끝나는 팀이 있을 때만 확인한다.
+    const closeConfirm = requestedCount > 0
+      ? {
+          title: '모집을 마감할까요?',
+          message: `대기 중인 신청 ${requestedCount}팀이 종료되고 알림이 가요. 마감한 뒤에도 모집을 다시 열 수 있어요.`,
+          confirmLabel: '모집 마감',
+          cancelLabel: '닫기',
+          tone: 'default' as const,
+        }
+      : undefined;
     return [
-      { label: '모집 마감', tone: 'neutral', pending, onClick: closeTeamMatch },
+      {
+        label: '모집 마감',
+        description: requestedCount > 0 ? `대기 중인 신청 ${requestedCount}팀이 종료돼요.` : '더 이상 신청을 받지 않아요.',
+        tone: 'neutral',
+        pending,
+        confirm: closeConfirm,
+        onClick: closeTeamMatch,
+      },
       ...(isLeagueFixture ? [] : [cancelAction]),
     ];
   }
   if (status === 'closed') {
     return [
-      { label: '모집 재개', tone: 'primary', pending, onClick: reopenTeamMatch },
+      { label: '모집 재개', description: '다시 신청을 받아요.', tone: 'primary', pending, onClick: reopenTeamMatch },
       ...(isLeagueFixture ? [] : [cancelAction]),
     ];
   }
@@ -869,6 +1045,8 @@ function reasonLabel(reasonCode?: string) {
   // 있는데도 팀을 새로 만들라는 오해를 준다. 종목이 다르다는 걸 명시한다.
   if (reasonCode === 'SPORT_MISMATCH') return '이 팀매치와 종목이 다른 팀이에요';
   if (reasonCode === 'ALREADY_APPROVED') return '승인 완료';
+  if (reasonCode === 'ALREADY_REQUESTED') return '이미 신청한 팀이에요';
+  if (reasonCode === 'ALREADY_REQUESTED_WITH_ANOTHER_TEAM') return '다른 팀으로 이미 신청했어요';
   if (reasonCode === 'MATCHED_ALREADY') return '이미 상대팀이 정해진 매치예요';
   if (reasonCode === 'NOT_RECRUITING') return '신청 마감된 매치예요';
   // 팀이 없는 경우 → 팀 만들기 유도

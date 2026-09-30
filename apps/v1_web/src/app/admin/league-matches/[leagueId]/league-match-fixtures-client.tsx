@@ -237,6 +237,9 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
       ? `${homeName} vs ${teamNameById.get(fixture.awayTeamId) ?? '원정팀'}`
       : `${homeName} 부전승`;
   };
+  // 행 버튼의 접근 가능한 이름. 같은 주차·같은 두 팀이 두 번 붙으면 제목·매치업이 겹치므로 일시까지 넣는다.
+  const fixtureNameOf = (fixture: V1LeagueFixture) =>
+    `${matchupLabelOf(fixture)} ${formatKstDateShort(fixture.startAt)} ${formatKstTime(fixture.startAt)}`;
   const nextAction = pickLeagueNextAction(series.fixtures);
 
   /**
@@ -900,7 +903,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   {canOpenConsole ? (
                     <Link
                       href={consoleHref(leagueId, row.teamMatchId)}
-                      aria-label={`${row.title} 콘솔 열기`}
+                      aria-label={`${fixtureNameOf(row)} 콘솔 열기`}
                       className="tm-btn tm-btn-sm tm-btn-outline whitespace-nowrap"
                     >
                       콘솔 열기
@@ -911,7 +914,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   ) : (
                     <button
                       type="button"
-                      aria-label={`${row.title} 더보기`}
+                      aria-label={`${fixtureNameOf(row)} 더보기`}
                       aria-haspopup="dialog"
                       onClick={() => setMenuFixture(row)}
                       className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"

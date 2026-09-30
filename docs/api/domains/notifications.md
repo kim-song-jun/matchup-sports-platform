@@ -157,8 +157,20 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 | 리그 대진 확정 `league_fixture_scheduled` | 팀장·매니저 | 리그 대진이 확정됐어요 / `"(리그명)" 리그 대진이 확정됐어요. 이번 시즌 N경기가 배정됐어요.` | `/league-matches/:leagueId` |
 | 〃 | 시즌 참가 명단(확정 신청의 활성 선수) 중 팀장·매니저가 아닌 활성 팀원 | 리그 대진이 확정됐어요 / `"(리그명)" 첫 경기는 9/30 (수) 01:10, (상대팀)와 해요.` | `/league-matches/:leagueId` |
 
+| 경기 전날 `game_day_before_reminder` | 출전자(대회·리그 팀장·매니저는 기존 "명단 확인"을 받으므로 제외) | `9/30 (수) 01:10 경기가 있어요` / `vs (상대) · (장소). 출전 명단은 경기 전까지 바뀔 수 있어요.` | 공개 경기 상세 |
+| 킥오프 2시간 전 `game_kickoff_reminder` | 출전자 + 팀장·매니저 | 2시간 뒤 경기가 시작돼요 / `01:10 vs (상대) · (장소). 지금 출전 명단에 있어요.` — 출전자가 아닌 팀장·매니저는 마지막 문장 없음 | 공개 경기 상세 |
+
 - 한 사람에게 한 건 — 참가 명단에 든 팀장·매니저는 팀장 문구만 받는다.
 - 시각은 KST 날짜·요일·시각으로 쓰고 "내일" 같은 상대 표현을 쓰지 않는다. 와/과는 상대팀 이름의 받침으로 고른다.
+- **출전자**: 대회·리그는 계산된 경기 명단(참가 명단 − 조정 − 결장 − 출전정지), 친선 팀매치는 최신 참석명단이
+  제출(SUBMITTED·LOCKED)된 경우 그 명단. 참석명단을 아직 안 낸 친선 사이드는 킥오프 알림을 보내지 않는다(팀장·매니저는
+  참석명단 최종 확인 알림을 받는다).
+- 경기 전 알림은 라인업 리마인더 워커(15분 스캔)가 보낸다. 전날 알림은 내일(KST) 경기에 대해 09시 이후 첫 스캔이, 킥오프 알림은
+  킥오프 2시간 전부터 30분 안의 스캔이 보낸다. **2시간 전 시각이 21~09시(KST)면 보내지 않는다.** businessKey
+  `game-day-before:{gameId}:{userId}` · `game-kickoff:{gameId}:{userId}` 로 (경기, 수신자)당 한 번이다.
+- 수신 설정은 "경기·대회"(`teamMatchEnabled`)를 따른다. 기존 팀장·매니저 "명단 확인"·참석명단 알림은 `teamEnabled` 그대로다.
+- 공개 경기 상세: 대회는 `targetType=tournament`, targetId `{tournamentId}:{teamMatchId}` → `/tournaments/:id/matches/:teamMatchId`,
+  리그·친선은 `targetType=team_match` → `/team-matches/:id`(리그 대진은 리그 경기 상세로 redirect).
 
 ## Delivery Architecture
 

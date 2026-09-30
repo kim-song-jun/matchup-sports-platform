@@ -2205,6 +2205,8 @@ export type V1TeamUpcomingGame = {
   lineupState: 'MISSING' | 'DRAFT' | 'DONE';
   /** 대회·리그 경기의 계산된 명단 요약. 친선과 확정 명단이 없는 팀은 null. */
   rosterSummary: V1GameRosterSummary | null;
+  /** 보는 사람이 이 경기에 출전하는지(서버 판정). "내 출전" 칩만 이 값을 읽는다. */
+  viewerParticipating: boolean;
 };
 
 export type V1GameRosterSummary = {

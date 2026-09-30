@@ -73,12 +73,21 @@ function toTeamMatchRow(match: FakeMatch) {
   };
 }
 
+// 팀 A 의 활성 팀원. OUTSIDER 는 어느 팀에도 없다.
+const TEAM_A_MEMBERS = new Set([PLAYER_IN, PLAYER_OUT]);
+
 function buildPrisma(db: FakeDb) {
   const sides = MATCHES.flatMap((match) => [
     { id: `side-${match.id}-home`, gameId: `game-${match.id}`, teamId: match.hostTeamId, game: { teamMatchId: match.id } },
     { id: `side-${match.id}-away`, gameId: `game-${match.id}`, teamId: OPPONENT, game: { teamMatchId: match.id } },
   ]);
   return {
+    v1Team: { findFirst: jest.fn(({ where }: { where: { id: string } }) => Promise.resolve({ id: where.id })) },
+    v1TeamMembership: {
+      findFirst: jest.fn(({ where }: { where: { teamId: string; userId: string } }) =>
+        Promise.resolve(where.teamId === TEAM_A && TEAM_A_MEMBERS.has(where.userId) ? { id: `m-${where.userId}` } : null),
+      ),
+    },
     v1TeamMatch: {
       findMany: jest.fn((args: { where: { status?: string; startAt?: { gte: Date }; OR?: Array<Record<string, { in: string[] }>> } }) => {
         if (args.where.status !== 'matched') return Promise.resolve([{ leagueId: LEAGUE_ID, startAt: LEAGUE_KICKOFF }]);
@@ -273,6 +282,38 @@ describe('TeamUpcomingGamesService.nextForMemberships — 홈 "다음 경기"', 
       const next = await service.nextForMemberships(OUTSIDER, [{ teamId: TEAM_A, role: 'member' }], NOW);
       expect(next?.teamId).toBe(TEAM_A);
       expect(await service.nextForMemberships(OUTSIDER, [], NOW)).toBeNull();
+    } finally {
+      await moduleRef.close();
+    }
+  });
+});
+
+describe('TeamUpcomingGamesService.listForTeam — 팀 상세 "다가오는 경기"의 내 출전', () => {
+  // 친선 참석명단은 OUT 만 제출했다 — 리그와 반대로 갈려야 칩이 경기마다 따로 판정되는지 드러난다.
+  const db = (): FakeDb => ({
+    lineups: [{ id: 'lineup-f', gameId: 'game-match-friendly', sideId: 'side-match-friendly-home', revision: 1, state: 'SUBMITTED' }],
+    participants: [{ lineupId: 'lineup-f', userId: PLAYER_OUT }],
+  });
+
+  it('같은 팀원이라도 출전하는 경기에만 viewerParticipating 이 true 이고 목록 자체는 같다', async () => {
+    const { service, moduleRef } = await buildService(db());
+    try {
+      const asIn = await service.listForTeam({ id: PLAYER_IN } as never, TEAM_A, NOW);
+      const asOut = await service.listForTeam({ id: PLAYER_OUT } as never, TEAM_A, NOW);
+      const view = (items: Array<{ gameId: string; viewerParticipating: boolean }>) =>
+        Object.fromEntries(items.map((item) => [item.gameId, item.viewerParticipating]));
+
+      expect(view(asIn.items)).toEqual({ 'game-match-league': true, 'game-match-friendly': false });
+      expect(view(asOut.items)).toEqual({ 'game-match-league': false, 'game-match-friendly': true });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('팀원이 아니면 목록을 받지 못한다(403)', async () => {
+    const { service, moduleRef } = await buildService(db());
+    try {
+      await expect(service.listForTeam({ id: OUTSIDER } as never, TEAM_A, NOW)).rejects.toMatchObject({ status: 403 });
     } finally {
       await moduleRef.close();
     }

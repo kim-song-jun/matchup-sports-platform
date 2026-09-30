@@ -40,12 +40,13 @@ export class TeamUpcomingGamesService {
     private readonly lineupTodos: LineupTodoService,
   ) {}
 
-  async listForTeam(user: V1AuthUser, teamId: string) {
+  async listForTeam(user: V1AuthUser, teamId: string, now: Date = new Date()) {
     // 전술보드 읽기와 같은 선 — 활성 팀원이면 본다. 팀이 없으면 404, 팀원이 아니면 403.
     await assertTeamLineupMember(this.prisma, teamId, user.id);
-    const games = await this.lineupTodos.listUpcomingForTeam(teamId, new Date());
+    const games = await this.lineupTodos.listUpcomingForTeam(teamId, now);
     // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
     const rosters = await loadRosterSummaries(this.prisma, teamId, games);
+    const participating = await loadViewerParticipation(this.prisma, { userId: user.id, games, rosters });
     return {
       items: games.map((game) => ({
         gameId: game.gameId,
@@ -63,6 +64,8 @@ export class TeamUpcomingGamesService {
         lineupState: game.lineupState,
         // 대회·리그만. 친선과 기준 명단이 없는 팀(확정 신청 없는 대회)은 null.
         rosterSummary: rosters.get(game.gameId)?.summary ?? null,
+        // "내 출전" 칩의 근거. 빠진 경기는 false 일 뿐 "빠졌다"는 값을 따로 두지 않는다.
+        viewerParticipating: participating.has(game.gameId),
       })),
     };
   }

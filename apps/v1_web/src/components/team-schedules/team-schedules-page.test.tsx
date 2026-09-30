@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -95,6 +95,7 @@ function buildModel(
     },
     loading: false,
     error: false,
+    inaccessible: false,
     onRetry: () => undefined,
   };
 }
@@ -182,5 +183,79 @@ describe('일정 상세 — 팀장 대리 참석 표시', () => {
     renderAttendees({ canProxy: true, viewerUserId: 'u-me', proxyError: '참석을 대신 표시하지 못했어요.' });
     expect(screen.getByRole('alert')).toHaveTextContent('참석을 대신 표시하지 못했어요.');
     expect(screen.getByText('미응답이')).toBeInTheDocument();
+  });
+});
+
+describe('일정 상세 — 접근 불가', () => {
+  it('멤버 전용 일정이 숨겨진 사람에게는 재시도 없이 팀 상세로 돌아갈 길을 준다', () => {
+    renderPage(<ScheduleDetailPageView model={{ ...buildModel({}), error: true, inaccessible: true }} />);
+
+    expect(screen.getByText('볼 수 없는 일정이에요')).toBeInTheDocument();
+    expect(screen.queryByText(/잠시 후 다시 시도/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 시도하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '팀 상세로 돌아가기' })).toHaveAttribute('href', '/teams/team-1');
+  });
+
+  it('일시적인 조회 실패에는 다시 시도하기를 준다', () => {
+    const onRetry = vi.fn();
+    renderPage(<ScheduleDetailPageView model={{ ...buildModel({}), error: true, inaccessible: false, onRetry }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('볼 수 없는 일정이에요')).not.toBeInTheDocument();
+  });
+});
+
+describe('일정 상세 — 취소 패널', () => {
+  it('일정 취소를 누르면 화면 밖에 펼쳐지는 패널로 스크롤하고 포커스를 옮긴다', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const base = buildModel({});
+    const closed = { ...base };
+    const opened = { ...base, cancelModal: { ...base.cancelModal, open: true } };
+
+    const view = renderPage(<ScheduleDetailPageView model={closed} />);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <ScheduleDetailPageView model={opened} />
+      </QueryClientProvider>,
+    );
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('group', { name: '일정을 취소할까요?' })).toHaveFocus();
+  });
+});
+
+describe('일정 상세 — 용병 모집 열기', () => {
+  function withRecruitment(canCreate: boolean) {
+    const base = buildModel({});
+    return {
+      ...base,
+      guestRecruitment: {
+        ...base.guestRecruitment,
+        manage: {
+          onCreate: () => undefined,
+          onToggleOpen: () => undefined,
+          onEdit: () => undefined,
+          pending: false,
+          exists: false,
+          canCreate,
+          applications: { items: [], loading: false, error: null, onApprove: () => undefined, onReject: () => undefined, pendingApplicationId: null },
+        },
+      },
+    };
+  }
+
+  it('예정된 일정에서만 모집을 열 수 있다', () => {
+    renderPage(<ScheduleDetailPageView model={withRecruitment(true)} />);
+    expect(screen.getByRole('button', { name: '용병 모집 열기' })).toBeInTheDocument();
+  });
+
+  it('취소·종료된 일정에는 모집 열기를 내지 않는다', () => {
+    renderPage(<ScheduleDetailPageView model={withRecruitment(false)} />);
+    expect(screen.queryByRole('button', { name: '용병 모집 열기' })).not.toBeInTheDocument();
   });
 });

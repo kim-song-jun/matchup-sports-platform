@@ -172,3 +172,13 @@ export function describeSkipped(applied: number, skipped: readonly SkippedEntry[
     .join(', ');
   return `${applied + skipped.length}명 중 ${applied}명을 불러왔어요 · ${details}`;
 }
+
+/**
+ * 프리셋 이름 입력칸의 예시. 종목의 경기 방식에 맞춘다 — 풋살 팀이 11인제 표기를 예시로 보지 않도록.
+ * 종목을 모르면 종목 표기 없는 예시를 쓴다.
+ */
+export function presetNamePlaceholder(sportName: string | null): string {
+  if (sportName === '풋살') return '예: 5:5 기본 멤버';
+  if (sportName === '축구') return '예: 11:11 기본 멤버';
+  return '예: 기본 멤버';
+}

@@ -346,6 +346,9 @@ export class LeagueMatchAdminService {
         game: {
           select: {
             id: true,
+            // 진행 중 여부 — 어드민 "지금 할 일" 카드가 결과 단계(resultStage)와 별개로
+            // 경기가 뛰는 중인지를 알아야 한다. 결과 단계만으로는 진행 중과 시작 전이 같은 not_entered 다.
+            state: true,
             currentOfficialRevisionId: true,
             resultRevisions: { select: { state: true }, orderBy: { revision: 'desc' }, take: 1 },
           },
@@ -413,6 +416,7 @@ export class LeagueMatchAdminService {
           placeAddress: fixture.placeAddress,
           status: fixture.status,
           resultStage: resolveResultStage(fixture.game),
+          gameState: fixture.game?.state ?? null,
           homeScore: fact?.homeScore ?? null,
           awayScore: fact?.awayScore ?? null,
           isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),

@@ -12,6 +12,8 @@ type SavePresetDialogProps = {
   saving: boolean;
   error: string | null;
   onSave: (name: string) => void;
+  /** 이름 입력칸 예시. 종목에 맞는 값은 호출부가 안다. */
+  namePlaceholder: string;
 };
 
 /**
@@ -21,7 +23,7 @@ type SavePresetDialogProps = {
  * 뒤다. 입력하는 동안 "이 이름은 이미 있어요 — 저장하면 덮어써요"를 미리 말해 주고,
  * 그대로 진행하면 덮어쓰기로 처리한다.
  */
-export function SavePresetDialog({ open, onClose, existingNames, saving, error, onSave }: SavePresetDialogProps) {
+export function SavePresetDialog({ open, onClose, existingNames, saving, error, onSave, namePlaceholder }: SavePresetDialogProps) {
   const idPrefix = useId();
   const titleId = `${idPrefix}-save-preset-title`;
   const inputId = `${idPrefix}-save-preset-name`;
@@ -75,7 +77,7 @@ export function SavePresetDialog({ open, onClose, existingNames, saving, error, 
             id={inputId}
             type="text"
             className="tm-input"
-            placeholder="예: 주전 4-4-2"
+            placeholder={namePlaceholder}
             maxLength={30}
             value={name}
             onChange={(event) => setName(event.target.value)}

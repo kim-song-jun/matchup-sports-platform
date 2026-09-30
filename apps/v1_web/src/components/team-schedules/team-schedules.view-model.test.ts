@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamScheduleSummary } from '@/types/api';
 import {
+  attendanceLockedReason,
   attendanceSummaryText,
   buildScheduleCalendarMonth,
   dateKeyOf,
@@ -296,5 +297,18 @@ describe('team-schedules view-model — calendar month grid', () => {
 
     const inMonthCount = allDays.filter((day) => day.inCurrentMonth).length;
     expect(inMonthCount).toBe(31); // 2026-08 has 31 days
+  });
+});
+
+describe('attendanceLockedReason', () => {
+  it('취소된 일정은 종료가 아니라 취소라고 말한다', () => {
+    expect(attendanceLockedReason('CANCELLED', false)).toBe('취소된 일정이라 참석 여부를 바꿀 수 없어요.');
+    expect(attendanceLockedReason('CANCELLED', true)).toBe('취소된 일정이라 참석 여부를 바꿀 수 없어요.');
+  });
+
+  it('완료된 일정은 종료, 예정된 일정은 마감 여부로만 갈린다', () => {
+    expect(attendanceLockedReason('COMPLETED', false)).toBe('이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.');
+    expect(attendanceLockedReason('SCHEDULED', true)).toBe('참석 신청 마감 시간이 지났어요.');
+    expect(attendanceLockedReason('SCHEDULED', false)).toBeNull();
   });
 });

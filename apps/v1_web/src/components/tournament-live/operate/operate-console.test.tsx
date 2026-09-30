@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
     isError: false,
   })),
   useTournamentOpsRole: vi.fn(),
+  confirmSideArrival: vi.fn(),
+  useV1TeamGameRoster: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -39,11 +41,29 @@ vi.mock('@/hooks/use-v1-game-operations', () => ({
   // 명단 검인 토글 — 이 스위트는 검인 동작 자체를 검증하지 않지만(전용 스위트가 있다),
   // 콘솔이 매 렌더 호출하는 훅이라 모듈 목에 반드시 있어야 한다.
   useV1SetParticipantArrival: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+  // 팀별 "전원 도착" 일괄 검인 — 호출 인자만 본다(서버 계약은 API 스펙이 검증한다).
+  useV1ConfirmSideArrival: () => ({ mutate: mocks.confirmSideArrival, isPending: false, variables: undefined }),
+}));
+// 킥오프 준비 체크리스트의 팀별 명단 요약(빠짐·정지). 요약 자체의 표시 규칙은 kickoff-checklist.test 가 본다.
+vi.mock('@/hooks/use-v1-game-roster', () => ({
+  useV1TeamGameRoster: (...args: unknown[]) => mocks.useV1TeamGameRoster(...args),
 }));
 vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
   gameOperationsErrorMessage: (code: string) => `오류(${code})`,
   isRetryableGameOperationsErrorCode: () => true,
+}));
+// 종료 직후 콘솔이 끼우는 결과 확정 카드 — 카드 자체(권한별 표시·확정 흐름)는 패널 스위트가 검증한다.
+// 여기서는 콘솔이 언제, 어떤 경기에 대해 그 카드를 마운트하는지만 본다.
+vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
+  GameResultReviewPanel: (props: { gameId: string; variant?: string; tournamentId?: string }) => (
+    <div
+      data-testid="result-confirm-card"
+      data-game-id={props.gameId}
+      data-variant={props.variant}
+      data-tournament-id={props.tournamentId}
+    />
+  ),
 }));
 vi.mock('@/components/tournament-ops/role-context', () => ({
   useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
@@ -119,6 +139,11 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
 // 지운다(mockClear, 각 describe가 이미 따로 설정하는 mockResolvedValue
 // 구현 자체는 건드리지 않는다).
 beforeEach(() => {
+  mocks.useV1TeamGameRoster.mockReturnValue({
+    data: { counts: { base: 10, participating: 9, excluded: 1, unavailable: 0, suspended: 0 } },
+    isPending: false,
+    isError: false,
+  });
   mocks.postV1GameCommand.mockClear();
   mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
 });
@@ -198,6 +223,18 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(list).toHaveTextContent('정우진');
+  });
+
+  // Task 180 G6(F76) — 콘솔에서는 방금 한 일이 맨 위여야 어시스트를 잘못된 골에 다는 사고가 없다.
+  it('콘솔의 기록된 이벤트는 최신순이다 (맨 위가 가장 나중에 기록된 골)', () => {
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ liveEvents: [goal(1), { ...goal(2), clockMs: 9 * 60000 }, { ...goal(3), clockMs: 12 * 60000 }] }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9', '6']);
+    expect(screen.getByRole('heading', { name: /기록된 이벤트/ })).toHaveTextContent('최신순');
   });
 
   it('FIELD_OPERATOR가 takeover를 보유하면 기록 수정 액션을 노출한다', () => {
@@ -543,7 +580,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       expect(screen.getByRole('button', { name: '후반 시작' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+      // 조기 정상 종료는 주 조작 줄이 아니라 ⋯ 더보기 시트 안에 있다.
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
       expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
       expect(screen.getByText(/하프타임이에요/)).toBeInTheDocument();
@@ -585,6 +623,348 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       await waitFor(() =>
         expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything()),
       );
+    });
+  });
+
+  // Task 180 G6(F69) — 자주 누르는 "전반 종료" 곁에 되돌릴 수 없는 "경기 종료"가 있던 배치를
+  // 없앴다. 정규 시간이 끝나기 전의 종료 계열은 ⋯ 시트 안에만 있다.
+  describe('조기 종료는 ⋯ 더보기 시트 안에만 있다', () => {
+    const FIRST_HALF = [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ];
+    const REGULATION_ENDED = [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+    ];
+
+    it('전반 중에는 헤더에 "경기 종료"·"몰수·중단으로 종료"가 없고, ⋯ 시트 안에 둘 다 있다', () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /몰수·중단으로 종료/ })).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
+      expect(within(sheet).getByRole('button', { name: /^경기 종료/ })).toBeEnabled();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeEnabled();
+    });
+
+    it('시트에서 "경기 종료"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ }));
+
+      const confirmDialog = await screen.findByRole('dialog');
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(confirmDialog).not.toHaveAccessibleName('경기 더보기');
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+
+      fireEvent.click(within(confirmDialog).getByRole('button', { name: '경기 종료' }));
+      await waitFor(() =>
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything()),
+      );
+    });
+
+    it('시트에서 "몰수·중단으로 종료"를 고르면 사유 입력 창이 열린다', () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^몰수·중단으로 종료/ }));
+
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(screen.getByRole('dialog', { name: '몰수·중단으로 종료' })).toBeInTheDocument();
+    });
+
+    it('일시 중지 중에도 "경기 종료"는 헤더가 아니라 시트 안에 있다', () => {
+      gameWithPeriods('LIVE', FIRST_HALF);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state: 'PAUSED' },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'PAUSED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '재개' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      expect(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ })).toBeInTheDocument();
+    });
+
+    it('정규 시간 종료 뒤의 "경기 종료"는 헤더 주 버튼이고, 시트에는 몰수·중단만 남는다', () => {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '경기 종료' })).toBeEnabled();
+
+      fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+      const sheet = screen.getByRole('dialog', { name: '경기 더보기' });
+      expect(within(sheet).queryByRole('button', { name: /^경기 종료/ })).toBeNull();
+      expect(within(sheet).getByRole('button', { name: /^몰수·중단으로 종료/ })).toBeInTheDocument();
+    });
+
+    it('조작할 명령이 없는 경기(종료됨)에는 조작 줄과 ⋯ 가 없다', () => {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state: 'ENDED' },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByRole('button', { name: '더보기' })).toBeNull();
+      expect(screen.queryByRole('group', { name: '경기 진행 조작' })).toBeNull();
+    });
+  });
+
+  // Task 180 G6(F56) — 킥오프 전 검인: 기본은 전원 미확인이고, 팀별 "전원 도착" 한 번으로 그 팀을 채운다.
+  describe('킥오프 전 명단 검인 — 팀별 전원 도착', () => {
+    function scheduledWithRosters() {
+      gameWithPeriods('SCHEDULED', []);
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+      const row = (id: string, sideId: string, lineupId: string, name: string) => ({
+        id, gameId: 'game-1', sideId, lineupId, displayNameSnapshot: name, jerseyNumber: 1,
+        position: null, arrivedAt: null, createdAt: '', updatedAt: '',
+      });
+      mocks.useV1FixtureLineup.mockReturnValue({
+        data: {
+          gameId: 'game-1',
+          lineups: [
+            { id: 'l-home', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null,
+              participants: [row('h-1', 'side-home', 'l-home', '홈선수1')] },
+            { id: 'l-away', sideId: 'side-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null,
+              participants: [row('a-1', 'side-away', 'l-away', '원정선수1')] },
+          ],
+        },
+        isLoading: false, isError: false, error: null, refetch: vi.fn(),
+      });
+    }
+
+    // 일괄 검인은 도착 시각을 여러 명에게 한꺼번에 남기고 일괄로 되돌리는 길이 없다 — 눌러서 바로 나가지 않는다.
+    it('"전원 도착"은 몇 명이 표시되는지 묻는 확인을 거친 뒤에야 누른 팀의 sideId 로 일괄 검인을 요청한다', async () => {
+      mocks.confirmSideArrival.mockClear();
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '성수 풋살 클럽 전원 도착 확인' }));
+
+      const dialog = await screen.findByRole('dialog', { name: '성수 풋살 클럽 1명을 도착으로 표시할까요?' });
+      expect(mocks.confirmSideArrival).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '전원 도착' }));
+
+      await waitFor(() => expect(mocks.confirmSideArrival).toHaveBeenCalledTimes(1));
+      expect(mocks.confirmSideArrival.mock.calls[0][0]).toBe('side-away');
+      // 기본값은 전원 미확인 — 다른 팀은 건드리지 않는다.
+      expect(screen.getByRole('switch', { name: /홈선수1/ })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('확인 창에서 취소하면 아무도 도착으로 표시되지 않는다', async () => {
+      mocks.confirmSideArrival.mockClear();
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '성수 풋살 클럽 전원 도착 확인' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      // 확인 결과는 오버레이 히스토리가 정리된 뒤에 전달된다 — 그 뒤까지 흘려보내고 나서도 호출이 없어야 한다.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      });
+      expect(mocks.confirmSideArrival).not.toHaveBeenCalled();
+    });
+
+    it('경기 시작 전 콘솔은 "킥오프 준비"로 팀별 명단 요약과 도착 확인을 한 자리에 보인다', () => {
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      const checklist = screen.getByRole('region', { name: '킥오프 준비' });
+      expect(within(checklist).getAllByText('빠짐 1 · 정지 0').length).toBeGreaterThan(0);
+      expect(within(checklist).getByRole('switch', { name: /홈선수1/ })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: '명단 검인' })).toBeNull();
+    });
+
+    it('준비가 끝나면 경기 시작으로 이어지고, 시작하면 킥오프 준비는 사라진다', async () => {
+      // 두 팀 모두 도착 확인이 끝난 상태.
+      scheduledWithRosters();
+      const lineupData = mocks.useV1FixtureLineup().data;
+      mocks.useV1FixtureLineup.mockReturnValue({
+        ...mocks.useV1FixtureLineup(),
+        data: {
+          ...lineupData,
+          lineups: lineupData.lineups.map((lineup: { participants: Array<Record<string, unknown>> }) => ({
+            ...lineup,
+            participants: lineup.participants.map((row) => ({ ...row, arrivedAt: '2026-09-30T00:50:00.000Z' })),
+          })),
+        },
+      });
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText('준비가 끝났어요. ‘경기 시작’을 눌러 주세요.')).toBeInTheDocument();
+
+      // 안내가 가리키는 그 버튼이 조작 줄에 있고, 누르면 확인 뒤 start 가 나간다.
+      fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '경기 시작' }));
+      await waitFor(() =>
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start', expect.anything()),
+      );
+
+      // 서버가 LIVE 로 옮기면 체크리스트 자리는 이벤트 기록이 차지한다.
+      gameWithPeriods('LIVE', [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }]);
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'LIVE' } }));
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(screen.queryByRole('region', { name: '킥오프 준비' })).toBeNull();
+      expect(screen.queryByText('준비가 끝났어요. ‘경기 시작’을 눌러 주세요.')).toBeNull();
+    });
+
+    it('미확인이 남아 있어도 경기 시작 버튼은 막히지 않는다 — 체크리스트는 조건이 아니라 안내다', () => {
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText(/그래도 ‘경기 시작’은 누를 수 있어요/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    });
+
+    it('경기가 시작된 뒤에는 검인 패널(과 전원 도착 버튼)이 없다', () => {
+      scheduledWithRosters();
+      gameWithPeriods('LIVE', [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByRole('button', { name: /전원 도착/ })).toBeNull();
+    });
+  });
+
+  // Task 180 G6(C-2) — 헤더의 진행 단계 스트립: 전반 · 하프타임 · 후반 · 종료 (끝난 뒤엔 예정 · 진행 · 결과 확인 · 확정).
+  describe('진행 단계 스트립', () => {
+    const strip = () => screen.queryByRole('list', { name: '경기 진행 단계' });
+    const current = () => {
+      const list = strip();
+      return list === null ? null : within(list).getByText((_, el) => el?.getAttribute('aria-current') === 'step').textContent;
+    };
+
+    it('전반이 뛰는 중이면 전반이 현재 단계다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+        { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      ]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
+        '전반', '하프타임', '후반', '종료',
+      ]);
+      expect(current()).toBe('전반');
+    });
+
+    it('하프타임 중이면 하프타임이, 후반 중이면 후반이 현재 단계다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+      ]);
+      const { unmount } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(current()).toBe('하프타임');
+      unmount();
+
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+      ]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(current()).toBe('후반');
+    });
+
+    it('정규 시간이 끝나 경기 종료만 남았으면 종료가 현재 단계다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+      ]);
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(current()).toBe('종료');
+    });
+
+    it('끝난 경기는 결과 단계 스트립으로 바뀌고, 공식 결과가 서기 전에는 결과 확인이 현재다', () => {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+      ]);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state: 'ENDED' },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
+        '예정', '진행', '결과 확인', '확정',
+      ]);
+      expect(current()).toBe('결과 확인');
+    });
+
+    it('시작 전 경기에는 스트립이 없다 — 그 자리는 킥오프 준비가 맡는다', () => {
+      gameWithPeriods('SCHEDULED', []);
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(strip()).toBeNull();
+    });
+  });
+
+  // Task 180 G6(F78) — 종료 직후 콘솔은 "287ms" 한 줄이 아니라 결과 확정 카드로 이어진다.
+  describe('종료 직후 결과 확정 카드', () => {
+    const REGULATION_ENDED = [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
+    ];
+
+    function endedGame(state: 'LIVE' | 'ENDED') {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      mocks.useV1Game.mockReturnValue({
+        ...mocks.useV1Game(),
+        data: { ...mocks.useV1Game().data, state },
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state } }));
+    }
+
+    it('경기가 ENDED 이면 이 경기의 확정 카드를 콘솔 모드로 마운트한다', () => {
+      endedGame('ENDED');
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      const card = screen.getByTestId('result-confirm-card');
+      expect(card).toHaveAttribute('data-game-id', 'game-1');
+      expect(card).toHaveAttribute('data-variant', 'console');
+      expect(card).toHaveAttribute('data-tournament-id', 't-1');
+    });
+
+    it('아직 끝나지 않은 경기(정규 시간 종료 직후 포함)에는 확정 카드가 없다', () => {
+      endedGame('LIVE');
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByTestId('result-confirm-card')).toBeNull();
+    });
+
+    it('명령 왕복 시간(ms)을 더 이상 보여주지 않는다', async () => {
+      gameWithPeriods('LIVE', REGULATION_ENDED);
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '경기 종료' }));
+      await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalled());
+      // 성공 뒤 재조회·상태 갱신까지 흘려보낸 다음에도 화면에 시간이 없어야 한다.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(screen.queryByText(/\d+\s*ms/)).toBeNull();
     });
   });
 });
@@ -1272,9 +1652,12 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    const endButton = screen.getByRole('button', { name: '경기 종료' });
+    // 조기 종료는 ⋯ 시트 안에서만 만난다 — 비활성이고, 왜 못 누르는지 배너와 시트가 함께 말한다.
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    const endButton = within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ });
     expect(endButton).toBeDisabled();
-    expect(screen.getByText(/승부차기 결과를 입력해주세요/)).toBeInTheDocument();
+    expect(screen.getAllByText(/승부차기 결과를 입력해주세요/).length).toBeGreaterThanOrEqual(1);
     // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
   });

@@ -208,6 +208,17 @@ export class GamesController {
     return this.gamesService.setParticipantArrival(user, gameId, participantId, dto.arrived);
   }
 
+  /** 한 팀의 명단 검인을 한 번에("전원 도착"). 권한·규칙은 개별 검인과 같고 본문은 없다. */
+  @Post(':gameId/sides/:sideId/arrival/confirm-all')
+  @UseGuards(V1AuthGuard)
+  confirmSideArrival(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('sideId') sideId: string,
+  ) {
+    return this.gamesService.confirmSideArrival(user, gameId, sideId);
+  }
+
   @Post(':gameId/result-recovery/derive-and-submit')
   @UseGuards(V1AuthGuard)
   resultRecoveryDeriveAndSubmit(

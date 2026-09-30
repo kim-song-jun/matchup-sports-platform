@@ -667,6 +667,11 @@ export type V1TeamDetail = {
    * "현재 선택된 정책"을 렌더하려면 이 GET 응답에서 읽어야 한다.
    */
   contactPolicy?: 'open' | 'recruiting_only' | 'closed';
+  /**
+   * 내 운영 팀 중 하나라도 이 팀에 컨택을 보낼 수 있는가. 차단·closed·모집 중 아님을 합친 값이라
+   * 사유는 알 수 없다. 로그인한 비멤버 + 다른 팀 운영진에게만 내려오고 그 외에는 없다.
+   */
+  canSendContact?: boolean;
   trustState?: TrustState | 'none';
   version?: string;
   membersVisibilityEnabled: boolean;

@@ -581,6 +581,75 @@ describe('경기 명단 계산 동기화 (Task 179)', () => {
     });
   });
 
+  // Task 180 G6 — "전원 도착": 한 팀의 명단 검인을 한 번에. 개별 검인과 같은 권한·같은 리비전 규칙이다.
+  describe('전원 도착 (confirmSideArrival)', () => {
+    async function arrivals(target: { gameId: string; sideId: string }) {
+      const latest = await latestLineup(target.gameId, target.sideId);
+      const rows = await prisma.v1GameParticipant.findMany({ where: { lineupId: latest.id }, orderBy: { id: 'asc' } });
+      return rows.map((row) => ({ id: row.id, arrivedAt: row.arrivedAt }));
+    }
+
+    it('그 사이드의 화면 명단만 채우고 다른 사이드·다른 경기는 건드리지 않으며, 이미 검인한 사람의 시각은 유지한다 (멱등)', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      await syncTeam(f.tournament.id, f.teamA.id);
+      await syncTeam(f.tournament.id, f.teamB.id);
+      const games = app.get(GamesService);
+      const admin = authUser(adminUserId);
+      const g4A = side(f, 'g4', f.teamA.id);
+      const g4B = side(f, 'g4', f.teamB.id);
+      const g3A = side(f, 'g3', f.teamA.id);
+      const [first] = await arrivals(g4A);
+      const checkedIn = await games.setParticipantArrival(admin, g4A.gameId, first.id, true);
+
+      const result = await games.confirmSideArrival(admin, g4A.gameId, g4A.sideId);
+
+      const filled = await arrivals(g4A);
+      expect(result).toEqual({ sideId: g4A.sideId, participantCount: filled.length, newlyArrivedCount: filled.length - 1 });
+      expect(filled.every((row) => row.arrivedAt !== null)).toBe(true);
+      // 먼저 검인한 사람의 최초 시각은 그대로다 — 분쟁 시 근거가 되는 시각이다.
+      expect(filled.find((row) => row.id === first.id)?.arrivedAt).toEqual(checkedIn.arrivedAt);
+      // 대조군: 같은 경기의 상대 사이드와 같은 팀의 다른 경기는 여전히 미검인이다.
+      expect((await arrivals(g4B)).every((row) => row.arrivedAt === null)).toBe(true);
+      expect((await arrivals(g3A)).every((row) => row.arrivedAt === null)).toBe(true);
+
+      const again = await games.confirmSideArrival(admin, g4A.gameId, g4A.sideId);
+      expect(again).toEqual({ sideId: g4A.sideId, participantCount: filled.length, newlyArrivedCount: 0 });
+      expect(await arrivals(g4A)).toEqual(filled);
+    });
+
+    it('이 경기의 사이드가 아니면 404 이고 아무것도 채우지 않는다 (다른 경기의 sideId)', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      await syncTeam(f.tournament.id, f.teamA.id);
+      const games = app.get(GamesService);
+      const g4A = side(f, 'g4', f.teamA.id);
+      const g3A = side(f, 'g3', f.teamA.id);
+
+      await expect(games.confirmSideArrival(authUser(adminUserId), g4A.gameId, g3A.sideId)).rejects.toMatchObject({
+        response: { code: 'GAME_SIDE_NOT_FOUND' },
+      });
+      expect((await arrivals(g3A)).every((row) => row.arrivedAt === null)).toBe(true);
+    });
+
+    it('팀 액터는 자기 팀 사이드만 채울 수 있다 — 상대 사이드는 403, 자기 사이드는 200', async () => {
+      const f = await seedTournament({ redCardRule: false, redCardOnA1: false });
+      await syncTeam(f.tournament.id, f.teamA.id);
+      await syncTeam(f.tournament.id, f.teamB.id);
+      const games = app.get(GamesService);
+      const g4A = side(f, 'g4', f.teamA.id);
+      const g4B = side(f, 'g4', f.teamB.id);
+
+      await expect(games.confirmSideArrival(authUser(f.teamA.ownerId), g4B.gameId, g4B.sideId)).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'PERMISSION_DENIED' },
+      });
+      expect((await arrivals(g4B)).every((row) => row.arrivedAt === null)).toBe(true);
+
+      const own = await games.confirmSideArrival(authUser(f.teamA.ownerId), g4A.gameId, g4A.sideId);
+      expect(own.newlyArrivedCount).toBeGreaterThan(0);
+      expect((await arrivals(g4A)).every((row) => row.arrivedAt !== null)).toBe(true);
+    });
+  });
+
   // ── 리그: A·B 두 팀, 경기 L1(+7일) · L2(+14일) ─────────────────────────────────────
   async function seedLeague(input: { eligibleA: boolean }) {
     const teamA = await makeTeam('LA', ['m1', 'm2'], input.eligibleA);

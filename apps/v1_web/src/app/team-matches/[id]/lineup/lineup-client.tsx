@@ -5,7 +5,7 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { LoadLineupSheet, type LoadableLineup } from '@/components/lineup/load-lineup-sheet';
 import { SavePresetDialog } from '@/components/lineup/save-preset-dialog';
 import {
-  buildRecentJerseyMap, describeSkipped, resolveJerseyNumber, resolveLoadableEntries,
+  buildRecentJerseyMap, describeSkipped, presetNamePlaceholder, resolveJerseyNumber, resolveLoadableEntries,
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
@@ -29,6 +29,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { josa } from '@/lib/korean';
+import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { randomUuid } from '@/lib/uuid';
 import type { LineupEditorState, LineupEntryDraft, RosterOption } from './lineup.view-model';
 import {
@@ -45,6 +46,7 @@ import {
   isRosterMemberPlaced,
   addGuestToLineup,
   addRosterMemberToLineup,
+  findJerseyHolder,
   replaceEntries,
   removeEntry,
   resolveOwnTeamId,
@@ -71,7 +73,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const competitionGameQuery = useV1Game(lineupQuery.data?.gameId, { enabled: isCompetition && ownTeamId === null });
   const rosterQuery = useV1TeamMembers(ownTeamId, { limit: 100 }, { enabled: Boolean(ownTeamId) && !isCompetition });
   const rosterPool: RosterOption[] = useMemo(
-    () => (rosterQuery.data?.items ?? []).map((member) => ({ userId: member.userId, displayName: member.displayName, role: member.role })),
+    () => (rosterQuery.data?.items ?? []).map((member) => ({
+      userId: member.userId,
+      displayName: member.displayName,
+      role: member.role,
+      jerseyNumber: member.jerseyNumber ?? null,
+    })),
     [rosterQuery.data],
   );
 
@@ -129,11 +136,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [lastSubmittedRevision, setLastSubmittedRevision] = useState<number | null>(null);
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
+  const matchCancelled = teamMatchQuery.data ? getStatus(teamMatchQuery.data) === 'cancelled' : false;
   const phase = lineupQuery.data
     ? describeLineupPhase(
         lineupQuery.data.state,
         lineupQuery.data.editable === true,
         lineupQuery.data.lockReason ?? null,
+        matchCancelled,
       )
     : null;
   const editable = Boolean(phase?.editable) && isOnline;
@@ -243,7 +252,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     submitMutation.mutate(
       { idempotencyKey: randomUuid(), expectedVersion },
       {
-        onSuccess: () => setLastSubmittedRevision(expectedVersion),
+        onSuccess: () => {
+          setLastSubmittedRevision(expectedVersion);
+          // 불러오기·프리셋 저장 결과 안내는 제출 전 작업의 것이다 — 제출 뒤에도 남으면 지금 상태처럼 읽힌다.
+          setLoadNotice(null);
+        },
         onError: (error) => {
           if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
             setConflict(true);
@@ -439,6 +452,19 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     setLoadSheetOpen(false);
   }
 
+  /** 팀 등번호를 기본값으로 채우되, 명단의 다른 행이 이미 쓰는 번호면 비워 두고 알린다. */
+  function handleAddMember(member: RosterOption) {
+    if (state === null) return;
+    const holder = member.jerseyNumber == null ? null : findJerseyHolder(state, member.jerseyNumber);
+    setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev));
+    // 충돌이 없으면 떠 있던 안내(불러오기 결과 등)를 그대로 둔다.
+    if (holder !== null && member.jerseyNumber != null) {
+      setLoadNotice(
+        `${member.displayName}님의 팀 등번호 ${member.jerseyNumber}번은 ${josa(holder, ['이', '가'])} 쓰고 있어서 비워 뒀어요. 등번호를 직접 넣어 주세요.`,
+      );
+    }
+  }
+
   async function handleSavePreset(name: string) {
     if (state === null) return;
     setPresetError(null);
@@ -477,7 +503,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     }
   }
   const validationErrors = validateLineupForSubmit(state);
-  const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
+  const publicationLabel = matchCancelled ? null : describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
   const submittedWithoutChanges =
     !state.dirty &&
     (lineupQuery.data.state === 'SUBMITTED' ||
@@ -649,7 +675,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                 </span>
                 <span
                   className="tm-text-micro"
-                  style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
+                  style={{ width: 'var(--size-input-compact-number)', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
                 >
                   등번호
                 </span>
@@ -738,8 +764,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       type="number"
                       inputMode="numeric"
                       aria-label={`${entry.displayName} 등번호`}
-                      className="tm-input"
-                      style={{ width: 56, textAlign: 'center' }}
+                      className="tm-input tm-input-compact-number"
                       value={entry.jerseyNumber ?? ''}
                       disabled={!editable}
                       onChange={(event) =>
@@ -830,7 +855,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         <button
                           type="button"
                           className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
+                          onClick={() => handleAddMember(member)}
                         >
                           명단 추가
                         </button>
@@ -947,6 +972,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         saving={createPreset.isPending || updatePreset.isPending}
         error={presetError}
         onSave={(name) => void handleSavePreset(name)}
+        namePlaceholder={presetNamePlaceholder(formationSupportedSportName)}
       />
     </>
   );

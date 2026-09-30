@@ -63,6 +63,8 @@ export type ChatRoomViewModel = {
   onDraftChange?: (value: string) => void;
   onSend?: () => void;
   onRetry?: () => void;
+  /** 다시 불러와도 소용없는 막힘(권한 없음)일 때 재시도 대신 돌아갈 곳. */
+  errorBack?: { href: string; label: string };
 };
 
 export type NotificationModel = {

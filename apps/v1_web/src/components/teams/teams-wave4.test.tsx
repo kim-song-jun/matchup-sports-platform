@@ -197,6 +197,7 @@ describe('TeamEditPageClient — 로딩 중 목업 노출 방지', () => {
         memberCount: 12,
         membersVisibilityEnabled: false,
         version: 'version-1',
+        viewer: { role: 'owner' },
       },
       isError: false,
       isLoading: false,

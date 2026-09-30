@@ -126,6 +126,11 @@ export interface V1LeagueFixture {
    */
   resultStage?: 'not_entered' | 'draft' | 'awaiting_approval' | 'change_requested' | 'official' | 'voided';
   /**
+   * 경기(Game)의 진행 상태 — 어드민 상세에서만 채워진다. 결과 단계와 **다른 축**이다: 결과 단계는
+   * 진행 중과 시작 전을 둘 다 `not_entered` 로 말하므로, "지금 뛰는 경기"는 이 값으로만 안다.
+   */
+  gameState?: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED' | null;
+  /**
    * 경기 결과 점수 — 공식 결과가 확정된 대진에만 채워진다. 미확정이면 null 이고,
    * 0:0 으로 오인되지 않게 서버가 명시적으로 구분해 내려준다. 소비 측은 값이 없으면
    * 스코어 대신 상태 기반 문구("예정"/"결과 대기")로 대체한다.

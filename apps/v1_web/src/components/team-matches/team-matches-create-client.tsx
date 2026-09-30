@@ -26,6 +26,7 @@ import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from 
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
+import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
 import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
 import { teamMatchStepHref } from './team-matches.routes';
@@ -443,12 +444,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
       // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
       // 확인 없이 즉시 실행하지 않는다.
-      const ok = await confirm({
-        title: '팀매치를 취소할까요?',
-        message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
-        confirmLabel: '팀매치 취소',
-        tone: 'danger',
-      });
+      const ok = await confirm({ ...TEAM_MATCH_CANCEL_CONFIRM, tone: 'danger' });
       if (!ok) return;
       setError(null);
       cancelTeamMatch.mutate(

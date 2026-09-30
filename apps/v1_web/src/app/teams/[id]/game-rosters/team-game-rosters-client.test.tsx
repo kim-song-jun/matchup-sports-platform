@@ -285,6 +285,8 @@ describe('경기 명단 관리 — 결장 기간 시트(팀 C)', () => {
     fireEvent.change(dialog.getByLabelText('시작일'), { target: { value: '2026-10-03' } });
     fireEvent.change(dialog.getByLabelText('마지막 날'), { target: { value: '2026-10-12' } });
     expect(dialog.getByText(/이 기간 대회·리그 경기 2개에서 빠져요/)).toBeInTheDocument();
+    // L19 — 친선은 자동으로 빠지지 않는다는 것을 같은 안내에서 밝힌다(결장 배지만 붙는다).
+    expect(dialog.getByText(/친선 경기는 자동으로 빠지지 않고, 참석명단에 결장 배지만 붙어요/)).toBeInTheDocument();
     fireEvent.change(dialog.getByLabelText('마지막 날'), { target: { value: '2026-10-05' } });
     expect(dialog.getByText(/이 기간 대회·리그 경기 1개에서 빠져요/)).toBeInTheDocument();
 

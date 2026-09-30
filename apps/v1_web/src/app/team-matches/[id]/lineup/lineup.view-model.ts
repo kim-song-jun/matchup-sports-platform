@@ -2,6 +2,7 @@ import { GOALKEEPER_SLOT_CODE, type FormationSlot } from '@/components/lineup/fo
 import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { randomUuid } from '@/lib/uuid';
+import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 import type {
   V1TeamMatchLineup,
   V1TeamMatchLineupParticipantInput,
@@ -26,6 +27,8 @@ export type RosterOption = {
   userId: string;
   displayName: string;
   role: 'owner' | 'manager' | 'member';
+  /** 멤버 관리에서 지정한 팀 고정 등번호. 명단에 넣을 때 기본값으로 쓴다. */
+  jerseyNumber?: number | null;
 };
 
 /**
@@ -248,14 +251,22 @@ export function isRosterMemberPlaced(state: LineupEditorState, member: RosterOpt
  * `next === state`로 이걸 직접 검증할 수 있다. */
 export function addRosterMemberToLineup(state: LineupEditorState, member: RosterOption): LineupEditorState {
   if (isPlaced(state, member)) return state;
+  // 팀 번호가 이미 명단의 다른 행에 있으면 빈칸으로 둔다 — 같은 번호를 채우면 제출 검증이 막는다.
+  const teamNumber = member.jerseyNumber ?? null;
+  const jerseyNumber = teamNumber !== null && findJerseyHolder(state, teamNumber) === null ? teamNumber : null;
   return {
     ...state,
     participants: [
       ...state.participants,
-      makeEntry({ userId: member.userId, displayName: member.displayName }),
+      makeEntry({ userId: member.userId, displayName: member.displayName, jerseyNumber }),
     ],
     dirty: true,
   };
+}
+
+/** 이 등번호를 이미 쓰는 명단 행의 이름. 없으면 null. */
+export function findJerseyHolder(state: LineupEditorState, jerseyNumber: number): string | null {
+  return state.participants.find((entry) => entry.jerseyNumber === jerseyNumber)?.displayName ?? null;
 }
 
 /** 로스터에 없는 사람(게스트·용병)을 이름만으로 명단에 넣는다. */
@@ -375,10 +386,10 @@ export function deriveLineupCounts(state: LineupEditorState, rosterPool: RosterO
   };
 }
 
-/** 제출 전 클라이언트 사전 검증. 서버가 실제로 강제하는 규칙 중 프론트가 확실히 알 수
- * 있는 것만 검사한다 — 종목별 최소/최대 인원(V1CompetitionConfigVersion.lineup)은 프론트에
- * 노출되는 계약이 없어 여기서 하드코딩하지 않고 서버의 422 LINEUP_SIZE_INVALID 메시지를
- * 그대로 보여주는 쪽을 택했다(잘못된 상수를 만드는 것보다 정직하다). */
+/** 제출 전 클라이언트 사전 검증 — 서버(`team-match-lineup.service.ts#resolveEntries`)가
+ * 거절하는 규칙만 옮긴다. `lineupConfig.minPlayers/maxPlayers` 는 응답에 있지만 서버가
+ * 제출에서 검증하지 않으므로(Task 163, `team-match-lineup-size.integration-spec.ts`) 여기서도
+ * 막지 않는다. */
 export function validateLineupForSubmit(state: LineupEditorState): string[] {
   const errors: string[] = [];
   if (state.participants.length === 0) {
@@ -456,8 +467,17 @@ export function describeLineupPhase(
   state: V1TeamMatchLineupState,
   editable: boolean,
   lockReason: V1TeamMatchLineupLockReason,
+  /** 서버 lockReason 'terminal' 은 종료·취소·보관을 한 값으로 묶는다 — 취소는 매치 상태로 가른다. */
+  matchCancelled = false,
 ): { label: string; editable: boolean; helperText: string } {
   if (!editable) {
+    if (matchCancelled) {
+      return {
+        label: `${TEAM_MATCH_CANCELLED_LABEL} · 잠김`,
+        editable: false,
+        helperText: '취소된 경기의 참석명단은 수정할 수 없어요.',
+      };
+    }
     if (lockReason === 'records_exist') {
       return {
         label: '기록 시작 · 잠김',

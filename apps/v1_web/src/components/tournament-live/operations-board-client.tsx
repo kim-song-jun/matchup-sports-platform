@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
+import { Ellipsis, RefreshCw } from 'lucide-react';
 import {
   fetchV1TournamentOperationsBoardPage,
   useV1AssignFixtureField,
@@ -18,16 +18,9 @@ import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/
 import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { useGameResultRevisions } from '@/hooks/use-tournament-result-review';
-import { useV1AdminRegistrationGameRosterList } from '@/hooks/use-v1-game-roster';
-import {
-  BoardRosterSummary,
-  boardRosterRegistrationIds,
-  indexBoardRosters,
-  type BoardRosterSideState,
-} from '@/components/game-roster/operations-board-roster';
+import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
-import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
@@ -269,6 +262,8 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
+  // ⋯ 시트가 열려 있는 경기(fixtureId). 시트 하나를 모든 행이 공유한다.
+  const [menuFixtureId, setMenuFixtureId] = useState<string | null>(null);
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
   const [editorHost] = useState<HTMLDivElement | null>(() =>
     typeof document === 'undefined' ? null : document.createElement('div'),
@@ -289,9 +284,6 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const resultActionLabel = role === 'SUPPORT_READONLY' ? '결과 보기' : '결과 정정';
   const resultPanelLabel = role === 'SUPPORT_READONLY' ? '결과 보기' : '결과 편집';
   const resultCloseLabel = role === 'SUPPORT_READONLY' ? '결과 보기 닫기' : '정정 닫기';
-  const resultUnavailableTitle = role === 'SUPPORT_READONLY'
-    ? '제출되거나 확정된 결과가 없어 결과를 볼 수 없어요.'
-    : '제출되거나 확정된 결과가 없어 정정할 수 없어요.';
   const canAssignField = FIELD_ASSIGN_ROLES.includes(role);
   const allFields = useMemo(() => fields.data?.items ?? [], [fields.data]);
 
@@ -378,31 +370,6 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const items = useMemo(() => [...(board.data?.items ?? []), ...olderItems], [board.data?.items, olderItems]);
   const nextCursor = olderCursor !== undefined ? olderCursor : (board.data?.nextCursor ?? null);
 
-  // 경기 카드의 명단 요약 — 경기마다 명단을 부르지 않고 보이는 시작 전 경기의 팀(참가 신청)마다 표 한 장.
-  const rosterRegistrationIds = useMemo(() => boardRosterRegistrationIds(items), [items]);
-  const rosterQueries = useV1AdminRegistrationGameRosterList(tournamentId, rosterRegistrationIds);
-  const rosterIndex = indexBoardRosters(rosterQueries.flatMap((query) => (query.data === undefined ? [] : [query.data])));
-  const failedRosterIds = new Set(rosterRegistrationIds.filter((_, index) => rosterQueries[index]?.isError === true));
-  const currentHref = useCurrentHref();
-
-  function rosterSide(item: V1TournamentOperationsBoardItem, which: 'home' | 'away'): BoardRosterSideState {
-    const registrationId = which === 'home' ? item.homeRegistrationId : item.awayRegistrationId;
-    const names = teamNamesByFixtureId.get(item.fixtureId);
-    return {
-      registrationId,
-      name: names ? names[which] : null,
-      side: registrationId === null || item.gameId === null ? null : (rosterIndex.games.get(item.gameId)?.get(registrationId) ?? null),
-      teamId: registrationId === null ? null : (rosterIndex.teamIds.get(registrationId) ?? null),
-      failed: registrationId !== null && failedRosterIds.has(registrationId),
-    };
-  }
-
-  function rosterSummary(item: V1TournamentOperationsBoardItem) {
-    return (
-      <BoardRosterSummary item={item} home={rosterSide(item, 'home')} away={rosterSide(item, 'away')} from={currentHref} />
-    );
-  }
-
   function rowLabel(item: V1TournamentOperationsBoardItem): string {
     const names = teamNamesByFixtureId.get(item.fixtureId);
     if (names) return `${names.home} vs ${names.away}`;
@@ -423,6 +390,43 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   function toggleCorrection(item: V1TournamentOperationsBoardItem) {
     if (item.gameId === null) return;
     setExpandedGameId((current) => (current === item.gameId ? null : item.gameId));
+  }
+
+  /**
+   * ⋯ 시트의 항목. 결과 정정·보기는 제출되거나 확정된 결과가 있는 경기에만 둔다 — 아직 안 치른
+   * 경기에 비활성 버튼을 두면 "왜 못 누르지"만 남는다(F55). 팀별 명단 요약과 명단 화면 링크는 콘솔의
+   * "킥오프 준비"로 옮겼다 — 킥오프를 준비하는 자리가 그곳이다.
+   */
+  function rowActions(item: V1TournamentOperationsBoardItem): ActionSheetAction[] {
+    const actions: ActionSheetAction[] = [];
+    if (canOpenResultCorrection(item)) {
+      actions.push({
+        key: 'result',
+        label: resultActionLabel,
+        description: role === 'SUPPORT_READONLY' ? '제출·확정된 결과를 확인해요' : '제출·확정된 결과를 확인하고 고쳐요',
+        onSelect: () => {
+          setMenuFixtureId(null);
+          toggleCorrection(item);
+        },
+      });
+    }
+    return actions;
+  }
+
+  /** 운영 열/카드의 조작 — 주 버튼은 운영 콘솔 하나, 나머지는 ⋯ 안이다. */
+  function rowMenuButton(item: V1TournamentOperationsBoardItem) {
+    if (rowActions(item).length === 0) return null;
+    return (
+      <button
+        type="button"
+        aria-label={`${rowLabel(item)} 더보기`}
+        aria-haspopup="dialog"
+        onClick={() => setMenuFixtureId(item.fixtureId)}
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      >
+        <Ellipsis size={18} aria-hidden="true" />
+      </button>
+    );
   }
 
   function expandedCorrection(item: V1TournamentOperationsBoardItem) {
@@ -451,6 +455,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     if (editorHost.parentElement !== slot) slot.appendChild(editorHost);
   }, [editorHost, expandedGameId, isDesktop, items]);
 
+  const menuItem = menuFixtureId === null ? null : items.find((item) => item.fixtureId === menuFixtureId) ?? null;
   const expandedItem = expandedGameId === null ? null : items.find((item) => item.gameId === expandedGameId) ?? null;
   const expandedEditor =
     editorHost && expandedItem
@@ -663,25 +668,15 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
                           <Link
                             href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
                             className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                           >
                             운영 콘솔
                           </Link>
-                          <button
-                            type="button"
-                            onClick={() => toggleCorrection(item)}
-                            aria-expanded={expandedGameId === item.gameId}
-                            disabled={!canOpenResultCorrection(item)}
-                            title={!canOpenResultCorrection(item) && item.gameId !== null ? resultUnavailableTitle : undefined}
-                            className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--text-body)] border border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                          >
-                            {resultActionLabel}
-                          </button>
+                          {rowMenuButton(item)}
                         </div>
-                        {rosterSummary(item)}
                       </td>
                     </tr>
                     {expandedGameId === item.gameId && item.gameId !== null ? (
@@ -743,25 +738,15 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     ))}
                   </div>
                 )}
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex items-center gap-2">
                   <Link
                     href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
                     className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     운영 콘솔로 이동
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => toggleCorrection(item)}
-                    aria-expanded={expandedGameId === item.gameId}
-                    disabled={!canOpenResultCorrection(item)}
-                    title={!canOpenResultCorrection(item) && item.gameId !== null ? resultUnavailableTitle : undefined}
-                    className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--text-body)] border border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                  >
-                    {resultActionLabel}
-                  </button>
+                  {rowMenuButton(item)}
                 </div>
-                {rosterSummary(item)}
                 {expandedGameId === item.gameId && item.gameId !== null ? (
                   <div ref={(node) => { mobileEditorSlots.current[item.gameId!] = node; }} />
                 ) : null}
@@ -788,6 +773,12 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           )}
         </>
       )}
+      <ActionSheet
+        open={menuItem !== null}
+        title={menuItem === null ? '경기 더보기' : `${rowLabel(menuItem)} 더보기`}
+        actions={menuItem === null ? [] : rowActions(menuItem)}
+        onClose={() => setMenuFixtureId(null)}
+      />
       {expandedEditor}
     </div>
   );

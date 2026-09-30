@@ -28,12 +28,15 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import type { CursorListSeed } from '@/lib/public-list-seed';
 import { extractErrorMessage } from '@/lib/error-message';
+import { josa } from '@/lib/korean';
+import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 // 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
 import { TeamMatchDetailPageSkeleton, TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -248,6 +251,10 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const canManageOpponentTeam = query.data?.viewer?.manageableOpponentTeam === true;
   // 채팅 게이트의 한 축 — 이 값이 있으면 상대가 확정된 것이다(types/api.ts 참조).
   const opponentAssigned = Boolean(query.data?.approvedOpponentTeam);
+  // 서버는 취소된 매치의 채팅방을 열지도, 기존 방에 들어오지도 못하게 막는다(chat.service.ts
+  // assertCanUseTeamMatchChat) — 버튼을 남기면 눌러서 409 를 봐야만 알게 된다.
+  const isCancelled = query.data ? getStatus(query.data) === 'cancelled' : false;
+  const chatAvailable = !isCancelled && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned);
   // platformManaged의 hostTeam은 경기 HOME 사이드일 뿐 모집 운영자가 아니다. 서버가
   // host_team을 내리지 않는 것이 정본이지만, API/Web 롤링 배포 중 구 응답이 남아도
   // "내가 만든 팀매치"/"매치 관리"가 다시 노출되지 않도록 화면에서도 방어한다.
@@ -298,7 +305,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const ownTeamId = useMemo(() => resolveOwnTeamId(query.data, myTeamsQuery.data), [query.data, myTeamsQuery.data]);
 
   useEffect(() => {
-    if (!query.data || !canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned) || autoResolvedChatRef.current === teamMatchId) return;
+    if (!query.data || !chatAvailable || autoResolvedChatRef.current === teamMatchId) return;
     autoResolvedChatRef.current = teamMatchId;
     resolveChatRoom.mutate(
       { targetType: 'team_match', targetId: teamMatchId },
@@ -306,7 +313,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       // 페이지 진입만으로 매번 에러가 뜬다) — 그래도 삼키지 않고 로그는 남긴다.
       { onError: (e) => console.warn('team match chat auto-resolve failed', e) },
     );
-  }, [query.data, resolveChatRoom, teamMatchId, canManageHostTeam, canManageOpponentTeam, opponentAssigned]);
+  }, [query.data, resolveChatRoom, teamMatchId, chatAvailable]);
 
   if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch(), backHref: fromPath ?? undefined }} />;
 
@@ -367,7 +374,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
     detailBackHref: fromPath ?? '/team-matches',
-    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess, isParticipantMember),
     // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
     applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
     hostActions: !seeding && canManageMatchListing
@@ -387,10 +394,10 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : modelScheduleLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
     statusLabelKind: !seeding && modelScheduleLabel(query.data) ? 'match' : 'application',
-    chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam, opponentAssigned),
+    chatLabel: chatLabel(chatAvailable),
     chatPending: resolveChatRoom.isPending,
     chatError,
-    onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned)
+    onChat: !seeding && chatAvailable
       ? () => {
           setChatError(null);
           resolveChatRoom.mutate(
@@ -403,7 +410,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }
       : undefined,
     onShare: () => shareTeamMatch(query.data),
-    lineupAction: buildLineupAction(teamMatchId, ownTeamId, query.data.gameId ?? null, isLeagueFixture, chainFrom),
+    lineupAction: isCancelled ? undefined : buildLineupAction(teamMatchId, ownTeamId, query.data.gameId ?? null, isLeagueFixture, chainFrom),
     onApply: seeding ? undefined : getApplyAction({
       viewerState,
       status: getStatus(query.data),
@@ -412,6 +419,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       eligible: selectedEligibility?.eligible,
       isGuest,
       hasNoTeam,
+      isParticipantMember,
       apply: (teamId) =>
         applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }).then((result) => {
           trackEvent('team_match_apply_complete', { teamMatchId });
@@ -567,6 +575,9 @@ function toApplicantTeamsWithActions(
 
 
 function toDetailMode(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus): TeamMatchDetailViewModel['mode'] {
+  // 취소는 뷰어 상태보다 우선한다 — cancel() 이 신청서를 그대로 두므로 viewerState 는
+  // 취소 뒤에도 'host_team'/'approved' 로 남아 "참가 확정"·"매치 관리" 가 계속 보였다.
+  if (status === 'cancelled') return 'cancelled';
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
   if (viewerState === 'approved') return 'approved';
@@ -581,7 +592,10 @@ function applyLabel(
   hasNoTeam?: boolean,
   /** eligibility 응답 도착 여부. 도착 전에는 "철회 대상을 못 찾았다"고 단정할 수 없다. */
   eligibilityLoaded?: boolean,
+  /** 참가팀(host·승인 상대팀)의 active 멤버 — 신청할 대상이 아니라 자기 팀 경기를 보는 사람이다. */
+  isParticipantMember?: boolean,
 ) {
+  if (status === 'cancelled') return '취소된 팀매치예요';
   if (viewerState === 'host_team') return '매치 관리';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') {
     // 라벨과 액션은 같은 `team`에서 나와야 한다(getApplyAction도 이 팀의 applicationId를 쓴다).
@@ -594,16 +608,20 @@ function applyLabel(
     return eligibilityLoaded ? '팀 운영진만 취소할 수 있어요' : '신청 취소';
   }
   if (viewerState === 'approved') return '승인 완료';
+  if (isParticipantMember) return OWN_TEAM_MATCH_LABEL;
   if (status !== 'recruiting') return '신청 불가';
   // 비인증 사용자: 로그인 유도 (#13)
   if (isGuest) return '로그인하고 신청하기';
   // 팀 없음: 팀 만들기 유도 (#13)
   if (hasNoTeam) return '팀 만들고 신청하기';
-  if (team?.eligible) return `${team.name}으로 신청`;
+  if (team?.eligible) return `${josa(team.name, ['으로', '로'])} 신청`;
   return reasonLabel(team?.reasonCode);
 }
 
+const OWN_TEAM_MATCH_LABEL = '우리 팀 경기예요';
+
 function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
+  if (status === 'cancelled') return TEAM_MATCH_CANCELLED_LABEL;
   if (viewerState === 'host_team') return '내가 만든 팀매치';
   if (viewerState === 'requested') return '승인 대기';
   if (viewerState === 'approved') return '승인 완료';
@@ -612,13 +630,12 @@ function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApi
   // 막 닫혔다"는 인상을 준다 — guest가 완료된 리그 경기를 열어도 "모집 중"이 아니라 정확한
   // 상태가 보이게 한다(alpha 실측 C-1).
   if (status === 'completed') return '경기 종료';
-  if (status === 'cancelled') return '매치 취소';
   if (status !== 'recruiting') return '신청 마감';
   return '신청 가능';
 }
 
-function chatLabel(canManageHostTeam: boolean, canManageOpponentTeam: boolean, opponentAssigned: boolean) {
-  return canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned) ? '채팅' : '승인 후 채팅';
+function chatLabel(chatAvailable: boolean) {
+  return chatAvailable ? '채팅' : '승인 후 채팅';
 }
 
 /**
@@ -633,7 +650,7 @@ function chatLabel(canManageHostTeam: boolean, canManageOpponentTeam: boolean, o
  *
  * 서버의 세 번째 축(`status ∈ {matched, completed}`)은 여기서 보지 않는다 — 프론트의
  * `getStatus` 는 `displayState` 우선이라 서버가 보는 DB `status` 와 같은 질문에 답하지
- * 않는다. 취소된 매치에 상대가 배정된 채 남아 있으면 그때는 서버가 막는다.
+ * 않는다. 다만 취소(`cancelled`)는 두 값이 같으므로 호출부가 따로 걸러낸다(`chatAvailable`).
  */
 function canOpenTeamMatchChat(
   canManageHostTeam: boolean,
@@ -665,11 +682,7 @@ function buildHostActions({
     label: '팀매치 취소',
     tone: 'danger',
     pending,
-    confirm: {
-      title: '팀매치를 취소할까요?',
-      message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
-      confirmLabel: '팀매치 취소',
-    },
+    confirm: TEAM_MATCH_CANCEL_CONFIRM,
     onClick: cancelTeamMatch,
   };
   if (status === 'recruiting') {
@@ -806,6 +819,7 @@ function getApplyAction({
   eligible,
   isGuest,
   hasNoTeam,
+  isParticipantMember,
   apply,
   withdraw,
   reasonCode,
@@ -818,11 +832,14 @@ function getApplyAction({
   eligible?: boolean;
   isGuest?: boolean;
   hasNoTeam?: boolean;
+  isParticipantMember?: boolean;
   apply: (teamId: string) => Promise<unknown>;
   withdraw: () => Promise<unknown>;
   reasonCode?: string;
   redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
+  // 취소된 매치에는 신청도 철회도 없다 — 신청서가 살아 있어도 아래 철회 분기로 흘리지 않는다.
+  if (status === 'cancelled') return undefined;
   // 내 신청서가 이미 살아 있으면 이 CTA가 할 수 있는 일은 '철회' 하나뿐이다. 철회 대상을 못
   // 찾았다고 해서 아래 신청 분기로 흘려보내면 안 된다 — 종전 코드가 `&& applicationId`로 이
   // 분기를 탈락시켰고, 그 순간 사용자가 고른 적 없는 다른 팀으로 새 신청이 나갔다(그리고
@@ -830,6 +847,8 @@ function getApplyAction({
   if (viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') {
     return applicationId ? withdraw : undefined;
   }
+  // 자기 팀 경기에는 신청할 대상이 없다 — 라벨(OWN_TEAM_MATCH_LABEL)과 같은 근거로 끊는다.
+  if (isParticipantMember) return undefined;
   // 이미 마감/확정/종료/취소된 매치는 신청할 게 없다 — 여기서 끊지 않으면 guest/무팀 사용자가
   // applyLabel()엔 '신청 불가'로 뜨는데 onApply는 여전히 로그인·팀만들기 리다이렉트를 반환해서
   // 파란 primary 버튼이 "신청 불가"라고 적힌 채 클릭되면 로그인 페이지로 튀는 상태였다

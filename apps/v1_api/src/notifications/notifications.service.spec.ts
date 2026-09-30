@@ -591,4 +591,84 @@ describe('NotificationsService', () => {
       expect(prisma.v1Notification.create).toHaveBeenCalled();
     });
   });
+
+  // ─── 팀 초대 도착 알림의 후속 처리 ─────────────────────────────────────────
+
+  describe('팀 초대 도착 알림 처리', () => {
+    type Row = ReturnType<typeof makeNotification>;
+
+    // where 를 실제로 평가하는 저장소 — 조건에서 하나라도 빠지면 엉뚱한 알림이 바뀐다.
+    function seed(): Row[] {
+      const invite = (id: string, overrides: Record<string, unknown> = {}) =>
+        makeNotification({
+          id,
+          targetType: 'team',
+          targetId: 'team-1',
+          title: '팀 초대가 도착했어요',
+          deepLink: '/my/invitations',
+          ...overrides,
+        });
+      return [
+        invite('target'),
+        invite('other-team', { targetId: 'team-2' }),
+        invite('other-user', { recipientUserId: 'user-2' }),
+        invite('already-read', { readAt: new Date('2026-06-14T09:00:00Z') }),
+        // 같은 팀이지만 초대가 아닌 알림 — 가입 신청 도착(팀장에게 가는 것)
+        invite('join-request', { title: '팀 가입 신청이 도착했어요', deepLink: '/teams/team-1/members' }),
+      ];
+    }
+
+    function useFakeStore(rows: Row[]) {
+      prisma.v1Notification.updateMany.mockImplementation(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        const matched = rows.filter((row) =>
+          Object.entries(where).every(([key, value]) => (row as Record<string, unknown>)[key] === value),
+        );
+        matched.forEach((row) => Object.assign(row, data));
+        return { count: matched.length };
+      });
+    }
+
+    const byId = (rows: Row[], id: string) => rows.find((row) => row.id === id)!;
+
+    it('수락·거절 처리는 그 사용자의 그 팀 초대 도착 알림만 읽음으로 만든다', async () => {
+      const rows = seed();
+      useFakeStore(rows);
+
+      await service.markTeamInvitationHandled('user-1', 'team-1');
+
+      expect(byId(rows, 'target').readAt).toBeInstanceOf(Date);
+      expect(byId(rows, 'target').title).toBe('팀 초대가 도착했어요');
+      for (const untouched of ['other-team', 'other-user', 'join-request']) {
+        expect(byId(rows, untouched).readAt).toBeNull();
+      }
+      expect(byId(rows, 'already-read').readAt).toEqual(new Date('2026-06-14T09:00:00Z'));
+    });
+
+    it('초대 취소는 알림을 "취소됐어요"로 바꾸고 읽음 처리하며 도착지를 팀 상세로 옮긴다', async () => {
+      const rows = seed();
+      useFakeStore(rows);
+
+      await service.markTeamInvitationCancelled('user-1', 'team-1', '성수 FC');
+
+      const target = byId(rows, 'target');
+      expect(target).toMatchObject({
+        title: '팀 초대가 취소됐어요',
+        body: '"성수 FC" 팀이 초대를 취소했어요.',
+        deepLink: '/teams/team-1',
+      });
+      expect(target.readAt).toBeInstanceOf(Date);
+      expect(byId(rows, 'other-team').title).toBe('팀 초대가 도착했어요');
+      expect(byId(rows, 'join-request').title).toBe('팀 가입 신청이 도착했어요');
+      expect(byId(rows, 'join-request').deepLink).toBe('/teams/team-1/members');
+    });
+
+    it('알림 갱신이 실패해도 던지지 않고 로그를 남긴다 — 수락·거절·취소 응답을 깨지 않는다', async () => {
+      prisma.v1Notification.updateMany.mockRejectedValue(new Error('db down'));
+
+      await expect(service.markTeamInvitationHandled('user-1', 'team-1')).resolves.toBeUndefined();
+      await expect(service.markTeamInvitationCancelled('user-1', 'team-1', '성수 FC')).resolves.toBeUndefined();
+
+      expect(logger.warn).toHaveBeenCalledTimes(2);
+    });
+  });
 });

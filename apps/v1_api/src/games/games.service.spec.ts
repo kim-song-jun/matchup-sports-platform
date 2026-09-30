@@ -613,3 +613,180 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
     });
   });
 });
+
+// Task 180 G6(F56) — "전원 도착": 팀 한 곳의 명단 검인을 한 번에 채우는 일괄 경로.
+describe('GamesService.confirmSideArrival', () => {
+  const USER = { id: 'user-1' } as V1AuthUser;
+
+  type Actor = { role: string; teamId: string | null };
+
+  function build(options: {
+    actor?: Actor;
+    side?: { id: string; teamId: string | null } | null;
+    lineups?: Array<{ id: string; sideId: string; revision: number; state: string }>;
+    participants?: Array<{ id: string; sideId: string; lineupId: string; arrivedAt: Date | null }>;
+    /** 갱신 결과 count 를 강제한다. 기본은 넘긴 id 수 그대로(경합 없음). */
+    updatedCount?: number;
+  } = {}) {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      v1GameSide: {
+        findFirst: jest.fn().mockResolvedValue(
+          options.side === undefined ? { id: 'side-home', teamId: 'team-home' } : options.side,
+        ),
+      },
+      v1GameLineup: { findMany: jest.fn().mockResolvedValue(options.lineups ?? []) },
+      v1GameParticipant: {
+        findMany: jest.fn().mockResolvedValue(options.participants ?? []),
+        updateMany: jest.fn(async (args: { where: { id: { in: string[] } } }) => ({
+          count: options.updatedCount ?? args.where.id.in.length,
+        })),
+      },
+    };
+    const prisma = { $transaction: jest.fn(async (callback: (client: unknown) => unknown) => callback(tx)) };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const resolveActor = jest
+      .spyOn(service as never, 'resolveActor' as never)
+      .mockResolvedValue((options.actor ?? { role: 'platform_ops', teamId: null }) as never);
+    return { service, tx, resolveActor };
+  }
+
+  const ARRIVED_AT = new Date('2026-09-30T00:55:00.000Z');
+  const LINEUP_SUBMITTED = { id: 'lineup-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' };
+  const LINEUP_DRAFT = { id: 'lineup-2', sideId: 'side-home', revision: 2, state: 'DRAFT' };
+
+  it('화면이 보여 주는 리비전에서 아직 검인 안 된 참가자만 채우고, 이미 검인한 사람의 시각은 건드리지 않는다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [
+        { id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: ARRIVED_AT },
+        { id: 'p-2', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-3', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+      ],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toEqual({
+      sideId: 'side-home',
+      participantCount: 3,
+      newlyArrivedCount: 2,
+    });
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p-2', 'p-3'] }, arrivedAt: null },
+      data: { arrivedAt: expect.any(Date) },
+    });
+  });
+
+  // 좁히는 쿼리라 `gameId`·`sideId`·`invalidatedAt` 하나만 빠져도 다른 경기·다른 팀·대체된 리비전의 참가자를
+  // 도착으로 표시한다. 가짜 tx 는 조건을 무시하고 고정 데이터를 돌려주므로 인자를 직접 잰다.
+  it('사이드·라인업·참가자 조회는 이 경기와 이 사이드로 좁히고, 대체된 리비전은 제외한다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(tx.v1GameSide.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'side-home', gameId: 'game-1' } }),
+    );
+    expect(tx.v1GameLineup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gameId: 'game-1', sideId: 'side-home', invalidatedAt: null } }),
+    );
+    expect(tx.v1GameParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gameId: 'game-1', sideId: 'side-home' } }),
+    );
+    // 경기 행을 잡아(FOR SHARE) 명단 재계산과 엇갈리지 않게 한다 — 잠금 대상이 이 경기인지까지 본다.
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw.mock.calls[0].slice(1)).toEqual(['game-1']);
+  });
+
+  it('이번에 새로 채운 수는 조회한 미검인 수가 아니라 갱신이 실제로 바꾼 행 수다 — 그 사이 개별 검인이 끼어든 경우', async () => {
+    const { service } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [
+        { id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-2', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+      ],
+      updatedCount: 1,
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      participantCount: 2,
+      newlyArrivedCount: 1,
+    });
+  });
+
+  it('제출본이 있으면 그 위에 얹힌 초안 리비전의 참가자는 건드리지 않는다 (대조군: 초안 쪽에도 미검인 참가자가 있다)', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED, LINEUP_DRAFT],
+      participants: [
+        { id: 'p-shown', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-draft', sideId: 'side-home', lineupId: 'lineup-2', arrivedAt: null },
+      ],
+    });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['p-shown'] }, arrivedAt: null } }),
+    );
+  });
+
+  it('전원이 이미 검인된 상태면 아무것도 쓰지 않는다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: ARRIVED_AT }],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      participantCount: 1,
+      newlyArrivedCount: 0,
+    });
+    expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('개별 검인과 같은 권한(lineup_mutate)으로 인가하고, 경기 행을 잠근 뒤 판정한다', async () => {
+    const { service, tx, resolveActor } = build({ lineups: [LINEUP_SUBMITTED] });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(resolveActor).toHaveBeenCalledWith(expect.anything(), 'game-1', 'user-1', 'lineup_mutate');
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('팀 액터는 자기 팀 사이드만 채울 수 있다 — 다른 팀 사이드는 403 이고 아무것도 쓰지 않는다', async () => {
+    const { service, tx } = build({
+      actor: { role: 'team_manager', teamId: 'team-away' },
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+    });
+    expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('팀 액터가 자기 팀 사이드를 채우는 것은 허용된다', async () => {
+    const { service, tx } = build({
+      actor: { role: 'team_owner', teamId: 'team-home' },
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      newlyArrivedCount: 1,
+    });
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('이 경기의 사이드가 아니면 404 GAME_SIDE_NOT_FOUND', async () => {
+    const { service, tx } = build({ side: null });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-other')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'GAME_SIDE_NOT_FOUND' }),
+    });
+    expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
+  });
+});

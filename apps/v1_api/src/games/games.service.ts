@@ -2621,6 +2621,54 @@ export class GamesService {
   }
 
   /**
+   * 한 팀의 명단 검인을 한 번에 — "전원 도착". 현장에서 19명을 한 명씩 누르지 않게 한다(F56).
+   *
+   * 권한·경기 행 잠금·"화면이 보여 주는 리비전" 판정은 `setParticipantArrival` 과 같은 규칙이다
+   * (`lineup_mutate`, 팀 액터는 자기 팀 사이드만, 대체된 리비전의 행은 건드리지 않는다). 이미 검인한
+   * 사람의 최초 시각은 다시 쓰지 않는다 — 분쟁 시 근거가 되는 시각이라 일괄 동작도 지켜야 한다.
+   * 검인 취소는 이 경로에 없다(개별 토글만): 한 번에 전원을 미확인으로 되돌릴 이유가 없다.
+   */
+  async confirmSideArrival(user: V1AuthUser, gameId: string, sideId: string) {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR SHARE`;
+      const side = await tx.v1GameSide.findFirst({
+        where: { id: sideId, gameId },
+        select: { id: true, teamId: true },
+      });
+      if (side === null) {
+        throw this.notFound('GAME_SIDE_NOT_FOUND');
+      }
+      if ((actor.role === 'team_manager' || actor.role === 'team_owner') && actor.teamId !== side.teamId) {
+        throw this.forbidden();
+      }
+      const [lineups, participants] = await Promise.all([
+        tx.v1GameLineup.findMany({
+          where: { gameId, sideId, invalidatedAt: null },
+          select: { id: true, sideId: true, revision: true, state: true },
+        }),
+        tx.v1GameParticipant.findMany({
+          where: { gameId, sideId },
+          select: { id: true, sideId: true, lineupId: true, arrivedAt: true },
+        }),
+      ]);
+      const shown = selectLineupParticipantsWithDraftFallback(participants, lineups);
+      const pendingIds = shown.filter((participant) => participant.arrivedAt === null).map((participant) => participant.id);
+      let newlyArrivedCount = 0;
+      if (pendingIds.length > 0) {
+        // `arrivedAt: null` 조건을 다시 건다 — 위 조회와 갱신 사이에 개별 검인이 끼어들어도 그 시각을 덮지 않는다.
+        // 그 경우 실제로 바뀐 행은 조회한 미검인 수보다 적으므로, 이번에 새로 채운 수는 갱신 결과의 count 다.
+        const updated = await tx.v1GameParticipant.updateMany({
+          where: { id: { in: pendingIds }, arrivedAt: null },
+          data: { arrivedAt: new Date() },
+        });
+        newlyArrivedCount = updated.count;
+      }
+      return { sideId, participantCount: shown.length, newlyArrivedCount };
+    });
+  }
+
+  /**
    * `PUT /games/:gameId/lineups/:sideId`·`POST .../lineups/:lineupId/submit`(대회 운영 어댑터 포함)은
    * 더 이상 쓰지 않는다. 친선은 팀매치 참석명단 경로가, 대회·리그는 참가 명단에서 계산된 경기 명단과
    * 조정 API(`/games/:gameId/sides/:sideId/roster-adjustments`)가 맡는다(Task 179). 인가는 그대로 태워
@@ -5794,7 +5842,17 @@ export class GamesService {
       // 생긴다. 팀 owner/manager 라도 예외 없이 거부한다.
       throw this.forbidden();
     }
-    const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
+    // role 과 teamId 는 **같은 멤버십**에서 나와야 한다. 따로 고르면(role 은 호스트 ?? 상대 매니저, teamId 는
+    // 호스트 ?? 상대 멤버십) 한쪽 팀의 일반 멤버이면서 다른 쪽 팀의 매니저인 사용자가 매니저 권한은 상대팀에서
+    // 받고 teamId 는 자기가 매니저가 아닌 호스트팀으로 나와, teamId 로 사이드를 고르는 곳에서 반대편을 다룬다.
+    const grantingMembership =
+      managerRole(hostMembership) !== null
+        ? hostMembership
+        : managerRole(opponentMembership) !== null
+          ? opponentMembership
+          : undefined;
+    const role = managerRole(grantingMembership);
+    const actorTeamId = grantingMembership?.teamId ?? hostMembership?.teamId ?? opponentMembership?.teamId;
     // `participant_identity` (Task 14 identity-link/consent mutations) is
     // deliberately as permissive as `read` here: the actor only needs to be
     // an active member of one of the two match teams to self-request/revoke
@@ -5806,7 +5864,7 @@ export class GamesService {
         actorType: 'USER',
         actorUserId: userId,
         role: role ?? 'support_readonly',
-        teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
+        teamId: actorTeamId,
       };
     }
     if (role === null) {
@@ -5816,7 +5874,7 @@ export class GamesService {
       actorType: 'USER',
       actorUserId: userId,
       role,
-      teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
+      teamId: actorTeamId,
     };
   }
 

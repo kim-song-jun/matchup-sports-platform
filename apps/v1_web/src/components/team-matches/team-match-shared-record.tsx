@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
+import { TeamMatchClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
+import { useV1TeamMatch } from '@/hooks/use-v1-api';
 import {
   useTeamMatchRecord,
   useMutateTeamMatchRecord,
@@ -408,7 +410,17 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
         </details>}
       </aside>
     </div>
+    {/* 이름만 올라간 게스트를 본인으로 연결하는 입구 — 리그 경기 상세와 같은 컴포넌트다. 경기 기록이 생긴 뒤에만 뜻이 있다. */}
+    {!admin && (data.phase === 'live' || data.phase === 'official') ? <TeamMatchClaimEntry teamMatchId={teamMatchId} /> : null}
   </main>;
+}
+
+/** 참가팀 소속으로 확인된 사람에게만 — 비참가자는 모달을 연 뒤에야 403 을 받으므로 입구부터 숨긴다. */
+function TeamMatchClaimEntry({ teamMatchId }: { teamMatchId: string }) {
+  const viewer = useV1TeamMatch(teamMatchId).data?.viewer;
+  const isParticipant =
+    viewer?.manageableHostTeam === true || viewer?.manageableOpponentTeam === true || viewer?.participantMember === true;
+  return isParticipant ? <TeamMatchClaimMyRecordSection teamMatchId={teamMatchId} /> : null;
 }
 
 function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {

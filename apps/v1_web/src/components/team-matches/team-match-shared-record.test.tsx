@@ -12,7 +12,14 @@ vi.mock('@/hooks/use-team-match-record', () => ({
   useTeamMatchRecord: () => ({ data: state.data, isError: false, refetch: state.refetch }),
   useMutateTeamMatchRecord: () => ({ mutateAsync: state.mutate, isPending: false, isError: false, reset: vi.fn() }),
 }));
+// 신원 연결 입구는 리그 경기 상세와 같은 컴포넌트다(자체 테스트 있음) — 여기서는 노출 조건만 본다.
+const claim = vi.hoisted(() => ({ viewer: undefined as Record<string, unknown> | undefined }));
+vi.mock('@/hooks/use-v1-api', () => ({ useV1TeamMatch: () => ({ data: claim.viewer === undefined ? undefined : { viewer: claim.viewer } }) }));
+vi.mock('@/components/public-game-records/claim-my-record', () => ({
+  TeamMatchClaimMyRecordSection: ({ teamMatchId }: { teamMatchId: string }) => <button type="button">명단에서 나 찾기 ({teamMatchId})</button>,
+}));
 beforeEach(() => {
+  claim.viewer = undefined;
   state.mutate.mockReset().mockResolvedValue({});
   state.replace.mockReset();
   state.search = '';
@@ -234,6 +241,48 @@ describe('shared record participant flow', () => {
     rerender(<TeamMatchSharedRecord teamMatchId="match" />);
     expect(screen.getByRole('button', { name: '이 기록으로 종료 확인' })).toBeDisabled();
   });
+  // L27 — 친선 결과 화면에는 "명단에서 나 찾기" 입구가 없어 게스트로 들어간 팀원이 자기 기록을 되찾을 길이 없었다.
+  describe('명단에서 나 찾기 입구 (L27)', () => {
+    it.each([
+      ['참가팀 멤버', { participantMember: true }],
+      ['호스트팀 운영진', { manageableHostTeam: true }],
+      ['상대팀 운영진', { manageableOpponentTeam: true }],
+    ])('확정된 경기에서 %s에게 보인다', (_label, viewer) => {
+      claim.viewer = viewer;
+      state.data = { ...state.data, phase: 'official', canEdit: false, participant: false };
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      expect(screen.getByRole('button', { name: '명단에서 나 찾기 (match)' })).toBeInTheDocument();
+    });
+
+    it('진행 중인 경기에서도 보인다', () => {
+      claim.viewer = { participantMember: true };
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      expect(screen.getByRole('button', { name: /명단에서 나 찾기/ })).toBeInTheDocument();
+    });
+
+    it.each([
+      ['참가팀이 아닌 사람', { participantMember: false, manageableHostTeam: false, manageableOpponentTeam: false }],
+      ['뷰어 정보가 아직 없을 때', undefined],
+    ])('%s에게는 보이지 않는다', (_label, viewer) => {
+      claim.viewer = viewer;
+      state.data = { ...state.data, phase: 'official', canEdit: false, participant: false };
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      expect(screen.queryByRole('button', { name: /명단에서 나 찾기/ })).not.toBeInTheDocument();
+    });
+
+    it('취소된 경기와 어드민 화면에는 보이지 않는다', () => {
+      claim.viewer = { participantMember: true };
+      state.data = { ...state.data, phase: 'cancelled', canEdit: false };
+      const { unmount } = render(<TeamMatchSharedRecord teamMatchId="match" />);
+      expect(screen.queryByRole('button', { name: /명단에서 나 찾기/ })).not.toBeInTheDocument();
+      unmount();
+
+      state.data = { ...state.data, phase: 'official', participant: false, operator: true };
+      render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+      expect(screen.queryByRole('button', { name: /명단에서 나 찾기/ })).not.toBeInTheDocument();
+    });
+  });
+
   // L30 — 취소된 경기의 공동 기록 화면에 "경기 종료 확인 · 확인 대기" 카드가 남았다.
   it('취소된 경기에는 종료 확인 카드가 없고 배지는 취소로 읽힌다', () => {
     state.data = { ...state.data, phase: 'cancelled', canEdit: false };

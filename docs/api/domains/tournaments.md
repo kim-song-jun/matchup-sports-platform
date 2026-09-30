@@ -227,7 +227,7 @@ Public tournament list/detail responses include both `confirmedCount` and `pendi
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
-| `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member | path ids | roster players and `belowMinimum` |
+| `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member (owner/manager also get personal info) | path ids | roster players, `belowMinimum`, `personalInfoVisible` — see Roster Read Contract |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
@@ -251,6 +251,19 @@ If any required source field is missing, the API rejects the request with `400 P
 The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
 
 `POST /api/v1/admin/registrations/:registrationId/roster-lock` locks the registration row and validates a mixed tournament's active-player `genderSnapshot` counts in the same serializable transaction. A violated minimum or maximum returns `409 TOURNAMENT_GENDER_QUOTA_NOT_MET` with `details.male` and `details.female`, each containing `count`, `min`, `max`, and `ok`; the roster remains unlocked. Male/female tournament categories are labels only and do not enforce a player-gender match.
+
+## Roster Read Contract
+
+`GET /tournaments/:tournamentId/registrations/:registrationId/players` is open to every active member of the registration team, but the response depends on the caller's team role:
+
+| Caller | `realName` / `birthDateSnapshot` / `genderSnapshot` | `personalInfoVisible` |
+|---|---|---|
+| team `owner`, team `manager` | stored snapshot values | `true` |
+| team `member` | `null` (keys stay in the response) | `false` |
+
+Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `eligibilityNote`, `addedAt` and `removedAt`. Clients must use `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". A non-member of the team gets `403 PERMISSION_DENIED`.
+
+Endpoints that return a team's real names or birth dates and who can call them: `POST`/`PATCH`/`DELETE` under the same prefix are team manager+ only; every `/admin/...` player endpoint (list, export, tournament export, eligible-players, eligibility, add, remove) requires an active admin; `GET /teams/:teamId/members` already returns `realName`, `phone`, `birthDate`, `gender` as `null` to a plain member (except their own row). The public tournament detail roster carries `jerseyNumber` and `nickname` only.
 
 Admin roster reads use the dedicated `/admin/registrations/:registrationId/players` endpoint. They must not reuse the team-member endpoint because active admins are not necessarily members of the registered team. Owner, ops, and support admins may read the roster; eligibility mutation remains owner/ops-only.
 

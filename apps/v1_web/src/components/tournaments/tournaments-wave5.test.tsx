@@ -172,7 +172,9 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
     id: 'player-1',
     userId: 'user-1',
     realName: '홍길동',
+    nickname: '길동이',
     birthDateSnapshot: '1995-03-15',
+    genderSnapshot: 'male' as const,
     eligibilityStatus: 'non_pro' as const,
     eligibilityNote: null,
     addedAt: '2026-01-01T00:00:00.000Z',
@@ -200,7 +202,7 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
       refetch: vi.fn(),
     } as never);
     vi.spyOn(api, 'useV1TournamentPlayers').mockReturnValue({
-      data: { players: [player], belowMinimum: false },
+      data: { players: [player], belowMinimum: false, personalInfoVisible: true },
       isLoading: false,
       isError: false,
       error: null,

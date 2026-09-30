@@ -3809,9 +3809,22 @@ export type V1TournamentPlayer = {
   removedAt: string | null;
 };
 
+/**
+ * 팀 명단 조회(`GET …/registrations/:id/players`)의 선수 한 명.
+ * 일반 팀원에게는 `realName`·`birthDateSnapshot`·`genderSnapshot` 이 `null` 이고
+ * (`V1TournamentRosterResponse.personalInfoVisible === false`), 표시 이름은 `nickname` 이다.
+ */
+export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {
+  realName: string | null;
+  /** 프로필이 없으면 null — 실명으로 대체하지 않는다. */
+  nickname: string | null;
+};
+
 export type V1TournamentRosterResponse = {
-  players: V1TournamentPlayer[];
+  players: V1TournamentRosterPlayer[];
   belowMinimum: boolean;
+  /** 팀장·매니저만 true. false 면 개인정보 세 필드는 "미입력"이 아니라 가려진 것이다. */
+  personalInfoVisible: boolean;
 };
 
 export type V1AdminTournamentPlayer = V1TournamentPlayer & {
@@ -3820,7 +3833,7 @@ export type V1AdminTournamentPlayer = V1TournamentPlayer & {
 };
 
 /** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */
-export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players'> & {
+export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players' | 'personalInfoVisible'> & {
   players: V1AdminTournamentPlayer[];
   registrationId: string;
   teamId: string;

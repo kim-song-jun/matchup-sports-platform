@@ -52,13 +52,20 @@ const useV1RemovePlayerMock = vi.mocked(useV1RemovePlayer);
 const PAST_DEADLINE = '2020-01-01T00:00:00.000Z';
 const FUTURE_DEADLINE = '2099-01-01T00:00:00.000Z';
 
+/** 일반 팀원이 받는 응답 — 실명·생년월일·성별이 서버에서 비워진다. */
+function memberViewPlayer(overrides: Record<string, unknown> = {}) {
+  return mockPlayer({ realName: null, birthDateSnapshot: null, genderSnapshot: null, ...overrides });
+}
+
 function mockPlayer(overrides: Record<string, unknown> = {}) {
   return {
     id: 'player-1',
     jerseyNumber: null as number | null,
     userId: 'user-1',
-    realName: '홍길동',
-    birthDateSnapshot: '1995-03-15',
+    realName: '홍길동' as string | null,
+    nickname: '길동이' as string | null,
+    birthDateSnapshot: '1995-03-15' as string | null,
+    genderSnapshot: 'male' as const,
     eligibilityStatus: 'non_pro' as const,
     eligibilityNote: null,
     addedAt: '2026-01-01T00:00:00.000Z',
@@ -84,7 +91,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1TeamDetail>);
     useV1TournamentPlayersMock.mockReturnValue({
-      data: { players: [mockPlayer()], belowMinimum: false },
+      data: { players: [mockPlayer()], belowMinimum: false, personalInfoVisible: true },
       isLoading: false,
       isError: false,
       error: null,
@@ -250,7 +257,7 @@ describe('명단 등번호 표시', () => {
       data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
     } as never);
     vi.mocked(useV1TournamentPlayers).mockReturnValue({
-      data: { players: [player], belowMinimum: false },
+      data: { players: [player], belowMinimum: false, personalInfoVisible: true },
       isPending: false,
     } as never);
     vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
@@ -319,7 +326,7 @@ describe('등번호 수정', () => {
       data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
     } as never);
     vi.mocked(useV1TournamentPlayers).mockReturnValue({
-      data: { players: [mockPlayer({ jerseyNumber })], belowMinimum: false },
+      data: { players: [mockPlayer({ jerseyNumber })], belowMinimum: false, personalInfoVisible: true },
       isPending: false,
     } as never);
     vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
@@ -421,7 +428,7 @@ describe('등번호 수정', () => {
 
     // 서버 갱신이 도착한다 — 다른 요청이 등번호를 10 으로 바꿔 놓았다.
     vi.mocked(useV1TournamentPlayers).mockReturnValue({
-      data: { players: [mockPlayer({ jerseyNumber: 10 })], belowMinimum: false },
+      data: { players: [mockPlayer({ jerseyNumber: 10 })], belowMinimum: false, personalInfoVisible: true },
       isPending: false,
     } as never);
     rerender(<TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />);
@@ -451,7 +458,7 @@ describe('등번호 입력 종류', () => {
       data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
     } as never);
     vi.mocked(useV1TournamentPlayers).mockReturnValue({
-      data: { players: [], belowMinimum: true },
+      data: { players: [], belowMinimum: true, personalInfoVisible: true },
       isPending: false,
     } as never);
     vi.mocked(useV1AddPlayer).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
@@ -535,7 +542,7 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
       data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
     } as unknown as ReturnType<typeof useV1Registration>);
     useV1TournamentPlayersMock.mockReturnValue({
-      data: { players: [mockPlayer()], belowMinimum: false },
+      data: { players: [mockPlayer()], belowMinimum: false, personalInfoVisible: true },
       isLoading: false,
       isError: false,
       error: null,
@@ -559,15 +566,23 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
 
   it('member 역할은 추가·수정·삭제 버튼이 전부 안 보이고, "팀장에게 요청"으로 안내한다', () => {
     mockTeam('member');
+    // 일반 팀원은 서버에서 실명이 없는 응답을 받는다 — 표시 이름은 닉네임이다.
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [memberViewPlayer()], belowMinimum: false, personalInfoVisible: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
 
     render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
 
     expect(screen.getByText('팀장에게 요청')).toBeInTheDocument();
     expect(screen.getByText(/추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '길동이 수정' })).not.toBeInTheDocument();
     // 명단 자체(읽기)는 그대로 보인다 — 막는 건 쓰기뿐이다.
-    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('길동이')).toBeInTheDocument();
   });
 
   it.each(['owner', 'manager'] as const)('%s 역할은 기존과 동일하게 추가·수정 버튼이 보인다', (role) => {
@@ -606,6 +621,85 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
   });
 });
 
+// 개인정보(F93): 서버가 일반 팀원 응답에서 실명·생년월일·성별을 비운다. 화면은 그 빈 값을
+// "미입력"으로 읽지 않고 줄 자체를 그리지 않아야 하고, 팀장·매니저 화면은 그대로여야 한다.
+describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    useV1TournamentMock.mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+  });
+
+  function renderAs(
+    role: 'owner' | 'manager' | 'member',
+    response: { players: unknown[]; personalInfoVisible?: boolean },
+  ) {
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { belowMinimum: false, ...response },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    return render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+  }
+
+  it.each(['owner', 'manager'] as const)('%s 는 실명과 생년월일을 그대로 본다', (role) => {
+    renderAs(role, { players: [mockPlayer({ jerseyNumber: 7 })], personalInfoVisible: true });
+
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('1995.03.15')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+  });
+
+  it('일반 팀원은 닉네임·등번호·자격 상태만 보고 생년월일 줄은 그려지지 않는다', () => {
+    const { container } = renderAs('member', {
+      players: [memberViewPlayer({ jerseyNumber: 7 })],
+      personalInfoVisible: false,
+    });
+
+    expect(screen.getByText('길동이')).toBeInTheDocument();
+    expect(screen.getByLabelText('등번호 7번')).toBeInTheDocument();
+    expect(screen.getByText('아마추어')).toBeInTheDocument();
+    // "미입력"으로 대신 그리지 않는다 — 입력 여부가 아니라 가려진 값이다.
+    expect(screen.queryByText('미입력')).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\d{4}\.\d{2}\.\d{2}/);
+    expect(container.textContent).not.toContain('홍길동');
+  });
+
+  it('일반 팀원에게 닉네임이 없는 선수는 실명 대신 자리표시자로 그려진다', () => {
+    renderAs('member', {
+      players: [memberViewPlayer({ nickname: null })],
+      personalInfoVisible: false,
+    });
+
+    expect(screen.getByText('(탈퇴한 선수)')).toBeInTheDocument();
+  });
+
+  it('응답에 personalInfoVisible 이 없으면(구버전 서버) 가린 쪽으로 그린다', () => {
+    const { container } = renderAs('owner', { players: [mockPlayer()] });
+
+    expect(container.textContent).not.toMatch(/\d{4}\.\d{2}\.\d{2}/);
+  });
+});
+
 describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받은 from 을 잇는다', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -627,7 +721,7 @@ describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1TeamDetail>);
     useV1TournamentPlayersMock.mockReturnValue({
-      data: { players: [], belowMinimum: false },
+      data: { players: [], belowMinimum: false, personalInfoVisible: true },
       isLoading: false,
       isError: false,
       error: null,

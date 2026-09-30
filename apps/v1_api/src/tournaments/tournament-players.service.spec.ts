@@ -102,6 +102,8 @@ function playerRow(overrides: Record<string, unknown> = {}) {
     removedAt: null,
     createdAt: new Date('2026-06-14T00:00:00Z'),
     updatedAt: new Date('2026-06-14T00:00:00Z'),
+    // 명단 조회가 `include` 로 읽는 관계 — 표시 이름(닉네임)의 출처.
+    user: { profile: { nickname: '길동이' } },
     ...overrides,
   };
 }
@@ -797,6 +799,90 @@ describe('TournamentPlayersService', () => {
 
     const result = await service.listPlayers(manager, 'tournament-1', 'reg-1');
     expect(result.belowMinimum).toBe(false);
+  });
+
+  // ─── 8-1. 명단 조회의 개인정보 — 팀장·매니저만 실명·생년월일·성별을 본다 ─────────────
+  //
+  // 한 팀에 owner·manager·member 를 모두 두고 **같은 명단**을 조회한다. 좁히는 변경이라
+  // 대조군이 없으면 "member 가 못 받는다" 단언이 게이트를 과하게 좁혀도(팀장까지 가려도)
+  // 그대로 통과한다 — 그래서 owner·manager 가 **여전히 받는다** 를 같은 픽스처에서 함께 건다.
+  describe('listPlayers: 역할별 개인정보', () => {
+    const owner = { ...manager, id: 'owner-user-id' };
+    const plainMember = { ...nonManager, id: 'member-user-id' };
+    const outsider = { ...nonManager, id: 'outsider-user-id' };
+    const roleByUserId: Record<string, string> = {
+      'owner-user-id': 'owner',
+      'manager-user-id': 'manager',
+      'member-user-id': 'member',
+    };
+
+    beforeEach(() => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      // 실제 쿼리처럼 where.userId 로 팀원을 가른다 — 팀원이 아니면 null.
+      prisma.v1TeamMembership.findFirst.mockImplementation(
+        ({ where }: { where: { userId: string } }) => {
+          const role = roleByUserId[where.userId];
+          return Promise.resolve(role ? { id: `mem-${where.userId}`, role } : null);
+        },
+      );
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 1 }));
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+      prisma.$queryRaw.mockResolvedValue([{ id: 'player-1', jersey_number: 7 }]);
+    });
+
+    it.each([
+      ['owner', owner],
+      ['manager', manager],
+    ])('%s 는 실명·생년월일·성별을 그대로 받는다', async (_role, viewer) => {
+      const result = await service.listPlayers(viewer, 'tournament-1', 'reg-1');
+
+      expect(result.personalInfoVisible).toBe(true);
+      expect(result.players[0]).toMatchObject({
+        realName: '홍길동',
+        birthDateSnapshot: '1995-03-15',
+        genderSnapshot: 'male',
+        nickname: '길동이',
+        jerseyNumber: 7,
+        eligibilityStatus: 'needs_review',
+      });
+    });
+
+    it('일반 팀원은 개인정보 세 필드를 받지 못하고 닉네임·등번호·자격 상태·userId 는 받는다', async () => {
+      const result = await service.listPlayers(plainMember, 'tournament-1', 'reg-1');
+
+      expect(result.personalInfoVisible).toBe(false);
+      expect(result.players[0]).toMatchObject({
+        realName: null,
+        birthDateSnapshot: null,
+        genderSnapshot: null,
+        nickname: '길동이',
+        jerseyNumber: 7,
+        eligibilityStatus: 'needs_review',
+        userId: 'player-user-id',
+      });
+      // 다른 키로 새는 경로까지 막는다 — 응답 전체에 원본 값이 한 번도 나오면 안 된다.
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('홍길동');
+      expect(serialized).not.toContain('1995-03-15');
+    });
+
+    it('일반 팀원에게 프로필이 없는 선수의 닉네임은 실명으로 대체하지 않고 null 이다', async () => {
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+        playerRow({ user: { profile: null } }),
+      ]);
+
+      const result = await service.listPlayers(plainMember, 'tournament-1', 'reg-1');
+
+      expect(result.players[0].nickname).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('홍길동');
+    });
+
+    it('팀원이 아니면 403 이고 명단을 읽지 않는다', async () => {
+      await expect(
+        service.listPlayers(outsider, 'tournament-1', 'reg-1'),
+      ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+      expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+    });
   });
 
   // ─── 9. 선수 삭제 happy path ──────────────────────────────────────────────

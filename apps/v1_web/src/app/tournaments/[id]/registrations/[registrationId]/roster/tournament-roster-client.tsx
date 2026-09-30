@@ -24,7 +24,7 @@ import { randomUuid } from '@/lib/uuid';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
 import type {
-  V1TournamentPlayer,
+  V1TournamentRosterPlayer,
   V1PlayerEligibilityStatus,
   V1TeamMembersPage,
   V1TournamentGenderCategory,
@@ -834,8 +834,17 @@ function FormField({
 
 /* ── Player row ── */
 
+/**
+ * 명단에서 선수를 부르는 이름. 팀장·매니저 응답은 실명이 있고, 일반 팀원 응답은 실명이 `null` 이라
+ * 닉네임이다. 둘 다 없으면 탈퇴 등으로 프로필을 잃은 선수다(공개 명단의 자리표시자와 같은 말).
+ */
+function rosterPlayerName(player: Pick<V1TournamentRosterPlayer, 'realName' | 'nickname'>): string {
+  return player.realName ?? player.nickname ?? '(탈퇴한 선수)';
+}
+
 function PlayerRow({
   player,
+  personalInfoVisible,
   onUpdate,
   onRemove,
   isUpdating,
@@ -846,7 +855,9 @@ function PlayerRow({
   isPrimary,
   onUpdateJersey,
 }: {
-  player: V1TournamentPlayer;
+  player: V1TournamentRosterPlayer;
+  /** false 면 생년월일 줄을 그리지 않는다 — "미입력"이 아니라 서버가 가린 값이다. */
+  personalInfoVisible: boolean;
   onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
   onRemove: (playerId: string) => void;
   isUpdating: boolean;
@@ -870,6 +881,7 @@ function PlayerRow({
     player.jerseyNumber === null ? '' : String(player.jerseyNumber),
   );
   const [editError, setEditError] = useState<string | null>(null);
+  const playerName = rosterPlayerName(player);
 
   // 이 행이 (다시) 열릴 때마다 최신 서버 값으로 초기화한다 — 부모가 편집 상태를
   // 컨트롤하므로 "수정" 버튼 onClick 대신 여기서 동기화한다.
@@ -954,7 +966,7 @@ function PlayerRow({
             fontWeight: 700,
           }}
         >
-          {player.realName.charAt(0)}
+          {playerName.charAt(0)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -970,15 +982,17 @@ function PlayerRow({
               </span>
             )}
             <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-              {player.realName}
+              {playerName}
             </span>
             <span className={`tm-badge ${eligibilityBadgeClass(player.eligibilityStatus)}`}>
               {eligibilityLabel(player.eligibilityStatus)}
             </span>
           </div>
-          <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-            {formatRosterBirthDate(player.birthDateSnapshot)}
-          </div>
+          {personalInfoVisible ? (
+            <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+              {formatRosterBirthDate(player.birthDateSnapshot)}
+            </div>
+          ) : null}
         </div>
         {!isLocked ? (
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -989,7 +1003,7 @@ function PlayerRow({
               onClick={onToggleEdit}
               disabled={isUpdating || isRemoving}
               aria-expanded={isEditing}
-              aria-label={`${player.realName} 수정`}
+              aria-label={`${playerName} 수정`}
             >
               수정
             </button>
@@ -999,7 +1013,7 @@ function PlayerRow({
               style={{ minWidth: 44, padding: '0 12px' }}
               onClick={() => onRemove(player.id)}
               disabled={isRemoving || isUpdating}
-              aria-label={`${player.realName} 삭제`}
+              aria-label={`${playerName} 삭제`}
             >
               삭제
             </button>
@@ -1340,9 +1354,10 @@ export function TournamentRosterPageClient({
   async function handleRemovePlayer(playerId: string) {
     if (!canEditRoster) return;
     const player = players.find((p) => p.id === playerId);
-    const nameLabel = player?.realName ? `"${player.realName}"` : '이 선수';
+    const playerName = player ? rosterPlayerName(player) : '이 선수';
+    const nameLabel = player ? `"${playerName}"` : playerName;
     // 조사는 따옴표가 아니라 이름의 받침 기준으로 고른다 ("김민준"을 / "이수아"를)
-    const nameJosa = josa(player?.realName ?? '이 선수', ['을', '를']).slice((player?.realName ?? '이 선수').length);
+    const nameJosa = josa(playerName, ['을', '를']).slice(playerName.length);
     const ok = await confirmRemove({
       title: '선수 삭제',
       message: `${nameLabel}${nameJosa} 명단에서 삭제할까요?`,
@@ -1601,6 +1616,8 @@ export function TournamentRosterPageClient({
               <PlayerRow
                 key={player.id}
                 player={player}
+                // 응답에 필드가 없으면(배포 중 구버전 서버) 가린 쪽으로 — 실패해도 개인정보를 그리지 않는다.
+                personalInfoVisible={rosterData?.personalInfoVisible ?? false}
                 onUpdate={handleUpdatePlayer}
                 onUpdateJersey={handleUpdatePlayerJersey}
                 onRemove={handleRemovePlayer}

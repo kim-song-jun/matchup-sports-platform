@@ -331,4 +331,17 @@ describe('팀 해체(보관)·복구 계약', () => {
     });
     expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('archived');
   });
+
+  it('운영팀이 보관을 풀 때도 그 사이 같은 이름의 팀이 생겼으면 409 TEAM_RESTORE_NAME_TAKEN 이고 보관 그대로다', async () => {
+    await archiveByOps();
+    // 운영팀 보관은 이름을 바로 풀어 주므로 다른 팀이 그 이름을 가져갈 수 있다.
+    await prisma.v1Team.update({ where: { id: rivalTeamId }, data: { name: '해체 테스트팀' } });
+    const logsBefore = await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } });
+    await expect(admin.changeTeamStatus(asUser(opsUserId), teamId, { status: 'active', reason: '복구 요청' })).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'TEAM_RESTORE_NAME_TAKEN' },
+    });
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('archived');
+    expect(await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } })).toBe(logsBefore);
+  });
 });

@@ -186,8 +186,10 @@ type AdminListSummary = {
   - 막는 조건이 없으면 예정 팀매치·신청·초대·일정·채팅을 정리하고 `deletedAt` 에 해체 시각을 남기며 팀원 전원에게
     `team_dissolved` 를 보낸다. 팀 전이 status log 는 `actorType=admin` 한 벌이고, 이렇게 보관한 팀은 팀장이 30일 안에도
     직접 복구할 수 없다(`403 TEAM_RESTORE_ADMIN_ONLY`).
-  - `archived` 에서 벗어나면 `deletedAt` 을 지우고 팀 채팅방을 다시 연다(취소된 것은 되살리지 않음). 자세한 계약은
-    [Teams](./teams.md) "팀 해체(보관)·복구".
+  - `archived` 에서 벗어나면 `deletedAt` 을 지우고 팀 채팅방을 다시 연다(취소된 것은 되살리지 않음). 운영팀 보관은
+    이름을 바로 풀어 주므로, 그 사이 같은 종목·지역에 같은 이름의 활동 중·예약 팀이 생겼으면 팀장 셀프 복구와 같은
+    `409 TEAM_RESTORE_NAME_TAKEN`("같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.")이고 상태·감사 로그를
+    바꾸지 않는다(화면은 이 문구를 토스트로 보여 준다). 자세한 계약은 [Teams](./teams.md) "팀 해체(보관)·복구".
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.
 

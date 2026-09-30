@@ -13,7 +13,7 @@ export function isSameTeamName(team: { name: string; sportId: string; regionId: 
   return normalizeTeamName(team.name) === normalizeTeamName(target.name) && team.sportId === target.sportId && team.regionId === target.regionId;
 }
 
-/** 만들기·수정·셀프 복구가 같은 이름을 동시에 통과하지 않게 이름 단위로 줄 세운다(DB 유니크는 기존 중복 때문에 못 건다). */
+/** 만들기·수정·보관 해제(셀프·운영팀)가 같은 이름을 동시에 통과하지 않게 이름 단위로 줄 세운다(DB 유니크는 기존 중복 때문에 못 건다). */
 export async function lockTeamNameScope(tx: Prisma.TransactionClient, target: TeamNameTarget) {
   const scope = `team-name:${target.sportId}:${target.regionId}:${normalizeTeamName(target.name)}`;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
@@ -45,5 +45,16 @@ export async function assertTeamNameAvailable(tx: Prisma.TransactionClient, targ
   await lockTeamNameScope(tx, target);
   if (await hasTeamWithSameName(tx, target, new Date())) {
     throw new ConflictException({ code: 'TEAM_NAME_TAKEN', message: 'Another team in the same sport and region already uses this name' });
+  }
+}
+
+/**
+ * 보관을 푸는 두 경로(팀장 셀프 복구·운영팀 보관 해제)가 함께 본다. 운영팀 보관은 이름을 바로 풀어 주므로
+ * 그 사이 같은 이름의 팀이 생겼을 수 있다. 호출부가 lockTeamNameScope 를 먼저 잡고 있어야 한다.
+ */
+export async function assertRestoredTeamNameFree(tx: Prisma.TransactionClient, team: { id: string; name: string; sportId: string; regionId: string }) {
+  const target = { name: team.name, sportId: team.sportId, regionId: team.regionId, excludeTeamId: team.id };
+  if (await hasTeamWithSameName(tx, target, new Date())) {
+    throw new ConflictException({ code: 'TEAM_RESTORE_NAME_TAKEN', message: '같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.' });
   }
 }

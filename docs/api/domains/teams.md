@@ -122,7 +122,7 @@ CAUTION:
 - `skillLevelText`는 표시/레거시 설명용이고, 필터와 `levelLabel`은 `minSportLevelId`, `maxSportLevelId` FK를 기준으로 계산한다.
 - 생성 시 트랜잭션으로 owner 멤버십(`role=owner`, `status=active`)이 자동 생성된다.
 - 팀 생성은 프로필 `realName`, `phone`, `gender`가 있어야 하며 없으면 `422 PROFILE_COMPLETION_REQUIRED`다. 신청/관리 엔드포인트는 이 검사에서 제외된다.
-- **팀 이름 중복 금지**(Task 180 H2): 같은 `sportId`·같은 `regionId` 안에서 앞뒤 공백·대소문자를 무시하고 같은 이름을 차지한 팀이 있으면 `409 TEAM_NAME_TAKEN`. 이름을 차지하는 팀은 활동 중인 팀과, **팀장이 해체해 아직 직접 복구할 수 있는 팀**(`canRestore` 와 같은 판정 — 팀장 해체이고 해체 후 30일 경계 포함, 아래 "팀 해체(보관)·복구")이다. 복구 기간이 지났거나 운영팀이 보관한 팀의 이름은 풀린다. 규칙 전부터 있던 중복은 그대로 둔다. DB 유니크 제약은 없고 서비스가 이름 단위 advisory lock 안에서 검사한다(만들기·수정·셀프 복구가 같은 잠금으로 줄 선다).
+- **팀 이름 중복 금지**(Task 180 H2): 같은 `sportId`·같은 `regionId` 안에서 앞뒤 공백·대소문자를 무시하고 같은 이름을 차지한 팀이 있으면 `409 TEAM_NAME_TAKEN`. 이름을 차지하는 팀은 활동 중인 팀과, **팀장이 해체해 아직 직접 복구할 수 있는 팀**(`canRestore` 와 같은 판정 — 팀장 해체이고 해체 후 30일 경계 포함, 아래 "팀 해체(보관)·복구")이다. 복구 기간이 지났거나 운영팀이 보관한 팀의 이름은 풀린다. 규칙 전부터 있던 중복은 그대로 둔다. DB 유니크 제약은 없고 서비스가 이름 단위 advisory lock 안에서 검사한다(만들기·수정·셀프 복구·운영팀 보관 해제가 같은 잠금으로 줄 선다).
 
 ## GET /teams/name-availability (TeamNameAvailabilityQueryDto)
 
@@ -184,15 +184,16 @@ CAUTION:
   - 기간이 지나면 `409 TEAM_RESTORE_WINDOW_EXPIRED`(운영팀이 어드민 "팀 상태 변경"으로 복구), 해체된 팀이 아니면
     `409 TEAM_NOT_DISSOLVED`. 두 판정 모두 팀 행 잠금 뒤 다시 본다.
   - 복구 기간 동안 이름은 예약돼 있지만, 같은 종목·지역에 같은 이름을 차지한 팀이 있으면(규칙 전부터 있던 중복,
-    기간 경계 경합) `409 TEAM_RESTORE_NAME_TAKEN`("같은 종목·지역에 같은 이름의 팀이 있어 직접 복구할 수 없어요.
-    운영팀에 문의해 주세요.")이고 아무것도 되돌리지 않는다. 이름 잠금 뒤에 기간·이름을 함께 본다.
+    기간 경계 경합) `409 TEAM_RESTORE_NAME_TAKEN`("같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.")이고
+    아무것도 되돌리지 않는다. 이름 잠금 뒤에 기간·이름을 함께 본다. 어드민 "팀 상태 변경"으로 보관을 풀 때도 같은
+    검사(`team-dissolution-tx.ts` `restoreTeamInTx`)를 지난다.
 - **`GET /me/dissolved-teams`** → `{ items[{ teamId, name, logoUrl, sportName, memberCount, dissolvedAt,
   archivedBy, restoreDeadlineAt, canRestore, detailRoute }], restoreWindowDays }` — 내가 active owner 인 보관 팀,
   최근 해체 순. 기간이 지났거나 운영팀이 보관한(`archivedBy=admin`) 팀도 `canRestore=false` 로 들어온다.
 - 어드민 `POST /admin/teams/:teamId/status` 의 `archived` 도 같은 막는 조건(`409 TEAM_DISSOLVE_BLOCKED` +
   `details.blockers`)·정리·알림을 지난다(팀장 본인도 알림 수신). 이렇게 보관한 팀은 팀장이 직접 복구할 수 없다.
-  `archived` 에서 다른 상태로 바꾸면 기간 제한 없이 `deletedAt` 을 지우고 채팅방을 다시 연다. 이 경로는 이름 중복을
-  검사하지 않는다(운영 판단으로 푼다).
+  `archived` 에서 다른 상태로 바꾸면 기간 제한 없이 `deletedAt` 을 지우고 채팅방을 다시 연다. 같은 이름의 팀이 있으면
+  셀프 복구와 같은 `409 TEAM_RESTORE_NAME_TAKEN` 이다(운영팀 보관은 이름을 바로 풀어 그 사이 생길 수 있다).
 - 해체된 팀의 팀장은 회원 탈퇴 차단(`WITHDRAWAL_BLOCKED_TEAM_AUTHORITY`)에서 풀린다 — 그 판정이 `status=active` 팀만 본다.
 
 ## PATCH /teams/:teamId

@@ -684,6 +684,7 @@ describe('NotificationsService', () => {
       ['team_manager_revoked', {}, '매니저에서 멤버로 바뀌었어요', '"마포 FC" · 팀 관리 메뉴는 더 보이지 않아요.', '/teams/team-1'],
       ['team_owner_received', {}, '팀장이 되었어요', '"마포 FC" · 팀장을 넘겨받았어요. 멤버 관리와 팀 정보를 바꿀 수 있어요.', '/teams/team-1/members'],
       ['team_owner_changed', { name: '새팀장' }, '팀장이 바뀌었어요', '"마포 FC" · 새 팀장은 새팀장님이에요.', '/teams/team-1'],
+      ['team_membership_removed', {}, '팀에서 제외됐어요', '"마포 FC" · 이 팀의 일정과 채팅은 더 볼 수 없어요.', '/teams/team-1'],
     ] as const)('%s', async (type, extra, title, body, deepLink) => {
       const data = await rendered(type, 'team-1', { team: '마포 FC', ...extra });
       expect(data).toMatchObject({ targetType: 'team', targetId: 'team-1', title, body, deepLink });

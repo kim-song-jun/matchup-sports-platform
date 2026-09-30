@@ -932,6 +932,9 @@ export class TeamsService {
         `roster cleanup on member removal team=${target.teamId} user=${target.userId} rosters=${result.removedRosterCount}`,
       );
     }
+    void this.notifications.emitNotification(target.userId, 'team_membership_removed', target.teamId, undefined, {
+      vars: { team: target.team.name },
+    });
 
     return {
       membershipId: result.updated.id,

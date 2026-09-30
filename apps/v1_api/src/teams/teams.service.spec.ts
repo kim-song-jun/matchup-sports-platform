@@ -1933,6 +1933,11 @@ describe('TeamsService', () => {
       }),
     );
     expect(result).toMatchObject({ status: 'removed', memberCount: 4 });
+    // 내보내진 본인에게만, 이유 없이 — 내보낸 매니저에게는 가지 않는다(H1-removed).
+    expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+    expect(notifications.emitNotification).toHaveBeenCalledWith('target-user', 'team_membership_removed', 'team-1', undefined, {
+      vars: { team: '테스트팀' },
+    });
   });
 
   it('removeMembership: manager는 다른 manager를 추방할 수 없다 → 403 PERMISSION_DENIED', async () => {

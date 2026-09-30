@@ -1486,11 +1486,12 @@ async function seedChatAndNotifications(
     },
     {
       id: '00000000-0000-4000-8000-000000000502',
-      recipientUserId: userIds['host@teameet.v1'],
+      // 팀매치 301 의 호스트 팀(강남 러닝 크루) 팀장에게 신청 팀(송파 풋살 모임)을 알린다 — 실제 발송 문구와 같은 모양.
+      recipientUserId: userIds['owner@teameet.v1'],
       targetType: V1NotificationTargetType.team_match,
       targetId: teamMatchId,
-      title: '팀매치 신청 도착',
-      body: '상대팀 신청이 들어왔습니다. 조건을 확인해 주세요.',
+      title: '송파 풋살 모임 팀이 팀매치를 신청했어요',
+      body: '"강남 러닝 크루" · 친선 팀매치 · 5/23 (토) 14:00 · 승인하거나 거절해 주세요.',
       deepLink: `/team-matches/${teamMatchId}`,
       readAt: null,
       createdAt: new Date('2026-05-24T07:50:00.000Z'),

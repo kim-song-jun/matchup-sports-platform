@@ -487,7 +487,13 @@ function ScheduleCancelConfirm({
     <ConfirmModal
       open={model.open}
       title="일정을 취소할까요?"
-      message={`취소하면 이 일정은 "취소됨"으로 바뀌고 되돌릴 수 없어요.${recruitmentOpen ? ' 열려 있는 용병 모집도 함께 닫혀요.' : ''}`}
+      message={[
+        '취소하면 이 일정은 "취소됨"으로 바뀌고 되돌릴 수 없어요.',
+        recruitmentOpen ? '열려 있는 용병 모집도 함께 닫혀요.' : '',
+        model.noticeLine,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       confirmLabel={model.pending ? '취소하는 중…' : '일정 취소'}
       cancelLabel="닫기"
       tone="danger"

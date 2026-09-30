@@ -56,7 +56,13 @@ and therefore has no host participant row.
   created at entry time. A participant whose boundary was set to an entry time earlier is pulled back to
   `room.created_at` on the next room access (no backfill). Match and team rooms keep the entry-time boundary.
 - Team-membership activation creates one system message (`messageType = "system"`,
-  `systemEventType = "joined"`); existing active-member repair does not duplicate it.
+  `systemEventType = "joined"`); existing active-member repair does not duplicate it. Leaving or being
+  removed from a team writes `systemEventType = "left"` (`○○님이 나갔어요` for both — the room does not
+  reveal who removed the member).
+- Joined/left lines go through `ChatService` only: `recordSystemLine` persists them inside the membership
+  transaction, and after commit `deliverSystemLine` emits `chat:message` to the same recipients a text
+  message from that user would reach (payload = text payload + `messageType`, `systemEventType`). No
+  notification row or push is created, and a socket failure is logged, not surfaced.
 - Message rows include `messageType`, `systemEventType`, and `unreadCount`. `unreadCount` is
   computed per text message from active participants whose visibility boundary includes that
   message and whose `lastReadMessageId` is older or empty; system messages always return `0`.

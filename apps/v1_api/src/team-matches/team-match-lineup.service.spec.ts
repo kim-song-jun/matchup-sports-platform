@@ -51,6 +51,8 @@ interface FakeState {
   recordChanges: Array<{ version: number; commandId: string; action: string; actorName: string; after: unknown }>;
   /** 팀 일정 RSVP 를 읽은 횟수 — 저장·추가 경로는 읽지 않아야 한다(명단 자격과 무관). */
   scheduleReads: number;
+  /** V1OutboxEvent — businessKey 가 유니크라 skipDuplicates 면 같은 키는 한 행만 남는다. */
+  outbox: Array<{ businessKey: string; type: string; aggregateId: string; payload: unknown }>;
 }
 
 function createFake(options: {
@@ -86,6 +88,7 @@ function createFake(options: {
     record: options.hasSharedRecord ? { gameId: 'game-1', version: 3, officialAt: null, confirmations: [{ sideId: 'side-away' }] } : null,
     recordChanges: [],
     scheduleReads: 0,
+    outbox: [],
   };
   let participantSeq = 0;
   let lineupSeq = 0;
@@ -130,6 +133,20 @@ function createFake(options: {
     },
     v1UserProfile: {
       findUnique: async () => ({ nickname: '팀장 님', displayName: null }),
+    },
+    v1OutboxEvent: {
+      createMany: async (args: { data: FakeState['outbox']; skipDuplicates?: boolean }) => {
+        let count = 0;
+        for (const row of args.data) {
+          if (state.outbox.some((existing) => existing.businessKey === row.businessKey)) {
+            if (args.skipDuplicates === true) continue;
+            throw new Error('unique constraint: v1_outbox_events_business_key_key');
+          }
+          state.outbox.push({ businessKey: row.businessKey, type: row.type, aggregateId: row.aggregateId, payload: row.payload });
+          count += 1;
+        }
+        return { count };
+      },
     },
     v1GameVisibilityPolicy: {
       findUnique: async () => (options.publicLineupAt === undefined ? null : { lineupAt: options.publicLineupAt }),
@@ -999,6 +1016,50 @@ describe('TeamMatchLineupService.addLateParticipant — 첫 기록 뒤에는 추
 
     expect(state.participants.at(-1)).toMatchObject({ lineupId: 'side-home-lineup', userId: null, displayNameSnapshot: '용병 김' });
     expect(state.links).toHaveLength(0);
+    // 게스트는 받을 사람이 없어 참석명단 포함 알림도 넣지 않는다.
+    expect(state.outbox).toEqual([]);
+  });
+
+  it('[H1 연결] 늦게 추가된 팀원 한 명에게만 "참석명단에 올랐어요" outbox 를 같은 트랜잭션에 넣는다 — 재시도·중복 추가는 한 건', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await service.addLateParticipant(manager, 'team-match-1', 'late-notice', { userId: 'user-3', jerseyNumber: 5 });
+    // 같은 요청 재시도(멱등 키 재사용)와 같은 선수 다시 추가(422)는 outbox 를 늘리지 않는다.
+    await service.addLateParticipant(manager, 'team-match-1', 'late-notice', { userId: 'user-3', jerseyNumber: 5 });
+    await expect(service.addLateParticipant(manager, 'team-match-1', 'late-notice-again', { userId: 'user-3', jerseyNumber: 6 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_DUPLICATE_PARTICIPANT' }),
+    });
+
+    // 제출 때의 키(`…:{lineupId}`)와 달라야 이미 처리된 제출 행에 막혀 버려지지 않는다. payload 의 userId 로 워커가 이 사람만 본다.
+    expect(state.outbox).toEqual([
+      {
+        businessKey: 'team-match-lineup-included:side-home-lineup:user-3',
+        type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION',
+        aggregateId: 'side-home-lineup',
+        payload: { lineupId: 'side-home-lineup', userId: 'user-3' },
+      },
+    ]);
+  });
+
+  it('[H1 연결] 제출 때의 outbox 행이 이미 있어도 늦은 추가의 알림은 따로 들어간다(대조군)', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    state.outbox.push({
+      businessKey: 'team-match-lineup-included:side-home-lineup',
+      type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION',
+      aggregateId: 'side-home-lineup',
+      payload: { lineupId: 'side-home-lineup' },
+    });
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await service.addLateParticipant(manager, 'team-match-1', 'late-after-submit', { userId: 'user-3' });
+
+    expect(state.outbox.map((row) => row.businessKey)).toEqual([
+      'team-match-lineup-included:side-home-lineup',
+      'team-match-lineup-included:side-home-lineup:user-3',
+    ]);
   });
 
   it('같은 잠금 상태에서 빼기·번호 변경(전체 저장)은 409 이고 제출본이 그대로다', async () => {

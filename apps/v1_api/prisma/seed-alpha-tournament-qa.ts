@@ -851,7 +851,8 @@ export async function createScenario(
     promoHomeTitle: scenario.title,
     promoHomeSubtitle: marketing.promoHomeSubtitle,
     promoHomeImageUrl: COVER_IMAGE_URL,
-    promoHomeBadgeText: scenario.status,
+    // 상태값('open' 등)을 배지에 넣으면 카드에 영문 그대로 노출된다 — null 이면 카드가 '추천 대회'로 그린다.
+    promoHomeBadgeText: null,
     promoHomeDateText: scheduledAt.toISOString().slice(0, 10),
     promoHomeTeamsText: '4개 팀',
     promoHomeLocationText: '서울 송파',
@@ -861,7 +862,7 @@ export async function createScenario(
     promoListTitle: scenario.title,
     promoListSubtitle: '신청부터 결과·영상·시상까지 확인하세요',
     promoListImageUrl: COVER_IMAGE_URL,
-    promoListBadgeText: scenario.status,
+    promoListBadgeText: null,
     promoListDateText: scheduledAt.toISOString().slice(0, 10),
     promoListTeamsText: '4개 팀',
     promoListLocationText: '서울 송파',

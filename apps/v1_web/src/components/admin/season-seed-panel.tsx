@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { useV1Teams } from '@/hooks/use-v1-api';
+import { DATE_INPUT_MAX } from '@/lib/kst-calendar';
 import type { V1SeedSeasonPayload } from '@/types/league-series';
 
 /**
@@ -120,6 +121,7 @@ export function SeasonSeedPanel({
           <input
             id="seed-starts-on"
             type="date"
+            max={DATE_INPUT_MAX}
             value={startsOn}
             onChange={(event) => setStartsOn(event.target.value)}
             className="h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -132,6 +134,7 @@ export function SeasonSeedPanel({
           <input
             id="seed-ends-on"
             type="date"
+            max={DATE_INPUT_MAX}
             value={endsOn}
             onChange={(event) => setEndsOn(event.target.value)}
             className="h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"

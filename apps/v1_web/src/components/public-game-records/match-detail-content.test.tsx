@@ -391,3 +391,25 @@ describe('MatchDetailContent — official-only pending result guidance', () => {
     expect(screen.queryByText('공식 결과가 확정되면 점수와 기록이 공개돼요.')).not.toBeInTheDocument();
   });
 });
+
+describe('MatchDetailContent — 공식 확정 대기 문구', () => {
+  const pendingText = '경기 결과가 공식 확정을 기다리고 있어요.';
+
+  it('경기 중(live)에는 pendingProjection 이어도 확정 대기 문구를 보이지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({ status: 'live', pendingProjection: true })} />);
+
+    expect(screen.queryByText(pendingText)).not.toBeInTheDocument();
+  });
+
+  it('경기가 끝난 뒤 pendingProjection 이면 확정 대기 문구를 보인다', () => {
+    render(<MatchDetailContent data={makeDetail({ status: 'ended', pendingProjection: true })} />);
+
+    expect(screen.getByText(pendingText)).toBeInTheDocument();
+  });
+
+  it('pendingProjection 이 아니면 끝난 경기에도 문구가 없다', () => {
+    render(<MatchDetailContent data={makeDetail({ status: 'ended', pendingProjection: false })} />);
+
+    expect(screen.queryByText(pendingText)).not.toBeInTheDocument();
+  });
+});

@@ -315,3 +315,66 @@ describe('경기 명단 관리 — 결장 기간 시트(팀 C)', () => {
     expect(dialog.getByRole('button', { name: '결장 등록' })).toBeDisabled();
   });
 });
+
+describe('경기 명단 관리 — 결장 기간 시트 등록·취소 뒤 상태', () => {
+  async function openSheet() {
+    renderPage();
+    fireEvent.click(within(await playerCard('박서준')).getByRole('button', { name: '박서준 결장 기간' }));
+    return within(await screen.findByRole('dialog', { name: '결장 기간 · 박서준' }));
+  }
+
+  async function register(dialog: ReturnType<typeof within>, from: string, to: string, message: string) {
+    fireEvent.change(dialog.getByLabelText('시작일'), { target: { value: from } });
+    fireEvent.change(dialog.getByLabelText('마지막 날'), { target: { value: to } });
+    fireEvent.click(dialog.getByRole('button', { name: '결장 등록' }));
+    await dialog.findByText(message);
+  }
+
+  it('시작일·마지막 날 입력은 연도를 4자리로 제한하면서 마지막 날 min(시작일)을 유지한다', async () => {
+    const dialog = await openSheet();
+
+    expect(dialog.getByLabelText('시작일')).toHaveAttribute('max', '9999-12-31');
+    const end = dialog.getByLabelText('마지막 날');
+    expect(end).toHaveAttribute('max', '9999-12-31');
+    fireEvent.change(dialog.getByLabelText('시작일'), { target: { value: '2026-10-03' } });
+    expect(end).toHaveAttribute('min', '2026-10-03');
+  });
+
+  it('등록에 성공하면 사유·날짜가 초기값으로 돌아와 방금 등록한 기간이 폼에 남지 않는다', async () => {
+    const dialog = await openSheet();
+    const defaultStart = (dialog.getByLabelText('시작일') as HTMLInputElement).value;
+    const defaultEnd = (dialog.getByLabelText('마지막 날') as HTMLInputElement).value;
+    expect(defaultStart).not.toBe('2026-10-03');
+    fireEvent.click(dialog.getByRole('button', { name: '부상' }));
+
+    await register(dialog, '2026-10-03', '2026-10-05', '결장 기간을 등록했어요.');
+
+    expect(dialog.getByLabelText('시작일')).toHaveValue(defaultStart);
+    expect(dialog.getByLabelText('마지막 날')).toHaveValue(defaultEnd);
+    expect(dialog.getByRole('button', { name: '부상' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('겹치는 다른 결장 기간이 남아 있으면 취소 문구가 그 경기는 계속 빠진다고 알린다', async () => {
+    const dialog = await openSheet();
+    await register(dialog, '2026-10-03', '2026-10-05', '결장 기간을 등록했어요.');
+    await register(dialog, '2026-10-04', '2026-10-08', '결장 기간을 등록했어요.');
+    await waitFor(() => expect(dialog.getAllByRole('button', { name: /결장 취소$/ })).toHaveLength(2));
+
+    fireEvent.click(dialog.getAllByRole('button', { name: /결장 취소$/ })[0]);
+
+    expect(await dialog.findByText('결장 기간을 취소했어요. 다른 결장 기간에 걸린 경기는 계속 빠져요.')).toBeInTheDocument();
+    await waitFor(() => expect(dialog.getAllByRole('button', { name: /결장 취소$/ })).toHaveLength(1));
+  });
+
+  it('겹치지 않는 기간만 남았으면 취소한 기간 경기가 다시 출전으로 돌아간다고 알린다', async () => {
+    const dialog = await openSheet();
+    await register(dialog, '2026-10-03', '2026-10-05', '결장 기간을 등록했어요.');
+    await register(dialog, '2026-10-20', '2026-10-22', '결장 기간을 등록했어요.');
+    await waitFor(() => expect(dialog.getAllByRole('button', { name: /결장 취소$/ })).toHaveLength(2));
+
+    fireEvent.click(dialog.getAllByRole('button', { name: /결장 취소$/ })[0]);
+
+    expect(await dialog.findByText('결장 기간을 취소했어요. 그 기간 경기에 다시 출전으로 들어가요.')).toBeInTheDocument();
+    await waitFor(() => expect(dialog.getAllByRole('button', { name: /결장 취소$/ })).toHaveLength(1));
+  });
+});

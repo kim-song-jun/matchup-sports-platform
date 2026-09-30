@@ -184,4 +184,17 @@ describe('AdminLeagueMatchNewPage', () => {
     const notice = await screen.findByText(/^순위 규칙:/);
     expect(notice.textContent).toBe('순위 규칙: 승점 → 골득실 → 다득점 → 승자승 → 최소 실점 (고정값 — 리그별 변경 미지원)');
   });
+
+  it('시작일·종료일 입력은 연도를 4자리로 제한한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1MasterSportsMock.mockReturnValue({ data: [] } as never);
+    useV1MasterRegionsMock.mockReturnValue({ data: [] } as never);
+    useV1TeamsMock.mockReturnValue({ data: { items: [], nextCursor: null }, isFetching: false } as never);
+
+    renderPage();
+
+    expect(await screen.findByLabelText('시작일')).toHaveAttribute('max', '9999-12-31');
+    expect(screen.getByLabelText('종료일')).toHaveAttribute('max', '9999-12-31');
+  });
 });

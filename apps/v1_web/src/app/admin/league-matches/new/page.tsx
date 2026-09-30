@@ -12,6 +12,7 @@ import {
   useV1Teams,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { DATE_INPUT_MAX } from '@/lib/kst-calendar';
 import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 
@@ -169,11 +170,11 @@ export default function AdminLeagueMatchNewPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="series-starts-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작일</label>
-            <input id="series-starts-on" type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} className={inputClass} />
+            <input id="series-starts-on" type="date" max={DATE_INPUT_MAX} value={startsOn} onChange={(e) => setStartsOn(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label htmlFor="series-ends-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종료일</label>
-            <input id="series-ends-on" type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} className={inputClass} />
+            <input id="series-ends-on" type="date" max={DATE_INPUT_MAX} value={endsOn} onChange={(e) => setEndsOn(e.target.value)} className={inputClass} />
           </div>
         </div>
 

@@ -18,9 +18,7 @@ import {
   useV1SetParticipantArrival,
 } from './use-v1-game-operations';
 import { usePublicLeagueFixtureRecord, usePublicMatch } from '@/components/public-game-records/use-public-game-records';
-import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import {
-  useV1AdminRegistrationGameRosterList,
   useV1AdminRegistrationGameRosters,
   useV1ApplyGameRosterBatch,
   useV1CreateMemberUnavailability,
@@ -299,31 +297,6 @@ describe('운영 콘솔 전원 도착(일괄 검인)', () => {
 
     await waitFor(() => expect(fetched(READERS.fixtureLineup)).toBe(2));
     await waitFor(() => expect(fetched(READERS.opsLineup1)).toBe(2));
-  });
-});
-
-describe('운영 보드 명단 요약', () => {
-  afterEach(() => vi.useRealTimers());
-
-  it('보드 본체와 같은 주기로 다시 받는다', async () => {
-    // 주기 타이머만 가짜로 — waitFor 도 setInterval 로 재시도하므로 여기선 setTimeout 으로 기다린다.
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    const until = async (check: () => boolean) => {
-      for (let i = 0; i < 100 && !check(); i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(check()).toBe(true);
-    };
-    const { tournamentId, registrationId } = GAME_ROSTER_MSW;
-    const path = `/api/v1/admin/tournaments/${tournamentId}/registrations/${registrationId}/game-rosters`;
-    const { result } = renderHook(() => useV1AdminRegistrationGameRosterList(tournamentId, [registrationId]), {
-      wrapper: wrapper(),
-    });
-    await until(() => result.current[0]?.isSuccess === true);
-    vi.advanceTimersByTime(OPERATIONS_BOARD_POLL_INTERVAL_MS - 1);
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(gets(path)).toBe(1);
-
-    vi.advanceTimersByTime(1);
-    await until(() => gets(path) === 2);
   });
 });
 

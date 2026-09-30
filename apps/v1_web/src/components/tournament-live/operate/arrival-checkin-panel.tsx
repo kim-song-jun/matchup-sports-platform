@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
 import { latestLineupForDisplay } from './lineup-grid';
@@ -27,7 +28,28 @@ import { latestLineupForDisplay } from './lineup-grid';
  * 사람은 "명단에 있는데 안 온 사람" 이고, 그건 이 축 하나로 표현된다.
  */
 
+/**
+ * 검인 대상과 도착 수 — 패널과 "킥오프 준비" 체크리스트가 같은 수를 말해야 하므로 한 곳에서 센다.
+ * 폴백(제출본이 없으면 초안)을 쓰는 이유는 패널 안 주석을 따른다.
+ */
+export function arrivalProgress(sides: readonly GameSide[], lineups: readonly GameLineup[]) {
+  const sections = sides.map((side) => ({
+    side,
+    participants: latestLineupForDisplay(lineups, side.id)?.participants ?? [],
+  }));
+  const total = sections.reduce((sum, section) => sum + section.participants.length, 0);
+  const arrived = sections.reduce(
+    (sum, section) => sum + section.participants.filter((p) => p.arrivedAt !== null).length,
+    0,
+  );
+  return { sections, total, arrived };
+}
+
 export interface ArrivalCheckinPanelProps {
+  /** 제목. 킥오프 준비 체크리스트 안에서는 "킥오프 준비"로 바꿔 쓴다. */
+  readonly title?: string;
+  /** 팀 이름 줄 아래에 붙는 부가 정보(예: 그 팀의 명단 요약). */
+  readonly sideAccessory?: (side: GameSide) => ReactNode;
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
   readonly onToggleArrival: (input: { participantId: string; arrived: boolean }) => void;
@@ -45,6 +67,8 @@ export interface ArrivalCheckinPanelProps {
 }
 
 export function ArrivalCheckinPanel({
+  title = '명단 검인',
+  sideAccessory,
   sides,
   lineups,
   onToggleArrival,
@@ -53,17 +77,9 @@ export function ArrivalCheckinPanel({
   pendingParticipantId = null,
   pendingSideId = null,
 }: ArrivalCheckinPanelProps) {
-  const sections = sides.map((side) => ({
-    side,
-    // 폴백을 써야 한다 -- 제출본만 보면 미제출 상태로 시작한 경기에서 **검인할 대상이
-    // 통째로 비고**, 그러면 P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수가 없다.
-    participants: latestLineupForDisplay(lineups, side.id)?.participants ?? [],
-  }));
-  const total = sections.reduce((sum, section) => sum + section.participants.length, 0);
-  const arrived = sections.reduce(
-    (sum, section) => sum + section.participants.filter((p) => p.arrivedAt !== null).length,
-    0,
-  );
+  // 폴백을 써야 한다 -- 제출본만 보면 미제출 상태로 시작한 경기에서 **검인할 대상이
+  // 통째로 비고**, 그러면 P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수가 없다.
+  const { sections, total, arrived } = arrivalProgress(sides, lineups);
 
   if (total === 0) {
     return (
@@ -76,9 +92,9 @@ export function ArrivalCheckinPanel({
   }
 
   return (
-    <section className="flex flex-col gap-3 px-4" aria-label="명단 검인">
+    <section className="flex flex-col gap-3 px-4" aria-label={title}>
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold">명단 검인</h3>
+        <h3 className="text-sm font-semibold">{title}</h3>
         {/* 진행 상황을 숫자로 먼저 보여준다 — 스태프가 알고 싶은 건 개별 이름이 아니라
             "몇 명 남았나"이고, 그게 다음 행동(더 기다릴지 시작할지)을 결정한다. */}
         <p className="text-xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
@@ -106,6 +122,7 @@ export function ArrivalCheckinPanel({
               )
             ) : null}
           </div>
+          {sideAccessory ? sideAccessory(side) : null}
           {participants.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">제출된 명단이 없어요.</p>
           ) : (

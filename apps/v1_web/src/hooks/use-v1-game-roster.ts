@@ -1,12 +1,11 @@
 'use client';
 
-import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type { GameRosterAdjustmentReason, MemberUnavailabilityReason } from '@/lib/v1-status-labels';
 import type { V1GameState } from '@/types/api';
 import type { V1GameRosterSummary } from '@/hooks/use-v1-api';
-import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 
 /**
@@ -391,24 +390,5 @@ export function useV1AdminRegistrationGameRosters(
     },
     enabled: (options?.enabled ?? true) && Boolean(tournamentId) && Boolean(registrationId),
     retry: false,
-  });
-}
-
-/**
- * 운영 보드 — 보이는 시작 전 경기의 참가 신청 여러 개를 한 번에. 경기마다 명단을 부르지 않고
- * 팀(신청)마다 한 번씩 표를 받는다(표 한 장이 그 팀의 시작 전 경기 전부를 싣는다).
- * 팀장이 다른 기기에서 빼거나 앞 경기 결과로 출전정지가 생겨도 보이게 보드 본체와 같은 주기로 다시 받는다.
- */
-export function useV1AdminRegistrationGameRosterList(tournamentId: string, registrationIds: readonly string[]) {
-  return useQueries({
-    queries: registrationIds.map((registrationId) => ({
-      queryKey: v1Keys.adminRegistrationGameRosters(tournamentId, registrationId),
-      queryFn: () =>
-        v1Get<V1AdminRegistrationRosterMatrix>(
-          `/admin/tournaments/${tournamentId}/registrations/${registrationId}/game-rosters`,
-        ),
-      retry: false,
-      refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
-    })),
   });
 }

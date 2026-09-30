@@ -101,14 +101,6 @@ export function WarningBadge({ code }: { code: V1TournamentOperationsWarningCode
   return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
 }
 
-/**
- * 코드가 아니라 문장이 경고인 칩 — 경기별 명단 요약("레드팀 · 빠짐 2 · 정지 1")처럼 숫자가 담긴
- * 것. 모양은 다른 경고 배지와 같다(한 줄 고정이라 숫자 사이에서 꺾이지 않는다).
- */
-export function TextWarningBadge({ label }: { label: string }) {
-  return <Pill tone="amber" icon={<UserX size={12} aria-hidden="true" />} label={label} />;
-}
-
 // ── 스태프 역할 라벨 ───────────────────────────────────────────────────────
 export const STAFF_ROLE_LABELS: Record<V1TournamentStaffRole, string> = {
   PLATFORM_OPS: '플랫폼 운영자',

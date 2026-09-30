@@ -45,7 +45,7 @@ import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
-import { ArrivalCheckinPanel } from './arrival-checkin-panel';
+import { KickoffChecklist } from './kickoff-checklist';
 import { ConsoleNextSteps } from './console-next-steps';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { RestTimer } from './rest-timer';
@@ -1553,7 +1553,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           차지해야 하고, 그때까지도 안 온 사람은 애초에 라인업에서 빠졌어야 한다.
           takeover 를 쥔 운영자만 조작할 수 있게 하는 것도 다른 액션과 동일하다. */}
       {gameState === 'SCHEDULED' && (
-        <ArrivalCheckinPanel
+        <KickoffChecklist
+          gameId={gameId}
           sides={sides}
           lineups={lineups}
           disabled={!canOperate || commandBlocked}

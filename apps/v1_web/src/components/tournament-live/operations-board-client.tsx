@@ -18,24 +18,15 @@ import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/
 import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { useGameResultRevisions } from '@/hooks/use-tournament-result-review';
-import { useV1AdminRegistrationGameRosterList } from '@/hooks/use-v1-game-roster';
-import {
-  boardRosterAlerts,
-  boardRosterLinkActions,
-  boardRosterRegistrationIds,
-  indexBoardRosters,
-  type BoardRosterSideState,
-} from '@/components/game-roster/operations-board-roster';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
-import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
-import { GameStateBadge, TextWarningBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
+import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
@@ -379,29 +370,6 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const items = useMemo(() => [...(board.data?.items ?? []), ...olderItems], [board.data?.items, olderItems]);
   const nextCursor = olderCursor !== undefined ? olderCursor : (board.data?.nextCursor ?? null);
 
-  // 경기 카드의 명단 요약 — 경기마다 명단을 부르지 않고 보이는 시작 전 경기의 팀(참가 신청)마다 표 한 장.
-  const rosterRegistrationIds = useMemo(() => boardRosterRegistrationIds(items), [items]);
-  const rosterQueries = useV1AdminRegistrationGameRosterList(tournamentId, rosterRegistrationIds);
-  const rosterIndex = indexBoardRosters(rosterQueries.flatMap((query) => (query.data === undefined ? [] : [query.data])));
-  const failedRosterIds = new Set(rosterRegistrationIds.filter((_, index) => rosterQueries[index]?.isError === true));
-  const currentHref = useCurrentHref();
-
-  function rosterSide(item: V1TournamentOperationsBoardItem, which: 'home' | 'away'): BoardRosterSideState {
-    const registrationId = which === 'home' ? item.homeRegistrationId : item.awayRegistrationId;
-    const names = teamNamesByFixtureId.get(item.fixtureId);
-    return {
-      registrationId,
-      name: names ? names[which] : null,
-      side: registrationId === null || item.gameId === null ? null : (rosterIndex.games.get(item.gameId)?.get(registrationId) ?? null),
-      teamId: registrationId === null ? null : (rosterIndex.teamIds.get(registrationId) ?? null),
-      failed: registrationId !== null && failedRosterIds.has(registrationId),
-    };
-  }
-
-  function rosterAlerts(item: V1TournamentOperationsBoardItem): string[] {
-    return boardRosterAlerts(item, rosterSide(item, 'home'), rosterSide(item, 'away'));
-  }
-
   function rowLabel(item: V1TournamentOperationsBoardItem): string {
     const names = teamNamesByFixtureId.get(item.fixtureId);
     if (names) return `${names.home} vs ${names.away}`;
@@ -426,7 +394,8 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   /**
    * ⋯ 시트의 항목. 결과 정정·보기는 제출되거나 확정된 결과가 있는 경기에만 둔다 — 아직 안 치른
-   * 경기에 비활성 버튼을 두면 "왜 못 누르지"만 남는다(F55). 팀별 명단은 시작 전 경기에서만 열린다.
+   * 경기에 비활성 버튼을 두면 "왜 못 누르지"만 남는다(F55). 팀별 명단 요약과 명단 화면 링크는 콘솔의
+   * "킥오프 준비"로 옮겼다 — 킥오프를 준비하는 자리가 그곳이다.
    */
   function rowActions(item: V1TournamentOperationsBoardItem): ActionSheetAction[] {
     const actions: ActionSheetAction[] = [];
@@ -441,9 +410,6 @@ export function OperationsBoardClient({ tournamentId }: Props) {
         },
       });
     }
-    actions.push(
-      ...boardRosterLinkActions(item, rosterSide(item, 'home'), rosterSide(item, 'away'), currentHref),
-    );
     return actions;
   }
 
@@ -694,13 +660,10 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="flex flex-wrap gap-1">
-                          {rowWarnings(item).length === 0 && rosterAlerts(item).length === 0 ? (
+                          {rowWarnings(item).length === 0 ? (
                             <span className="text-[length:var(--font-size-caption)] text-gray-300 dark:text-gray-600">—</span>
                           ) : (
-                            <>
-                              {rowWarnings(item).map((code) => <WarningBadge key={code} code={code} />)}
-                              {rosterAlerts(item).map((text) => <TextWarningBadge key={text} label={text} />)}
-                            </>
+                            rowWarnings(item).map((code) => <WarningBadge key={code} code={code} />)
                           )}
                         </div>
                       </td>
@@ -768,13 +731,10 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     <FixtureResultCell item={item} align="right" />
                   </div>
                 </div>
-                {(rowWarnings(item).length > 0 || rosterAlerts(item).length > 0) && (
+                {rowWarnings(item).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {rowWarnings(item).map((code) => (
                       <WarningBadge key={code} code={code} />
-                    ))}
-                    {rosterAlerts(item).map((text) => (
-                      <TextWarningBadge key={text} label={text} />
                     ))}
                   </div>
                 )}

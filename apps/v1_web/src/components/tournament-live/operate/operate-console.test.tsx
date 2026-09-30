@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   })),
   useTournamentOpsRole: vi.fn(),
   confirmSideArrival: vi.fn(),
+  useV1TeamGameRoster: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -42,6 +43,10 @@ vi.mock('@/hooks/use-v1-game-operations', () => ({
   useV1SetParticipantArrival: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
   // 팀별 "전원 도착" 일괄 검인 — 호출 인자만 본다(서버 계약은 API 스펙이 검증한다).
   useV1ConfirmSideArrival: () => ({ mutate: mocks.confirmSideArrival, isPending: false, variables: undefined }),
+}));
+// 킥오프 준비 체크리스트의 팀별 명단 요약(빠짐·정지). 요약 자체의 표시 규칙은 kickoff-checklist.test 가 본다.
+vi.mock('@/hooks/use-v1-game-roster', () => ({
+  useV1TeamGameRoster: (...args: unknown[]) => mocks.useV1TeamGameRoster(...args),
 }));
 vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
@@ -134,6 +139,11 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
 // 지운다(mockClear, 각 describe가 이미 따로 설정하는 mockResolvedValue
 // 구현 자체는 건드리지 않는다).
 beforeEach(() => {
+  mocks.useV1TeamGameRoster.mockReturnValue({
+    data: { counts: { base: 10, participating: 9, excluded: 1, unavailable: 0, suspended: 0 } },
+    isPending: false,
+    isError: false,
+  });
   mocks.postV1GameCommand.mockClear();
   mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
 });
@@ -747,6 +757,60 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(mocks.confirmSideArrival.mock.calls[0][0]).toBe('side-away');
       // 기본값은 전원 미확인 — 버튼을 누르기 전에 도착으로 그려지는 사람이 없다.
       expect(screen.getByRole('switch', { name: /홈선수1/ })).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('경기 시작 전 콘솔은 "킥오프 준비"로 팀별 명단 요약과 도착 확인을 한 자리에 보인다', () => {
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      const checklist = screen.getByRole('region', { name: '킥오프 준비' });
+      expect(within(checklist).getAllByText('빠짐 1 · 정지 0').length).toBeGreaterThan(0);
+      expect(within(checklist).getByRole('switch', { name: /홈선수1/ })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: '명단 검인' })).toBeNull();
+    });
+
+    it('준비가 끝나면 경기 시작으로 이어지고, 시작하면 킥오프 준비는 사라진다', async () => {
+      // 두 팀 모두 도착 확인이 끝난 상태.
+      scheduledWithRosters();
+      const lineupData = mocks.useV1FixtureLineup().data;
+      mocks.useV1FixtureLineup.mockReturnValue({
+        ...mocks.useV1FixtureLineup(),
+        data: {
+          ...lineupData,
+          lineups: lineupData.lineups.map((lineup: { participants: Array<Record<string, unknown>> }) => ({
+            ...lineup,
+            participants: lineup.participants.map((row) => ({ ...row, arrivedAt: '2026-09-30T00:50:00.000Z' })),
+          })),
+        },
+      });
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText('준비가 끝났어요. ‘경기 시작’을 눌러 주세요.')).toBeInTheDocument();
+
+      // 안내가 가리키는 그 버튼이 조작 줄에 있고, 누르면 확인 뒤 start 가 나간다.
+      fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '경기 시작' }));
+      await waitFor(() =>
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start', expect.anything()),
+      );
+
+      // 서버가 LIVE 로 옮기면 체크리스트 자리는 이벤트 기록이 차지한다.
+      gameWithPeriods('LIVE', [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }]);
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'LIVE' } }));
+      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      expect(screen.queryByRole('region', { name: '킥오프 준비' })).toBeNull();
+      expect(screen.queryByText('준비가 끝났어요. ‘경기 시작’을 눌러 주세요.')).toBeNull();
+    });
+
+    it('미확인이 남아 있어도 경기 시작 버튼은 막히지 않는다 — 체크리스트는 조건이 아니라 안내다', () => {
+      scheduledWithRosters();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText(/그래도 ‘경기 시작’은 누를 수 있어요/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     });
 
     it('경기가 시작된 뒤에는 검인 패널(과 전원 도착 버튼)이 없다', () => {

@@ -335,6 +335,7 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     });
     scheduleApiMocks.useV1TeamMatch.mockReturnValue({
       data: {
+        hostTeamId: 'team-1',
         approvedOpponentTeam: { teamId: 'team-2', name: 'E2E 알파 B팀' },
         place: { name: '(테스트) 알파 구장' },
       },

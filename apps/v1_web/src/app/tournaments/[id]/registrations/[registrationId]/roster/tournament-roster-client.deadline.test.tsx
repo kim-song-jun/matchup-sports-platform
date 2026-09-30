@@ -700,6 +700,86 @@ describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
   });
 });
 
+// F98: 리그 참가 명단 화면이 리그 기간 대신 "일정 미정" 을, 리그 말투 대신 "대회" 를 말했다.
+// 종료 여부는 서버가 준 status 그대로 판정하고(진행 중이면 막지 않는다), 표시만 리그 말투로 한다.
+describe('TournamentRosterPageClient — 정규 리그 표시', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'member' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [memberViewPlayer()], belowMinimum: false, personalInfoVisible: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+  });
+
+  function mockCompetition(kind: 'regular_league' | 'regular_tournament', status: string) {
+    useV1TournamentMock.mockReturnValue({
+      data: {
+        kind,
+        status,
+        minPlayers: 5,
+        maxPlayers: 20,
+        rosterDeadlineAt: null,
+        // 리그 거울 행은 신청 마감이 없고 기간은 scheduledAt/scheduledEndAt 에 있다.
+        registrationDeadlineAt: kind === 'regular_league' ? null : '2099-01-01T00:00:00.000Z',
+        scheduledAt: '2026-09-29T15:00:00.000Z',
+        scheduledEndAt: '2026-11-30T14:59:59.999Z',
+      },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+  }
+
+  it('진행 중 리그: 리그 기간과 "진행 중" 이 보이고 종료·일정 미정 문구는 없다', () => {
+    mockCompetition('regular_league', 'in_progress');
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(screen.getByText('리그 기간')).toBeInTheDocument();
+    expect(screen.getByText('2026년 9월 30일 (수) ~ 2026년 11월 30일 (월)')).toBeInTheDocument();
+    expect(screen.getByText('진행 중')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('일정 미정');
+    expect(container.textContent).not.toContain('종료');
+    expect(container.textContent).not.toContain('대회 신청 마감');
+  });
+
+  it('종료된 리그: 종료 안내는 남기되 "대회" 가 아니라 "리그" 로 말한다', () => {
+    mockCompetition('regular_league', 'completed');
+
+    const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+
+    expect(screen.getAllByText('리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length).toBeGreaterThan(0);
+    expect(container.textContent).not.toContain('대회가');
+    expect(screen.getByText('리그 기간')).toBeInTheDocument();
+  });
+
+  it('대조군: 종료된 대회는 기존 "대회" 문구와 신청 마감 표시 그대로다', () => {
+    mockCompetition('regular_tournament', 'completed');
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getAllByText('대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.').length).toBeGreaterThan(0);
+    expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
+    expect(screen.queryByText('리그 기간')).not.toBeInTheDocument();
+  });
+});
+
 describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받은 from 을 잇는다', () => {
   afterEach(() => {
     vi.clearAllMocks();

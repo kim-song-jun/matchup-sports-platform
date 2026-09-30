@@ -72,6 +72,15 @@ describe('tournamentRosterClosedMessage', () => {
     expect(tournamentRosterClosedMessage('cancelled')).toContain('종료되었거나 취소돼');
     expect(tournamentRosterClosedMessage('draft')).toBe('대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.');
   });
+
+  it('calls a regular league a league, and leaves tournaments and unfilled kinds as "대회"', () => {
+    expect(tournamentRosterClosedMessage('completed', 'regular_league')).toBe(
+      '리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.',
+    );
+    expect(tournamentRosterClosedMessage('cancelled', 'regular_league')).toContain('리그가');
+    expect(tournamentRosterClosedMessage('completed', 'regular_tournament')).toContain('대회가 종료되었거나');
+    expect(tournamentRosterClosedMessage('completed', null)).toContain('대회가 종료되었거나');
+  });
 });
 
 // 감사 finding #49: 명단 추가 화면이 실명·생년월일·휴대폰만 보고 "선택 가능"으로 표시해,

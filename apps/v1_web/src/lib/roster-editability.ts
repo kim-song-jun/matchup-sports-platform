@@ -28,11 +28,18 @@ export function isTournamentRosterMutable(
   return tournament.kind === 'regular_league' && tournament.status === 'draft';
 }
 
-/** 명단을 못 고치는 이유를 사실대로 말한다 — 아직 공개 전인 대회를 "종료·취소"로 안내하지 않는다. */
-export function tournamentRosterClosedMessage(status: string | null | undefined): string {
+/**
+ * 명단을 못 고치는 이유를 사실대로 말한다 — 아직 공개 전인 대회를 "종료·취소"로 안내하지 않는다.
+ * 정규 리그(`kind === 'regular_league'`)는 "대회" 대신 "리그"라고 부른다.
+ */
+export function tournamentRosterClosedMessage(
+  status: string | null | undefined,
+  kind?: string | null,
+): string {
+  const subject = kind === 'regular_league' ? '리그' : '대회';
   return status === 'completed' || status === 'cancelled'
-    ? '대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'
-    : '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.';
+    ? `${subject}가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.`
+    : `${subject}가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.`;
 }
 
 export type RosterDeadlineState = {

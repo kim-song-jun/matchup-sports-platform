@@ -21,13 +21,15 @@ import { josa } from '@/lib/korean';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
-import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { formatTournamentDateRangeLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { withFromPath } from '@/lib/session-storage';
 import type {
   V1TournamentRosterPlayer,
   V1PlayerEligibilityStatus,
   V1TeamMembersPage,
   V1TournamentGenderCategory,
+  V1TournamentStatus,
 } from '@/types/api';
 
 /**
@@ -113,9 +115,15 @@ export function TournamentRosterDeadlineCard({
   isRosterDeadlineBlocked,
   canManageRoster = true,
   permissionResolved = true,
+  season,
   nowMs,
 }: {
   deadlineAt: string | null;
+  /**
+   * 정규 리그일 때만 넘긴다. 리그에는 신청 마감이 없어 `deadlineAt` 이 항상 null 이므로
+   * 그 자리에 시즌 기간과 리그 상태를 보여 준다(대회는 생략 → 기존 신청 마감 표시).
+   */
+  season?: { startAt: string | null; endAt: string | null; status: V1TournamentStatus } | null;
   /** 대회 상태 때문에 누구도 명단을 못 고치는 상태 — 잠금·마감보다 우선한다(서버 assertRosterMutable과 동일 순서). */
   isTournamentRosterClosed?: boolean;
   /** 막힌 이유 문구를 고르는 데 쓴다(종료·취소 ≠ 아직 공개 전). */
@@ -136,11 +144,18 @@ export function TournamentRosterDeadlineCard({
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
-  const deadlineBadge = deadlineState === 'upcoming'
-    ? { label: '신청 접수 중', className: 'tm-badge-green' }
-    : deadlineState === 'closed'
-      ? { label: '신청 마감', className: 'tm-badge-grey' }
-      : { label: '일정 미정', className: 'tm-badge-grey' };
+  const seasonStatus = season ? getTournamentStatusConfig(season.status) : null;
+  const deadlineBadge = seasonStatus
+    ? { label: seasonStatus.label, className: seasonStatus.badgeClass }
+    : deadlineState === 'upcoming'
+      ? { label: '신청 접수 중', className: 'tm-badge-green' }
+      : deadlineState === 'closed'
+        ? { label: '신청 마감', className: 'tm-badge-grey' }
+        : { label: '일정 미정', className: 'tm-badge-grey' };
+  const headerLabel = season ? '리그 기간' : '대회 신청 마감';
+  const headerValue = season
+    ? formatTournamentDateRangeLong(season.startAt, season.endAt)
+    : formatTournamentDateTimeLong(deadlineAt);
   const canEditRoster =
     canManageRoster &&
     !isTournamentRosterClosed && !isRosterLocked && !isRosterEditBlockedByStatus && !isRosterDeadlineBlocked;
@@ -158,24 +173,26 @@ export function TournamentRosterDeadlineCard({
   const rosterEditMessage = !canManageRoster
     ? '선수 명단은 확인할 수 있어요. 추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요.'
     : isTournamentRosterClosed
-    ? tournamentRosterClosedMessage(tournamentStatus)
+    ? tournamentRosterClosedMessage(tournamentStatus, season ? 'regular_league' : null)
       : isRosterLocked
         ? '선수 명단이 운영진에 의해 마감됐어요.'
         : isRosterEditBlockedByStatus
           ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
           : isRosterDeadlineBlocked
             ? '선수 명단 제출 기간이 종료됐어요.'
-            : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
+            : season
+              ? '운영진이 명단을 잠그기 전까지 수정할 수 있어요.'
+              : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
 
   return (
     <Card pad={16} style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
-            대회 신청 마감
+            {headerLabel}
           </div>
           <div className={'tm-text-label'} style={{ color: 'var(--text-strong)', fontWeight: 700, marginTop: 4 }}>
-            {formatTournamentDateTimeLong(deadlineAt)}
+            {headerValue}
           </div>
         </div>
         <span className={`tm-badge ${deadlineBadge.className}`} style={{ flexShrink: 0 }}>
@@ -1403,6 +1420,11 @@ export function TournamentRosterPageClient({
             isRosterDeadlineBlocked={rosterDeadlineState.blocked}
             canManageRoster={canManageRoster}
             permissionResolved={teamPermissionResolved}
+            season={
+              tournament.kind === 'regular_league'
+                ? { startAt: tournament.scheduledAt, endAt: tournament.scheduledEndAt, status: tournament.status }
+                : null
+            }
           />
         ) : null}
 
@@ -1441,7 +1463,7 @@ export function TournamentRosterPageClient({
         */}
         {isTournamentRosterClosed ? (
           <div style={{ marginBottom: 16 }}>
-            <AlertBanner message={tournamentRosterClosedMessage(tournament?.status)} tone="info" />
+            <AlertBanner message={tournamentRosterClosedMessage(tournament?.status, tournament?.kind)} tone="info" />
           </div>
         ) : isRosterLocked && rosterDeadlineState.overridden ? (
           <div style={{ marginBottom: 16 }}>

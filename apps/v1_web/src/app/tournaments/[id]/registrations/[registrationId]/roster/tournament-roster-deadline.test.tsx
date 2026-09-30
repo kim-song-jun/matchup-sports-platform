@@ -95,4 +95,74 @@ describe('TournamentRosterDeadlineCard', () => {
     expect(screen.getByText('수정 불가')).toBeInTheDocument();
     expect(screen.getByText('대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.')).toBeInTheDocument();
   });
+
+  // F98: 정규 리그에는 신청 마감이 없다. 예전엔 그 자리가 항상 "일정 미정 · 일정 미정" 이었다.
+  describe('정규 리그(season)', () => {
+    const season = (status: 'in_progress' | 'completed' | 'cancelled') => ({
+      // KST 2026-09-30 00:00 ~ 2026-11-30 23:59 — 서버가 내려주는 시즌 기간 그대로다.
+      startAt: '2026-09-29T15:00:00.000Z',
+      endAt: '2026-11-30T14:59:59.999Z',
+      status,
+    });
+
+    it('진행 중 리그는 신청 마감 대신 리그 기간과 "진행 중" 을 보여 주고 종료 문구를 내지 않는다', () => {
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={null}
+          season={season('in_progress')}
+          tournamentStatus="in_progress"
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+        />,
+      );
+
+      expect(screen.getByText('리그 기간')).toBeInTheDocument();
+      expect(screen.getByText('2026년 9월 30일 (수) ~ 2026년 11월 30일 (월)')).toBeInTheDocument();
+      expect(screen.getByText('진행 중')).toBeInTheDocument();
+      expect(screen.queryByText('대회 신청 마감')).not.toBeInTheDocument();
+      expect(screen.queryByText('일정 미정')).not.toBeInTheDocument();
+      expect(screen.getByText('수정 가능')).toBeInTheDocument();
+      // 리그에는 "대회 신청 마감" 이 없으니 그와 "별개" 라는 안내도 말이 안 된다.
+      expect(screen.getByText('운영진이 명단을 잠그기 전까지 수정할 수 있어요.')).toBeInTheDocument();
+      expect(screen.queryByText(/종료/)).not.toBeInTheDocument();
+    });
+
+    it('종료된 리그는 리그 말투로 종료를 알린다', () => {
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={null}
+          season={season('completed')}
+          isTournamentRosterClosed
+          tournamentStatus="completed"
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+        />,
+      );
+
+      expect(screen.getByText('리그 기간')).toBeInTheDocument();
+      expect(screen.getByText('종료')).toBeInTheDocument();
+      expect(
+        screen.getByText('리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/대회가/)).not.toBeInTheDocument();
+    });
+
+    it('대조군: season 을 안 넘기는 대회는 기존 신청 마감 표시 그대로다', () => {
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={'2026-07-20T18:30:00+09:00'}
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+          nowMs={new Date('2026-07-20T17:00:00+09:00').getTime()}
+        />,
+      );
+
+      expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
+      expect(screen.queryByText('리그 기간')).not.toBeInTheDocument();
+      expect(screen.getByText('신청 접수 중')).toBeInTheDocument();
+    });
+  });
 });

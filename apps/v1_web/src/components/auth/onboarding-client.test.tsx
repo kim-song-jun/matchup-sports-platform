@@ -8,6 +8,10 @@ const router = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
+const fixtures = vi.hoisted(() => ({
+  regions: [] as unknown[],
+}));
+
 const hooks = vi.hoisted(() => ({
   savePreferencesMutate: vi.fn(),
   completeOnboardingMutate: vi.fn(),
@@ -22,6 +26,13 @@ const analytics = vi.hoisted(() => ({
 const FUTSAL_SPORT_ID = '22222222-2222-4222-8222-222222222222';
 
 const FUTSAL_LEVEL_ID = '33333333-3333-4333-8333-333333333333';
+const SEOUL_ID = '44444444-4444-4444-8444-444444444444';
+const MAPO_ID = '55555555-5555-4555-8555-555555555555';
+const BUSAN_ID = '66666666-6666-4666-8666-666666666666';
+const regionsFixture = [
+  { id: SEOUL_ID, name: '서울', parentId: null, level: 1, children: [{ id: MAPO_ID, name: '마포구', parentId: SEOUL_ID, level: 2 }] },
+  { id: BUSAN_ID, name: '부산', parentId: null, level: 1, children: [] },
+];
 const sportsFixture = [
   { id: FUTSAL_SPORT_ID, code: 'futsal', name: '풋살', levels: [{ id: '33333333-3333-4333-8333-333333333333', name: '초급' }] },
 ];
@@ -35,7 +46,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AuthMe: () => ({ data: { user: { id: 'user-1' } } }),
   useV1Onboarding: () => ({ data: { sports: [], regions: [] }, isLoading: false, isError: false, refetch: vi.fn() }),
   useV1MasterSports: () => ({ data: sportsFixture, isLoading: false, isError: false, refetch: vi.fn() }),
-  useV1MasterRegions: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useV1MasterRegions: () => ({ data: fixtures.regions, isLoading: false, isError: false, refetch: vi.fn() }),
   useV1SaveOnboardingPreferences: () => ({ mutate: hooks.savePreferencesMutate, isPending: false }),
   useV1CompleteOnboarding: () => ({ mutate: hooks.completeOnboardingMutate, isPending: false }),
   useV1DeferOnboarding: () => ({ mutate: hooks.deferOnboardingMutate, isPending: false }),
@@ -60,7 +71,11 @@ describe('OnboardingClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    fixtures.regions = [];
     hooks.savePreferencesMutate.mockImplementation((_body: unknown, callbacks: SaveCallbacks) => callbacks.onSuccess());
+    hooks.deferOnboardingMutate.mockImplementation((_body: unknown, callbacks: CompleteCallbacks) =>
+      callbacks.onSuccess({ next: { route: '/home' } }),
+    );
     hooks.completeOnboardingMutate.mockImplementation((_arg: unknown, callbacks: CompleteCallbacks) =>
       callbacks.onSuccess({ next: { route: '/home' } }),
     );
@@ -165,7 +180,7 @@ describe('OnboardingClient GA events', () => {
     expect(subscribe).not.toHaveBeenCalled();
   });
 
-  it('renders a 알림 받기 button on the confirm step that triggers subscribe() via explicit click', async () => {
+  it('renders a 켜기 button on the confirm step that triggers subscribe() via explicit click', async () => {
     const subscribe = vi.fn().mockResolvedValue(undefined);
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe,
@@ -183,12 +198,12 @@ describe('OnboardingClient GA events', () => {
     // Not called just from rendering the confirm step.
     expect(subscribe).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '알림 받기' }));
+    fireEvent.click(screen.getByRole('button', { name: '알림 켜기' }));
 
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
   });
 
-  it('shows the subscribed state on the 알림 받기 button once isSubscribed is true', () => {
+  it('shows the subscribed state on the 알림 row once isSubscribed is true', () => {
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
@@ -202,7 +217,149 @@ describe('OnboardingClient GA events', () => {
     );
     render(<OnboardingClient step="confirm" />);
 
-    const button = screen.getByRole('button', { name: '알림 받기 완료' });
+    const button = screen.getByRole('button', { name: '알림 켜짐' });
     expect(button).toBeDisabled();
+  });
+
+  it.each([
+    ['denied', '브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요.'],
+    ['unsupported', '이 브라우저에서는 알림을 지원하지 않아요.'],
+  ] as const)('알림 권한이 %s 이면 켜기를 잠그고 이유를 한 줄로 말한다', (permission, message) => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission,
+      isSubscribed: false,
+      isPending: false,
+    });
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft:user-1',
+      JSON.stringify({ sports: [{ sportId: FUTSAL_SPORT_ID, levelId: null }], regions: [] }),
+    );
+    render(<OnboardingClient step="confirm" />);
+
+    expect(screen.getByRole('button', { name: '알림 켜기' })).toBeDisabled();
+    expect(screen.getByText(message)).toBeInTheDocument();
+  });
+});
+
+// 확인 화면은 "내가 고른 것"이 먼저 보여야 하고, 알림은 같은 말을 세 번 하지 않고 한 줄이다.
+describe('OnboardingClient 확인 단계', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    fixtures.regions = regionsFixture;
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: false,
+    });
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft:user-1',
+      JSON.stringify({
+        sports: [{ sportId: FUTSAL_SPORT_ID, levelId: FUTSAL_LEVEL_ID }],
+        regions: [{ regionId: MAPO_ID, primary: true }],
+      }),
+    );
+  });
+
+  it('요약 카드가 알림 한 줄보다 앞에 오고, 알림 안내와 버튼은 한 번씩만 나온다', () => {
+    render(<OnboardingClient step="confirm" />);
+
+    const summary = screen.getByText('관심 종목과 실력');
+    expect(screen.getByText('풋살 초급')).toBeInTheDocument();
+    expect(screen.getByText('서울 마포구')).toBeInTheDocument();
+    const pushRow = screen.getByText('알림 받기');
+    expect(summary.compareDocumentPosition(pushRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // "알림 받기" 제목 하나, 켜기 버튼 하나 — 큰 버튼·안내 카드·설명 문단으로 되풀이하지 않는다.
+    expect(screen.getAllByText('알림 받기')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^알림/ })).toHaveLength(1);
+    expect(screen.queryByText('설정 완료')).not.toBeInTheDocument();
+  });
+});
+
+describe('OnboardingClient 지역 단계', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    fixtures.regions = regionsFixture;
+    hooks.savePreferencesMutate.mockImplementation((_body: unknown, callbacks: SaveCallbacks) => callbacks.onSuccess());
+    hooks.deferOnboardingMutate.mockImplementation((_body: unknown, callbacks: CompleteCallbacks) =>
+      callbacks.onSuccess({ next: { route: '/home' } }),
+    );
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: false,
+    });
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft:user-1',
+      JSON.stringify({ sports: [{ sportId: FUTSAL_SPORT_ID, levelId: FUTSAL_LEVEL_ID }], regions: [] }),
+    );
+  });
+
+  it('처음에는 어떤 시/도도 골라져 있지 않고 상세 지역은 닫혀 있으며 큰 버튼이 잠겨 있다', () => {
+    render(<OnboardingClient step="region" />);
+
+    expect(screen.getByRole('button', { name: '서울' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '부산' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText(/상세 지역/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '지역 선택 완료' })).toBeDisabled();
+  });
+
+  it('"나중에 설정하기"는 하단에 하나뿐이고 누르면 온보딩을 미룬다', () => {
+    render(<OnboardingClient step="region" />);
+
+    const skip = screen.getAllByRole('button', { name: '나중에 설정하기' });
+    expect(skip).toHaveLength(1);
+    fireEvent.click(skip[0]);
+
+    expect(hooks.deferOnboardingMutate).toHaveBeenCalledWith({ reason: 'later' }, expect.anything());
+    expect(router.replace).toHaveBeenCalledWith('/home');
+  });
+
+  it('시/도를 고르면 상세 지역이 열리고, 상세 지역을 고르면 큰 버튼이 열려 확인 단계로 간다', async () => {
+    render(<OnboardingClient step="region" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '서울' }));
+    expect(screen.getByText('서울 상세 지역')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '지역 선택 완료' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '마포구' }));
+    const done = screen.getByRole('button', { name: '지역 선택 완료' });
+    expect(done).toBeEnabled();
+    fireEvent.click(done);
+
+    // 분석 이벤트 단계명과 이동 경로는 그대로다.
+    expect(hooks.savePreferencesMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ currentStep: 'region', regions: [{ regionId: MAPO_ID, primary: true }] }),
+      expect.anything(),
+    );
+    await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('onboarding_step_complete', { step: 'region' }));
+    expect(router.push).toHaveBeenCalledWith('/onboarding/confirm');
+  });
+
+  it('이미 고른 지역이 있으면 그 시/도가 열려 있고 큰 버튼도 열려 있다', () => {
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft:user-1',
+      JSON.stringify({ sports: [{ sportId: FUTSAL_SPORT_ID, levelId: FUTSAL_LEVEL_ID }], regions: [{ regionId: MAPO_ID, primary: true }] }),
+    );
+    render(<OnboardingClient step="region" />);
+
+    expect(screen.getByRole('button', { name: '서울' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '마포구' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '지역 선택 완료' })).toBeEnabled();
+  });
+
+  it('위치 안내는 한 번만 나온다', () => {
+    render(<OnboardingClient step="region" />);
+
+    expect(screen.getAllByText(/좌표는 저장하지 않아요/)).toHaveLength(1);
+    expect(screen.queryByText('현재 위치로 지역 찾기')).not.toBeInTheDocument();
   });
 });

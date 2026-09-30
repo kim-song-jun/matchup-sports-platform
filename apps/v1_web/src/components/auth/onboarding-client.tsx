@@ -84,12 +84,12 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
   region: {
     stepNo: 3,
     title: '주 활동 지역을 선택해 주세요',
-    sub: '위치 권한 없어도 괜찮아요. 아래에서 지역을 직접 고르거나 건너뛸 수 있어요.',
+    sub: '위치 권한 없어도 괜찮아요. 지역은 직접 골라도 돼요.',
   },
   confirm: {
     stepNo: 4,
     title: '준비가 끝났어요',
-    sub: '선택한 종목, 실력, 지역을 기준으로 홈 추천과 필터가 시작돼요.',
+    sub: '홈 추천과 필터가 시작돼요. 마이 탭에서 언제든 바꿀 수 있어요.',
   },
 };
 
@@ -145,7 +145,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const selectedRegionGroup =
     regionGroups.find((group) => group.id === selectedRegionGroupId) ??
     regionGroups.find((group) => draft.regions.some((region) => group.options.some((option) => option.id === region.regionId))) ??
-    regionGroups[0] ??
     null;
   const regionOptions = regionGroups.flatMap((group) => group.options);
   const selectedSportIds = new Set(draft.sports.map((sport) => sport.sportId));
@@ -300,6 +299,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         pending ||
         (step === 'sport' && emptySports) ||
         (step === 'level' && (emptySports || missingLevels)) ||
+        (step === 'region' && draft.regions.length === 0) ||
         (step === 'confirm' && emptySports)
       }
       pending={pending}
@@ -308,7 +308,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     />
   );
 
-  const skipAction = step === 'region' ? defer : undefined;
   const meta = stepMeta[step];
 
   const backHref = getBackHref(step);
@@ -339,7 +338,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         {step === 'confirm' ? <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop" /> : null}
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
-        {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
         {onboarding.isLoading || sportsQuery.isLoading || regionsQuery.isLoading ? <Notice title="불러오는 중" body="저장된 정보를 불러오고 있어요." /> : null}
         {/* 마스터 데이터 실패 시 빈 draft로 저장 방지 — 재시도 유도 후 저장 CTA도 disable됨 */}
         {masterError ? <ErrorState message="운동 설정 정보를 불러오지 못했어요. 다시 시도해 주세요." onRetry={retryMasterData} /> : null}
@@ -392,8 +390,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
               {locationStatus === 'requesting' ? '현재 위치 확인 중' : '현재 위치로 찾기'}
             </button>
             <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
-              버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
-              좌표 자체는 저장하지 않아요.
+              누르면 현재 좌표를 지역 확인용으로 팀밋 서버와 카카오에 한 번 보내요. 좌표는 저장하지 않아요.
             </p>
             <LocationNotice detectedRegion={draft.detectedRegion ?? null} status={locationStatus} />
             <div className="tm-auth-stack">
@@ -413,43 +410,39 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   ))}
                 </div>
               </Card>
-              <Card pad={16}>
-                <div className="tm-text-label">{selectedRegionGroup ? `${selectedRegionGroup.name} 상세 지역` : '상세 지역'}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
-                  {(selectedRegionGroup?.options ?? []).map((region) => (
-                    <button
-                      className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}
-                      key={region.id}
-                      onClick={() => setDraft((current) => toggleRegion(current, region))}
-                      type="button"
-                      aria-pressed={selectedRegionIds.has(region.id)}
-                    >
-                      {region.shortName}
-                    </button>
-                  ))}
-                </div>
-              </Card>
+              {/* 시/도를 고르기 전에는 상세 지역을 열지 않는다 — 미리 서울을 골라 둔 것처럼 보이지 않게. */}
+              {selectedRegionGroup ? (
+                <Card pad={16}>
+                  <div className="tm-text-label">{`${selectedRegionGroup.name} 상세 지역`}</div>
+                  <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
+                    {selectedRegionGroup.options.map((region) => (
+                      <button
+                        className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}
+                        key={region.id}
+                        onClick={() => setDraft((current) => toggleRegion(current, region))}
+                        type="button"
+                        aria-pressed={selectedRegionIds.has(region.id)}
+                      >
+                        {region.shortName}
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
             </div>
           </>
         ) : null}
         {step === 'confirm' ? (
           <>
-            {/* 위치 권한과 동일한 패턴: 사전 안내 후 명시적 버튼 클릭이 실제 user gesture로
-                pushRegistration.subscribe()를 트리거한다 — complete() 성공 시 자동 호출 금지. */}
-            <button
-              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-              disabled={pushRequesting || pushRegistration.isSubscribed}
-              onClick={() => void requestPush()}
-              type="button"
-            >
-              {pushRequesting ? '알림 권한 확인 중' : pushRegistration.isSubscribed ? '알림 받기 완료' : '알림 받기'}
-            </button>
-            <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
-              매칭 성사, 채팅, 경기 결과 같은 소식을 놓치지 않도록 브라우저 알림을 받을 수 있어요.
-              언제든 설정에서 끌 수 있어요.
-            </p>
-            <PushNotice isSubscribed={pushRegistration.isSubscribed} permission={pushRegistration.permission} requesting={pushRequesting} />
             <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} />
+            {/* 위치 권한과 동일한 패턴: 명시적 버튼 클릭이 실제 user gesture로 pushRegistration.subscribe()를
+                트리거한다 — complete() 성공 시 자동 호출 금지. */}
+            <PushRow
+              isSubscribed={pushRegistration.isSubscribed}
+              onRequest={() => void requestPush()}
+              permission={pushRegistration.permission}
+              requesting={pushRequesting}
+            />
           </>
         ) : null}
       </div>
@@ -505,12 +498,13 @@ function OnboardingFixedAction({
   }
 
   if (step === 'region') {
-    /* #22: 픽셀 스페이서 div → gap으로 교체 */
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '지역 선택 완료'}</button>
-        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
-      </div>
+      <>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '지역 선택 완료'}</button>
+        <div className="tm-auth-fixed-skip-row">
+          <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
+        </div>
+      </>
     );
   }
 
@@ -566,8 +560,6 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
           </div>
         </Card>
       ) : null}
-      {/* 종목이 설정된 경우에만 완료 안내 노출 */}
-      {!emptySports ? <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" /> : null}
     </div>
   );
 }
@@ -593,35 +585,49 @@ function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRe
     return <Notice title="현재 위치 확인 완료" body={`${detectedRegion.regionName}을 활동 지역으로 선택했어요. 허용 상태는 브라우저에 유지되지만 좌표는 저장하지 않아요.`} tone="green" />;
   }
 
-  return <Notice title="현재 위치로 지역 찾기" body="한 번 허용하면 브라우저가 권한을 기억해요. 좌표는 가까운 지역을 찾을 때만 1회 사용하고 저장하지 않아요." />;
+  return null;
 }
 
-function PushNotice({
+function PushRow({
   isSubscribed,
+  onRequest,
   permission,
   requesting,
 }: {
   isSubscribed: boolean;
+  onRequest: () => void;
   permission: NotificationPermission | 'unsupported';
   requesting: boolean;
 }) {
-  if (requesting) {
-    return <Notice title="알림 권한 확인 중" body="브라우저의 알림 권한을 확인하고 있어요." />;
-  }
+  const blocked = permission === 'unsupported' || permission === 'denied';
+  const caption = permission === 'unsupported'
+    ? '이 브라우저에서는 알림을 지원하지 않아요.'
+    : permission === 'denied'
+      ? '브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요.'
+      : isSubscribed
+        ? '매칭, 채팅, 경기 결과 소식을 보내드릴게요.'
+        : '매칭 성사, 채팅, 경기 결과 소식을 보내드려요. 설정에서 언제든 끌 수 있어요.';
+  // 보이는 글자(켜기·켜짐)를 이름에 포함해, 옆 문구 없이도 무엇을 켜는지 읽히게 한다.
+  const action = requesting ? '확인 중' : isSubscribed ? '켜짐' : '켜기';
 
-  if (permission === 'unsupported') {
-    return <Notice title="알림 사용 불가" body="이 브라우저에서는 알림을 지원하지 않아요. 다른 브라우저에서 다시 시도해 주세요." tone="orange" />;
-  }
-
-  if (permission === 'denied') {
-    return <Notice title="알림 권한이 꺼져 있어요" body="브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요." tone="orange" />;
-  }
-
-  if (isSubscribed) {
-    return <Notice title="알림 받기 완료" body="매칭, 채팅, 경기 결과 소식을 보내드릴게요." tone="green" />;
-  }
-
-  return <Notice title="알림 받기" body="버튼을 누르면 브라우저가 알림 권한을 물어봐요. 언제든 설정에서 끌 수 있어요." />;
+  return (
+    <Card pad={16} className="tm-onboarding-push-row">
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="tm-text-label">알림 받기</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>{caption}</div>
+      </div>
+      <button
+        aria-label={`알림 ${action}`}
+        className="tm-btn tm-btn-md tm-btn-neutral"
+        disabled={requesting || isSubscribed || blocked}
+        onClick={onRequest}
+        style={{ flex: 'none' }}
+        type="button"
+      >
+        {action}
+      </button>
+    </Card>
+  );
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {

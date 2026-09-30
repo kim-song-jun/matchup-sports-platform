@@ -1539,6 +1539,14 @@ button:disabled {
   justify-content: flex-end;
 }
 
+/* 온보딩 확인 단계의 알림 한 줄: 제목·설명은 왼쪽, 켜기 버튼은 오른쪽 끝. */
+.tm-onboarding-push-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .tm-auth-progress {
   display: grid;
   gap: 12px;

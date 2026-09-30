@@ -29,8 +29,8 @@ vi.mock('next/navigation', () => ({
 // 셸 자체의 반응형/드로어 로직은 이 게이트 테스트의 관심사가 아니다 — 게이트가 도출한
 // role/origin/children을 정확히 전달하는지만 확인할 수 있게 얇게 대체한다.
 vi.mock('@/components/tournament-ops/tournament-ops-shell', () => ({
-  TournamentOpsShell: ({ children, role, origin }: { children: React.ReactNode; role: string; origin: string }) => (
-    <div data-testid="shell" data-role={role} data-origin={origin}>
+  TournamentOpsShell: ({ children, role, origin, tournamentKind }: { children: React.ReactNode; role: string; origin: string; tournamentKind?: string | null }) => (
+    <div data-testid="shell" data-role={role} data-origin={origin} data-kind={String(tournamentKind)}>
       {children}
     </div>
   ),
@@ -508,5 +508,36 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
       </TournamentLiveGate>,
     );
     expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'home');
+  });
+
+  it('공개 상세의 종류(리그)를 셸에 넘긴다 — 셸이 복귀 목적지를 리그 관리로 고른다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 리그', kind: 'regular_league' } });
+    render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentLiveGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'regular_league');
+  });
+
+  it('공개 상세 조회 중이면 종류를 undefined 로, 실패하면 null(대회 관리로 복귀)로 넘긴다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    mocks.useV1Tournament.mockReturnValue({ data: undefined, isPending: true });
+    const { unmount } = render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentLiveGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'undefined');
+    unmount();
+
+    mocks.useV1Tournament.mockReturnValue({ data: undefined, isPending: false, isError: true });
+    render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentLiveGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-kind', 'null');
   });
 });

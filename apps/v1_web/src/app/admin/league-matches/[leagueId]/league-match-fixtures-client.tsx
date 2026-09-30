@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, X } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
@@ -527,6 +527,16 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
 
   return (
     <div className="tm-content-enter">
+      {/* 대회 관리 상세의 "대회 목록으로"와 같은 자리·같은 모양 — 리그 상세에만 없었다. */}
+      <div className="mb-4">
+        <Link
+          href="/admin/league-matches"
+          className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+          리그 목록으로
+        </Link>
+      </div>
       <AdminPageHeader
         eyebrow="플랫폼 · 리그"
         title={series.title}

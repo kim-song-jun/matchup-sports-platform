@@ -143,3 +143,17 @@ describe('TeamUpcomingGamesCard — 종류별 명단 입구(Task 179 팀 A)', ()
     expect(screen.getByText('시간 미정')).toBeInTheDocument();
   });
 });
+
+describe('TeamUpcomingGamesCard — 권한 안내는 바꿀 수 없는 사람에게만(G13 F57)', () => {
+  const HINT = '팀장·매니저만 명단을 바꿀 수 있어요.';
+
+  it('팀장·매니저에겐 안내가 없고, 팀원에게만 누가 바꾸는지 알린다', () => {
+    show([game({ gameId: 'g-l', competitionKind: 'LEAGUE', opponentName: '한강유나이티드' })]);
+    const { unmount } = render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters />);
+    expect(screen.queryByText(HINT)).toBeNull();
+    unmount();
+
+    render(<TeamUpcomingGamesCard teamId={TEAM_ID} canManageRosters={false} />);
+    expect(screen.getByText(HINT)).toBeInTheDocument();
+  });
+});

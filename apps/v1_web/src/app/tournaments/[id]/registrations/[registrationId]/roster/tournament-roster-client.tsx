@@ -1225,6 +1225,9 @@ export function TournamentRosterPageClient({
   const teamPermissionError = Boolean(registration?.teamId) && isTeamError;
   const canManageRoster =
     teamPermissionResolved && (team?.viewer.role === 'owner' || team?.viewer.role === 'manager');
+  // 팀장·매니저에겐 위 명단 카드가 종료·취소 사유를 같은 문장으로 이미 말한다 — 안내 상자로 한 번 더
+  // 싣지 않는다(F99). 팀원 카드는 "팀장에게 요청"만 말하므로 사유는 안내 상자가 맡는다.
+  const lockReasonInCard = canManageRoster && tournament !== undefined && registration !== undefined;
   const canEditRoster =
     Boolean(registration) &&
     canManageRoster &&
@@ -1458,9 +1461,11 @@ export function TournamentRosterPageClient({
           있어요"와 "명단이 마감됐어요"가 동시에 뜨는 모순이 있었다(감사 finding #1·#52).
         */}
         {isTournamentRosterClosed ? (
-          <div style={{ marginBottom: 16 }}>
-            <AlertBanner message={tournamentRosterClosedMessage(tournament?.status, tournament?.kind, tournament?.scheduledEndAt)} tone="info" />
-          </div>
+          lockReasonInCard ? null : (
+            <div style={{ marginBottom: 16 }}>
+              <AlertBanner message={tournamentRosterClosedMessage(tournament?.status, tournament?.kind, tournament?.scheduledEndAt)} tone="info" />
+            </div>
+          )
         ) : isRosterLocked && rosterDeadlineState.overridden ? (
           <div style={{ marginBottom: 16 }}>
             <AlertBanner
@@ -1491,7 +1496,7 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
-        {isRosterEditBlockedByStatus ? (
+        {isRosterEditBlockedByStatus && !lockReasonInCard ? (
           <div style={{ marginBottom: 16 }}>
             <AlertBanner
               message="취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요."

@@ -872,6 +872,33 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
     expect(screen.queryByText('리그 기간')).not.toBeInTheDocument();
   });
+
+  it('F99: 종료 사유는 팀장 화면에도 한 번만 — 카드가 말하면 안내 상자는 되풀이하지 않는다', () => {
+    const CLOSED = '모든 경기 결과가 확정돼 리그가 종료 처리됐어요. 더 이상 선수 명단을 수정할 수 없어요.';
+    mockCompetition('regular_league', 'completed', SEASON_LEFT_END);
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'owner' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+
+    const { unmount } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+    expect(screen.getAllByText(CLOSED)).toHaveLength(1);
+    unmount();
+
+    // 대조군: 팀원 카드는 "팀장에게 요청"만 말하므로 사유는 안내 상자가 한 번 싣는다.
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'member' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+    expect(screen.getAllByText(CLOSED)).toHaveLength(1);
+  });
 });
 
 describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받은 from 을 잇는다', () => {

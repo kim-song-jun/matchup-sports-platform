@@ -2,29 +2,14 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import type { V1TeamRosterCellStatus } from '@/hooks/use-v1-game-roster';
-import {
-  GAME_ROSTER_AUTO_ACTOR_LABEL,
-  gameRosterActorRoleLabel,
-  gameRosterReasonLabel,
-  gameRosterStatusLabel,
-} from '@/lib/v1-status-labels';
+import { GAME_ROSTER_AUTO_ACTOR_LABEL, gameRosterActorRoleLabel } from '@/lib/v1-status-labels';
+import { gameRosterStatusChip } from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 
-const BADGE_TONE: Record<V1TeamRosterCellStatus, string> = {
-  PARTICIPATING: 'tm-badge-blue',
-  EXCLUDED: 'tm-badge-grey',
-  UNAVAILABLE: 'tm-badge-orange',
-  SUSPENDED: 'tm-badge-red',
-  NOT_IN_ROSTER: 'tm-badge-grey',
-};
-
-/** 배지 문구 — 색만으로 구분하지 않도록 상태를 글자로 싣고, 빠짐·결장은 사유를 잇는다. */
-function gameRosterBadgeText(status: V1TeamRosterCellStatus, reason?: string | null, remainingMatches?: number | null) {
-  const statusLabel = gameRosterStatusLabel(status, remainingMatches);
-  const reasonLabel = status === 'EXCLUDED' || status === 'UNAVAILABLE' ? gameRosterReasonLabel(reason) : null;
-  return reasonLabel === null ? statusLabel : `${statusLabel} · ${reasonLabel}`;
-}
-
-/** 경기 명단 상태 배지 — 명단 화면·표 밖(친선 참석명단의 결장 표시)에서도 같은 모양·문구로 쓴다. */
+/**
+ * 경기 명단 상태 칩 — 명단 화면·표 밖(친선 참석명단의 결장 표시)에서도 같은 모양·문구로 쓴다.
+ * 출전은 기본 상태라 칩이 없다(체크박스·"출전 N명" 제목이 이미 말한다). 체크를 풀면 "빠짐"이 붙는다.
+ */
 export function GameRosterStatusBadge({
   status,
   reason,
@@ -34,11 +19,8 @@ export function GameRosterStatusBadge({
   reason?: string | null;
   remainingMatches?: number | null;
 }) {
-  return (
-    <span className={`tm-badge tm-badge-sm ${BADGE_TONE[status]}`}>
-      {gameRosterBadgeText(status, reason, remainingMatches)}
-    </span>
-  );
+  const chip = gameRosterStatusChip(status, { reason, remainingMatches });
+  return chip === null ? null : <StatusChip chip={chip} />;
 }
 
 /** 누가 이 상태를 만들었나. 출전정지는 계산 결과라 "자동", 출전·명단 밖은 주체가 없다. */

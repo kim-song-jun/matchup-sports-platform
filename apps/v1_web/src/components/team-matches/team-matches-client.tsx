@@ -35,6 +35,7 @@ import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, 
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
 import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
 import { TeamMatchDetailPageSkeleton, TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -674,11 +675,7 @@ function buildHostActions({
     label: '팀매치 취소',
     tone: 'danger',
     pending,
-    confirm: {
-      title: '팀매치를 취소할까요?',
-      message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
-      confirmLabel: '팀매치 취소',
-    },
+    confirm: TEAM_MATCH_CANCEL_CONFIRM,
     onClick: cancelTeamMatch,
   };
   if (status === 'recruiting') {

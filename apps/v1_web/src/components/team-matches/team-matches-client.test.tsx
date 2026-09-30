@@ -85,6 +85,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-away-meta">{model.match.applicantTeams[0]?.meta}</span>
       <span data-testid="team-match-away-trust">{model.match.applicantTeams[0]?.trustState}</span>
       <span data-testid="team-match-host-actions">{model.hostActions?.map((action) => action.label).join(',')}</span>
+      <span data-testid="team-match-cancel-confirm">{JSON.stringify(model.hostActions?.find((action) => action.label === '팀매치 취소')?.confirm ?? null)}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
       {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
@@ -1098,6 +1099,18 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
 
     const actions = (screen.getByTestId('team-match-host-actions').textContent ?? '').split(',').filter(Boolean);
     expect(actions).toEqual([]);
+  });
+
+  // L29 — 닫기 버튼이 확정 버튼("팀매치 취소")과 같은 '취소'여서 헷갈렸고, 제출한 참석명단이
+  // 어떻게 되는지는 말하지 않았다. 취소하면 명단은 지워지지 않고 잠긴다.
+  it('취소 확인창은 닫기 버튼을 "닫기"로 부르고 참석명단이 잠긴다고 알린다', () => {
+    mockHostView('recruiting', null);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
+
+    const confirm = JSON.parse(screen.getByTestId('team-match-cancel-confirm').textContent ?? 'null');
+    expect(confirm).toMatchObject({ confirmLabel: '팀매치 취소', cancelLabel: '닫기' });
+    expect(confirm.message).toContain('제출한 참석명단은 잠겨서 더는 수정할 수 없어요');
+    expect(confirm.message).not.toContain('사라져요');
   });
 
   it('일반 팀매치(리그 아님, 같은 상태)는 여전히 "팀매치 취소"가 보인다(회귀 방지)', () => {

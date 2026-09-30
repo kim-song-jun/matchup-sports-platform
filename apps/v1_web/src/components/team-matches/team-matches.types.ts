@@ -169,6 +169,7 @@ export type TeamMatchDetailViewModel = {
       title: string;
       message: string;
       confirmLabel: string;
+      cancelLabel?: string;
     };
     onClick: () => void | Promise<unknown>;
   }>;

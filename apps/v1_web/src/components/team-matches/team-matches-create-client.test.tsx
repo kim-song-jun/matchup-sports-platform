@@ -416,6 +416,21 @@ describe('TeamMatchEditPageClient — cancel confirmation', () => {
     expect(cancelTeamMatchMutate).not.toHaveBeenCalled();
   });
 
+  // L29 — 닫기 버튼이 확정 버튼과 같은 '취소'였고, 제출한 참석명단이 잠긴다는 말이 없었다.
+  it('확인창은 닫기 버튼을 "닫기"로 부르고 참석명단이 잠긴다고 알린다', async () => {
+    confirmMock.mockResolvedValue(false);
+    render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      confirmLabel: '팀매치 취소',
+      cancelLabel: '닫기',
+      tone: 'danger',
+      message: expect.stringContaining('제출한 참석명단은 잠겨서 더는 수정할 수 없어요'),
+    })));
+  });
+
   it('확인 모달에서 승인하면 그제서야 취소 API를 호출한다', async () => {
     confirmMock.mockResolvedValue(true);
     render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);

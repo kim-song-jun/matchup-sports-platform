@@ -6,7 +6,8 @@ import { useV1AdminLeagueMatchList, useV1AdminTournaments } from '@/hooks/use-v1
 import type { V1Tournament } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
-import { AdminDataTable, AdminStatusPill, AdminFilterBar, AdminEmpty, AdminTableSkeleton } from '@/components/admin';
+import { AdminDataTable, AdminLeagueStatePill, AdminStatusPill, AdminFilterBar, AdminEmpty, AdminTableSkeleton } from '@/components/admin';
+import type { LeagueStateKey } from '@/lib/v1-status-labels';
 
 const STATUS_OPTIONS = [
   { value: 'in_progress', label: '진행 중' },
@@ -19,18 +20,19 @@ const LIMIT = 50;
 /**
  * 운영 진입 목록의 한 행 — 대회와 리그가 같은 표에 섞여 나온다.
  *
- * `status` 는 원천의 어휘를 그대로 둔다(대회 `in_progress`, 리그 `active`). `AdminStatusPill` 이
- * 두 어휘를 다 읽으므로 화면에서 굳이 한쪽으로 바꾸지 않는다.
+ * `status` 는 원천의 어휘를 그대로 들고(대회 `in_progress`, 리그 `active`), 알약이 같은 사실을
+ * 같은 말로 그린다 — 리그는 `AdminLeagueStatePill`(상태 모델의 "진행 중").
  */
 type OpsRow = {
   readonly key: string;
-  readonly kind: 'tournament' | 'league';
   readonly id: string;
   readonly title: string;
   readonly venue: string | null;
-  readonly status: string;
   readonly startsAt: string | null;
-};
+} & (
+  | { readonly kind: 'tournament'; readonly status: string }
+  | { readonly kind: 'league'; readonly status: LeagueStateKey }
+);
 
 const KIND_LABEL: Record<OpsRow['kind'], string> = { tournament: '대회', league: '리그' };
 
@@ -85,7 +87,7 @@ export function TournamentOpsPickerClient() {
       .filter((row) => leagueMatchesStatus(row.state, activeStatus))
       .map((row) => ({
         key: `league:${row.leagueId}`,
-        kind: 'league',
+        kind: 'league' as const,
         id: row.leagueId,
         title: row.title,
         venue: null,
@@ -120,7 +122,7 @@ export function TournamentOpsPickerClient() {
           keyExtractor={(row) => row.key}
           tableMaxWidth="max-w-none"
           columns={[
-            { key: 'status', header: '상태', width: 'w-[104px]', render: (row) => <AdminStatusPill status={row.status} /> },
+            { key: 'status', header: '상태', width: 'w-[104px]', render: (row) => (row.kind === 'league' ? <AdminLeagueStatePill state={row.status} /> : <AdminStatusPill status={row.status} />) },
             {
               key: 'title',
               header: '대회·리그',

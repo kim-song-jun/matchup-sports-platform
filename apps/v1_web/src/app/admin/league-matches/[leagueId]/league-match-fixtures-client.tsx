@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useId, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
-import { AdminPageHeader, AdminDataTable, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
@@ -612,7 +612,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <AdminStatusPill status={series.state} />
+            <AdminLeagueStatePill state={series.state} />
             {/* 경기 영상 관리 — 대회 운영 콘솔의 영상 화면과 같은 역할의 리그 판.
                 대진이 없으면 그 화면이 빈 상태 안내를 대신한다. */}
             <Link

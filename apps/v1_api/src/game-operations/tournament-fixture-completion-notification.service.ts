@@ -3,7 +3,10 @@ import { Logger } from '@nestjs/common';
 import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
+import { loadOfficialResultRecipients, loadResultTeamNames, officialResultNoticeBody } from './official-result-notice';
 import { parseOfficialScore } from './parse-official-score';
+import { notificationCopyFor } from '../notifications/notifications.service';
+import { tournamentRoundLabel } from '../tournaments/tournament-round-label';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
 
 /**
@@ -15,8 +18,8 @@ import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tourna
  * 여부를 앱을 스스로 열어 확인하는 것 외엔 알 방법이 없었다.
  *
  * 설계는 그 sibling 을 그대로 따른다(다른 점만 기록):
- * - 수신자: 양 참가팀의 owner/manager active 멤버십 — 임박 알림
- *   (`jobs/lineup-reminders`)과 같은 "팀 운영진 대상" 축이다. 로스터 전원이 아니다.
+ * - 수신자: 양 참가팀의 owner/manager active 멤버십 + 그 공식 결과의 출전자(Task 180 G7).
+ *   본문(스코어·받는 사람 팀 기준 승패·출전자 개인 기록)은 리그와 같은 `official-result-notice.ts` 가 만든다.
  * - 선호도: 대회 알림 7종+수상과 같은 `activityEnabled` 축
  *   (`preferenceFieldForEvent`의 tournament 그룹). 팀매치의 `teamMatchEnabled`가 아니다.
  * - businessKey는 (픽스처, 수신자) 쌍마다 한 번 — CORRECTION 리비전이 같은 픽스처를
@@ -24,8 +27,8 @@ import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tourna
  * - 알림 row는 outbox 트랜잭션(`tx`)으로 직접 쓴다. `NotificationsService.emit*`는
  *   별도 커넥션 fire-and-forget이라 outbox 커밋과 원자성이 없다
  *   (sibling 헤더의 W1 관례 설명 참조). Web Push는 커밋 밖 best-effort.
- * - 본문에 확정 스코어를 싣는다. `parseOfficialScore`는 핸들러 선두에서 같은
- *   리비전으로 이미 성공한 뒤라 여기서 다시 던질 수 없다.
+ * - `parseOfficialScore`는 핸들러 선두에서 같은 리비전으로 이미 성공한 뒤라 여기서 다시 던질 수 없다.
+ * - 제목·딥링크는 `notificationCopyFor('tournament_match_completed')`, targetId 는 "${tournamentId}:${fixtureId}".
  *
  * **afterCommit 경계 (2026-08-27 감사 41/44)**: sibling(`TeamMatchCompletionNotificationService`)과
  * 같은 이유로 웹 푸시를 `claim.afterCommit`에 담아 커밋 확정 뒤에만 보낸다 — 자세한
@@ -48,81 +51,67 @@ export class TournamentFixtureCompletionNotificationService {
       throw new Error('Tournament completion notification requires matching canonical Details ownership');
     }
 
-    const teamIds = [revision.homeTeamId, revision.awayTeamId].filter(
-      (id): id is string => id !== null,
-    );
-    if (teamIds.length === 0) return;
-
-    const memberships = await tx.v1TeamMembership.findMany({
-      where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { userId: true },
+    const recipients = await loadOfficialResultRecipients(tx, {
+      revisionId: revision.revisionId,
+      gameId: revision.gameId,
+      homeTeamId: revision.homeTeamId,
+      awayTeamId: revision.awayTeamId,
     });
-    const recipients = [...new Set(memberships.map((m) => m.userId))];
     if (recipients.length === 0) return;
 
     const preferences = await tx.v1NotificationPreference.findMany({
-      where: { userId: { in: recipients } },
+      where: { userId: { in: recipients.map((recipient) => recipient.userId) } },
       select: { userId: true, activityEnabled: true },
     });
-    const activityEnabledByUser = new Map(
-      preferences.map((p) => [p.userId, p.activityEnabled] as const),
-    );
-    const enabledRecipients = recipients.filter(
-      (userId) => activityEnabledByUser.get(userId) !== false,
-    );
+    const optedOut = new Set(preferences.filter((p) => p.activityEnabled === false).map((p) => p.userId));
+    const enabledRecipients = recipients.filter((recipient) => !optedOut.has(recipient.userId));
     if (enabledRecipients.length === 0) return;
 
-    const [tournament, teams] = await Promise.all([
+    const [tournament, details, names] = await Promise.all([
       findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
         where: { id: tournamentId },
         select: { title: true },
       }),
-      tx.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } }),
+      tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId }, select: { round: true } }),
+      loadResultTeamNames(tx, revision.homeTeamId, revision.awayTeamId),
     ]);
-    if (tournament === null) {
-      throw new Error('Tournament completion notification requires a tournament-kind competition');
+    if (tournament === null || details === null) {
+      throw new Error('Tournament completion notification requires a tournament-kind competition and its match details');
     }
-    const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
-    const homeName = (revision.homeTeamId !== null ? teamNameById.get(revision.homeTeamId) : undefined) ?? '홈팀';
-    const awayName = (revision.awayTeamId !== null ? teamNameById.get(revision.awayTeamId) : undefined) ?? '원정팀';
-    const score = parseOfficialScore(revision.score);
-    const scoreline =
-      score.penalties === undefined
-        ? `${score.home}:${score.away}`
-        : `${score.home}:${score.away} (승부차기 ${score.penalties.home}:${score.penalties.away})`;
 
-    const title = '대회 경기 결과가 확정됐어요';
-    const body = `${tournament.title} — ${homeName} ${scoreline} ${awayName} 결과가 공식 확정됐어요.`;
-    const deepLink = `/tournaments/${tournamentId}/matches/${fixtureId}`;
+    const copy = notificationCopyFor('tournament_match_completed', 'tournament', `${tournamentId}:${fixtureId}`);
+    const label = `${tournament.title} · ${tournamentRoundLabel(details.round)}`;
+    const score = parseOfficialScore(revision.score);
     const businessKeyFor = (userId: string) =>
       `tournament-fixture-completed:${fixtureId}:${userId}`;
+    const rows = enabledRecipients.map((recipient) => ({
+      userId: recipient.userId,
+      body: officialResultNoticeBody({ label, ...names, score, side: recipient.side, record: recipient.record }),
+    }));
 
     const alreadyDelivered = await tx.v1Notification.findMany({
-      where: { businessKey: { in: enabledRecipients.map(businessKeyFor) } },
+      where: { businessKey: { in: rows.map((row) => businessKeyFor(row.userId)) } },
       select: { businessKey: true },
     });
     const alreadyDeliveredKeys = new Set(alreadyDelivered.map((n) => n.businessKey));
 
     await tx.v1Notification.createMany({
-      data: enabledRecipients.map((userId) => ({
-        recipientUserId: userId,
+      data: rows.map((row) => ({
+        recipientUserId: row.userId,
         targetType: 'tournament' as const,
-        targetId: tournamentId,
-        title,
-        body,
-        deepLink,
-        businessKey: businessKeyFor(userId),
+        targetId: `${tournamentId}:${fixtureId}`,
+        title: copy.title,
+        body: row.body,
+        deepLink: copy.deepLink,
+        businessKey: businessKeyFor(row.userId),
       })),
       skipDuplicates: true,
     });
 
-    const newlyDelivered = enabledRecipients.filter(
-      (userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)),
-    );
-    for (const userId of newlyDelivered) {
+    for (const row of rows.filter((candidate) => !alreadyDeliveredKeys.has(businessKeyFor(candidate.userId)))) {
       const send = () =>
         void this.webPush
-          ?.sendToUser(userId, { title, body, url: deepLink })
+          ?.sendToUser(row.userId, { title: copy.title, body: row.body, url: copy.deepLink ?? undefined })
           .catch((error: unknown) => {
             // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지되지만,
             // 조용히 삼키면 sendToUser 내부 실패(조회·전송)를 추적할 수 없다

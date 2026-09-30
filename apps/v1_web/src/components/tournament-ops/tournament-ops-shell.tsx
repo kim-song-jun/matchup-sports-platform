@@ -16,11 +16,11 @@ import {
 import type { V1CompetitionKind, V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
-import { displayInitials } from '@/lib/display-initials';
 import { staffRoleLabel } from './badges';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
+import { displayInitials } from '@/lib/display-initials';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**

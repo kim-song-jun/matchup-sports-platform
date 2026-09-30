@@ -4,24 +4,20 @@ import Link from 'next/link';
 import { Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { useV1TeamUpcomingGames, type V1GameRosterSummary, type V1TeamUpcomingGame } from '@/hooks/use-v1-api';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { gameRosterScreenPath } from '@/lib/game-roster-routes';
+import { teamGameDetailHref, teamGameRosterHref } from '@/lib/team-game-links';
+import { MyParticipationChip } from './my-participation-chip';
+import { TeamGameKindBadge } from './team-game-kind-badge';
 
 /**
- * 팀 상세의 "다가오는 경기" — 경기마다 명단 상태와 명단·전술 입구(Task 179 팀 A).
- * 대회·리그는 계산된 경기 명단 요약 → 경기 명단 화면, 친선은 참석명단 제출 여부 → 참석명단.
- * 명단 버튼은 팀장·매니저에게만(팀원은 요약만), 전술보드는 팀원도 읽기로 들어간다.
+ * 팀 상세의 "다가오는 경기" — 경기마다 명단 상태와 경기 상세·명단·전술 입구(Task 179 팀 A, Task 180 G7).
+ * 대회·리그는 계산된 경기 명단 요약 → 경기 명단 화면, 친선은 참석명단 제출 여부 → 참석명단(팀장·매니저만).
+ * 팀원도 경기 상세와 대회·리그 명단을 보기 전용으로 연다. 출전하는 경기에만 "내 출전" 칩(서버 판정).
  *
  * 이 목록이 따로 있는 이유: `팀 일정`(V1TeamSchedule)은 팀이 직접 만드는 캘린더라 대회
  * 경기가 들어오지 않는다. 알려진 한계: 서버가 **앞으로의 경기만** 모은다.
  */
 /** 경기 명단 화면의 "우리 팀 다른 경기" 링크가 여기로 온다(`/teams/:id#…`). */
 export const TEAM_UPCOMING_GAMES_ANCHOR = 'team-upcoming-games';
-
-const KIND_BADGE: Record<V1TeamUpcomingGame['competitionKind'], { label: string; className: string }> = {
-  TOURNAMENT: { label: '대회', className: 'tm-badge-blue' },
-  LEAGUE: { label: '리그', className: 'tm-badge-green' },
-  FRIENDLY: { label: '친선', className: 'tm-badge-grey' },
-};
 
 export function TeamUpcomingGamesCard({ teamId, canManageRosters }: { teamId: string; canManageRosters: boolean }) {
   const query = useV1TeamUpcomingGames(teamId);
@@ -66,10 +62,9 @@ function UpcomingGameRow({
   game: V1TeamUpcomingGame;
   canManageRosters: boolean;
 }) {
-  const kind = KIND_BADGE[game.competitionKind];
   const title = game.opponentName !== null ? `vs ${game.opponentName}` : game.title;
   const status = rosterStatus(game);
-  const rosterLink = canManageRosters ? rosterHref(teamId, game) : null;
+  const links = rowLinks(teamId, game, canManageRosters);
 
   return (
     <>
@@ -77,37 +72,33 @@ function UpcomingGameRow({
         <span className="tm-text-label" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
           {title}
         </span>
-        <span className={`tm-badge tm-badge-sm ${kind.className}`} style={{ flex: '0 0 auto' }}>
-          {kind.label}
-        </span>
+        <TeamGameKindBadge kind={game.competitionKind} />
       </div>
       <span className="tm-text-caption">
         {formatTournamentDateTimeShort(game.scheduledAt) ?? '시간 미정'}
         {game.opponentName !== null ? ` · ${game.title}` : ''}
       </span>
       <div style={{ ...rowLineStyle, flexWrap: 'wrap' }}>
+        {/* 출전하는 경기에만 칩을 단다. 빠진 경기에는 아무 표시도 두지 않는다(행을 열면 명단에서 확인). */}
+        {game.viewerParticipating ? <MyParticipationChip /> : null}
         <span className="tm-text-caption" style={{ fontWeight: 700, color: STATUS_COLOR[status.tone] }}>
           {status.text}
         </span>
-        <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
-          {/* 행마다 보조 버튼 — 미제출은 주황 상태 글자로 알린다(화면의 주 CTA 는 하나). */}
-          {rosterLink !== null ? (
-            <Link
-              className="tm-btn tm-btn-sm tm-btn-outline"
-              href={rosterLink.href}
-              aria-label={`${title} ${rosterLink.label}`}
-            >
-              {rosterLink.label}
-            </Link>
-          ) : null}
-          <Link
-            className="tm-btn tm-btn-sm tm-btn-neutral"
-            href={`/teams/${teamId}/tactics/${game.gameId}`}
-            aria-label={`${title} 전술`}
-          >
-            전술
+      </div>
+      {/* 행마다 보조 버튼 — 미제출은 주황 상태 글자로 알린다(화면의 주 CTA 는 하나). */}
+      <div style={{ display: 'grid', gridTemplateColumns: `${'1fr '.repeat(links.length)}auto`, gap: 6 }}>
+        {links.map((link) => (
+          <Link key={link.label} className="tm-btn tm-btn-sm tm-btn-outline" href={link.href} aria-label={`${title} ${link.label}`}>
+            {link.label}
           </Link>
-        </span>
+        ))}
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-neutral"
+          href={`/teams/${teamId}/tactics/${game.gameId}`}
+          aria-label={`${title} 전술`}
+        >
+          전술
+        </Link>
       </div>
     </>
   );
@@ -140,13 +131,25 @@ export function formatRosterSummary(summary: V1GameRosterSummary): string {
   return parts.join(' · ');
 }
 
-function rosterHref(teamId: string, game: V1TeamUpcomingGame): { href: string; label: string } | null {
-  if (game.competitionKind === 'FRIENDLY') {
-    return game.teamMatchId === null ? null : { href: `/team-matches/${game.teamMatchId}/lineup`, label: '참석명단' };
-  }
-  // 기준 명단이 없으면 경기 명단 화면이 404(GAME_ROSTER_NOT_AVAILABLE)라 버튼을 내지 않는다.
-  if (game.rosterSummary === null) return null;
-  return { href: gameRosterScreenPath(teamId, game.gameId), label: '명단' };
+/**
+ * 경기 상세는 누구나, 명단은 열 수 있는 사람에게만 낸다(`lib/team-game-links.ts` 가 홈 카드와 같은 규칙을 쥔다).
+ * 팀장·매니저의 명단 버튼은 고치러 가는 입구라 "명단"·"참석명단", 팀원은 보기 전용이라 "명단 보기"다.
+ */
+function rowLinks(teamId: string, game: V1TeamUpcomingGame, canManage: boolean): { href: string; label: string }[] {
+  const target = { competitionKind: game.competitionKind, competitionId: game.tournamentId, teamMatchId: game.teamMatchId };
+  const detail = teamGameDetailHref(target, `/teams/${teamId}`);
+  const roster = teamGameRosterHref({
+    ...target,
+    teamId,
+    gameId: game.gameId,
+    rosterAvailable: game.rosterSummary !== null,
+    canManage,
+  });
+  const rosterLabel = !canManage ? '명단 보기' : game.competitionKind === 'FRIENDLY' ? '참석명단' : '명단';
+  return [
+    ...(detail !== null ? [{ href: detail, label: '경기 상세' }] : []),
+    ...(roster !== null ? [{ href: roster, label: rosterLabel }] : []),
+  ];
 }
 
 const rowLineStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };

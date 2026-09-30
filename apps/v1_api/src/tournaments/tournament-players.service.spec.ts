@@ -141,7 +141,7 @@ describe('TournamentPlayersService', () => {
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentRegistration: { findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    v1TournamentRegistration: { findFirst: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
@@ -165,7 +165,7 @@ describe('TournamentPlayersService', () => {
     prisma = {
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
-      v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: {
         findMany: jest.fn(),
         // Prisma 는 못 찾으면 null 을 준다. 기본값을 undefined 로 두면 "찾았다" 로 읽히는
@@ -1383,11 +1383,13 @@ describe('TournamentPlayersService', () => {
 
   // ─── 전체 명단 CSV (대회·리그 단위) ─────────────────────────────────────────
   describe('exportTournamentCsv', () => {
+    afterEach(() => jest.useRealTimers());
+
     it('non-admin → 403', async () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(null);
 
       await expect(service.exportTournamentCsv(nonManager, 'tournament-1')).rejects.toThrow(ForbiddenException);
-      expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentRegistration.findMany).not.toHaveBeenCalled();
     });
 
     it('없는 대회 → 404 TOURNAMENT_NOT_FOUND', async () => {
@@ -1399,37 +1401,46 @@ describe('TournamentPlayersService', () => {
       });
     });
 
-    it('팀명·신청 상태를 앞에 붙이고, 임시저장·취소 신청은 뺀다', async () => {
+    it('팀별 블록 — 한글 머리글·한글 값, 팀장 표시, 명단이 빈 팀도 블록으로 남긴다', async () => {
+      // 2026-09-30 23:40 KST
+      jest.useFakeTimers({ now: new Date('2026-09-30T14:40:00Z'), doNotFake: ['nextTick', 'setImmediate'] });
       prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
-      prisma.v1Tournament.findFirst.mockResolvedValue({ title: '가을 풋살컵' });
-      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      prisma.v1Tournament.findFirst.mockResolvedValue({ title: '가을 풋살컵: 1/2차' });
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([
         {
-          ...playerRow({ jerseyNumber: 10 }),
-          user: { profile: { nickname: '번개맨' } },
-          registration: { status: 'confirmed', team: { name: '번개팀' } },
+          status: 'confirmed',
+          team: { name: '번개팀', ownerUserId: 'player-user-id' },
+          players: [
+            { ...playerRow({ jerseyNumber: 7, eligibilityStatus: 'non_pro' }), user: { profile: { nickname: '번개맨' } } },
+            {
+              ...playerRow({ id: 'player-2', userId: 'user-2', realName: '이영희', genderSnapshot: 'female', eligibilityStatus: 'pro' }),
+              user: { profile: null },
+            },
+          ],
         },
-        {
-          ...playerRow({ id: 'player-2', registrationId: 'reg-2', realName: '이영희', genderSnapshot: 'female', jerseyNumber: null }),
-          user: { profile: { nickname: '영희' } },
-          registration: { status: 'payment_checking', team: { name: '=HYPERLINK("x")' } },
-        },
+        // 팀명도 사용자 입력이다 — 쉼표·수식 문자가 칸을 가르거나 수식으로 읽히지 않아야 한다.
+        { status: 'awaiting_payment', team: { name: '천둥, "번개"', ownerUserId: 'x' }, players: [] },
       ]);
 
       const result = await service.exportTournamentCsv(adminUser, 'tournament-1');
 
-      expect(result.filename).toBe('players_가을_풋살컵_all_tourname.csv');
+      expect(result.filename).toBe('가을_풋살컵_12차_전체명단_20260930.csv');
       expect(result.csv.split('\n')).toEqual([
-        'teamName,registrationStatus,realName,birthDate,gender,eligibility,nickname,jerseyNumber',
-        '번개팀,confirmed,홍길동,1995-03-15,male,needs_review,번개맨,10',
-        // 팀명도 사용자 입력이다 — 수식 인젝션 차단·RFC 4180 따옴표 규칙을 똑같이 탄다.
-        `"'=HYPERLINK(""x"")",payment_checking,이영희,1995-03-15,female,needs_review,영희,`,
+        '가을 풋살컵: 1/2차 전체 명단',
+        '내려받은 시각,2026-09-30 23:40',
+        '신청 팀,2팀 · 선수 2명',
+        '',
+        '[1] 번개팀 · 참가 확정 · 2명',
+        '순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고',
+        '1,7,홍길동,1995-03-15,남성,아마추어,번개맨,팀장',
+        '2,,이영희,1995-03-15,여성,프로,,',
+        '',
+        '"[2] 천둥, ""번개"" · 입금 대기 · 명단 미등록"',
       ]);
-      expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
+      expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
-            removedAt: null,
-            registration: { tournamentId: 'tournament-1', status: { notIn: ['draft', 'cancelled'] } },
-          },
+          where: { tournamentId: 'tournament-1', status: { notIn: ['draft', 'cancelled'] } },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         }),
       );
       expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({

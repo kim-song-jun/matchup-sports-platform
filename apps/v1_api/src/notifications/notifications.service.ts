@@ -83,10 +83,17 @@ export type NotificationEventType =
   // team-match-completion-notification.service.ts가 leagueId 유무로 갈라 이 타입과
   // team_match_completed 중 하나를 골라 쓴다 — 실제 발송은 그 파일이 outbox tx 안에서
   // 직접 V1Notification을 쓰므로(top of team-match-completion-notification.service.ts
-  // 참조) 여기 title/body/deepLink는 그 문구의 단일 소스(참고용 겸 emitNotification을
-  // 통해 직접 호출될 경우의 실제 경로)다 — 두 파일의 문구가 갈리지 않도록 여기를 고치면
-  // 그 파일도 같은 커밋에서 고친다.
+  // 참조) 여기 title/deepLink는 그 문구의 단일 소스다. 본문은 스코어·승패·개인 기록이 받는
+  // 사람마다 달라 game-operations/official-result-notice.ts 가 조립한다(Task 180 G7).
   | 'league_team_match_completed'
+  // 대회 경기 결과 확정(tournament-fixture-completion-notification.service.ts). targetId 는
+  // "${tournamentId}:${teamMatchId}" 복합 — 경기 상세가 2계층 경로라서다.
+  | 'tournament_match_completed'
+  // 경기 전 알림(Task 180 G7): 출전자에게 전날 한 번(대회·리그 팀장·매니저는 기존 "명단 확인"을 받는다),
+  // 킥오프 2시간 전에 출전자와 팀장·매니저에게 한 번. 발송은 jobs/lineup-reminders 워커가 tx 로 직접 쓴다.
+  // 대회 경기는 targetType 'tournament' + "${tournamentId}:${teamMatchId}", 나머지는 'team_match' + teamMatchId.
+  | 'game_day_before_reminder'
+  | 'game_kickoff_reminder'
   // 내 기록 연결(claim) 승인 요청 (2026-08-26, attest UI C안): 신청이 들어오면 확인자
   // 후보에게 알린다 — 요청이 24시간 뒤 만료되는데 알림 없이는 확인자가 신청 사실
   // 자체를 알 수 없었다. 소스별로 딥링크·게이트가 달라 두 타입으로 나눈다.
@@ -171,6 +178,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_fixture_scheduled' ||
     type === 'league_fixture_cancelled' ||
     type === 'league_team_match_completed' ||
+    type === 'game_day_before_reminder' ||
+    type === 'game_kickoff_reminder' ||
     type === 'team_match_identity_attest_requested' ||
     type === 'team_match_identity_attest_expired' ||
     type === 'team_match_identity_attest_approved' ||
@@ -191,6 +200,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     // importantEnabled 는 "놓치면 안 되는 1:1 문의 답변" 전용이라 성격이 다르고,
     // 새 preference 컬럼을 만들면 마이그레이션이 붙는데 그럴 이유가 없다.
     type === 'tournament_award_received' ||
+    type === 'tournament_match_completed' ||
     // 신원 연결 승인 요청·만료·승인·거절(대회 판)도 대회 활동 축이다.
     type === 'tournament_identity_attest_requested' ||
     type === 'tournament_identity_attest_expired' ||
@@ -257,6 +267,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_announcement_published' ||
     type === 'tournament_completed_review_request' ||
     type === 'tournament_award_received' ||
+    type === 'tournament_match_completed' ||
     // targetId 는 "${tournamentId}:${fixtureId}" 복합 문자열 — 경기 상세가 2계층 경로라서다.
     // schedule_rsvp_deadline_reminder 의 기존 복합 targetId 선례를 따르고, 딥링크는
     // deepLinkForEvent 에서 명시적으로 파싱한다.
@@ -406,7 +417,8 @@ function deepLinkForEvent(
     (type === 'tournament_identity_attest_requested' ||
       type === 'tournament_identity_attest_expired' ||
       type === 'tournament_identity_attest_approved' ||
-      type === 'tournament_identity_attest_rejected') &&
+      type === 'tournament_identity_attest_rejected' ||
+      type === 'tournament_match_completed') &&
     targetId
   ) {
     const [tournamentId, fixtureId] = targetId.split(':');
@@ -436,6 +448,13 @@ function deepLinkForEvent(
   // 완료 알림 하나다.
   if (type === 'league_team_match_completed' && targetId) {
     return `/team-matches/${targetId}/result`;
+  }
+  // 경기 전 알림은 받는 사람 누구나 열 수 있는 공개 경기 상세로 보낸다. /team-matches/:id 는 리그 대진이면
+  // 리그 경기 상세로 서버 redirect 된다. 대회 경기는 복합 targetId 를 파싱한다(위 신원 연결 알림과 같은 패턴).
+  if ((type === 'game_day_before_reminder' || type === 'game_kickoff_reminder') && targetId) {
+    if (targetType !== 'tournament') return `/team-matches/${targetId}`;
+    const [tournamentId, teamMatchId] = targetId.split(':');
+    if (tournamentId && teamMatchId) return `/tournaments/${tournamentId}/matches/${teamMatchId}`;
   }
   return deepLinkForTarget(targetType, targetId);
 }
@@ -480,7 +499,11 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '다음 시즌 하위 리그로 강등됐어요',
   league_promotion_stayed: '다음 시즌에도 같은 리그예요',
   league_promotion_withdrawn: '리그 참가가 종료됐어요',
-  league_team_match_completed: '리그 경기 결과가 확정됐어요',
+  league_team_match_completed: '경기 결과가 확정됐어요',
+  tournament_match_completed: '대회 경기 결과가 확정됐어요',
+  // 발송 경로가 앞에 "9/30 (수) 01:10 " 을 붙인다 — 자정을 넘긴 경기가 "내일"로 읽히지 않게 날짜를 쓴다.
+  game_day_before_reminder: '경기가 있어요',
+  game_kickoff_reminder: '2시간 뒤 경기가 시작돼요',
   team_match_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   tournament_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   team_match_identity_attest_expired: '기록 연결 요청이 만료됐어요',
@@ -538,7 +561,11 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
-  league_team_match_completed: '경기 결과가 확정됐어요. 문의는 리그 운영자에게 해주세요.',
+  league_team_match_completed: '확정된 경기 결과를 확인해 보세요.',
+  tournament_match_completed: '확정된 경기 결과를 확인해 보세요.',
+  // 두 경기 전 알림의 본문 끝 문장이다 — 발송 경로가 "vs 상대 · 장소." 뒤에 붙인다.
+  game_day_before_reminder: '출전 명단은 경기 전까지 바뀔 수 있어요.',
+  game_kickoff_reminder: '지금 출전 명단에 있어요.',
   team_match_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   team_match_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',

@@ -4,6 +4,9 @@ import { Eye, ShieldAlert, X } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
+import { HomeStarterCard } from './home-starter-card';
+import { NextGameCard } from './next-game-card';
+import { TeamRequestBanner } from './team-request-banner';
 import {
   ChatIcon,
   ChevronRightIcon,
@@ -93,11 +96,21 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
               0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
           <div className="tm-home-banner-slot">
+            {/* 다음 경기는 유도 배너 예산 밖이다 -- 배너가 아니라 오늘의 정보라 조건이 맞으면 항상 맨 위에
+                온다. 팀이 없는 새 가입자에게는 같은 자리가 "먼저 해 볼 일"이 된다. */}
+            {model.teamActivity?.nextGame ? <NextGameCard game={model.teamActivity.nextGame} /> : null}
+            {!dash && model.teamActivity?.hasTeam === false ? <HomeStarterCard /> : null}
             {/* Task 154 P2-1: 조건이 맞아도 이번 방문에 선택된 유도 배너 하나만 렌더한다.
                 차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
                 밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.
                 판정은 model.bannerDecision(lib/home-banner-policy.ts) 하나로 모았다. */}
             {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+            {model.bannerDecision.nudge === 'teamInvitation' && model.teamActivity?.pendingInvitations ? (
+              <TeamRequestBanner kind="teamInvitation" invitations={model.teamActivity.pendingInvitations} />
+            ) : null}
+            {model.bannerDecision.nudge === 'joinRequests' && model.teamActivity?.pendingJoinRequests ? (
+              <TeamRequestBanner kind="joinRequests" joinRequests={model.teamActivity.pendingJoinRequests} />
+            ) : null}
             {model.bannerDecision.nudge === 'recordConsent' && model.recordConsentNudge ? (
               <RecordConsentNudgeBanner recordConsentNudge={model.recordConsentNudge} />
             ) : null}
@@ -121,7 +134,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
              */}
             <div className="tm-home-stats">
               <div>
-                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
+                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 경기</div>
                 {/* 로딩 중엔 '-'(값이 없다는 뜻)와 구분되게 스켈레톤을 그린다 — 레이블은
                     그대로 둬서 데이터가 도착해도 줄 높이가 바뀌지 않는다. */}
                 {model.statsLoading ? (
@@ -547,8 +560,9 @@ function RecordConsentNudgeBanner({
 }
 
 function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
+  // 슬롯의 다른 카드처럼 아래 여백을 스스로 가진다 — 유도 배너와 함께 뜨면(별개 예산) 둘이 붙지 않게.
   return (
-    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
       <span
         aria-hidden="true"
         style={{

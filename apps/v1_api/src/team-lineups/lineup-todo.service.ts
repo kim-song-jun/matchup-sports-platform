@@ -124,6 +124,12 @@ export class LineupTodoService {
     return this.collectWithLineupState([teamId], now);
   }
 
+  /** 여러 팀의 다가오는 경기를 시각순으로 한 번에 모은다(홈의 "다음 경기"). 팀이 없으면 빈 목록. */
+  async listUpcomingForTeams(teamIds: readonly string[], now: Date): Promise<TeamUpcomingGame[]> {
+    if (teamIds.length === 0) return [];
+    return this.collectWithLineupState([...teamIds], now);
+  }
+
   /**
    * `[from, to)` 에 시작하는 대회·리그 경기의 팀별 계산된 명단 요약. 기준 명단이 없는 팀
    * (확정 신청 없는 대회 등)은 알릴 명단이 없으므로 빠진다.
@@ -389,12 +395,20 @@ export class LineupTodoService {
   }
 }
 
+export interface GameRosterSummaryEntry {
+  readonly teamMatchId: string | null;
+  readonly sideId: string;
+  readonly summary: GameRosterSummary | null;
+  /** 계산된 출전자의 userId. `summary` 와 같은 계산에서 나오므로 함께 null 이다. */
+  readonly participantUserIds: ReadonlySet<string> | null;
+}
+
 /** 한 팀의 경기들에 대한 사이드·계산된 명단 요약. 대회·리그만 요약이 있고 친선·기준 명단 없음은 null. */
 export async function loadRosterSummaries(
   tx: Prisma.TransactionClient,
   teamId: string,
   games: readonly TeamUpcomingGame[],
-): Promise<Map<string, { teamMatchId: string | null; sideId: string; summary: GameRosterSummary | null }>> {
+): Promise<Map<string, GameRosterSummaryEntry>> {
   const sides = await tx.v1GameSide.findMany({
     where: { gameId: { in: games.map((game) => game.gameId) }, teamId },
     select: { id: true, gameId: true, game: { select: { teamMatchId: true } } },
@@ -407,11 +421,12 @@ export async function loadRosterSummaries(
     return { base, orderedGames: base === null ? [] : await loadTeamCompetitionGameOrder(tx, scope) };
   }
 
-  const result = new Map<string, { teamMatchId: string | null; sideId: string; summary: GameRosterSummary | null }>();
+  const result = new Map<string, GameRosterSummaryEntry>();
   for (const game of games) {
     const side = sideByGame.get(game.gameId);
     if (side === undefined) continue;
     let summary: GameRosterSummary | null = null;
+    let participantUserIds: ReadonlySet<string> | null = null;
     if (game.competitionKind !== 'FRIENDLY' && game.tournamentId !== null) {
       let cached = preloaded.get(game.tournamentId);
       if (cached === undefined) {
@@ -421,8 +436,9 @@ export async function loadRosterSummaries(
       const loaded =
         cached.base === null ? null : await loadGameRoster(tx, { gameId: game.gameId, sideId: side.id }, cached);
       summary = loaded === null ? null : summarizeGameRoster(loaded.computation);
+      participantUserIds = loaded === null ? null : new Set(loaded.computation.participants.map((entry) => entry.userId));
     }
-    result.set(game.gameId, { teamMatchId: side.game.teamMatchId, sideId: side.id, summary });
+    result.set(game.gameId, { teamMatchId: side.game.teamMatchId, sideId: side.id, summary, participantUserIds });
   }
   return result;
 }

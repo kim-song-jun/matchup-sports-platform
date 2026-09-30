@@ -60,6 +60,34 @@
 - 팝업 삭제는 `popup.delete`, 공지 삭제는 `notice.delete` 감사 이벤트를 남긴다.
 - 마스터 데이터(`master/sports`, `master/regions`)는 v1 사용자 API에서 read-only다.
 
+## `GET /api/v1/home` — `summary.monthlyMatches` (Task 180 F85)
+
+"이번 달 경기" — 마이 `GET /me/activity-summary` 의 `monthly.matchCount` 와 같은 집계 함수로 센다(끝난 개인 매치
+참가 + 공식 팀매치 출전, KST 달). 신청만 한 매치는 세지 않고 `pendingLabel`("대기 중인 신청 N건")로 따로 싣는다.
+
+## `GET /api/v1/home` — `teamActivity` (Task 180 G7)
+
+로그인 사용자에게 홈 맨 위 "다음 경기" 카드와 팀 유도 배너의 재료를 싣는다. 비로그인은
+`{ hasTeam: false, nextGame: null, pendingInvitations: null, pendingJoinRequests: null }`.
+계산이 실패하면 홈 전체를 죽이지 않고 `teamActivity: null` 을 준다 — `null` 은 "팀이 없다"가 아니라
+"계산하지 못했다"이므로 클라이언트는 그 영역을 그리지 않는다.
+
+- `hasTeam`: 활성 팀(활성 멤버십 + 활성·미삭제 팀)이 하나라도 있는지. `false` 면 그 자리가 "먼저 해 볼 일" 빈 상태다.
+- `nextGame`: 내 활성 팀들의 **앞으로의** 경기(`status=matched`, `startAt >= now`) 중 가장 가까운 하나 — 리그·대회·친선
+  팀매치. 수집은 팀 상세 `GET /teams/:teamId/upcoming-games` 와 같은 경로(`LineupTodoService`)다. 권한 경계는
+  서비스 계층의 멤버십 조회이며, 내 팀이 아닌 팀의 경기는 더 가까워도 나오지 않는다.
+  `{ gameId, teamMatchId, competitionKind, competitionId(대회 id 또는 리그 id), title, opponentName, scheduledAt,
+  placeName, teamId, teamName, viewerCanManage(owner·manager), viewerParticipating, participantCount }`.
+  - `viewerParticipating` 은 서버 판정이다: 대회·리그는 계산된 경기 명단(참가 명단 − 조정 − 결장 − 출전정지)의
+    출전자, 친선은 그 사이드의 가장 최근 제출본(SUBMITTED·LOCKED) 참석명단. 제출 뒤 다시 연 초안은 직전 제출본을
+    밀어내지 않는다. 빠진 선수는 `false` 일 뿐 "빠졌다"는 별도 값은 없다.
+  - `participantCount`: 대회·리그의 계산된 출전 인원. 친선과 기준 명단이 없는 팀은 `null`.
+- `pendingInvitations`: 내가 받은 대기 초대 `{ count, latestTeamName }` — 초대함 `GET /me/invitations` 와 같은 조건
+  (`invitedUserId = 나`, `status = pending`). 팀이 없어도 실린다. 없으면 `null`.
+- `pendingJoinRequests`: 내가 **팀장·매니저**인 활성 팀들의 대기(`requested`) 가입 신청
+  `{ count(합계), teamId·teamName(가장 많이 쌓인 팀), otherTeamCount }`. 팀원으로만 있는 팀의 신청은 세지 않는다.
+  없으면 `null`. 웹은 홈 유도 배너(상한 1, 팀 초대 → 가입 신청 → 공개 동의 → 남은 후기)로 그린다.
+
 ## 통합 검색은 아직 없다
 
 `GET /api/v1/search`(unified search)는 컨트롤러가 없다 — 검색 화면은 도메인별 목록 API를 직접

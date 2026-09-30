@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -157,6 +158,16 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
         tone="info"
         message={`${board.data.teamNameSnapshot} 팀원만 볼 수 있어요. 상대 팀과 관중에게는 등번호와 이름만 공개되고, 선발·후보와 배치는 나가지 않아요.`}
       />
+
+      {!canEdit ? (
+        <p
+          className="tm-text-label"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, color: 'var(--text-strong)', fontWeight: 600 }}
+        >
+          <Eye size={16} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+          보기 전용이에요. 배치는 팀장·매니저가 정해요.
+        </p>
+      ) : null}
 
       {notice !== null ? <AlertBanner tone="info" message={notice} /> : null}
       {error !== null ? <AlertBanner tone="error" message={error} /> : null}

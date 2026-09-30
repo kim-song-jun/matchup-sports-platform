@@ -210,6 +210,16 @@ describe('TacticsBoardClient — 보는 사람', () => {
     expect(screen.getByText('코트 1명 · 대기 1명.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /코트에 놓기$|배치 취소$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
+    // 왜 못 누르는지 한 줄로 말한다(W3-V3).
+    expect(screen.getByText('보기 전용이에요. 배치는 팀장·매니저가 정해요.')).toBeInTheDocument();
+  });
+
+  it('팀장·매니저에게는 보기 전용 안내가 없다 (대조군)', () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '한대기', 3)], 'owner');
+    mockBoard(boardData({ entries: [boardEntry()] }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.queryByText(/보기 전용/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '한대기(3번) 코트에 놓기' })).toBeInTheDocument();
   });
 
   it('보드에 게스트(userId 없음)로 있는 사람은 같은 이름의 팀원 칩을 또 만들지 않는다', () => {

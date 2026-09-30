@@ -353,8 +353,8 @@ export function PitchFormationEditor({
           className="tm-pressable"
           onClick={() => setSheetOpen(true)}
           disabled={!editable}
-          aria-haspopup="dialog"
-          aria-label={`포메이션 ${mobileFormationLabel}, 변경하기`}
+          aria-haspopup={editable ? 'dialog' : undefined}
+          aria-label={editable ? `포메이션 ${mobileFormationLabel}, 변경하기` : `포메이션 ${mobileFormationLabel}`}
           style={{
             width: '100%',
             minHeight: 56,
@@ -389,12 +389,14 @@ export function PitchFormationEditor({
               {mobileFormationLabel}
             </span>
           </span>
-          <span
-            aria-hidden="true"
-            style={{ flexShrink: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-body-lg)', lineHeight: 1 }}
-          >
-            ⌄
-          </span>
+          {editable ? (
+            <span
+              aria-hidden="true"
+              style={{ flexShrink: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-body-lg)', lineHeight: 1 }}
+            >
+              ⌄
+            </span>
+          ) : null}
         </button>
       </div>
 
@@ -481,7 +483,8 @@ function buildFormationChangeMessage(summary: FormationChangeSummary | null): st
 /**
  * 코트 밖 선수 칩. 풋살은 코트 옆 세로 줄(코트 높이만큼, 넘치면 그 안에서 스크롤), 축구는 피치 아래
  * 가로 줄이다. 칩 이름은 공통 앞부분만 떼고 5자로 줄이지 않는다 — 전체 이름은 스크린리더 라벨에 있다.
- * 읽기 전용이면 버튼이 아니라 목록 글자로 그린다(누를 수 없는 것을 버튼으로 보이지 않게).
+ * 읽기 전용이면 버튼도, 칩 모양(테두리·알약)도 아닌 목록 글자로 그린다 — 팀장 화면의 눌리는 칩과
+ * 같아 보이면 눌러도 반응이 없는 이유를 모른다.
  */
 function WaitingChips({
   entries,
@@ -523,6 +526,13 @@ function WaitingChips({
     >
       {entries.map((entry) => {
         const selected = !slotMode && selectedKey === entry.key;
+        const readOnlyStyle: React.CSSProperties = {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 0',
+          color: 'var(--text-strong)',
+        };
         const chipStyle: React.CSSProperties = {
           display: 'flex',
           alignItems: 'center',
@@ -580,7 +590,7 @@ function WaitingChips({
                 {content}
               </button>
             ) : (
-              <span title={entry.displayName} style={chipStyle}>
+              <span title={entry.displayName} style={readOnlyStyle}>
                 {content}
               </span>
             )}

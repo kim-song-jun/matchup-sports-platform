@@ -22,6 +22,7 @@ function record(overrides: Partial<SharedRecord>): SharedRecord {
     serverTime: '2026-09-29T00:00:00.000Z',
     canEdit: false,
     participant: true,
+    operator: false,
     ownSideId: 'side-home',
     lineupReady: false,
     missingSides: [{ sideId: 'side-home', sideKey: 'HOME', teamName: '우리 팀' }],

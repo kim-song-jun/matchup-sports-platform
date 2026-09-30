@@ -21,6 +21,8 @@ PR #1365 targets dev. Expand-contract gate PASS after using a nullable server-de
 
 2026-09-30 user approved proceeding with DEV-only deployment after CI, explicitly deferring Copilot and authenticated visual QA. CI revealed missing schema digest repins and three unsized admin links; fixed without weakening either gate. Historical schema hashes remain accepted for rollback; the M11 migration binding is unchanged.
 
+CI run 36678867332: API/Web/Gates PASS, including real DB integration and migration replay. PR #1365 merged to dev as 782ffacb98e91f5070eab940fd197270c223224d. Alpha run 36679582565 tracks deployment. Late automated static review found no Critical/Major and two Minor findings (required operator field/fixture sync and permission copy); both addressed in fresh follow-up branch `fix/platform-match-review-contract`.
+
 Date: 2026-09-19
 Owner: codex
 Status: in_progress

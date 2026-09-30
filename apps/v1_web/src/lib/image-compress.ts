@@ -45,6 +45,15 @@ export type ImageEncoder = (
   quality: number,
 ) => Promise<Blob | null>;
 
+export type CompressOptions = {
+  /**
+   * 크기와 무관하게 **항상** 캔버스로 다시 그려 원본 메타데이터(EXIF — 촬영 위치 GPS·기기 정보)를 지운다.
+   * 채팅처럼 사람 사이에 사진이 오가는 곳에서 켠다(Task 181 — 2MB 이하 원본을 그대로 보내면 위치가 따라간다).
+   * 다시 그린 결과가 원본보다 커도 한도 안이면 채택한다. 디코드할 수 없는 파일은 원본을 보내 서버 검증에 맡긴다.
+   */
+  stripMetadata?: boolean;
+};
+
 /** 종횡비를 유지한 채 긴 변이 maxEdge 를 넘지 않도록 줄인 크기 (확대하지 않는다). */
 export function fitWithin(
   width: number,
@@ -81,12 +90,14 @@ function toEncodedFile(original: File, blob: Blob): File {
 export async function compressImageForUpload(
   file: File,
   encode: ImageEncoder = encodeWithCanvas,
+  options: CompressOptions = {},
 ): Promise<File> {
   const withinLimit = file.size <= UPLOAD_IMAGE_MAX_BYTES;
   const serverAccepted = SERVER_ACCEPTED_MIME_TYPES.includes(file.type);
+  const strip = options.stripMetadata === true;
 
   if (!file.type.startsWith('image/')) return file;
-  if (serverAccepted && file.size <= SKIP_RECOMPRESS_BELOW_BYTES) return file;
+  if (serverAccepted && file.size <= SKIP_RECOMPRESS_BELOW_BYTES && !strip) return file;
 
   for (const maxEdge of MAX_EDGE_STEPS) {
     for (const quality of QUALITY_STEPS) {
@@ -98,7 +109,8 @@ export async function compressImageForUpload(
       }
       // 서버가 받는 형식은 크기가 줄었을 때만 채택한다(작은 PNG 를 재인코딩하면 커질 수 있다).
       // 서버가 안 받는 형식(HEIC 등)은 원본이 어차피 거부되므로 한도 안이기만 하면 채택한다.
-      const adopt = serverAccepted
+      // 메타데이터 제거가 목적이면 커져도 채택한다 — 원본을 쓰면 지우려던 EXIF 가 그대로 간다.
+      const adopt = serverAccepted && !strip
         ? encoded.size <= UPLOAD_IMAGE_MAX_BYTES && encoded.size < file.size
         : encoded.size <= UPLOAD_IMAGE_MAX_BYTES;
       if (adopt) return toEncodedFile(file, encoded);
@@ -118,10 +130,11 @@ export async function compressImageForUpload(
 export async function compressImagesForUpload(
   files: File[],
   encode: ImageEncoder = encodeWithCanvas,
+  options: CompressOptions = {},
 ): Promise<File[]> {
   const prepared: File[] = [];
   for (const file of files) {
-    prepared.push(await compressImageForUpload(file, encode));
+    prepared.push(await compressImageForUpload(file, encode, options));
   }
   return prepared;
 }
@@ -136,7 +149,8 @@ async function encodeWithCanvas(
 
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file);
+    // EXIF 방향(세로로 찍은 사진)을 픽셀에 반영해 그린다 — 다시 그리면 방향 태그가 사라지므로 안 하면 사진이 눕는다.
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
     // 손상된 파일이거나 브라우저가 디코드하지 못하는 형식 — 원본 경로로 넘긴다.
     return null;

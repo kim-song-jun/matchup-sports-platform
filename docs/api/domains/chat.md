@@ -64,6 +64,10 @@ and therefore has no host participant row.
   body-only readers stay readable), `imageUrl` = the referenced `V1UploadAsset.url`. `imageUrl` is `null` when the
   message is hidden/deleted (same rule as `content`) or the upload was deleted (FK `ON DELETE SET NULL`).
   Notification/push body is "사진을 보냈어요". Room-list `unreadCount` counts every non-system message.
+- Image privacy: chat photos are served from the same **public, unguessable UUID path** (`/uploads/...`) as other
+  uploads — anyone holding the URL can open it (no room-membership check on the static file). The web client always
+  re-encodes chat photos before upload (`useV1UploadImages({ stripMetadata: true })`) so EXIF (GPS location, device)
+  does not travel with them. A participant-only download path is planned with file attachments (Task 181 ③).
 
 ## Reporting and blocking
 

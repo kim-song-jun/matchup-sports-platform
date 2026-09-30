@@ -135,6 +135,33 @@ describe('compressImageForUpload', () => {
   });
 });
 
+describe('compressImageForUpload — stripMetadata (채팅 사진, Task 181)', () => {
+  it('2MB 이하 원본도 다시 그려 메타데이터(EXIF 위치)를 지운다 — 결과가 원본보다 커도 채택', async () => {
+    const original = makeFile(300 * 1024);
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(400 * 1024));
+    const result = await compressImageForUpload(original, encode, { stripMetadata: true });
+
+    expect(encode).toHaveBeenCalledTimes(1);
+    expect(result).not.toBe(original);
+    expect(result.type).toBe('image/webp');
+  });
+
+  it('디코드할 수 없으면 원본을 보내 서버 검증에 맡긴다', async () => {
+    const original = makeFile(300 * 1024);
+    const result = await compressImageForUpload(original, vi.fn(async () => null), { stripMetadata: true });
+
+    expect(result).toBe(original);
+  });
+
+  it('옵션이 없으면 기존처럼 작은 원본은 손대지 않는다', async () => {
+    const original = makeFile(300 * 1024);
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(100 * 1024));
+
+    expect(await compressImageForUpload(original, encode)).toBe(original);
+    expect(encode).not.toHaveBeenCalled();
+  });
+});
+
 describe('compressImagesForUpload', () => {
   it('여러 장을 동시에 인코딩하지 않는다 — 모바일에서 비트맵이 한꺼번에 잡히면 탭이 죽는다', async () => {
     let inFlight = 0;

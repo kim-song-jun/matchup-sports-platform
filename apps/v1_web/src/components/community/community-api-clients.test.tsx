@@ -435,28 +435,46 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
       return { sendMutateAsync };
     }
 
-    it('고른 사진을 한 번에 올리고 사진마다 메시지 하나로 보낸다', async () => {
-      const upload = vi.fn().mockResolvedValue({ urls: ['/uploads/a.jpg', '/uploads/b.jpg'] });
+    // 업로드 mock — 받은 파일 이름으로 경로를 돌려준다(사진마다 한 장씩 올린다).
+    const uploadEach = () => vi.fn(async ([file]: File[]) => ({ urls: [`/uploads/${file.name}`] }));
+
+    it('사진마다 올리고 바로 보낸다 — 채팅 사진은 메타데이터(EXIF)를 지우는 업로드를 쓴다', async () => {
+      const upload = uploadEach();
       const { sendMutateAsync } = arrange(upload);
       const files = photos(2);
 
       fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
 
       await waitFor(() => expect(sendMutateAsync).toHaveBeenCalledTimes(2));
-      expect(upload).toHaveBeenCalledWith(files);
-      expect(sendMutateAsync).toHaveBeenNthCalledWith(1, { imageUrl: '/uploads/a.jpg' });
-      expect(sendMutateAsync).toHaveBeenNthCalledWith(2, { imageUrl: '/uploads/b.jpg' });
+      expect(hooks.uploadImages).toHaveBeenCalledWith({ stripMetadata: true });
+      expect(upload.mock.calls.map(([batch]) => batch.map((file: File) => file.name))).toEqual([['p0.jpg'], ['p1.jpg']]);
+      expect(sendMutateAsync).toHaveBeenNthCalledWith(1, { imageUrl: '/uploads/p0.jpg' });
+      expect(sendMutateAsync).toHaveBeenNthCalledWith(2, { imageUrl: '/uploads/p1.jpg' });
     });
 
-    it('6장 이상 고르면 앞 5장만 올리고 알려 준다', async () => {
-      const upload = vi.fn().mockResolvedValue({ urls: ['1', '2', '3', '4', '5'].map((n) => `/uploads/${n}.jpg`) });
+    it('6장 이상 고르면 앞 5장만 보내고 알려 준다', async () => {
+      const upload = uploadEach();
       arrange(upload);
       const files = photos(6);
 
       fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
 
       expect(await screen.findByText('사진은 한 번에 5장까지 보낼 수 있어요. 앞의 5장만 보냈어요.')).toBeInTheDocument();
-      expect(upload).toHaveBeenCalledWith(files.slice(0, 5));
+      // jsdom File 은 모양만 비교되므로 이름으로 본다 — 6번째(p5)는 올리지 않는다.
+      expect(upload.mock.calls.map(([batch]) => batch[0].name)).toEqual(['p0.jpg', 'p1.jpg', 'p2.jpg', 'p3.jpg', 'p4.jpg']);
+    });
+
+    it('중간에 실패하면 몇 장이 갔는지 알리고 거기서 멈춘다 — 다시 고를 때 앞 사진이 중복되지 않게', async () => {
+      const upload = uploadEach();
+      const { sendMutateAsync } = arrange(upload);
+      sendMutateAsync.mockResolvedValueOnce({}).mockRejectedValueOnce({});
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(3) } });
+
+      expect(await screen.findByText('사진 3장 중 1장만 보냈어요. 사진을 보내지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+      // 실패한 2번째 뒤로는 올리지 않는다 — 안 보내질 사진이 저장소에 쌓이지 않는다.
+      expect(upload).toHaveBeenCalledTimes(2);
+      expect(sendMutateAsync).toHaveBeenCalledTimes(2);
     });
 
     it('업로드가 실패하면 보내지 않고 서버가 준 이유(용량 초과 등)를 보여 준다', async () => {

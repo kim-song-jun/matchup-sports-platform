@@ -150,7 +150,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const room = useV1ChatRoom(roomId);
   const messages = useV1ChatMessages(roomId, { limit: 50 });
   const send = useV1SendChatMessage(roomId);
-  const uploadImages = useV1UploadImages();
+  // 채팅 사진은 크기와 무관하게 다시 그려 촬영 위치(EXIF GPS)·기기 정보를 지운다.
+  const uploadImages = useV1UploadImages({ stripMetadata: true });
   const updateMe = useV1UpdateMyChatRoom(roomId);
   const [draft, setDraft] = useState('');
   const [sendingImages, setSendingImages] = useState(false);
@@ -229,20 +230,27 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         },
       );
     },
-    // 고른 사진은 한 번에 올리고(업로드 1회) 사진마다 메시지 1개로 보낸다 — 카카오톡처럼 말풍선이 사진별로 올라간다.
+    // 사진마다 "올리기 → 보내기"를 차례로 한다 — 말풍선이 사진별로 올라가고(카카오톡처럼), 중간에 실패해도
+    // 몇 장이 갔는지 정확히 알려 다시 고를 때 앞 사진이 중복되지 않으며, 올리기만 되고 안 보내진 사진이 쌓이지 않는다.
     onPickImages: async (files) => {
       if (sendingImages || files.length === 0) return;
       const picked = files.slice(0, MAX_CHAT_IMAGES);
       setImageNotice(undefined);
       setSendingImages(true);
+      let sent = 0;
       try {
-        const { urls } = await uploadImages.mutateAsync(picked);
-        for (const imageUrl of urls) await send.mutateAsync({ imageUrl });
+        for (const file of picked) {
+          const { urls } = await uploadImages.mutateAsync([file]);
+          if (!urls[0]) throw new Error('사진을 올리지 못했어요. 다시 시도해 주세요.');
+          await send.mutateAsync({ imageUrl: urls[0] });
+          sent += 1;
+        }
         if (files.length > MAX_CHAT_IMAGES) {
           setImageNotice(`사진은 한 번에 ${MAX_CHAT_IMAGES}장까지 보낼 수 있어요. 앞의 ${MAX_CHAT_IMAGES}장만 보냈어요.`);
         }
       } catch (err) {
-        setImageNotice(extractErrorMessage(err, '사진을 보내지 못했어요. 다시 시도해 주세요.'));
+        const reason = extractErrorMessage(err, '사진을 보내지 못했어요. 다시 시도해 주세요.');
+        setImageNotice(sent > 0 ? `사진 ${picked.length}장 중 ${sent}장만 보냈어요. ${reason}` : reason);
       } finally {
         setSendingImages(false);
       }

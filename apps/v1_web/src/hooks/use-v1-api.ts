@@ -3,7 +3,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { compressImagesForUpload } from '@/lib/image-compress';
+import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compress';
 import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
@@ -2873,7 +2873,7 @@ export function useV1WithdrawalRequest() {
  * 전송 전에 compressImagesForUpload 로 한 장씩 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을
  * 그대로 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
  */
-export function useV1UploadImages() {
+export function useV1UploadImages(options?: CompressOptions) {
   return useMutation({
     mutationFn: async (files: File | File[] | FileList) => {
       const formData = new FormData();
@@ -2882,7 +2882,7 @@ export function useV1UploadImages() {
         : Array.isArray(files)
           ? files
           : [files];
-      const prepared = await compressImagesForUpload(fileArray);
+      const prepared = await compressImagesForUpload(fileArray, undefined, options);
       prepared.forEach((file) => formData.append('files', file));
       return v1MultipartPost<V1UploadImagesResult>('/uploads', formData);
     },

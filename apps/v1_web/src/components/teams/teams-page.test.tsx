@@ -503,6 +503,64 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
   });
 });
 
+// G12 B-1(F22·F23): 만들기 첫 화면은 이름·종목·지역만 — 선택 항목은 "더 꾸미기"로 접어 둔다.
+describe('TeamFormPageView — 만들기 첫 화면', () => {
+  function createModel(form: Partial<NonNullable<TeamFormViewModel['form']>> = {}): TeamFormViewModel {
+    return {
+      mode: 'create',
+      team: {
+        name: '', logoUrl: null, coverImageUrl: null, sport: '풋살', region: '서울 마포구',
+        description: '', sports: ['풋살'], city: '서울', county: '마포구', level: '', genderRule: '성별 무관',
+        activityDays: [], activityFrequency: '', activityTimeSlots: [], activityTypes: [], activityMemo: '', capacity: 24,
+      },
+      form: {
+        sportId: 'sport-1', regionId: 'region-1', regions: [{ id: 'region-1', name: '서울 마포구' }],
+        sports: [{ id: 'sport-1', name: '풋살' }], joinPolicy: 'approval_required',
+        onFieldChange: vi.fn(), onSportChange: vi.fn(), onRegionChange: vi.fn(), onJoinPolicyChange: vi.fn(), onSubmit: vi.fn(),
+        ...form,
+      },
+    };
+  }
+
+  it('선택 항목은 더 꾸미기를 열어야 보인다', () => {
+    render(<TeamFormPageView model={createModel()} />);
+
+    const more = screen.getByRole('button', { name: /더 꾸미기/ });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('상단 이미지')).not.toBeVisible();
+    expect(screen.queryByRole('combobox', { name: '정원' })).not.toBeInTheDocument();
+
+    fireEvent.click(more);
+
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
+  });
+
+  it('로고는 한 줄로 두고 바꾸기를 눌러야 고르는 칸이 열린다', () => {
+    render(<TeamFormPageView model={createModel()} />);
+    expect(screen.queryByRole('group', { name: '기본 팀 로고 선택' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '바꾸기' }));
+
+    expect(screen.getByRole('group', { name: '기본 팀 로고 선택' })).toBeInTheDocument();
+  });
+
+  it('내 지역으로 채웠으면 그렇게 알리고, 아니면 알리지 않는다', () => {
+    const view = render(<TeamFormPageView model={createModel({ regionPrefilled: true })} />);
+    expect(screen.getByText('내 활동 지역으로 채웠어요. 바꿀 수 있어요.')).toBeInTheDocument();
+
+    view.rerender(<QueryClientProvider client={new QueryClient()}><TeamFormPageView model={createModel({ regionPrefilled: false })} /></QueryClientProvider>);
+    expect(screen.queryByText('내 활동 지역으로 채웠어요. 바꿀 수 있어요.')).not.toBeInTheDocument();
+  });
+
+  it('수정 화면은 접지 않고 모든 항목을 바로 보인다', () => {
+    render(<TeamFormPageView model={{ ...createModel(), mode: 'edit' }} />);
+
+    expect(screen.queryByRole('button', { name: /더 꾸미기/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
+  });
+});
+
 describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
   it('일반 멤버는 관리자 문구·가입 신청 탭·비활성 관리 버튼 없이 본인 탈퇴만 본다', () => {
     const base = getTeamMembersViewModel();

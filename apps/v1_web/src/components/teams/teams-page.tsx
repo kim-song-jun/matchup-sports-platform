@@ -944,6 +944,18 @@ export function TeamFormPageView({
   useEffect(() => {
     if (formError) revealAndFocus(errorRef.current);
   }, [formError]);
+  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreId = useId();
+  const coverField = <TeamCoverImageField coverImageUrl={team.coverImageUrl} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('coverImageUrl', url)} />;
+  const descriptionField = <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />;
+  const detailFields = (
+    <>
+      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+      <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
+      <TeamActivityFields team={team} form={form} />
+    </>
+  );
   // title은 mode(edit/create)로만 갈리고 mode는 어느 pathname이 이 컴포넌트를 렌더했는지로
   // 완전히 결정된다(/teams/new → create, /teams/:id/edit → edit) — fetch 의존이 아니라
   // route-chrome 테이블에 두 pathname 각각의 정적 title로 등록돼 있다(fragments/teams.ts).
@@ -981,11 +993,20 @@ export function TeamFormPageView({
               </div>
             </Card>
           ) : null}
-          {!edit ? <h2 className="tm-text-heading">새 팀을 만들어요</h2> : null}
+          {!edit ? (
+            <>
+              <h2 className="tm-text-heading">새 팀을 만들어요</h2>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>이름·종목·활동 지역만 정하면 바로 시작해요.</div>
+            </>
+          ) : null}
           {form?.error ? <div ref={errorRef} tabIndex={-1} role="alert"><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
-          <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
-          <TeamCoverImageField coverImageUrl={team.coverImageUrl} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('coverImageUrl', url)} />
+          {edit || logoPickerOpen ? (
+            <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
+          ) : (
+            <TeamLogoSummaryRow logoUrl={team.logoUrl} teamName={team.name} onChange={() => setLogoPickerOpen(true)} />
+          )}
+          {edit ? coverField : null}
           <div className="tm-create-field">
             <div className="tm-text-label">종목</div>
             {/* Fix (3): 하드코딩 fallback 제거.
@@ -1021,12 +1042,49 @@ export function TeamFormPageView({
               </div>
             )}
           </div>
-          <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
-          <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />
-          {edit ? <TeamJoinPolicyField form={form} /> : null}
-          <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
-          <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
-          <TeamActivityFields team={team} form={form} />
+          <RegionSelect
+            value={form?.regionId ?? ''}
+            regions={form?.regions ?? []}
+            onChange={form?.onRegionChange}
+            caption={
+              edit
+                ? '팀 추천과 지역 검색에 쓰여요. 세부 장소나 예외 일정은 아래 활동 메모에 적어 주세요.'
+                : form?.regionPrefilled
+                  ? '내 활동 지역으로 채웠어요. 바꿀 수 있어요.'
+                  : '팀 추천과 지역 검색에 쓰여요.'
+            }
+          />
+          {edit ? (
+            <>
+              {descriptionField}
+              <TeamJoinPolicyField form={form} />
+              {detailFields}
+            </>
+          ) : (
+            <>
+              {/* 선택 항목이 필수 항목을 첫 화면 밖으로 밀지 않게 접어 둔다(F22). */}
+              <button
+                type="button"
+                className="tm-card tm-pressable tm-team-form-more"
+                aria-expanded={moreOpen}
+                aria-controls={moreId}
+                onClick={() => setMoreOpen((current) => !current)}
+              >
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="tm-text-label" style={{ display: 'block' }}>
+                    더 꾸미기 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
+                  </span>
+                  <span className="tm-text-caption" style={{ display: 'block', marginTop: 2 }}>상단 이미지 · 팀 소개 · 레벨 · 정원 · 성별 · 활동 일정</span>
+                </span>
+                <ChevronDown size={20} aria-hidden="true" className="tm-team-form-more-chevron" data-open={moreOpen ? 'true' : undefined} />
+              </button>
+              <div id={moreId} hidden={!moreOpen}>
+                {coverField}
+                {descriptionField}
+                {detailFields}
+              </div>
+            </>
+          )}
         </div>
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
@@ -1232,6 +1290,23 @@ function formatActivityDays(days: string[]) {
 function labelFromOptions(options: ReadonlyArray<{ value: string; label: string }>, values: string[]) {
   const labels = new Map(options.map((option) => [option.value, option.label]));
   return values.map((value) => labels.get(value)).filter(Boolean);
+}
+
+/** 만들기 첫 화면의 로고 한 줄 — 무작위 기본 로고로 시작하고, 바꿀 때만 고르는 칸을 연다(B-1). */
+function TeamLogoSummaryRow({ logoUrl, teamName, onChange }: { logoUrl: string | null; teamName: string; onChange: () => void }) {
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">팀 로고</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+        <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="lg" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>기본 로고로 시작해요</div>
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>나중에 내 이미지로 바꿀 수 있어요.</div>
+        </div>
+        <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" style={{ minHeight: 44 }} onClick={onChange}>바꾸기</button>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -2063,10 +2138,12 @@ function RegionSelect({
   value,
   regions,
   onChange,
+  caption,
 }: {
   value: string;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   onChange?: (regionId: string) => void;
+  caption: string;
 }) {
   const normalizedRegions = regions.map((region) => {
     if (region.parentName || region.shortName) return region;
@@ -2120,7 +2197,7 @@ function RegionSelect({
           ))}
         </select>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 8 }}>팀 추천과 지역 검색에 쓰여요. 세부 장소나 예외 일정은 아래 활동 메모에 적어 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>{caption}</div>
     </label>
   );
 }

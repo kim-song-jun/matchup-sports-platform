@@ -4102,6 +4102,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--grey100);
 }
 
+/* 정원 하한에 닿아 막힌 "−" — 활성 "+" 와 같은 파랑으로 두면 눌리는 것처럼 보인다(.tm-btn:disabled 와 같은 토큰). */
+.tm-create-stepper-button:disabled {
+  background: var(--grey100);
+  border-color: var(--grey100);
+  color: var(--text-caption);
+  cursor: not-allowed;
+}
+
 /* Capacity stepper: the middle <select> sits between −/+ buttons, so drop its
    chevron and centre the value — the steppers are the primary control.
    Pin its height to 48px so all three controls match exactly. */
@@ -4577,6 +4585,37 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* 팀 만들기 "더 꾸미기" — 선택 항목을 접어 두는 한 줄(G12 B-1). */
+.tm-team-form-more {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 24px;
+  padding: 12px 16px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-team-form-more-chevron {
+  flex: none;
+  color: var(--text-caption);
+  transition: transform var(--duration-fast) ease;
+}
+
+.tm-team-form-more-chevron[data-open='true'] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-team-form-more-chevron {
+    transition: none;
+  }
 }
 
 .tm-team-form-chip-row .tm-chip {

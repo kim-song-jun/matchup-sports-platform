@@ -12,6 +12,7 @@ const {
   routerPush,
   updateTeamMutateAsync,
   useV1MasterSportsMock,
+  useV1ProfileMock,
   useV1TeamDetailMock,
 } = vi.hoisted(() => ({
   confirmMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   routerPush: vi.fn(),
   updateTeamMutateAsync: vi.fn(),
   useV1MasterSportsMock: vi.fn(),
+  useV1ProfileMock: vi.fn(),
   useV1TeamDetailMock: vi.fn(),
 }));
 
@@ -26,9 +28,11 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
 }));
 
+const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => navigation.searchParams,
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
@@ -41,16 +45,20 @@ vi.mock('@/components/v1-ui/confirm-modal', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateTeam: () => ({ mutateAsync: createTeamMutateAsync, isPending: false }),
   useV1MasterRegions: () => ({
-    data: [{ id: 'region-seoul', name: '서울', parentId: null, level: 1 }],
+    data: [
+      { id: 'region-seoul', name: '서울', parentId: null, level: 1 },
+      { id: 'region-mapo', name: '마포구', parentId: 'region-seoul', level: 2 },
+    ],
   }),
   useV1MasterSports: useV1MasterSportsMock,
+  useV1Profile: useV1ProfileMock,
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1TeamDetail: useV1TeamDetailMock,
   useV1UpdateTeam: () => ({ mutateAsync: updateTeamMutateAsync, isPending: false }),
 }));
 
 vi.mock('./teams-page', () => ({
-  TeamFormPageView: ({ model }: { model: TeamFormViewModel }) => {
+  TeamFormPageView: ({ model, cancelHref }: { model: TeamFormViewModel; cancelHref?: string }) => {
     const form = model.form;
 
     if (!form) return <div role="status">종목 목록 불러오는 중</div>;
@@ -66,6 +74,9 @@ vi.mock('./teams-page', () => ({
         />
         <output data-testid="team-logo-url">{model.team.logoUrl}</output>
         <output data-testid="min-capacity">{form.minCapacity}</output>
+        <output data-testid="region-id">{form.regionId}</output>
+        <output data-testid="region-prefilled">{String(Boolean(form.regionPrefilled))}</output>
+        <button type="button" onClick={() => form.onRegionChange('region-seoul')}>서울 전체 고르기</button>
         {form.error ? <p role="alert">{form.error}</p> : null}
         {form.sports.map((sport) => (
           <button
@@ -80,6 +91,7 @@ vi.mock('./teams-page', () => ({
         <button type="button" onClick={form.onSubmit}>
           {model.mode === 'create' ? '팀 만들기' : '저장'}
         </button>
+        {cancelHref ? <a href={cancelHref}>취소</a> : null}
       </div>
     );
   },
@@ -88,6 +100,8 @@ vi.mock('./teams-page', () => ({
 describe('Team form client contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigation.searchParams = new URLSearchParams();
+    useV1ProfileMock.mockReturnValue({ data: { regions: [] }, isPending: false });
     useV1MasterSportsMock.mockReturnValue({
       data: [
         { id: 'sport-soccer', code: 'soccer', name: '축구', levels: [] },
@@ -241,6 +255,69 @@ describe('Team form client contracts', () => {
     fireEvent.click(submit);
 
     expect(updateTeamMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  // G12(F23): 온보딩에서 고른 내 지역으로 채운다 — "서울/전체"로 시작하지 않는다.
+  describe('만들기 활동 지역 기본값', () => {
+    it('프로필의 대표 지역으로 채우고, 그 사실을 알린다', async () => {
+      useV1ProfileMock.mockReturnValue({
+        data: { regions: [{ regionId: 'region-seoul', primary: false }, { regionId: 'region-mapo', primary: true }] },
+        isPending: false,
+      });
+      render(<TeamCreatePageClient />);
+
+      await waitFor(() => expect(screen.getByTestId('region-id')).toHaveTextContent('region-mapo'));
+      expect(screen.getByTestId('region-prefilled')).toHaveTextContent('true');
+    });
+
+    it('프로필이 늦게 와도 첫 지역을 먼저 박지 않고 내 지역으로 채운다', async () => {
+      useV1ProfileMock.mockReturnValue({ data: undefined, isPending: true });
+      const view = render(<TeamCreatePageClient />);
+      expect(screen.getByTestId('region-id')).toHaveTextContent('');
+
+      useV1ProfileMock.mockReturnValue({ data: { regions: [{ regionId: 'region-mapo', primary: true }] }, isPending: false });
+      view.rerender(<TeamCreatePageClient />);
+
+      await waitFor(() => expect(screen.getByTestId('region-id')).toHaveTextContent('region-mapo'));
+    });
+
+    it('프로필 지역이 없으면 첫 지역으로 시작하고 채웠다고 말하지 않는다', async () => {
+      render(<TeamCreatePageClient />);
+
+      await waitFor(() => expect(screen.getByTestId('region-id')).toHaveTextContent('region-seoul'));
+      expect(screen.getByTestId('region-prefilled')).toHaveTextContent('false');
+    });
+
+    it('직접 지역을 바꾸면 채웠다는 안내를 내린다', async () => {
+      useV1ProfileMock.mockReturnValue({ data: { regions: [{ regionId: 'region-mapo', primary: true }] }, isPending: false });
+      render(<TeamCreatePageClient />);
+      await waitFor(() => expect(screen.getByTestId('region-prefilled')).toHaveTextContent('true'));
+
+      fireEvent.click(screen.getByRole('button', { name: '서울 전체 고르기' }));
+
+      expect(screen.getByTestId('region-id')).toHaveTextContent('region-seoul');
+      expect(screen.getByTestId('region-prefilled')).toHaveTextContent('false');
+    });
+  });
+
+  // W2-V2: 취소는 들어온 곳으로 — 팀 목록으로 보내면 방금 보던 팀을 잃는다.
+  describe('수정 취소 목적지', () => {
+    it('출처가 없으면 그 팀 상세로 돌아간다', () => {
+      render(<TeamEditPageClient teamId="team-futsal" />);
+
+      expect(screen.getByRole('link', { name: '취소' })).toHaveAttribute('href', '/teams/team-futsal');
+    });
+
+    it('안전한 출처가 있으면 그곳으로, 바깥 주소는 버리고 팀 상세로 돌아간다', () => {
+      navigation.searchParams = new URLSearchParams({ from: '/teams/team-futsal?from=%2Fmy%2Fteams' });
+      const view = render(<TeamEditPageClient teamId="team-futsal" />);
+      expect(screen.getByRole('link', { name: '취소' })).toHaveAttribute('href', '/teams/team-futsal?from=%2Fmy%2Fteams');
+
+      view.unmount();
+      navigation.searchParams = new URLSearchParams({ from: 'https://evil.example/teams' });
+      render(<TeamEditPageClient teamId="team-futsal" />);
+      expect(screen.getByRole('link', { name: '취소' })).toHaveAttribute('href', '/teams/team-futsal');
+    });
   });
 
   describe('수정 권한', () => {

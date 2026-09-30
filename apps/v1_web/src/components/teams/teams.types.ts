@@ -171,6 +171,8 @@ export type TeamFormViewModel = {
     membersVisibilityEnabled?: boolean;
     /** 수정 화면에서 정원이 내려갈 수 있는 하한 — 지금 팀원 수. */
     minCapacity?: number;
+    /** 만들기 화면에서 활동 지역을 내 프로필 지역으로 채웠고 아직 바꾸지 않았다. */
+    regionPrefilled?: boolean;
     onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
     onSportChange: (sportId: string) => void;
     onRegionChange: (regionId: string) => void;

@@ -11,6 +11,7 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { isTeamOperatorRole } from '@/lib/team-role';
+import { withFromPath } from '@/lib/session-storage';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { TEAM_NAME_TAKEN_MESSAGE, teamErrorMessage } from '@/lib/team-error-messages';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
@@ -313,6 +314,11 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
         });
     },
   });
+
+  // 해체는 팀장만 — 멤버가 있는 팀은 여기가 해체 화면으로 가는 입구다(혼자면 멤버 관리에도 있다).
+  if (query.data.viewer?.role === 'owner') {
+    model.dissolveHref = withFromPath(`/teams/${teamId}/dissolve`, `/teams/${teamId}/edit`);
+  }
 
   return (
     <>

@@ -99,4 +99,15 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
       backHref: (p) => `/teams/${p.id}`,
     },
   },
+  {
+    // Task 180 H3 — 해체 버튼이 하단 고정이라 탭바를 숨긴다. `?from=` 은 AppBackLink 가 읽는다.
+    pattern: '/teams/:id/dissolve',
+    chrome: {
+      title: '팀 해체',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
 ];

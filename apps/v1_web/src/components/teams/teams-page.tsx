@@ -22,6 +22,7 @@ import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamMembersSection } from './team-members-section';
+import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -1085,6 +1086,7 @@ export function TeamFormPageView({
               {descriptionField}
               <TeamJoinPolicyField form={form} />
               {detailFields}
+              {model.dissolveHref ? <TeamManageDissolveEntry dissolveHref={model.dissolveHref} /> : null}
             </>
           ) : (
             <>
@@ -1610,6 +1612,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         ) : model.invitations ? (
           <InvitationSection invitations={model.invitations} />
         ) : null}
+        {model.soloOwner && model.activeTab === 'members' ? <SoloOwnerCard {...model.soloOwner} /> : null}
       </div>
     </>
   );

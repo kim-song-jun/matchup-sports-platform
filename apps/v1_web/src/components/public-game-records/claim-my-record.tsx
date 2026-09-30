@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
@@ -52,19 +53,26 @@ export function ClaimMyRecordSection({
   return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
 }
 
-/** 리그 경기 상세용 — 목록만 리그 스코프 API 를 쓰고 나머지는 대회와 동일하다. */
+/**
+ * 리그 경기 상세용 — 목록만 리그 스코프 API 를 쓰고 나머지는 대회와 동일하다.
+ * `variant="link"` 는 명단 카드 아래 한 줄 입구(G13 F61) — 노출 조건은 호출부가 상태 모델로 정한다.
+ */
 export function LeagueClaimMyRecordSection({
   leagueId,
   teamMatchId,
+  variant = 'card',
 }: {
   leagueId: string;
   teamMatchId: string;
+  variant?: ClaimEntryVariant;
 }) {
   const [open, setOpen] = useState(false);
   const claimable = useV1LeagueClaimableParticipants(leagueId, teamMatchId, { enabled: open });
   const request = useV1LeagueRequestIdentityLink(leagueId, teamMatchId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} variant={variant} />;
 }
+
+type ClaimEntryVariant = 'card' | 'link';
 
 /** 팀매치 상세용 — 후보 목록 API만 팀매치 스코프로 바꾸고 화면·신청 계약은 공유한다. */
 export function TeamMatchClaimMyRecordSection({ teamMatchId }: { teamMatchId: string }) {
@@ -79,11 +87,13 @@ function ClaimMyRecordView({
   onOpenChange,
   claimable,
   request,
+  variant = 'card',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   claimable: ReturnType<typeof useV1ClaimableParticipants>;
   request: ReturnType<typeof useV1RequestIdentityLink>;
+  variant?: ClaimEntryVariant;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +115,13 @@ function ClaimMyRecordView({
 
   // 신청이 끝나면 배너를 접는다. 같은 경기에 두 번 신청할 이유가 없고, 남겨 두면
   // "아직 안 됐나?" 하고 다시 누르게 된다.
+  if (done && variant === 'link') {
+    return (
+      <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0' }}>
+        연결을 신청했어요. 다른 참가자가 확인하면 내 활동 기록에 이 경기가 표시돼요.
+      </p>
+    );
+  }
   if (done) {
     return (
       <Card pad={16} style={{ marginTop: 12 }}>
@@ -116,25 +133,34 @@ function ClaimMyRecordView({
     );
   }
 
+  const openModal = () => {
+    setError(null);
+    onOpenChange(true);
+  };
+
   return (
     <>
-      <Card pad={16} style={{ marginTop: 12, borderStyle: 'solid' }}>
-        <div className="tm-text-body-lg">이 경기에 뛰었는데 내 기록이 없나요?</div>
-        <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-          명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.
-        </div>
-        <button
-          type="button"
-          className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-          style={{ marginTop: 12, minHeight: 44 }}
-          onClick={() => {
-            setError(null);
-            onOpenChange(true);
-          }}
-        >
-          명단에서 나 찾기
+      {variant === 'link' ? (
+        <button type="button" className="tm-section-action" style={{ paddingLeft: 0, marginTop: 4 }} onClick={openModal}>
+          내 기록이 안 보이나요? 명단에서 나 찾기
+          <ChevronRightIcon size={16} strokeWidth={2} aria-hidden="true" />
         </button>
-      </Card>
+      ) : (
+        <Card pad={16} style={{ marginTop: 12, borderStyle: 'solid' }}>
+          <div className="tm-text-body-lg">이 경기에 뛰었는데 내 기록이 없나요?</div>
+          <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.
+          </div>
+          <button
+            type="button"
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 12, minHeight: 44 }}
+            onClick={openModal}
+          >
+            명단에서 나 찾기
+          </button>
+        </Card>
+      )}
 
       {open && typeof document !== 'undefined'
         ? createPortal((

@@ -82,3 +82,8 @@ export function competitionFormatLabel(competition: {
   if (isLeagueCompetition(competition)) return '리그 방식';
   return competition.format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트';
 }
+
+/** 현장 운영 셸 제목. `format` 이 아니라 `kind` 로 가른다(리그 방식 대회는 대회다). 모르는 동안·옛 행(null)은 대회. */
+export function competitionOpsTitle(kind: V1CompetitionKind | null | undefined): string {
+  return kind === 'regular_league' ? '리그 운영' : '대회 운영';
+}

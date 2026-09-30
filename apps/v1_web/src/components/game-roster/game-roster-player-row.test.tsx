@@ -27,12 +27,19 @@ describe('GameRosterPlayerRow', () => {
     expect(screen.queryByText(/퇴장 1회/)).toBeNull();
   });
 
-  it('출전은 사유·주체 없이, 계정 없는 폴백 팀원은 안내를 단다', () => {
-    render(<GameRosterPlayerRow {...base} jerseyNumber={null} accountLinked={false} status="PARTICIPATING" reason="INJURY" />);
-    expect(screen.getByText('출전')).toBeInTheDocument();
+  it('출전은 기본 상태라 칩이 없고(F58), 계정 없는 폴백 팀원은 안내를 단다', () => {
+    const { rerender } = render(
+      <GameRosterPlayerRow {...base} jerseyNumber={null} accountLinked={false} status="PARTICIPATING" reason="INJURY" />,
+    );
+    expect(screen.queryByText('출전')).toBeNull();
+    expect(document.querySelector('.tm-badge')).toBeNull();
     expect(screen.getByText('계정 없이 기록돼요')).toBeInTheDocument();
     expect(screen.queryByText(/처리/)).toBeNull();
     expect(screen.getByText('없음')).toHaveClass('sr-only');
+
+    // 같은 행에서 체크를 풀어 빠짐이 되면 칩이 붙는다 — 바뀐 것만 표시한다.
+    rerender(<GameRosterPlayerRow {...base} jerseyNumber={null} accountLinked={false} status="EXCLUDED" />);
+    expect(screen.getByText('빠짐')).toHaveClass('tm-badge');
   });
 
   it('모르는 사유·역할 코드는 영문으로 새지 않는다', () => {

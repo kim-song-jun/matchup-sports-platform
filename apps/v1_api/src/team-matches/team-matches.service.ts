@@ -1368,7 +1368,7 @@ export class TeamMatchesService {
       result.autoRejectedApplicantTeamIds,
       'team_match_application_rejected',
       application.teamMatchId,
-      `"${application.teamMatch.title}" 팀매치의 상대팀이 확정되어 신청이 종료됐어요.`,
+      `"${application.teamMatch.title}" 팀매치는 다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.`,
     );
 
     return {

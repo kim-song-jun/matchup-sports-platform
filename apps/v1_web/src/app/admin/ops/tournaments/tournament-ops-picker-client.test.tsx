@@ -83,6 +83,16 @@ describe('TournamentOpsPickerClient (T6-3)', () => {
     expect(within(leagueRow).queryByText('대회')).toBeNull();
   });
 
+  it('G6-V1: 같은 진행 중 탭의 리그·대회 행 상태가 같은 알약("진행 중")이다 — 리그가 "활성"으로 읽히지 않는다', () => {
+    render(<TournamentOpsPickerClient />);
+
+    const table = screen.getAllByRole('table')[0];
+    const leaguePill = within(within(table).getByText('마포 주말 리그').closest('tr') as HTMLElement).getByText('진행 중');
+    const tournamentPill = within(within(table).getByText('가을 풋살 대회').closest('tr') as HTMLElement).getByText('진행 중');
+    expect(leaguePill.className).toBe(tournamentPill.className);
+    expect(within(table).queryByText('활성')).toBeNull();
+  });
+
   it('전체 필터에서는 모든 상태의 리그가 나온다', () => {
     render(<TournamentOpsPickerClient />);
     fireEvent.click(screen.getByRole('button', { name: '전체' }));

@@ -2,8 +2,11 @@ import { GOALKEEPER_SLOT_CODE, type FormationSlot } from '@/components/lineup/fo
 import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { randomUuid } from '@/lib/uuid';
+import { formatKstMeridiemTime, formatTournamentDateShort } from '@/lib/date-utils';
 import { TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 import type {
+  V1LineupConfig,
+  V1TeamMatchRsvpStatus,
   V1TeamMatchLineup,
   V1TeamMatchLineupParticipantInput,
   V1TeamMatchLineupState,
@@ -29,7 +32,22 @@ export type RosterOption = {
   role: 'owner' | 'manager' | 'member';
   /** 멤버 관리에서 지정한 팀 고정 등번호. 명단에 넣을 때 기본값으로 쓴다. */
   jerseyNumber?: number | null;
+  /** 번호 시트의 "팀 번호도 함께"가 고칠 멤버십. 없으면 팀 번호를 바꿀 수 없다. */
+  membershipId?: string;
+  /** 이 경기 팀 일정 응답 — 팀장 참고용 읽기 전용 칩(H5). */
+  rsvpStatus?: V1TeamMatchRsvpStatus | null;
 };
+
+/** 등번호순, 번호 없는 사람은 뒤, 같으면 이름순 — 명단과 후보가 같은 순서 규칙을 쓴다(H5). */
+export function compareByJersey(
+  a: { jerseyNumber?: number | null; displayName: string },
+  b: { jerseyNumber?: number | null; displayName: string },
+): number {
+  return (
+    (a.jerseyNumber ?? Number.MAX_SAFE_INTEGER) - (b.jerseyNumber ?? Number.MAX_SAFE_INTEGER) ||
+    a.displayName.localeCompare(b.displayName, 'ko')
+  );
+}
 
 /**
  * `GET .../lineup`은 어느 팀 소속인지(teamId)를 돌려주지 않는다 — 오직 side/role만 준다.
@@ -136,14 +154,6 @@ export type LineupEditorState = {
   dirty: boolean;
 };
 
-export type LineupCounts = {
-  /** 명단에 올린 인원 — 선발/후보 구분이 없으므로 하나다(정본 §3). */
-  participantCount: number;
-  /** 로스터 중 아직 명단에 올리지 않은 인원 수. */
-  waitingCount: number;
-  totalRoster: number;
-};
-
 function makeEntry(input: {
   userId?: string | null;
   displayName: string;
@@ -223,6 +233,36 @@ export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEdito
   };
 }
 
+/**
+ * 편집할 수 없는 명단(추가만·잠김)을 서버 응답 그대로 보인다 — 키는 참가자 id 라 늦게 온 선수가 붙어도
+ * 행이 흔들리지 않는다. `revision === 1` 은 팀이 짠 명단이 아니라서(위 hydrate 참고) 빈 목록이다.
+ */
+export function serverRosterEntries(lineup: V1TeamMatchLineup): LineupEntryDraft[] {
+  if (lineup.revision === 1) return [];
+  return [
+    ...lineup.starters.map((row) => ({
+      key: row.id,
+      userId: row.userId,
+      displayName: row.displayName,
+      jerseyNumber: row.jerseyNumber,
+      goalkeeper: row.goalkeeper,
+      position: row.position,
+      positionX: row.positionX,
+      positionY: row.positionY,
+    })),
+    ...lineup.bench.map((row) => ({
+      key: row.id,
+      userId: null,
+      displayName: row.displayName,
+      jerseyNumber: row.jerseyNumber,
+      goalkeeper: false,
+      position: null,
+      positionX: null,
+      positionY: null,
+    })),
+  ];
+}
+
 /** 엔트리 하나가 이 로스터 멤버를 가리키는지 판정한다.
  *
  * - `entry.userId`가 있으면 userId를 그대로 비교한다 — 가장 정확한 신호이고, **재수화된
@@ -262,6 +302,25 @@ export function addRosterMemberToLineup(state: LineupEditorState, member: Roster
     ],
     dirty: true,
   };
+}
+
+/**
+ * 아직 명단에 없는 팀원을 번호순으로 한 번에 넣는다("팀원 전원 추가", H5 A-1). 팀 번호가 이미 다른 행과
+ * 겹치면 `addRosterMemberToLineup` 처럼 빈칸으로 둔다 — 겹친 사람 이름을 돌려줘 화면이 알린다.
+ */
+export function addAllRosterMembersToLineup(
+  state: LineupEditorState,
+  members: readonly RosterOption[],
+): { state: LineupEditorState; clearedJersey: string[] } {
+  let next = state;
+  const clearedJersey: string[] = [];
+  for (const member of [...members].sort(compareByJersey)) {
+    if (isPlaced(next, member)) continue;
+    const collides = member.jerseyNumber != null && findJerseyHolder(next, member.jerseyNumber) !== null;
+    next = addRosterMemberToLineup(next, member);
+    if (collides) clearedJersey.push(member.displayName);
+  }
+  return { state: next, clearedJersey };
 }
 
 /** 이 등번호를 이미 쓰는 명단 행의 이름. 없으면 null. */
@@ -375,17 +434,6 @@ export function setGoalkeeper(state: LineupEditorState, key: string): LineupEdit
   };
 }
 
-export function deriveLineupCounts(state: LineupEditorState, rosterPool: RosterOption[]): LineupCounts {
-  return {
-    participantCount: state.participants.length,
-    // isPlaced와 동일한 판정을 재사용한다 — waitingCount와 "추가 가능한 팀원" 목록이
-    // 서로 다른 기준으로 어긋나면 카운트만 맞고 목록엔 이미 배치된 사람이 남는(또는 그
-    // 반대) 불일치가 생긴다.
-    waitingCount: rosterPool.filter((member) => !isPlaced(state, member)).length,
-    totalRoster: rosterPool.length,
-  };
-}
-
 /** 제출 전 클라이언트 사전 검증 — 서버(`team-match-lineup.service.ts#resolveEntries`)가
  * 거절하는 규칙만 옮긴다. `lineupConfig.minPlayers/maxPlayers` 는 응답에 있지만 서버가
  * 제출에서 검증하지 않으므로(Task 163, `team-match-lineup-size.integration-spec.ts`) 여기서도
@@ -452,16 +500,6 @@ export function applyVersionConflictReload(lineup: V1TeamMatchLineup): LineupEdi
   return hydrateLineupEditorState(lineup);
 }
 
-/** 409 응답 본문에서 currentVersion을 읽는다. `details`로 감싸지 않은 과거 형태(버그, 이제
- * 수정됨)도 방어적으로 함께 지원 — 백엔드 배포가 프론트보다 늦게 나가는 창구에서도
- * 재시도 로직이 깨지지 않게 한다. */
-export function extractConflictCurrentVersion(details: unknown): number | null {
-  if (details === null || typeof details !== 'object') return null;
-  const record = details as Record<string, unknown>;
-  const value = record.currentVersion;
-  return typeof value === 'number' ? value : null;
-}
-
 /** 서버의 실제 경기 상태 기반 판정을 사용자에게 설명하는 단일 지점. */
 export function describeLineupPhase(
   state: V1TeamMatchLineupState,
@@ -469,8 +507,17 @@ export function describeLineupPhase(
   lockReason: V1TeamMatchLineupLockReason,
   /** 서버 lockReason 'terminal' 은 종료·취소·보관을 한 값으로 묶는다 — 취소는 매치 상태로 가른다. */
   matchCancelled = false,
+  /** 첫 기록 뒤 결과 확정 전 — 늦게 온 선수 추가만 열린다(서버 `lateAdditionAllowed`). */
+  lateAdditionAllowed = false,
 ): { label: string; editable: boolean; helperText: string } {
   if (!editable) {
+    if (lateAdditionAllowed && !matchCancelled && (lockReason === 'records_exist' || lockReason === 'active_lineups_complete')) {
+      return {
+        label: '경기 중 · 추가만',
+        editable: false,
+        helperText: '경기 기록이 시작돼 늦게 온 선수 추가만 할 수 있어요. 이미 있는 선수는 빼거나 번호를 바꿀 수 없어요.',
+      };
+    }
     if (matchCancelled) {
       return {
         label: `${TEAM_MATCH_CANCELLED_LABEL} · 잠김`,
@@ -503,7 +550,7 @@ export function describeLineupPhase(
   }
   if (state === 'SUBMITTED' || state === 'LOCKED') {
     return {
-      label: '제출됨 · 수정 가능',
+      label: '제출 완료',
       editable: true,
       helperText: '경기 기록이 시작되기 전까지 참석명단을 수정하고 다시 제출할 수 있어요.',
     };
@@ -511,15 +558,102 @@ export function describeLineupPhase(
   return { label: '초안', editable: true, helperText: '' };
 }
 
+const PUBLIC_LINEUP_LEAD_MS = 60 * 60 * 1000;
+
+/**
+ * 상대 팀에게 공개되는 시각 — 서버 정책값, 없으면(제출 전) 킥오프 1시간 전(D-02). 서버
+ * `effectivePublicLineupAt` 과 같은 규칙이라 제출 전에도 언제 공개되는지 미리 말할 수 있다.
+ */
+export function resolvePublicLineupAt(publicLineupAt: string | null, kickoffAt: string | null | undefined): string | null {
+  if (publicLineupAt !== null) return publicLineupAt;
+  const kickoff = kickoffAt ? Date.parse(kickoffAt) : Number.NaN;
+  return Number.isNaN(kickoff) ? null : new Date(kickoff - PUBLIC_LINEUP_LEAD_MS).toISOString();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 공개 시각 표기 — 하루 안이면 '오후 8:00', 더 멀면 날짜까지 '10/7 (수) 오후 8:00'.
+ * "163시간 38분 후"처럼 시간으로만 세면 며칠 뒤인지 읽히지 않는다(W2-V10).
+ */
+export function formatPublicationTime(publicAt: string | null, now: number): string | null {
+  const time = formatKstMeridiemTime(publicAt);
+  if (publicAt === null || time === null) return null;
+  const sameDay = formatTournamentDateShort(publicAt) === formatTournamentDateShort(new Date(now).toISOString());
+  return sameDay ? time : `${formatTournamentDateShort(publicAt)} ${time}`;
+}
+
+/** "킥오프 1시간 전(오후 8:00)에 상대 팀에게 이 명단이 공개돼요…" — 누구에게·언제(L10). */
+export function describePublicationNotice(publicAt: string | null, kickoffAt: string | null | undefined, now: number): string | null {
+  const time = formatPublicationTime(publicAt, now);
+  if (publicAt === null || time === null) return null;
+  const kickoff = kickoffAt ? Date.parse(kickoffAt) : Number.NaN;
+  const when = kickoff - Date.parse(publicAt) === PUBLIC_LINEUP_LEAD_MS ? `킥오프 1시간 전(${time})` : time;
+  return `${when}에 상대 팀에게 이 명단이 공개돼요. 그 전까지 상대는 제출했는지만 볼 수 있어요.`;
+}
+
+/** 공개까지 남은 시간(파란 줄) — 하루 안이면 "공개까지 4시간 3분 남았어요.", 더 멀면 날짜로. */
 export function describePublicationCountdown(publicLineupAt: string | null, now: number): string | null {
-  if (publicLineupAt === null) return null;
-  const target = new Date(publicLineupAt).getTime();
-  if (Number.isNaN(target)) return null;
+  const remaining = describeRemaining(publicLineupAt, now);
+  if (remaining === undefined) return null;
+  if (remaining === null) return '상대 팀에게 공개됐어요.';
+  if (remaining === 'days') return `${formatPublicationTime(publicLineupAt, now)}에 공개돼요.`;
+  return `공개까지 ${remaining} 남았어요.`;
+}
+
+/**
+ * "4시간 3분" · 하루 넘게 남았으면 'days'(호출부가 날짜로 쓴다) · 이미 지났으면 null · 시각을 모르면 undefined.
+ */
+export function describeRemaining(targetIso: string | null, now: number): string | null | undefined {
+  if (targetIso === null) return undefined;
+  const target = new Date(targetIso).getTime();
+  if (Number.isNaN(target)) return undefined;
   const diffMs = target - now;
-  if (diffMs <= 0) return '참석명단이 공개됐어요.';
+  if (diffMs <= 0) return null;
+  if (diffMs >= DAY_MS) return 'days';
   const totalMinutes = Math.ceil(diffMs / 60_000);
-  if (totalMinutes < 60) return `${totalMinutes}분 후 공개돼요.`;
+  if (totalMinutes < 60) return `${totalMinutes}분`;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return minutes === 0 ? `${hours}시간 후 공개돼요.` : `${hours}시간 ${minutes}분 후 공개돼요.`;
+  return minutes === 0 ? `${hours}시간` : `${hours}시간 ${minutes}분`;
+}
+
+/** 막지 않는 안내 한 줄 — `emphasis` 만 굵게, `tone` 이 warn 이면 강조를 주황으로. */
+export type LineupNotice = { tone: 'warn' | 'info'; before: string; emphasis: string; after: string };
+
+/**
+ * 인원 안내(L28 → B). 서버는 인원을 검증하지 않으므로(정본 §3) **막지 않고** 알리기만 한다. 설정의
+ * 최대치는 한 번에 뛰는 인원일 수 있어(교체가 자유로운 친선은 7~8명 출전이 흔하다) 넘침은 참고 톤,
+ * 모자람만 경고 톤이다. 범위 안이거나 설정이 없으면 null.
+ */
+export function describeLineupSizeNotice(count: number, config: V1LineupConfig | undefined): LineupNotice | null {
+  const min = config?.minPlayers;
+  const max = config?.maxPlayers;
+  if (count === 0 || (min === undefined && max === undefined)) return null;
+  const under = min !== undefined && count < min;
+  const over = max !== undefined && count > max;
+  if (!under && !over) return null;
+  const range =
+    min !== undefined && max !== undefined
+      ? min === max ? `${min}명` : `${min}~${max}명`
+      : min !== undefined ? `${min}명 이상` : `${max}명 이하`;
+  return {
+    tone: under ? 'warn' : 'info',
+    before: `이 경기 기준 인원은 ${range}이에요 · `,
+    emphasis: `지금 ${count}명`,
+    after: under
+      ? '이지만 그대로 제출할 수 있어요.'
+      : '이지만 그대로 제출할 수 있어요. 교체로 뛸 선수까지 넣어도 돼요.',
+  };
+}
+
+/** 골키퍼를 둘 이상 지정했을 때 같은 톤의 한 줄(L28 → B). 한 명 이하면 null. */
+export function describeGoalkeeperNotice(goalkeepers: number): LineupNotice | null {
+  if (goalkeepers < 2) return null;
+  return {
+    tone: 'info',
+    before: '골키퍼를 ',
+    emphasis: `${goalkeepers}명`,
+    after: ' 지정했어요 · 번갈아 맡는다면 그대로 제출할 수 있어요.',
+  };
 }

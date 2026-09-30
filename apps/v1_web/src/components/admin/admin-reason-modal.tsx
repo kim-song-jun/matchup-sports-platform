@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useModalA11y } from '../v1-ui/use-modal-a11y';
 
@@ -19,6 +19,8 @@ interface AdminReasonModalProps {
   onClose: () => void;
   /** True while the parent mutation is in flight */
   pending?: boolean;
+  /** 서버가 거절한 이유를 모달 안에 남긴다 — 토스트로는 다 못 읽는 목록(예: 보관을 막는 항목)용. */
+  error?: ReactNode;
 }
 
 const REASON_MAX = 500;
@@ -32,6 +34,7 @@ export function AdminReasonModal({
   onSubmit,
   onClose,
   pending = false,
+  error,
 }: AdminReasonModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>(
     currentStatus ?? statusOptions[0]?.value ?? '',
@@ -174,6 +177,15 @@ export function AdminReasonModal({
                 공백만 입력하면 제출할 수 없어요.
               </p>
             )}
+
+            {error ? (
+              <div
+                role="alert"
+                className="max-h-[240px] overflow-y-auto rounded-xl bg-[var(--red50)] px-3 py-3 text-[length:var(--font-size-caption)] text-[var(--red700)]"
+              >
+                {error}
+              </div>
+            ) : null}
           </div>
 
           {/* Footer */}

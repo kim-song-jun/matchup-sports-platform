@@ -2,7 +2,7 @@ import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong 
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
-import { teamRecruitmentLabel } from '@/lib/v1-status-labels';
+import { leagueStateLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
 import type { V1Match, V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 /**
@@ -23,8 +23,6 @@ const TOURNAMENT_STATUS_LABEL: Record<V1TournamentStatus, string> = {
   completed: '종료',
   cancelled: '취소',
 };
-
-const LEAGUE_STATE_LABEL = { draft: '준비 중', active: '진행 중', completed: '종료' } as const;
 
 /**
  * 한 줄 링크 텍스트로 만든다. 줄바꿈을 접어 가짜 섹션을 막고, 대괄호는 소괄호로 바꿔 가짜 링크를 막는다
@@ -132,7 +130,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
 
   const leagueRows = s.leagues?.map((l) => row(link(l.title, `/league-matches/${l.leagueId}`), [
     l.sport.name,
-    LEAGUE_STATE_LABEL[l.state],
+    leagueStateLabel(l.state),
     `${formatTournamentDateLong(l.startsOn)} ~ ${formatTournamentDateLong(l.endsOn)}`,
     l.region?.name && `지역 ${inline(l.region.name, 30)}`,
     l.teamCount != null && `참가 ${l.teamCount}팀`,

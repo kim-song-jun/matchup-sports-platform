@@ -145,12 +145,45 @@ export function inquiryReportReasonLabel(reason: V1InquiryReportReason): string 
 /** 취소된 팀매치 — 상세 화면 히어로·하단 상태와 참석명단 배지가 함께 쓴다. */
 export const TEAM_MATCH_CANCELLED_LABEL = '취소됨';
 
+/**
+ * 팀매치 신청 상태 — 호스트(검토자) 관점. '승인 완료'는 상세 히어로가 상대팀을 찾는 표식이라 바꾸지 않는다.
+ * 승인하면 서버가 나머지 대기 신청을 같은 트랜잭션에서 rejected 로 바꾼다 — 그건 `autoClosed` 로 가른다.
+ */
+const TEAM_MATCH_APPLICATION_STATUS: Record<string, string> = {
+  requested: '승인 대기',
+  approved: '승인 완료',
+  rejected: '거절',
+  withdrawn: '신청 취소',
+  expired: '마감 종료',
+};
+
+export function teamMatchApplicationStatusLabel(status: string, options?: { autoClosed?: boolean }): string {
+  if (status === 'rejected' && options?.autoClosed) return '자동 종료';
+  return TEAM_MATCH_APPLICATION_STATUS[status] ?? '처리됨';
+}
+
 /** 친선 팀매치 공동 기록 상태와 변경 이력. */
 const phaseLabel: Record<string, string> = { scheduled: '경기 시작 전', live: '진행 중', official: '경기 종료 · 결과 확정', cancelled: '취소된 경기', legacy: '기존 경기 결과', managed: '운영자 기록 경기' };
-const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소', submatch_add: '서브매치 추가', submatch_edit: '서브매치 이름 수정', submatch_delete: '서브매치 삭제' };
+const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소', submatch_add: '서브매치 추가', submatch_edit: '서브매치 이름 수정', submatch_delete: '서브매치 삭제', participant_add: '늦게 온 선수 추가' };
 
 export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
 export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }
+
+/**
+ * 친선 경기 일정의 응답(RSVP) — 참석명단과 이름이 겹치지 않게 "올 수 있어요?"로 부른다(H5 결정 A).
+ * 훈련·모임 일정의 "참석/미정/불참"은 그대로다. 일정 화면의 응답 버튼과 참석명단 후보 칩이 같이 쓴다.
+ */
+const FRIENDLY_RSVP_LABEL: Record<string, string> = {
+  GOING: '올 수 있어요',
+  MAYBE: '미정',
+  NOT_GOING: '못 가요',
+  WAITLISTED: '대기',
+  NO_RESPONSE: '미응답',
+};
+
+export function friendlyRsvpLabel(status: string): string {
+  return FRIENDLY_RSVP_LABEL[status] ?? status;
+}
 
 /** 개인 매치가 시작된 뒤의 표시 상태(displayState) 라벨. 시작 전·완료 상태는 null — 호출부의 기존 라벨을 쓴다. */
 export function personalMatchLifecycleLabel(displayState: string | null | undefined, isHost: boolean): string | null {
@@ -240,3 +273,83 @@ export function gameRosterStatusLabel(status: string, remainingMatches?: number 
       return '확인 필요';
   }
 }
+
+// ── Task 180 G13 상태 모델 — 리그·경기·종류 ─────────────────────────────────────
+// 문구만 여기 둔다. 칩 톤·아이콘·노출 조건은 `lib/competition-status.ts` 가 이 라벨로 만든다.
+
+export type LeagueStateKey = 'draft' | 'active' | 'completed';
+
+const LEAGUE_STATE_LABEL: Record<LeagueStateKey, string> = {
+  draft: '준비 중',
+  active: '진행 중',
+  completed: '종료',
+};
+
+/** 리그(시즌) 자체의 상태. 경기 상태와 한 화면에 함께 나오면 `LEAGUE_SUBJECT_LABEL` 을 앞에 붙인다. */
+export function leagueStateLabel(state: LeagueStateKey): string {
+  return LEAGUE_STATE_LABEL[state];
+}
+
+/** 경기 하나의 단계. 공개 화면의 리그 대진·운영 콘솔·결과 검토가 같은 말을 쓴다. */
+export type MatchPhase = 'scheduled' | 'awaiting_result' | 'live' | 'paused' | 'ended' | 'cancelled';
+
+const MATCH_PHASE_LABEL: Record<MatchPhase, string> = {
+  scheduled: '예정',
+  awaiting_result: '결과 대기',
+  live: '진행 중',
+  paused: '일시 중지',
+  ended: '종료',
+  cancelled: '취소됨',
+};
+
+export function matchPhaseLabel(phase: MatchPhase): string {
+  return MATCH_PHASE_LABEL[phase];
+}
+
+/** 경기 운영 상태(GameState)는 경기 단계의 부분집합이다 — 킥오프 전·후를 가르는 '결과 대기'는 운영 상태에 없다. */
+export const GAME_STATE_MATCH_PHASE: Readonly<Record<string, MatchPhase>> = {
+  SCHEDULED: 'scheduled',
+  LIVE: 'live',
+  PAUSED: 'paused',
+  ENDED: 'ended',
+  CANCELLED: 'cancelled',
+};
+
+export function gameStateLabel(state: string): string {
+  const phase = GAME_STATE_MATCH_PHASE[state];
+  return phase === undefined ? '확인 필요' : MATCH_PHASE_LABEL[phase];
+}
+
+export type CompetitionKindKey = 'LEAGUE' | 'TOURNAMENT' | 'FRIENDLY';
+
+const COMPETITION_KIND_LABEL: Record<CompetitionKindKey, string> = {
+  LEAGUE: '리그',
+  TOURNAMENT: '대회',
+  FRIENDLY: '친선',
+};
+
+export function competitionKindLabel(kind: CompetitionKindKey): string {
+  return COMPETITION_KIND_LABEL[kind];
+}
+
+/** 한 화면에 리그 상태와 경기 상태가 같이 보일 때 칩 앞에 붙이는 대상 이름("리그 · 진행 중", "경기 · 예정"). */
+export const LEAGUE_SUBJECT_LABEL = COMPETITION_KIND_LABEL.LEAGUE;
+export const MATCH_SUBJECT_LABEL = '경기';
+
+/** 리그 순위표 자리의 시즌 단계. */
+export type LeagueSeasonStage = 'preseason' | 'in_progress' | 'awaiting_result' | 'completed';
+
+const LEAGUE_SEASON_STAGE_LABEL: Record<LeagueSeasonStage, string> = {
+  preseason: '시즌 시작 전',
+  in_progress: '시즌 진행 중',
+  awaiting_result: MATCH_PHASE_LABEL.awaiting_result,
+  completed: '시즌 종료',
+};
+
+export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
+  return LEAGUE_SEASON_STAGE_LABEL[stage];
+}
+
+/** 운영 콘솔 도착 확인(검인)을 한 경기에서, 아직 도착 확인이 안 된 선수. */
+export const ARRIVAL_PENDING_LABEL = '도착 전';
+export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';

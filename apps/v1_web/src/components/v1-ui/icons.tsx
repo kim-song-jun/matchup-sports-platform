@@ -207,3 +207,14 @@ export function ClockIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+/** 가로 ⋯ — 히어로의 관리 메뉴 입구. 점은 선이 아니라 채움이라 stroke 를 끈다. */
+export function MoreIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none" />
+    </SvgIcon>
+  );
+}

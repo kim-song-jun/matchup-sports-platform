@@ -30,12 +30,16 @@
 | GET | `/me/invitations` | Yes | 받은 초대 목록 (pending) |
 | POST | `/team-invitations/:invitationId/accept` | Yes(피초대자 본인) | 초대 수락 |
 | POST | `/team-invitations/:invitationId/decline` | Yes(피초대자 본인) | 초대 거절 |
+| GET | `/teams/:teamId/dissolution-preview` | Yes(owner) | 해체 사전 점검 — 막는 조건·함께 정리될 것 |
+| POST | `/teams/:teamId/dissolve` | Yes(owner) | 팀 해체(보관) — body `{ confirmTeamName }` |
+| POST | `/teams/:teamId/restore` | Yes(owner) | 해체 30일 안 복구 |
+| GET | `/me/dissolved-teams` | Yes | 내가 팀장인 해체한 팀 목록 |
 
 `teams.controller.ts`에는 `/teams/:teamId/hub`, `DELETE /teams/:teamId`, `POST/PATCH/DELETE
 /teams/:teamId/members(/:userId)`, `/teams/:teamId/apply`, `GET /teams/me` 라우트가 없다 —
 가입·멤버십·탈퇴는 각각 `join-applications`, `team-memberships`, `team-join-applications`,
-`/leave` 라는 flat 리소스 경로를 쓴다. `V1Team.deletedAt` 컬럼은 존재하지만 이를 세팅하는
-컨트롤러 라우트(admin 포함)는 현재 코드에 없다.
+`/leave` 라는 flat 리소스 경로를 쓴다. 팀은 물리 삭제하지 않는다 — 해체는 `status=archived` +
+`deletedAt`(해체 시각) 세팅이다(아래 "팀 해체(보관)·복구").
 
 ## Member Response Contract
 
@@ -132,6 +136,61 @@ CAUTION:
 - `canSendContact`(boolean)는 **로그인한 비멤버이고 다른 팀의 owner/manager인 viewer**에게만 내려가며, 그 외(비로그인·이 팀 멤버·보낼 팀 없음)에는 생략된다. 내 owner/manager 팀 중 하나라도 이 팀에 컨택을 보낼 수 있으면 `true`, 전부 막혔으면 `false`다.
 - `false`는 차단(양방향) / `closed` / `recruiting_only`인데 모집 중 아님 세 사유를 **하나로 합친 값**이라 컨택 거절(`TEAM_CONTACT_NOT_ACCEPTING`) 뒤에 알 수 있는 정보와 같다 — 발신자가 "차단당했다"를 역추론하지 못하는 성질(§8(b))을 그대로 유지한다. 화면은 이 값으로 "컨택 보내기"를 비활성화하고 "이 팀은 지금 컨택을 받지 않고 있어요"를 보여주며, 서버는 여전히 컨택 생성 시점에 같은 검사를 한다.
 
+### 해체된 팀(`status=archived`)
+
+- 404 대신 읽기 전용 상세를 준다(지난 경기의 팀 링크가 끊기지 않게). 운영이 멈춘 `suspended` 팀은 여전히 404다.
+- `viewer` 는 역할과 무관하게 `{ role: 'none', membershipId: null, joinState: 'none', canRequestJoin: false,
+  disabledReason: 'TEAM_DISSOLVED', manageRoute: null }` — 수정·멤버 관리·컨택 화면이 전부 닫힌다.
+  `canViewMembers=false`, `membersPreview=[]`, `contactPolicy`·`canSendContact` 생략.
+- `dissolution: { dissolvedAt, archivedBy, restoreDeadlineAt, canRestore }` — 활동 중인 팀은 `null`.
+  `archivedBy` 는 `owner`(팀장 해체) | `admin`(운영팀 보관)이고 팀장에게만 채워진다(그 외 viewer 는 `null`).
+  `canRestore` 는 팀장이 해체한 팀의 팀장이고 해체 후 30일(경계 포함) 안일 때만 `true`, `restoreDeadlineAt` 은
+  운영팀 보관이면 `null`. `deletedAt` 없이 보관된 옛 팀은 `dissolvedAt=null`, `canRestore=false`.
+- `GET /teams/:teamId/records`·`/reviews` 는 상태 필터가 없어 해체 뒤에도 그대로 열린다. 목록·`/me/teams`·
+  멤버·가입 신청·일정·채팅·컨택은 `status=active` 만 통과시키므로 보관 팀은 빠진다.
+
+## 팀 해체(보관)·복구 (Task 180 H3)
+
+- **권한**: 세 엔드포인트 모두 그 팀의 active owner 본인만. manager·member·비팀원은 `403 PERMISSION_DENIED`,
+  팀이 없으면 `404 NOT_FOUND`.
+- **`GET /teams/:teamId/dissolution-preview`** → `{ teamId, teamName, canDissolve, blockers, cleanup, restoreWindowDays: 30 }`
+  - `blockers[]`: `{ kind, items[] }`, `kind` = `live_game`(LIVE·PAUSED 경기) | `matched_team_match`(상대가 정해진
+    친선 팀매치, 시작 전·결과 전 모두) | `league_entry` | `tournament_entry`(끝나지 않은 대회·리그에 `draft`·`cancelled`
+    가 아닌 참가 신청). 항목은 `{ id, title, opponentName, startAt, placeName, registrationStatus, route }` —
+    `route` 는 정리하러 갈 화면(`/team-matches/:id`, `/tournaments/:id/matches/:id`, `/tournaments/:id/my`), 갈 곳이 없으면 `null`.
+  - `cleanup`: `{ recruitingTeamMatchCount, outgoingApplicationCount, joinApplicationCount, invitationCount,
+    upcomingSchedules[{ scheduleId, title, startAt }], notifyMemberCount }` — 해체가 실제로 정리하는 범위와 같다.
+  - 이미 해체된 팀 `409 TEAM_ALREADY_DISSOLVED`, 운영 중지 팀 `409 TEAM_NOT_ACTIVE`.
+- **`POST /teams/:teamId/dissolve`** body `{ confirmTeamName: string }`(1~50자) — 팀 이름과 앞뒤 공백을 빼고 같아야 한다
+  (`400 TEAM_NAME_MISMATCH`). 막는 조건은 팀 행 잠금 뒤 다시 보고, 남아 있으면 `409 TEAM_DISSOLVE_BLOCKED`
+  (`details.blockers` = 미리보기와 같은 형태). 한 트랜잭션에서:
+  - 앞으로 있을 모집 중·모집 마감 친선 팀매치(이 팀이 호스트, 리그·대회 대진·플랫폼 모집 제외) → `cancelled`,
+    대기 신청 `rejected`, 연결된 팀 일정 취소
+  - 이 팀이 다른 팀매치에 보낸 대기 신청 → `withdrawn`
+  - 대기 중 가입 신청 → `expired`, 보낸 초대 → `cancelled`
+  - 시작 전 `SCHEDULED` 팀 일정 → `CANCELLED`(사유 "팀이 해체되어 취소됐어요.", 열린 용병 모집 닫힘). 지난 일정은 그대로.
+  - 팀 채팅방 `archived`, 팀 `status=archived`·`deletedAt=now`, status log `team_dissolved_by_owner`
+  - 멤버십은 바꾸지 않는다(복구하면 같은 팀원). 경기 결과·전적·개인 기록·후기는 건드리지 않는다.
+  - 응답 `{ teamId, status: 'archived', dissolvedAt, archivedBy: 'owner', restoreDeadlineAt, canRestore, cancelledTeamMatchCount,
+    cancelledScheduleCount, notifiedMemberCount, detailRoute }`
+  - 알림(모두 fire-and-forget): 팀원(해체한 본인 제외)·대기 중이던 가입 신청자에게 `team_dissolved`, 자동 취소된
+    팀매치에 신청했던 팀의 owner/manager 에게 `team_match_cancelled`, 철회된 신청의 호스트 팀 owner/manager 에게
+    `team_match_application_withdrawn`, 초대받은 사람의 초대 알림은 "팀 초대가 취소됐어요"로 바뀐다.
+- **`POST /teams/:teamId/restore`** — 팀장이 해체한 팀을 `deletedAt` 로부터 30일(경계 포함) 안에만
+  `status=active`·`deletedAt=null` 로 되돌리고 팀 채팅방만 다시 연다. 취소된 경기·일정·신청은 되살리지 않는다.
+  - 팀장 해체인지는 그 팀의 마지막 `toStatus=archived` status log 의 `actorType` 으로 가른다(`user` = 팀장 해체,
+    어드민 "팀 상태 변경"은 `admin`). 운영팀이 보관한 팀은 기간 안이어도 `403 TEAM_RESTORE_ADMIN_ONLY`
+    ("운영팀이 보관한 팀은 직접 복구할 수 없어요. 운영팀에 문의해 주세요.") — 기간 판정보다 먼저 본다.
+  - 기간이 지나면 `409 TEAM_RESTORE_WINDOW_EXPIRED`(운영팀이 어드민 "팀 상태 변경"으로 복구), 해체된 팀이 아니면
+    `409 TEAM_NOT_DISSOLVED`. 두 판정 모두 팀 행 잠금 뒤 다시 본다.
+- **`GET /me/dissolved-teams`** → `{ items[{ teamId, name, logoUrl, sportName, memberCount, dissolvedAt,
+  archivedBy, restoreDeadlineAt, canRestore, detailRoute }], restoreWindowDays }` — 내가 active owner 인 보관 팀,
+  최근 해체 순. 기간이 지났거나 운영팀이 보관한(`archivedBy=admin`) 팀도 `canRestore=false` 로 들어온다.
+- 어드민 `POST /admin/teams/:teamId/status` 의 `archived` 도 같은 막는 조건(`409 TEAM_DISSOLVE_BLOCKED` +
+  `details.blockers`)·정리·알림을 지난다(팀장 본인도 알림 수신). 이렇게 보관한 팀은 팀장이 직접 복구할 수 없다.
+  `archived` 에서 다른 상태로 바꾸면 기간 제한 없이 `deletedAt` 을 지우고 채팅방을 다시 연다.
+- 해체된 팀의 팀장은 회원 탈퇴 차단(`WITHDRAWAL_BLOCKED_TEAM_AUTHORITY`)에서 풀린다 — 그 판정이 `status=active` 팀만 본다.
+
 ## PATCH /teams/:teamId
 
 - 권한: manager 이상
@@ -208,6 +267,7 @@ CAUTION:
 - `apps/v1_api/src/teams/teams.controller.ts`
 - `apps/v1_api/src/teams/dto/*.ts`
 - `apps/v1_api/src/teams/teams.service.ts`
+- `apps/v1_api/src/teams/team-dissolution*.ts`
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`

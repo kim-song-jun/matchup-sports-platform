@@ -140,3 +140,15 @@ describe('LeagueClaimMyRecordSection', () => {
     );
   });
 });
+
+describe('LeagueClaimMyRecordSection — 명단 카드 아래 한 줄(G13 F61)', () => {
+  it('link 는 카드 대신 한 줄 버튼이고, 누르면 같은 모달로 리그 목록을 부른다', () => {
+    leagueClaimableMock.mockReturnValue({ data: { gameId: 'g-1', version: 1, participants: [] }, isLoading: false, isError: false, error: null });
+    render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" variant="link" />);
+
+    expect(screen.queryByText('이 경기에 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '내 기록이 안 보이나요? 명단에서 나 찾기' }));
+    expect(leagueClaimableMock).toHaveBeenLastCalledWith('lg-1', 'tm-1', { enabled: true });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});

@@ -25,7 +25,8 @@ import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './com
 import { formatChatListTimestamp } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 import { getChatRoomViewModel } from './community.view-model';
-import { chatRoomTypeLabel } from '@/lib/chat-route';
+import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
+import { displayInitials } from '@/lib/display-initials';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -181,7 +182,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     context: room.data
       ? {
           title: room.data.linkedTarget.title,
-          sub: `${chatRoomTypeLabel(room.data.roomType)} 채팅`,
+          sub: chatRoomContextSub(room.data.roomType),
           // 연결된 화면에서 뒤로가면 이 채팅방으로 돌아온다.
           href: room.data.linkedTarget.route ? withFromPath(room.data.linkedTarget.route, currentHref) : '/chat',
         }
@@ -313,7 +314,7 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
     pinned: room.pinned,
     muted: room.muted,
     mutedUntil: room.mutedUntil ?? null,
-    initials: room.title.slice(0, 1) || '채',
+    initials: displayInitials(room.title, { fallback: '채' }),
     avatarUrl: CHAT_AVATARS[type],
   };
 }

@@ -227,6 +227,36 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByRole('link', { name: '채팅 목록으로' })).not.toBeInTheDocument();
   });
 
+  it('F62·F63: 경기 채팅방 카드는 "경기 채팅 · 경기 상세 보기"이고, 차단 관리는 방 맨 위가 아니라 ⋯ 채팅방 메뉴 안에 있다', () => {
+    hooks.chatRoom.mockReturnValue({
+      data: {
+        roomId: 'room-league',
+        roomType: 'team_match',
+        status: 'active',
+        title: '(QA0929) 마포 주말 리그 1주차',
+        linkedTarget: { type: 'team_match', id: 'tm-1', title: '(QA0929) 마포 주말 리그 1주차', route: '/team-matches/tm-1' },
+        me: { participantId: 'participant-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+        participants: [],
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    hooks.chatMessages.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null } }, isPending: false, isError: false, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-league" />);
+
+    expect(screen.getByText('경기 채팅 · 경기 상세 보기')).toBeInTheDocument();
+    expect(screen.queryByText(/팀매치 채팅/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '채팅 차단 관리' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '채팅방 메뉴' }));
+    fireEvent.click(screen.getByRole('button', { name: /채팅 차단 관리/ }));
+
+    expect(screen.queryByRole('dialog', { name: '채팅방 메뉴' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: '채팅 차단 관리' })).toBeInTheDocument();
+  });
+
   it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {
     hooks.chatRoom.mockReturnValue({
       data: {

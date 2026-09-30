@@ -1951,6 +1951,11 @@ label.tm-btn:focus-within {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
+/* 팀매치 신청 팀 선택 행 — sr-only radio 를 감싼 label 이 키보드 포커스 링을 대신 그린다(마우스 클릭엔 안 뜬다). */
+.tm-apply-team-option:has(input:focus-visible) {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
 /* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
 .v1-button:focus-visible {
   outline: 2px solid var(--blue500);
@@ -2110,22 +2115,6 @@ label.tm-btn:focus-within {
   color: var(--text-caption);
   cursor: not-allowed;
   opacity: 1; /* 브라우저 기본 opacity 오버라이드 */
-}
-
-/* 등번호처럼 두 자리 안팎의 좁은 숫자 입력. 데스크톱 브라우저의 스핀 버튼이 좁은 칸의
-   글자 폭을 먹어 10 이 "1" 로만 보이던 결함이 있어 스핀 버튼을 없애고 폭·패딩을 토큰으로 잡는다. */
-.tm-input-compact-number {
-  width: var(--size-input-compact-number);
-  padding: 0 var(--spacing-2);
-  text-align: center;
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.tm-input-compact-number::-webkit-inner-spin-button,
-.tm-input-compact-number::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .tm-date-picker-text-input {
@@ -8705,6 +8694,30 @@ textarea.tm-chat-input-placeholder::placeholder {
   .tm-fixture-lineup-player-main,
   .tm-fixture-lineup-player-controls { gap: 8px; }
   .tm-fixture-lineup-player-controls .tm-input { width: 72px; }
+}
+
+/* 친선 참석명단(H5 D-4) — 모바일은 한 줄 흐름 + 고정 CTA, 데스크톱은 목록 560px + 옆 요약 카드.
+   요약 카드와 고정 CTA 는 화면이 폭에 따라 한쪽만 그린다(같은 버튼이 두 번 보이지 않게). */
+.tm-attendance-lineup-page {
+  padding: var(--spacing-4) var(--spacing-5) 168px;
+}
+
+@media (min-width: 1024px) {
+  .tm-attendance-lineup-page {
+    padding-bottom: var(--spacing-10);
+  }
+
+  .tm-attendance-lineup-layout {
+    display: grid;
+    grid-template-columns: 560px minmax(0, 1fr);
+    gap: var(--spacing-6);
+    align-items: start;
+  }
+
+  .tm-attendance-lineup-aside {
+    position: sticky;
+    top: var(--spacing-6);
+  }
 }
 
 /* 후기 작성 — 선수 개별 평가는 이름 한 줄 행으로 접어 두고 누른 선수만 펼친다(한 번에 한 명).

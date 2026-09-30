@@ -13,7 +13,7 @@ export type MyMatchRosterTeam =
   /** 비로그인이거나, 두 팀 어디에도 활성 멤버가 아니거나, 경기(게임)가 아직 없다 — 우리 팀 카드가 없다. */
   | { status: 'none' }
   | { status: 'loading' }
-  | { status: 'resolved'; teamId: string; gameId: string }
+  | { status: 'resolved'; teamId: string; gameId: string; viewerUserId: string }
   | { status: 'error'; error: unknown };
 
 /**
@@ -55,7 +55,7 @@ export function useMyMatchRosterTeam({
   if (me.data === undefined || myTeams.isPending) return { status: 'loading' };
   if (myTeams.isError) return { status: 'error', error: myTeams.error };
   if (candidates.length === 0 || gameId === null) return { status: 'none' };
-  if (!probe) return { status: 'resolved', teamId: candidates[0].teamId, gameId };
+  if (!probe) return { status: 'resolved', teamId: candidates[0].teamId, gameId, viewerUserId: me.data.user.id };
   if (rosters.some((roster) => roster.isPending)) return { status: 'loading' };
 
   const myUserId = me.data.user.id;
@@ -69,7 +69,7 @@ export function useMyMatchRosterTeam({
   );
   // 다른 후보가 실패했으면 그 팀이 내 팀이었을 수 있다 — 명단에 내가 있는 팀을 찾았을 때만 실패를 무시한다.
   if (picked !== null && (failure === undefined || picked.data.base.some((row) => row.userId === myUserId))) {
-    return { status: 'resolved', teamId: picked.team.teamId, gameId };
+    return { status: 'resolved', teamId: picked.team.teamId, gameId, viewerUserId: myUserId };
   }
   if (failure !== undefined) return { status: 'error', error: failure.error };
   return { status: 'none' };

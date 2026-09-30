@@ -2,6 +2,7 @@
 
 import { PreferredPositionPicker } from './preferred-position-picker';
 import { ProfilePhotoCropper } from './profile-photo-cropper';
+import { MyDissolvedTeamsSection } from './my-dissolved-teams-section';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -189,6 +190,7 @@ export function MyTeamsPageClient() {
   const model: MyTeamsViewModel = {
     teams,
     summary: buildTeamSummary(teams),
+    dissolvedSection: <MyDissolvedTeamsSection />,
   };
 
   return <MyTeamsPageView model={model} />;

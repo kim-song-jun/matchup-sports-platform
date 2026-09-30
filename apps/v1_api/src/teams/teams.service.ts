@@ -1734,7 +1734,7 @@ export class TeamsService {
       return { updatedInvitation, membership, team };
     });
 
-    void this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
+    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
     // 알림: 초대한 사람에게 수락 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       invitation.invitedByUserId,
@@ -1780,7 +1780,7 @@ export class TeamsService {
       data: { status: 'declined', respondedAt: new Date() },
       select: { id: true, status: true },
     });
-    void this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
+    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
 
     return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };
   }

@@ -488,6 +488,27 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('전반 하이라이트')).toBeInTheDocument();
   });
 
+  it('킥오프 지난 미제출 대진: 진행 중이면 "결과 대기"가 어디에도 없고, 기록이 없으면 칩만 "결과 대기"를 말한다', () => {
+    // 2주차 대진을 킥오프(9/4) 뒤 · 결과 미제출로 둔다 — 공개 대진만 보면 '결과 대기' 단계다.
+    const kickedOff = FIXTURES.map((fixture) =>
+      fixture.teamMatchId === 'fx-1' ? { ...fixture, startAt: '2026-09-04T10:00:00.000Z' } : fixture,
+    );
+    mockLeague({ fixtures: kickedOff });
+    mockViewer('none');
+    mockRecord('present', { status: 'live', resultState: null, scoreStatus: null, score: { home: 1, away: 0, penalties: null } });
+    const live = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getByText('경기 · 진행 중')).toBeInTheDocument();
+    expect(live.container.textContent).not.toContain('결과 대기');
+    live.unmount();
+
+    // 대조군: 기록 404 폴백 — 단계는 칩 하나가 말하고 가운데 칸은 'vs'.
+    mockRecord('absent');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getAllByText(/결과 대기/)).toHaveLength(1);
+    expect(screen.getByText('경기 · 결과 대기')).toBeInTheDocument();
+    expect(screen.getByText('vs')).toBeInTheDocument();
+  });
+
   it('기록 API 가 404 면 자체 요약 카드로 폴백한다(게임 미공개 대진)', () => {
     mockLeague();
     mockViewer('none');

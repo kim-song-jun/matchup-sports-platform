@@ -185,7 +185,8 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   }
 
   // 공개 대진에는 운영 상태가 없어 진행 중은 기록(record) 응답으로만 안다.
-  const phase = recordQuery.data?.status === 'live' ? 'live' : leagueFixturePhase(fixture);
+  const fixturePhase = leagueFixturePhase(fixture);
+  const phase = recordQuery.data?.status === 'live' ? 'live' : fixturePhase;
   const phaseChip = matchPhaseChip(phase, { withSubject: true });
   const result = fixtureResultLabel(fixture);
   const round = roundLabel(series.fixtures, fixture);
@@ -324,8 +325,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
                 <span className="text-2xl font-bold text-[var(--text-strong)]">{result.text}</span>
               ) : (
                 <span className="text-sm font-semibold text-[var(--text-muted)]">
-                  {/* 단계는 위 경기 칩이 말한다 — 여기는 그와 다른 말('집계 제외'·'점수 비공개')만. */}
-                  {result.text === matchPhaseChip(phase).label ? 'vs' : result.text}
+                  {/* 단계는 위 경기 칩이 말한다 — 여기는 그와 다른 말('집계 제외'·'점수 비공개')만.
+                      result.text 는 대진 단계에서 나오므로 live 로 덮기 전 단계와 견준다. */}
+                  {result.text === matchPhaseChip(fixturePhase).label ? 'vs' : result.text}
                 </span>
               )}
               {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-orange">몰수</span> : null}

@@ -128,7 +128,10 @@ describe('팀 해체(보관)·복구 계약', () => {
     await prisma.v1TeamJoinApplication.create({ data: { teamId, applicantUserId: applicantId, status: 'requested' } });
     await prisma.v1TeamInvitation.create({ data: { teamId, invitedUserId: inviteeId, invitedByUserId: ownerId, status: 'pending' } });
     await prisma.v1TeamMatch.create({
-      data: { id: recruitingMatchId, sportId, title: '모집 중 친선', hostTeamId: teamId, status: 'recruiting', startAt: new Date(Date.now() + 7 * DAY) },
+      data: {
+        id: recruitingMatchId, sportId, title: '모집 중 친선', hostTeamId: teamId, status: 'recruiting', startAt: new Date(Date.now() + 7 * DAY),
+        createdByUserId: ownerId, regionId, placeName: '해체 테스트 구장',
+      },
     });
     await prisma.v1TeamMatchApplication.create({
       data: { teamMatchId: recruitingMatchId, applicantTeamId: rivalTeamId, appliedByUserId: rivalOwnerId, status: 'requested' },
@@ -145,7 +148,7 @@ describe('팀 해체(보관)·복구 계약', () => {
     await prisma.v1TeamMatch.create({
       data: {
         id: matchedMatchId, sportId, title: '상대 확정 친선', hostTeamId: teamId, approvedApplicantTeamId: rivalTeamId,
-        status: 'matched', startAt: new Date(Date.now() + 10 * DAY),
+        status: 'matched', startAt: new Date(Date.now() + 10 * DAY), createdByUserId: ownerId, regionId, placeName: '해체 테스트 구장',
       },
     });
   }

@@ -196,6 +196,42 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
   });
 
+  it('지정 종료 시각이 지나면 종료 확인 중을 보여주면서 경기 기록 진입은 유지한다', () => {
+    const now = Date.now();
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        status: 'matched',
+        displayState: 'matched',
+        startsAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(now - 60_000).toISOString(),
+        viewerState: 'host_team',
+        viewer: {
+          state: 'host_team',
+          manageableHostTeam: true,
+          manageableOpponentTeam: false,
+          participantMember: true,
+          eligibleTeams: [],
+        },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: { teamId: 'team-away', name: '상대 팀' },
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('종료 확인 중');
+    expect(screen.getByRole('link', { name: '경기 기록 보기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/result',
+    );
+  });
+
   it('플랫폼 HOME 팀을 모집 운영자로 표시하지 않는다', () => {
     // 롤링 배포 중 구 API가 host_team을 내려도 Web이 관리 CTA를 복구하지 않아야 한다.
     useV1TeamMatchMock.mockReturnValue({

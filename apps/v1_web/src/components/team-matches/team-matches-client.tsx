@@ -44,6 +44,7 @@ import {
 import {
   buildSportChips,
   buildTeamMatchHref,
+  getFriendlyTeamMatchSchedulePhase,
   getStatus,
   getViewerState,
   statusToCardStatus,
@@ -384,8 +385,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       : undefined,
     resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture, chainFrom),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
-    statusLabel: seeding ? undefined : modelLiveLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
-    statusLabelKind: !seeding && modelLiveLabel(query.data) ? 'match' : 'application',
+    statusLabel: seeding ? undefined : modelScheduleLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
+    statusLabelKind: !seeding && modelScheduleLabel(query.data) ? 'match' : 'application',
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam, opponentAssigned),
     chatPending: resolveChatRoom.isPending,
     chatError,
@@ -855,6 +856,9 @@ function reasonLabel(reasonCode?: string) {
   return '팀을 만들고 신청할 수 있어요';
 }
 
-function modelLiveLabel(match: V1TeamMatch) {
-  return getStatus(match) === 'matched' && !match.league && !!match.startsAt && new Date(match.startsAt).getTime() <= Date.now() ? '진행 중' : null;
+function modelScheduleLabel(match: V1TeamMatch) {
+  const phase = getFriendlyTeamMatchSchedulePhase(match);
+  if (phase === 'completion_pending') return '종료 확인 중';
+  if (phase === 'live') return '진행 중';
+  return null;
 }

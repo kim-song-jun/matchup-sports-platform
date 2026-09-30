@@ -149,7 +149,7 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
     expect(onCommitGoal.mock.calls[0]![0].participantId).toBeUndefined();
   });
 
-  it('OWN_GOAL은 선수 없이 득점 팀 기준으로 OG를 기록한다', async () => {
+  it('OWN_GOAL은 자책골을 넣은 선수를 고르면 상대 팀 득점으로 기록한다', async () => {
     const onCommit = vi.fn();
     render(
       <ActionTargetPicker
@@ -164,9 +164,32 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
         onCancel={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: /성수 풋살 클럽 득점 · OG로 기록/ }));
+    await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
     expect(onCommit).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'OWN_GOAL', sideId: 's-away', payload: { anonymous: true } }),
+      expect.objectContaining({ type: 'OWN_GOAL', participantId: 'p-cho', sideId: 's-home' }),
+    );
+  });
+
+  it('OWN_GOAL은 선수 없이 자책골을 넣은 팀을 고르면 상대 팀 득점으로 기록한다', async () => {
+    const onCommit = vi.fn();
+    render(
+      <ActionTargetPicker
+        open
+        actionLabel="자책골"
+        actionType="OWN_GOAL"
+        frozen={FROZEN}
+        sides={SIDES}
+        lineups={LINEUPS}
+        allowTeamOnly
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /성수 풋살 클럽 자책골 · 강남 풋살 클럽 득점으로 기록/ }),
+    );
+    expect(onCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'OWN_GOAL', sideId: 's-home', payload: { anonymous: true } }),
     );
     expect(onCommit.mock.calls[0]![0].participantId).toBeUndefined();
   });

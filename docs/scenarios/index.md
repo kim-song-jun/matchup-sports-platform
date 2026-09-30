@@ -443,3 +443,10 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - PR #1243의 양 팀 라인업 참가자 공동 기록에 선택적인 서브매치를 추가한다.
 - 최상단 점수와 공식 결과는 모든 서브매치 득점의 합이며 팀매치 한 경기로 한 번만 집계한다.
 - [시나리오](05-team-match-flows.md#v1-공동-경기-기록-서브매치--task-173) · [선수 사진·이름 변경 포함 30장 갤러리](team-match-shared-submatches-gallery.md)
+
+## 2026-09-30 — 팀매치 종료 확인 표시·자책골 귀속 보완
+
+- 친선 팀매치가 지정 종료 시각을 지났지만 양 팀 확인 전이면 목록과 상세에 `종료 확인 중`을 표시한다.
+- 이 표시는 자동 완료나 편집 잠금이 아니며, 점수·공동 기록 수정과 기존 종료 확인 동작을 유지한다.
+- 자책골은 선수 또는 익명 팀으로 자책한 쪽을 고르고 상대 팀 점수에 귀속한다.
+- 정본: [Task 172](../../.github/tasks/172-team-match-shared-record.md), [팀매치 시나리오](./05-team-match-flows.md), [경기 기록 시나리오](./19-game-operations-result-correction.md).

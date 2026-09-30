@@ -35,6 +35,8 @@
 - 이 요청은 일반 친선 팀매치 범위. 리그/대회는 운영자 기록 계약을 유지.
 - 팀당 라인업 참가자 한 명의 종료 확인을 팀 확인으로 취급; 전원 확인은 요구하지 않음.
 - 예정 종료 시각은 자동 확정 조건으로 쓰지 않음.
+- 예정 종료 시각이 지나면 공개 목록·상세 표시는 `종료 확인 중`으로 전환하되, 자동 확정하거나
+  점수/기록 편집을 잠그지 않는다. 기존 양 팀 종료 확인이 완료될 때까지 `matched` 계약을 유지한다.
 
 ## Progress snapshot
 - 2026-09-21: origin/dev a02af4aff 기준 /tmp/teameet-shared-record, feat/team-match-shared-record.
@@ -50,3 +52,5 @@
 
 - 2026-09-28 follow-up: wall-clock/위험확인 기반 명단 재수정을 서버 상태 기반 복구 창으로 교체했다. `SCHEDULED`는 시각과 무관하게 열고, `LIVE`/`PAUSED`는 한쪽 최신 명단이 미완료인 동안만 연다. 양 팀 제출, 일반 이벤트, 공동 기록, 결과 revision부터 잠그며 명단·기록 mutation은 같은 Game 행 잠금을 사용한다. PR/alpha 검증은 이 follow-up 브랜치에서 수행한다.
 - 2026-09-28 validation: API 집중 단위 34/34, Web 명단 단위 41/41, 양쪽 `tsc --noEmit`, API surface/Web pattern lint를 통과했다. 로컬 통합 테스트는 격리 suite에 필요한 `DATABASE_URL`이 없고 Docker daemon도 사용할 수 없어 시작 전 차단됐으며, dev PR CI에서 DB 통합 검증을 이어간다.
+- 2026-09-30 follow-up: 친선 팀매치의 `endsAt`이 지났지만 양 팀 확인 전인 `matched` 상태를
+  목록·상세에서 `종료 확인 중`으로 표시한다. 결과/공동 기록 진입과 편집 권한은 그대로 유지한다.

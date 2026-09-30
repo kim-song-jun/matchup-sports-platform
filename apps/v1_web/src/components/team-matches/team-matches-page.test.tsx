@@ -272,6 +272,28 @@ describe('TeamMatchListPageView — 신청 마감 카드 구분', () => {
     expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
   });
 
+  it('지정 종료 시각이 지난 matched 카드는 "종료 확인 중"으로 표시하고 마감 카드처럼 흐리지 않는다', () => {
+    const base = getTeamMatchListViewModel();
+    const model = {
+      ...base,
+      matches: [{
+        ...base.matches[0],
+        apiStatus: 'matched' as const,
+        status: 'approved' as const,
+        closed: true,
+        live: false,
+        completionPending: true,
+      }],
+    };
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByText('종료 확인 중')).toBeInTheDocument();
+    expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-match-row.tm-card-closed')).toBeNull();
+  });
+
   // 행 카드 전환(2026-09-07) 후 목록의 열린 카드는 "모집 중"이 아니라 **"상대 모집 중"**을
   // 쓴다 — 목록 응답에 상대팀이 없어 그 자리가 늘 비어 있던 것을, 배지 한 칸으로 답한다.
   it('열린 카드는 "상대 모집 중" 배지를 쓰고 흐림 처리도 없다', () => {
@@ -965,7 +987,7 @@ describe('상세 히어로 — 상대가 정해졌거나 끝난 매치는 "모�
 
 /**
  * 2026-09-26 alpha 감사 — CTA 상태줄 캡션이 항상 "신청 상태"였는데, 경기가 실제로 시작되면
- * model.statusLabel 값이 modelLiveLabel()의 "진행 중"으로 바뀐다(경기 자체의 실시간 상태 —
+ * model.statusLabel 값이 modelScheduleLabel()의 경기 상태로 바뀐다(경기 자체의 시간 상태 —
  * 신청 흐름과 무관한 축). 캡션은 값의 의미 축(statusLabelKind)을 따라야 한다.
  */
 describe('상세 CTA 상태줄 캡션 — 값의 의미 축(신청/경기)에 따라 바뀐다', () => {

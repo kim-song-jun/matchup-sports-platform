@@ -31,6 +31,8 @@
 
 ## Progress Snapshot
 
+- 2026-09-30: 익명 자책골에서 선택한 팀을 득점 팀으로 저장하던 회귀를 수정했다. 선수/팀 선택은
+  모두 자책골을 넣은 쪽을 뜻하며, 반대편 `sideId`에 득점을 귀속한다.
 - 2026-08-19: `origin/dev` `6631d4b2` 기준 재현 경로 감사.
 - 이미 구현 확인: 승부차기 선축 선택, takeover token 자동 갱신/재요청, 등번호 저장·recent fallback.
 - 확인된 결함: generic event amend 부재, own-goal 부재, correction penalty 편집 부재, official goal timeline이 원본 이벤트에 고정, 공개 시각이 `mm:ss`/내림 분으로 표시.

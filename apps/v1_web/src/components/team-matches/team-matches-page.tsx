@@ -186,7 +186,7 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
 }
 
 // CTA 카드의 값(model.statusLabel)은 대부분 신청 흐름 상태(승인 대기/완료·신청 마감 등)지만,
-// 경기가 실제로 시작되면 modelLiveLabel()이 '진행 중'을 덮어써 값의 의미 축이 바뀐다
+// 경기가 시작되거나 지정 종료 시각을 지나면 modelScheduleLabel()이 경기 상태를 덮어써 의미 축이 바뀐다
 // (team-matches-client.tsx statusLabelKind 참고) — 그때는 캡션도 '신청 상태'가 아니라
 // '경기 상태'라고 해야 값과 뜻이 맞는다.
 function teamMatchStatusCaption(mode: TeamMatchDetailViewModel['mode'], statusLabelKind: TeamMatchDetailViewModel['statusLabelKind']) {
@@ -1030,10 +1030,10 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // **리그 대진은 제외한다.** 리그엔 신청 개념이 없어 `closed` 가 "모집이 끝났다" 가 아니라
   // 그냥 "상대가 정해져 있다" 는 뜻인데, 그 상태가 원정팀 팀장·선수 전원에게 붙어
   // **자기 팀 경기가 마감·흐림으로** 보였다.
-  const isClosed = match.closed && !isLeagueFixture && !match.live;
+  const isClosed = match.closed && !isLeagueFixture && !match.live && !match.completionPending;
   // 관계도 없고 마감도 아니면 "상대가 아직 없다"를 쓴다 — 목록 응답에 상대팀이 없어
   // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
-  const openLabel = !relation && !isClosed && !isLeagueFixture && !match.live ? '상대 모집 중' : null;
+  const openLabel = !relation && !isClosed && !isLeagueFixture && !match.live && !match.completionPending ? '상대 모집 중' : null;
   return (
     <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
       {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
@@ -1065,6 +1065,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               </span>
             ) : null}
             {match.live && <span className="tm-badge tm-badge-green">진행 중</span>}
+            {match.completionPending ? <span className="tm-badge tm-badge-orange">종료 확인 중</span> : null}
             {isClosed ? (
               <span className="tm-badge tm-badge-grey tm-card-closed-badge">
                 <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>

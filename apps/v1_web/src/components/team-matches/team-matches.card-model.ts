@@ -28,13 +28,15 @@ import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState
 export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const apiStatus = getStatus(match);
   const status = statusToCardStatus(apiStatus, getViewerState(match));
+  const schedulePhase = getFriendlyTeamMatchSchedulePhase(match);
   const costs = parseCosts(match.costNote);
   const hasStructuredConditions = Boolean(match.matchFormat) || (match.matchStyle?.length ?? 0) > 0 || Boolean(match.uniformColor);
   const legacyNote = !hasStructuredConditions ? match.rulesText ?? '' : '';
 
   return {
     ...fallback,
-    live: apiStatus === 'matched' && !match.league && (match.isLive ?? (!!match.startsAt && new Date(match.startsAt).getTime() <= Date.now())),
+    live: schedulePhase === 'live',
+    completionPending: schedulePhase === 'completion_pending',
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
     // image 도 목업의 폴백으로 쓰지 않는다(웨이브4, 2026-09-04) — 예전엔 `fallback.imageUrl`
@@ -78,6 +80,25 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     apiStatus,
     closed: isClosedApiStatus(apiStatus),
   };
+}
+
+/**
+ * 친선 팀매치는 결과가 확정될 때까지 DB status가 `matched`로 유지된다. 따라서 시작 시각만
+ * 보면 지정 종료 시각이 지난 뒤에도 계속 "진행 중"으로 보인다. 종료 시각은 자동 확정 조건이
+ * 아니라 표시 전환 기준일 뿐이며, 실제 점수 편집과 양 팀 종료 확인 계약은 그대로 유지한다.
+ */
+export function getFriendlyTeamMatchSchedulePhase(
+  match: V1TeamMatch,
+): 'live' | 'completion_pending' | null {
+  if (getStatus(match) !== 'matched' || match.league) return null;
+
+  const now = Date.now();
+  const endsAt = match.endsAt ? new Date(match.endsAt).getTime() : Number.NaN;
+  if (Number.isFinite(endsAt) && endsAt <= now) return 'completion_pending';
+
+  const startsAt = match.startsAt ? new Date(match.startsAt).getTime() : Number.NaN;
+  const started = match.isLive ?? (Number.isFinite(startsAt) && startsAt <= now);
+  return started ? 'live' : null;
 }
 
 export function buildSportChips({
@@ -196,4 +217,3 @@ export function parseCosts(value: string | null | undefined) {
     opponentCost: amounts[1] ?? null,
   };
 }
-

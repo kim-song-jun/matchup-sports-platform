@@ -201,6 +201,7 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 | TM-SHARED-06 | 원정 선수 | 홈 선수가 등록한 골 수정 | 득점자 수정·작성자 이력 공유 |
 | TM-SHARED-07 | 양 팀 선수 | 삭제 → 이력에서 복구 | 점수 감소·복원, 새 변경 이력 |
 | TM-SHARED-08 | 동시 작성 | 다른 참가자가 먼저 저장 | 작성 중 값 보존·충돌 안내, stale overwrite 금지 |
+| TM-SHARED-08A | 지정 종료 시각 경과 / 아직 미확정 | 목록·상세 조회 | `종료 확인 중` 표시, 점수·기록 편집과 종료 확인 유지 |
 | TM-SHARED-09 | 첫 팀 | 종료 확인 | 상대팀 확인 대기, 아직 결과 미확정 |
 | TM-SHARED-10 | 상대팀 | 같은 기록 종료 확인 | 공식 결과·전적 outbox·편집 잠금 |
 | TM-SHARED-11 | 비참가자/경기 전/취소/확정 | API 수정 시도 | 서버 403/409, DB 변경 없음 |

@@ -191,4 +191,20 @@ describe('friendly match live card', () => {
     expect(toTeamMatch(match, base.matches[0]).live).toBe(true);
     expect(toTeamMatch({ ...match, status: 'cancelled' } as unknown as V1TeamMatch, base.matches[0]).live).toBe(false);
   });
+
+  it('switches from live to completion pending after the configured end time', () => {
+    const now = Date.now();
+    const match = {
+      id: 'completion-pending',
+      title: 'Completion pending',
+      status: 'matched',
+      startsAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      endsAt: new Date(now - 60_000).toISOString(),
+    } as unknown as V1TeamMatch;
+
+    const model = toTeamMatch(match, base.matches[0]);
+
+    expect(model.live).toBe(false);
+    expect(model.completionPending).toBe(true);
+  });
 });

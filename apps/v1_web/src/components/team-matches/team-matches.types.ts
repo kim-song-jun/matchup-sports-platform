@@ -55,6 +55,8 @@ export type TeamMatchModel = {
   /** API status 만으로 판정한 "더는 신청받지 않는다" — 관계와 무관하다. */
   closed: boolean;
   live?: boolean;
+  /** 친선 경기의 지정 종료 시각은 지났지만 양 팀 종료 확인은 아직 끝나지 않은 상태. */
+  completionPending?: boolean;
 };
 
 export type TeamMatchListViewModel = {
@@ -177,7 +179,7 @@ export type TeamMatchDetailViewModel = {
   reviewAction?: { label: string; href: string } | null;
   statusLabel?: string;
   /** statusLabel의 의미 축. 기본은 'application'(신청 흐름 — 승인 대기/완료, 신청 마감 등)이고,
-   * modelLiveLabel()이 '진행 중'을 준 경우에만 'match'(경기 자체의 실시간 진행 상태)다.
+   * modelScheduleLabel()이 진행/종료 확인 상태를 준 경우에는 'match'(경기 자체 상태)다.
    * 두 축은 캡션이 다르다 — '신청 상태' 캡션 아래 경기 진행 상태를 보여주면 신청 관련
    * 정보로 오인된다(team-matches-page.tsx statusLabel 캡션 참고). */
   statusLabelKind?: 'application' | 'match';

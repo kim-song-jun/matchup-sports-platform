@@ -144,15 +144,18 @@ export function ActionTargetPicker({
 
   const payload: Record<string, unknown> = actionType === 'CARD' ? { card: cardColor } : {};
 
+  // 자책골에서 고르는 대상은 "득점한 팀"이 아니라 자책골을 넣은 선수/팀이다.
+  // 선수 선택과 익명 팀 선택이 같은 의미를 갖도록 두 경로 모두 상대 팀에 점수를 귀속한다.
+  const creditedSideIdForTarget = (targetSideId: string) =>
+    actionType === 'OWN_GOAL'
+      ? (sides.find((side) => side.id !== targetSideId)?.id ?? targetSideId)
+      : targetSideId;
+
   const commitPlayer = (input: { sideId: string; participant: GameLineupParticipant }) => {
-    const scoringSideId =
-      actionType === 'OWN_GOAL'
-        ? (sides.find((side) => side.id !== input.sideId)?.id ?? input.sideId)
-        : input.sideId;
     onCommit({
       type: actionType,
       participantId: input.participant.id,
-      sideId: scoringSideId,
+      sideId: creditedSideIdForTarget(input.sideId),
       period: frozen.period,
       clockMs: frozen.clockMs,
       occurredAt: frozen.occurredAt,
@@ -160,10 +163,10 @@ export function ActionTargetPicker({
     });
   };
 
-  const commitTeamOnly = (sideId: string) => {
+  const commitTeamOnly = (targetSideId: string) => {
     onCommit({
       type: actionType,
-      sideId,
+      sideId: creditedSideIdForTarget(targetSideId),
       period: frozen.period,
       clockMs: frozen.clockMs,
       occurredAt: frozen.occurredAt,
@@ -282,20 +285,23 @@ export function ActionTargetPicker({
 
           {allowTeamOnly ? (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {sides.map((side) => (
-                <button
-                  key={side.id}
-                  type="button"
-                  onClick={() => commitTeamOnly(side.id)}
-                  className="min-h-[44px] rounded-lg border border-dashed border-[var(--border)] px-3 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                >
-                  {actionType === 'OWN_GOAL'
-                    ? `${side.displayNameSnapshot} 득점 · OG로 기록`
-                    : actionType === 'GOAL'
-                      ? `${side.displayNameSnapshot} · 익명 골로 기록`
-                      : `${side.displayNameSnapshot} · 선수 지정 없이 기록`}
-                </button>
-              ))}
+              {sides.map((side) => {
+                const creditedSide = sides.find((candidate) => candidate.id !== side.id);
+                return (
+                  <button
+                    key={side.id}
+                    type="button"
+                    onClick={() => commitTeamOnly(side.id)}
+                    className="min-h-[44px] rounded-lg border border-dashed border-[var(--border)] px-3 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  >
+                    {actionType === 'OWN_GOAL'
+                      ? `${side.displayNameSnapshot} 자책골 · ${creditedSide?.displayNameSnapshot ?? '상대 팀'} 득점으로 기록`
+                      : actionType === 'GOAL'
+                        ? `${side.displayNameSnapshot} · 익명 골로 기록`
+                        : `${side.displayNameSnapshot} · 선수 지정 없이 기록`}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </div>

@@ -826,14 +826,17 @@ describe('TournamentPlayersService', () => {
         },
       );
       prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 1 }));
-      prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+      // 어드민이 남긴 심사 메모 — 팀장·매니저에게만 보여야 한다.
+      prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+        playerRow({ eligibilityNote: '2018 프로 등록 이력 확인 필요' }),
+      ]);
       prisma.$queryRaw.mockResolvedValue([{ id: 'player-1', jersey_number: 7 }]);
     });
 
     it.each([
       ['owner', owner],
       ['manager', manager],
-    ])('%s 는 실명·생년월일·성별을 그대로 받는다', async (_role, viewer) => {
+    ])('%s 는 실명·생년월일·성별·심사 메모를 그대로 받는다', async (_role, viewer) => {
       const result = await service.listPlayers(viewer, 'tournament-1', 'reg-1');
 
       expect(result.personalInfoVisible).toBe(true);
@@ -841,13 +844,14 @@ describe('TournamentPlayersService', () => {
         realName: '홍길동',
         birthDateSnapshot: '1995-03-15',
         genderSnapshot: 'male',
+        eligibilityNote: '2018 프로 등록 이력 확인 필요',
         nickname: '길동이',
         jerseyNumber: 7,
         eligibilityStatus: 'needs_review',
       });
     });
 
-    it('일반 팀원은 개인정보 세 필드를 받지 못하고 닉네임·등번호·자격 상태·userId 는 받는다', async () => {
+    it('일반 팀원은 개인정보 세 필드와 심사 메모를 받지 못하고 닉네임·등번호·자격 상태·userId 는 받는다', async () => {
       const result = await service.listPlayers(plainMember, 'tournament-1', 'reg-1');
 
       expect(result.personalInfoVisible).toBe(false);
@@ -855,6 +859,7 @@ describe('TournamentPlayersService', () => {
         realName: null,
         birthDateSnapshot: null,
         genderSnapshot: null,
+        eligibilityNote: null,
         nickname: '길동이',
         jerseyNumber: 7,
         eligibilityStatus: 'needs_review',
@@ -864,6 +869,7 @@ describe('TournamentPlayersService', () => {
       const serialized = JSON.stringify(result);
       expect(serialized).not.toContain('홍길동');
       expect(serialized).not.toContain('1995-03-15');
+      expect(serialized).not.toContain('프로 등록 이력');
     });
 
     it('일반 팀원에게 프로필이 없는 선수의 닉네임은 실명으로 대체하지 않고 null 이다', async () => {

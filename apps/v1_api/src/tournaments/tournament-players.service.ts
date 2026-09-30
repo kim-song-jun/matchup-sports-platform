@@ -1058,8 +1058,9 @@ export class TournamentPlayersService {
   }
 
   /**
-   * 팀 명단 조회용 직렬화. 숨길 때는 개인정보 세 키의 값만 `null` 로 둔다(같은 화면이 두 응답을
-   * 한 타입으로 읽는다). `nickname` 은 공개 명단이 이미 쓰는 표시 이름이라 어느 쪽에나 싣는다.
+   * 팀 명단 조회용 직렬화. 숨길 때는 개인정보 세 키와 어드민 심사 메모(`eligibilityNote`)의 값만
+   * `null` 로 둔다(같은 화면이 두 응답을 한 타입으로 읽는다). `nickname` 은 공개 명단이 이미
+   * 쓰는 표시 이름이라 어느 쪽에나 싣는다.
    */
   private serializeRosterPlayer(
     row: V1TournamentPlayer,
@@ -1069,7 +1070,14 @@ export class TournamentPlayersService {
   ) {
     const player = this.serializePlayer(row, jerseyNumber);
     if (personalInfoVisible) return { ...player, nickname };
-    return { ...player, realName: null, birthDateSnapshot: null, genderSnapshot: null, nickname };
+    return {
+      ...player,
+      realName: null,
+      birthDateSnapshot: null,
+      genderSnapshot: null,
+      eligibilityNote: null,
+      nickname,
+    };
   }
 
   private async lockAndLoadMutableRegistration(

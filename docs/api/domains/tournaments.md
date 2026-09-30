@@ -256,12 +256,12 @@ The stored roster snapshot uses the server-side member profile values for `realN
 
 `GET /tournaments/:tournamentId/registrations/:registrationId/players` is open to every active member of the registration team, but the response depends on the caller's team role:
 
-| Caller | `realName` / `birthDateSnapshot` / `genderSnapshot` | `personalInfoVisible` |
+| Caller | `realName` / `birthDateSnapshot` / `genderSnapshot` / `eligibilityNote` | `personalInfoVisible` |
 |---|---|---|
 | team `owner`, team `manager` | stored snapshot values | `true` |
 | team `member` | `null` (keys stay in the response) | `false` |
 
-Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `eligibilityNote`, `addedAt` and `removedAt`. Clients must use `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". A non-member of the team gets `403 PERMISSION_DENIED`.
+`eligibilityNote` is the admin review memo, so it follows the same rule as the personal info. Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `addedAt` and `removedAt`. Clients must use `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". A non-member of the team gets `403 PERMISSION_DENIED`.
 
 Endpoints that return a team's real names or birth dates and who can call them: `POST`/`PATCH`/`DELETE` under the same prefix are team manager+ only; every `/admin/...` player endpoint (list, export, tournament export, eligible-players, eligibility, add, remove) requires an active admin; `GET /teams/:teamId/members` already returns `realName`, `phone`, `birthDate`, `gender` as `null` to a plain member (except their own row). The public tournament detail roster carries `jerseyNumber` and `nickname` only.
 

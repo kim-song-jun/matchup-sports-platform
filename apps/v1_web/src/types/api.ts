@@ -3811,7 +3811,7 @@ export type V1TournamentPlayer = {
 
 /**
  * 팀 명단 조회(`GET …/registrations/:id/players`)의 선수 한 명.
- * 일반 팀원에게는 `realName`·`birthDateSnapshot`·`genderSnapshot` 이 `null` 이고
+ * 일반 팀원에게는 `realName`·`birthDateSnapshot`·`genderSnapshot`·`eligibilityNote` 가 `null` 이고
  * (`V1TournamentRosterResponse.personalInfoVisible === false`), 표시 이름은 `nickname` 이다.
  */
 export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {

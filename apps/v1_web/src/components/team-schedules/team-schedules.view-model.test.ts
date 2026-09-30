@@ -13,6 +13,7 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
   scheduleStateLabel,
   scheduleTypeLabel,
@@ -318,5 +319,35 @@ describe('attendanceLockedReason', () => {
     expect(attendanceLockedReason('COMPLETED', false)).toBe('이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.');
     expect(attendanceLockedReason('SCHEDULED', true)).toBe('참석 신청 마감 시간이 지났어요.');
     expect(attendanceLockedReason('SCHEDULED', false)).toBeNull();
+  });
+});
+
+describe('scheduleOpponentTeamName — 일정을 가진 팀 기준의 상대 (W3-V8)', () => {
+  // 매치 상세 모양 그대로: approvedOpponentTeam 은 호스트 기준 상대다.
+  const friendly = {
+    hostTeamId: 'team-host',
+    hostTeamName: '팀관리 테스트',
+    hostTeam: { teamId: 'team-host', name: '팀관리 테스트' },
+    approvedOpponentTeam: { teamId: 'team-guest', name: '마포 FC' },
+  };
+
+  it('호스트 팀 일정에서는 신청(원정) 팀이 상대다 (대조군)', () => {
+    expect(scheduleOpponentTeamName(friendly, 'team-host')).toBe('마포 FC');
+  });
+
+  it('신청(원정) 팀 일정에서는 호스트 팀이 상대다 — 자기 팀 이름이 나오지 않는다', () => {
+    expect(scheduleOpponentTeamName(friendly, 'team-guest')).toBe('팀관리 테스트');
+  });
+
+  it('리그 대진(원정 쪽)도 같은 규칙이다 — 호스트 객체가 없으면 hostTeamName 으로', () => {
+    const league = { hostTeamId: 'team-a', hostTeamName: '성수 FC', hostTeam: null, approvedOpponentTeam: { teamId: 'team-b', name: '망원 FC' } };
+    expect(scheduleOpponentTeamName(league, 'team-b')).toBe('성수 FC');
+    expect(scheduleOpponentTeamName(league, 'team-a')).toBe('망원 FC');
+  });
+
+  it('상대가 확정되지 않았거나, 보는 팀이 어느 쪽도 아니면 null', () => {
+    expect(scheduleOpponentTeamName({ ...friendly, approvedOpponentTeam: null }, 'team-host')).toBeNull();
+    expect(scheduleOpponentTeamName(friendly, 'team-other')).toBeNull();
+    expect(scheduleOpponentTeamName(undefined, 'team-host')).toBeNull();
   });
 });

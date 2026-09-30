@@ -1677,6 +1677,41 @@ describe('ReviewsService', () => {
       expect(createMock).toHaveBeenCalledTimes(1);
     });
 
+    // 회귀: 게임 생성은 사이드마다 빈 rev1 라인업을 항상 만들고, 계정 없는 자동 명단(리그)은 참가자가
+    // 있어도 전원이 계정으로 해석되지 않는다. "라인업이 있다"만으로 명단 기준을 걸면 이런 경기에서 팀장을
+    // 포함한 팀원 전원이 작성 자격을 잃는다 — 계정으로 해석된 참가자가 있을 때만 명단 기준이다.
+    it.each([
+      ['참가자가 없는 빈 rev1 라인업', [] as string[]],
+      ['참가자는 있지만 전원 계정 미연결인 라인업', ['게스트1', '게스트2']],
+    ])('작성자 사이드가 %s 이면 활성 팀원 전원이 그대로 작성자다', async (_label, unlinkedNames) => {
+      const { prisma, createMock } = teamMatchWorld(
+        [
+          { userId: memberAId, teamId: hostTeamId, role: 'member' },
+          { userId: leaderId, teamId: hostTeamId, role: 'owner' },
+        ],
+        [],
+        [opponentA],
+        [],
+        [],
+        {},
+        unlinkedNames,
+      );
+      const service = makeService(prisma);
+
+      for (const userId of [memberAId, leaderId]) {
+        const pending = await service['pendingTeamReviews'](authUser(userId), 20);
+        expect(pending).toHaveLength(1);
+        const source = await service.source(authUser(userId), { sourceType: 'team_match', sourceId: teamSourceId });
+        expect(source.targets.map((target) => target.targetType)).toEqual(['team', 'user']);
+      }
+      const memberResult = await service.submit(authUser(memberAId), teamReviewDto(5));
+      const leaderResult = await service.submit(authUser(leaderId), teamReviewDto(4));
+
+      expect(memberResult.alreadySubmitted).toBe(false);
+      expect(leaderResult.alreadySubmitted).toBe(false);
+      expect(createMock).toHaveBeenCalledTimes(2);
+    });
+
     it('양 팀 겸직자가 한쪽 사이드 명단에서만 빠지면 그 방향만 닫힌다', async () => {
       // memberA 는 홈·원정 양쪽 팀원. 홈 명단에는 없고(빠짐) 원정 명단에는 있다.
       const { prisma, createMock } = teamMatchWorld(
@@ -1960,12 +1995,15 @@ function teamMatchWorld(
    */
   staleAwayRosterUserIds: string[] = [],
   /**
-   * 홈(작성자) 사이드 최신 라인업에 실린 userId 목록 — F88: 명단이 있는 사이드의 팀원만 작성자다.
-   * null 이면 홈 사이드에 라인업이 없다(예전 기본 동작), 빈 배열이면 라인업은 있으나 아무도 안 실렸다.
+   * 홈(작성자) 사이드 최신 라인업에 실린 userId 목록 — F88: 계정으로 해석된 참가자가 있는 사이드는
+   * 그 명단의 팀원만 작성자다. null 이면 홈 사이드에 라인업 행이 없고, 빈 배열이면 참가자가 없는
+   * 빈 rev1 라인업이다(게임 생성이 사이드마다 항상 만든다).
    */
   homeRosterUserIds: string[] | null = null,
   /** 원정 최신 라인업 선수별 등번호(F60). 없는 userId 는 번호 없음(null)이다. */
   awayJerseyNumbers: Record<string, number> = {},
+  /** 홈 최신 라인업의 계정 미연결 참가자(userId 없음 · identity link 없음) 표시 이름 — 계정 없는 자동 명단 재현용. */
+  homeUnlinkedNames: string[] = [],
 ) {
   const membershipRows: FakeRow[] = memberships.map((membership) => ({
     ...membership,
@@ -2000,7 +2038,7 @@ function teamMatchWorld(
     ],
   };
   const hasAwayLineup = awayRosterUserIds.length > 0 || staleAwayRosterUserIds.length > 0;
-  const hasHomeLineup = homeRosterUserIds !== null;
+  const hasHomeLineup = homeRosterUserIds !== null || homeUnlinkedNames.length > 0;
   const homeLineupId = 'lineup-home-rev1';
   const staleLineupId = 'lineup-away-rev1';
   const latestLineupId = hasAwayLineup ? (staleAwayRosterUserIds.length ? 'lineup-away-rev2' : 'lineup-away-rev1') : null;
@@ -2041,6 +2079,14 @@ function teamMatchWorld(
       lineupId: homeLineupId,
       userId,
       displayNameSnapshot: `선수-${userId}`,
+    })),
+    ...homeUnlinkedNames.map((name) => ({
+      id: `participant-unlinked-${name}`,
+      gameId: gameRow.id,
+      sideId: homeSideId,
+      lineupId: homeLineupId,
+      userId: null,
+      displayNameSnapshot: name,
     })),
   ];
 
@@ -2094,7 +2140,7 @@ function teamMatchWorld(
     })),
   );
   const currentLinkFindMany = jest.fn().mockResolvedValue(
-    gameParticipantRows.map((row) => ({ participantId: row.id, userId: row.userId })),
+    gameParticipantRows.filter((row) => row.userId !== null).map((row) => ({ participantId: row.id, userId: row.userId })),
   );
   const eventLinkFindMany = jest.fn().mockResolvedValue([]);
 

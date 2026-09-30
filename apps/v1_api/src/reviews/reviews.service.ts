@@ -62,8 +62,7 @@ type TeamMatchRosterParticipant = {
   userId: string | null;
   displayNameSnapshot: string;
 };
-/** 사이드의 최신 라인업 명단. hasLineup=false 면 명단이 아직 없는 사이드다. */
-type SideLineupRoster = { hasLineup: boolean; players: Array<{ userId: string; name: string; imageUrl: string | null }> };
+type LineupPlayer = { userId: string; name: string; imageUrl: string | null };
 type PrismaTx = Omit<
   PrismaService,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onModuleDestroy'
@@ -550,8 +549,7 @@ export class ReviewsService {
         // 양 팀 모두의 멤버면 두 방향이 각각 별도의 후기 항목이 된다.
         return resolveReviewerTeamIds(teamIds, match.hostTeamId, match.approvedApplicantTeamId).flatMap((reviewerTeamId) => {
           // 작성자 쪽 명단이 있는 경기는 명단에서 빠진 팀원에게 후기 의무를 만들지 않는다.
-          const reviewerRoster = rostersBySource.get(match.id)?.get(reviewerTeamId);
-          if (reviewerRoster?.hasLineup && !reviewerRoster.userIds.includes(user.id)) return [];
+          if (!canReviewFromLineup(rostersBySource.get(match.id)?.get(reviewerTeamId) ?? [], user.id)) return [];
           const isHost = reviewerTeamId === match.hostTeamId;
           const targetTeam = isHost ? match.approvedApplicantTeam : match.hostTeam;
           const key = teamReviewKey(match.id, targetTeam.id);
@@ -559,7 +557,7 @@ export class ReviewsService {
           // 팀 후기는 팀장·운영진만 — 목록의 남은 개수도 실제로 쓸 수 있는 대상만 세야
           // "1건 남음"을 눌렀는데 쓸 게 없는 화면이 나오지 않는다.
           const canReviewTeam = role ? canReviewOpponentTeam(role) : false;
-          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam.id)?.userIds ?? [])
+          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam.id) ?? [])
             .filter((userId) => userId !== user.id);
           const reviewedUserIds = reviewKeys.users.get(match.id) ?? new Set<string>();
           const teamReviewed = reviewKeys.teams.has(key);
@@ -723,11 +721,14 @@ export class ReviewsService {
       [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
       db,
     );
-    const reviewerTeams = memberTeams.filter((team) => isOnLineupOrNoLineup(rosterByTeamId.get(team.teamId), user.id));
+    const reviewerTeams = memberTeams.filter((team) => canReviewFromLineup(
+      (rosterByTeamId.get(team.teamId) ?? []).map((player) => player.userId),
+      user.id,
+    ));
     const benchedTeamIds = memberTeams.filter((team) => !reviewerTeams.includes(team)).map((team) => team.teamId);
     if (reviewerTeams.length === 0) throw notActualParticipant();
     const opponentTeamIds = reviewerTeams.map((team) => opponentOf(team.teamId).id);
-    const rosterUserIds = opponentTeamIds.flatMap((teamId) => (rosterByTeamId.get(teamId)?.players ?? []).map((player) => player.userId));
+    const rosterUserIds = opponentTeamIds.flatMap((teamId) => (rosterByTeamId.get(teamId) ?? []).map((player) => player.userId));
 
     // 기존 후기 조회도 사람 기준 — 팀 기준으로 조회하면 같은 팀 다른 사람의 후기를 "내 후기"로 잘못 잠근다.
     const existingReviews = await db.v1PostEventReview.findMany({
@@ -774,7 +775,7 @@ export class ReviewsService {
             }]
           : [];
         // 상대 선수 후기는 역할 무관 — 팀원도 자기가 상대한 사람을 평가한다.
-        const playerTargets = (rosterByTeamId.get(targetTeam.id)?.players ?? []).map((player) => {
+        const playerTargets = (rosterByTeamId.get(targetTeam.id) ?? []).map((player) => {
           const existingPlayerReview = existingByTargetUser.get(player.userId) ?? null;
           return {
             targetType: 'user' as const,
@@ -820,7 +821,7 @@ export class ReviewsService {
 
   /**
    * 팀 매치에서 "그 경기에 실제로 뛴 선수" 명단 — 상대 선수(후기 대상)와 작성자 본인 사이드(작성 자격)
-   * 양쪽에 같은 규칙으로 쓴다. `hasLineup=false` 는 최신 라인업이 없는 사이드라 명단이 없다는 뜻이다.
+   * 양쪽에 같은 규칙으로 쓴다. 계정으로 해석된 참가자가 없는 사이드는 빈 명단이다.
    *
    * 근거는 제출된 라인업 하나뿐이다 — V1Game.teamMatchId 로 연결된 경기의, 상대 팀 사이드에 속한
    * "최신 revision 라인업"에 딸린 V1GameParticipant를 읽고, 현재 identity link로 실제 계정을
@@ -841,7 +842,7 @@ export class ReviewsService {
     teamIds: string[],
     db: PrismaService | PrismaTx = this.prisma,
   ) {
-    const rosterByTeamId = new Map<string, SideLineupRoster>();
+    const rosterByTeamId = new Map<string, LineupPlayer[]>();
     if (!teamIds.length) return rosterByTeamId;
 
     const game = await db.v1Game.findUnique({
@@ -883,7 +884,7 @@ export class ReviewsService {
 
     for (const [teamId, teamSideIds] of sideIdsByTeamId) {
       const seen = new Set<string>();
-      const roster: SideLineupRoster['players'] = [];
+      const roster: LineupPlayer[] = [];
       for (const participant of orderedParticipants) {
         if (!teamSideIds.includes(participant.sideId)) continue;
         // 최신 라인업으로 이미 좁혔지만, 한 사람이 같은 라인업에 중복 등록되는 입력 오류까지
@@ -897,10 +898,7 @@ export class ReviewsService {
           imageUrl: profile?.profileImageUrl ?? null,
         });
       }
-      rosterByTeamId.set(teamId, {
-        hasLineup: teamSideIds.some((sideId) => latestLineupIdBySideId.has(sideId)),
-        players: roster,
-      });
+      rosterByTeamId.set(teamId, roster);
     }
     return rosterByTeamId;
   }
@@ -1206,7 +1204,7 @@ export class ReviewsService {
    * "남은 리뷰 N명" 카운트가 지워지지 않는 옛 라인업 참가자만큼 부풀려진다.
    */
   private async teamMatchRostersBySource(teamMatchIds: string[]) {
-    const empty = new Map<string, Map<string, { hasLineup: boolean; userIds: string[] }>>();
+    const empty = new Map<string, Map<string, string[]>>();
     if (!teamMatchIds.length) return empty;
 
     const games = await this.prisma.v1Game.findMany({
@@ -1229,7 +1227,7 @@ export class ReviewsService {
 
     for (const game of games) {
       if (!game.teamMatchId) continue;
-      const byTeamId = new Map<string, { hasLineup: boolean; userIds: string[] }>();
+      const byTeamId = new Map<string, string[]>();
       for (const side of game.sides) {
         if (!side.teamId) continue;
         const userIds = [
@@ -1239,11 +1237,7 @@ export class ReviewsService {
               .map((participant) => participant.userId)
           ),
         ];
-        const previous = byTeamId.get(side.teamId);
-        byTeamId.set(side.teamId, {
-          hasLineup: (previous?.hasLineup ?? false) || latestLineupIdBySideId.has(side.id),
-          userIds: [...(previous?.userIds ?? []), ...userIds],
-        });
+        byTeamId.set(side.teamId, [...(byTeamId.get(side.teamId) ?? []), ...userIds]);
       }
       empty.set(game.teamMatchId, byTeamId);
     }
@@ -1720,11 +1714,12 @@ function notActualParticipant() {
 }
 
 /**
- * 작성자 사이드에 최신 라인업이 있으면 그 명단에 있어야 작성자다. 라인업이 없는 사이드는
- * 활성 팀원 전원이 작성자다(2026-08-18 정책 — 명단이 없는 경기에서 후기가 통째로 막히지 않게).
+ * 작성자 사이드의 최신 라인업에 계정으로 해석된 참가자가 있을 때만 명단 기준이고, 없으면 활성 팀원
+ * 전원이 작성자다(2026-08-18 정책). "라인업이 있는가"로 가르면 안 된다 — 게임은 사이드마다 빈 rev1
+ * 라인업을 항상 만들고, 계정 없는 자동 명단(리그)도 해석된 참가자가 0명이라 전원이 자격을 잃는다.
  */
-function isOnLineupOrNoLineup(roster: SideLineupRoster | undefined, userId: string) {
-  return !roster?.hasLineup || roster.players.some((player) => player.userId === userId);
+function canReviewFromLineup(lineupUserIds: readonly string[], userId: string) {
+  return lineupUserIds.length === 0 || lineupUserIds.includes(userId);
 }
 
 function notFound(code: string, message: string) {

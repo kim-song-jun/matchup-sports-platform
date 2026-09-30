@@ -312,6 +312,17 @@ describe('OnboardingClient 지역 단계', () => {
     expect(screen.getByRole('button', { name: '지역 선택 완료' })).toBeDisabled();
   });
 
+  // 지역을 안 고르면 큰 버튼이 잠기므로, 부제가 "직접 골라도 돼요" 로 끝나면 왜 못 넘어가는지 읽히지 않는다.
+  it('부제가 지역을 고르면 넘어가고 안 정하면 나중에 설정하기를 누르라고 말한다', () => {
+    render(<OnboardingClient step="region" />);
+
+    expect(screen.getByText(
+      '위치 권한 없어도 괜찮아요. 지역을 직접 고르면 다음으로 넘어가요. 지금 정하지 않으면 "나중에 설정하기"를 눌러 주세요.',
+    )).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '지역 선택 완료' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '나중에 설정하기' })).toBeEnabled();
+  });
+
   it('"나중에 설정하기"는 하단에 하나뿐이고 누르면 온보딩을 미룬다', () => {
     render(<OnboardingClient step="region" />);
 

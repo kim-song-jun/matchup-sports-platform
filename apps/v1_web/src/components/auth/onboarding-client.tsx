@@ -84,7 +84,7 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
   region: {
     stepNo: 3,
     title: '주 활동 지역을 선택해 주세요',
-    sub: '위치 권한 없어도 괜찮아요. 지역은 직접 골라도 돼요.',
+    sub: '위치 권한 없어도 괜찮아요. 지역을 직접 고르면 다음으로 넘어가요. 지금 정하지 않으면 "나중에 설정하기"를 눌러 주세요.',
   },
   confirm: {
     stepNo: 4,

@@ -482,6 +482,62 @@ describe('TeamFormPageView', () => {
   });
 });
 
+describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
+  function formModel(form: Partial<NonNullable<TeamFormViewModel['form']>>, capacity = 12): TeamFormViewModel {
+    return {
+      mode: 'edit',
+      team: {
+        name: '성수 풋살 크루', logoUrl: null, coverImageUrl: null, sport: '풋살', region: '서울 성동구',
+        description: '', sports: ['풋살'], city: '서울', county: '성동구', level: '입문-중수', genderRule: '성별 무관',
+        activityDays: [], activityFrequency: '', activityTimeSlots: [], activityTypes: [], activityMemo: '', capacity,
+      },
+      form: {
+        sportId: 'sport-1', regionId: 'region-1', regions: [{ id: 'region-1', name: '서울 성동구' }],
+        sports: [{ id: 'sport-1', name: '풋살' }], joinPolicy: 'approval_required',
+        onFieldChange: vi.fn(), onSportChange: vi.fn(), onRegionChange: vi.fn(), onJoinPolicyChange: vi.fn(), onSubmit: vi.fn(),
+        ...form,
+      },
+    };
+  }
+
+  it('minCapacity 아래로는 고를 수 없고 이유를 알려 준다', () => {
+    const onFieldChange = vi.fn();
+    render(<TeamFormPageView model={formModel({ minCapacity: 12, onFieldChange }, 12)} />);
+
+    const select = screen.getByRole('combobox', { name: '정원' });
+    const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value));
+    expect(Math.min(...values)).toBe(12);
+    expect(screen.getByRole('button', { name: '정원 한 명 줄이기' })).toBeDisabled();
+    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '정원 한 명 늘리기' }));
+    expect(onFieldChange).toHaveBeenCalledWith('capacity', 13);
+  });
+
+  it('하한이 없으면(팀 만들기) 2명부터 고를 수 있다', () => {
+    render(<TeamFormPageView model={formModel({}, 12)} />);
+
+    const values = Array.from(screen.getByRole('combobox', { name: '정원' }).querySelectorAll('option')).map((option) => Number(option.value));
+    expect(Math.min(...values)).toBe(2);
+    expect(screen.getByRole('button', { name: '정원 한 명 줄이기' })).toBeEnabled();
+    expect(screen.queryByText(/그보다 적게 정할 수 없어요/)).not.toBeInTheDocument();
+  });
+
+  it('저장 오류가 생기면 화면 밖 안내로 스크롤하고 포커스를 옮긴다', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const view = render(<TeamFormPageView model={formModel({})} />);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    view.rerender(<TeamFormPageView model={formModel({ error: '팀장·매니저만 할 수 있어요.' })} />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('팀장·매니저만 할 수 있어요.');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(alert).toHaveFocus();
+  });
+});
+
 describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
   it('일반 멤버는 관리자 문구·가입 신청 탭·비활성 관리 버튼 없이 본인 탈퇴만 본다', () => {
     const base = getTeamMembersViewModel();

@@ -171,6 +171,8 @@ export type TeamFormViewModel = {
     sports: Array<{ id: string; name: string }>;
     joinPolicy: 'approval_required' | 'closed';
     membersVisibilityEnabled?: boolean;
+    /** 수정 화면에서 정원이 내려갈 수 있는 하한 — 지금 팀원 수. */
+    minCapacity?: number;
     onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
     onSportChange: (sportId: string) => void;
     onRegionChange: (regionId: string) => void;

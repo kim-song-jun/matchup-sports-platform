@@ -12,6 +12,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -916,6 +917,12 @@ export function TeamFormPageView({
   const form = model.form;
   const previewSport = form?.sports.find((sport) => sport.id === form.sportId)?.name ?? team.sports[0] ?? '';
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
+  // 저장 버튼은 화면 맨 아래, 오류 안내는 맨 위라 저장이 거절돼도 아무 일 없어 보인다 — 안내가 생기면 끌어온다.
+  const errorRef = useRef<HTMLDivElement>(null);
+  const formError = form?.error;
+  useEffect(() => {
+    if (formError) revealAndFocus(errorRef.current);
+  }, [formError]);
   // title은 mode(edit/create)로만 갈리고 mode는 어느 pathname이 이 컴포넌트를 렌더했는지로
   // 완전히 결정된다(/teams/new → create, /teams/:id/edit → edit) — fetch 의존이 아니라
   // route-chrome 테이블에 두 pathname 각각의 정적 title로 등록돼 있다(fragments/teams.ts).
@@ -954,7 +961,7 @@ export function TeamFormPageView({
             </Card>
           ) : null}
           {!edit ? <h2 className="tm-text-heading">새 팀을 만들어요</h2> : null}
-          {form?.error ? <Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card> : null}
+          {form?.error ? <div ref={errorRef} tabIndex={-1} role="alert"><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           <TeamCoverImageField coverImageUrl={team.coverImageUrl} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('coverImageUrl', url)} />
@@ -996,7 +1003,7 @@ export function TeamFormPageView({
           <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
           <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />
           {edit ? <TeamJoinPolicyField form={form} /> : null}
-          <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+          <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
           <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
           <TeamActivityFields team={team} form={form} />
         </div>
@@ -1916,20 +1923,23 @@ function TeamLevelSelect({ value, onChange }: { value: string; onChange?: (value
   );
 }
 
-function TeamCapacityField({ value, onChange }: { value: number; onChange?: (value: number) => void }) {
-  const options = Array.from({ length: 49 }, (_, index) => index + 2);
-  const normalized = Math.min(50, Math.max(2, Number(value) || 2));
+function TeamCapacityField({ value, min, onChange }: { value: number; min?: number; onChange?: (value: number) => void }) {
+  // 이미 있는 팀원보다 적은 정원은 서버가 거절한다 — 저장 전에 입력 칸에서 막는다.
+  const floor = Math.min(50, Math.max(2, min ?? 2));
+  const options = Array.from({ length: 50 - floor + 1 }, (_, index) => index + floor);
+  const normalized = Math.min(50, Math.max(floor, Number(value) || floor));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">정원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" onClick={() => onChange?.(Math.max(2, normalized - 1))}>−</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" disabled={normalized <= floor} onClick={() => onChange?.(Math.max(floor, normalized - 1))}>−</button>
         <select className="tm-create-input tm-create-select-control" aria-label="정원" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
         <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
       </div>
+      {floor > 2 ? <div className="tm-text-caption" style={{ marginTop: 8 }}>지금 팀원이 {floor}명이라 그보다 적게 정할 수 없어요.</div> : null}
     </div>
   );
 }

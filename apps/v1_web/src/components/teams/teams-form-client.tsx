@@ -12,6 +12,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
+import { teamErrorMessage } from '@/lib/team-error-messages';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
@@ -214,7 +215,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       activityTimeSlots: query.data.profile.activityTimeSlots ?? [],
       activityTypes: query.data.profile.activityTypes ?? [],
       activityMemo: normalizeHydratedActivityMemo(query.data.profile),
-      capacity: query.data.profile.memberGoalCount ?? query.data.memberCount,
+      capacity: Math.max(query.data.profile.memberGoalCount ?? 0, query.data.memberCount),
     });
     setDraft((current) => ({
       ...current,
@@ -258,6 +259,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     regionId,
     joinPolicy,
     membersVisibilityEnabled,
+    minCapacity: query.data.memberCount,
     // query.data는 위 skeleton gate를 통과했으므로 여기서는 항상 정의돼 있다.
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [{ id: query.data.sport.sportId, name: query.data.sport.name }],
     regions: regionOptions.length
@@ -280,7 +282,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       void updateTeamWithActivityCompatibility({ ...payload, version, membersVisibilityEnabled }, draft)
         // #16: from=my이면 저장 후 canonical /teams/[id]로 복귀, 아니면 API 응답 경로 사용
         .then((result) => router.push(successHref ?? result.detailRoute ?? `/teams/${teamId}`))
-        .catch((err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'))
+        .catch((err) => setError(teamErrorMessage(err, '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.', { memberCount: query.data.memberCount })))
         .finally(() => {
           submitLockRef.current = false;
         });
@@ -320,6 +322,7 @@ function buildModel({
   regionId,
   joinPolicy,
   membersVisibilityEnabled,
+  minCapacity,
   sports,
   regions,
   error,
@@ -338,6 +341,7 @@ function buildModel({
   regionId: string;
   joinPolicy: 'approval_required' | 'closed';
   membersVisibilityEnabled?: boolean;
+  minCapacity?: number;
   sports: Array<{ id: string; name: string }>;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   error: string | null;
@@ -363,6 +367,7 @@ function buildModel({
       sports,
       joinPolicy,
       membersVisibilityEnabled,
+      minCapacity,
       onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
       onSportChange: setSportId,
       onRegionChange: (nextRegionId) => {

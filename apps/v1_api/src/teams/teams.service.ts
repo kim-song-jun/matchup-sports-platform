@@ -756,7 +756,7 @@ export class TeamsService {
       });
     }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
-      throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
+      throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -768,7 +768,7 @@ export class TeamsService {
           data: { managerCount: { increment: 1 } },
         });
         if (capGuard.count !== 1) {
-          throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
+          throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
         }
       }
       const updated = await tx.v1TeamMembership.update({
@@ -1956,7 +1956,7 @@ export class TeamsService {
     if (membership.role !== 'owner' && membership.role !== 'manager') {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Only team owners or managers can manage this team',
+        message: '팀장·매니저만 팀을 관리할 수 있어요.',
       });
     }
 
@@ -2018,7 +2018,7 @@ export class TeamsService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Only team owners or managers can perform this action',
+        message: '팀장·매니저만 할 수 있어요.',
       });
     }
     return membership.role as 'owner' | 'manager';
@@ -2035,7 +2035,7 @@ export class TeamsService {
 
   private assertMemberGoalFitsCurrentMembers(memberGoalCount: number | null | undefined, memberCount: number) {
     if (memberGoalCount != null && memberGoalCount < memberCount) {
-      throw validationError('memberGoalCount cannot be lower than the current member count', 'memberGoalCount');
+      throw validationError('정원은 지금 팀원 수보다 적게 정할 수 없어요.', 'memberGoalCount');
     }
   }
 

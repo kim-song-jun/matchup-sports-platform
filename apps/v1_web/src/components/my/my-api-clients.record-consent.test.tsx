@@ -84,6 +84,9 @@ describe('RecordConsentSettingsPageClient', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('ON')).toBeInTheDocument();
     expect(screen.getByText(/부터 공개하고 있어요/)).toBeInTheDocument();
+    // 서버는 끄는 즉시 연결된 모든 기록을 비공개로 돌린다(새 경기부터가 아니다) -- 문구가 그 동작을 말한다.
+    expect(screen.getByText(/끄면 바로 모두 비공개로 돌아가요/)).toBeInTheDocument();
+    expect(screen.queryByText(/새 경기부터/)).not.toBeInTheDocument();
   });
 
   it('저장에 실패하면 조용히 넘어가지 않고 이유를 알린다', async () => {
@@ -107,6 +110,16 @@ describe('RecordConsentSettingsPageClient', () => {
 
     expect(screen.getByText('설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: '경기 기록 공개' })).not.toBeInTheDocument();
+  });
+
+  it('응답이 오기 전에는 OFF 토글을 그리지 않는다 (처음 답하는 화면으로 바뀔 때 깜빡이지 않게)', () => {
+    hooks.consent.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    renderWithClient(<RecordConsentSettingsPageClient />);
+
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByText('OFF')).not.toBeInTheDocument();
   });
 
   it('데스크톱 뒤로가기는 ?from= 이 없으면 /my/settings 로 떨어진다', () => {

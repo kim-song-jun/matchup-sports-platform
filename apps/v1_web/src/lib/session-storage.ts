@@ -177,52 +177,59 @@ export function getTournamentOpsOrigin(tournamentId: string): TournamentOpsOrigi
 }
 
 /**
- * 경기 기록 공개 동의 홈 넛지 노출 횟수 (Task 154 P0-3 / 사용자 결정 ②: "처음 1~2회만").
+ * 경기 기록 공개 동의 홈 배너를 X 로 넘긴 시점의 "공개 대기 경기 수".
  *
- * 푸시 넛지와 달리 `sessionStorage` 가 아니라 `localStorage` 를 쓴다 -- 푸시는 "로그인마다
- * 한 번" 이라 세션 단위면 충분하지만, 이건 계정 수명 전체에서 총 2회만 보여야 하므로
- * 세션이 끝나도 값이 남아야 한다.
+ * 횟수 상한이 아니라 **새 대기 경기가 생기면 다시 뜬다**(2026-09-30 사용자 결정 -- 예전엔
+ * 계정 수명 총 2회였고 설정에 다녀오기만 해도 소진됐다). 영구 종료는 서버에 남는 응답
+ * (`hasResponded`)이 맡는다: "공개 안 함"을 누른 사람은 서버가 기억한다.
  *
- * 값이 깨져 있거나(수동 편집·다른 버전) 스토리지 접근이 막힌 경우(프라이빗 모드 등)는
- * "보여주지 않음" 쪽으로 붙는다 -- 유도 배너를 못 보는 것보다 무한 반복 노출이 더 나쁘다.
+ * `localStorage` 인 이유는 세션이 끝나도 남아야 해서다. 키는 **계정별**이다 -- 대기 경기 수를
+ * 비교하는 값이라, 다른 계정이 남긴 값이 섞이면 수가 적은 계정의 배너가 조용히 사라진다.
+ *
+ * 값이 깨져 있거나 스토리지 접근이 막힌 경우(프라이빗 모드 등)는 "보여주지 않음" 쪽으로
+ * 붙는다 -- 넘겼다는 사실을 기억하지 못하면 방문마다 다시 뜨기 때문이다.
  */
-export const V1_RECORD_CONSENT_NUDGE_SEEN_KEY = 'teameet.v1.recordConsentNudgeSeen';
-const RECORD_CONSENT_NUDGE_MAX_VIEWS = 2;
+const RECORD_CONSENT_NUDGE_DISMISSED_KEY_PREFIX = 'teameet.v1.recordConsentNudgeDismissed.';
 
-function readRecordConsentNudgeSeen(): number {
-  if (typeof window === 'undefined') return RECORD_CONSENT_NUDGE_MAX_VIEWS;
+export function recordConsentNudgeDismissedKey(userId: string): string {
+  return `${RECORD_CONSENT_NUDGE_DISMISSED_KEY_PREFIX}${userId}`;
+}
+
+/** `null` 은 넘긴 적 없음, `undefined` 는 읽을 수 없음(막힘·깨짐)이다. */
+function readRecordConsentNudgeDismissedCount(userId: string): number | null | undefined {
+  if (typeof window === 'undefined') return undefined;
   try {
-    const raw = window.localStorage.getItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY);
-    if (raw === null) return 0;
+    const raw = window.localStorage.getItem(recordConsentNudgeDismissedKey(userId));
+    if (raw === null) return null;
     const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : RECORD_CONSENT_NUDGE_MAX_VIEWS;
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
   } catch {
-    return RECORD_CONSENT_NUDGE_MAX_VIEWS;
+    return undefined;
   }
 }
 
-export function shouldShowRecordConsentNudge(): boolean {
-  return readRecordConsentNudgeSeen() < RECORD_CONSENT_NUDGE_MAX_VIEWS;
+/** 넘긴 뒤 대기 경기가 늘었을 때만 다시 보여준다. */
+export function shouldShowRecordConsentNudge(userId: string, pendingCount: number): boolean {
+  const dismissed = readRecordConsentNudgeDismissedCount(userId);
+  if (dismissed === undefined) return false;
+  return dismissed === null || pendingCount > dismissed;
 }
 
-/** 배너를 실제로 렌더한 시점에 1 올린다. */
-export function markRecordConsentNudgeSeen(): void {
+/** X 로 넘긴다. 이 시점의 대기 경기 수를 기억해 "새 경기"의 기준으로 삼는다. */
+export function dismissRecordConsentNudge(userId: string, pendingCount: number): void {
   if (typeof window === 'undefined') return;
   try {
-    const next = Math.min(readRecordConsentNudgeSeen() + 1, RECORD_CONSENT_NUDGE_MAX_VIEWS);
-    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, String(next));
+    window.localStorage.setItem(recordConsentNudgeDismissedKey(userId), String(pendingCount));
   } catch {
-    // 스토리지가 막힌 브라우저에서는 카운트를 못 올린다. 그래도 위 read 가
-    // MAX 를 돌려주므로 배너 자체가 안 뜬다 -- 무한 노출로는 이어지지 않는다.
+    // 스토리지가 막혔으면 위 read 가 undefined 를 돌려줘 배너가 뜨지 않는다 -- 반복 노출로 이어지지 않는다.
   }
 }
 
-/** 사용자가 X 로 닫으면 남은 횟수와 무관하게 끝낸다. */
-export function dismissRecordConsentNudge(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, String(RECORD_CONSENT_NUDGE_MAX_VIEWS));
-  } catch {
-    // 위와 같다 -- 실패해도 무한 노출로 이어지지 않는다.
-  }
+/**
+ * 대기 경기가 넘길 때보다 줄었으면(결과 정정 등) 기준을 따라 내린다. 그대로 두면 이후 새 경기가
+ * 생겨도 옛 기준에 못 미쳐 배너가 안 뜬다.
+ */
+export function lowerRecordConsentNudgeDismissal(userId: string, pendingCount: number): void {
+  const dismissed = readRecordConsentNudgeDismissedCount(userId);
+  if (typeof dismissed === 'number' && dismissed > pendingCount) dismissRecordConsentNudge(userId, pendingCount);
 }

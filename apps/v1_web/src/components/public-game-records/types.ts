@@ -252,8 +252,19 @@ export interface PublicMatchEvent {
   readonly jerseyNumber: number | null;
   /** 공개 프로필 경로 — 서버가 열어도 되는지까지 판단한 값. `PublicLineupSlot` 과 동일 규칙. */
   readonly profileHref: string | null;
+  /**
+   * 골에 붙은 도움. `null` 은 "도움을 기입하지 않았다"이고, 안의 `participantName` 이 `null` 이면
+   * "가렸다"다 -- 득점자와 같은 규칙이라 둘을 섞지 않는다. 옛 서버 응답에는 필드 자체가 없다.
+   */
+  readonly assist: PublicMatchEventAssist | null;
   readonly period: number | null;
   readonly clockMs: number | null;
+}
+
+export interface PublicMatchEventAssist {
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly profileHref: string | null;
 }
 
 export interface PublicMatchMvp {
@@ -466,6 +477,7 @@ export interface PublicUserRecordItem {
   readonly opponentTeamName: string | null;
   readonly result: 'WON' | 'LOST' | 'DRAWN' | null;
   readonly goals: number;
+  readonly assists: number;
   readonly cards: { readonly yellow: number; readonly red: number };
   readonly minutesPlayed: number | null;
   readonly started: boolean;

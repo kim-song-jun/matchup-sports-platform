@@ -11,9 +11,9 @@ import {
   saveStoredV1Session,
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
-  V1_RECORD_CONSENT_NUDGE_SEEN_KEY,
   dismissRecordConsentNudge,
-  markRecordConsentNudgeSeen,
+  lowerRecordConsentNudgeDismissal,
+  recordConsentNudgeDismissedKey,
   shouldShowRecordConsentNudge,
 } from './session-storage';
 
@@ -130,45 +130,73 @@ describe('tournament-ops 진입 출처 (T6-2)', () => {
 });
 
 /**
- * 기록 공개 넛지는 "계정 수명 전체에서 총 2회" 라는 사용자 결정(②)을 지켜야 한다.
- * 푸시 넛지(sessionStorage, 로그인마다 1회)와 저장소가 다른 이유가 여기 있다 --
- * 세션 단위로 세면 로그아웃할 때마다 다시 2회가 살아나 사실상 무한 노출이 된다.
+ * 기록 공개 배너는 횟수 상한이 없다 -- X 로 넘겨도 새로 공개를 기다리는 경기가 생기면 다시 뜬다
+ * (2026-09-30 사용자 결정). 영구 종료는 서버의 응답 기록(`hasResponded`)이 맡으므로 여기서는
+ * 다루지 않는다. 푸시 넛지(sessionStorage)와 저장소가 다른 이유는 세션이 끝나도 남아야 해서다.
  */
-describe('recordConsentNudge 노출 횟수', () => {
-  it('처음에는 보여준다', () => {
-    expect(shouldShowRecordConsentNudge()).toBe(true);
+describe('recordConsentNudge 넘김 기준', () => {
+  const USER = 'user-a';
+
+  it('넘긴 적이 없으면 보여준다', () => {
+    expect(shouldShowRecordConsentNudge(USER, 1)).toBe(true);
   });
 
-  it('2회까지만 보여주고 3회째부터 멈춘다', () => {
-    markRecordConsentNudgeSeen();
-    expect(shouldShowRecordConsentNudge()).toBe(true);
-    markRecordConsentNudgeSeen();
-    expect(shouldShowRecordConsentNudge()).toBe(false);
-    markRecordConsentNudgeSeen();
-    expect(shouldShowRecordConsentNudge()).toBe(false);
+  it('넘긴 뒤 같은 대기 경기 수에서는 뜨지 않고, 새 경기가 생겨 수가 늘면 다시 뜬다', () => {
+    dismissRecordConsentNudge(USER, 2);
+    expect(shouldShowRecordConsentNudge(USER, 2)).toBe(false);
+    expect(shouldShowRecordConsentNudge(USER, 3)).toBe(true);
   });
 
-  it('사용자가 닫으면 남은 횟수와 무관하게 끝난다', () => {
-    dismissRecordConsentNudge();
-    expect(shouldShowRecordConsentNudge()).toBe(false);
+  it('넘긴 뒤 여러 번 열어 봐도(설정에 다녀와도) 횟수로 소진되지 않는다', () => {
+    dismissRecordConsentNudge(USER, 1);
+    for (let visit = 0; visit < 5; visit += 1) {
+      expect(shouldShowRecordConsentNudge(USER, 1)).toBe(false);
+    }
+    expect(shouldShowRecordConsentNudge(USER, 2)).toBe(true);
   });
 
-  it('세션이 끝나도(=sessionStorage 비워져도) 횟수가 남는다', () => {
-    markRecordConsentNudgeSeen();
-    markRecordConsentNudgeSeen();
+  it('세션이 끝나도(=sessionStorage 비워져도) 넘김이 남는다', () => {
+    dismissRecordConsentNudge(USER, 1);
     window.sessionStorage.clear();
-    expect(shouldShowRecordConsentNudge()).toBe(false);
+    expect(shouldShowRecordConsentNudge(USER, 1)).toBe(false);
+  });
+
+  it('계정마다 따로 센다 -- 다른 계정이 넘긴 값이 내 배너를 가리지 않는다', () => {
+    dismissRecordConsentNudge('user-b', 5);
+    expect(shouldShowRecordConsentNudge(USER, 1)).toBe(true);
+    expect(shouldShowRecordConsentNudge('user-b', 1)).toBe(false);
+  });
+
+  it('대기 경기가 줄었다가 다시 늘어도 새 경기로 인식한다', () => {
+    dismissRecordConsentNudge(USER, 3);
+    // 결과 정정으로 3 -> 2. 기준을 안 내리면 다음 새 경기(다시 3)가 옛 기준 3 에 걸려 안 뜬다.
+    lowerRecordConsentNudgeDismissal(USER, 2);
+    expect(shouldShowRecordConsentNudge(USER, 2)).toBe(false);
+    expect(shouldShowRecordConsentNudge(USER, 3)).toBe(true);
+  });
+
+  it('기준을 내리는 함수는 대기 경기가 늘었을 때 기준을 올리지 않는다', () => {
+    dismissRecordConsentNudge(USER, 2);
+    lowerRecordConsentNudgeDismissal(USER, 4);
+    expect(shouldShowRecordConsentNudge(USER, 3)).toBe(true);
   });
 
   it('저장된 값이 깨져 있으면 보여주지 않는다 (무한 노출 방지)', () => {
-    // 손으로 편집했거나 옛 버전이 남긴 값. 파싱 실패를 "0회" 로 읽으면 영원히 뜬다.
-    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, 'nope');
-    expect(shouldShowRecordConsentNudge()).toBe(false);
+    window.localStorage.setItem(recordConsentNudgeDismissedKey(USER), 'nope');
+    expect(shouldShowRecordConsentNudge(USER, 9)).toBe(false);
   });
 
   it('음수가 들어 있어도 보여주지 않는다', () => {
-    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, '-5');
-    expect(shouldShowRecordConsentNudge()).toBe(false);
+    window.localStorage.setItem(recordConsentNudgeDismissedKey(USER), '-5');
+    expect(shouldShowRecordConsentNudge(USER, 9)).toBe(false);
+  });
+
+  it('스토리지 접근이 막힌 브라우저에서는 넘김을 기억할 수 없으니 보여주지 않는다', () => {
+    const blocked = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    expect(shouldShowRecordConsentNudge(USER, 1)).toBe(false);
+    blocked.mockRestore();
   });
 });
 

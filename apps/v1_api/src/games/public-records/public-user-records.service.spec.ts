@@ -218,6 +218,32 @@ describe('PublicUserRecordsService', () => {
     ]);
   });
 
+  it('행마다 그 경기의 도움 수를 싣고, 합계는 행 도움의 합이다', async () => {
+    const withAssists = { ...gameResultRow(), assists: 2 };
+    const olderNoAssist = sourcedResultRow({ suffix: 'b', participantId: 'participant-2', teamMatchId: 'team-match-1' });
+    olderNoAssist.resultRevision.officialAt = new Date('2026-08-01T00:00:00Z');
+    const prisma = createFakePrisma({
+      links: [
+        { participantId: 'participant-1', linkId: 'link-1', userId: OWNER_ID },
+        { participantId: 'participant-2', linkId: 'link-2', userId: OWNER_ID },
+      ],
+      userConsents: [],
+      snapshots: [],
+      resultRows: [withAssists, olderNoAssist],
+      viewerConsentState: null,
+    });
+    const service = new PublicUserRecordsService(prisma);
+
+    const result = await service.getRecords(OWNER_ID, {}, OWNER_ID);
+
+    // 두 행의 도움 수가 다르다 -- 행 값을 합계나 0 으로 뭉개면 이 단언이 깨진다.
+    expect(result.items.map((item) => [item.id, item.assists])).toEqual([
+      ['result-1', 2],
+      ['result-b', 0],
+    ]);
+    expect(result.summary.assists).toBe(2);
+  });
+
   it('존재하지 않는 사용자는 404를 던진다', async () => {
     const prisma = createFakePrisma({ links: [], userConsents: [], snapshots: [], resultRows: [] });
     (prisma.v1User.findFirst as jest.Mock).mockResolvedValue(null);

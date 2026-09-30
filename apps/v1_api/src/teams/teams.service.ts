@@ -16,7 +16,7 @@ import {
 import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { appendChatSystemLine } from '../chat/chat-system-line';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, notificationPersonName } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -93,11 +93,6 @@ type TeamWithRelations = V1Team & {
     profile: { nickname: string; displayName: string | null; profileImageUrl: string | null } | null;
   };
 };
-
-/** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
-function notificationDisplayName(profile: { nickname: string | null; displayName: string | null } | null | undefined): string {
-  return profile?.nickname ?? profile?.displayName ?? '팀원';
-}
 
 type TeamCapacityLike = {
   memberCount: number;
@@ -843,7 +838,7 @@ export class TeamsService {
       ]);
       const recipients = managers.map((membership) => membership.userId).filter((userId) => userId !== leftUserId);
       await this.notifications.emitNotificationToMany(recipients, 'team_member_left', teamId, undefined, {
-        vars: { team: teamName, name: notificationDisplayName(leftUser?.profile), count: String(memberCount) },
+        vars: { team: teamName, name: notificationPersonName(leftUser?.profile), count: String(memberCount) },
       });
     })().catch((err: unknown) => this.logger.warn(`member left notification failed team=${teamId}: ${String(err)}`));
   }
@@ -871,7 +866,7 @@ export class TeamsService {
         .map((membership) => membership.userId)
         .filter((userId) => userId !== previousOwnerUserId && userId !== newOwnerUserId);
       await this.notifications.emitNotificationToMany(recipients, 'team_owner_changed', teamId, undefined, {
-        vars: { team: teamName, name: notificationDisplayName(newOwner?.profile) },
+        vars: { team: teamName, name: notificationPersonName(newOwner?.profile) },
       });
     })().catch((err: unknown) => this.logger.warn(`owner delegation notification failed team=${teamId}: ${String(err)}`));
   }
@@ -1112,19 +1107,8 @@ export class TeamsService {
       return nextApplication;
     });
 
-    // 알림: 팀 manager+에게 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
-    this.notifications.emitToManyDeferred(
-      async () =>
-        (
-          await this.prisma.v1TeamMembership.findMany({
-            where: { teamId: team.id, status: 'active', role: { in: ['owner', 'manager'] } },
-            select: { userId: true },
-          })
-        ).map((m) => m.userId),
-      'team_join_application_received',
-      team.id,
-      `"${team.name}" 팀 가입 신청을 확인해 주세요.`,
-    );
+    // 팀장·매니저의 '가입 신청' 줄을 올린다(팀별 한 줄 — H1-join-burst). 실패해도 신청은 이미 끝났다.
+    void this.notifications.refreshTeamJoinApplicationsLine(team.id, 'arrival');
 
     return {
       applicationId: application.id,
@@ -1233,6 +1217,7 @@ export class TeamsService {
 
       return nextApplication;
     });
+    void this.notifications.refreshTeamJoinApplicationsLine(updated.teamId, 'recount');
 
     return {
       applicationId: updated.id,
@@ -1343,6 +1328,7 @@ export class TeamsService {
       return { updatedApplication, membership, team };
     });
 
+    void this.notifications.refreshTeamJoinApplicationsLine(application.teamId, 'recount');
     // 알림: 신청자에게 수락 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       application.applicantUserId,
@@ -1399,6 +1385,7 @@ export class TeamsService {
       return nextApplication;
     });
 
+    void this.notifications.refreshTeamJoinApplicationsLine(application.teamId, 'recount');
     // 알림: 신청자에게 거절 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       application.applicantUserId,
@@ -1744,12 +1731,13 @@ export class TeamsService {
     }
     this.assertTeamHasCapacity(invitation.team);
 
+    const respondedAt = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
       // R15-002: conditional update — rejects if another actor cancelled the invitation
       // between the outer read and transaction start.
       const acceptCount = await tx.v1TeamInvitation.updateMany({
         where: { id: invitation.id, status: 'pending' },
-        data: { status: 'accepted', respondedAt: new Date() },
+        data: { status: 'accepted', respondedAt },
       });
       if (acceptCount.count !== 1) {
         throw stateConflict(
@@ -1818,13 +1806,13 @@ export class TeamsService {
     });
 
     await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
-    // 알림: 초대한 사람에게 수락 안내 (fire-and-forget)
-    void this.notifications.emitNotification(
-      invitation.invitedByUserId,
-      'team_invitation_accepted',
-      invitation.teamId,
-      `"${invitation.team.name}" 팀 초대를 수락했어요.`,
-    );
+    // 초대한 사람의 '초대 수락' 줄에 더한다(안 읽은 동안은 한 줄 — H1-join-burst).
+    void this.notifications.recordTeamInvitationAccepted({
+      inviterUserId: invitation.invitedByUserId,
+      teamId: invitation.teamId,
+      invitationId: invitation.id,
+      acceptedAt: respondedAt,
+    });
 
     return {
       invitationId: result.updatedInvitation.id,
@@ -1873,7 +1861,7 @@ export class TeamsService {
     });
     await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
     void this.notifications.emitNotification(invitation.invitedByUserId, 'team_invitation_declined', invitation.teamId, undefined, {
-      vars: { team: invitation.team.name, name: notificationDisplayName(invitation.invitedUser.profile) },
+      vars: { team: invitation.team.name, name: notificationPersonName(invitation.invitedUser.profile) },
     });
 
     return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };

@@ -176,11 +176,16 @@ const SCHEDULE_TARGET_EVENTS: ReadonlySet<NotificationEventType> = new Set([
  * 채우지 못한 자리가 남으면 그 알림은 만들지 않는다(`{team}` 이 사용자에게 보이면 안 된다).
  */
 export type NotificationCopyVars = Readonly<
-  Partial<Record<'name' | 'team' | 'count' | 'title' | 'when' | 'reason' | 'matchup', string>>
+  Partial<Record<'name' | 'team' | 'count' | 'others' | 'title' | 'when' | 'reason' | 'matchup', string>>
 >;
 
 export interface NotificationEmitOptions {
   readonly vars?: NotificationCopyVars;
+}
+
+/** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
+export function notificationPersonName(profile: { nickname: string | null; displayName: string | null } | null | undefined): string {
+  return profile?.nickname ?? profile?.displayName ?? '팀원';
 }
 
 export function renderNotificationCopy(template: string, vars: NotificationCopyVars = {}): string {
@@ -410,7 +415,7 @@ function deepLinkForEvent(
   targetId: string | null,
 ): string | null {
   if (type === 'team_join_application_received' && targetId) {
-    return `/teams/${targetId}/members`;
+    return `/teams/${targetId}/members?tab=requests`;
   }
   if (type === 'team_invitation_declined' && targetId) {
     return `/teams/${targetId}/members?tab=invitations`;
@@ -531,7 +536,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_cancelled: '매치가 취소됐어요',
   match_closed: '매치 모집이 마감됐어요',
   match_completed: '매치가 완료됐어요. 리뷰를 남겨보세요!',
-  team_join_application_received: '팀 가입 신청이 도착했어요',
+  team_join_application_received: '{name}님이 가입을 신청했어요',
   team_join_application_accepted: '팀 가입 신청이 수락됐어요',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요',
   team_contact_received: '새 팀 컨택이 도착했어요',
@@ -554,7 +559,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_payment_confirmed: '입금이 확인됐어요',
   tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
-  team_invitation_accepted: '팀 초대를 수락했어요',
+  team_invitation_accepted: '{name}님이 초대를 수락했어요',
   team_manager_assigned: '매니저가 되었어요',
   team_manager_revoked: '매니저에서 멤버로 바뀌었어요',
   team_owner_received: '팀장이 되었어요',
@@ -600,7 +605,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   match_cancelled: '매치가 취소됐어요.',
   match_closed: '모집이 마감되어 대기 중인 신청이 종료됐어요.',
   match_completed: '함께한 매치의 리뷰를 남겨보세요.',
-  team_join_application_received: '팀 가입 신청을 확인해 주세요.',
+  team_join_application_received: '"{team}" · 승인하거나 거절해 주세요.',
   team_join_application_accepted: '팀 가입이 승인됐어요.',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요.',
   team_contact_received: '상대 팀이 보낸 컨택을 확인해 주세요.',
@@ -623,7 +628,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_payment_confirmed: '운영진 확정을 기다려 주세요.',
   tournament_announcement_published: '공지를 확인해 보세요.',
   team_invitation_received: '팀 초대를 확인해 보세요.',
-  team_invitation_accepted: '팀 초대를 수락했어요.',
+  team_invitation_accepted: '"{team}" 멤버가 됐어요.',
   team_manager_assigned: '"{team}" · 가입 신청과 팀 일정을 관리할 수 있어요.',
   team_manager_revoked: '"{team}" · 팀 관리 메뉴는 더 보이지 않아요.',
   team_owner_received: '"{team}" · 팀장을 넘겨받았어요. 멤버 관리와 팀 정보를 바꿀 수 있어요.',
@@ -655,6 +660,31 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_match_identity_attest_rejected: '연결 요청이 거절됐어요. 다시 신청할 수 있어요.',
   tournament_identity_attest_rejected: '연결 요청이 거절됐어요. 다시 신청할 수 있어요.',
 };
+
+/**
+ * 몰림 줄(H1-join-burst)의 두 건 이상 문구. 한 건일 때는 위 표의 문구를 그대로 쓴다.
+ * 가입 신청은 지금 남은 대기 건수, 초대 수락은 그 줄을 안 읽은 동안 쌓인 수락 수다.
+ */
+const BURST_TITLES = {
+  team_join_application_received: '가입 신청 {count}건이 기다려요',
+  team_invitation_accepted: '{name}님 외 {others}명이 초대를 수락했어요',
+} as const satisfies Partial<Record<NotificationEventType, string>>;
+const BURST_BODIES = {
+  team_join_application_received: '"{team}" · {name}님 외 {others}명 · 승인하거나 거절해 주세요.',
+  team_invitation_accepted: '"{team}" 멤버가 됐어요.',
+} as const satisfies Partial<Record<NotificationEventType, string>>;
+
+type BurstEvent = keyof typeof BURST_TITLES;
+
+function burstCopy(type: BurstEvent, count: number, team: string, name: string): { title: string; body: string } {
+  const vars = { team, name, count: String(count), others: String(count - 1) };
+  return count > 1
+    ? { title: renderNotificationCopy(BURST_TITLES[type], vars), body: renderNotificationCopy(BURST_BODIES[type], vars) }
+    : { title: renderNotificationCopy(EVENT_TITLES[type], vars), body: renderNotificationCopy(EVENT_BODIES[type], vars) };
+}
+
+const joinLineKey = (teamId: string, userId: string) => `team-join-pending:${teamId}:${userId}`;
+const acceptedLinePrefix = (teamId: string, inviterUserId: string) => `team-invite-accepted:${teamId}:${inviterUserId}:`;
 
 @Injectable()
 export class NotificationsService {
@@ -757,6 +787,124 @@ export class NotificationsService {
     })().catch((e: unknown) => this.logger.warn({ type, err: e }, '알림 발송 실패'));
   }
 
+  /**
+   * 가입 신청 알림을 팀·받는 사람마다 한 줄로 유지한다(H1-join-burst). 새 신청(arrival)은 그 줄을 맨 위로 올리고,
+   * 읽은 줄이었으면 다시 안 읽음으로 열어 푸시한다 — 안 읽은 동안의 추가분은 문구만 바꾸고 푸시하지 않는다.
+   * 처리(recount)는 남은 건수로 문구를 고치고 0건이면 읽음으로 둔다. 실패해도 가입 신청 처리를 깨지 않는다.
+   */
+  async refreshTeamJoinApplicationsLine(teamId: string, trigger: 'arrival' | 'recount'): Promise<void> {
+    try {
+      const [team, pendingCount, latest] = await Promise.all([
+        this.prisma.v1Team.findUnique({ where: { id: teamId }, select: { name: true } }),
+        this.prisma.v1TeamJoinApplication.count({ where: { teamId, status: 'requested' } }),
+        this.prisma.v1TeamJoinApplication.findFirst({
+          where: { teamId, status: 'requested' },
+          orderBy: [{ updatedAt: 'desc' }],
+          select: { applicantUser: { select: { profile: { select: { nickname: true, displayName: true } } } } },
+        }),
+      ]);
+      if (team === null) return;
+      const lineWhere = { targetType: 'team' as const, targetId: teamId, businessKey: { startsWith: joinLineKey(teamId, '') } };
+      if (pendingCount === 0 || latest === null) {
+        await this.prisma.v1Notification.updateMany({ where: { ...lineWhere, readAt: null }, data: { readAt: new Date() } });
+        return;
+      }
+      const copy = burstCopy('team_join_application_received', pendingCount, team.name, notificationPersonName(latest.applicantUser.profile));
+      const managers = await this.prisma.v1TeamMembership.findMany({
+        where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+        select: { userId: true },
+      });
+      if (trigger === 'recount') {
+        // 지금 팀장·매니저의 줄만 고친다 — 역할을 잃은 사람의 옛 줄에 새 신청자 이름을 싣지 않는다.
+        const recipientUserId = { in: managers.map((manager) => manager.userId) };
+        await this.prisma.v1Notification.updateMany({ where: { ...lineWhere, recipientUserId }, data: copy });
+        return;
+      }
+      const pushAllowed = await this.pushAllowedNow('team_join_application_received', 'team', teamId);
+      const deepLink = deepLinkForEvent('team_join_application_received', 'team', teamId);
+      for (const { userId } of managers) {
+        if (!(await this.preferenceEnabled(userId, 'teamEnabled'))) continue;
+        const businessKey = joinLineKey(teamId, userId);
+        const existing = await this.prisma.v1Notification.findUnique({ where: { businessKey }, select: { id: true, readAt: true } });
+        if (existing !== null) {
+          const reopened = await this.prisma.v1Notification.update({
+            where: { id: existing.id },
+            data: { ...copy, deepLink, readAt: null, createdAt: new Date() },
+          });
+          this.deliver(userId, reopened, existing.readAt !== null && pushAllowed);
+          continue;
+        }
+        const created = await this.createLineOrNull({ businessKey, recipientUserId: userId, targetType: 'team', targetId: teamId, deepLink, ...copy });
+        // 동시에 들어온 다른 신청이 방금 줄을 만들었다 — 그 줄의 건수만 맞춘다(푸시는 그쪽이 했다).
+        if (created === null) await this.prisma.v1Notification.update({ where: { businessKey }, data: copy });
+        else this.deliver(userId, created, pushAllowed);
+      }
+    } catch (err) {
+      this.logger.warn({ teamId, trigger, err }, '가입 신청 알림 줄 갱신 실패');
+    }
+  }
+
+  /**
+   * 초대 수락 알림을 초대한 사람·팀마다 한 줄로 모은다(H1-join-burst). 안 읽은 줄이 있으면 그 줄에 더하고(푸시 없음),
+   * 없으면 새 줄을 열어 푸시한다. 줄의 키에 첫 수락 시각을 박아 두고 그 뒤의 수락만 센다 — 읽은 뒤의 수락은 새 줄이다.
+   */
+  async recordTeamInvitationAccepted(input: {
+    inviterUserId: string;
+    teamId: string;
+    invitationId: string;
+    acceptedAt: Date;
+  }): Promise<void> {
+    const { inviterUserId, teamId, invitationId, acceptedAt } = input;
+    try {
+      if (!(await this.preferenceEnabled(inviterUserId, 'teamEnabled'))) return;
+      const prefix = acceptedLinePrefix(teamId, inviterUserId);
+      const [team, open, invitation] = await Promise.all([
+        this.prisma.v1Team.findUnique({ where: { id: teamId }, select: { name: true } }),
+        this.prisma.v1Notification.findFirst({
+          where: { recipientUserId: inviterUserId, readAt: null, targetType: 'team', targetId: teamId, businessKey: { startsWith: prefix } },
+          orderBy: [{ createdAt: 'desc' }],
+          select: { id: true, businessKey: true },
+        }),
+        this.prisma.v1TeamInvitation.findUnique({
+          where: { id: invitationId },
+          select: { invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } } },
+        }),
+      ]);
+      if (team === null) return;
+      const windowStartMs = open?.businessKey ? Number(open.businessKey.slice(prefix.length).split(':')[0]) : acceptedAt.getTime();
+      const count = await this.prisma.v1TeamInvitation.count({
+        where: { teamId, invitedByUserId: inviterUserId, status: 'accepted', respondedAt: { gte: new Date(windowStartMs) } },
+      });
+      const copy = burstCopy('team_invitation_accepted', Math.max(count, 1), team.name, notificationPersonName(invitation?.invitedUser.profile));
+      if (open !== null) {
+        const updated = await this.prisma.v1Notification.update({ where: { id: open.id }, data: { ...copy, createdAt: new Date() } });
+        this.deliver(inviterUserId, updated, false);
+        return;
+      }
+      const created = await this.prisma.v1Notification.create({ data: {
+        businessKey: `${prefix}${acceptedAt.getTime()}:${invitationId}`,
+        recipientUserId: inviterUserId,
+        targetType: 'team',
+        targetId: teamId,
+        deepLink: deepLinkForEvent('team_invitation_accepted', 'team', teamId),
+        ...copy,
+      } });
+      this.deliver(inviterUserId, created, await this.pushAllowedNow('team_invitation_accepted', 'team', teamId));
+    } catch (err) {
+      this.logger.warn({ teamId, inviterUserId, err }, '초대 수락 알림 줄 갱신 실패');
+    }
+  }
+
+  /** businessKey 로 새 줄을 만든다. 동시에 들어온 다른 요청이 같은 줄을 먼저 만들었으면 null. */
+  private async createLineOrNull(data: Prisma.V1NotificationUncheckedCreateInput) {
+    try {
+      return await this.prisma.v1Notification.create({ data });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return null;
+      throw err;
+    }
+  }
+
   private dispatch(
     userIds: readonly string[],
     type: NotificationEventType,
@@ -839,43 +987,44 @@ export class NotificationsService {
     prefField: NotificationPrefField,
     pushAllowed: boolean,
   ): Promise<void> {
-    const { targetType, targetId, title, body, deepLink } = message;
+    if (!(await this.preferenceEnabled(userId, prefField))) return;
+    const notification = await this.prisma.v1Notification.create({ data: { recipientUserId: userId, ...message } });
+    this.deliver(userId, notification, pushAllowed);
+  }
+
+  /** 수신 설정 행이 없으면 켜진 것으로 본다. */
+  private async preferenceEnabled(userId: string, prefField: NotificationPrefField): Promise<boolean> {
     const pref = await this.prisma.v1NotificationPreference.findUnique({
       where: { userId },
       select: { [prefField]: true },
     });
-    // If no preference row, default is enabled (treat as true).
-    const enabled = pref ? (pref as Record<string, boolean>)[prefField] !== false : true;
-    if (!enabled) return;
+    return pref ? (pref as Record<string, boolean>)[prefField] !== false : true;
+  }
 
-    const notification = await this.prisma.v1Notification.create({
-      data: {
-        recipientUserId: userId,
-        targetType,
-        targetId,
-        title,
-        body,
-        deepLink,
-      },
-    });
-
-    // emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의
-    // 시도는 계속되어야 한다(ChatService.sendMessage의 개별 try/catch 격리 패턴과 동일).
-    // realtimeNotifier는 REALTIME_NOTIFIER 포트(realtime-notifier.port.ts)를 통해 주입되며,
-    // 구현체는 호출 측(HTTP 앱 vs 워커)마다 다르다 — 자세한 내용은 그 파일 참조.
+  /**
+   * 이미 저장된 알림 행을 실시간으로 알리고, 허용되면 푸시한다.
+   * emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의 시도는 계속되어야 한다.
+   * realtimeNotifier 구현체는 호출 측(HTTP 앱 vs 워커)마다 다르다 — realtime-notifier.port.ts 참조.
+   */
+  private deliver(
+    userId: string,
+    notification: { id: string; targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string | null; deepLink: string | null },
+    push: boolean,
+  ): void {
+    const { targetType, targetId } = notification;
     try {
       this.realtimeNotifier.emitToUser(userId, 'notification:new', notification);
     } catch (err) {
       this.logger.warn({ userId, targetType, targetId, err }, '실시간 알림 전송 실패');
     }
 
-    if (!pushAllowed) return;
+    if (!push) return;
     void this.webPushService
       .sendToUser(userId, {
         notificationId: notification.id,
-        title,
-        body: body ?? undefined,
-        url: deepLink ?? undefined,
+        title: notification.title,
+        body: notification.body ?? undefined,
+        url: notification.deepLink ?? undefined,
       })
       .catch((err: unknown) => {
         this.logger.warn({ userId, targetType, targetId, err }, '푸시 알림 발송 실패');

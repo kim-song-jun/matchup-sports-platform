@@ -144,6 +144,8 @@ describe('TeamsService', () => {
     emitToManyDeferred: jest.Mock;
     markTeamInvitationHandled: jest.Mock;
     markTeamInvitationCancelled: jest.Mock;
+    refreshTeamJoinApplicationsLine: jest.Mock;
+    recordTeamInvitationAccepted: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -212,6 +214,8 @@ describe('TeamsService', () => {
       emitToManyDeferred: jest.fn(),
       markTeamInvitationHandled: jest.fn().mockResolvedValue(undefined),
       markTeamInvitationCancelled: jest.fn().mockResolvedValue(undefined),
+      refreshTeamJoinApplicationsLine: jest.fn().mockResolvedValue(undefined),
+      recordTeamInvitationAccepted: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -1635,6 +1639,8 @@ describe('TeamsService', () => {
       application.teamId,
       '"테스트팀" 팀 가입이 승인됐어요.',
     );
+    // 처리한 신청은 팀장·매니저의 가입 신청 줄에서 빠진다(남은 건수로 다시 센다).
+    expect(notifications.refreshTeamJoinApplicationsLine).toHaveBeenCalledWith(application.teamId, 'recount');
     // 새 팀원은 팀원 기준(폴백) 리그 경기 명단에 후속 이벤트로 들어간다.
     const resync = prisma.$executeRaw.mock.calls.filter((call: unknown[]) => call[5] === 'COMPETITION_ROSTER_RESYNC');
     expect(resync.map((call: unknown[]) => JSON.parse(String(call[6])))).toEqual([
@@ -1741,7 +1747,7 @@ describe('TeamsService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('createJoinApplication: notifies active owner and manager when an application is requested', async () => {
+  it('createJoinApplication: 팀장·매니저의 가입 신청 줄을 새 신청으로 올린다(H1-join-burst)', async () => {
     const openTeam = {
       ...teamRow({ joinPolicy: 'approval_required', memberCount: 5 }),
       sport: { id: 's-1', name: 'sport' },
@@ -1783,25 +1789,8 @@ describe('TeamsService', () => {
       status: 'requested',
       joinState: 'requested',
     });
-    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
-      expect.any(Function),
-      'team_join_application_received',
-      'team-1',
-      '"테스트팀" 팀 가입 신청을 확인해 주세요.',
-    );
-
-    prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
-      { userId: owner.id },
-      { userId: manager.id },
-    ]);
-    const resolveRecipients = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<
-      string[]
-    >;
-    await expect(resolveRecipients()).resolves.toEqual([owner.id, manager.id]);
-    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith({
-      where: { teamId: 'team-1', status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { userId: true },
-    });
+    expect(notifications.refreshTeamJoinApplicationsLine).toHaveBeenCalledWith('team-1', 'arrival');
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
   });
 
 
@@ -2278,6 +2267,10 @@ describe('TeamsService', () => {
         }),
         select: { sentAt: true },
       });
+      // 초대한 사람의 '초대 수락' 줄에 더한다 — 수락 시각은 저장한 respondedAt 과 같은 값이다.
+      const [accepted] = notifications.recordTeamInvitationAccepted.mock.calls[0];
+      expect(accepted).toMatchObject({ inviterUserId: manager.id, teamId: 'team-1', invitationId: 'inv-1' });
+      expect(prisma.v1TeamInvitation.updateMany.mock.calls[0][0].data.respondedAt).toBe(accepted.acceptedAt);
     });
 
     it('본인 아닌 유저가 수락 시도 → 403 PERMISSION_DENIED', async () => {

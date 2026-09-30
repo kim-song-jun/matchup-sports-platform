@@ -7,6 +7,7 @@
  * No test merely verifies that a mock was called with what we told it to return.
  */
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,6 +38,24 @@ function makeNotification(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Prisma where 를 실제로 평가한다(같음·startsWith·in·gte) — 줄·알림을 고르는 조건이 하나라도 빠지면
+ * 다른 팀·다른 사람·다른 초대의 알림을 건드리는데, 호출 인자만 보는 단언으로는 그걸 못 잡는다.
+ */
+function whereMatches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
+  return Object.entries(where).every(([key, expected]) => {
+    const actual = row[key];
+    if (expected === null || typeof expected !== 'object' || expected instanceof Date) {
+      return actual instanceof Date && expected instanceof Date ? actual.getTime() === expected.getTime() : actual === expected;
+    }
+    const filter = expected as { startsWith?: string; in?: unknown[]; gte?: Date };
+    if (filter.startsWith !== undefined) return typeof actual === 'string' && actual.startsWith(filter.startsWith);
+    if (filter.in !== undefined) return filter.in.includes(actual);
+    if (filter.gte !== undefined) return actual instanceof Date && actual.getTime() >= filter.gte.getTime();
+    throw new Error(`unsupported where filter on ${key}`);
+  });
+}
+
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let prisma: {
@@ -44,6 +63,7 @@ describe('NotificationsService', () => {
     v1Notification: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
@@ -51,6 +71,10 @@ describe('NotificationsService', () => {
     };
     v1TeamMatch: { findUnique: jest.Mock };
     v1TeamSchedule: { findUnique: jest.Mock };
+    v1Team: { findUnique: jest.Mock };
+    v1TeamMembership: { findMany: jest.Mock };
+    v1TeamJoinApplication: { count: jest.Mock; findFirst: jest.Mock };
+    v1TeamInvitation: { count: jest.Mock; findUnique: jest.Mock };
   };
 
   const realtimeNotifier = { emitToUser: jest.fn() };
@@ -66,6 +90,7 @@ describe('NotificationsService', () => {
       v1Notification: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -73,6 +98,10 @@ describe('NotificationsService', () => {
       },
       v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(null) },
       v1TeamSchedule: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1Team: { findUnique: jest.fn().mockResolvedValue({ name: '마포 FC' }) },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamJoinApplication: { count: jest.fn(), findFirst: jest.fn() },
+      v1TeamInvitation: { count: jest.fn(), findUnique: jest.fn() },
     };
     // 팀·팀매치 알림은 밤에 푸시를 보류한다 — 시각에 따라 결과가 갈리지 않게 한낮(KST 12시)으로 고정한다.
     jest.useFakeTimers({ now: new Date('2026-06-14T03:00:00Z'), doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
@@ -99,7 +128,8 @@ describe('NotificationsService', () => {
 
   it('선호도 row 없을 때 알림을 생성한다 (기본값 활성)', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null); // no pref row
-    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+    // 저장한 행을 그대로 돌려준다 — 푸시는 저장된 제목·본문을 싣는다.
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
 
     await service.emitNotification('user-1', 'match_application_received', 'match-1');
 
@@ -308,25 +338,6 @@ describe('NotificationsService', () => {
     expect(webPushService.sendToUser).toHaveBeenCalledWith(
       'user-1',
       expect.objectContaining({ title: '매치 신청이 도착했어요' }),
-    );
-  });
-
-  it('team join application received notifications deep-link to team member management', async () => {
-    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
-    prisma.v1Notification.create.mockResolvedValue(makeNotification());
-
-    await service.emitNotification('manager-1', 'team_join_application_received', 'team-1');
-    await new Promise(setImmediate);
-
-    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          recipientUserId: 'manager-1',
-          targetType: 'team',
-          targetId: 'team-1',
-          deepLink: '/teams/team-1/members',
-        }),
-      }),
     );
   });
 
@@ -661,6 +672,145 @@ describe('NotificationsService', () => {
 
       expect(prisma.v1TeamMatch.findUnique).not.toHaveBeenCalled();
       expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ─── 몰림 줄(H1-join-burst) ──────────────────────────────────────────────
+
+  describe('가입 신청·초대 수락 몰림 줄', () => {
+    type Row = Record<string, unknown> & { id: string; businessKey: string | null; readAt: Date | null; createdAt: Date };
+    let rows: Row[];
+    const matches = whereMatches;
+
+    beforeEach(() => {
+      rows = [];
+      let seq = 0;
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      // Prisma 처럼 행의 사본을 돌려준다 — 참조를 돌려주면 뒤이은 update 가 앞서 읽은 값을 바꿔 버린다.
+      const copy = (row: Row | undefined) => (row === undefined ? null : { ...row });
+      prisma.v1Notification.findUnique.mockImplementation(async ({ where }) => copy(rows.find((row) => matches(row, where))));
+      prisma.v1Notification.findFirst.mockImplementation(async ({ where }) =>
+        copy(rows.filter((row) => matches(row, where)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]),
+      );
+      prisma.v1Notification.create.mockImplementation(async ({ data }) => {
+        if (data.businessKey && rows.some((row) => row.businessKey === data.businessKey)) {
+          throw new Prisma.PrismaClientKnownRequestError('duplicate', { code: 'P2002', clientVersion: 'test' });
+        }
+        const row: Row = { id: `n-${++seq}`, businessKey: null, readAt: null, createdAt: new Date(), ...data };
+        rows.push(row);
+        return copy(row);
+      });
+      prisma.v1Notification.update.mockImplementation(async ({ where, data }) => copy(Object.assign(rows.find((row) => matches(row, where))!, data)));
+      prisma.v1Notification.updateMany.mockImplementation(async ({ where, data }) => {
+        const hit = rows.filter((row) => matches(row, where));
+        hit.forEach((row) => Object.assign(row, data));
+        return { count: hit.length };
+      });
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }]);
+    });
+
+    const pending = (count: number, latestName: string) => {
+      prisma.v1TeamJoinApplication.count.mockResolvedValue(count);
+      prisma.v1TeamJoinApplication.findFirst.mockResolvedValue(
+        count === 0 ? null : { applicantUser: { profile: { nickname: latestName, displayName: null } } },
+      );
+    };
+    const later = () => jest.advanceTimersByTime(60_000);
+
+    it('신청 3건이 몰려도 팀장에게는 한 줄·푸시 1회 — "가입 신청 3건이 기다려요 · 막내님 외 2명"', async () => {
+      pending(1, '첫째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      expect(rows[0]).toMatchObject({ title: '첫째님이 가입을 신청했어요', body: '"마포 FC" · 승인하거나 거절해 주세요.' });
+
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      pending(3, '막내');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        recipientUserId: 'owner-1',
+        title: '가입 신청 3건이 기다려요',
+        body: '"마포 FC" · 막내님 외 2명 · 승인하거나 거절해 주세요.',
+        deepLink: '/teams/team-1/members?tab=requests',
+        readAt: null,
+      });
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+      expect(realtimeNotifier.emitToUser).toHaveBeenCalledTimes(3);
+    });
+
+    it('읽은 줄에 새 신청이 오면 같은 줄이 다시 안 읽음이 되어 맨 위로 올라오고 푸시가 다시 간다', async () => {
+      pending(1, '첫째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      rows[0].readAt = new Date();
+      const firstCreatedAt = rows[0].createdAt;
+      later();
+
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].readAt).toBeNull();
+      expect(rows[0].createdAt.getTime()).toBeGreaterThan(firstCreatedAt.getTime());
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('처리하면 남은 건수로 문구만 고치고(푸시 없음), 대기가 0 이 되면 읽음 — 다른 팀 줄은 그대로다', async () => {
+      pending(3, '막내');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      await service.refreshTeamJoinApplicationsLine('team-2', 'arrival');
+      jest.mocked(webPushService.sendToUser).mockClear();
+
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'recount');
+      const team1 = rows.find((row) => row.targetId === 'team-1')!;
+      expect(team1).toMatchObject({ title: '가입 신청 2건이 기다려요', readAt: null });
+
+      pending(0, '');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'recount');
+      expect(team1.readAt).toBeInstanceOf(Date);
+      expect(rows.find((row) => row.targetId === 'team-2')).toMatchObject({ title: '가입 신청 3건이 기다려요', readAt: null });
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('처리 뒤 다시 세는 줄은 지금 팀장·매니저 것뿐이다 — 매니저에서 내려온 사람의 옛 줄에는 새 신청자 이름이 실리지 않는다', async () => {
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }, { userId: 'manager-2' }]);
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }]);
+      pending(3, '셋째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'recount');
+
+      const lineOf = (userId: string) => rows.find((row) => row.recipientUserId === userId)!;
+      expect(lineOf('owner-1').body).toBe('"마포 FC" · 셋째님 외 2명 · 승인하거나 거절해 주세요.');
+      expect(lineOf('manager-2').body).toBe('"마포 FC" · 둘째님 외 1명 · 승인하거나 거절해 주세요.');
+    });
+
+    it('초대 수락은 안 읽은 동안 한 줄로 모이고("○○님 외 N명"), 읽은 뒤의 수락은 새 줄로 다시 알린다', async () => {
+      const accepted: Array<{ respondedAt: Date }> = [];
+      prisma.v1TeamInvitation.count.mockImplementation(async ({ where }) =>
+        accepted.filter((invitation) => invitation.respondedAt >= where.respondedAt.gte).length,
+      );
+      const accept = async (id: string, name: string) => {
+        later();
+        const acceptedAt = new Date();
+        accepted.push({ respondedAt: acceptedAt });
+        prisma.v1TeamInvitation.findUnique.mockResolvedValue({ invitedUser: { profile: { nickname: name, displayName: null } } });
+        await service.recordTeamInvitationAccepted({ inviterUserId: 'owner-1', teamId: 'team-1', invitationId: id, acceptedAt });
+      };
+
+      await accept('inv-a', '선수10');
+      await accept('inv-b', '선수11');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ title: '선수11님 외 1명이 초대를 수락했어요', body: '"마포 FC" 멤버가 됐어요.', deepLink: '/teams/team-1' });
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+
+      rows[0].readAt = new Date();
+      await accept('inv-c', '선수12');
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toMatchObject({ title: '선수12님이 초대를 수락했어요', readAt: null });
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
     });
   });
 

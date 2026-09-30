@@ -899,6 +899,43 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
     expect(screen.getAllByText(CLOSED)).toHaveLength(1);
   });
+
+  it('F99: 취소된 신청은 카드가 다른 사유(잠금·종료)를 말해도 취소 안내가 한 번 남는다', () => {
+    const CANCELLED = '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.';
+    const LOCKED_IN_CARD = '선수 명단이 운영진에 의해 마감됐어요.';
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'owner' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    const mockCancelledRegistration = (rosterLockedAt: string | null) =>
+      useV1RegistrationMock.mockReturnValue({
+        data: { id: 'reg-1', teamId: 'team-1', status: 'cancelled', rosterLockedAt, rosterDeadlineOverrideAt: null },
+      } as unknown as ReturnType<typeof useV1Registration>);
+
+    // 잠김: 카드는 잠금을 말하므로 취소 사유는 안내 상자가 싣는다.
+    mockCompetition('regular_league', 'in_progress', SEASON_LEFT_END);
+    mockCancelledRegistration('2026-09-30T00:00:00.000Z');
+    const locked = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+    expect(screen.getByText(LOCKED_IN_CARD)).toBeInTheDocument();
+    expect(screen.getAllByText(CANCELLED)).toHaveLength(1);
+    locked.unmount();
+
+    // 종료: 카드는 종료를 말하므로 역시 취소 사유는 안내 상자가 싣는다.
+    mockCompetition('regular_league', 'completed', SEASON_OVER_END);
+    const closed = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+    expect(screen.getAllByText(CANCELLED)).toHaveLength(1);
+    closed.unmount();
+
+    // 대조군: 다른 사유가 없으면 카드가 취소를 말하고, 안내 상자는 되풀이하지 않는다.
+    mockCompetition('regular_league', 'in_progress', SEASON_LEFT_END);
+    mockCancelledRegistration(null);
+    render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
+    expect(screen.getAllByText(CANCELLED)).toHaveLength(1);
+    expect(screen.queryByText(LOCKED_IN_CARD)).not.toBeInTheDocument();
+  });
 });
 
 describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받은 from 을 잇는다', () => {

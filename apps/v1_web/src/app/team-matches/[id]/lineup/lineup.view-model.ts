@@ -386,10 +386,10 @@ export function deriveLineupCounts(state: LineupEditorState, rosterPool: RosterO
   };
 }
 
-/** 제출 전 클라이언트 사전 검증. 서버가 실제로 강제하는 규칙 중 프론트가 확실히 알 수
- * 있는 것만 검사한다 — 종목별 최소/최대 인원(V1CompetitionConfigVersion.lineup)은 프론트에
- * 노출되는 계약이 없어 여기서 하드코딩하지 않고 서버의 422 LINEUP_SIZE_INVALID 메시지를
- * 그대로 보여주는 쪽을 택했다(잘못된 상수를 만드는 것보다 정직하다). */
+/** 제출 전 클라이언트 사전 검증 — 서버(`team-match-lineup.service.ts#resolveEntries`)가
+ * 거절하는 규칙만 옮긴다. `lineupConfig.minPlayers/maxPlayers` 는 응답에 있지만 서버가
+ * 제출에서 검증하지 않으므로(Task 163, `team-match-lineup-size.integration-spec.ts`) 여기서도
+ * 막지 않는다. */
 export function validateLineupForSubmit(state: LineupEditorState): string[] {
   const errors: string[] = [];
   if (state.participants.length === 0) {

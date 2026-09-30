@@ -82,8 +82,8 @@ describe('ConfirmModal confirmation phrase', () => {
     render(
       <ConfirmModal
         open
-        title="운영진 지정"
-        message="운영진으로 지정할까요?"
+        title="매니저로 지정"
+        message="매니저로 지정할까요?"
         onConfirm={onConfirm}
         onCancel={() => undefined}
       />,

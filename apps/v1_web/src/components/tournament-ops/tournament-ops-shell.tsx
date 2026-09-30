@@ -16,6 +16,7 @@ import {
 import type { V1CompetitionKind, V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { competitionOpsTitle } from '@/lib/competition-kind';
 import { staffRoleLabel } from './badges';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
@@ -393,7 +394,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
     setDrawerOpen(false);
   }, [pathname]);
 
-  const sectionLabel = navItems.find((item) => isActive(item))?.label ?? '대회 운영';
+  const sectionLabel = navItems.find((item) => isActive(item))?.label ?? competitionOpsTitle(tournamentKind);
 
   return (
     <div className="min-h-screen bg-[var(--surface-soft)] flex [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">

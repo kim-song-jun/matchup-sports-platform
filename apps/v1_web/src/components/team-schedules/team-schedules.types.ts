@@ -99,6 +99,8 @@ export type ScheduleGuestRecruitmentModel = {
     onEdit: () => void;
     pending: boolean;
     exists: boolean;
+    /** 예정된 일정만 새 모집을 열 수 있다 — 취소·종료된 일정은 서버도 거절한다. */
+    canCreate: boolean;
     editPanel?: {
       open: boolean;
       slots: string;
@@ -247,6 +249,8 @@ export type ScheduleDetailViewModel = {
   };
   loading: boolean;
   error: boolean;
+  /** 조회 실패 중 권한이 없거나 멤버 전용이라 숨겨진 경우 — 다시 시도해도 같다. */
+  inaccessible: boolean;
   onRetry: () => void;
 };
 

@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { scheduleTypeLabel, weekdayHeaders } from './team-schedules.view-model';
 import type {
   MyScheduleViewModel,
@@ -224,7 +225,15 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
   useShellOverride({ desktopHead: !model.error && !model.loading ? false : undefined });
 
   if (model.error) {
-    return <ErrorState message="일정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />;
+    return model.inaccessible ? (
+      <ErrorState
+        title="볼 수 없는 일정이에요"
+        message="이 팀의 멤버에게만 공개된 일정이거나 없어진 일정이에요. 팀에서 빠졌다면 다시 가입해야 볼 수 있어요."
+        back={{ href: `/teams/${model.teamId}`, label: '팀 상세로 돌아가기' }}
+      />
+    ) : (
+      <ErrorState message="일정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />
+    );
   }
 
   if (model.loading) {
@@ -400,35 +409,48 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           ) : null;
         })()}
 
-        {model.cancelModal.open ? (
-          <Card pad={16} style={{ marginTop: 12 }}>
-            <div className="tm-text-label" style={{ marginBottom: 8 }}>일정을 취소할까요?</div>
-            <TextField
-              label="취소 사유"
-              multiline
-              rows={3}
-              value={model.cancelModal.reason}
-              onChange={(e) => model.cancelModal.onReasonChange(e.target.value)}
-              disabled={model.cancelModal.pending}
-              error={model.cancelModal.error}
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={model.cancelModal.onDismiss} disabled={model.cancelModal.pending}>
-                닫기
-              </button>
-              <button
-                type="button"
-                className="tm-btn tm-btn-sm tm-btn-danger"
-                onClick={model.cancelModal.onConfirm}
-                disabled={model.cancelModal.pending || model.cancelModal.reason.trim().length === 0}
-              >
-                {model.cancelModal.pending ? '취소하는 중…' : '취소 확정'}
-              </button>
-            </div>
-          </Card>
-        ) : null}
+        {model.cancelModal.open ? <ScheduleCancelPanel model={model.cancelModal} /> : null}
       </div>
     </>
+  );
+}
+
+/** 버튼 카드 아래(화면 밖)에 펼쳐지므로, 열리는 순간 뷰로 끌어와 눌렀는데 반응 없는 버튼처럼 보이지 않게 한다. */
+function ScheduleCancelPanel({ model }: { model: ScheduleDetailViewModel['cancelModal'] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    revealAndFocus(ref.current);
+  }, []);
+
+  return (
+    <div ref={ref} tabIndex={-1} role="group" aria-labelledby={titleId}>
+      <Card pad={16} style={{ marginTop: 12 }}>
+        <div id={titleId} className="tm-text-label" style={{ marginBottom: 8 }}>일정을 취소할까요?</div>
+        <TextField
+          label="취소 사유"
+          multiline
+          rows={3}
+          value={model.reason}
+          onChange={(e) => model.onReasonChange(e.target.value)}
+          disabled={model.pending}
+          error={model.error}
+        />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={model.onDismiss} disabled={model.pending}>
+            닫기
+          </button>
+          <button
+            type="button"
+            className="tm-btn tm-btn-sm tm-btn-danger"
+            onClick={model.onConfirm}
+            disabled={model.pending || model.reason.trim().length === 0}
+          >
+            {model.pending ? '취소하는 중…' : '취소 확정'}
+          </button>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -510,7 +532,8 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
               >
                 {item.nickname.slice(0, 1)}
               </div>
-              <div className="tm-text-body" style={{ flex: 1, minWidth: 0 }}>{item.nickname}</div>
+              {/* 이름이 버튼·배지에 밀려 "QA0929선수/10" 처럼 꺾이지 않게 최소 폭을 주고, 남는 폭 부족은 버튼 라벨이 줄바꿈으로 받는다. */}
+              <div className="tm-text-body" style={{ flex: '1 1 auto', minWidth: '7rem', wordBreak: 'keep-all' }}>{item.nickname}</div>
               {/*
                 미응답 팀원만 대리 표시 대상이다 — 이미 응답한 사람의 의사를 팀장이
                 덮어쓰지 않는다. 정원이 찼으면 서버가 본인 응답과 똑같이 대기자로
@@ -568,9 +591,11 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
       {model.manage ? (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {!model.manage.exists ? (
-            <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" disabled={model.manage.pending} onClick={model.manage.onCreate}>
-              용병 모집 열기
-            </button>
+            model.manage.canCreate ? (
+              <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" disabled={model.manage.pending} onClick={model.manage.onCreate}>
+                용병 모집 열기
+              </button>
+            ) : null
           ) : (
             <>
               <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" disabled={model.manage.pending} onClick={model.manage.onEdit}>

@@ -33,6 +33,7 @@ import {
   formatPhone,
   getSignupProfileIssue,
   isCompleteSignupProfile,
+  isPlausibleEmail,
   isSignupAgeEligible,
   normalizeSeparatedDigits,
   normalizeSignupDisplayName,
@@ -116,7 +117,7 @@ export function SignupClient() {
   });
   const emailCheck = useDuplicateCheck({
     value: normalizedEmail,
-    isCheckable: (value) => value.includes('@'),
+    isCheckable: isPlausibleEmail,
     check: checkEmail.mutateAsync,
   });
   /** 인증 완료 → 다음 단계 자동 이동 타이머. 언마운트 시 정리해 사라진 화면에 setState 하지 않는다. */

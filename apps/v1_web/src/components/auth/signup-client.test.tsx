@@ -490,6 +490,40 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
     expect(await screen.findByText('사용 가능한 닉네임이에요.')).toBeInTheDocument();
   });
 
+  // `kim@` 에서 0.5초 쉬면 "사용 가능"이 뜨고 형식이 틀린 채 다음 단계로 넘어갔다.
+  it.each([['kim@'], ['kim@a']])('형식이 덜 된 이메일 %s 는 확인 요청 없이 형식만 안내한다', async (typed) => {
+    vi.useFakeTimers();
+    try {
+      render(<SignupClient />);
+      const input = screen.getByLabelText(/^이메일/);
+
+      fireEvent.change(input, { target: { value: typed } });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(hooks.checkEmailMutateAsync).not.toHaveBeenCalled();
+      expect(screen.queryByText('사용 가능한 이메일이에요.')).not.toBeInTheDocument();
+
+      fireEvent.blur(input);
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식을 확인해 주세요.');
+      expect(hooks.checkEmailMutateAsync).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('형식을 갖춘 이메일 kim@a.com 은 입력을 멈추면 확인 요청을 보낸다', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<SignupClient />);
+
+      fireEvent.change(screen.getByLabelText(/^이메일/), { target: { value: 'kim@a.com' } });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+
+      expect(hooks.checkEmailMutateAsync).toHaveBeenCalledWith('kim@a.com');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('2자 미만 닉네임은 요청 없이 형식만 안내한다', async () => {
     vi.useFakeTimers();
     try {

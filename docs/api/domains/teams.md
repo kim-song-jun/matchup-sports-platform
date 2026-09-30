@@ -117,6 +117,12 @@ CAUTION:
 - 생성 시 트랜잭션으로 owner 멤버십(`role=owner`, `status=active`)이 자동 생성된다.
 - 팀 생성은 프로필 `realName`, `phone`, `gender`가 있어야 하며 없으면 `422 PROFILE_COMPLETION_REQUIRED`다. 신청/관리 엔드포인트는 이 검사에서 제외된다.
 
+## GET /teams/:teamId — 컨택 관련 필드
+
+- `contactPolicy`(`open|recruiting_only|closed`)는 그 팀의 owner/manager에게만 내려간다.
+- `canSendContact`(boolean)는 **로그인한 비멤버이고 다른 팀의 owner/manager인 viewer**에게만 내려가며, 그 외(비로그인·이 팀 멤버·보낼 팀 없음)에는 생략된다. 내 owner/manager 팀 중 하나라도 이 팀에 컨택을 보낼 수 있으면 `true`, 전부 막혔으면 `false`다.
+- `false`는 차단(양방향) / `closed` / `recruiting_only`인데 모집 중 아님 세 사유를 **하나로 합친 값**이라 컨택 거절(`TEAM_CONTACT_NOT_ACCEPTING`) 뒤에 알 수 있는 정보와 같다 — 발신자가 "차단당했다"를 역추론하지 못하는 성질(§8(b))을 그대로 유지한다. 화면은 이 값으로 "컨택 보내기"를 비활성화하고 "이 팀은 지금 컨택을 받지 않고 있어요"를 보여주며, 서버는 여전히 컨택 생성 시점에 같은 검사를 한다.
+
 ## PATCH /teams/:teamId
 
 - 권한: manager 이상

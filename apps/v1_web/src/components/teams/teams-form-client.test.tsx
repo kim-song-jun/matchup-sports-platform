@@ -65,6 +65,8 @@ vi.mock('./teams-page', () => ({
           onChange={(event) => form?.onFieldChange('name', event.target.value)}
         />
         <output data-testid="team-logo-url">{model.team.logoUrl}</output>
+        <output data-testid="min-capacity">{form.minCapacity}</output>
+        {form.error ? <p role="alert">{form.error}</p> : null}
         {form.sports.map((sport) => (
           <button
             key={sport.id}
@@ -117,6 +119,7 @@ describe('Team form client contracts', () => {
         memberCount: 12,
         membersVisibilityEnabled: false,
         version: 'version-1',
+        viewer: { role: 'owner' },
       },
       isError: false,
       isLoading: false,
@@ -238,6 +241,73 @@ describe('Team form client contracts', () => {
     fireEvent.click(submit);
 
     expect(updateTeamMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  describe('수정 권한', () => {
+    function viewAs(role: string) {
+      const current = useV1TeamDetailMock();
+      useV1TeamDetailMock.mockReturnValue({ ...current, data: { ...current.data, teamId: 'team-futsal', viewer: { role } } });
+    }
+
+    it.each(['member', 'none'])('%s 는 수정 폼 대신 권한 안내와 돌아갈 길을 본다', (role) => {
+      viewAs(role);
+      render(<TeamEditPageClient teamId="team-futsal" />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent('팀장·매니저만 고칠 수 있어요');
+      expect(screen.getByRole('alert')).toHaveTextContent('팀장에게');
+      expect(screen.getByRole('link', { name: '팀 상세로 돌아가기' })).toHaveAttribute('href', '/teams/team-futsal');
+      expect(screen.queryByLabelText('팀 이름')).not.toBeInTheDocument();
+    });
+
+    it.each(['owner', 'manager'])('%s 는 수정 폼을 본다', (role) => {
+      viewAs(role);
+      render(<TeamEditPageClient teamId="team-futsal" />);
+
+      expect(screen.getByLabelText('팀 이름')).toBeInTheDocument();
+      expect(screen.queryByText('팀장·매니저만 고칠 수 있어요')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('수정 저장 거절', () => {
+    const serverError = (statusCode: number, code: string, message: string, details?: unknown) =>
+      new V1ApiError({ status: 'error', statusCode, code, message, details, timestamp: '2026-09-30T00:00:00.000Z' });
+
+    async function submitEdit() {
+      render(<TeamEditPageClient teamId="team-futsal" />);
+      await waitFor(() => expect(screen.getByLabelText('팀 이름')).toHaveValue('기존 풋살 팀'));
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    }
+
+    it('권한 거절의 영어 서버 문구를 해요체 안내로 바꿔 보여준다', async () => {
+      updateTeamMutateAsync.mockRejectedValueOnce(
+        serverError(403, 'PERMISSION_DENIED', 'Only team owners or managers can manage this team'),
+      );
+      await submitEdit();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('팀장·매니저만 할 수 있어요');
+      expect(screen.queryByText(/Only team owners/)).not.toBeInTheDocument();
+    });
+
+    it('정원 거절은 지금 팀원 수를 알려 준다', async () => {
+      updateTeamMutateAsync.mockRejectedValueOnce(
+        serverError(400, 'VALIDATION_FAILED', 'memberGoalCount cannot be lower than the current member count', { field: 'memberGoalCount' }),
+      );
+      await submitEdit();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('정원은 지금 팀원 수(12명)보다 적게 정할 수 없어요.');
+    });
+
+    it('정원 하한을 지금 팀원 수로 넘기고, 목표 인원이 팀원 수보다 작게 저장된 팀도 하한부터 시작한다', async () => {
+      const current = useV1TeamDetailMock();
+      useV1TeamDetailMock.mockReturnValue({
+        ...current,
+        data: { ...current.data, profile: { ...current.data.profile, memberGoalCount: 5 } },
+      });
+      await submitEdit();
+
+      expect(screen.getByTestId('min-capacity')).toHaveTextContent('12');
+      await waitFor(() => expect(updateTeamMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ memberGoalCount: 12 })));
+    });
   });
 
   describe('profile-completion leave', () => {

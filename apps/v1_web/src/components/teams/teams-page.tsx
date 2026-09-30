@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
-import { Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -737,11 +738,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
           {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 8 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
-            {model.contactHref ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
-                  컨택 보내기
-                </Link>
+            {model.contactHref || model.contactUnavailableReason ? (
+              <TeamContactRow href={model.contactHref} unavailableReason={model.contactUnavailableReason}>
                 <button
                   className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
                   type="button"
@@ -750,7 +748,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 >
                   {model.ctaPending ? '처리 중' : cta}
                 </button>
-              </div>
+              </TeamContactRow>
             ) : (
               <button
                 className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
@@ -846,15 +844,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 8 }}>{heroMessage}</div> : null}
-        {model.contactHref ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
-              컨택 보내기
-            </Link>
+        {model.contactHref || model.contactUnavailableReason ? (
+          <TeamContactRow href={model.contactHref} unavailableReason={model.contactUnavailableReason}>
             <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
               {model.ctaPending ? '처리 중' : cta}
             </button>
-          </div>
+          </TeamContactRow>
         ) : (
           <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
             {model.ctaPending ? '처리 중' : cta}
@@ -883,6 +878,32 @@ function TeamJoinPendingNotice({ requestedAtLabel }: { requestedAtLabel?: string
         관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.
       </p>
     </Card>
+  );
+}
+
+/** 컨택 보내기 + 주 CTA 한 줄. 보낼 수 없는 팀이면 링크 대신 이유를 가리키는 비활성 버튼과 그 이유를 보여준다. */
+function TeamContactRow({ href, unavailableReason, children }: { href?: string; unavailableReason?: string; children: ReactNode }) {
+  const reasonId = useId();
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+        {unavailableReason || !href ? (
+          <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled aria-describedby={reasonId}>
+            컨택 보내기
+          </button>
+        ) : (
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={href}>
+            컨택 보내기
+          </Link>
+        )}
+        {children}
+      </div>
+      {unavailableReason ? (
+        <p id={reasonId} className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+          {unavailableReason}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -916,6 +937,12 @@ export function TeamFormPageView({
   const form = model.form;
   const previewSport = form?.sports.find((sport) => sport.id === form.sportId)?.name ?? team.sports[0] ?? '';
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
+  // 저장 버튼은 화면 맨 아래, 오류 안내는 맨 위라 저장이 거절돼도 아무 일 없어 보인다 — 안내가 생기면 끌어온다.
+  const errorRef = useRef<HTMLDivElement>(null);
+  const formError = form?.error;
+  useEffect(() => {
+    if (formError) revealAndFocus(errorRef.current);
+  }, [formError]);
   // title은 mode(edit/create)로만 갈리고 mode는 어느 pathname이 이 컴포넌트를 렌더했는지로
   // 완전히 결정된다(/teams/new → create, /teams/:id/edit → edit) — fetch 의존이 아니라
   // route-chrome 테이블에 두 pathname 각각의 정적 title로 등록돼 있다(fragments/teams.ts).
@@ -954,7 +981,7 @@ export function TeamFormPageView({
             </Card>
           ) : null}
           {!edit ? <h2 className="tm-text-heading">새 팀을 만들어요</h2> : null}
-          {form?.error ? <Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card> : null}
+          {form?.error ? <div ref={errorRef} tabIndex={-1} role="alert"><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           <TeamCoverImageField coverImageUrl={team.coverImageUrl} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('coverImageUrl', url)} />
@@ -996,7 +1023,7 @@ export function TeamFormPageView({
           <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
           <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />
           {edit ? <TeamJoinPolicyField form={form} /> : null}
-          <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+          <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
           <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
           <TeamActivityFields team={team} form={form} />
         </div>
@@ -1456,6 +1483,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           {canManageMembers ? <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card> : null}
         </div>
         {model.selfNotice ? <div style={{ marginTop: 16 }}>{model.selfNotice}</div> : null}
+        <ActionErrorNotice message={model.actionError} />
         {canManageMembers ? (
           <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
             <div className="tm-text-label">권한 규칙</div>
@@ -1484,6 +1512,20 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         ) : null}
       </div>
     </>
+  );
+}
+
+/** 목록 어디서 눌렀든 거절 이유가 화면 밖 위쪽에 묻히지 않게, 생길 때 끌어와 읽힌다. */
+function ActionErrorNotice({ message }: { message?: string | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (message) revealAndFocus(ref.current);
+  }, [message]);
+  if (!message) return null;
+  return (
+    <div ref={ref} tabIndex={-1} style={{ marginTop: 16 }}>
+      <AlertBanner message={message} />
+    </div>
   );
 }
 
@@ -1916,20 +1958,23 @@ function TeamLevelSelect({ value, onChange }: { value: string; onChange?: (value
   );
 }
 
-function TeamCapacityField({ value, onChange }: { value: number; onChange?: (value: number) => void }) {
-  const options = Array.from({ length: 49 }, (_, index) => index + 2);
-  const normalized = Math.min(50, Math.max(2, Number(value) || 2));
+function TeamCapacityField({ value, min, onChange }: { value: number; min?: number; onChange?: (value: number) => void }) {
+  // 이미 있는 팀원보다 적은 정원은 서버가 거절한다 — 저장 전에 입력 칸에서 막는다.
+  const floor = Math.min(50, Math.max(2, min ?? 2));
+  const options = Array.from({ length: 50 - floor + 1 }, (_, index) => index + floor);
+  const normalized = Math.min(50, Math.max(floor, Number(value) || floor));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">정원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" onClick={() => onChange?.(Math.max(2, normalized - 1))}>−</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" disabled={normalized <= floor} onClick={() => onChange?.(Math.max(floor, normalized - 1))}>−</button>
         <select className="tm-create-input tm-create-select-control" aria-label="정원" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
         <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
       </div>
+      {floor > 2 ? <div className="tm-text-caption" style={{ marginTop: 8 }}>지금 팀원이 {floor}명이라 그보다 적게 정할 수 없어요.</div> : null}
     </div>
   );
 }
@@ -1959,13 +2004,16 @@ function MemberCard({
   sub: string;
   role: string;
   profileHref?: string;
-  actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
+  actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
   actionPending?: boolean;
   selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; error?: string | null; onSelect: () => void };
 }) {
   const [open, setOpen] = useState(false);
+  const reasonIdBase = useId();
   const hasActions = actions.length > 0;
   const disabled = actionPending || !hasActions;
+  const leaveReasonId = `${reasonIdBase}-leave`;
+  const leaveReasonShown = Boolean(selfLeave?.disabled && selfLeave.disabledReason);
 
   return (
     <Card pad={16}>
@@ -1977,19 +2025,30 @@ function MemberCard({
       ) : null}
       {open && !disabled ? (
         <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 12 }}>
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                action.onSelect();
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
+          {actions.map((action, index) => {
+            const reasonId = `${reasonIdBase}-action-${index}`;
+            return (
+              <div key={action.label}>
+                <button
+                  className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
+                  type="button"
+                  disabled={Boolean(action.disabledReason)}
+                  aria-describedby={action.disabledReason ? reasonId : undefined}
+                  onClick={() => {
+                    setOpen(false);
+                    action.onSelect();
+                  }}
+                >
+                  {action.label}
+                </button>
+                {action.disabledReason ? (
+                  <p id={reasonId} className="tm-text-caption" style={{ margin: '4px 0 0' }}>
+                    {action.disabledReason}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : null}
       {selfLeave ? (
@@ -1998,12 +2057,16 @@ function MemberCard({
           style={{ marginTop: 12, minHeight: 44 }}
           type="button"
           disabled={selfLeave.disabled || selfLeave.pending}
-          title={selfLeave.disabled ? selfLeave.disabledReason : undefined}
-          aria-label={selfLeave.disabled && selfLeave.disabledReason ? `팀 나가기 — ${selfLeave.disabledReason}` : '팀 나가기'}
+          aria-describedby={leaveReasonShown ? leaveReasonId : undefined}
           onClick={selfLeave.onSelect}
         >
           {selfLeave.pending ? '나가는 중…' : '팀 나가기'}
         </button>
+      ) : null}
+      {leaveReasonShown ? (
+        <p id={leaveReasonId} className="tm-text-caption" style={{ marginTop: 8 }}>
+          {selfLeave?.disabledReason}
+        </p>
       ) : null}
       {selfLeave?.error ? (
         <p role="alert" className="tm-text-caption" style={{ marginTop: 8, color: 'var(--red700)' }}>

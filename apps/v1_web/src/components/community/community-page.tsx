@@ -195,6 +195,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
               message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
               onRetry={model.onRetry}
               retryLabel="다시 불러오기"
+              back={model.errorBack}
             />
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */

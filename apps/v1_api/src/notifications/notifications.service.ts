@@ -332,6 +332,9 @@ export function notificationCopyFor(
   };
 }
 
+/** 초대받은 사람이 수락·거절하는 내 초대함. 초대 도착 알림의 도착지이자, 그 알림을 찾는 열쇠다. */
+const TEAM_INVITATION_INBOX_LINK = '/my/invitations';
+
 function deepLinkForEvent(
   type: NotificationEventType,
   targetType: V1NotificationTargetType,
@@ -342,7 +345,7 @@ function deepLinkForEvent(
   }
   // 초대받은 사람이 수락·거절하는 곳은 팀 상세가 아니라 내 초대함이다. targetId 는 팀 id 그대로다.
   if (type === 'team_invitation_received') {
-    return '/my/invitations';
+    return TEAM_INVITATION_INBOX_LINK;
   }
   // team_contact_* — 컨택 = 채팅방(스펙 §1 결정 1). targetId 는 이제 contactId 가 아니라
   // roomId 다(TeamContactsService.notifyTeamManagers 가 roomId 를 넘긴다). targetType 도
@@ -580,6 +583,52 @@ export class NotificationsService {
       deepLink,
       prefField,
     );
+  }
+
+  /** 아직 처리 전인 "팀 초대 도착" 알림 — 사용자·팀이 같고 도착지가 초대함이며 읽지 않은 것. */
+  private pendingTeamInvitationNotifications(userId: string, teamId: string) {
+    return {
+      recipientUserId: userId,
+      targetType: 'team' as const,
+      targetId: teamId,
+      deepLink: TEAM_INVITATION_INBOX_LINK,
+      readAt: null,
+    };
+  }
+
+  /**
+   * 초대를 수락·거절하면 그 초대의 도착 알림을 읽음 처리한다 — 처리한 뒤에도 안 읽음으로 남아
+   * 아직 할 일이 있는 것처럼 보이던 문제. 알림 실패는 이미 끝난 수락·거절을 깨지 않는다.
+   */
+  async markTeamInvitationHandled(userId: string, teamId: string): Promise<void> {
+    try {
+      await this.prisma.v1Notification.updateMany({
+        where: this.pendingTeamInvitationNotifications(userId, teamId),
+        data: { readAt: new Date() },
+      });
+    } catch (err) {
+      this.logger.warn({ userId, teamId, err }, '팀 초대 알림 읽음 처리 실패');
+    }
+  }
+
+  /**
+   * 초대가 취소되면 받은 사람의 도착 알림을 "취소됐어요"로 바꾸고 읽음 처리한다. 그대로 두면 눌러서
+   * 들어간 내 초대함이 "초대가 없어요"만 말한다. 도착지는 초대함 대신 팀 상세로 옮긴다.
+   */
+  async markTeamInvitationCancelled(userId: string, teamId: string, teamName: string): Promise<void> {
+    try {
+      await this.prisma.v1Notification.updateMany({
+        where: this.pendingTeamInvitationNotifications(userId, teamId),
+        data: {
+          readAt: new Date(),
+          title: '팀 초대가 취소됐어요',
+          body: `"${teamName}" 팀이 초대를 취소했어요.`,
+          deepLink: `/teams/${teamId}`,
+        },
+      });
+    } catch (err) {
+      this.logger.warn({ userId, teamId, err }, '팀 초대 취소 알림 갱신 실패');
+    }
   }
 
   /**

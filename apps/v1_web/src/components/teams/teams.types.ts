@@ -114,6 +114,8 @@ export type TeamDetailViewModel = {
    * 계산 위치: `TeamDetailPageClient`(teams-client.tsx).
    */
   contactHref?: string;
+  /** 보낼 수 없는 팀이라 "컨택 보내기"를 비활성으로 두는 이유. contactHref 대신 채워진다. */
+  contactUnavailableReason?: string;
   /**
    * 승인 대기 중일 때만 채워진다(mode === 'pending'). 토스트는 2초 뒤 사라지므로
    * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.
@@ -171,6 +173,8 @@ export type TeamFormViewModel = {
     sports: Array<{ id: string; name: string }>;
     joinPolicy: 'approval_required' | 'closed';
     membersVisibilityEnabled?: boolean;
+    /** 수정 화면에서 정원이 내려갈 수 있는 하한 — 지금 팀원 수. */
+    minCapacity?: number;
     onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
     onSportChange: (sportId: string) => void;
     onRegionChange: (regionId: string) => void;
@@ -192,6 +196,8 @@ export type TeamMembersViewModel = {
   summary: { total: number; managers: number; pending: number };
   /** 팀원 본인에게만 보이는 안내(내 결장 기간 등). 멤버 탭 위에 놓인다. */
   selfNotice?: ReactNode;
+  /** 역할 변경·내보내기가 서버에서 거절됐을 때의 이유. 목록 위에 뜨고 화면으로 끌어온다. */
+  actionError?: string | null;
   members: Array<{
     name: string;
     role: string;
@@ -199,7 +205,8 @@ export type TeamMembersViewModel = {
     profileHref?: string;
     manageLabel?: string;
     locked?: boolean;
-    actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
+    /** disabledReason 이 있으면 버튼을 비활성으로 두고 그 이유를 버튼 아래에 보여준다. */
+    actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
     actionPending?: boolean;
     /** 본인 행에만 노출되는 "팀 나가기" 버튼. owner는 소유권 이전 전까지 disabled + 툴팁. */
     selfLeave?: {

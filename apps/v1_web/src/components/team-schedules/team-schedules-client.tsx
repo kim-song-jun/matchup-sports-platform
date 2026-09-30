@@ -30,6 +30,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { extractErrorCode } from '@/lib/error-message';
+import { isHiddenFromViewerError } from '@/lib/access-denied-error';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type {
   V1CreateScheduleDto,
@@ -56,6 +57,7 @@ import type {
   ScheduleTypeFilter,
 } from './team-schedules.types';
 import {
+  attendanceLockedReason,
   attendanceStatusLabel,
   buildScheduleCalendarMonth,
   dateKeyOf,
@@ -441,13 +443,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       deadlineLabel: scheduleRsvpDeadlineLabel(schedule?.rsvpDeadlineAt ?? null),
       deadlinePassed: rsvpDeadlinePassed,
       disabled: !schedule || schedule.state !== 'SCHEDULED' || rsvpDeadlinePassed || setAttendance.isPending,
-      disabledReason: !schedule
-        ? null
-        : schedule.state !== 'SCHEDULED'
-          ? '이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.'
-          : rsvpDeadlinePassed
-            ? '참석 신청 마감 시간이 지났어요.'
-            : null,
+      disabledReason: schedule ? attendanceLockedReason(schedule.state, rsvpDeadlinePassed) : null,
       pending: setAttendance.isPending,
       error: attendanceError,
       onSetStatus,
@@ -494,6 +490,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
             onEdit: onOpenRecruitmentEdit,
             pending: createRecruitment.isPending || updateRecruitment.isPending,
             exists: Boolean(recruitment),
+            canCreate: schedule?.state === 'SCHEDULED',
             editPanel: recruitmentEditOpen
               ? {
                   open: true,
@@ -594,6 +591,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     },
     loading: detail.isLoading,
     error: detail.isError,
+    inaccessible: detail.isError && isHiddenFromViewerError(detail.error),
     onRetry: () => void detail.refetch(),
   };
 

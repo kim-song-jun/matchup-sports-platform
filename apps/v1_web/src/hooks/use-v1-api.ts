@@ -5048,6 +5048,8 @@ export function useV1AcceptTeamInvitation() {
       queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+      // 서버가 그 초대의 도착 알림을 읽음 처리한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
     },
   });
 }
@@ -5060,6 +5062,7 @@ export function useV1DeclineTeamInvitation() {
       v1Post<V1InvitationActionResult>(`/team-invitations/${invitationId}/decline`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
     },
   });
 }

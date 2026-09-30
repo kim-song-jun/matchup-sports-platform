@@ -44,7 +44,7 @@ export async function countMonthlyGames(prisma: PrismaService, userId: string, n
   const month = activityMonth(now);
   const [personal, official] = await Promise.all([
     countMonthlyPersonalMatches(prisma, userId, month),
-    countOfficialGameAppearances(prisma, userId, month),
+    countOfficialGameAppearances(prisma, userId, month, { monthOnly: true }),
   ]);
   return personal + official.monthly;
 }
@@ -75,6 +75,8 @@ export async function countOfficialGameAppearances(
   prisma: PrismaService,
   userId: string,
   { monthStart, nextMonthStart }: ActivityMonth,
+  // 홈처럼 monthly 만 쓰는 곳은 DB 에서 이번 달로 자른다 — 이때 total 계열도 이번 달 값이 된다.
+  { monthOnly = false }: { monthOnly?: boolean } = {},
 ): Promise<{ total: number; monthly: number; tournamentTotal: number; tournamentMonthly: number }> {
   const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({
     where: { userId },
@@ -86,12 +88,12 @@ export async function countOfficialGameAppearances(
   const rows = await prisma.v1GameResultParticipant.findMany({
     // sourceType·officialAt 은 DB 에서 먼저 거른다 -- 링크가 많은 사용자일수록 아래
     // 루프까지 끌고 올 행이 불필요하게 커진다. "현재 공식 리비전인가"(컬럼 대 컬럼
-    // 비교)만 where 로 표현할 수 없어 루프에 남는다. 이번 달 범위는 여기서 거르면
-    // 안 된다 -- monthly 는 total 의 부분집합이라 같은 쿼리로 둘 다 세야 한다.
+    // 비교)만 where 로 표현할 수 없어 루프에 남는다. 누적과 이번 달을 같이 셀 때는 이번 달
+    // 범위를 여기서 거르면 안 된다 -- monthly 는 total 의 부분집합이라 같은 쿼리로 둘 다 센다.
     where: {
       participantId: { in: participantIds },
       resultRevision: {
-        officialAt: { not: null },
+        officialAt: monthOnly ? { not: null, gte: monthStart, lt: nextMonthStart } : { not: null },
         // 공개 개인 기록과 같은 공식 게임 모집단. 팀매치를 빼면 개인 기록에는 3경기가
         // 보이는데 마이페이지 활동은 0회가 되어 같은 사용자의 두 화면이 모순된다.
         game: { sourceType: 'TEAM_MATCH' },

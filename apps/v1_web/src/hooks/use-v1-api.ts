@@ -1186,6 +1186,8 @@ export function useV1ApproveTeamJoinApplication(teamId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-applications'] });
+      // 홈 응답이 대기 가입 신청 수(배너)를 싣는다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }
@@ -1198,6 +1200,7 @@ export function useV1RejectTeamJoinApplication(teamId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-applications'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }
@@ -5052,6 +5055,8 @@ export function useV1AcceptTeamInvitation() {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       // 서버가 그 초대의 도착 알림을 읽음 처리한다.
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
+      // 홈 응답이 받은 초대 수(배너)·팀 소속·다음 경기를 싣는다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }
@@ -5065,6 +5070,7 @@ export function useV1DeclineTeamInvitation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }

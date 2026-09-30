@@ -73,6 +73,7 @@ export class TeamUpcomingGamesService {
   /**
    * 내 팀들의 경기 중 **가장 가까운 앞으로의 경기** 하나. 팀원이 아니면 애초에 이 팀들에 들지 않으므로
    * 남의 팀 경기는 나오지 않는다 — `memberships` 는 호출자가 활성 멤버십으로 조회한 값이다.
+   * 킥오프 시각이 지나면 그 경기는 빠지고 다음 경기로 넘어간다(진행 중 경기를 붙잡아 두지 않는다).
    */
   async nextForMemberships(
     userId: string,

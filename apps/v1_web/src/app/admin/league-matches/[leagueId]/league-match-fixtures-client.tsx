@@ -56,10 +56,6 @@ function consoleHref(leagueId: string, teamMatchId: string): string {
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
-// 대진 표의 구장·주소 입력: 데스크톱에서는 열 폭에 맞춰 줄어들고(`lg:w-full`), 잘린 값은
-// 말줄임 + title 로 읽는다. 모바일 카드에서는 기존 고유 폭을 유지한다.
-const FIT_TEXT_INPUT_CLASS = 'min-w-0 text-ellipsis lg:w-full';
-
 const WEEKDAY_OPTIONS = [
   { value: 0, label: '일요일' },
   { value: 1, label: '월요일' },

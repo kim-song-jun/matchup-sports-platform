@@ -242,7 +242,11 @@ function invalidateLineupReaders(queryClient: QueryClient, gameIds: readonly str
  * 그 팀이 뛰는 대회·리그 경기의 명단. 사이드는 서버가 팀으로 찾는다 — 그 팀이 사이드가 아니거나 친선·명단 없는
  * 경기는 404 `GAME_ROSTER_NOT_AVAILABLE`. 조정·변경 기록 훅은 응답의 `sideId` 로 부른다.
  */
-export function useV1TeamGameRoster(teamId: string | null, gameId: string | null, options?: { enabled?: boolean }) {
+export function useV1TeamGameRoster(
+  teamId: string | null,
+  gameId: string | null,
+  options?: { enabled?: boolean; refetchInterval?: number },
+) {
   return useQuery({
     queryKey: v1Keys.teamGameRoster(teamId ?? '', gameId ?? ''),
     queryFn: () => {
@@ -251,6 +255,7 @@ export function useV1TeamGameRoster(teamId: string | null, gameId: string | null
     },
     enabled: (options?.enabled ?? true) && Boolean(teamId) && Boolean(gameId),
     retry: false,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

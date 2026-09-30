@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 import { KickoffChecklist } from './kickoff-checklist';
 
@@ -78,8 +79,8 @@ describe('KickoffChecklist — 킥오프 준비', () => {
     );
     renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
 
-    expect(mocks.useV1TeamGameRoster).toHaveBeenCalledWith('team-red', 'g-1');
-    expect(mocks.useV1TeamGameRoster).toHaveBeenCalledWith('team-blue', 'g-1');
+    expect(mocks.useV1TeamGameRoster).toHaveBeenCalledWith('team-red', 'g-1', { refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS });
+    expect(mocks.useV1TeamGameRoster).toHaveBeenCalledWith('team-blue', 'g-1', { refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS });
     expect(screen.getByText('빠짐 2 · 정지 1')).toBeInTheDocument();
     expect(screen.getByText('빠짐 0 · 정지 0')).toBeInTheDocument();
   });

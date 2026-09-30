@@ -128,7 +128,7 @@ export function ConsoleResultCard({
           </Button>
         ) : null}
         <Button variant="outline" size="md" disabled={officializing} onClick={onResubmit}>
-          고치고 확정
+          고치고 확인
         </Button>
       </div>
       <p className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.5, color: 'var(--text-muted)' }}>

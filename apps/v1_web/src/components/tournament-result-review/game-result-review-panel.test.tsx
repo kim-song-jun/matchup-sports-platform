@@ -408,7 +408,7 @@ describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', ()
     expect(within(card).getByText('확정 전')).toBeInTheDocument();
     expect(within(card).getByLabelText('스코어 2 : 1')).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: '2 : 1 결과 확정' })).toBeEnabled();
-    expect(within(card).getByRole('button', { name: '고치고 확정' })).toBeEnabled();
+    expect(within(card).getByRole('button', { name: '고치고 확인' })).toBeEnabled();
     // 콘솔은 자기 이벤트 목록이 있으므로 검토 화면의 세부 기록·처리 이력을 되풀이하지 않는다.
     expect(screen.queryByText('경기 세부 기록')).toBeNull();
     expect(screen.queryByText('처리 이력')).toBeNull();
@@ -430,7 +430,7 @@ describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', ()
       expect(screen.getByRole('status')).toHaveTextContent('운영자가 확인해요');
       expect(screen.queryByRole('region', { name: '결과 확정' })).toBeNull();
       expect(screen.queryByRole('button', { name: /결과 확정/ })).toBeNull();
-      expect(screen.queryByRole('button', { name: '고치고 확정' })).toBeNull();
+      expect(screen.queryByRole('button', { name: '고치고 확인' })).toBeNull();
     },
   );
 
@@ -471,7 +471,7 @@ describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', ()
     expect(await screen.findByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '2 : 1 결과 확정' })).toBeNull();
     // 고쳐서 다시 제출하는 길은 막지 않는다.
-    expect(screen.getByRole('button', { name: '고치고 확정' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '고치고 확인' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: '다시 확인' }));
     expect(screen.getByRole('button', { name: '2 : 1 결과 확정' })).toBeInTheDocument();

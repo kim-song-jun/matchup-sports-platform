@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useV1TeamGameRoster } from '@/hooks/use-v1-game-roster';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { gameRosterScreenPath } from '@/lib/game-roster-routes';
+import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { withFromPath } from '@/lib/session-storage';
 import type { GameSide } from '@/types/game-operations';
 import { ArrivalCheckinPanel, arrivalProgress, type ArrivalCheckinPanelProps } from './arrival-checkin-panel';
@@ -54,7 +55,8 @@ export function KickoffChecklist({ gameId, sides, lineups, ...panelProps }: Kick
 function RosterSummaryLine({ side, gameId }: { side: GameSide; gameId: string }) {
   const teamId = side.teamId;
   const from = useCurrentHref();
-  const roster = useV1TeamGameRoster(teamId, gameId);
+  // 킥오프 직전은 팀장이 다른 기기에서 결장을 반영하는 시점이라 운영 보드와 같은 주기로 다시 읽는다.
+  const roster = useV1TeamGameRoster(teamId, gameId, { refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS });
   if (teamId === null) return null;
   if (roster.isPending) {
     return <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">명단 요약을 불러오는 중이에요…</p>;

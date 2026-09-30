@@ -62,3 +62,5 @@ Root agent only. 기존 shared-tree WIP 보존. 2026-10-01 사용자 dev 배포 
 - 실제 HTTP/DB 참여 이력 시나리오는 시간 fixture 후 주최자 confirm-proceed HTTP를 수행하도록 수정. 0/1 보류 조회/완료 차단/권한/soft delete 및 일정 변경·승인 초기화·이력 삭제 차단 시나리오 추가. CI 실제 Postgres 재검증 대기.
 - 진행 확정 뒤 불참(no_show) 처리로 보류에 역전하지 않도록 기존 완료 흐름 보존. 참가 집계에서는 불참을 계속 제외.
 - Web 가입 대기 상태는 진행중보다 우선 유지하고 보류만 공통 우선. 관리 링크 fixture는 실제 manageHref를 명시. 관련 Web 98/98 PASS; 개인 API 67/67 PASS(팀 API 74/74 이전 PASS).
+
+- 두 번째 CI: Gates/Web 전체 PASS. API 참여 이력 한 건만 RED(철회 후 미완료 매치 후기의 SOURCE_NOT_COMPLETED 409 계약). 기존 403 기대를 실제 409 + code 검증으로 갱신. 나머지 참여/권한/삭제/일정변경 HTTP 시나리오 PASS.

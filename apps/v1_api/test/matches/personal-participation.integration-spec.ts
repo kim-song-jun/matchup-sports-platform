@@ -335,6 +335,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     await end(id);
     await post(host, `/matches/${id}/complete`, await completionBody(id)).expect(409);
     expect(await db.v1MatchParticipant.findUnique({ where: { matchId_userId: { matchId: id, userId: member } } })).toMatchObject({ status: 'cancelled', completedAt: null });
-    await get(member, `/reviews/sources/match/${id}`).expect(403);
+    const review = await get(member, `/reviews/sources/match/${id}`).expect(409);
+    expect(review.body.code).toBe('SOURCE_NOT_COMPLETED');
   });
 });

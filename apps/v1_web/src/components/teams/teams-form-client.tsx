@@ -14,7 +14,7 @@ import { isTeamOperatorRole } from '@/lib/team-role';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { teamErrorMessage } from '@/lib/team-error-messages';
 import { labelToLevelCode } from '@/lib/v1-levels';
-import { toTeamRegionOptions } from '@/lib/v1-regions';
+import { formatProvinceWide, toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
 import { TeamDetailPageSkeleton, TeamFormPageView } from './teams-page';
 import type { TeamFormViewModel } from './teams.types';
@@ -394,7 +394,7 @@ function buildModel({
 
 function formatTeamRegionName(region?: { name: string; parentName?: string | null } | null) {
   if (!region) return null;
-  return region.parentName ? `${region.parentName} ${region.name}` : `${region.name} 전체`;
+  return region.parentName ? `${region.parentName} ${region.name}` : formatProvinceWide(region.name);
 }
 
 function toTeamRegionFallbackOption(region: { regionId: string; name: string; parentName?: string | null }) {
@@ -409,7 +409,7 @@ function toTeamRegionFallbackOption(region: { regionId: string; name: string; pa
 
   return {
     id: region.regionId,
-    name: `${region.name} 전체`,
+    name: formatProvinceWide(region.name),
     shortName: '전체',
     parentName: region.name,
   };

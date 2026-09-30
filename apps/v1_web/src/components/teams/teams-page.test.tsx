@@ -124,16 +124,11 @@ describe('TeamListPageView', () => {
     expect(screen.queryByText(/내 주변\s+\d+/)).not.toBeInTheDocument();
   });
 
-  it('renders team list cards from the explicit team fields without stale recruiting copy', () => {
+  function listOf(team: Partial<TeamListViewModel['teams'][number]>): TeamListViewModel {
     const base = getTeamListViewModel();
-    const model: TeamListViewModel = {
+    return {
       ...base,
-      summary: {
-        ...base.summary,
-        total: 1,
-        recruiting: 1,
-        nearby: undefined,
-      },
+      summary: { ...base.summary, total: 1, recruiting: 1, nearby: undefined },
       teams: [
         {
           id: 'team-live-1',
@@ -145,70 +140,40 @@ describe('TeamListPageView', () => {
           members: 7,
           capacity: 0,
           status: 'open',
-          statusLabel: '가입 신청 가능',
+          statusLabel: '가입 가능',
           tags: ['레벨 미설정'],
           genderRule: '성별 무관',
-          ownerName: '김도윤',
-          managerName: '박서준',
           intro: '짧은 소개',
           next: '수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ',
+          ...team,
         },
       ],
     };
+  }
 
-    render(<TeamListPageView model={model} />);
+  // G12(F19): 고르는 화면이라 한 줄씩만 — 활동 일정이 있으면 그 한 줄, 팀장 이름은 싣지 않는다.
+  it('목록 카드는 활동 일정 한 줄만 싣고 팀장 줄은 없다', () => {
+    render(<TeamListPageView model={listOf({})} />);
 
     expect(screen.getByText('라이브 팀')).toBeInTheDocument();
-    // 가입 가능은 목록에서 50/50 이 같은 값이라(alpha 실측 2026-09-07) 더는 쓰지 않는다 —
-    // 예외(가입 닫힘·정원 마감)만 배지로 알린다. 아래 별도 describe 에서 그 계약을 지킨다.
-    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
+    expect(screen.queryByText('가입 가능')).not.toBeInTheDocument();
     expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
-    expect(screen.getByText('짧은 소개')).toBeInTheDocument();
-    expect(screen.getByText('팀장 김도윤 · 감독 박서준')).toBeInTheDocument();
-    expect(screen.queryByText('가입 신청은 운영진 승인 후 확정돼요.')).not.toBeInTheDocument();
     expect(screen.getByText('수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ')).toBeInTheDocument();
-    expect(screen.queryByText('자세히 보기 ›')).not.toBeInTheDocument();
-    expect(screen.queryByText('팀 보기 ›')).not.toBeInTheDocument();
-    expect(screen.queryByText('알림받기')).not.toBeInTheDocument();
+    expect(screen.queryByText('짧은 소개')).not.toBeInTheDocument();
+    expect(screen.queryByText(/팀장|감독/)).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();
   });
 
-  it('shows only the owner line and no manager text when the team has no manager', () => {
-    const base = getTeamListViewModel();
-    const model: TeamListViewModel = {
-      ...base,
-      summary: {
-        ...base.summary,
-        total: 1,
-        recruiting: 1,
-        nearby: undefined,
-      },
-      teams: [
-        {
-          id: 'team-live-2',
-          name: '마포 농구 클럽',
-          logo: '마',
-          sport: '농구',
-          sports: ['농구'],
-          region: '서울 마포구',
-          members: 5,
-          capacity: 10,
-          status: 'open',
-          statusLabel: '가입 신청 가능',
-          tags: ['레벨 미설정'],
-          genderRule: '성별 무관',
-          ownerName: '이하나',
-          managerName: null,
-          intro: '',
-          next: '',
-        },
-      ],
-    };
+  it('활동 일정이 없으면 소개를 한 줄로 쓰고, 둘 다 없으면 줄을 그리지 않는다', () => {
+    const { container, rerender } = render(<TeamListPageView model={listOf({ next: '' })} />);
+    expect(screen.getByText('짧은 소개')).toBeInTheDocument();
 
-    render(<TeamListPageView model={model} />);
-
-    expect(screen.getByText('팀장 이하나')).toBeInTheDocument();
-    expect(screen.queryByText(/감독/)).not.toBeInTheDocument();
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TeamListPageView model={listOf({ next: '', intro: '' })} />
+      </QueryClientProvider>,
+    );
+    expect(container.querySelector('.tm-team-card-activity')).toBeNull();
   });
 });
 
@@ -925,22 +890,19 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(badge!.closest('[aria-hidden="true"]')).toBeNull();
   });
 
-  it("활동 일정이 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
-    const { container } = render(<TeamListPageView model={listWith({ next: '' })} />);
+  it("활동 일정·소개가 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
+    const { container } = render(<TeamListPageView model={listWith({ next: '', intro: '' })} />);
 
     expect(screen.queryByText('활동 일정 미정')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-team-card-activity')).toBeNull();
   });
 
-  it('FAB 가림 보호는 활동 줄이 없는 카드에도 걸린다 — 마지막 자식 기준이다', () => {
-    // 활동 줄에만 걸면 그 줄이 없는 카드는 마지막 줄(소개)이 FAB 에 가려진다(#1095 Copilot).
+  // G12(F96): 카드 마지막 자식에 FAB 몫 64px 를 비워 두면 소개·활동 줄이 없는 카드는 팀 이름이
+  // 그만큼 좁아져 줄바꿈된다. 목록 아래 여백이 FAB 를 비키므로 카드 안에서는 비우지 않는다.
+  it('팀 카드 안에 FAB 몫의 오른쪽 여백을 비워 두지 않는다', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-    const block = css.match(/@media \(max-width: 767px\) \{\s*\.tm-team-list \.tm-team-card > :last-child \{[^}]*\}/);
 
-    expect(block).not.toBeNull();
-    expect(block![0]).toContain('padding-right: 64px');
-    // 예전처럼 활동 줄만 겨냥하는 규칙이 남아 있으면 의도가 반쯤만 지켜진다.
-    expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
+    expect(css).not.toMatch(/\.tm-team-card[^{]*>\s*:last-child\s*\{[^}]*padding-right/);
   });
 
   /**
@@ -980,19 +942,18 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(tagRule).not.toMatch(/max-width:\s*62%/);
   });
 
-  it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {
+  it('소개가 없으면 지역·종목을 문장으로 되풀이하지 않는다', () => {
     // 예전 폴백 `{지역}에서 활동하는 {종목} 팀이에요.` 는 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)
     // 과 같은 말이라 정보가 되지 않았다. alpha 50팀 중 25팀이 그 문장을 보여주고 있었다.
-    const { container } = render(<TeamListPageView model={listWith({ intro: '' })} />);
+    render(<TeamListPageView model={listWith({ intro: '', next: '' })} />);
 
-    expect(container.querySelector('.tm-team-intro-box')).toBeNull();
     expect(screen.queryByText(/에서 활동하는 .+ 팀이에요\./)).not.toBeInTheDocument();
   });
 
-  it('소개가 있으면 그대로 쓴다', () => {
-    const { container } = render(<TeamListPageView model={listWith({ intro: '매주 토요일에 모여요' })} />);
+  it('활동 일정이 없고 소개가 있으면 소개를 한 줄로 쓴다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ intro: '매주 토요일에 모여요', next: '' })} />);
 
-    expect(container.querySelector('.tm-team-intro-box')?.textContent).toContain('매주 토요일에 모여요');
+    expect(container.querySelector('.tm-team-card-activity')?.textContent).toBe('매주 토요일에 모여요');
   });
 
   it('활동 일정이 있으면 그대로 한 줄로 쓴다', () => {

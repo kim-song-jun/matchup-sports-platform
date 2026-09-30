@@ -3430,6 +3430,19 @@ label.tm-btn:focus-within {
   z-index: var(--z-floating);
 }
 
+/* 글자가 붙은 FAB — 아이콘만으로는 뜻이 약한 첫 진입점(팀 만들기)에 쓴다. */
+.tm-floating-fab-extended {
+  width: auto;
+  height: 48px;
+  padding: 0 20px 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .tm-create-fixed-cta {
   padding-top: 12px;
 }
@@ -4407,7 +4420,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-team-card-stack {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   margin-top: 16px;
 }
 
@@ -4422,6 +4435,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: inherit;
   text-decoration: none;
   padding: 16px;
+}
+
+/* 목록 카드는 로고 54 + 세 줄로 98px 를 맞춘다(390 에서 화면당 5장, F19). */
+.tm-team-card-compact {
+  padding: 12px 16px;
 }
 
 .tm-team-card:active {
@@ -4564,21 +4582,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 .tm-team-form-chip-row .tm-chip {
   /* a11y: min-height 44px 유지 (base .tm-chip 상속) — padding만 축소해 밀도 조정 */
   padding: 0 12px;
-}
-
-/* 카드 마지막 줄이 플로팅 FAB 아래로 들어간다 — 예전 액션 행에 주던 여백을 물려준다.
-   활동 줄은 값이 있을 때만 그려지므로 그 클래스에 걸면 없는 카드가 무방비가 된다
-   (#1095 Copilot). 무엇이 마지막이든 보호되도록 카드의 마지막 자식에 건다. */
-@media (max-width: 767px) {
-  .tm-team-list .tm-team-card > :last-child {
-    padding-right: 64px;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1023px) {
-  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) > :last-child {
-    padding-right: 64px;
-  }
 }
 
 .tm-member-section {

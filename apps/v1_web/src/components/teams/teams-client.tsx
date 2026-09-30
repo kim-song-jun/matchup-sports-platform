@@ -119,7 +119,7 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   // 다만 이 폴백은 **렌더를 막지는 않았다** — 카드는 목록 응답만으로 그려지므로 탭 전환은
   // MutationObserver 기준 346ms 로 이미 빨랐다. 지우는 이유는 체감 속도가 아니라 아무 값도
   // 얻지 못하는 요청 44회 자체다(서버 부하·모바일 데이터·배터리).
-  const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
+  const visibleTeams = visibleItems.map((item) => toTeam(item));
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
@@ -836,7 +836,7 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
   const regionName = formatTeamRegion(team.region);
   const genderRule = team.profile.genderRule ?? '';
   // 목업(teams.view-model.ts)을 fallback 으로 받지 않는다. `...fallback` 스프레드는 여기서
-  // 덮어쓰지 않은 칸(next/ownerName/managerName)에 **다른(가짜) 팀의 값**을 그대로 남겼고,
+  // 덮어쓰지 않은 칸(next 등)에 **다른(가짜) 팀의 값**을 그대로 남겼고,
   // 그 결과 어느 팀 상세를 열어도 "오늘 21:00 정기전"·"주 1회 정기적으로 풋살을 즐기는
   // 동네 팀이에요"가 보였다. 목록 매퍼(toTeam)는 이미 목업 없이 API 값만으로 같은 모델을
   // 만들고 있어, 상세도 그 규칙을 그대로 따른다 — 화면은 빈 값을 이미 처리한다
@@ -855,7 +855,6 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
     status: team.profile.joinPolicy === 'closed' || full ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
     statusLabel: recruitmentLabel,
     genderRule,
-    ownerName: team.owner?.displayName,
     intro: team.profile.introduction ?? `${regionName}에서 활동하는 ${team.sport.name} 팀이에요.`,
     tags: [levelLabel, genderRule].filter(Boolean),
     next: team.profile.activitySummary ?? team.profile.activityAreaText ?? '',

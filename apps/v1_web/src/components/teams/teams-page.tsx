@@ -82,7 +82,8 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
   // RouteChromeConfig엔 floatingSlot 필드가 없다(정적 테이블은 ReactNode를 못 담는다,
   // 설계 문서 §1.3) — FAB이 고정 JSX라도 항상 override로 옮긴다.
   useShellOverride({
-    floatingSlot: <Link className="tm-floating-fab tm-hide-desktop" href="/teams/new" aria-label="팀 만들기"><PlusIcon size={26} strokeWidth={2.3} /></Link>,
+    // 팀이 없는 새 사용자에게 "+" 만으로는 진입점이 약하다 — 글자를 함께 쓴다(F21).
+    floatingSlot: <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
   });
   return (
     <>
@@ -161,7 +162,7 @@ function TeamListSkeleton() {
   return (
     <div className="tm-team-card-stack" aria-busy="true" aria-label="팀 목록 불러오는 중">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 'var(--radius-container)' }} aria-hidden="true" />
+        <div key={i} className="tm-review-skeleton" style={{ height: 98, borderRadius: 'var(--radius-container)' }} aria-hidden="true" />
       ))}
     </div>
   );
@@ -1780,27 +1781,20 @@ function formatInvitationDate(value: string) {
   return new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit' }).format(date);
 }
 
+/** 고르는 화면의 카드라 한 줄씩만 쓴다(390 에서 5장). 팀장 이름은 비교 축이 아니라 팀 상세에서 본다. */
 function TeamCard({ team }: { team: TeamModel }) {
-  const hasIntro = team.intro.trim().length > 0;
-  const activity = team.next.trim();
+  // 활동 일정과 소개 중 한 줄만 — 둘 다 없으면 줄 자체를 그리지 않는다.
+  const extraLine = team.next.trim() || team.intro.trim();
   const memberCapacity = formatMemberCapacity(team);
-  const leaderLine = formatTeamLeaderLine(team);
 
   return (
-    <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        {/* size="xl"(72px) — 팀장/감독 줄 + 배지 줄까지 늘어난 헤더 텍스트 블록(4줄) 옆에서
-            기존 60px가 텍스트 스택 대비 작아 보이던 것을 보완(실측: 배지 하단까지 잔여 gap
-            40px→28px). 헤더 블록이 더 길어져도 아바타는 top-align만 유지하고 픽셀 단위로
-            높이를 맞추지는 않는다. */}
-        <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
+    <Link className="tm-team-card tm-team-card-compact tm-pressable" href={`/teams/${team.id}`}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-body-lg line-clamp-2">{team.name}</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div>
-          {leaderLine ? (
-            <div className="tm-text-caption line-clamp-1" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{leaderLine}</div>
-          ) : null}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <div className="tm-text-body-lg line-clamp-1">{team.name}</div>
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
             {/* 레벨 태그는 서버가 자유 텍스트로 준다 — 길면 형제 배지를 다음 줄로 밀어낼 수
                 있다(flexWrap:'wrap'). 형제와 나눈 고정 %(예전 62%)로 잘라 한 줄을 지키던
                 예전 방식은 카드 폭이 좁아지는 768(2열 그리드)에서 "입문-고수" 같은 짧은 값까지
@@ -1823,27 +1817,11 @@ function TeamCard({ team }: { team: TeamModel }) {
               </span>
             ) : null}
           </div>
+          {extraLine ? <div className="tm-text-caption tm-team-card-activity line-clamp-1" style={{ marginTop: 6 }}>{extraLine}</div> : null}
         </div>
       </div>
-      {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
-      {hasIntro ? (
-        <div className="tm-team-intro-box">
-          <div className="tm-text-body line-clamp-3" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
-        </div>
-      ) : null}
-      {/* 활동 일정도 **있을 때만** 쓴다. 없을 때 '활동 일정 미정' 으로 채우면 '가입 신청 가능'
-          과 같은 종류의 빈 줄이 된다 — 모르는 것을 문장으로 만들지 않는다. */}
-      {activity ? (
-        <div className="tm-text-caption tm-team-card-activity line-clamp-1">{activity}</div>
-      ) : null}
     </Link>
   );
-}
-
-/** "팀장 {이름}" + (감독이 있으면) "· 감독 {이름}" — 팀장이 없는(폴백/구버전) 데이터에는 빈 문자열. */
-function formatTeamLeaderLine(team: Pick<TeamModel, 'ownerName' | 'managerName'>) {
-  if (!team.ownerName) return '';
-  return team.managerName ? `팀장 ${team.ownerName} · 감독 ${team.managerName}` : `팀장 ${team.ownerName}`;
 }
 
 function formatMemberCapacity(team: Pick<TeamModel, 'members' | 'capacity'>) {

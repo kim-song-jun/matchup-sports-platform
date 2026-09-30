@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmModal } from './confirm-modal';
@@ -107,5 +107,77 @@ describe('ConfirmModal reason field', () => {
     expect(screen.getByRole('button', { name: '일정 취소' })).toBeDisabled();
     expect(screen.getByRole('textbox', { name: '취소 사유' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('일정을 취소하지 못했어요.');
+  });
+});
+
+describe('ConfirmModal focus after a failed request', () => {
+  function FailingHost({ request }: { request: () => Promise<void> }) {
+    const [reason, setReason] = useState('우천 취소');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    return (
+      <ConfirmModal
+        open
+        title="일정을 취소할까요?"
+        message="되돌릴 수 없어요."
+        confirmLabel="일정 취소"
+        tone="danger"
+        reasonField={{ label: '취소 사유', value: reason, onChange: setReason, required: true }}
+        busy={busy}
+        error={error}
+        onConfirm={() => {
+          setBusy(true);
+          request().catch(() => {
+            setBusy(false);
+            setError('일정을 취소하지 못했어요.');
+          });
+        }}
+        onCancel={() => undefined}
+      />
+    );
+  }
+
+  function failingRequest() {
+    let reject = () => undefined as void;
+    const promise = new Promise<void>((_, rejectPromise) => {
+      reject = () => rejectPromise(new Error('500'));
+    });
+    return { promise, reject };
+  }
+
+  async function submitAndLock({ focusDroppedToBody }: { focusDroppedToBody: boolean }) {
+    const input = screen.getByRole('textbox', { name: '취소 사유' });
+    await waitFor(() => expect(input).toHaveFocus()); // 열릴 때의 60ms 초기 포커스가 끝난 뒤부터 잰다
+    const confirmButton = screen.getByRole('button', { name: '일정 취소' });
+    confirmButton.focus();
+    // Chrome 은 disabled 가 된 컨트롤의 포커스를 body 로 옮긴다(focus fixup). jsdom 은 그러지 않고
+    // disabled 요소의 blur() 도 무시하므로, 잠기기 직전에 body 로 떨어뜨려 같은 상태를 만든다.
+    if (focusDroppedToBody) confirmButton.blur();
+    fireEvent.click(confirmButton);
+    expect(confirmButton).toBeDisabled();
+    return { input, confirmButton };
+  }
+
+  it('returns focus to the reason field when the lock had dropped it to body', async () => {
+    const request = failingRequest();
+    render(<FailingHost request={() => request.promise} />);
+    const { input } = await submitAndLock({ focusDroppedToBody: true });
+    expect(document.activeElement).toBe(document.body);
+
+    await act(async () => request.reject());
+
+    expect(screen.getByRole('alert')).toHaveTextContent('일정을 취소하지 못했어요.');
+    expect(input).toHaveFocus();
+  });
+
+  it('leaves focus where it is when it never left the dialog', async () => {
+    const request = failingRequest();
+    render(<FailingHost request={() => request.promise} />);
+    const { confirmButton } = await submitAndLock({ focusDroppedToBody: false });
+
+    await act(async () => request.reject());
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(confirmButton).toHaveFocus();
   });
 });

@@ -21,6 +21,12 @@ describe('홈 통계', () => {
     expect(stats.monthlyActivitySub).not.toBe('지난달보다 +3');
   });
 
+  it('이번 달 경기의 부제는 대기 중인 신청이 있으면 그 건수, 없으면 무엇을 더한 숫자인지다', () => {
+    const summary = { monthlyMatches: 2, mannerScore: null, trustState: 'none' };
+    expect(model({ summary: { ...summary, pendingLabel: '대기 중인 신청 1건' } }).stats.monthlyActivitySub).toBe('대기 중인 신청 1건');
+    expect(model({ summary: { ...summary, pendingLabel: null } }).stats.monthlyActivitySub).toBe('매치·팀 경기·대회 합산');
+  });
+
   it('summary 가 오면 일곱 칸을 모두 그 값에서 만든다 — 목업이 섞이지 않는다', () => {
     const stats = model({
       // trustState 는 서버가 'verified' | 'estimated' 만 의미 있게 내려준다(그 외는 '-').

@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { PopupsService } from '../popups/popups.service';
+import { countMonthlyGames } from '../profile/activity-counts';
+import { HomeTeamActivityService } from './home-team-activity.service';
 import { HomeQueryDto, HomeRecommendationsQueryDto } from './dto/home-query.dto';
 
 @Injectable()
@@ -10,10 +12,11 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly popupsService: PopupsService,
+    private readonly teamActivityService: HomeTeamActivityService,
   ) {}
 
   async getHome(user: V1AuthUser | null, query: HomeQueryDto) {
-    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute] =
+    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute, teamActivity] =
       await Promise.all([
         this.getViewer(user),
         this.getSummary(user),
@@ -22,6 +25,7 @@ export class HomeService {
         this.getRecentNotices(),
         this.getUnreadCount(user),
         this.getMyTeamRoute(user),
+        this.teamActivityService.forUser(user),
       ]);
 
     const featured = recommendations[0] ?? null;
@@ -29,6 +33,7 @@ export class HomeService {
     return {
       viewer,
       summary,
+      teamActivity,
       featuredMatch: featured
         ? {
             matchId: featured.matchId,
@@ -109,26 +114,9 @@ export class HomeService {
       };
     }
 
-    const monthStart = new Date();
-    monthStart.setUTCDate(1);
-    monthStart.setUTCHours(0, 0, 0, 0);
-
     const [monthlyMatches, reputation, pendingApplications] = await Promise.all([
-      this.prisma.v1MatchParticipant.count({
-        where: {
-          userId: user.id,
-          status: { in: ['active', 'completed'] },
-          // 참가자 row 의 상태만 보면 안 된다 — 매치 자체의 상태도 함께 건다.
-          // matches.service.ts 의 cancel() 은 참가자 row 를 `role: 'participant'` 인 것만
-          // cancelled 로 바꾸므로 **호스트 자신의 row(role: 'host')는 active 로 남는다.**
-          // 그래서 자기가 만들었다 취소한 매치가 "이번 달 활동"에 계속 잡혔다
-          // (2026-09-07 alpha 실측: 매치 3건 생성 → 전량 취소했는데 8 → 11 로 오른 값이
-          // 취소 후에도 11 그대로. 정확히 +3 일치).
-          // profile.service.ts 의 같은 계열 count 4곳은 이미 match.status·deletedAt 을
-          // 함께 걸고 있었다 — 이 한 곳만 빠져 있었다.
-          match: { startAt: { gte: monthStart }, status: { not: 'cancelled' }, deletedAt: null },
-        },
-      }),
+      // 마이 "이번 달 경기"와 같은 집계 함수다(F85) — 홈에서 조건을 따로 두면 두 화면 숫자가 다시 갈린다.
+      countMonthlyGames(this.prisma, user.id, new Date()),
       this.prisma.v1UserReputationSummary.findUnique({
         where: { userId: user.id },
         select: { mannerScore: true, trustState: true },

@@ -109,6 +109,8 @@ export type NotificationEventType =
   // 대회 경기는 targetType 'tournament' + "${tournamentId}:${teamMatchId}", 나머지는 'team_match' + teamMatchId.
   | 'game_day_before_reminder'
   | 'game_kickoff_reminder'
+  // 친선 참석명단에 오른 선수에게(H1-lineup-included). 발송은 워커(jobs/lineup-reminders)가 outbox 로 받아 쓴다.
+  | 'team_match_lineup_included'
   // 내 기록 연결(claim) 승인 요청 (2026-08-26, attest UI C안): 신청이 들어오면 확인자
   // 후보에게 알린다 — 요청이 24시간 뒤 만료되는데 알림 없이는 확인자가 신청 사실
   // 자체를 알 수 없었다. 소스별로 딥링크·게이트가 달라 두 타입으로 나눈다.
@@ -245,6 +247,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_team_match_completed' ||
     type === 'game_day_before_reminder' ||
     type === 'game_kickoff_reminder' ||
+    type === 'team_match_lineup_included' ||
     type === 'team_match_identity_attest_requested' ||
     type === 'team_match_identity_attest_expired' ||
     type === 'team_match_identity_attest_approved' ||
@@ -583,6 +586,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   // 발송 경로가 앞에 "9/30 (수) 01:10 " 을 붙인다 — 자정을 넘긴 경기가 "내일"로 읽히지 않게 날짜를 쓴다.
   game_day_before_reminder: '경기가 있어요',
   game_kickoff_reminder: '2시간 뒤 경기가 시작돼요',
+  team_match_lineup_included: '참석명단에 올랐어요',
   team_match_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   tournament_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   team_match_identity_attest_expired: '기록 연결 요청이 만료됐어요',
@@ -656,6 +660,8 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   // 두 경기 전 알림의 본문 끝 문장이다 — 발송 경로가 "vs 상대 · 장소." 뒤에 붙인다.
   game_day_before_reminder: '출전 명단은 경기 전까지 바뀔 수 있어요.',
   game_kickoff_reminder: '지금 출전 명단에 있어요.',
+  // matchup = "vs 상대팀 · 일시 · 장소"(장소는 있을 때만) — 발송 경로가 조립한다.
+  team_match_lineup_included: '"{team}" · {matchup}',
   team_match_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   team_match_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',

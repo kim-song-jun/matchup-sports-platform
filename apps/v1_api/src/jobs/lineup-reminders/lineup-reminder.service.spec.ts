@@ -405,4 +405,131 @@ describe('LineupReminderService', () => {
       expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
     });
   });
+
+  describe('Task 180 H1-lineup-included: 참석명단에 오른 선수에게 한 번', () => {
+    // 지금 = KST 8/27 11:00(beforeEach). 킥오프 = KST 9/1 (화) 19:00.
+    const KICKOFF = new Date('2026-09-01T10:00:00Z');
+    const match = {
+      id: 'tm-f',
+      startAt: KICKOFF,
+      placeName: '망원 풋살장',
+      hostTeamId: 'team-home',
+      hostTeam: { name: '성수 FC' },
+      approvedApplicantTeam: { name: '망원 FC' },
+    };
+
+    function includedTx(options: {
+      lineupState?: string;
+      startAt?: Date;
+      listed?: string[];
+      activeMembers?: string[];
+      existingKeys?: string[];
+      matchFound?: boolean;
+    }) {
+      const existing = new Set(options.existingKeys ?? []);
+      const activeMembers = options.activeMembers ?? options.listed ?? [];
+      return {
+        v1GameLineup: { findUnique: jest.fn().mockResolvedValue({ id: 'lineup-2', gameId: 'game-f', sideId: 'side-home', state: options.lineupState ?? 'SUBMITTED', invalidatedAt: null }) },
+        v1GameSide: { findUnique: jest.fn().mockResolvedValue({ teamId: 'team-home' }) },
+        v1TeamMatch: { findFirst: jest.fn().mockResolvedValue(options.matchFound === false ? null : { ...match, startAt: options.startAt ?? KICKOFF }) },
+        v1GameParticipant: { findMany: jest.fn().mockResolvedValue([...(options.listed ?? []), null].map((userId) => ({ userId })).filter((row) => row.userId !== null)) },
+        v1TeamMembership: {
+          // 명단의 모든 사람이 멤버십 행을 갖고, activeMembers 밖은 'left' 다 — status 조건을 빼면 탈퇴자가 섞인다.
+          findMany: jest.fn(({ where }: { where: { status?: string; userId: { in: string[] } } }) =>
+            Promise.resolve(
+              where.userId.in
+                .filter((userId) => where.status === undefined || (where.status === 'active') === activeMembers.includes(userId))
+                .map((userId) => ({ userId })),
+            ),
+          ),
+        },
+        v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
+        v1Notification: {
+          findMany: jest.fn(({ where }: { where: { businessKey: { in: string[] } } }) =>
+            Promise.resolve(where.businessKey.in.filter((key) => existing.has(key)).map((businessKey) => ({ businessKey }))),
+          ),
+          createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+    }
+    const includedClaim = () => ({ ...fakeClaim(), type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION', payload: { lineupId: 'lineup-2' }, afterCommit: undefined });
+    function run(tx: ReturnType<typeof includedTx>) {
+      const webPush = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+      const service = new LineupReminderService({} as never, fakePrisma().prisma as never, webPush as never);
+      return { webPush, done: service.lineupIncludedHandler(includedClaim() as never, tx as never) };
+    }
+    const rowsOf = (tx: ReturnType<typeof includedTx>) =>
+      tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data) as Array<Record<string, string>>;
+    const kickoffKey = (userId: string, startAt = KICKOFF) => `game-kickoff:game-f:${startAt.getTime()}:${userId}`;
+
+    it('명단에 오른 지금의 팀원만 받고(탈퇴자 제외) 우리 팀·상대·일시·장소를 싣는다', async () => {
+      const tx = includedTx({ listed: ['p1', 'p2', 'left-member'], activeMembers: ['p1', 'p2'] });
+      const { webPush, done } = run(tx);
+      await done;
+
+      expect(rowsOf(tx).map((row) => [row.recipientUserId, row.businessKey])).toEqual([
+        ['p1', 'lineup-included:game-f:p1'],
+        ['p2', 'lineup-included:game-f:p2'],
+      ]);
+      expect(rowsOf(tx)[0]).toMatchObject({
+        targetType: 'team_match',
+        targetId: 'tm-f',
+        title: '참석명단에 올랐어요',
+        body: '"성수 FC" · vs 망원 FC · 9/1 (화) 19:00 · 망원 풋살장',
+        deepLink: '/team-matches/tm-f',
+      });
+      expect(webPush.sendToUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('다시 제출하면 새로 오른 사람만 받는다 — 이미 받은 사람에게 두 번 가지 않는다', async () => {
+      const tx = includedTx({ listed: ['p1', 'p3'], existingKeys: ['lineup-included:game-f:p1'] });
+      const { done } = run(tx);
+      await done;
+
+      expect(rowsOf(tx).map((row) => row.recipientUserId)).toEqual(['p3']);
+    });
+
+    it('킥오프 2시간 안에 제출하면 킥오프 알림의 키로 써서 뒤이은 킥오프 알림과 한 건으로 합친다', async () => {
+      const soon = new Date('2026-08-27T03:30:00Z'); // KST 12:30 — 1시간 30분 뒤
+      const tx = includedTx({ listed: ['p1'], startAt: soon });
+      await run(tx).done;
+
+      expect(rowsOf(tx).map((row) => row.businessKey)).toEqual([kickoffKey('p1', soon)]);
+    });
+
+    it('킥오프 알림을 이미 받은 사람(명단이 다시 열렸다 제출됨)은 건너뛴다', async () => {
+      const soon = new Date('2026-08-27T03:30:00Z');
+      const tx = includedTx({ listed: ['p1', 'p2'], startAt: soon, existingKeys: [kickoffKey('p2', soon)] });
+      await run(tx).done;
+
+      expect(rowsOf(tx).map((row) => row.recipientUserId)).toEqual(['p1']);
+    });
+
+    it('밤에는 알림함에만 남기고, 그 밤이 끝나기 전에 시작하는 경기만 푸시한다', async () => {
+      jest.setSystemTime(new Date('2026-08-27T14:00:00Z')); // KST 23:00
+      const laterTx = includedTx({ listed: ['p1'] }); // 9/1 19:00
+      const later = run(laterTx);
+      await later.done;
+      expect(rowsOf(laterTx)).toHaveLength(1);
+      expect(later.webPush.sendToUser).not.toHaveBeenCalled();
+
+      const earlyTx = includedTx({ listed: ['p1'], startAt: new Date('2026-08-27T16:10:00Z') }); // KST 01:10
+      const early = run(earlyTx);
+      await early.done;
+      expect(early.webPush.sendToUser).toHaveBeenCalledWith('p1', expect.objectContaining({ title: '참석명단에 올랐어요' }));
+    });
+
+    it('초안이거나 친선 매치가 아니면(리그·대회·취소) 보내지 않는다', async () => {
+      const draftTx = includedTx({ listed: ['p1'], lineupState: 'DRAFT' });
+      await run(draftTx).done;
+      const noMatchTx = includedTx({ listed: ['p1'], matchFound: false });
+      await run(noMatchTx).done;
+
+      expect(draftTx.v1Notification.createMany).not.toHaveBeenCalled();
+      expect(noMatchTx.v1Notification.createMany).not.toHaveBeenCalled();
+      expect(noMatchTx.v1TeamMatch.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ leagueId: null, tournamentId: null, status: 'matched' }) }),
+      );
+    });
+  });
 });

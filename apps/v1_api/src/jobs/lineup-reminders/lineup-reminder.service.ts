@@ -4,8 +4,15 @@ import type { CompetitionRosterCheck, LineupTodo, LineupTodoService } from '../.
 import type { WebPushService } from '../../notifications/web-push.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
-import { collectAttendeeReminderRows, type ReminderRow } from './game-attendee-reminders';
-import { isQuietHour, kstMidnight, kstParts } from '../../common/quiet-hours';
+import {
+  collectAttendeeReminderRows,
+  KICKOFF_REMINDER_LEAD_MS,
+  kickoffReminderKey,
+  type ReminderRow,
+} from './game-attendee-reminders';
+import { formatKstMonthDayTime } from '../../common/kst-datetime';
+import { isQuietHour, kstMidnight, kstParts, nightPushAllowed } from '../../common/quiet-hours';
+import { notificationCopyFor } from '../../notifications/notifications.service';
 
 const deliveryLogger = new Logger('LineupReminderDelivery');
 
@@ -123,6 +130,81 @@ export class LineupReminderService {
     }));
     await deliverReminderRows(tx, rows, { prefField: 'teamEnabled', webPush: this.webPush, claim });
   }
+
+  /**
+   * 친선 참석명단 제출(H1-lineup-included) — 제출된 리비전의 선수 중 지금도 팀 활성 멤버인 사람에게 '참석명단에 올랐어요'.
+   * 경기·사람당 한 번이라 다시 제출하면 새로 오른 사람만 받고, 빠진 사람에게는 보내지 않는다. 킥오프 2시간 안의
+   * 제출은 킥오프 알림의 키로 써서 뒤이은 스캔이 같은 사람에게 킥오프 알림을 또 보내지 않는다(한 건만).
+   */
+  readonly lineupIncludedHandler: GameOperationHandler = async (claim, tx) => {
+    const lineupId = lineupIdOf(claim.payload);
+    const lineup = await tx.v1GameLineup.findUnique({
+      where: { id: lineupId },
+      select: { id: true, gameId: true, sideId: true, state: true, invalidatedAt: true },
+    });
+    if (lineup === null || lineup.state === 'DRAFT' || lineup.invalidatedAt !== null) return;
+    const side = await tx.v1GameSide.findUnique({ where: { id: lineup.sideId }, select: { teamId: true } });
+    const match = await tx.v1TeamMatch.findFirst({
+      where: { game: { is: { id: lineup.gameId } }, status: 'matched', deletedAt: null, leagueId: null, tournamentId: null },
+      select: {
+        id: true,
+        startAt: true,
+        placeName: true,
+        hostTeamId: true,
+        hostTeam: { select: { name: true } },
+        approvedApplicantTeam: { select: { name: true } },
+      },
+    });
+    const teamId = side?.teamId ?? null;
+    if (match === null || match.startAt === null || teamId === null || match.hostTeam === null || match.approvedApplicantTeam === null) return;
+    const [ownTeam, opponent] = teamId === match.hostTeamId ? [match.hostTeam, match.approvedApplicantTeam] : [match.approvedApplicantTeam, match.hostTeam];
+
+    const listed = await tx.v1GameParticipant.findMany({ where: { lineupId, userId: { not: null } }, select: { userId: true } });
+    const members = await tx.v1TeamMembership.findMany({
+      where: { teamId, status: 'active', userId: { in: listed.flatMap((row) => (row.userId === null ? [] : [row.userId])) } },
+      select: { userId: true },
+    });
+    const now = new Date();
+    const startAt = match.startAt;
+    const includedKey = (userId: string) => `lineup-included:${lineup.gameId}:${userId}`;
+    const alreadyNotified = new Set(
+      (
+        await tx.v1Notification.findMany({
+          where: { businessKey: { in: members.flatMap(({ userId }) => [includedKey(userId), kickoffReminderKey(lineup.gameId, startAt, userId)]) } },
+          select: { businessKey: true },
+        })
+      ).map((row) => row.businessKey),
+    );
+    const withinKickoffLead = now.getTime() >= startAt.getTime() - KICKOFF_REMINDER_LEAD_MS;
+    const place = match.placeName === null ? '' : ` · ${match.placeName}`;
+    const copy = notificationCopyFor('team_match_lineup_included', 'team_match', match.id, {
+      team: ownTeam.name,
+      matchup: `vs ${opponent.name} · ${formatKstMonthDayTime(startAt)}${place}`,
+    });
+    const rows: ReminderRow[] = members
+      .filter(({ userId }) => !alreadyNotified.has(includedKey(userId)) && !alreadyNotified.has(kickoffReminderKey(lineup.gameId, startAt, userId)))
+      .map(({ userId }) => ({
+        userId,
+        targetType: 'team_match',
+        targetId: match.id,
+        title: copy.title,
+        body: copy.defaultBody,
+        deepLink: copy.deepLink,
+        businessKey: withinKickoffLead ? kickoffReminderKey(lineup.gameId, startAt, userId) : includedKey(userId),
+      }));
+    await deliverReminderRows(tx, rows, {
+      prefField: 'teamMatchEnabled',
+      webPush: this.webPush,
+      claim,
+      push: nightPushAllowed(now, startAt),
+    });
+  };
+}
+
+function lineupIdOf(payload: unknown): string {
+  const lineupId = typeof payload === 'object' && payload !== null ? (payload as { lineupId?: unknown }).lineupId : undefined;
+  if (typeof lineupId !== 'string' || lineupId.length === 0) throw new Error('Lineup included notice payload requires lineupId');
+  return lineupId;
 }
 
 /**
@@ -134,7 +216,7 @@ export class LineupReminderService {
 export async function deliverReminderRows(
   tx: Prisma.TransactionClient,
   rows: readonly ReminderRow[],
-  options: { prefField: 'teamEnabled' | 'teamMatchEnabled'; webPush?: WebPushService; claim?: GameOperationClaim },
+  options: { prefField: 'teamEnabled' | 'teamMatchEnabled'; webPush?: WebPushService; claim?: GameOperationClaim; push?: boolean },
 ): Promise<void> {
   if (rows.length === 0) return;
   const preferences = await tx.v1NotificationPreference.findMany({
@@ -164,6 +246,8 @@ export async function deliverReminderRows(
     skipDuplicates: true,
   });
 
+  // push=false 는 밤에 보류한 알림 — 알림함 행은 위에서 이미 남겼다(H1-night).
+  if (options.push === false) return;
   for (const row of enabled.filter((candidate) => !deliveredKeys.has(candidate.businessKey))) {
     const send = () =>
       void options.webPush

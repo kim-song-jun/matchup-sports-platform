@@ -33,6 +33,28 @@ import {
 
 type Transaction = Prisma.TransactionClient;
 
+/** 친선 참석명단 제출 알림(Task 180 H1-lineup-included) outbox 종류 — 워커의 LineupReminderService 가 받는다. */
+export const LINEUP_INCLUDED_NOTIFICATION_TYPE = 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION';
+
+/**
+ * 제출된 참석명단 리비전의 선수에게 '참석명단에 올랐어요'를 보내도록 같은 트랜잭션에 outbox 행을 넣는다.
+ * 명단에 선수를 새로 올리는 경로(다시 제출 등)는 모두 이걸 불러야 한다 — 이미 받은 사람은 워커가 거른다.
+ */
+export async function enqueueLineupIncludedNotice(tx: Transaction, lineupId: string): Promise<void> {
+  await tx.v1OutboxEvent.createMany({
+    data: [
+      {
+        businessKey: `team-match-lineup-included:${lineupId}`,
+        aggregateType: 'V1_GAME_LINEUP',
+        aggregateId: lineupId,
+        type: LINEUP_INCLUDED_NOTIFICATION_TYPE,
+        payload: { lineupId },
+      },
+    ],
+    skipDuplicates: true,
+  });
+}
+
 /**
  * 선발 골키퍼를 표시하는 `V1GameParticipant.position` 센티널.
  * (`V1GameResultParticipant.goalkeeper` 가 암묵적으로 따르던 관례와 같다.)
@@ -326,6 +348,7 @@ export class TeamMatchLineupService {
             context.gameId,
             context.startAt,
           );
+          await enqueueLineupIncludedNotice(tx, submitted.id);
           return {
             teamMatchId,
             gameId: context.gameId,

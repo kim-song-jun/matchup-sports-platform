@@ -198,6 +198,11 @@ export function isKickoffReminderDue(startAt: Date, now: Date): boolean {
   return !isQuietHour(new Date(startAt.getTime() - KICKOFF_REMINDER_LEAD_MS));
 }
 
+/** 킥오프 2시간 전 알림의 멱등 키. 참석명단 포함 알림(H1-lineup-included)이 2시간 안에 제출되면 이 키를 대신 써서 한 건만 가게 한다. */
+export function kickoffReminderKey(gameId: string, startAt: Date, userId: string): string {
+  return `game-kickoff:${gameId}:${startAt.getTime()}:${userId}`;
+}
+
 /**
  * 킥오프 2시간 전 — 출전자와 팀장·매니저. 출전자에게만 "지금 출전 명단에 있어요."를 붙인다.
  * 두 알림 모두 제목·본문에 시각이 박히므로 멱등 키에 킥오프 시각을 넣는다 — 경기를 옮기면 새 시각으로 다시 보낸다.
@@ -215,7 +220,7 @@ export function buildKickoffReminderRows(side: ReminderGameSide, audience: SideA
     title: copy.title,
     body: attendees.has(userId) ? `${lead} ${copy.defaultBody}` : lead,
     deepLink: copy.deepLink,
-    businessKey: `game-kickoff:${side.gameId}:${side.startAt.getTime()}:${userId}`,
+    businessKey: kickoffReminderKey(side.gameId, side.startAt, userId),
   }));
 }
 

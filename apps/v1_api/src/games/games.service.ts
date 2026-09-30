@@ -5842,7 +5842,17 @@ export class GamesService {
       // 생긴다. 팀 owner/manager 라도 예외 없이 거부한다.
       throw this.forbidden();
     }
-    const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
+    // role 과 teamId 는 **같은 멤버십**에서 나와야 한다. 따로 고르면(role 은 호스트 ?? 상대 매니저, teamId 는
+    // 호스트 ?? 상대 멤버십) 한쪽 팀의 일반 멤버이면서 다른 쪽 팀의 매니저인 사용자가 매니저 권한은 상대팀에서
+    // 받고 teamId 는 자기가 매니저가 아닌 호스트팀으로 나와, teamId 로 사이드를 고르는 곳에서 반대편을 다룬다.
+    const grantingMembership =
+      managerRole(hostMembership) !== null
+        ? hostMembership
+        : managerRole(opponentMembership) !== null
+          ? opponentMembership
+          : undefined;
+    const role = managerRole(grantingMembership);
+    const actorTeamId = grantingMembership?.teamId ?? hostMembership?.teamId ?? opponentMembership?.teamId;
     // `participant_identity` (Task 14 identity-link/consent mutations) is
     // deliberately as permissive as `read` here: the actor only needs to be
     // an active member of one of the two match teams to self-request/revoke
@@ -5854,7 +5864,7 @@ export class GamesService {
         actorType: 'USER',
         actorUserId: userId,
         role: role ?? 'support_readonly',
-        teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
+        teamId: actorTeamId,
       };
     }
     if (role === null) {
@@ -5864,7 +5874,7 @@ export class GamesService {
       actorType: 'USER',
       actorUserId: userId,
       role,
-      teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
+      teamId: actorTeamId,
     };
   }
 

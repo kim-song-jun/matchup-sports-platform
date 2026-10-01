@@ -58,3 +58,6 @@
 - 각 headed 브라우저는 finally에서 종료했다. 크롬의 누락된 shared library는 `/tmp`에만 압축 해제해 사용했다. 로컬 Next/QA bridge와 임시 schema/tsconfig는 종료 시 제거한다.
 
 - OG local Next dev는 font URL 로딩 실패로 브랜드 이미지가 반환되어 실제 카드 시각 근거로 사용하지 않는다. 로컬 서버 종료; alpha 원본 OG와 배포 후 OG를 비교한다.
+
+- 배포 전 실제 alpha 추가 확인: QA fixture 강현우로 세션 API 로그인 → /home 인증 UI hydrate → /my. 본인/공개/공유 × 390/768/1440 before 9/9에서 기존 단위 없는 점수·성향 태그를 재현했다. 본인은 인증 오류 없음. 공개 guest 401은 정상. 이후 각 QA 세션 로그아웃 및 headed 브라우저 종료. QA 스크립트는 optional CSV로 본인 시나리오를 지원하며 자격 증명은 메모리에서만 사용한다.
+- PR #1490 최신 runtime 수정 CI Gates/API/Web 모두 성공. Copilot 리뷰는 두 차례 요청 성공 응답을 받았으나 실제 리뷰/요청 이벤트가 아직 0건이다. 자동 Sonnet 리뷰의 실제 minor 2건은 수정 완료; 이를 Copilot clean으로 간주하지 않는다.

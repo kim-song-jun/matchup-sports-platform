@@ -46,7 +46,16 @@ import {
   ROSTER_VIEW_ONLY_BADGE_LABEL,
   registrationRosterBlockReason,
 } from '@/lib/roster-editability';
-import { teamRoleLabel, tournamentRegistrationStatusConfig as registrationStatusConfig } from '@/lib/v1-status-labels';
+import {
+  competitionKindLabel,
+  teamRoleLabel,
+  tournamentRegistrationStatusConfig as registrationStatusConfig,
+} from '@/lib/v1-status-labels';
+
+/** 정규 리그를 "대회"라고 부르지 않는다("리그 상세 보기"). 종류를 모르면(로딩 실패) 대회 말투를 쓴다. */
+function competitionNoun(isLeague: boolean): string {
+  return competitionKindLabel(isLeague ? 'LEAGUE' : 'TOURNAMENT');
+}
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
   if (!data) return [];
@@ -667,6 +676,7 @@ function RegistrationDetailView({
       : canManageRegistration
         ? null
         : ROSTER_VIEW_ONLY_BADGE_LABEL;
+  const detailLabel = `${competitionNoun(tournament.kind === 'regular_league')} 상세 보기`;
   const canCancelRequest =
     canManageRegistration &&
     (
@@ -825,7 +835,7 @@ function RegistrationDetailView({
         className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
         style={{ marginBottom: 8 }}
       >
-        대회 상세 보기
+        {detailLabel}
       </Link>
 
       {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
@@ -955,17 +965,11 @@ function RegistrationDetailView({
                     ) : null}
                   </div>
                 </div>
+                {/* 이 카드는 확정·결제 전 신청에만 뜬다(확정 뒤엔 패스 카드가 명단을 맡는다). */}
                 {belowMinimum && !isRosterEditBlockedByStatus ? (
-                  /* P0: copy branches on whether confirmation is still blocked */
-                  registration.status === 'confirmed' || registration.status === 'paid' ? (
-                    <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      대회 전까지 선수를 더 등록할 수 있어요.
-                    </p>
-                  ) : (
-                    <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      최소 인원을 채워야 참가 확정이 가능해요.
-                    </p>
-                  )
+                  <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    최소 인원을 채워야 참가 확정이 가능해요.
+                  </p>
                 ) : null}
               </Card>
             </section>
@@ -1130,7 +1134,7 @@ function RegistrationDetailView({
                 href={detailHref}
                 className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
               >
-                대회 상세 보기
+                {detailLabel}
               </Link>
             </div>
           </div>
@@ -1297,7 +1301,11 @@ function TeamRegistrationHub({
               받지 않아요")와 정면으로 어긋난다 — 팀을 만들어도 이 대회엔 신청할 수 없다. */}
           <EmptyState
             title={emptyState.title}
-            sub={canStartNewRegistration ? emptyState.description : '이 대회는 지금 참가 신청을 받지 않아요.'}
+            sub={
+              canStartNewRegistration
+                ? emptyState.description
+                : `이 ${competitionNoun(isLeague)}는 지금 참가 신청을 받지 않아요.`
+            }
             cta={canStartNewRegistration ? '팀 만들기' : undefined}
             onCta={canStartNewRegistration ? () => { window.location.href = '/teams/new'; } : undefined}
             icon={<UsersRound size={36} strokeWidth={1.5} />}
@@ -1463,7 +1471,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >
-            대회 상세로 돌아가기
+            {competitionNoun(tournament?.kind === 'regular_league')} 상세로 돌아가기
           </Link>
         </div>
       );

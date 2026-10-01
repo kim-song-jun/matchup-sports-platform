@@ -592,3 +592,50 @@ describe('MyRegistrationPageClient — 대회 상세·재신청 CTA 는 from 을
     );
   });
 });
+
+// W7-V4 — 리그 신청의 "내 신청" 레일 버튼이 "대회 상세 보기" 였다. 대회 쪽 "대회 상세 보기" 는 위 describe 가 지킨다.
+describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+  });
+
+  it('리그 신청 상세의 상세 버튼은 레일·모바일 모두 "리그 상세 보기" 이고, 화면에 "대회" 가 없다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'draft', title: 'QA 0930 test' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const links = screen.getAllByRole('link', { name: '리그 상세 보기' });
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link).toHaveAttribute('href', '/tournaments/tournament-1');
+    expect(container.textContent).not.toContain('대회');
+  });
+
+  it('신청을 받지 않는 리그의 팀 없음 안내도 "이 리그는" 이다', () => {
+    searchParams = new URLSearchParams();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [] }, isLoading: false });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'completed' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('이 리그는 지금 참가 신청을 받지 않아요.')).toBeInTheDocument();
+  });
+});

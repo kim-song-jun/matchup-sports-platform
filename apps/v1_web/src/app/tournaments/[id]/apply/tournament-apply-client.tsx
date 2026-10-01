@@ -966,7 +966,7 @@ function AgreementsStep({
                 id={`agree-${term.code}`}
                 label={term.title}
                 consentType={term.requirement === 'required' ? 'required' : 'optional'}
-                summary={term.subtitle ?? term.changeSummary ?? `${term.version} 약관`}
+                summary={term.subtitle ?? undefined}
                 checked={isChecked(term)}
                 onChange={(value) => {
                   const acceptedTermsDocumentIds = value

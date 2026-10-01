@@ -1,6 +1,7 @@
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/league-match';
 
 /**
@@ -56,7 +57,7 @@ export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
     '@id': `${url}#event`,
-    name: `${homeName} vs ${awayName} | ${match.tournamentTitle} ${match.round}`,
+    name: `${homeName} vs ${awayName} | ${match.tournamentTitle} ${tournamentRoundLabel(match.round)}`,
     url,
     startDate: match.scheduledAt,
     eventStatus: match.status === 'cancelled'

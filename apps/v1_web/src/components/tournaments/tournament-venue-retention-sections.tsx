@@ -21,6 +21,7 @@ import {
 } from './tournament-venue-retention-model';
 import { TournamentVenueMap } from './tournament-venue-map';
 import { TournamentVenueNavigationButton } from './tournament-venue-navigation-button';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 
 export {
   getTournamentPostEventCards,
@@ -270,7 +271,7 @@ function TournamentFixtureReviewEntryList({
           const homeTeamName = getFixtureTeamLabel(fixture.homeTeamName);
           const awayTeamName = getFixtureTeamLabel(fixture.awayTeamName);
           const result = fixture.result!;
-          const roundLabel = fixture.round || `${fixture.fixtureNumber}경기`;
+          const roundLabel = fixture.round ? tournamentRoundLabel(fixture.round) : `${fixture.fixtureNumber}경기`;
           const hasPenaltyResult =
             result.hasPenalty && result.homePenaltyScore !== null && result.awayPenaltyScore !== null;
 

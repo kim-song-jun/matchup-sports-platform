@@ -36,6 +36,7 @@ import {
   type SchedulePhaseLabels,
 } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 
 /**
  * 참가팀 공개 정책 통일(fix/v1-publish) — side 자체가 null이면 슬롯 미배정("미정"),
@@ -372,7 +373,7 @@ function ScheduleRow({
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {showGroupLabel ? entry.groupName ?? entry.round : ''}
+          {showGroupLabel ? entry.groupName ?? tournamentRoundLabel(entry.round) : ''}
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
           {venue ? (

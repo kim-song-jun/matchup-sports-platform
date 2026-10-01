@@ -41,7 +41,7 @@ function openModal() {
 describe('ClaimMyRecordSection 빈 상태', () => {
   it('연결 가능한 참가자가 없으면 확정 버튼을 렌더하지 않는다', () => {
     claimableMock.mockReturnValue({
-      data: { gameId: 'g-1', version: 3, rosterCount: 4, participants: [] },
+      data: { gameId: 'g-1', version: 3, rosterCount: 4, rosterSubmitted: true, participants: [] },
       isLoading: false,
       isError: false,
       error: null,
@@ -69,6 +69,7 @@ describe('ClaimMyRecordSection 빈 상태', () => {
         gameId: 'g-1',
         version: 3,
         rosterCount: 2,
+        rosterSubmitted: true,
         participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,
@@ -100,6 +101,7 @@ describe('LeagueClaimMyRecordSection', () => {
         gameId: 'g-1',
         version: 3,
         rosterCount: 2,
+        rosterSubmitted: true,
         participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,
@@ -125,6 +127,7 @@ describe('LeagueClaimMyRecordSection', () => {
         gameId: 'g-1',
         version: 3,
         rosterCount: 2,
+        rosterSubmitted: true,
         participants: [
           { participantId: 'p-home', sideId: 's-home', sideKey: 'HOME', sideLabel: '블루팀', displayName: 'E2E 선수01', jerseyNumber: null },
           { participantId: 'p-away', sideId: 's-away', sideKey: 'AWAY', sideLabel: '레드팀', displayName: 'E2E 선수01', jerseyNumber: null },
@@ -153,7 +156,7 @@ describe('LeagueClaimMyRecordSection', () => {
 
 describe('LeagueClaimMyRecordSection — 명단 카드 아래 한 줄(G13 F61)', () => {
   it('link 는 카드 대신 한 줄 버튼이고, 누르면 같은 모달로 리그 목록을 부른다', () => {
-    leagueClaimableMock.mockReturnValue({ data: { gameId: 'g-1', version: 1, rosterCount: 2, participants: [] }, isLoading: false, isError: false, error: null });
+    leagueClaimableMock.mockReturnValue({ data: { gameId: 'g-1', version: 1, rosterCount: 2, rosterSubmitted: true, participants: [] }, isLoading: false, isError: false, error: null });
     render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" variant="link" />);
 
     expect(screen.queryByText('이 경기에 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
@@ -163,10 +166,10 @@ describe('LeagueClaimMyRecordSection — 명단 카드 아래 한 줄(G13 F61)',
   });
 });
 
-// W5-V3 — 후보 0명이 "명단이 아직 없음"인데 "명단은 모두 계정에 연결돼 있어요"라고 말하던 결함.
-describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount)', () => {
-  const emptyList = (rosterCount: number) => ({
-    data: { gameId: 'g-1', version: 1, rosterCount, participants: [] }, isLoading: false, isError: false, error: null,
+// W5-V3·W6-V3 — 후보 0명이 "제출된 명단이 아직 없음"인데 "명단은 모두 계정에 연결돼 있어요"라고 말하던 결함.
+describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount·rosterSubmitted)', () => {
+  const emptyList = (rosterCount: number, rosterSubmitted = true) => ({
+    data: { gameId: 'g-1', version: 1, rosterCount, rosterSubmitted, participants: [] }, isLoading: false, isError: false, error: null,
   });
   const openTeamMatch = () => {
     render(<TeamMatchClaimMyRecordSection teamMatchId="tm-1" />);
@@ -183,7 +186,30 @@ describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount)', (
     expect(screen.queryByRole('button', { name: '이 선수가 저예요' })).toBeNull();
   });
 
-  it('대조군 — 명단은 있는데 모두 연결됐으면 기존 안내와 기록 공개 설정 링크를 보여 준다', () => {
+  it('친선 양 팀이 초안만 저장했으면(제출 전) 명단 인원이 있어도 "아직 제출된 참석명단이 없어요"다', () => {
+    teamMatchClaimableMock.mockReturnValue(emptyList(20, false));
+    openTeamMatch();
+
+    expect(screen.getByRole('dialog', { name: '아직 제출된 참석명단이 없어요' })).toBeInTheDocument();
+    expect(screen.queryByText(/모두 계정에 연결돼 있어요/)).toBeNull();
+  });
+
+  it('대조군 — 제출 전이어도 초안에 미연결 참가자가 있으면 빈 상태 대신 후보를 고르게 한다', () => {
+    teamMatchClaimableMock.mockReturnValue({
+      data: {
+        gameId: 'g-1', version: 1, rosterCount: 11, rosterSubmitted: false,
+        participants: [{ participantId: 'p-guest', sideId: 's-2', sideKey: 'AWAY', sideLabel: '합정', displayName: '용병 박지성', jerseyNumber: null }],
+      },
+      isLoading: false, isError: false, error: null,
+    });
+    openTeamMatch();
+
+    expect(screen.getByRole('dialog', { name: '명단에서 본인을 골라 주세요' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /용병 박지성/ })).toBeInTheDocument();
+    expect(screen.queryByText('아직 제출된 참석명단이 없어요')).toBeNull();
+  });
+
+  it('대조군 — 한 팀 이상 제출한 명단이 모두 연결됐으면 기존 안내와 기록 공개 설정 링크를 보여 준다', () => {
     teamMatchClaimableMock.mockReturnValue(emptyList(10));
     openTeamMatch();
 
@@ -199,6 +225,15 @@ describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount)', (
     fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
 
     expect(screen.getByRole('dialog', { name: '아직 제출된 경기 명단이 없어요' })).toBeInTheDocument();
+  });
+
+  it('리그·대회 경기 명단은 제출본이라, 모두 연결됐으면 "모두 계정에 연결돼 있어요"다', () => {
+    leagueClaimableMock.mockReturnValue(emptyList(14, true));
+    render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(screen.getByRole('dialog', { name: '연결할 참가자가 없어요' })).toBeInTheDocument();
+    expect(screen.queryByText('아직 제출된 경기 명단이 없어요')).toBeNull();
   });
 });
 
@@ -243,6 +278,8 @@ describe('비로그인(게스트) — 이슈 #1401', () => {
       data: {
         gameId: 'g-1',
         version: 3,
+        rosterCount: 1,
+        rosterSubmitted: true,
         participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,

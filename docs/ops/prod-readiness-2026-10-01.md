@@ -1,153 +1,142 @@
 # dev → main 프로덕션 배포 준비 — NO-GO
 
-**NO-GO.** 2026-10-01 후속 점검 기준. main 머지·push·production 승인·DB 변경은 하지 않았다.
-요청된 PR 본문/오탐 근거와 확인된 리뷰·보안 처리는 원격에 기록했다. 준비 수정은 dev 대상 초안 PR로
-전달하며 dev/main에는 아직 반영하지 않는다. 원본 WIP는 보존했다.
+**NO-GO.** 2026-10-01 23:40 KST 전후 재점검. 에이전트가 GitHub·AWS·운영 서버·DB·공개 서비스를 직접 확인했다.
+main merge/push, production 승인, 운영 DB 변경, RDS 리소스 생성은 하지 않았다. 원본 작업 트리의 WIP를 보존했다.
 
-## 현재 후보와 범위
+## 후보와 변경 범위
 
-| 항목 | 마지막 fetch 결과 |
+| 항목 | 확인 결과 |
 |---|---|
-| origin/dev, PR #1325 head | `3aac46ec17f5b0646ca6a47f1e20a06771fd5fc6` |
-| origin/main, PR #1325 base | `f49742f4522d99eb6c0f25791904ba04278666f3` |
-| commit 차이 | main-only 0, dev-only 4,322 |
-| 규모 | rename 미탐지 7,262경로; 명시 탐지 6,796항목, +392,666/-242,704줄 |
-| DB 소스 | SQL migration 65개 추가; main 123 → dev 188 |
-| Changeset | **77개 미소비**, 앱 package 1.0.4 |
+| origin/dev / 승격 PR #1325 head | `16a8c301fd8b9e08c7b3c959c2c974480b6d431d` |
+| origin/main / #1325 base | `f49742f4522d99eb6c0f25791904ba04278666f3` |
+| 커밋 차이 | main-only 0 / dev-only 4,328 |
+| 파일·줄 수 | rename 미탐지 7,269경로; renameLimit=10000 명시 탐지 6,803항목, +393,361/-242,741 |
+| migration 소스 | main 123 → dev 188, SQL 65개 추가 |
+| Changeset | 미소비 **79개**, 두 앱 package 1.0.4 |
+| 준비 수정 | dev 대상 [PR #1476](https://github.com/kim-song-jun/matchup-sports-platform/pull/1476) |
 
-점검 중 #1459/#1462가 dev에 추가됐다. GitHub changed_files=0은 크기 근거로 사용하지 않았다.
-원본 `fix/tournament-lineup-flow` / `992dba62f`의 API·Web·Prisma·배포 WIP를 checkout/reset/stash/
-staging하지 않았으며 다른 worktree를 정리하지 않았다. 수정 작업은 별도 `/tmp/teameet-prod-readiness-20261001`이다.
+점검 중 dev가 여러 번 전진했다. 이 SHA는 관측 스냅샷이며 최종 동결 후보가 아니다. GitHub changed_files=0은 규모 근거로 사용하지 않았다.
+원본 `fix/tournament-lineup-flow` / `992dba62f`는 checkout/reset/stash/staging하지 않았다. 수정은 별도 worktree에서만 수행했다.
 
-## 해결된 리뷰·보안과 검증
+## 해결된 항목과 검증
 
-GitHub CLI 2.102.0을 공식 SHA256 확인 후 WSL 사용자 경로에 설치했다. 기존 인증을 이용했고
-비밀 값을 읽거나 복사하지 않았다. write/triage 권한은 있으나 admin/maintain 권한은 없다.
+- 기본 브랜치 main에 `promote-main.yml`이 없어 dispatch 404인 문제의 로컬 준비 경로를 구현했다.
+  `promote-main.sh --prepare-only`는 clean feature worktree만 허용한다. alpha SHA/버전 확인 → pinned Changesets CLI 2.30.0 소비 → 실제 승격 gate 순서다.
+  stage/commit/push/dispatch를 하지 않는다. main에 workflow를 넣기 위한 bootstrap push도 하지 않는다.
+  실패 후 변경 diff를 보존하고 새 worktree 재시도를 안내한다. 기본 모드는 dev push/alpha dispatch를 하므로 준비 단계에서 사용하지 않는다.
+- 채팅 파일 확장자를 서버 허용 목록의 literal key로 고정하고 prototype key를 거부했다. Docker context의 test/ultraplan/.autoqa 제외도 복원했다.
+- 런북 PITR 시점을 **Stage A 첫 DB 변경 전**으로 정정했다. M11 이후 legacy-table seal 조회를 구분하고 rollback/restore 설명을 실제 코드에 맞췄다.
+- promote 계약 **10 시나리오**, upload **16**, callback **6**, 실제 multer multipart 경로 위조 **3** 요청, surface 정상/거부 probe, Task168/security 계약 PASS.
+  로컬 테스트와 원격 CI, 운영 서비스 관측, 실증 DB 리허설은 각각 구분한다.
+- 준비 PR 최초 커밋 `704b601b4`의 [API/Web/Gates CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36870470174)는 모두 SUCCESS.
+  후속 커밋에는 실패 안내/실패 경로 검증/본 보고서 갱신이 포함되므로 최신 head의 CI와 리뷰를 다시 확인해야 한다.
+- Sonnet 자동 리뷰의 Minor 2건을 보완했다. Copilot을 명시 요청했으나 Copilot 작성자의 최신 clean 리뷰는 아직 확인하지 못했다.
+  별도 [AI findings 검사](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36870477217)는 `400 The requested model is not supported`로 실패했다.
+  CI 성공으로 이 실패나 Copilot 완료 조건을 통과 처리하지 않았다.
 
-- 전체 thread 26개(hasNextPage=false), unresolved **4→1(.dockerignore)**. outdated는 resolved로 간주하지 않았다.
-- High 총 **6개(#13, #44–48)**를 조사했다. 실제 요청/최신 SARIF/소스로 오탐 처리한 뒤 open **0개**,
-  CodeQL aggregate SUCCESS를 확인했다. [보안 판정 근거](https://github.com/kim-song-jun/matchup-sports-platform/pull/1325#issuecomment-5932370957).
-- #44–48의 source는 `@UploadedFile().path`다. controller는 고정 dest를 사용하고
-  [잠금 버전 multer 2.2.0](https://github.com/expressjs/multer/blob/v2.2.0/storage/disk.js)은 서버에서 랜덤 파일명을 생성한다.
-  실제 HTTP multipart로 Unix/Windows/절대 경로 filename 및 `path`/`file[path]`를 넣어도 서버 경로를
-  덮어쓰지 못했다(3/3 PASS). 미머지된 보강 코드를 오탐 근거로 사용하지 않았다.
-- #13은 password/token/개인정보가 없는 128-bit 요청 대조 nonce다. callback에서 읽기 즉시 제거,
-  불일치 교환 거부, 주소 code/state 제거. [RFC6749 §10.12](https://www.rfc-editor.org/rfc/rfc6749#section-10.12)의
-  같은 origin으로 보호되는 state 저장 원칙을 대조했다. callback suite 6/6 PASS. 실제 Kakao 로그인은 별도 미검증.
-- baseline의 `allowedOf(undefined)`는 guard 후 0 반환. 실제 gate PASS(593 files, raw lookup 0/0),
-  신규 raw lookup probe는 허용 0으로 FAIL/TypeError 없음. probe 삭제.
-  [답변](https://github.com/kim-song-jun/matchup-sports-platform/pull/1325#discussion_r4155841395), thread resolved.
-- Docker 제외 복원은 실제 개선 사항이며 **dev 반영 전 unresolved 유지**.
+과거 c4467dab1 기반 release-only worktree의 75개 소비/앱 1.1.0/로컬 gate PASS는 실행 예시다.
+현재 79개 및 준비 수정 자체 Changeset이 추가돼 **최종 후보로 사용할 수 없다**. 수정 dev 반영 후 최신 모든 Changeset으로 다시 생성해야 한다.
+최종 SHA의 resolver·alpha header·stable manifest 버전을 재대조한다.
 
-## 준비한 코드와 좁은 검증
+## 리뷰와 보안 판정
 
-- `promote-main.sh --prepare-only`: clean feature worktree만 허용; dirty WIP/main/dev/detached 거부.
-  alpha SHA/버전 대조 → 고정 Changesets CLI로 소비 → 승격 gate. stage/commit/push/dispatch 없음.
-  main에 promote-main.yml이 없어 dispatch 404인 상황의 안전한 로컬 경로다. 기본 모드는 dev push와
-  alpha dispatch까지 하므로 준비 단계에서는 사용하지 않는다. main workflow bootstrap push 금지.
-- 채팅 저장 확장자를 서버 허용 목록의 키로 고정; prototype key도 거부. `.dockerignore` 3개 제외 복원.
-- 런북 PITR를 **Stage A 첫 DB 변경 전의 검증된 시점**으로 정정. M11 이후 legacy table seal 쿼리를
-  조건 분기로 건너뛰고 rollback 거부 조건/비밀번호 없는 restore argv 설명을 맞췄다.
-- AGENTS/CLAUDE/compatibility 문서를 동기화하고 patch Changeset을 포함했다.
-- promote 8 시나리오 PASS(최종 dirty WIP 거부도 확인), 업로드 16/16, callback 6/6,
-  실제 surface 정상/거부, 실제 multer 3 요청, Task168 계약, production security guard PASS.
-  diff check/새 debt marker/import 범위도 확인. 원격 준비 수정 PR CI/실제 DB 리허설을 대체하지 않는다.
-- 이전 Prisma client 타입 오류와 callback 누락 의존성 때문에 초기 검증이 실패했다. 다른 세션의
-  node_modules를 바꾸지 않고 이 worktree의 client 및 /tmp 잠금 버전 의존성으로 보완해 통과했다.
-  테스트용 web overlay는 제거했다. 호스트 24 cores/load<0.2/가용 약15GB/swap0. Docker는 WSL IPC
-  오류로 접근 불가하여 실제 DB/이미지 빌드를 수행하지 않았다.
+- #1325 thread 26개, hasNextPage=false. 미해결 **4→1(.dockerignore)**. 복원 코드는 #1476에 있고 dev 반영 전 thread를 닫지 않는다.
+- #13/#44–48 High 6건은 최신 SARIF/현재 코드/실제 multipart·콜백 검증 후 false positive로 명시 처리했다.
+  [상세 보안 근거](https://github.com/kim-song-jun/matchup-sports-platform/pull/1325#issuecomment-5932370957).
+  파일 path는 multer 2.2.0의 서버 생성 경로이고 사용자 filename/body가 덮어쓰지 못한다. OAuth state는 요청 대조 nonce이며 callback에서 소비·검증한다.
+- 현재 **dev 및 #1325 ref의 open CodeQL alert는 각각 0개**. 저장소 전체 open 0이라는 뜻은 아니다.
+  main에는 기존 **High 9개/Medium 2개**가 남아 있다. #19 ReDoS는 dev의 선형 문자열 처리로 수정됐고 #1325 instance=fixed다.
+  다른 main High 경고 경로(삭제된 QA 스크립트 및 legacy apps/api·apps/web)는 현재 dev tree에 없다. legacy 구현을 v1 판단 근거로 읽지 않았다.
+  실제 승격 후 main 재스캔을 확인해야 한다. main 잔존 경고를 오탐으로 일괄 dismiss하지 않았다.
+- baseline undefined guard에 대한 리뷰는 실제 gate 정상/거부 probe로 확인해 답변 및 resolve했다.
+  [답변](https://github.com/kim-song-jun/matchup-sports-platform/pull/1325#discussion_r4155841395).
 
-과거 릴리스 전용 후보 `/tmp/teameet-prod-release-candidate-20261001`는 **c4467dab1의 75개**를
-실제 CLI 2.30.0으로 소비(1.0.4→1.1.0)하고 일반 release commit/promotion gate PASS를 확인한 예시다.
-현재 77개 및 준비 수정의 Changeset이 더 있으므로 **이 후보를 최종 후보로 사용하지 않는다**.
-준비 수정 dev 반영 후 최신 dev의 전체 Changeset을 다시 소비한다. resolver는 미소비가 없어도 다음
-patch를 계산하므로 package 1.1.0 후보 stable header=1.1.1이었다. 최종 SHA의 header/manifest 재대조 필요.
+## CI와 실제 서비스 관측
 
-## CI와 실제 서비스
-
-| 검사 | SHA와 판정 | 증거 |
+| 종류 | SHA / 결과 | 증거 |
 |---|---|---|
-| dev push API/Web/Gates | 70a8e2c5a PASS | [CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36866816889) |
-| alpha 배포 | 70a8e2c5a PASS | [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36866816901) |
-| 승격 PR API/Web | 70a8e2c5a PASS | [PR CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36866829467) |
-| 승격 PR Gates | 70a8e2c5a FAIL, unreleased Changesets | [실패 job](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36866829467/job/110384288199) |
-| CodeQL aggregate | 오탐 처리 후 SUCCESS | [체크](https://github.com/kim-song-jun/matchup-sports-platform/runs/110384554009) |
-| 최신 3aac46ec1 | 검사/alpha 완료 미확인, 이전 PASS 재사용 금지 | [최신 체크](https://github.com/kim-song-jun/matchup-sports-platform/pull/1325/checks) |
-| 현 production 배포 | f49742f45 SUCCESS | [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/35971423193) |
+| 최신 dev push CI | 16a8c301 API/Web/Gates PASS | [CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36874358056) |
+| 최신 alpha 배포 | 16a8c301 SUCCESS | [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36874357956) |
+| 승격 PR CI | 16a8c301 API/Web PASS, Gates FAIL: 미소비 Changesets | [승격 CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36874366476) |
+| CodeQL | 16a8c301 Analyze 및 aggregate SUCCESS | [분석](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/36874365478) |
+| 현재 production 배포 | f49742f45 SUCCESS | [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/35971423193) |
 
-인증 후 Gates 실제 로그에서 `dev -> main promotion must not contain unreleased Changesets`를 확인했다.
-현재 적용 ruleset에는 deletion/non-fast-forward/Copilot만 있고 required_status_checks 규칙은 없다.
-classic protection API는 404로 필수 체크 강제 여부를 확정하지 않았다. 운영 GO에는 API/Web/Gates/CodeQL과 리뷰 해결을 요구한다.
-
-실제 관측 **22:29 KST**: 양 환경 /landing·health·매치/팀/대회 목록 200, checks.db=true.
-alpha 웹/API commit=`70a8e2c5abf276c10e4a15423a81feed1611c711`, release=`1.1.0-alpha.20261001.g70a8e2c5abf2`.
+실제 HTTP 관측 23:31 KST: 양 환경 /landing·health·매치/팀/대회 목록 200, checks.db=true.
+alpha 웹/API commit=`16a8c301fd8b9e08c7b3c959c2c974480b6d431d`, release=`1.1.0-alpha.20261001.g16a8c301fd8b`.
 production 웹/API commit=`f49742f4522d99eb6c0f25791904ba04278666f3`, release=0.5.0.
-22:26 배포 중 alpha health 502/이전 웹 SHA도 관측했고 완료 후 회복 확인. **현재 dev=3aac46ec1과 마지막
-alpha SHA가 다르므로 최신 후보 검증은 미완료**다. 초기 c446 관측의 /v1/home 308, anonymous 보호 API401,
-alpha44/44·prod32/32 공개 경기 상세200은 별도 이전 증거다. 최신 전체 상세 및 로그인 후 사용자/호스트·
-명단/경기 운영/관리자/실제 OAuth 시나리오는 미확인이다. production 테스트 쓰기는 하지 않았다.
+전체 cursor pagination → 대회 detail → schedule → 모든 공개 경기 detail: alpha 21대회/44경기 **44/44**, prod 4대회/32경기 **32/32** 200.
+실제 canonical 보호 경로 `/api/v1/auth/me`의 anonymous 요청은 양쪽 401. 잘못 조회한 `/users/me`는 404여서 인증 거부 증거로 사용하지 않았다.
+22:26 alpha 배포 중 일시적 502와 이전 웹 SHA도 기록했고 배포 완료 뒤 회복을 확인했다.
+로그인 후 사용자·호스트·명단·경기 운영·관리자·실제 Kakao OAuth 브라우저 시나리오는 미검증이다. production 테스트 쓰기는 하지 않았다.
 
-## Task 168 사전 조건 7개
+## AWS·운영 DB 직접 확인
 
-| 런북 조건 | 판정 | 필요한 증거/조치 |
-|---|---|---|
-| 최신 후보의 리허설 | 미확인, 차단 | Task 175에는 09-27, 123→178 원장·drift 0·공개 경기 32건 기록. 현재는 188개 체인이다. 원본 영수증/덤프/hash 및 65개 migration 전체를 적용한 최신 결과 필요. task-6-report 경로는 현재 tracked tree에 없음 |
-| RDS 수동 스냅샷 | 미확인, 런북상 선택/권장 | 대상 DB와 바인딩된 snapshot, available 시각 확인. 존재하지 않는다고 단정하지 않음. 배포 IAM 역할에 권한이 없다는 역사 기록과 운영자의 콘솔 권한은 별개 |
-| 공개 대회 경기 존재 | PASS | prod 32/32 상세 200. 전환 직전에 다시 조회. 이전 덤프의 숫자만 사용하지 않음 |
-| PITR 보존 기간/복원 가능 시각 | 미확인, 차단 | 09-27의 7일은 역사 기록. 현재 retention·earliest/latest restorable time과 복원 권한 확인 |
-| 유지보수 공지 | 미확정, 차단 | API 오류 구간/예상 창/연락·복구 경로 공지, 게시 시각/링크 |
-| Stage A/B 연속 승인 운영자 | 미확정, 차단 | 같은 담당자의 이름·시간대·production 승인 권한·복구 담당자 확인 |
-| 동일 main SHA | 강제 코드 확인/운영 계획 미확정 | merge SHA 고정·main 변경 동결, A/B run head_sha와 transition.releaseSha 대조 |
+Windows AWS CLI 2.34.41의 기존 default 인증을 이용했다. STS 계정과 GitHub 등록 production 계정/리전이 일치한다.
+운영 DB 연결 URL/비밀 값은 출력하지 않았고 `.env*`를 읽지 않았다. DB 조회는 single connection, READ ONLY transaction, 5초 statement/1초 lock timeout이었다.
 
-추가 운영 미확인: 실제 RDS `_prisma_migrations` checksum/미해결 행, seal 상태, 현재 active/state
-매니페스트의 SHA·digest·DB 바인딩, core 테이블 전환 전 행 수, 호스트 백업/디스크, 전체 승인 대기/SSM
-상태, 로그인 후 사용자·운영 시나리오. 최초 점검에서는 gh/aws CLI 및 인증 환경 변수가 없었다.
-위 후속 확인에서 gh를 설치하고 기존 인증을 확인했으며, AWS 접근은 아직 확인하지 못했다.
+| 항목 | 실제 결과 |
+|---|---|
+| RDS | available, PostgreSQL, storage encrypted, Multi-AZ=false |
+| runtime DB 바인딩 | API DB hostname SHA256가 조사한 RDS endpoint SHA256와 일치 |
+| backup retention | **7일**, automated backup active |
+| 복원 가능 창 | 2026-09-24 14:02:29Z ~ 2026-10-01 14:02:29Z; 관측 10-01 14:11:45Z |
+| 수동 스냅샷 | 대상 DB 1개 available/encrypted, 생성 **2026-08-14 17:27:50.814Z**; 전환 직전 백업으로 인정하지 않음 |
+| 복원 권한 | 현재 운영자 IAM policy simulation의 snapshot/PITR restore·snapshot create allowed. 실제 복원/KMS/SCP/네트워크 성공 증거는 아님 |
+| DB 원장 | 총125행=완료123+과거 rolled-back2. unresolved0, 완료 중복0, main/dev historical 체크섬 불일치0, 누락/추가0 |
+| 전환 전 counts | users545, teams81, team_matches1, games33, tournaments4, legacy fixtures32/results0/goals0/videos32/edges0 |
+| 전환 seal | 활성 Task168 seal0, legacy5개 테이블 존재: 전환 전 상태 |
+| release state | state.json 존재/mode0600, active SHA=f49742f45/version0.5.0, candidate 없음 |
+| 실행 이미지·소스 | API/Web/worker running+healthy, 설정 URI 및 로드된 digest가 active와 일치; source marker/hash·live symlink 일치 |
+| Stage 영수증 | 기본 상태 경로에 Task168 receipt/backup 없음. 전환 전이므로 미래 A 영수증 부재는 정상이나, 다른 컴퓨터의 리허설 위치는 확정하지 못함 |
+| 호스트 | EC2 running/SSM Online, API restart0; RAM 약1.9GiB/available627MiB, swap 사용822MiB, root 여유 약15GiB |
+| 기존 호스트 백업 | 알려진 backup directory의 DB dump4개는 07-26 자료. 최신 리허설 또는 전환 직전 백업으로 인정하지 않음 |
+| 로컬 Docker | 설치된 Docker Desktop 시작 후 Linux 엔진 접근 성공, 기존 컨테이너0; 로컬 DB/volume reset/delete 없음 |
 
-전환 도구 archive와 M11 source hash는 런북의 고정 값과 일치했다. 소스 SQL의 단순 token
-inventory에서 DROP 관련 신호가 8개 migration에 있었으며, 이 중에는 table/type뿐 아니라
-constraint 삭제도 있다. M11 외 리그 테이블/분쟁 제거와 revision 변경 등도 최신 덤프에서
-리허설해야 한다. token inventory는 실제 DDL 영향 검토나 DB 리허설을 대체하지 않는다.
+SSM DB 원장 첫 출력은 API 24KB 제한으로 잘렸다. compact 배열로 다시 조회해 정상 JSON 전체125행을 받은 결과만 판정에 사용했다.
+운영 호스트에서 빌드/전체 테스트/복제 DB 리허설을 시작하지 않았다. 현재 호스트 메모리·swap 상태에서 그 부하를 올리지 않는다.
 
-## 남은 차단 항목
+## 런북 사전 조건 판정
 
-1. 준비 수정의 dev PR CI/리뷰·반영 및 Docker thread 해결.
-2. 최신 전체 Changeset 소비/릴리스 전용 dev PR, 최종 head CI/CodeQL/실제 alpha·인증 시나리오 확인.
-3. 188개 체인 실증 리허설·DB ledger/checksum·PITR·복원 권한. 스냅샷은 권장으로 따로 확인.
-4. 유지보수 공지·연속 승인 운영자·동일 main SHA 동결 확정.
+| 조건 | 판정 / 남은 요구 |
+|---|---|
+| 최신 후보 실증 리허설 | **차단**. 09-27의 123→178/drift0/공개32 기록은 역사 증거. 현재188개 체인과 최종 SHA로 production clone에 A/B 적용한 원본 영수증/hash/drift/행수/공개 API 결과 미확인 |
+| RDS 수동 스냅샷 | 존재/available 확인, **신선도 불충족**. 런북상 선택·권장 조건이며 최신 snapshot 생성은 별도 운영 결정 |
+| 공개 대회 경기 | **PASS**: 현재 prod32/32. A 직전/B 이후 다시 확인 |
+| PITR | **현재 설정 PASS**: 보존7일/복원 가능 창 확인. A 첫 DB 변경 전의 선택 복원 시각과 실제 clone restore 증거는 아직 없음 |
+| 유지보수 공지 | **미확정·차단**: 시간창/게시 채널/공지 링크/복구 연락 경로 |
+| 연속 승인 운영자 | **미확정·차단**: 같은 사람의 A/B 연속 처리 시간·복구 담당자. GitHub production reviewer kim-song-jun 또는 seeungmin; prevent_self_review=false |
+| 동일 main SHA | 코드 강제 확인. **운영 동결 미확정**: 최종 merge SHA M, A/B run.head_sha=M·transition.releaseSha=M 확인 |
 
-## 정확한 운영 순서 — 사용자 실행 단계
+## 남은 차단 / 확인하지 못한 항목
 
-1. 기존 GitHub 인증으로 보안/리뷰 조회 및 오탐 처리를 완료했다. 다음은 AWS 읽기 권한/리허설/공지/운영자
-   조건을 **한 항목씩** 확인한다. 토큰/DB 비밀 값을 보고서나 채팅에 넣지 않는다.
-2. 수정 브랜치 diff 검수 → dev 대상 수정 PR의 CI/리뷰 → dev 반영·alpha 검증.
-3. 그 결과의 최신 dev를 새 worktree에 받고 `--prepare-only`로 자체 Changeset까지 소비 → release-only
-   PR을 dev로 반영 → 새 dev SHA의 CI/alpha/인증 시나리오 검증. #1325 head/base와 본문을 다시 고정한다.
-4. 최신 덤프 리허설·DB 원장·PITR·권장 스냅샷·공지·연속 담당자·동결 조건을 완료한 뒤 GO를 재판정한다.
-5. **사용자가** #1325를 main으로 머지한다. 에이전트는 merge/push/production 승인을 하지 않는다.
-6. 자동 시작된 main push / Stage none 런을 식별하고 **승인하지 않고 취소**한다. 취소 완료를 확인해
-   `deploy-production` 큐를 비운다. 무관한 alpha/CI 런은 취소하지 않는다.
-7. main merge SHA를 `M`으로 기록하고 동결한다. Stage A dispatch 시 선택한 ref와 실제 run.head_sha가
-   `M`인지 확인한다. `task168_stage=stageA`, 검증된 `task168_rehearsal_evidence` 한 줄을 입력한다.
-   **사용자/지정 운영자가** production 승인한다.
-8. A는 quiesce→pg_dump/검증→pre-migration→cutover/seal→M9→transition 영수증 순서다. A 성공은
-   러너 완료 로그와 영수증으로 확인한다. API/워커는 내려간 채이며 health skip은 의도된 동작이다.
-9. 같은 `M`에 `task168_stage=stageB`, 같은 증거 문구로 dispatch한다. **같은 운영자가 연속 승인**한다.
-   A~B 사이 일반 배포/main 변경/수동 SQL/영수증 수정 금지. 재부팅이나 Docker 재시작이 있었다면 중단·보고.
-10. B는 바인딩/재quiesce→M11 및 남은 migration→전체 ledger→backfill→기동→health/digest→공개 API
-    verify→active 승격이다. 실패한 원장 상태를 무조건 재dispatch하지 말고 런북 실패 표를 따른다.
-11. B 완료 뒤 웹/API header=`M`, checks.db=true, /landing 200, /v1/home 308, 공개 대회/경기 전체,
-    원장 미해결 0/M11 checksum, legacy table 없음, core 행 수와 모든 영수증·active digest를 확인한다.
-    인증 사용자/운영 시나리오 확인 후 점검 종료 공지를 낸다.
+1. #1476 최신 head CI와 Copilot clean 리뷰, dev 반영 및 Docker thread 해결.
+2. 이후 최신 dev의 전체 Changeset 소비/release-only dev PR, 최종 head CI/alpha 재검증. 현재 #1325 Gates FAIL.
+3. 최종188개 chain의 production clone 리허설과 실제 snapshot/PITR restore 증거. 기존 리허설 원본 경로도 미확인.
+4. 실제 인증 사용자/운영 브라우저 QA. 공개 API 성공은 이 검증을 대체하지 않는다.
+5. 유지보수 공지·동일 운영자·main SHA 동결의 사람 결정.
 
-**중단 시간은 A quiesce부터 B 활성화까지다. 승인·빌드 대기까지 포함하므로 과거 DB 작업 14초/7초를
-전체 중단 예상 시간으로 쓰지 않는다. M11 이후 이전 이미지 롤백은 안전하지 않다.**
-재시도/복원은 실패 표와 사용자 판단을 따른다. PITR/pg_dump는 새 DB로 복원해 원장·스키마를 검증하고,
-사용자 승인 후 연결을 바꾼다. 이미지 rollback/revert를 자동 실행하지 않는다.
+RDS clone 생성/새 snapshot/production dump 반출은 실행하지 않았다. 직접 조회로 알 수 있는 상태 확인은 완료했지만
+새 과금 리소스·production 데이터 복사와 배포 승인은 운영자가 결정해야 한다. 확인되지 않은 항목을 PASS로 표시하지 않는다.
+
+## 정확한 운영 순서
+
+1. 수정 dev PR CI/리뷰·반영 → 최신 dev alpha 확인 → clean feature worktree에서 `--prepare-only` → release-only dev PR 반영.
+2. 최종 SHA 고정·CI/CodeQL/전체 리뷰·alpha 인증 QA·최신 clone A/B 리허설 → PITR/백업·공지·연속 운영자·동결 완료 → GO 재판정.
+3. **사용자만 #1325 main merge**. 자동 main push `deploy.yml` **Stage none은 승인하지 않고 취소**, cancelled 확인해 production 큐를 비운다.
+4. merge SHA `M` 기록/main 동결. 사용자/운영자가 `deploy.yml --ref main`, `task168_stage=stageA`, 검증된 `task168_rehearsal_evidence`로 dispatch.
+   실제 run.head_sha=M인지 확인한 뒤 **사람이 production 승인**한다. 현재 branch ref 대신 임의 SHA를 dispatch하면 main 조건을 통과하지 못할 수 있다.
+5. A는 quiesce → pg_dump/검증 → pre-migrations → cutover/seal → M9 → transition 영수증. 러너 완료와 receipt/seal/ledger를 확인한다.
+   A 뒤 API/worker는 계속 정지한다. A health skip은 의도된 동작이다.
+6. **같은 M**, 같은 리허설 증거로 Stage B dispatch → **같은 운영자가 연속 승인**. A/B 사이 일반배포·main 변경·수동 SQL·receipt 수정 금지.
+7. B는 바인딩/재quiesce → M11 및 남은 migration → 전체 ledger/backfill → 기동/health/digest → 공개 API verify → active 승격.
+8. 웹/API header=M, DBhealth, M11 checksum/원장 unresolved0/legacy없음, core counts, digest·receipt·전체 공개 경기·인증 시나리오를 확인하고 종료 공지.
+
+중단은 A quiesce부터 B 활성화까지이며 승인·빌드 대기도 포함한다. **M11 이후 단순 이전 이미지 롤백은 안전하지 않다.**
+실패한 원장을 무조건 재dispatch하지 않는다. [Task168 런북](prod-task168-transition-runbook.md)의 실패 표에 따라 판단하고
+PITR/pg_dump는 새 DB로 복원해 확인한 뒤 사용자가 연결 전환을 승인한다.
 
 ## 증거 위치
 
-원격 근거는 위 PR/체크/리뷰 링크. 원본 및 수정 worktree의 `output/release/prod-readiness-20261001/`
-(Git ignore)에 raw JSON/SARIF/테스트/처리 결과/후보 패치를 보존한다. 최신 SHA·시각과 과거 결과를 구분한다.
-[dispatch 제약 공식 문서](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
-이 보고서는 현재 NO-GO이며 상태 변경 뒤 다시 판정한다. 실제 DB 접근이 없어 확인하지 못한 조건은 PASS가 아니다.
+원격 증거는 본문 PR/CI/보안 링크. 로컬 정리 증거는 gitignored `output/release/prod-readiness-20261001/`.
+AWS raw 결과와 운영 식별자는 mode0600으로 보관하고 공개 PR/커밋에 포함하지 않는다. timestamp/SHA와 과거 증거를 구분한다.
+[GitHub dispatch 기본 브랜치 제약](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).

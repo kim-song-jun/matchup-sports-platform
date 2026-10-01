@@ -125,18 +125,23 @@ gh() {
 }
 
 FAKE_PNPM_CALLS=0
+FAKE_PNPM_VERSION_OVERRIDE=''
+FAKE_PNPM_KEEP_CHANGESETS=0
 pnpm() {
   FAKE_PNPM_CALLS=$((FAKE_PNPM_CALLS + 1))
   local api_version new_version tmp
   api_version="$(jq -r .version apps/v1_api/package.json)"
   new_version="$(awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}' <<< "${api_version}")"
+  new_version="${FAKE_PNPM_VERSION_OVERRIDE:-${new_version}}"
   for pkg in v1_api v1_web; do
     tmp="$(mktemp)"
     jq --arg v "${new_version}" '.version = $v' "apps/${pkg}/package.json" > "${tmp}"
     mv "${tmp}" "apps/${pkg}/package.json"
     printf '\n## %s\n\n- fixture release\n' "${new_version}" >> "apps/${pkg}/CHANGELOG.md"
   done
-  find .changeset -maxdepth 1 -name '*.md' ! -name README.md -delete
+  if [[ "${FAKE_PNPM_KEEP_CHANGESETS}" -eq 0 ]]; then
+    find .changeset -maxdepth 1 -name '*.md' ! -name README.md -delete
+  fi
 }
 
 reset_fakes() {
@@ -145,6 +150,8 @@ reset_fakes() {
   FAKE_GH_PR_LIST_OUTPUT=''
   FAKE_GH_WORKFLOW_RUN_CALLS=0
   FAKE_PNPM_CALLS=0
+  FAKE_PNPM_VERSION_OVERRIDE=''
+  FAKE_PNPM_KEEP_CHANGESETS=0
 }
 
 # main 을 직접(서브셸 없이) 실행해 stdout+stderr 를 파일로 모은다. `out="$(main 2>&1)"` 처럼
@@ -406,5 +413,47 @@ test_prepare_only() {
 }
 
 test_prepare_only
+
+test_prepare_failure() {
+  local failure_kind="$1" pair origin work before_head before_index before_dev before_main
+  reset_fakes
+  pair="$(make_repo_pair 0.4.0)"
+  origin="$(sed -n 1p <<< "${pair}")"
+  work="$(sed -n 2p <<< "${pair}")"
+  add_pending_changeset "${work}" pending-failure v1_api patch
+  git -C "${work}" checkout -qb fix/prepare-failure
+  export REPO_ROOT="${work}" CONFIRMATION=PROMOTE
+  before_head="$(git -C "${work}" rev-parse HEAD)"
+  before_index="$(git -C "${work}" write-tree)"
+  before_dev="$(git -C "${origin}" rev-parse dev)"
+  before_main="$(git -C "${origin}" rev-parse main)"
+  FAKE_ALPHA_SHA="${before_head}"
+  FAKE_ALPHA_RELEASE="$(resolve_expected_release "${work}")"
+  if [[ "${failure_kind}" == version ]]; then
+    FAKE_PNPM_VERSION_OVERRIDE=9.9.9
+  else
+    FAKE_PNPM_KEEP_CHANGESETS=1
+  fi
+  if main --prepare-only > "${TEST_ROOT}/prepare-failure-${failure_kind}.log" 2>&1; then
+    fail "prepare-only ${failure_kind} failure returned success"
+  fi
+  if [[ "${failure_kind}" == version ]]; then
+    grep -q 'Changesets output does not match' "${TEST_ROOT}/prepare-failure-${failure_kind}.log" || fail 'version refusal missing'
+  else
+    grep -q 'must not contain unreleased Changesets' "${TEST_ROOT}/prepare-failure-${failure_kind}.log" || fail 'real promotion gate refusal missing'
+  fi
+  grep -q 'retry in a fresh isolated worktree' "${TEST_ROOT}/prepare-failure-${failure_kind}.log" || fail 'failure recovery guidance missing'
+  [[ "${FAKE_PNPM_CALLS}" -eq 1 && "${FAKE_GH_WORKFLOW_RUN_CALLS}" -eq 0 ]] || fail 'failure dispatched'
+  [[ "$(git -C "${work}" rev-parse HEAD)" == "${before_head}" ]] || fail 'failure committed'
+  [[ "$(git -C "${work}" write-tree)" == "${before_index}" ]] || fail 'failure staged'
+  [[ "$(git -C "${origin}" rev-parse dev)" == "${before_dev}" ]] || fail 'failure pushed dev'
+  [[ "$(git -C "${origin}" rev-parse main)" == "${before_main}" ]] || fail 'failure changed main'
+  [[ "$(jq -r .version "${work}/apps/v1_api/package.json")" != 0.4.0 ]] || fail 'diagnostic diff was erased'
+  rm -rf "${origin}" "${work}"
+  echo "[test-promote-main] prepare-only ${failure_kind} failure -> nonzero, preserved diff/refs, no dispatch: OK"
+}
+
+test_prepare_failure version
+test_prepare_failure gate
 
 echo "[test-promote-main] all scenarios passed"

@@ -27,6 +27,10 @@ CONFIRMATION="${CONFIRMATION:-}"
 
 log() { printf '%s\n' "$*" >&2; }
 
+log_preparation_failure() {
+  log "Local preparation failed; version/Changeset edits may remain. Preserve the diff for diagnosis and retry in a fresh isolated worktree. No changes were staged, committed, pushed or dispatched."
+}
+
 require_confirmation() {
   if [[ "${CONFIRMATION}" != "PROMOTE" ]]; then
     log "confirmation 입력이 정확히 PROMOTE 가 아니다 (받은 값: '${CONFIRMATION}') — 오타로 인한 실수 실행을 막는다."
@@ -274,12 +278,12 @@ main() {
   # Prepare a reviewable release diff; never stage, commit, push or dispatch.
   if [[ "${prepare_only}" == true ]]; then
     if [[ "${changesets_count}" -gt 0 ]]; then
-      run_changesets_version || return 1
+      run_changesets_version || { log_preparation_failure; return 1; }
       local prepared_versions expected_version
       prepared_versions="$(node -e 'const fs=require("fs"); for(const p of ["v1_api","v1_web"]) console.log(JSON.parse(fs.readFileSync(process.argv[1]+"/apps/"+p+"/package.json")).version)' "${REPO_ROOT}")" || return 1
       expected_version="$(jq -er '.stableVersion' <<< "${metadata}")" || return 1
       [[ "${prepared_versions}" == "${expected_version}"$'\n'"${expected_version}" ]] || {
-        log "Changesets output does not match the planned fixed version"; return 1;
+        log "Changesets output does not match the planned fixed version"; log_preparation_failure; return 1;
       }
     fi
     local prepared_files main_versions
@@ -291,7 +295,7 @@ main() {
     local prepare_rc=0
     run_promotion_gate "${prepared_files}" "${main_versions%% *}" "${main_versions##* }" || prepare_rc=$?
     rm -f "${prepared_files}"
-    [[ "${prepare_rc}" -eq 0 ]] || return "${prepare_rc}"
+    [[ "${prepare_rc}" -eq 0 ]] || { log_preparation_failure; return "${prepare_rc}"; }
     log "Local release candidate prepared. Review the diff and deliver it through a PR to dev; rerun CI and alpha verification on the resulting dev SHA."
     return 0
   fi

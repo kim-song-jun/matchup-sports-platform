@@ -4,29 +4,28 @@ Status: Implemented — 승격(dev→main)과 Stage A/B 실행은 사용자 결�
 
 ## Progress Snapshot — 2026-10-01 production readiness
 
-판정 **NO-GO**, 보고서 `docs/ops/prod-readiness-2026-10-01.md`, PR 본문 초안
-`docs/ops/prod-promotion-pr1325-body.md`. 사용자 요청에 따라 다음 운영 확인은 한 단계씩 진행한다.
+판정 **NO-GO**. 보고서 `docs/ops/prod-readiness-2026-10-01.md`, 승격 PR 본문 `docs/ops/prod-promotion-pr1325-body.md`.
+사용자의 최신 지시대로 직접 가능한 GitHub/AWS/서비스 확인은 에이전트가 수행한다.
 
-- [x] 규칙/런북/현재 배포 경로 읽기, 원격 재fetch: dev `3aac46ec1`, main `f49742f45`, main-only 0/dev-only 4322.
-- [x] 기존 dirty tree를 보존하고 `/tmp/teameet-prod-readiness-20261001`의 별도 수정 브랜치 사용.
-- [x] 최신 PR 실패 확인: Changeset 77. 인증된 Gates 실패 로그 확인, High 6건 검토/오탐 처리.
-- [x] prepare-only 로컬 실행 경로·고정 업로드 확장자·dockerignore·PITR/완료 쿼리 설명 보강.
-- [x] promote 계약 8 시나리오, upload 16 tests, Task 168 계약, production security, surface gate 통과.
-- [x] 별도 release-only worktree `/tmp/teameet-prod-release-candidate-20261001`: 75개 소비, 앱 1.1.0, 로컬 승격 정책 통과.
-- [x] alpha/prod 실제 웹/API SHA·DB health·308 및 공개 경기 44/44·32/32 확인.
-- [x] GitHub CLI 2.102.0 설치·기존 seeungmin 인증 확인. 전체 thread 26/미해결 4, CodeQL 44/48 PR 인스턴스 open/high 조회.
-- [x] baseline/CodeQL thread 3개 resolved, High 6건 false positive/CodeQL PASS. Docker thread 1개는 dev 반영 대기.
-- [x] 실제 multer 경로 위조 3 요청, surface 정상/거부, callback 6/6 PASS.
-- [x] #1325 본문을 최신 범위/검증/NO-GO/사용자 운영 순서로 게시.
-- [ ] dev 대상 준비 수정 초안 PR CI와 리뷰.
-- [ ] 수정 PR → dev 검증 → 최신 dev에서 릴리스 재생성/PR → 새 SHA CI/alpha 재검증.
-- [ ] 현재 188개 migration chain의 원본 리허설·DB ledger/PITR·권장 스냅샷 증거 확보.
-- [ ] 공지·연속 운영자·main SHA 동결 확정, 인증 시나리오 확인 → GO 재판정.
+- [x] 규칙/런북/워크플로 읽기, 재fetch dev16a8c301/mainf49742f45, main-only0/dev-only4328, Changeset79/source chain188.
+- [x] 원본 WIP를 보존하고 격리 worktree/dev 대상 PR #1476에서만 수정.
+- [x] prepare-only·업로드 확장자·dockerignore·PITR/완료쿼리 설명, 자동 리뷰의 실패 안내 및 실패 경로 보완.
+- [x] promote10/upload16/callback6, multer3, surface 정상/거부, Task168/security 계약 PASS.
+- [x] 최초704b601의 #1476 API/Web/Gates CI PASS; 최신 후속 커밋은 별도 확인.
+- [x] #1325 thread26/미해결1(.dockerignore), High6 오탐 명시 처리. 현재dev/승격ref open0과 main 잔존High9/Medium2를 구분.
+- [x] 최신 dev CI/CodeQL/alpha SUCCESS, 실제 웹/API alpha16a8c301/prodf49742f45/health200/DBtrue, 전체 공개44/44·32/32 상세200.
+- [x] Windows AWS 기존 인증으로 production 계정 바인딩/RDS available/PITR7일/자동백업active/오래된manual snapshot/SSM Online 확인.
+- [x] 운영 DB READ ONLY: 완료123/rollback2/unresolved0, main/dev 역사 checksum exact, pre-transition counts/seal0 확인.
+- [x] state active f497/0.5.0 존재, API/Web/worker healthy·digest/source 일치. 알려진 백업은07-26/Task168 기본receipt 없음.
+- [x] 로컬 Docker Desktop Linux 엔진 연결, 기존 컨테이너0. 시스템/운영 DB reset 없음.
+- [ ] #1476 최신 CI/Copilot clean 리뷰 → dev 반영 → Docker thread 해결.
+- [ ] 수정 dev 반영 뒤 모든 Changeset release-only 재생성/PR → 최종 SHA CI/alpha 인증 QA.
+- [ ] 현재188개 chain의 production clone 실증 리허설/실제 복원 증거. 과거178개 기록을 최신 완료로 표시하지 않음.
+- [ ] 공지·동일 연속 운영자·main SHA 동결 확정 → GO 재판정.
 
-Owned: release script/test, upload service/test, dockerignore, 이 task 및 운영 보고서/런북,
-AGENTS/CLAUDE/compatibility 문서, 자체 patch Changeset. Forbidden: 기존 shared-tree WIP,
-main push/merge, production approval, production DB mutation. release-only 후보는 과거 c4467dab1 기반으로 재생성 필요. 준비 수정은 dev 대상 초안 PR로 전달한다.
-기존 09-27 리허설(178개) 기록을 현재 188개 체인의 실증 완료로 취급하지 않는다.
+Owned: release script/test, upload service/test, dockerignore, task/운영 보고서/런북, AGENTS/CLAUDE/compatibility, 자체 Changeset.
+Forbidden: 원본 shared-tree WIP, main push/merge, production approval, production DB mutation.
+과거75개/c446 기반 release-only 후보는 최종 후보가 아니다. RDS 리소스 생성/덤프 반출은 수행하지 않았다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development. 체크박스로 진행을 추적한다.
 

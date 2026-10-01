@@ -139,6 +139,15 @@ function previousTournament(): V1Tournament {
   };
 }
 
+// jsdom 은 scrollIntoView 를 구현하지 않는다 — 불가피한 브라우저 API 스텁. 파일 전체에 두고 복구한다.
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
+
 function renderPage() {
   return render(
     <Providers>
@@ -915,6 +924,77 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         locationText: '서울월드컵보조경기장',
       });
       expect(reset.promoList.locationText).toBe('목록 전용 장소');
+    });
+  });
+
+  describe('단계 전환 시 스크롤·포커스 (#1437)', () => {
+    // 모바일 셸처럼 문서가 아니라 안쪽 컨테이너가 스크롤러다(.tm-scroll-area).
+    const scrollTo = vi.fn();
+    let scroller: HTMLDivElement;
+
+    function renderInScroller() {
+      return render(
+        <Providers>
+          <AdminTournamentsNewPage />
+        </Providers>,
+        { container: scroller },
+      );
+    }
+
+    beforeEach(() => {
+      scrollTo.mockClear();
+      scroller = document.createElement('div');
+      scroller.style.overflowY = 'auto';
+      scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
+      document.body.appendChild(scroller);
+    });
+    afterEach(() => {
+      scroller.remove();
+    });
+
+    it('다음 단계로 넘어가면 스크롤을 맨 위로 올리고 새 단계 제목에 포커스를 둔다', () => {
+      renderInScroller();
+      goToScheduleStep();
+
+      const heading = screen.getByRole('heading', { level: 2, name: /일정/ });
+      expect(heading).toHaveFocus();
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+    });
+
+    it('이전 단계로 돌아가도 새 단계 제목에 포커스를 둔다', () => {
+      renderInScroller();
+      goToScheduleStep();
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+
+      expect(screen.getByRole('heading', { level: 2, name: /기본 정보/ })).toHaveFocus();
+    });
+
+    it('검증에 실패하면 단계는 그대로 두고 첫 오류 필드로 포커스한다', () => {
+      renderInScroller();
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByLabelText(/종목/)).toHaveFocus();
+      expect(scrollTo).not.toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+    });
+
+    it('혼성 정원 그룹 오류는 그 그룹의 첫 입력(남성 최소)에 포커스한다', () => {
+      renderInScroller();
+      goToParticipationStep();
+      fireEvent.change(screen.getByLabelText(/최대 선수 수/), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText('남성 최소'), { target: { value: '8' } });
+      fireEvent.change(screen.getByLabelText('여성 최소'), { target: { value: '8' } });
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByText('성별 최소 인원 합이 최대 선수 수를 넘을 수 없어요.')).toBeInTheDocument();
+      expect(screen.getByLabelText('남성 최소')).toHaveFocus();
+    });
+
+    it('종목만 채우고 넘기면 두 번째 오류 필드(대회명)로 포커스한다', () => {
+      renderInScroller();
+      fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByLabelText(/대회명/)).toHaveFocus();
     });
   });
 });

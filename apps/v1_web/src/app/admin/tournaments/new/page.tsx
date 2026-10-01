@@ -30,6 +30,7 @@ import {
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { findScrollContainer } from '@/components/reviews/review-scroll-anchor';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
 import {
   CONFIRM_STEP_INDEX,
@@ -46,6 +47,10 @@ import {
   type TournamentCreateAction,
   type TournamentCreateState,
 } from './tournament-create-model';
+
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
@@ -116,6 +121,36 @@ export default function AdminTournamentsNewPage() {
     clearError(field);
   };
 
+  // 검증 실패로 띄운 오류만 첫 오류 필드로 포커스한다 — 입력하며 오류가 지워지는 갱신은 제외.
+  const focusFirstErrorRef = useRef(false);
+  const showErrors = (next: Record<string, string>) => {
+    focusFirstErrorRef.current = true;
+    setErrors(next);
+  };
+
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const renderedStepRef = useRef(state.step);
+  useEffect(() => {
+    if (renderedStepRef.current === state.step) return;
+    renderedStepRef.current = state.step;
+    const heading = stepHeadingRef.current;
+    if (!heading) return;
+    findScrollContainer(heading)?.scrollTo({ top: 0, behavior: scrollBehavior() });
+    heading.focus({ preventScroll: true });
+  }, [state.step]);
+
+  useEffect(() => {
+    if (!focusFirstErrorRef.current) return;
+    focusFirstErrorRef.current = false;
+    // 오류 문구가 `data-error-focus` 로 가리키는 입력에 포커스한다. 그룹 오류는 그룹의 첫 입력을 가리킨다.
+    const alert = formRef.current?.querySelector<HTMLElement>('[role="alert"][data-error-focus]');
+    if (!alert) return;
+    const control = document.getElementById(alert.dataset.errorFocus ?? '');
+    (control ?? alert).scrollIntoView({ block: 'center', behavior: scrollBehavior() });
+    control?.focus({ preventScroll: true });
+  }, [errors]);
+
   const goToStep = (nextStep: number) => {
     // "공개 확인" 단계는 초안이 실제로 만들어진 뒤에만 들어갈 수 있다 — 검증만 통과했다고
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
@@ -130,7 +165,7 @@ export default function AdminTournamentsNewPage() {
       const stepErrors = validateTournamentCreateStep(state, step);
       if (Object.keys(stepErrors).length > 0) {
         dispatch({ type: 'set-step', step });
-        setErrors(stepErrors);
+        showErrors(stepErrors);
         return;
       }
     }
@@ -141,7 +176,7 @@ export default function AdminTournamentsNewPage() {
   const goNext = () => {
     const stepErrors = validateTournamentCreateStep(state);
     if (Object.keys(stepErrors).length > 0) {
-      setErrors(stepErrors);
+      showErrors(stepErrors);
       return;
     }
     dispatch({ type: 'set-step', step: state.step + 1 });
@@ -192,7 +227,7 @@ export default function AdminTournamentsNewPage() {
       ...[0, 1, 2, 3].map((step) => validateTournamentCreateStep(state, step)),
     ) as Record<string, string>;
     if (!canSubmitTournamentCreate(state)) {
-      setErrors(allErrors);
+      showErrors(allErrors);
       const firstInvalidStep = [0, 1, 2, 3].find(
         (step) => Object.keys(validateTournamentCreateStep(state, step)).length > 0,
       );
@@ -286,7 +321,7 @@ export default function AdminTournamentsNewPage() {
         description="기본 정보부터 참가 조건까지 입력하면 대회가 초안으로 만들어져요. 마지막 확인 화면에서 참가자에게 보일 모습을 확인한 뒤 접수를 시작하세요."
       />
 
-      <form onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
+      <form ref={formRef} onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
         <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null} onSelect={goToStep} />
 
         <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
@@ -294,7 +329,11 @@ export default function AdminTournamentsNewPage() {
             <p className="text-xs font-bold text-[var(--blue700)]">
               STEP {state.step + 1} / {TOURNAMENT_CREATE_STEPS.length}
             </p>
-            <h2 className="mt-1 text-xl font-bold text-[var(--text-strong)]">
+            <h2
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              className="mt-1 text-xl font-bold text-[var(--text-strong)] focus:outline-none"
+            >
               {TOURNAMENT_CREATE_STEPS[state.step].title}
             </h2>
             <p className="mt-1 text-sm text-[var(--text-caption)]">
@@ -1035,7 +1074,7 @@ function ParticipationStep({
             />
           </div>
           {errors.genderQuota ? (
-            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red700)]">
+            <p role="alert" data-error-focus="gender-min-male" className="mt-3 text-xs font-semibold text-[var(--red700)]">
               {errors.genderQuota}
             </p>
           ) : null}
@@ -1409,7 +1448,7 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-[var(--red700)]">
+        <p role="alert" data-error-focus={id} className="text-xs font-medium text-[var(--red700)]">
           {error}
         </p>
       ) : hint ? (

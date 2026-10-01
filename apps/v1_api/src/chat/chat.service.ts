@@ -15,6 +15,9 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
 import { archiveEndedContactRooms } from '../team-contacts/contact-room-archive';
 import {
+  CHAT_SHARE_KINDS,
+  ChatShareKind,
+  ChatShareTargetDto,
   ReportChatMessageDto,
   ChatMessagesQueryDto,
   ChatRoomsQueryDto,
@@ -279,6 +282,7 @@ export class ChatService {
         content: message.status === 'sent' ? message.body : null,
         // 숨김·삭제 메시지는 본문처럼 사진도 내리지 않는다.
         imageUrl: message.status === 'sent' ? message.attachmentAsset?.url ?? null : null,
+        shareCard: message.status === 'sent' ? parseShareCard(message.shareCard) : null,
         status: message.status,
         sentAt: message.sentAt,
         mine: message.senderUserId === user.id,
@@ -288,11 +292,70 @@ export class ChatService {
     };
   }
 
+  /**
+   * 공유 대상을 보내는 사람 기준으로 열람 확인하고 카드 스냅숏을 만든다. 못 보면 400(존재를 드러내지 않는다).
+   * - 팀 일정: 팀이 살아 있고, 공개 일정이거나 보내는 사람이 활성 팀원(팀 일정 상세의 규칙과 같다).
+   *   팀 매치 일정이면 카드는 상대 팀도 열 수 있는 팀 매치 화면으로 연다.
+   * - 매치: 지워지지 않은 매치(매치 상세의 규칙과 같다).
+   */
+  private async resolveShareCard(userId: string, target: ChatShareTargetDto): Promise<ChatShareCard> {
+    if (target.kind === 'team_schedule') {
+      const schedule = await this.prisma.v1TeamSchedule.findFirst({
+        where: { id: target.targetId },
+        select: { id: true, teamId: true, teamMatchId: true, title: true, startAt: true, visibility: true, state: true },
+      });
+      const team = schedule
+        ? await this.prisma.v1Team.findFirst({ where: { id: schedule.teamId, status: 'active', deletedAt: null }, select: { name: true } })
+        : null;
+      const member = schedule && team
+        ? await this.prisma.v1TeamMembership.findFirst({ where: { teamId: schedule.teamId, userId, status: 'active' }, select: { id: true } })
+        : null;
+      if (!schedule || !team || (schedule.visibility !== 'PUBLIC' && !member)) {
+        throw validationError('공유할 일정을 찾을 수 없어요.', 'share');
+      }
+      // 카드는 보낼 때의 스냅숏이라 취소·끝난 일정을 보내면 받는 사람이 진행되는 줄 안다.
+      if (schedule.state !== 'SCHEDULED') throw validationError('취소됐거나 끝난 일정은 공유할 수 없어요.', 'share');
+      const teamMatch = schedule.teamMatchId
+        ? await this.prisma.v1TeamMatch.findFirst({ where: { id: schedule.teamMatchId, deletedAt: null }, select: { placeName: true } })
+        : null;
+      return {
+        kind: 'team_schedule',
+        targetId: schedule.id,
+        title: schedule.title,
+        startAt: schedule.startAt.toISOString(),
+        place: teamMatch?.placeName ?? null,
+        sub: team.name,
+        route: teamMatch && schedule.teamMatchId ? `/team-matches/${schedule.teamMatchId}` : `/teams/${schedule.teamId}/schedules/${schedule.id}`,
+      };
+    }
+    // 종류를 명시적으로 가른다 — 검증을 빠져나온 이상한 값이 매치 분기로 떨어져 `id: undefined` 조회(= 아무 매치)가
+    // 되지 않게(#1398 리뷰).
+    if (target.kind !== 'match' || !target.targetId) throw validationError('공유할 대상을 알 수 없어요.', 'share');
+    const match = await this.prisma.v1Match.findFirst({
+      where: { id: target.targetId, deletedAt: null },
+      select: { id: true, title: true, startAt: true, placeName: true, status: true },
+    });
+    if (!match) throw validationError('공유할 매치를 찾을 수 없어요.', 'share');
+    if (match.status === 'cancelled' || match.status === 'archived') {
+      throw validationError('취소된 매치는 공유할 수 없어요.', 'share');
+    }
+    return {
+      kind: 'match',
+      targetId: match.id,
+      title: match.title,
+      startAt: match.startAt.toISOString(),
+      place: match.placeName,
+      sub: null,
+      route: `/matches/${match.id}`,
+    };
+  }
+
   async sendMessage(user: V1AuthUser, roomId: string, dto: SendChatMessageDto) {
     const content = dto.content?.trim() ?? '';
     const imageUrl = dto.imageUrl?.trim() ?? '';
-    if (content && imageUrl) throw validationError('content and imageUrl cannot be sent together', 'imageUrl');
-    if (!content && !imageUrl) throw validationError('content is required', 'content');
+    const sentKinds = [content, imageUrl, dto.share].filter(Boolean).length;
+    if (sentKinds > 1) throw validationError('send exactly one of content, imageUrl and share', dto.share ? 'share' : 'imageUrl');
+    if (sentKinds === 0) throw validationError('content is required', 'content');
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.teamContact) {
       const status = contactDisplayStatus(room.teamContact.status, room.teamContact.expiresAt);
@@ -308,15 +371,24 @@ export class ChatService {
         })
       : null;
     if (imageUrl && !image) throw validationError('사진을 찾을 수 없어요. 다시 올려 주세요.', 'imageUrl');
-    // 사진 메시지의 body 는 '사진' — 목록 미리보기·신고 스냅샷·body 만 읽는 옛 경로가 그대로 읽힌다.
-    const body = image ? '사진' : content;
-    const notificationText = image ? '사진을 보냈어요' : content.slice(0, 120);
+    // 공유 카드는 보내는 사람이 볼 수 있는 일정·매치만 — 못 보는 걸 카드로 퍼 나르지 못하게. 보낼 때 스냅숏한다.
+    const shareCard = dto.share ? await this.resolveShareCard(user.id, dto.share) : null;
+    const shareLabel = shareCard ? CHAT_SHARE_LABEL[shareCard.kind] : null;
+    // 사진·공유 메시지의 body 는 읽을 수 있는 대체 문구 — 목록 미리보기·신고 스냅샷·body 만 읽는 옛 경로가 그대로 읽힌다.
+    const body = image ? '사진' : shareCard ? `[${shareLabel}] ${shareCard.title}` : content;
+    const notificationText = image
+      ? '사진을 보냈어요'
+      : shareCard
+        ? `${shareLabel}${shareCard.kind === 'team_schedule' ? '을' : '를'} 공유했어요 · ${shareCard.title}`.slice(0, 120)
+        : content.slice(0, 120);
 
     const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1ChatMessage.create({
         data: image
           ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'image', attachmentAssetId: image.id }
-          : { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent' },
+          : shareCard
+            ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'share', shareCard }
+            : { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent' },
       });
       await tx.v1ChatRoom.update({
         where: { id: room.id },
@@ -331,6 +403,7 @@ export class ChatService {
       messageType: message.messageType,
       content: message.body,
       imageUrl: image?.url ?? null,
+      shareCard,
       status: message.status,
       sentAt: message.sentAt,
       senderUserId: user.id,
@@ -977,6 +1050,32 @@ export function contactDisplayStatus(status: string, expiresAt: Date) {
 function counterpartTeamId(block: { mySide: 'from' | 'to'; fromTeam: { id: string }; toTeam: { id: string } } | null) {
   if (!block) return null;
   return block.mySide === 'to' ? block.fromTeam.id : block.toTeam.id;
+}
+
+/** 공유 카드 스냅숏(`V1ChatMessage.shareCard`). */
+export type ChatShareCard = {
+  kind: ChatShareKind;
+  targetId: string;
+  title: string;
+  startAt: string | null;
+  place: string | null;
+  sub: string | null;
+  route: string;
+};
+
+const CHAT_SHARE_LABEL: Record<ChatShareKind, string> = { team_schedule: '일정', match: '매치' };
+
+/** DB JSON 을 카드 모양으로 — 모양이 어긋난 행은 카드 없이(null) 내보낸다(본문 대체 문구는 그대로 보인다). */
+export function parseShareCard(value: Prisma.JsonValue | null): ChatShareCard | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const card = value as Record<string, unknown>;
+  const text = (key: string) => (typeof card[key] === 'string' ? (card[key] as string) : null);
+  const kind = text('kind');
+  const targetId = text('targetId');
+  const title = text('title');
+  const route = text('route');
+  if (!kind || !(CHAT_SHARE_KINDS as readonly string[]).includes(kind) || !targetId || !title || !route?.startsWith('/')) return null;
+  return { kind: kind as ChatShareKind, targetId, title, startAt: text('startAt'), place: text('place'), sub: text('sub'), route };
 }
 
 function validationError(message: string, field: string) {

@@ -219,6 +219,72 @@ describe('채팅방 + 패널 · 사진 (Task 181)', () => {
   });
 });
 
+describe('채팅방 일정·매치 공유 (Task 181 ②)', () => {
+  const shareModel = (overrides: Partial<NonNullable<ChatRoomViewModel['share']>> = {}): NonNullable<ChatRoomViewModel['share']> => ({
+    open: false,
+    onOpen: vi.fn(),
+    onClose: vi.fn(),
+    status: 'ready',
+    schedules: [{ kind: 'team_schedule', targetId: 'sch-1', title: '토요일 친선', when: '10/4 (토) 19:00', sub: '번개 FC' }],
+    matches: [{ kind: 'match', targetId: 'm-1', title: '수요일 저녁 풋살', when: '10/8 (수) 20:00', sub: '성수 풋살파크' }],
+    onPick: vi.fn(),
+    onRetry: vi.fn(),
+    ...overrides,
+  });
+
+  it('+ 패널의 "일정·매치" 칸은 공유 시트를 열고 패널을 닫는다', () => {
+    const share = shareModel();
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share }} roomId="room-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '일정·매치' }));
+
+    expect(share.onOpen).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('group', { name: '보내기 메뉴' })).not.toBeInTheDocument();
+  });
+
+  it('시트에서 팀 일정·매치 탭을 바꿔 고르면 그 항목을 넘긴다', () => {
+    const share = shareModel({ open: true });
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share }} roomId="room-1" />);
+    const sheet = screen.getByRole('dialog', { name: '일정·매치 공유' });
+
+    fireEvent.click(within(sheet).getByRole('button', { name: /토요일 친선/ }));
+    expect(share.onPick).toHaveBeenCalledWith(share.schedules[0]);
+
+    fireEvent.click(within(sheet).getByRole('tab', { name: '매치' }));
+    expect(within(sheet).getByText('10/8 (수) 20:00 · 성수 풋살파크')).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: /수요일 저녁 풋살/ }));
+    expect(share.onPick).toHaveBeenLastCalledWith(share.matches[0]);
+  });
+
+  it('비었거나·불러오는 중이거나·실패하면 그 상태를 알리고 실패는 다시 불러온다', () => {
+    const { unmount } = renderWithClient(
+      <ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share: shareModel({ open: true, schedules: [] }) }} roomId="room-1" />,
+    );
+    expect(screen.getByText('다가오는 팀 일정이 없어요.')).toBeInTheDocument();
+    unmount();
+
+    const failing = shareModel({ open: true, status: 'error' });
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share: failing }} roomId="room-1" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('목록을 불러오지 못했어요.');
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(failing.onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('공유 카드는 종류·제목·일시·장소를 보여 주고 누르면 그 화면으로 간다', () => {
+    const messages: ChatRoomViewModel['messages'] = [{
+      id: 's1', who: 'me', senderId: 'u1', label: '나', body: '[매치] 수요일 저녁 풋살', sentAt: '2026-10-01T01:00:00Z', kind: 'share',
+      share: { label: '매치', title: '수요일 저녁 풋살', when: '10/8 (수) 20:00', place: '성수 풋살파크', sub: null, href: '/matches/m-1?from=%2Fchat%2Froom-1' },
+    }];
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, messages }} roomId="room-1" />);
+
+    const card = screen.getByRole('link', { name: /매치 공유/ });
+    expect(card).toHaveAttribute('href', '/matches/m-1?from=%2Fchat%2Froom-1');
+    expect(within(card).getByText('수요일 저녁 풋살')).toBeInTheDocument();
+    expect(within(card).getByText('성수 풋살파크')).toBeInTheDocument();
+  });
+});
+
 const emptyNotifications: NotificationsViewModel = { status: 'ready', unreadCount: 0, notifications: [] };
 
 describe('알림 빈 상태', () => {

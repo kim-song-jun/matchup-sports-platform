@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class ChatRoomsQueryDto {
   @IsOptional()
@@ -47,7 +47,19 @@ export class ChatMessagesQueryDto {
   direction?: 'before' | 'after';
 }
 
-/** 텍스트(`content`) 또는 사진(`imageUrl`) 중 **하나**. 둘 다·둘 다 없음은 서비스가 400 으로 막는다. */
+export const CHAT_SHARE_KINDS = ['team_schedule', 'match'] as const;
+export type ChatShareKind = (typeof CHAT_SHARE_KINDS)[number];
+
+/** 공유할 대상 — 서버가 보내는 사람의 열람 권한을 확인하고 제목·일시·장소를 스냅숏한다(Task 181 ②). */
+export class ChatShareTargetDto {
+  @IsIn(CHAT_SHARE_KINDS)
+  kind!: ChatShareKind;
+
+  @IsUUID()
+  targetId!: string;
+}
+
+/** 텍스트(`content`) · 사진(`imageUrl`) · 공유(`share`) 중 **하나**. 여러 개·하나도 없음은 서비스가 400 으로 막는다. */
 export class SendChatMessageDto {
   @IsOptional()
   @IsString()
@@ -59,6 +71,13 @@ export class SendChatMessageDto {
   @IsString()
   @MaxLength(512)
   imageUrl?: string;
+
+  // @IsObject 가 없으면 `share: []` 가 ValidateNested 를 그냥 통과한다(검사할 원소가 없어서) — 대상 없는 공유를 막는다.
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ChatShareTargetDto)
+  share?: ChatShareTargetDto;
 }
 
 export class UpdateMyChatRoomDto {

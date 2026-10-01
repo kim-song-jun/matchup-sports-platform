@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { Camera, Image as ImageIcon, X } from 'lucide-react';
+import { CalendarDays, Camera, Image as ImageIcon, X } from 'lucide-react';
+import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { detectNativeShell } from '@/lib/native-bridge';
+import type { ChatShareCandidate, ChatShareSheetModel } from './community.types';
 
 /** 한 번에 보낼 수 있는 사진 수 — 업로드 API 한도(`FilesInterceptor('files', 5)`)와 같다. */
 export const MAX_CHAT_IMAGES = 5;
@@ -32,10 +35,13 @@ export function ChatPlusPanel({
   id,
   disabled,
   onPickImages,
+  onOpenShare,
 }: {
   id: string;
   disabled: boolean;
   onPickImages: (files: File[]) => void;
+  /** 일정·매치 공유 시트를 연다(Task 181 ②). 없으면 칸이 안 보인다. */
+  onOpenShare?: () => void;
 }) {
   const albumRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -56,6 +62,11 @@ export function ChatPlusPanel({
       {canUseCamera ? (
         <PlusTile label="카메라" disabled={disabled} onClick={() => cameraRef.current?.click()}>
           <Camera size={22} strokeWidth={2} />
+        </PlusTile>
+      ) : null}
+      {onOpenShare ? (
+        <PlusTile label="일정·매치" disabled={disabled} onClick={onOpenShare}>
+          <CalendarDays size={22} strokeWidth={2} />
         </PlusTile>
       ) : null}
       <input ref={albumRef} type="file" accept={IMAGE_ACCEPT} multiple hidden onChange={handleChange} data-testid="chat-album-input" />
@@ -88,5 +99,62 @@ export function ChatImageViewer({ url, onClose }: { url: string | null; onClose:
         <img src={url} alt="보낸 사진" className="tm-chat-image-viewer-img" />
       </div>
     </div>
+  );
+}
+
+/**
+ * 일정·매치 공유 시트 — 내 팀의 다가오는 일정, 내가 참여·개설한 다가오는 매치 중 하나를 골라 카드로 보낸다.
+ * 기존 BottomSheet(상태로 여닫는 형태: ESC·뒤로가기·드래그 닫기)를 그대로 쓴다.
+ */
+export function ChatSharePicker({ share }: { share: ChatShareSheetModel }) {
+  const [tab, setTab] = useState<'schedules' | 'matches'>('schedules');
+  if (!share.open) return null;
+  const rows = tab === 'schedules' ? share.schedules : share.matches;
+  const emptyText = tab === 'schedules' ? '다가오는 팀 일정이 없어요.' : '다가오는 매치가 없어요.';
+  return (
+    <BottomSheet open onClose={share.onClose} title="일정·매치 공유">
+      <div className="tm-chat-share-sheet">
+        <SegmentedTabs
+          items={[
+            { id: 'schedules', label: '팀 일정' },
+            { id: 'matches', label: '매치' },
+          ]}
+          activeId={tab}
+          onSelect={(id) => setTab(id === 'matches' ? 'matches' : 'schedules')}
+          ariaLabel="공유할 종류"
+          role="tablist"
+        />
+        {share.status === 'loading' ? (
+          <p className="tm-text-caption tm-chat-share-sheet-note" role="status">불러오는 중이에요…</p>
+        ) : share.status === 'error' ? (
+          <div className="tm-chat-share-sheet-note">
+            <p className="tm-text-caption" role="alert">목록을 불러오지 못했어요.</p>
+            {share.onRetry ? (
+              <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={share.onRetry}>다시 불러오기</button>
+            ) : null}
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="tm-text-caption tm-chat-share-sheet-note">{emptyText}</p>
+        ) : (
+          <ul className="tm-chat-share-list" aria-label={tab === 'schedules' ? '다가오는 팀 일정' : '다가오는 매치'}>
+            {rows.map((row) => (
+              <li key={`${row.kind}:${row.targetId}`}>
+                <ShareRow row={row} onPick={share.onPick} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function ShareRow({ row, onPick }: { row: ChatShareCandidate; onPick: (row: ChatShareCandidate) => void }) {
+  const meta = [row.when, row.sub].filter(Boolean).join(' · ');
+  return (
+    <button type="button" className="tm-chat-share-row" onClick={() => onPick(row)}>
+      <span className="tm-text-body tm-chat-share-row-title">{row.title}</span>
+      {meta ? <span className="tm-text-caption">{meta}</span> : null}
+    </button>
   );
 }

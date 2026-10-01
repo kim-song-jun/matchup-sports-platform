@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isAccessDeniedError } from '@/lib/access-denied-error';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
 import { withFromPath } from '@/lib/session-storage';
@@ -17,6 +18,8 @@ import {
   useV1NotificationsInfinite,
   useV1ReadAllNotifications,
   useV1ReadNotification,
+  useV1MyMatches,
+  useV1MySchedule,
   useV1SendChatMessage,
   useV1UploadImages,
   useV1UpdateChatRoomMe,
@@ -25,7 +28,7 @@ import {
 import type { V1ChatMessage, V1ChatRoom, V1Notification } from '@/types/api';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
 import { formatChatListTimestamp } from './chat-message-time';
-import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
+import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCandidate, NotificationModel, NotificationsViewModel } from './community.types';
 import { getChatRoomViewModel } from './community.view-model';
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
@@ -157,6 +160,12 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const [draft, setDraft] = useState('');
   const [sendingImages, setSendingImages] = useState(false);
   const [imageNotice, setImageNotice] = useState<string | undefined>();
+  // 일정·매치 공유 시트 — 열 때만 내 팀 일정·내 매치를 불러온다(채팅방을 열 때마다 부르지 않게).
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareFrom = useMemo(() => new Date().toISOString(), [shareOpen]);
+  const mySchedules = useV1MySchedule({ status: 'scheduled', from: shareFrom, limit: 30 }, { enabled: shareOpen });
+  const joinedMatches = useV1MyMatches({ mode: 'joined', limit: 30 }, { enabled: shareOpen });
+  const createdMatches = useV1MyMatches({ mode: 'created', limit: 30 }, { enabled: shareOpen });
   const items = useMemo(() => [...(messages.data?.items ?? [])].reverse(), [messages.data]);
   const lastMessageId = items.at(-1)?.messageId ?? null;
 
@@ -181,7 +190,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const isLoading = room.isPending || messages.isPending;
   // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
   // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
-  const messageItems = messages.data ? items.map(toChatMessageModel) : isLoading ? fallback.messages : [];
+  const messageItems = messages.data ? items.map((message) => toChatMessageModel(message, currentHref)) : isLoading ? fallback.messages : [];
+  const shareQueries = [mySchedules, joinedMatches, createdMatches];
   const model: ChatRoomViewModel = {
     onMessageSafety: setSafety,
     onManageBlocked: () => setSafety('manage'),
@@ -260,6 +270,29 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     },
     sendingImages,
     imageNotice,
+    share: {
+      open: shareOpen,
+      onOpen: () => setShareOpen(true),
+      onClose: () => setShareOpen(false),
+      status: shareQueries.some((query) => query.isError) ? 'error' : shareQueries.some((query) => query.isPending) ? 'loading' : 'ready',
+      schedules: (mySchedules.data?.items ?? []).map((item) => ({
+        kind: 'team_schedule' as const,
+        targetId: item.id,
+        title: item.title,
+        when: formatTournamentDateTimeShort(item.startAt),
+        sub: item.teamName,
+      })),
+      matches: upcomingMatches([...(joinedMatches.data?.items ?? []), ...(createdMatches.data?.items ?? [])], shareFrom),
+      onPick: (candidate: ChatShareCandidate) => {
+        setShareOpen(false);
+        setImageNotice(undefined);
+        send.mutate(
+          { share: { kind: candidate.kind, targetId: candidate.targetId } },
+          { onError: (err) => setImageNotice(extractErrorMessage(err, '공유하지 못했어요. 다시 시도해 주세요.')) },
+        );
+      },
+      onRetry: () => shareQueries.forEach((query) => void query.refetch()),
+    },
     errorBack: accessDenied ? { href: '/chat', label: '채팅 목록으로' } : undefined,
     onRetry: isError && !accessDenied
       ? () => {
@@ -358,7 +391,24 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
 //   return '9999-12-31T23:59:59.999Z';
 // }
 
-function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages'][number] {
+/** 내가 참여·개설한 매치 중 다가오고 취소되지 않은 것만, 중복 없이 빠른 순(서버도 취소 매치 공유를 400 으로 막는다). */
+function upcomingMatches(matches: Array<{ id: string; title: string; startsAt: string; placeName: string; status: string }>, fromIso: string): ChatShareCandidate[] {
+  const seen = new Set<string>();
+  return matches
+    .filter((match) => match.status !== 'cancelled' && match.startsAt >= fromIso && !seen.has(match.id) && seen.add(match.id))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+    .map((match) => ({
+      kind: 'match' as const,
+      targetId: match.id,
+      title: match.title,
+      when: formatTournamentDateTimeShort(match.startsAt),
+      sub: match.placeName,
+    }));
+}
+
+const SHARE_LABEL = { team_schedule: '일정', match: '매치' } as const;
+
+function toChatMessageModel(message: V1ChatMessage, currentHref: string | null): ChatRoomViewModel['messages'][number] {
   if (message.messageType === 'system') {
     return {
       id: message.messageId,
@@ -385,7 +435,22 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
           // 숨김·삭제면 content 가 null 이라 위 '삭제된 메시지예요.' 가 남고, 업로드만 지워졌으면 이 문구다.
           ...(message.content !== null && !message.imageUrl ? { body: '사진을 볼 수 없어요' } : {}),
         }
-      : {}),
+      : message.messageType === 'share'
+        ? {
+            kind: 'share' as const,
+            // 카드에서 연 화면의 뒤로가기가 이 채팅방으로 돌아오게 출처를 싣는다.
+            share: message.shareCard
+              ? {
+                  label: SHARE_LABEL[message.shareCard.kind],
+                  title: message.shareCard.title,
+                  when: formatTournamentDateTimeShort(message.shareCard.startAt),
+                  place: message.shareCard.place,
+                  sub: message.shareCard.sub,
+                  href: withFromPath(message.shareCard.route, currentHref),
+                }
+              : null,
+          }
+        : {}),
   };
 }
 

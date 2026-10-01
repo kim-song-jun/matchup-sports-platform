@@ -14,7 +14,7 @@ import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/compone
 import { cssUrl } from '@/lib/assets';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
-import { ChatImageViewer, ChatPlusPanel } from './chat-plus-panel';
+import { ChatImageViewer, ChatPlusPanel, ChatSharePicker } from './chat-plus-panel';
 import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
@@ -284,8 +284,19 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                           {showTime ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
                         </div>
                       ) : null}
-                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}${message.kind === 'image' && message.imageUrl ? ' tm-chat-bubble-image' : ''}`}>
-                        {message.kind === 'image' && message.imageUrl ? (
+                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}${message.kind === 'image' && message.imageUrl ? ' tm-chat-bubble-image' : ''}${message.kind === 'share' && message.share ? ' tm-chat-bubble-share' : ''}`}>
+                        {message.kind === 'share' && message.share ? (
+                          <Link className="tm-chat-share-card" href={message.share.href}>
+                            <span className="tm-text-micro tm-chat-share-card-kind">{message.share.label} 공유</span>
+                            <span className="tm-text-body tm-chat-share-card-title">{message.share.title}</span>
+                            {message.share.when ? <span className="tm-text-caption">{message.share.when}</span> : null}
+                            {message.share.place ? <span className="tm-text-caption">{message.share.place}</span> : null}
+                            {message.share.sub ? <span className="tm-text-caption">{message.share.sub}</span> : null}
+                            <span className="tm-text-caption tm-chat-share-card-cta">
+                              자세히 보기 <ChevronRightIcon size={14} strokeWidth={2.2} />
+                            </span>
+                          </Link>
+                        ) : message.kind === 'image' && message.imageUrl ? (
                           <button type="button" className="tm-chat-image-button" aria-label="사진 크게 보기" onClick={() => setViewerUrl(message.imageUrl ?? null)}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- 사용자 업로드(/uploads)는 next/image 최적화 대상이 아니다. */}
                             <img src={message.imageUrl} alt="" className="tm-chat-image" loading="lazy" />
@@ -365,8 +376,13 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
               setPlusOpen(false);
               model.onPickImages?.(files);
             }}
+            onOpenShare={model.share ? () => {
+              setPlusOpen(false);
+              model.share?.onOpen();
+            } : undefined}
           />
         ) : null}
+        {model.share ? <ChatSharePicker share={model.share} /> : null}
         <ChatImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />
       </div>
         </section>

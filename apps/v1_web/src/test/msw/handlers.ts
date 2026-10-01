@@ -634,15 +634,27 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/chat/rooms/:roomId/messages`, ({ params }) => ok(v1ChatMessagesByRoomFixture[String(params.roomId)] ?? v1ChatMessagesFixture)),
   http.post(`${api}/chat/rooms/:roomId/messages`, async ({ params, request }) => {
-    const body = await request.json() as { content?: string; imageUrl?: string };
+    const body = await request.json() as { content?: string; imageUrl?: string; share?: { kind: 'team_schedule' | 'match'; targetId: string } };
     const sentAt = new Date().toISOString();
     // 사진 메시지(Task 181)는 서버처럼 body '사진' + imageUrl 로 싣는다.
     const message = {
       messageId: `message-${Date.now()}`,
       sender: { userId: 'user-1', displayName: '나', profileImageUrl: null },
-      messageType: body.imageUrl ? 'image' as const : 'text' as const,
-      content: body.imageUrl ? '사진' : body.content ?? '',
+      messageType: body.imageUrl ? 'image' as const : body.share ? 'share' as const : 'text' as const,
+      content: body.imageUrl ? '사진' : body.share ? '[공유] 공유한 항목' : body.content ?? '',
       imageUrl: body.imageUrl ?? null,
+      // 일정·매치 공유(Task 181 ②)는 서버처럼 스냅숏 카드를 싣는다(목 서버는 제목을 모르니 고정 문구).
+      shareCard: body.share
+        ? {
+            kind: body.share.kind,
+            targetId: body.share.targetId,
+            title: '공유한 항목',
+            startAt: null,
+            place: null,
+            sub: null,
+            route: body.share.kind === 'match' ? `/matches/${body.share.targetId}` : `/team-matches/${body.share.targetId}`,
+          }
+        : null,
       status: 'sent',
       sentAt,
       mine: true,
@@ -654,7 +666,7 @@ export const v1MswHandlers = [
       room.lastMessage = { messageId: message.messageId, contentPreview: `나: ${message.content}`, sentAt };
       room.unreadCount = 0;
     }
-    return ok({ messageId: message.messageId, roomId: params.roomId, messageType: message.messageType, content: message.content, imageUrl: message.imageUrl, status: 'sent', sentAt });
+    return ok({ messageId: message.messageId, roomId: params.roomId, messageType: message.messageType, content: message.content, imageUrl: message.imageUrl, shareCard: message.shareCard, status: 'sent', sentAt });
   }),
   http.patch(`${api}/chat/rooms/:roomId/me`, async ({ params, request }) => {
     const body = await request.json() as { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null };

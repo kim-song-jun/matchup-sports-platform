@@ -80,6 +80,8 @@ export interface PlayerCard {
   /** 카드 모양(코스메틱). 업적으로 열리며 능력치·등급과 무관하다. */
   readonly shape: PlayerCardShape;
   readonly appearances: number;
+  /** 공개 동의·공식 결과 게이트를 통과한 원본 집계. 허용된 기록이 없으면 null. */
+  readonly records: { readonly appearances: number; readonly goals: number; readonly assists: number } | null;
   readonly stats: readonly PlayerCardStat[];
   /** 열린 능력치 / 전체. 카드 완성도 표시에 쓴다. */
   readonly unlockedCount: number;
@@ -280,6 +282,9 @@ export function buildPlayerCard(input: PlayerCardInput): PlayerCard {
     tier: resolveTier(appearances),
     shape: resolveCardShape(input.savedShape, input.reviewCount),
     appearances,
+    records: input.recordsConsented && input.hasUnlockableRecords
+      ? { appearances, goals: input.goals, assists: input.assists }
+      : null,
     stats,
     unlockedCount: unlocked.length,
     nextUnlock: nearest === null ? null : { code: nearest.code, reason: nearest.lockedBy as PlayerCardLockReason },

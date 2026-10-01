@@ -23,6 +23,7 @@ import {
   normalizeSignupDisplayName,
   SIGNUP_PROFILE_ERROR_MESSAGES,
 } from './signup-profile-validation';
+import { extractErrorMessage } from '@/lib/error-message';
 
 type FieldErrors = Partial<Record<'nickname' | 'gender', string>>;
 type DuplicateCheckState = {
@@ -167,7 +168,7 @@ export function SocialSignupClient() {
             return;
           }
 
-          setError(nextError instanceof Error ? nextError.message : '가입을 완료하지 못했어요.');
+          setError(extractErrorMessage(nextError, '가입을 완료하지 못했어요.'));
         },
       },
     );

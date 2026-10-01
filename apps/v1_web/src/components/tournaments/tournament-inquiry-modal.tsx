@@ -14,6 +14,7 @@ import {
 } from './tournament-inquiry-topics';
 import { useTournamentInquiryDialog } from './use-tournament-inquiry-dialog';
 import { TournamentInquiryContext } from './tournament-inquiry-context';
+import { extractErrorMessage } from '@/lib/error-message';
 
 type InquiryFormErrors = Partial<Record<'title' | 'body' | 'form', string>>;
 
@@ -217,7 +218,7 @@ export function TournamentInquiryModal({
 function friendlyErrorMessage(error: unknown) {
   if (error instanceof V1ApiError) {
     if (error.statusCode === 400) return '입력 내용을 다시 확인해 주세요.';
-    return error.message || '문의 접수에 실패했어요. 잠시 후 다시 시도해 주세요.';
+    return extractErrorMessage(error, '문의 접수에 실패했어요. 잠시 후 다시 시도해 주세요.');
   }
   return '문의 접수에 실패했어요. 잠시 후 다시 시도해 주세요.';
 }

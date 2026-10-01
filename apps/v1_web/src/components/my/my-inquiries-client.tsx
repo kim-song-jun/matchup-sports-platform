@@ -9,6 +9,7 @@ import { appRoute } from '@/lib/app-route';
 import { V1ApiError } from '@/lib/api-client';
 import { getStoredV1Session } from '@/lib/session-storage';
 import type { V1CreateInquiryPayload, V1Inquiry, V1InquiryCategory } from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
 
 const t = {
   account: '\uacc4\uc815',
@@ -272,7 +273,7 @@ function errorMessage(error: unknown) {
   if (error instanceof V1ApiError) {
     if (error.statusCode === 401) return '\ub85c\uadf8\uc778\uc774 \ub9cc\ub8cc\ub410\uc5b4\uc694. \ub2e4\uc2dc \ub85c\uadf8\uc778\ud55c \ub4a4 \ubb38\uc758\ub97c \uc811\uc218\ud574 \uc8fc\uc138\uc694.';
     if (error.statusCode === 400) return '\uc785\ub825\uac12\uc744 \ud655\uc778\ud574 \uc8fc\uc138\uc694.';
-    return error.message || '\ubb38\uc758 \uc811\uc218\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694.';
+    return extractErrorMessage(error, '\ubb38\uc758 \uc811\uc218\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694.');
   }
   return '\ubb38\uc758 \uc811\uc218\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.';
 }

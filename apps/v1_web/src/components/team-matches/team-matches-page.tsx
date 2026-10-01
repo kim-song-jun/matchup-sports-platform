@@ -32,6 +32,7 @@ import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { josa } from '@/lib/korean';
 import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
+import { extractErrorMessage } from '@/lib/error-message';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 
@@ -1402,7 +1403,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
       const url = await onUpload(file);
       onChange?.(url);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '이미지 업로드에 실패했어요. 다시 시도해 주세요.';
+      const msg = extractErrorMessage(err, '이미지 업로드에 실패했어요. 다시 시도해 주세요.');
       setUploadError(msg);
       setFileName('');
     } finally {

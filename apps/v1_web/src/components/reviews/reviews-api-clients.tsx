@@ -25,7 +25,7 @@ export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
 
   return (
     <ReviewsPageView
-      errorMessage={activeQuery.error instanceof Error ? activeQuery.error.message : null}
+      errorMessage={activeQuery.error ? extractErrorMessage(activeQuery.error, '후기를 불러오지 못했어요.') : null}
       hasManagedTeam={hasManagedTeam}
       loading={activeQuery.isLoading}
       model={model}
@@ -132,7 +132,7 @@ export function ReviewSourcePageClient({
     <ReviewSourcePageView
       admin={admin}
       drafts={drafts}
-      errorMessage={query.error instanceof Error ? query.error.message : null}
+      errorMessage={query.error ? extractErrorMessage(query.error, '후기를 남길 경기를 불러오지 못했어요.') : null}
       loading={query.isLoading}
       message={message}
       model={model}

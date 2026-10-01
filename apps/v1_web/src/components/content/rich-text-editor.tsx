@@ -27,6 +27,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { resolveRichContent } from '@/lib/rich-content';
 import { publicAssetPath } from '@/lib/assets';
 import type { V1AdminContentAsset, V1RichContentDocument } from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
 
 const ManagedImage = ImageExtension.extend({
   addAttributes() {
@@ -92,7 +93,7 @@ export function RichTextEditor({
       const chain = position === undefined ? editor.chain().focus() : editor.chain().focus().setTextSelection(position);
       chain.insertContent(images).run();
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : '이미지를 업로드하지 못했어요.');
+      setUploadError(extractErrorMessage(error, '이미지를 업로드하지 못했어요.'));
     } finally {
       setUploading(false);
     }

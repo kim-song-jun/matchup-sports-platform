@@ -123,6 +123,7 @@ vi.mock('./team-matches-page', () => ({
     <div>
       <span data-testid={'team-match-order'}>{model.matches.map((match) => match.title).join('|')}</span>
       <span data-testid="team-match-count">{model.matches.length}</span>
+      <span data-testid="team-match-sport-counts">{model.sports.map((sport) => `${sport.label}:${sport.count}`).join('|')}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
     </div>
   ),
@@ -1392,6 +1393,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsRef.current = new URLSearchParams();
     useV1TeamMatchesMock.mockImplementation((filters?: { cursor?: string }, options?: { enabled?: boolean }) => {
       if (options && options.enabled === false) {
         return { data: undefined, isError: false, isFetching: false, isPending: true };
@@ -1407,11 +1409,28 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
     render(<TeamMatchListPageClient />);
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('team-match-sport-counts')).toHaveTextContent('전체:1|풋살:1');
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('team-match-sport-counts')).toHaveTextContent('전체:2|풋살:2');
     expect(screen.getByTestId('team-match-order')).toHaveTextContent('팀매치 2|팀매치 1');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  it('종목을 선택해도 종목별 숫자에 선택된 종목의 별도 페이지를 섞지 않는다', () => {
+    searchParamsRef.current = new URLSearchParams('sportId=futsal-id');
+    useV1TeamMatchesMock.mockImplementation((filters?: { sportId?: string }, options?: { enabled?: boolean }) => {
+      if (options?.enabled === false) return { data: undefined, isError: false, isFetching: false, isPending: true };
+      return filters?.sportId
+        ? page([{ id: 'tm-outside-first-page', title: '다른 풋살 팀매치' }], null)
+        : page([{ id: 'tm1', title: '첫 페이지 풋살 팀매치' }], 'cursor-page-2');
+    });
+
+    render(<TeamMatchListPageClient />);
+
+    expect(screen.getByTestId('team-match-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('team-match-sport-counts')).toHaveTextContent('전체:1|풋살:1');
   });
 });
 

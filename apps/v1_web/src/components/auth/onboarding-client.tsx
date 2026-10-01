@@ -19,6 +19,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1OnboardingPreferencePayload, V1OnboardingStep, V1Region } from '@/types/api';
 import { AUTH_WELCOME_STAGE, AuthFrame, AuthIllustration, JOURNEY_DONE_STAGE } from './auth-page';
+import { extractErrorMessage } from '@/lib/error-message';
 
 type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
 
@@ -713,7 +714,7 @@ function clearDraft(userId: string) {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '요청을 처리하지 못했어요.';
+  return extractErrorMessage(error, '요청을 처리하지 못했어요.');
 }
 
 function sanitizeDraft(raw: Partial<OnboardingDraft> | null | undefined): OnboardingDraft {

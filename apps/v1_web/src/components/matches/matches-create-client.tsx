@@ -37,6 +37,7 @@ import {
   normalizeGenderRule,
 } from './matches.validation';
 import { getMatchCreateViewModel } from './matches.view-model';
+import { extractErrorMessage } from '@/lib/error-message';
 
 const CREATE_STEP_ORDER: MatchCreateStep[] = ['sport', 'info', 'place-time'];
 
@@ -215,7 +216,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
             });
             return;
           }
-          setError(err instanceof Error ? err.message : '매치를 만들지 못했어요. 다시 시도해 주세요.');
+          setError(extractErrorMessage(err, '매치를 만들지 못했어요. 다시 시도해 주세요.'));
         },
       });
     },
@@ -339,7 +340,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
                 { reason: 'host_closed_from_v1_web' },
                 {
                   onSuccess: () => router.push(detailHref),
-                  onError: (err) => setError(err instanceof Error ? err.message : '모집을 마감하지 못했어요. 다시 시도해 주세요.'),
+                  onError: (err) => setError(extractErrorMessage(err, '모집을 마감하지 못했어요. 다시 시도해 주세요.')),
                 },
               );
               return;
@@ -348,7 +349,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
               { reason: 'host_reopened_from_v1_web' },
               {
                 onSuccess: () => router.push(detailHref),
-                onError: (err) => setError(err instanceof Error ? err.message : '모집을 다시 열지 못했어요. 다시 시도해 주세요.'),
+                onError: (err) => setError(extractErrorMessage(err, '모집을 다시 열지 못했어요. 다시 시도해 주세요.')),
               },
             );
           },
@@ -432,7 +433,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
         { ...payloadResult.payload, version },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/matches/${matchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '매치를 수정하지 못했어요. 다시 시도해 주세요.'),
+          onError: (err) => setError(extractErrorMessage(err, '매치를 수정하지 못했어요. 다시 시도해 주세요.')),
         },
       );
     },
@@ -453,7 +454,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
         { reason: 'host_cancelled_from_v1_web' },
         {
           onSuccess: () => router.push(detailHref),
-          onError: (err) => setError(err instanceof Error ? err.message : '매치를 취소하지 못했어요. 다시 시도해 주세요.'),
+          onError: (err) => setError(extractErrorMessage(err, '매치를 취소하지 못했어요. 다시 시도해 주세요.')),
         },
       );
     },

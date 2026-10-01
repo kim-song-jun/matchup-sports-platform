@@ -1367,7 +1367,7 @@ function TeamLogoField({
       const url = await uploadImage(file);
       onChange(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '이미지를 올리지 못했어요. 다시 시도해 주세요.');
+      setError(extractErrorMessage(err, '이미지를 올리지 못했어요. 다시 시도해 주세요.'));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -1456,7 +1456,7 @@ function TeamCoverImageField({
       const url = await uploadImage(file);
       onChange(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '이미지를 올리지 못했어요. 다시 시도해 주세요.');
+      setError(extractErrorMessage(err, '이미지를 올리지 못했어요. 다시 시도해 주세요.'));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';

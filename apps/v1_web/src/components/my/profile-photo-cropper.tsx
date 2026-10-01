@@ -14,6 +14,7 @@ import {
   type ImageSize,
 } from '@/lib/image-crop';
 import { encodeCanvasToBlob } from '@/lib/image-compress';
+import { extractErrorMessage } from '@/lib/error-message';
 
 /**
  * 프로필 사진 크롭 (사용자 선택 A안, 2026-09-02).
@@ -244,7 +245,7 @@ export function ProfilePhotoCropper({
       const file = await exportCrop(imageEl, s, VIEWPORT);
       await onCropped(file);
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : '사진을 저장하지 못했어요. 다시 시도해 주세요.');
+      setExportError(extractErrorMessage(error, '사진을 저장하지 못했어요. 다시 시도해 주세요.'));
     } finally {
       setExporting(false);
     }

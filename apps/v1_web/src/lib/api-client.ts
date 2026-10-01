@@ -43,6 +43,16 @@ export function isV1NetworkError(error: unknown): boolean {
   return error instanceof V1ApiError && error.code === V1_NETWORK_ERROR_CODE;
 }
 
+/** 브라우저가 오프라인이라 쓰기 요청이 나가지 못했을 때 화면(V7 오류 자리)에 그대로 보이는 문구. */
+export const V1_OFFLINE_WRITE_MESSAGE = '인터넷에 연결되지 않아 보내지 못했어요. 연결되면 다시 눌러 주세요.';
+
+// 쓰기는 오프라인이면 기다리지 않고 바로 실패한다(lib/query-client.ts) — 그 실패에만 이유를 붙인다.
+// navigator.onLine 이 true 인데 응답이 없는 실패(연결은 됐는데 인터넷이 안 됨)는 종전대로 화면별 fallback 이다.
+function isOfflineWrite(init: RequestInit): boolean {
+  const method = String(init.method ?? 'GET').toUpperCase();
+  return method !== 'GET' && method !== 'HEAD' && typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
 /** fetch 가 reject 하면 V1ApiError(statusCode 0)로 바꾼다. 요청 취소는 오류가 아니라서 그대로 다시 던진다. */
 async function fetchOrNetworkError(input: string, init: RequestInit): Promise<Response> {
   try {
@@ -51,15 +61,16 @@ async function fetchOrNetworkError(input: string, init: RequestInit): Promise<Re
     const aborted = init.signal?.aborted === true
       || (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError');
     if (aborted) throw error;
+    const offlineWrite = isOfflineWrite(init);
     throw new V1ApiError(
       {
         status: 'error',
         statusCode: 0,
         code: V1_NETWORK_ERROR_CODE,
-        message: error instanceof Error ? error.message : String(error),
+        message: offlineWrite ? V1_OFFLINE_WRITE_MESSAGE : error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
       },
-      { displayableMessage: false, cause: error },
+      { displayableMessage: offlineWrite, cause: error },
     );
   }
 }

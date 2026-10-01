@@ -1,4 +1,4 @@
-import type { Query } from '@tanstack/react-query';
+import type { DehydrateOptions, Query } from '@tanstack/react-query';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 /**
@@ -66,6 +66,13 @@ export function shouldPersistQuery(query: Query): boolean {
 
   return false;
 }
+
+/** persistQueryClient 의 dehydrateOptions — 화이트리스트 조회만 남기고 쓰기(mutation)는 남기지 않는다. */
+export const V1_PERSIST_DEHYDRATE_OPTIONS = {
+  shouldDehydrateQuery: shouldPersistQuery,
+  // 기본값은 멈춘 쓰기를 저장하지만, 복원된 쓰기에는 보낼 함수(mutationFn)가 없어 조용히 사라진다.
+  shouldDehydrateMutation: () => false,
+} satisfies DehydrateOptions;
 
 export function createV1Persister() {
   return createSyncStoragePersister({

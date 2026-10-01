@@ -3,6 +3,7 @@
 import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture } from '@/types/api';
 import { AdminEmpty, AdminTableSkeleton } from '@/components/admin';
+import { extractErrorMessage } from '@/lib/error-message';
 
 export type TournamentScorerStat = {
   key: string;
@@ -213,7 +214,7 @@ export function TournamentStatisticsTab({ tournamentId }: { tournamentId: string
       <div className="p-4">
         <AdminEmpty
           title="통계를 불러오지 못했어요."
-          description={error instanceof Error ? error.message : undefined}
+          description={extractErrorMessage(error, '') || undefined}
           action={<button type="button" onClick={() => void refetch()} className="min-h-[44px] px-4 rounded-lg border border-[var(--border)] font-semibold">다시 시도</button>}
         />
       </div>

@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { V1ApiError } from '@/lib/api-client';
@@ -135,5 +135,26 @@ describe('KakaoCallbackClient GA events', () => {
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'invalid_state' }));
     expect(api.v1Post).not.toHaveBeenCalled();
+  });
+});
+
+// V7: 응답 없는 실패의 원문("Failed to fetch")은 화면 문구가 아니다.
+describe('KakaoCallbackClient 응답 없는 실패', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('fetch 가 응답 없이 실패하면 영어 원문 대신 해요체 안내를 보여 준다', async () => {
+    const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+    api.v1Post.mockImplementation(actual.v1Post);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    primeValidOAuthState();
+
+    render(<KakaoCallbackClient />);
+
+    expect(await screen.findByText('카카오 로그인에 실패했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
   });
 });

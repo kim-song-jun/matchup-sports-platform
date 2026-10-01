@@ -82,6 +82,14 @@ export function scheduleVisibilityLabel(visibility: V1ScheduleVisibility): strin
   return SCHEDULE_VISIBILITY_LABELS[visibility] ?? visibility;
 }
 
+/**
+ * 취소 확인 창의 알림 안내 — 서버 취소 알림(schedule-reminder.service scheduleCancelledNotificationHandler)의
+ * 수신자와 같아야 한다: 팀원(불참 응답자·본인 제외) + 전체 공개 일정일 때만 승인된 용병.
+ */
+export function scheduleCancelNoticeLine(visibility: V1ScheduleVisibility, approvedGuestCount: number): string {
+  return visibility === 'PUBLIC' && approvedGuestCount > 0 ? '팀원과 승인된 용병에게 알림이 가요.' : '팀원에게 알림이 가요.';
+}
+
 const ATTENDANCE_STATUS_LABELS: Record<V1AttendanceStatus, string> = {
   GOING: '참석',
   MAYBE: '미정',

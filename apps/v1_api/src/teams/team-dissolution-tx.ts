@@ -19,7 +19,8 @@ export type TeamDissolutionOutcome = {
   cancelledTeamMatches: Array<{ teamMatchId: string; title: string; applicantTeamIds: string[] }>;
   withdrawnApplications: Array<{ teamMatchId: string; title: string; hostTeamId: string | null }>;
   expiredJoinApplicantUserIds: string[];
-  cancelledInvitationUserIds: string[];
+  /** 취소한 대기 초대 — `sentAt`(대기 행의 updatedAt = 보낸·다시 보낸 시각) 뒤의 도착 알림만 그 초대의 것이다. */
+  cancelledInvitations: Array<{ userId: string; sentAt: Date }>;
   cancelledScheduleCount: number;
 };
 
@@ -125,7 +126,7 @@ export async function dissolveTeamInTx(
     });
   }
 
-  const invitations = await tx.v1TeamInvitation.findMany({ where: { teamId, status: 'pending' }, select: { id: true, invitedUserId: true } });
+  const invitations = await tx.v1TeamInvitation.findMany({ where: { teamId, status: 'pending' }, select: { id: true, invitedUserId: true, updatedAt: true } });
   if (invitations.length > 0) {
     await tx.v1TeamInvitation.updateMany({
       where: { id: { in: invitations.map((invitation) => invitation.id) }, status: 'pending' },
@@ -155,7 +156,7 @@ export async function dissolveTeamInTx(
       hostTeamId: application.teamMatch.hostTeamId,
     })),
     expiredJoinApplicantUserIds: joinApplications.map((application) => application.applicantUserId),
-    cancelledInvitationUserIds: invitations.map((invitation) => invitation.invitedUserId),
+    cancelledInvitations: invitations.map((invitation) => ({ userId: invitation.invitedUserId, sentAt: invitation.updatedAt })),
     cancelledScheduleCount,
   };
 }

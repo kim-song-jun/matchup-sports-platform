@@ -50,7 +50,7 @@
   "src/app/admin/tournaments/[id]/tournament-sponsors-tab.tsx": 4,
   "src/app/admin/tournaments/[id]/tournament-statistics-tab.tsx": 4,
   "src/app/admin/tournaments/new/page.tsx": 46,
-  "src/app/admin/users/[id]/page.tsx": 18,
+  "src/app/admin/users/[id]/page.tsx": 12,
   "src/app/league-matches/[leagueId]/awards/league-awards-page-client.tsx": 8,
   "src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.tsx": 13,
   "src/app/league-matches/[leagueId]/league-match-standings-client.tsx": 24,

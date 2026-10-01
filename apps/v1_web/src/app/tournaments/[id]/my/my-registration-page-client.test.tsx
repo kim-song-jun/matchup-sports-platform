@@ -424,6 +424,42 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
   });
 });
 
+/** W8-V2 — 종료된 리그의 "내 신청"에 [참가 취소 요청]이 남아 있었다. 서버도 409 `TOURNAMENT_ENDED` 로 막는다. */
+describe('MyRegistrationPageClient — 참가 취소 요청 버튼', () => {
+  beforeEach(() => {
+    searchParams = new URLSearchParams('reg=registration-1');
+  });
+
+  function arrange(tournament: Partial<V1TournamentDetail>) {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(tournament), isLoading: false });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status: 'confirmed' })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  }
+
+  it.each([
+    ['진행 중 대회', { status: 'in_progress' }],
+    ['진행 중 리그', { kind: 'regular_league', status: 'in_progress' }],
+  ] as const)('대조군: %s에서는 보인다', (_label, tournament) => {
+    arrange(tournament);
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(screen.getAllByRole('button', { name: '참가 취소 요청' }).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['종료 대회', { status: 'completed' }],
+    ['취소된 대회', { status: 'cancelled' }],
+    ['종료 리그', { kind: 'regular_league', status: 'completed' }],
+  ] as const)('%s에서는 숨긴다', (_label, tournament) => {
+    arrange(tournament);
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(screen.queryByRole('button', { name: '참가 취소 요청' })).not.toBeInTheDocument();
+  });
+});
+
 /**
  * W7-V1 — 멤버가 연 "내 신청" 패스 카드는 열린 명단을 "10명 · 마감" 이라 했고, 같은 화면 레일은 "수정 가능" 이었다.
  * 못 고치는 이유가 마감(누구나)인지 권한(멤버만)인지 갈라, 패스 카드와 레일이 한 판정을 본다.

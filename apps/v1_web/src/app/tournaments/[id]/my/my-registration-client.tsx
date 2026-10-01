@@ -136,6 +136,26 @@ export function shouldShowConfirmedAt(
   return Boolean(confirmedAt) && status === 'confirmed';
 }
 
+/** 서버 `CANCELLABLE_VIA_REQUEST`(tournament-registrations.service.ts)와 같은 목록. */
+const CANCEL_REQUESTABLE_STATUSES: ReadonlySet<V1TournamentRegistrationStatus> = new Set([
+  'awaiting_payment',
+  'payment_checking',
+  'paid',
+  'confirmed',
+  'waitlisted',
+]);
+
+/**
+ * [참가 취소 요청]을 보여도 되는가. 종료·취소된 대회·리그는 서버가 409 `TOURNAMENT_ENDED` 로 막는다(W8-V2).
+ */
+export function isRegistrationCancellable(
+  registrationStatus: V1TournamentRegistrationStatus,
+  tournamentStatus: string,
+): boolean {
+  if (tournamentStatus === 'completed' || tournamentStatus === 'cancelled') return false;
+  return CANCEL_REQUESTABLE_STATUSES.has(registrationStatus);
+}
+
 /** Returns the badge class + label for the roster shortage badge.
  *  Mirrors the body-card logic: confirmed/paid → softer orange; else → hard red. */
 function rosterShortagebadge(status: V1TournamentRegistrationStatus): { badgeClass: string; label: string } {
@@ -671,14 +691,7 @@ function RegistrationDetailView({
   const rosterStateBadge = rosterStateBadgeLabel(rosterBlockReason, canManageRegistration);
   const detailLabel = `${competitionNoun(tournament.kind === 'regular_league')} 상세 보기`;
   const canCancelRequest =
-    canManageRegistration &&
-    (
-      registration.status === 'awaiting_payment' ||
-      registration.status === 'payment_checking' ||
-      registration.status === 'paid' ||
-      registration.status === 'confirmed' ||
-      registration.status === 'waitlisted'
-    );
+    canManageRegistration && isRegistrationCancellable(registration.status, tournament.status);
   const canWithdrawCancelRequest =
     canManageRegistration &&
     registration.status === 'cancel_requested';

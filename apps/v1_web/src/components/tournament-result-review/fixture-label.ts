@@ -1,5 +1,6 @@
 import type { V1TournamentOperationsBoardItem } from '@/types/api';
 import type { V1LeagueFixture } from '@/types/league-match';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 
 /**
  * **운영 목록의 경기 이름표.**
@@ -46,7 +47,7 @@ export function resolveFixtureLabel(
   if (teamNames) {
     return {
       title: `${teamNames.home} vs ${teamNames.away}`,
-      subtitle: hasTournamentAxis ? `${round} · ${fixtureNumber}번 경기` : leagueTitle,
+      subtitle: hasTournamentAxis ? `${tournamentRoundLabel(round)} · ${fixtureNumber}번 경기` : leagueTitle,
     };
   }
   if (leagueTitle !== null) {
@@ -54,6 +55,6 @@ export function resolveFixtureLabel(
   }
   return {
     title: hasTournamentAxis ? `${fixtureNumber}번 경기` : '경기',
-    subtitle: hasTournamentAxis ? `${round} · ${fixtureNumber}번 경기` : null,
+    subtitle: hasTournamentAxis ? `${tournamentRoundLabel(round)} · ${fixtureNumber}번 경기` : null,
   };
 }

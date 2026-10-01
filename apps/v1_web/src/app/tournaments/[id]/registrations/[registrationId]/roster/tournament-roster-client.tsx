@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useToast } from '@/components/v1-ui/toast';
 import {
   useV1TournamentPlayers,
   useV1Tournament,
@@ -1181,10 +1182,11 @@ export function TournamentRosterPageClient({
   const updatePlayerJersey = useV1UpdatePlayerJersey(tournamentId, registrationId);
   const removePlayer = useV1RemovePlayer(tournamentId, registrationId);
   const { confirm: confirmRemove, ConfirmModal: RemoveConfirmModal } = useConfirm();
+  // 저장한 행은 목록 아래쪽일 수 있다 — 확인 문구를 목록 위 상태 줄에 두면 화면 밖이라 못 본다(W8-V1).
+  const { showToast, hideToast, toast } = useToast();
 
   const [draftForms, setDraftForms] = useState<DraftPlayerForm[]>([]);
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
-  const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   // [primary cap] 한 번에 한 행만 편집 모드로 둔다 — PlayerRow가 각자 로컬 상태로
   // isEditing을 가지면 여러 행이 동시에 열려 "저장" 버튼이 화면에 여럿 primary로
@@ -1283,7 +1285,7 @@ export function TournamentRosterPageClient({
   function handleAddDraftForm() {
     if (!canAddDraftForm) return;
     setDraftForms((prev) => [...prev, createDraftPlayerForm()]);
-    setAddSuccess(null);
+    hideToast();
     setRemoveError(null);
   }
 
@@ -1332,7 +1334,7 @@ export function TournamentRosterPageClient({
       delete next[formId];
       return next;
     });
-    setAddSuccess(null);
+    hideToast();
     try {
       // 빈 문자열은 **보내지 않는다**(번호 없는 선수). `0` 은 유효한 등번호라
       // truthy 검사로 거르면 0번이 사라진다 — 빈 값인지로만 가른다.
@@ -1354,7 +1356,7 @@ export function TournamentRosterPageClient({
         eligibilityStatus: formData.eligibilityStatus,
       });
       setDraftForms((prev) => prev.filter((form) => form.id !== formId));
-      setAddSuccess('선수를 추가했어요.');
+      showToast('선수를 추가했어요.');
     } catch (err) {
       setDraftErrors((prev) => ({
         ...prev,
@@ -1378,7 +1380,7 @@ export function TournamentRosterPageClient({
     });
     if (!ok) return;
     setRemoveError(null);
-    setAddSuccess(null);
+    hideToast();
     try {
       await removePlayer.mutateAsync(playerId);
     } catch (err) {
@@ -1386,19 +1388,19 @@ export function TournamentRosterPageClient({
     }
   }
 
-  /** 행 저장 하나에 상태 문구 하나 — 앞 동작의 문구("선수를 추가했어요." 등)를 지우고 시작한다. */
+  /** 행 저장 하나에 안내 하나 — 앞 동작의 안내("선수를 추가했어요." 등)를 거두고 시작한다. */
   async function handleSavePlayer(playerId: string, changes: PlayerRowChanges) {
     if (!canEditRoster) return;
     setRemoveError(null);
-    setAddSuccess(null);
+    hideToast();
     const { eligibilityStatus, jerseyNumber } = changes;
     if (eligibilityStatus !== undefined) {
       await updatePlayer.mutateAsync({ playerId, body: { eligibilityStatus } });
-      setAddSuccess('선수 정보를 수정했어요.');
+      showToast('선수 정보를 수정했어요.');
     }
     if (jerseyNumber !== undefined) {
       await updatePlayerJersey.mutateAsync({ playerId, jerseyNumber });
-      if (eligibilityStatus === undefined) setAddSuccess('등번호를 저장했어요.');
+      if (eligibilityStatus === undefined) showToast('등번호를 저장했어요.');
     }
   }
 
@@ -1534,13 +1536,6 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
-        {/* Add success feedback */}
-        {addSuccess ? (
-          <div style={{ marginBottom: 16 }}>
-            <AlertBanner tone="info" message={addSuccess} />
-          </div>
-        ) : null}
-
         {/* Roster header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
@@ -1666,6 +1661,7 @@ export function TournamentRosterPageClient({
 
       {/* 선수 삭제 confirm modal */}
       {RemoveConfirmModal}
+      {toast}
     </>
   );
 }

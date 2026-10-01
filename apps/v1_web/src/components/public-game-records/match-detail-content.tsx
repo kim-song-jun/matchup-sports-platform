@@ -22,6 +22,7 @@ import {
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 
 /**
  * 선수 이름을 프로필로 잇는다. **열어도 되는지는 서버가 이미 판단해서** `profileHref` 로
@@ -352,7 +353,7 @@ export function MatchDetailContent({
       <header>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)' }}>
-            {data.groupName ?? data.round}
+            {data.groupName ?? tournamentRoundLabel(data.round)}
             {data.legNumber > 1 ? ` ${data.legNumber}차` : ''}
           </span>
           <ResultStateBadge state={data.resultState} />

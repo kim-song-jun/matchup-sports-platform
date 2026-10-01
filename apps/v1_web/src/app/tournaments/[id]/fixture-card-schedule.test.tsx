@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { V1TournamentFixture } from '@/types/api';
 import { FixtureCard } from './tournament-detail-client';
 
-function makeGroupFixture(scheduledAt: string | null): V1TournamentFixture {
+function makeGroupFixture(scheduledAt: string | null, round = 'group'): V1TournamentFixture {
   return {
     id: 'group-fixture-1',
     groupId: 'group-a',
-    round: 'group',
+    round,
     fixtureNumber: 1,
     legNumber: 1,
     scheduledAt,
@@ -43,5 +43,21 @@ describe('FixtureCard 조별 일정 시간', () => {
     render(<FixtureCard fixture={makeGroupFixture(null)} />);
 
     expect(screen.getByText('시간 미정')).toBeInTheDocument();
+  });
+});
+
+// W8-V3 — 조별리그 대진 생성기의 라운드 키(`league_r1`)가 카드 머리에 그대로 보였다.
+describe('FixtureCard 라운드 이름', () => {
+  it('생성기 라운드 키는 서버 알림과 같은 이름으로 보인다', () => {
+    render(<FixtureCard fixture={makeGroupFixture(null, 'league_r2')} />);
+
+    expect(screen.getByText('조별리그 2라운드')).toBeInTheDocument();
+    expect(screen.queryByText(/league_r/)).not.toBeInTheDocument();
+  });
+
+  it('대조군: 운영자가 한국어로 넣은 라운드는 그대로 둔다', () => {
+    render(<FixtureCard fixture={makeGroupFixture(null, '준결승')} />);
+
+    expect(screen.getByText('준결승')).toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { createTournamentMatchInTx } from './tournament-match-creation';
+import { tournamentRoundLabel } from './tournament-round-label';
 import { lockGameRows } from '../games/roster/game-roster-sync';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { updateTournamentMatchInTx } from './tournament-match-update';
@@ -752,7 +753,8 @@ export class LeagueFixtureGeneratorService {
             awayRegistrationId: row.awayRegistrationId,
             sportId: pinnedTournament.sportId,
             regionId: pinnedTournament.regionId ?? null,
-            title: `${pinnedTournament.title} · ${row.round} ${row.fixtureNumber}`,
+            // round 는 `league_r{n}` 좌표 키다 — 제목은 팀 일정·알림에 그대로 복사되므로 화면 이름으로 저장한다.
+            title: `${pinnedTournament.title} · ${tournamentRoundLabel(row.round)} ${row.fixtureNumber}`,
             placeName: null,
             startAt: row.startAt,
             createdByUserId: user.id,

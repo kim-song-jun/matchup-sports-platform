@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -29,6 +29,9 @@ import type {
 import { buildTeamMatchSummaryLabel } from './team-matches.card-model';
 import { teamMatchStepHref } from './team-matches.routes';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { josa } from '@/lib/korean';
+import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
+import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 
@@ -144,9 +147,10 @@ function TeamMatchCreateFloatingButton() {
  * open/closed 판정, toTeamMatch의 statusToCardStatus)는 API status까지 반영하므로
  * 여기서 함께 봐야 완료된 리그 경기를 열어도 "모집 중"이 뜨지 않는다(alpha 실측 C-1).
  */
-function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match']) {
+function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], myTeamName?: string) {
   if (mode === 'cancelled') return match.applicantTeams.find((team) => team.status === '승인 완료')?.name ?? '미정';
-  if (mode === 'pending') return '검토 중';
+  // 신청 팀에게는 이 자리가 "우리 팀" 이다(H6 A-2) — 신청 팀을 못 찾았을 때만 검토 상태를 적는다.
+  if (mode === 'pending') return myTeamName ?? '검토 중';
   if (mode === 'approved') {
     // 일반 팀매치는 신청 승인 시 applicantTeams에 실제 상대팀이 담기지만, 관리자 생성
     // 매치에서 먼저 승인된 팀이 홈팀이 되는 경우에는 아직 상대팀이 없다. 이때 뷰어의
@@ -171,20 +175,24 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
   return '모집 중';
 }
 
-function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], statusLabel?: string) {
-  if (mode === 'cancelled') return statusLabel ?? TEAM_MATCH_CANCELLED_LABEL;
-  if (mode === 'pending') return '홈팀 검토 중';
+/** 상대팀 이름 아래 한 줄 — 그 팀의 상태만. 매치 상태(취소·종료 등)는 히어로 배지가 말한다(W2-V8). */
+function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], applicationsFailed: boolean): string | null {
+  if (mode === 'cancelled') return null;
+  if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
     return approvedOpponent ? '참가 확정' : '신청 후 승인';
   }
   if (mode === 'mine') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    return approvedOpponent ? '참가 확정' : '신청 후 승인';
+    if (approvedOpponent) return '참가 확정';
+    // 신청이 들어온 사실을 히어로가 먼저 말한다(H6 A-1).
+    const requested = match.applicantTeams.filter((team) => team.applicationStatus === 'requested').length;
+    if (requested > 0) return `신청 ${requested}팀 대기`;
+    // 목록을 못 받았으면 신청 수를 모른다 — '신청 후 승인'(아직 없음)으로 떨어뜨리지 않는다.
+    return applicationsFailed ? null : '신청 후 승인';
   }
-  // statusLabel(모델에서 이미 계산돼 온 문구)이 matched/completed/cancelled를
-  // 구분해 정확한 상태를 준다 — team-matches-client.tsx statusLabel() 참고.
-  if (match.status === 'closed') return statusLabel ?? '신청 마감';
+  if (match.status === 'closed') return match.applicantTeams.some((team) => team.status === '승인 완료') ? '참가 확정' : null;
   return '신청 후 승인';
 }
 
@@ -192,9 +200,11 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
 // 경기가 시작되거나 지정 종료 시각을 지나면 modelScheduleLabel()이 경기 상태를 덮어써 의미 축이 바뀐다
 // (team-matches-client.tsx statusLabelKind 참고) — 그때는 캡션도 '신청 상태'가 아니라
 // '경기 상태'라고 해야 값과 뜻이 맞는다.
-function teamMatchStatusCaption(mode: TeamMatchDetailViewModel['mode'], statusLabelKind: TeamMatchDetailViewModel['statusLabelKind']) {
-  if (mode === 'mine') return '내가 만든 팀매치';
-  return statusLabelKind === 'match' ? '경기 상태' : '신청 상태';
+function teamMatchStatusCaption(model: TeamMatchDetailViewModel) {
+  if (model.statusLabelKind === 'match') return '경기 상태';
+  if (model.statusCaption) return model.statusCaption;
+  if (model.mode === 'mine') return '내가 만든 팀매치';
+  return '신청 상태';
 }
 
 /**
@@ -243,29 +253,21 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
   const shouldShowHostTeamCard = !match.platformManaged || hasAssignedHostTeam;
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
-  /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
-   * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다.
-   * 리그 경기 명단 조정은 하지 않아도 되는 일이라 primary 를 받지 않는다(Task 179 D4). */
-  const lineupAction = model.lineupAction;
-  const lineupCopy = lineupAction ? LINEUP_ACTION_COPY[lineupAction.kind] : null;
-  const matchManageNextAction: 'lineup' | 'result' | 'review' | null = lineupAction?.kind === 'attendance'
-    ? 'lineup'
-    : model.resultAction
-      ? 'result'
-      : model.reviewAction
-        ? 'review'
-        : null;
   const locked = mode === 'pending' || mode === 'approved' || mode === 'cancelled';
-  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
+  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 수정' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
+  // 호스트의 "지금 할 일" — 대기 중인 신청. 라벨(status)이 아니라 서버 상태 원문으로 고른다.
+  const requestedTeams = mode === 'mine' ? match.applicantTeams.filter((team) => team.applicationStatus === 'requested') : [];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [applyTeamOpen, setApplyTeamOpen] = useState(false);
   // [P2] 신청한 적 없는 뷰어(mode==='default')가 이미 닫힌(상대 확정·종료·취소·마감) 팀매치를
-  // 볼 때 model.statusLabel 이 히어로의 상대팀 sub 문구(teamMatchOpponentSub)와 하단 바
-  // 값에 그대로 두 번 나온다 — 히어로가 이미 상대(사실)와 사유를 함께 말했으니 하단 바
+  // 볼 때 model.statusLabel 은 히어로 상태 배지(heroStatus)가 이미 말한다 — 하단 바
   // 캡션+값은 다시 말하지 않는다(버튼만 남는다).
   const isClosedGuestStatusDuplicate = (mode === 'default' && match.status === 'closed') || mode === 'cancelled';
   const canRunAction = Boolean(model.onApply);
   /* ctaTone: 행동 불가(신청 불가 등 onApply=undefined + 리다이렉트도 없는 상태)는
-   * neutral+disabled 조합으로 표시 — primary 파란 버튼처럼 보여 클릭 오인 방지(T1). */
-  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : canRunAction ? 'tm-btn-primary' : 'tm-btn-neutral tm-btn-disabled';
+   * neutral+disabled 조합으로 표시 — primary 파란 버튼처럼 보여 클릭 오인 방지(T1).
+   * 신청 취소(pending)는 주 행동이 아니라 중립 톤이다(H6 A-2). */
+  const ctaTone = mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : canRunAction ? 'tm-btn-primary' : 'tm-btn-neutral tm-btn-disabled';
   // 채팅 버튼: approved/host(mine)는 활성, pending(승인 대기)은 disabled + '승인 완료 후 이용' 안내.
   // default(비참여자)에는 미노출 — 단 `model.onChat`이 있으면(=canOpenTeamMatchChat이 팀
   // 멤버십으로 허용) mode가 default여도 보여준다. 신청팀 owner가 신청서를 직접 내지 않은
@@ -312,12 +314,41 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       });
   };
 
+  // ⋯ 메뉴 항목 — 확인 창은 시트 위에 겹쳐 뜨고, 확정했을 때만 시트를 닫고 실행한다.
   const runHostAction = async (action: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]) => {
     if (action.confirm) {
-      const accepted = await confirm({ ...action.confirm, tone: 'danger' });
+      const accepted = await confirm({ ...action.confirm, tone: action.confirm.tone ?? 'danger' });
       if (!accepted) return;
     }
+    setMenuOpen(false);
     runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`);
+  };
+
+  type ApplicantTeam = TeamMatchDetailViewModel['match']['applicantTeams'][number];
+  // N-2: 승인은 되돌릴 수 없고 나머지 대기 신청이 서버에서 자동 종료되므로 항상 확인한다.
+  const approveApplicant = async (team: ApplicantTeam) => {
+    const others = requestedTeams.filter((other) => other.applicationId !== team.applicationId);
+    const named = others.slice(0, 2).map((other) => other.name).join(', ');
+    const othersLabel = others.length > 2 ? `${named} 외 ${others.length - 2}팀` : named;
+    const accepted = await confirm({
+      title: `${josa(team.name, ['을', '를'])} 상대팀으로 확정할까요?`,
+      message: others.length > 0
+        ? `확정하면 되돌릴 수 없어요. 나머지 신청 ${others.length}팀(${othersLabel})은 자동으로 종료되고 알림이 가요.`
+        : '확정하면 되돌릴 수 없어요.',
+      confirmLabel: '승인하기',
+      cancelLabel: '닫기',
+    });
+    if (accepted) team.onApprove?.();
+  };
+  const rejectApplicant = async (team: ApplicantTeam) => {
+    const accepted = await confirm({
+      title: `${team.name} 신청을 거절할까요?`,
+      message: `거절하면 ${team.name}에 알림이 가요. 모집이 계속되는 동안에는 다시 신청할 수 있어요.`,
+      confirmLabel: '거절하기',
+      cancelLabel: '닫기',
+      tone: 'danger',
+    });
+    if (accepted) team.onReject?.();
   };
 
   const handleChatClick = () => {
@@ -430,11 +461,60 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
   ) : null;
 
   /* Shared CTA buttons — rendered in both mobile fixed bar and desktop sticky card */
+  // W2-V8: 매치 전체의 상태(취소됨·경기 종료 등)는 상대팀 이름 아래가 아니라 히어로 맨 위 배지가 말한다 —
+  // 그 자리에 두면 상대 팀의 상태처럼 읽혔다. 상대팀 캡션은 팀 상태(승인 대기·참가 확정 등)만 쓴다.
+  const heroStatus = mode === 'cancelled'
+    ? model.statusLabel ?? TEAM_MATCH_CANCELLED_LABEL
+    : mode === 'default' && match.status === 'closed' ? model.statusLabel ?? null : null;
+  const heroStatusBadge = heroStatus ? (
+    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+      <span className="tm-badge" style={{ background: 'var(--static-white)', color: 'var(--static-ink)' }}>{heroStatus}</span>
+    </div>
+  ) : null;
+  const opponentSub = teamMatchOpponentSub(mode, match, Boolean(model.applicationsError));
+  // 취소·모집 마감·수정은 화면 본문이 아니라 히어로 ⋯ 메뉴에 둔다(H6 manage-menu A).
+  const manageMenuButton = mode === 'mine' && model.manageMenu ? (
+    <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="매치 관리 메뉴" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+      <MoreIcon size={20} />
+    </button>
+  ) : null;
+  // 상세 맨 위 "지금 할 일" 카드 — 같은 자리가 상태마다 바뀐다(H6 A안). 취소는 모든 상태보다 우선한다.
+  const nowCard = mode === 'cancelled'
+    ? <StateCard tone="grey" title="취소된 팀매치예요" body="이 팀매치는 취소되어 진행되지 않아요." />
+    : model.progress
+      ? <MatchProgressCard model={model} />
+      : mode === 'mine'
+        ? (requestedTeams.length > 0
+          ? <HostApplicationsCard teams={requestedTeams} error={match.applicantActionError} onApprove={(team) => { void approveApplicant(team); }} onReject={(team) => { void rejectApplicant(team); }} />
+          : model.applicationsError
+            ? <HostApplicationsErrorCard onRetry={model.applicationsError.retry} />
+            : model.applicationsPending ? null : <HostWaitingCard apiStatus={match.apiStatus} />)
+        : mode === 'pending'
+          ? <PendingApplicationCard hostTeamName={match.hostTeam} team={model.myApplicationTeam} />
+          : mode === 'approved'
+            ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." />
+            : null;
+
+  const nextAction = model.nextAction;
   const ctaButtons = (
     <>
       {showChat ? chatButton : null}
-      {mode === 'mine' ? (
-        <>{match.manageHref ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref}>{cta}</Link> : <span className="tm-text-caption">{model.statusLabel ?? '신청자 관리에서 상태를 확인해 주세요.'}</span>}</>
+      {/* 호스트·참가팀은 상태별 다음 할 일(H6 A-1·A-3) — 매칭 뒤 잠긴 수정 폼으로 보내지 않는다. */}
+      {nextAction ? (
+        nextAction.href ? (
+          <Link className={`tm-btn tm-btn-lg tm-btn-${nextAction.tone}`} href={nextAction.href}>{nextAction.label}</Link>
+        ) : (
+          <button className={`tm-btn tm-btn-lg tm-btn-${nextAction.tone}`} type="button" onClick={() => runHeroAction(nextAction.onClick, `${nextAction.label} 처리를 완료했어요.`)}>
+            {nextAction.label}
+          </button>
+        )
+      ) : mode === 'mine' ? (
+        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-disabled" type="button" disabled>{cta}</button>
+      ) : model.applyTeamPicker ? (
+        // 신청할 수 있는 팀이 2개 이상이면 곧바로 신청하지 않고 팀을 고르게 한다(N-1).
+        <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.applyPending} onClick={() => setApplyTeamOpen(true)}>
+          {model.applyPending ? '처리 중' : cta}
+        </button>
       ) : (
         /* P2: 완료 메시지 능동형 전환 ("신청이 취소되었어요" → "신청을 취소했어요")
          *
@@ -486,15 +566,18 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                   <ChevronLeftIcon size={22} strokeWidth={2.2} />
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>
+                  {manageMenuButton}
                   <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
                 </div>
               </div>
               {/* Desktop-only share action inside hero */}
               <div className="tm-team-match-hero-actions tm-show-desktop">
+                {manageMenuButton}
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
               </div>
               {awaitingPlatformTeams ? (
                 <div>
+                  {heroStatusBadge}
                   <div className="tm-team-vs-row">
                     {['홈팀', 'vs', '어웨이팀'].map((side) => side === 'vs' ? (
                       <div key={side} className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
@@ -512,6 +595,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 </div>
               ) : (
                 <div>
+                  {heroStatusBadge}
                   <div className="tm-team-vs-row">
                     <div>
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
@@ -527,9 +611,9 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                     </div>
                     <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
                     <div style={{ textAlign: 'right' }}>
-                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
-                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
-                      <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
+                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{mode === 'pending' && model.myApplicationTeam ? '우리 팀' : '상대팀'}</div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}</div>
+                      {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentSub}</div> : null}
                     </div>
                   </div>
                   {match.platformManaged ? (
@@ -543,6 +627,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
             {/* 히어로(뒤로가기 포함) 다음, 본문 앞 — 내비게이션이 항상 먼저 보이게 유지한다. */}
             {recordEntry}
             <div className="tm-match-detail-body">
+              {nowCard}
               {/* ── 그룹 1: 일정 · 장소 ── */}
               <div className="tm-info-group">
                 <div className="tm-info-group-label">일정 · 장소</div>
@@ -606,192 +691,14 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 )}
               </div>
               )}
-              {/* P2: 능동형 카피 적용 */}
-              {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
-              {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
-              {mode === 'cancelled' ? <StateCard tone="grey" title="취소된 팀매치예요" body="이 팀매치는 취소되어 진행되지 않아요." /> : null}
               {match.description ? (
                 <Card pad={16} style={{ marginTop: 12 }}>
                   <div className="tm-text-body-lg">설명</div>
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>{match.description}</div>
                 </Card>
               ) : null}
-              {/* 매치 관리: 라인업(Task 15)과 경기 결과(Task 17) CTA를 한 카드로 묶는다 —
-                  예전엔 결과 입력 버튼이 카드 없이 붕 떠서 라인업 카드와 시각적으로
-                  분리돼 보였다(QA 지적). model.lineupAction/resultAction은
-                  team-matches-client.tsx가 권한 조건일 때만 설정한다.
-                  웨이브4(2026-09-04): 세 행이 모두 primary(파란 버튼)라 "무엇부터 해야 하는지"가
-                  안 보였다(DESIGN.md §14 — 화면당 primary 1개). 순서(라인업 → 경기 결과 → 후기)상
-                  가장 먼저 나타나는(=아직 안 끝난) 행 하나만 primary, 나머지는 outline. */}
-              {lineupAction || model.resultAction || model.reviewAction ? (
-                <Card pad={16} style={{ marginTop: 12 }}>
-                  <div className="tm-text-body-lg">매치 관리</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-                    {lineupAction && lineupCopy ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        <div style={{ minWidth: 0 }}>
-                          <div className="tm-text-label" style={{ fontWeight: 600 }}>{lineupCopy.title}</div>
-                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
-                            {lineupCopy.description}
-                          </div>
-                        </div>
-                        <Link className={`tm-btn tm-btn-sm ${matchManageNextAction === 'lineup' ? 'tm-btn-primary' : 'tm-btn-outline'}`} href={lineupAction.href} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
-                          {lineupCopy.cta}
-                        </Link>
-                      </div>
-                    ) : null}
-                    {model.resultAction ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 12,
-                          ...(lineupAction ? { borderTop: '1px solid var(--border)', paddingTop: 12 } : {}),
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div className="tm-text-label" style={{ fontWeight: 600 }}>경기 결과</div>
-                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
-                            경기 결과를 기록하거나 확인하세요.
-                          </div>
-                        </div>
-                        <Link
-                          className={`tm-btn tm-btn-sm ${matchManageNextAction === 'result' ? 'tm-btn-primary' : 'tm-btn-outline'}`}
-                          href={model.resultAction.href}
-                          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-                        >
-                          {model.resultAction.label}
-                        </Link>
-                      </div>
-                    ) : null}
-                    {/* 후기: 경기가 끝나야 열린다. 이 행이 없던 동안 팀매치 후기로 가는 링크가
-                        앱 전체에 없어서, /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */}
-                    {model.reviewAction ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 12,
-                          ...(lineupAction || model.resultAction
-                            ? { borderTop: '1px solid var(--border)', paddingTop: 12 }
-                            : {}),
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div className="tm-text-label" style={{ fontWeight: 600 }}>후기</div>
-                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
-                            상대 팀과 함께 뛴 선수에게 후기를 남겨요.
-                          </div>
-                        </div>
-                        <Link
-                          className={`tm-btn tm-btn-sm ${matchManageNextAction === 'review' ? 'tm-btn-primary' : 'tm-btn-outline'}`}
-                          href={model.reviewAction.href}
-                          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-                        >
-                          {model.reviewAction.label}
-                        </Link>
-                      </div>
-                    ) : null}
-                  </div>
-                </Card>
-              ) : null}
               {/* 참가 팀 카드: 모바일은 본문 하단, 데스크톱은 우측 컬럼에 모두 표시 */}
               {teamViewCards ? <div className="tm-hide-desktop" style={{ marginTop: 16 }}>{teamViewCards}</div> : null}
-              {mode === 'mine' ? (
-                <Card pad={16} style={{ marginTop: 12 }}>
-                  <div className="tm-text-body-lg">신청팀</div>
-                  {match.applicantActionError ? (
-                    <div className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', marginTop: 8 }}>{match.applicantActionError}</div>
-                  ) : null}
-                  {model.hostActions?.length ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-                      {model.hostActions.map((action) => (
-                        <button
-                          key={action.label}
-                          className={`tm-btn tm-btn-sm ${hostActionClass(action.tone)}`}
-                          type="button"
-                          disabled={action.pending}
-                          onClick={() => { void runHostAction(action); }}
-                        >
-                          {action.pending ? '처리 중' : action.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  {match.applicantTeams.length === 0 ? (
-                    <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-caption)' }}>
-                      아직 신청한 팀이 없어요.
-                    </div>
-                  ) : null}
-                  <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-                    {match.applicantTeams.map((team) => (
-                      <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 'var(--radius-control)', padding: '12px 12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div className="tm-text-label">{team.name}</div>
-                            <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{team.meta}</div>
-                          </div>
-                          {/* P0/P1: 상태 색상+아이콘+텍스트 병행 (WCAG 1.4.1) */}
-                          <span className={`tm-badge ${team.status === '승인 완료' ? 'tm-badge-green' : team.status === '미승인' ? 'tm-badge-red' : 'tm-badge-orange'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                            {team.status === '승인 완료' ? (
-                              <svg width="9" height="7" viewBox="0 0 9 7" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 3.5L3.5 6L8 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
-                            ) : team.status === '미승인' ? (
-                              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 1L6 6M6 1L1 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" /></svg>
-                            ) : (
-                              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-                            )}
-                            {team.status}
-                          </span>
-                        </div>
-                        {team.href ? (
-                          <Link
-                            className="tm-btn tm-btn-sm tm-btn-neutral"
-                            href={team.href}
-                            style={{ marginTop: 12, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
-                            aria-label={`${team.name} 팀 보기`}
-                          >
-                            팀 보기
-                          </Link>
-                        ) : null}
-                        {(team.onApprove ?? team.onReject) ? (
-                          // #4: 순서 [거절(좌)] [승인(우)] — 위험 행동을 왼쪽, 확정 행동을 오른쪽으로.
-                          // 웨이브4(2026-09-04): 신청팀 행은 접기/펼치기 없이 전부 항상 펼쳐진
-                          // 채로 그려진다 — 신청팀이 여럿이면 행마다 primary(승인)가 동시에 여러 개
-                          // 보여 "화면당 primary 1개"(DESIGN.md §14)가 깨졌다. 접기 상태 자체가
-                          // 없으므로 승인은 outline, 거절은 ghost로 낮춰 화면 전체의 primary 예산을
-                          // 매치 관리 카드(matchManageNextAction)와 하단 고정 CTA 에 남긴다.
-                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            {team.onReject ? (
-                              <button
-                                className="tm-btn tm-btn-sm tm-btn-ghost"
-                                type="button"
-                                disabled={team.actionPending}
-                                onClick={() => { void team.onReject?.(); }}
-                                aria-label={`${team.name} 거절`}
-                              >
-                                거절
-                              </button>
-                            ) : null}
-                            {team.onApprove ? (
-                              <button
-                                className="tm-btn tm-btn-sm tm-btn-outline"
-                                type="button"
-                                disabled={team.actionPending}
-                                onClick={() => { void team.onApprove?.(); }}
-                                aria-label={`${team.name} 승인`}
-                              >
-                                {team.actionPending ? '처리 중' : '승인'}
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              ) : null}
             </div>
           </article>
         </div>
@@ -803,7 +710,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
           <div className="tm-team-match-cta-card">
             {isClosedGuestStatusDuplicate ? null : (
               <div className="tm-team-match-cta-meta">
-                <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
+                <span className="tm-text-caption">{teamMatchStatusCaption(model)}</span>
                 {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
                 <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
               </div>
@@ -819,7 +726,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       <div className="tm-fixed-cta tm-team-match-mobile-cta">
         {isClosedGuestStatusDuplicate ? null : (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
+            <span className="tm-text-caption">{teamMatchStatusCaption(model)}</span>
             {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
             <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
           </div>
@@ -833,6 +740,28 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
           승인 완료 후 이용할 수 있어요
         </div>
       ) : null}
+      {menuOpen && model.manageMenu ? (
+        <TeamMatchManageMenuSheet
+          menu={model.manageMenu}
+          actions={model.hostActions ?? []}
+          onClose={() => setMenuOpen(false)}
+          onRunAction={(action) => { void runHostAction(action); }}
+        />
+      ) : null}
+      {applyTeamOpen && model.applyTeamPicker ? (
+        <TeamMatchApplyTeamSheet
+          picker={model.applyTeamPicker}
+          onClose={() => setApplyTeamOpen(false)}
+          onApplied={(result) => {
+            setApplyTeamOpen(false);
+            const message = applyResultMessage(result);
+            if (!message) return;
+            setHeroMessage(message);
+            window.setTimeout(() => setHeroMessage(''), 2000);
+          }}
+        />
+      ) : null}
+      {/* 확인 창은 시트보다 위 레이어라(z-index) ⋯ 메뉴 위에 겹쳐 뜬다. */}
       {ConfirmModal}
     </>
   );
@@ -1212,8 +1141,8 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
             <div className="tm-text-label" style={blocked ? { color: 'var(--orange700)' } : undefined}>권한 기준</div>
             <div className="tm-text-caption" style={{ marginTop: 8 }}>
               {blocked
-                ? '팀장이거나 매치 생성 권한이 있어야 다음으로 진행할 수 있어요. 팀을 만들거나 팀 목록에서 권한이 있는 팀을 찾아 주세요.'
-                : '팀장이거나 매치 생성 권한이 있는 관리자만 다음으로 진행할 수 있어요.'}
+                ? '팀장·매니저인 팀이 있어야 다음으로 진행할 수 있어요. 팀을 만들거나 팀 목록에서 함께할 팀을 찾아 주세요.'
+                : '팀장·매니저만 다음으로 진행할 수 있어요.'}
             </div>
             {blocked ? <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><Link className="tm-btn tm-btn-sm tm-btn-primary" href="/teams/new">팀 만들기</Link><Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/teams">팀 찾기</Link></div> : null}
           </Card>
@@ -1429,12 +1358,6 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
 // TeamMatchComplete(웨이브4 이전): /team-matches/new/complete 전용 화면이었다. 실제 제출
 // 성공 경로는 항상 /team-matches/:id 로 바로 이동해(team-matches-create-client.tsx) 이 화면에
 // 닿는 진짜 경로가 없었다(죽은 라우트, 2026-09-04 감사) — 라우트·타입과 함께 제거한다.
-
-function hostActionClass(tone: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]['tone']) {
-  if (tone === 'primary') return 'tm-btn-primary';
-  if (tone === 'danger') return 'tm-btn-danger';
-  return 'tm-btn-neutral';
-}
 
 /**
  * D7(2026-08-24 사용자 확정) — 값이 비어 있으면 **'미정'을 값 자리에 적는다**(행을 숨기지 않는다).

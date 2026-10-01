@@ -27,7 +27,9 @@
   `ownGoal`, nullable `subMatchId`만 포함한다. 편집용 participant id와 변경 이력은 계속 공개하지 않는다.
   `STATUS_ONLY`처럼 점수가 가려진 응답과 공식 확정 전 응답에서는 빈 배열이다. 선수 이름은 대회
   경기결과와 같은 이름 공개 게이트 및 닉네임/실명 선택 정책을 사용한다.
-- 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 팀 owner/manager 역할만으로 권한을 부여하지 않는다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
+- 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
+- **명단 밖 팀장·매니저(Task 180 H5)**: 친선 경기에서 라인업에 없는 사용자가 한쪽 참가팀의 active owner/manager 이면 그 팀 쪽으로 기록·종료 확인을 할 수 있다. 응답에 `teamAuthority: true`, 이력·확인자 이름은 `"<닉네임> · 팀장 권한"`. 양 팀을 모두 관리하면 권한을 주지 않는다. **대회·리그 경기(`phase=managed`)에는 적용하지 않는다** — 참가팀은 결과를 만들거나 확인하지 않으므로 기존처럼 403 `RECORD_PARTICIPANT_REQUIRED`(정본 §4).
+- 참가자 응답의 `participants[].guest` 는 계정·연결이 없는 출전자다(개인 기록에 남지 않는다).
 - `commandId` UUID와 `expectedVersion` 정수 필수. `action`: add/edit/delete/undo/confirm/reopen.
 - add/edit: `sideId`는 점수를 얻는 팀. `participantId`는 선택(null=미상), `ownGoal` 기본 false,
   `minute` 선택(null 또는 0..999 정수). 자책골 선수는 점수를 얻는 팀의 상대편 라인업에서 고른다.
@@ -59,6 +61,20 @@
 - Game이 `LIVE`/`PAUSED`일 때는 양 팀 중 한쪽 최신 revision이 아직 미제출인 동안만 복구할 수 있다. 양 팀 최신 revision이 모두 `SUBMITTED`/`LOCKED`가 되면 즉시 잠긴다.
 - 일반 경기 이벤트, 공동 기록, 결과 revision 중 하나라도 생기면 참석명단 수정은 `409 LINEUP_LOCKED_FOR_DIRECT_EDIT`로 거절된다. 구버전의 `confirmRecordedDataRisk` 값으로 우회할 수 없다.
 - 명단 mutation과 공동 기록/Game command는 같은 Game 행을 잠근 뒤 상태를 다시 읽어 동시 요청에서 참가자 ID가 기록 뒤에 바뀌지 않게 한다.
+
+### 첫 기록 뒤 "추가만" · 상대 참석명단 · 응답 칩 (Task 180 H5)
+
+| Method | Path | 권한 | 동작 |
+|---|---|---|---|
+| POST | `/team-matches/:id/lineup/late-additions` | V1AuthGuard + 참가팀 owner/manager, `Idempotency-Key` 필수 | 늦게 온 선수 한 명을 현재 제출본에 붙인다 |
+| GET | `/team-matches/:id/lineup/opponent` | V1AuthGuard + 참가팀 owner/manager | 공개 뒤 상대 참석명단(번호·이름만) |
+
+- **추가만**: `GET .../lineup` 의 `lateAdditionAllowed` 가 true 일 때만 연다 — 잠금 사유가 `records_exist`/`active_lineups_complete` 이고, 결과 revision 이 없고, 우리 최신 명단이 `SUBMITTED`/`LOCKED` 일 때. body `{ userId? | displayName?, jerseyNumber?, goalkeeper? }`(userId 는 현재 활성 팀원, 없으면 게스트 이름). 새 리비전을 만들지 않고 **현재 제출본에 행만 추가**해 기존 참가자 id(득점이 매달린 곳)를 지킨다. 빼기·번호 변경은 계속 `PUT .../lineup` 의 409 `LINEUP_LOCKED_FOR_DIRECT_EDIT` 다.
+- 추가 시각은 운영 감사(`LINEUP_LATE_ADDITION`)와, 공동 기록이 있으면 그 변경 이력(`action: participant_add`, `after: { participantId, sideId, name, jerseyNumber }`)에 남는다. 이력이 생기면 기록 `version` 이 오르고 양 팀 종료 확인이 초기화된다.
+- 오류: 409 `LINEUP_NOT_LOCKED`(첫 기록 전 — 참석명단에서 바로 고친다) · `LINEUP_LATE_ADDITION_CLOSED`(결과 확정 뒤·제출본 없음) · `LINEUP_MATCH_TERMINAL` · `ROSTER_MANAGED_BY_ADJUSTMENTS`(대회·리그); 422 `LINEUP_DUPLICATE_PARTICIPANT`/`LINEUP_DUPLICATE_JERSEY_NUMBER`/`LINEUP_PARTICIPANT_INELIGIBLE`; 403 `PERMISSION_DENIED`.
+- **상대 참석명단**: 공개 시각은 `V1GameVisibilityPolicy.lineupAt`, 없으면 킥오프 1시간 전. `GET .../lineup` 의 `opponent: { teamName, submitted, published, participantCount }` — 공개 전에는 제출 여부만, `participantCount` 는 공개 뒤에만 숫자. `GET .../lineup/opponent` 는 공개 뒤 `{ teamMatchId, teamName, publicLineupAt, participants: [{ jerseyNumber, displayName }] }`(번호순, 번호 없는 사람은 뒤)만 준다 — 공개 전 403 `OPPONENT_LINEUP_NOT_PUBLIC`(`details.publicLineupAt`), 미제출 404 `OPPONENT_LINEUP_NOT_SUBMITTED`, 대회·리그 409.
+- **응답 칩**: `eligibleMembers[].rsvpStatus` 는 이 경기 팀 일정(취소 제외)의 응답(`GOING`/`MAYBE`/`NOT_GOING`/`WAITLISTED`, 답이 없으면 `NO_RESPONSE`)이고 연결된 일정이 없으면 null. 읽기 전용 — 저장·추가 자격에 쓰지 않는다.
+- `GET .../lineup` 에 `ownTeamName` 도 싣는다.
 
 
 
@@ -308,8 +324,8 @@ Rules:
 - `GET /team-matches/:teamMatchId/lineup` reads the viewer's team lineup.
 - `PUT /team-matches/:teamMatchId/lineup` saves a draft through `TeamMatchLineupService`.
 - Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
-- Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement.
-- Opponent-side lineup access and change requests require an approved opponent team.
+- Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement. The RSVP is echoed read-only as `eligibleMembers[].rsvpStatus` (Task 180 H5).
+- Opponent-side lineup access and change requests require an approved opponent team. The opponent's numbers and names are readable only after the public lineup time (`GET .../lineup/opponent`, see "첫 기록 뒤 추가만" above).
 - Scheduled games remain editable regardless of wall-clock kickoff. LIVE/PAUSED games remain editable only while either side's latest lineup is incomplete and no event/shared-record/result revision exists. The GET response's `editable`/`lockReason` is the client source of truth.
 - Goalkeeper is an independent per-participant designation: multiple participants or no participant may be marked as goalkeeper.
 

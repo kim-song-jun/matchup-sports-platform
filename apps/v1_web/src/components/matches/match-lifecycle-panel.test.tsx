@@ -51,6 +51,14 @@ describe('match lifecycle actions', () => {
     expect(screen.getByRole('heading', { name: '보류 · 진행 결정 대기' })).toBeInTheDocument();
   });
 
+  it('explains an English state conflict without hiding its server code', async () => {
+    server.use(http.post(`${api}/matches/test/confirm-proceed`, () => HttpResponse.json({ status: 'error', statusCode: 409, code: 'STATE_CONFLICT', message: 'Match state changed' }, { status: 409 })));
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: '현재 인원으로 진행' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('매치 상태가 변경됐어요 (STATE_CONFLICT).');
+  });
+
   it('no-participant and guest surfaces never expose proceeding', () => {
     mount(<MatchLifecyclePanel id="test" domain="matches" status="on_hold" lifecycle={{ ...lifecycle, canConfirmProceed: false, onHoldReason: 'NO_PARTICIPANTS' }} canManage={false} current={1} capacity={10} />);
     expect(screen.getByText(/주최자 외 확정 참가자가 없어/)).toBeInTheDocument();

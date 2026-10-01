@@ -53,7 +53,18 @@ export type ChatRoomViewModel = {
   teamContact?: V1ChatRoomTeamContact | null;
   /** 값이 있으면 입력창을 잠그고 이 문구를 placeholder 로 보여준다(수락 전·종료된 컨택). */
   inputLockedMessage?: string;
-  messages: Array<{ id: string; who: 'me' | 'other' | 'system'; senderId: string; label: string; body: string; sentAt: string; unreadCount?: number }>;
+  messages: Array<{
+    id: string;
+    who: 'me' | 'other' | 'system';
+    senderId: string;
+    label: string;
+    body: string;
+    sentAt: string;
+    unreadCount?: number;
+    /** 사진 메시지. `imageUrl` 이 null 이면 볼 수 없는 사진(숨김·삭제·업로드 삭제). */
+    kind?: 'image';
+    imageUrl?: string | null;
+  }>;
   status?: 'loading' | 'error' | 'ready';
   emptyTitle?: string;
   emptyBody?: string;
@@ -62,9 +73,17 @@ export type ChatRoomViewModel = {
   sendError?: boolean;
   onDraftChange?: (value: string) => void;
   onSend?: () => void;
+  /** + 패널에서 고른 사진(앨범·카메라). 없으면 + 가 비활성이다. */
+  onPickImages?: (files: File[]) => void;
+  /** 사진 업로드·전송 중. */
+  sendingImages?: boolean;
+  /** 사진 전송 실패·안내 문구. */
+  imageNotice?: string;
   onRetry?: () => void;
   /** 다시 불러와도 소용없는 막힘(권한 없음)일 때 재시도 대신 돌아갈 곳. */
   errorBack?: { href: string; label: string };
+  /** 대화 맨 위 안내 한 줄 — 팀 채팅은 입장한 뒤의 대화만 보인다(H2, 서버 visibleFromAt). */
+  historyNotice?: string;
 };
 
 export type NotificationModel = {

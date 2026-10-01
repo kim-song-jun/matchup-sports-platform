@@ -1,19 +1,13 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { TacticsBoardClient } from './tactics-board-client';
 
 /**
- * 전술보드의 **되돌릴 수 있는가**를 못박는다.
- *
- * 처음 판에는 "선발로"만 있고 반대 방향이 없었다 — 한 번 선발로 올린 선수를 후보로
- * 내릴 방법이 없었고, 피치에서 빼도 좌표만 지워질 뿐 선발 그대로였다. 잘못 올린 선수를
- * 못 내리면 그 화면은 못 쓴다(QA 에서 30초 안에 부딪히는 종류다).
- *
- * 함께 고정하는 것: 후보로 내릴 때 **좌표도 지워지는지**. 안 지우면 다시 선발로 올렸을 때
- * 옛 자리에서 되살아나 사용자가 놓은 적 없는 배치가 생긴다.
+ * Task 180 H7 A안 — 전술보드는 팀 내부 도구다(정본 §3). 선수 풀은 팀원 전체, 번호는 팀 등번호,
+ * 참석명단과 따로 논다. 편집기는 실물을 쓴다 — "칩 한 번 → 코트" 가 화면 끝까지 이어지는지가 계약이다.
  */
 
 const apiMocks = vi.hoisted(() => ({
@@ -27,23 +21,12 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...apiMocks,
 }));
 
-// AppChrome 의 뒤로가기가 useSearchParams 를 읽는데 테스트 환경엔 Next 라우터 컨텍스트가
-// 없어 null 이 온다 — 이 테스트의 관심사가 아니라 최소한으로 대역을 세운다.
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/teams/team-1/tactics/game-1',
 }));
 
-// 피치 편집기는 SVG·포인터 좌표계라 이 테스트의 관심사가 아니다 — 받은 선발 명단만
-// 드러내는 가벼운 대역으로 바꾼다(그래야 "선발/후보 왕복"만 관찰된다).
-vi.mock('@/components/lineup/pitch-formation-editor', () => ({
-  PitchFormationEditor: ({ starters }: { starters: Array<{ key: string; displayName: string }> }) => (
-    <div data-testid="pitch">{starters.map((s) => s.displayName).join(',')}</div>
-  ),
-}));
-
-/** AppChrome 이 알림 벨(useQuery)을 렌더하므로 provider 가 필요하다 — 저장소 관례와 같다. */
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -54,170 +37,219 @@ function render(ui: ReactElement) {
 const TEAM_ID = 'team-1';
 const GAME_ID = 'game-1';
 
+const FUTSAL_CONFIG = {
+  positions: [
+    { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+    { code: 'FIXO', label: '픽소', short: 'FX' },
+    { code: 'ALA', label: '아라', short: 'AL' },
+    { code: 'PIVO', label: '피보', short: 'PV' },
+  ],
+  formations: [
+    { code: '1-2-1', label: '다이아몬드', outfield: 4, slots: [
+      { position: 'FIXO', x: 50, y: 35 }, { position: 'ALA', x: 20, y: 58 },
+      { position: 'ALA', x: 80, y: 58 }, { position: 'PIVO', x: 50, y: 83 },
+    ] },
+    { code: '2-2', label: '박스', outfield: 4, slots: [
+      { position: 'FIXO', x: 28, y: 38 }, { position: 'FIXO', x: 72, y: 38 },
+      { position: 'PIVO', x: 28, y: 76 }, { position: 'PIVO', x: 72, y: 76 },
+    ] },
+    { code: '2-2-1', label: '박스 + 피보', outfield: 5, slots: [
+      { position: 'FIXO', x: 27, y: 33 }, { position: 'FIXO', x: 73, y: 33 }, { position: 'ALA', x: 22, y: 59 },
+      { position: 'ALA', x: 78, y: 59 }, { position: 'PIVO', x: 50, y: 85 },
+    ] },
+  ],
+  minPlayers: 3,
+  maxPlayers: 6,
+};
+
+function member(userId: string, displayName: string, jerseyNumber: number | null) {
+  return { userId, displayName, jerseyNumber, role: 'member', status: 'active' };
+}
+
 function boardEntry(overrides: Record<string, unknown> = {}) {
   return {
-    userId: 'u1',
-    displayName: '김선발',
-    jerseyNumber: 7,
-    position: null,
-    positionX: 50,
-    positionY: 40,
-    started: true,
-    goalkeeper: false,
-    ...overrides,
+    userId: 'u1', displayName: '김선발', jerseyNumber: 7, position: null,
+    positionX: 50, positionY: 40, started: true, goalkeeper: false, ...overrides,
   };
 }
 
+function boardData(overrides: Record<string, unknown> = {}) {
+  return {
+    gameSideId: 'side-1', sideKey: 'HOME', teamNameSnapshot: '성수 FC', formation: null, version: 1,
+    updatedAt: null, updatedByUserId: null, starterCount: 0, benchCount: 0, entries: [],
+    sportCode: 'futsal', playersPerSide: 5, lineupConfig: FUTSAL_CONFIG, ...overrides,
+  };
+}
+
+function mockBoard(data: Record<string, unknown>) {
+  apiMocks.useV1TacticsBoard.mockReturnValue({ isLoading: false, isError: false, error: null, refetch: vi.fn(), data });
+}
+
+function mockMembers(items: unknown[], viewerRole = 'manager') {
+  apiMocks.useV1TeamMembers.mockReturnValue({ isLoading: false, isError: false, data: { items, viewerRole } });
+}
+
 let mutateAsync: ReturnType<typeof vi.fn>;
+type SavedEntry = { userId: string | null; displayName: string; jerseyNumber: number | null; started: boolean; positionX: number | null; position: string | null; goalkeeper: boolean };
+function savedInput() {
+  return mutateAsync.mock.calls[0][0] as { formation: string | null; entries: SavedEntry[] };
+}
 
 beforeEach(() => {
   mutateAsync = vi.fn().mockResolvedValue({ version: 2 });
   apiMocks.useV1SaveTacticsBoard.mockReturnValue({ mutateAsync, isPending: false });
-  apiMocks.useV1TeamMembers.mockReturnValue({
-    isLoading: false,
-    isError: false,
-    data: { items: [], viewerRole: 'manager' },
+  mockMembers([]);
+  mockBoard(boardData());
+});
+
+describe('TacticsBoardClient — 처음 여는 풋살 보드', () => {
+  const roster = [member('u1', '선수01', 1), member('u2', '선수02', 2), member('u10', '팀장1', 10)];
+
+  it('풋살 코트와 5:5 대형(필드 4명)만 보이고, 저장 전 판은 첫 대형으로 연다', () => {
+    mockMembers(roster);
+    mockBoard(boardData({ version: 0 }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+
+    expect(screen.getByRole('application', { name: '코트 배치 보드' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^1-2-1\s/ })[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: /^2-2\s/ })[0]).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^2-2-1\s/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText('5:5 경기예요. 필드 4명 대형만 보여요.')[0]).toBeInTheDocument();
+    // 정본 "선후발 없음" — 안내 띠가 선발·후보를 말하지 않는다(W3-V5).
+    const banner = screen.getByText(/팀원만 볼 수 있는 배치예요/);
+    expect(banner).toHaveTextContent('성수 FC 팀원만 볼 수 있는 배치예요. 상대 팀과 관중에게는 등번호와 이름만 공개돼요.');
+    expect(banner.textContent).not.toMatch(/선발|후보/);
   });
-  apiMocks.useV1TacticsBoard.mockReturnValue({
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-    data: {
-      gameSideId: 'side-1',
-      sideKey: 'HOME',
-      teamNameSnapshot: '성수 FC',
-      formation: null,
-      version: 1,
-      updatedAt: null,
-      updatedByUserId: null,
-      starterCount: 1,
-      benchCount: 1,
-      entries: [boardEntry(), boardEntry({ userId: 'u2', displayName: '박후보', jerseyNumber: 9, started: false, positionX: null, positionY: null })],
-    },
+
+  it('팀원 전원이 대기 칩(등번호 순)이고, 한 번씩 누르면 GK → FX 순서로 코트에 앉아 그대로 저장된다', async () => {
+    mockMembers([member('u10', '팀장1', 10), ...roster.slice(0, 2)]);
+    mockBoard(boardData({ version: 0 }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+
+    const chips = within(screen.getByRole('list', { name: '대기 3명' })).getAllByRole('button');
+    expect(chips.map((chip) => chip.getAttribute('aria-label'))).toEqual([
+      '선수01(1번) 코트에 놓기', '선수02(2번) 코트에 놓기', '팀장1(10번) 코트에 놓기',
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: '선수01(1번) 코트에 놓기' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수02(2번) 코트에 놓기' }));
+    expect(screen.getByRole('button', { name: '선수01 (골키퍼), 등번호 1' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '대기 1명' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AL 자리, 비어 있음 — 다음에 놓일 자리' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '전술 저장' }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    const input = savedInput();
+    expect(input.formation).toBe('1-2-1');
+    // 코트 밖 팀원(팀장1)은 싣지 않는다 — 팀원 목록에서 늘 다시 만들어진다.
+    expect(input.entries.map((entry) => [entry.displayName, entry.started, entry.goalkeeper, entry.position])).toEqual([
+      ['선수01', true, true, null],
+      ['선수02', true, false, 'FIXO'],
+    ]);
   });
 });
 
-describe('TacticsBoardClient — 선발과 후보를 오갈 수 있다', () => {
-  it('선발에게는 "후보로", 후보에게는 "선발로" 가 나온다', () => {
-    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
-    expect(screen.getByRole('button', { name: '김선발 후보로 내리기' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '박후보 선발로 올리기' })).toBeInTheDocument();
+describe('TacticsBoardClient — 페이지 여백', () => {
+  it('좌우는 셸 표준 여백이다 — 390 에서 대기 칩이 화면 끝에 붙지 않게 (W3-V4)', () => {
+    mockMembers([member('u1', '선수01', 1)]);
+    const { container } = render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    const page = container.firstElementChild as HTMLElement;
+    expect(page).toContainElement(screen.getByRole('application', { name: '코트 배치 보드' }));
+    expect(page.style.paddingLeft).toBe('var(--v1-shell-page-x)');
+    expect(page.style.paddingRight).toBe('var(--v1-shell-page-x)');
   });
+});
 
-  it('후보로 내리면 선발 명단에서 빠지고, 다시 선발로 올릴 수 있다', () => {
+describe('TacticsBoardClient — 번호는 팀 등번호', () => {
+  it('저장 당시 번호(7)가 아니라 지금 팀 등번호(10)를 보이고, 그 번호로 저장한다', async () => {
+    mockMembers([member('u1', '김선발', 10)]);
+    mockBoard(boardData({ entries: [boardEntry()] }));
     render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
-    expect(screen.getByTestId('pitch')).toHaveTextContent('김선발');
 
-    fireEvent.click(screen.getByRole('button', { name: '김선발 후보로 내리기' }));
-    expect(screen.getByTestId('pitch')).not.toHaveTextContent('김선발');
+    const token = screen.getByRole('button', { name: '김선발, 등번호 10' });
+    expect(token).toHaveTextContent(/^10$/);
 
-    // 되돌아가는 길이 실제로 열려 있는지 — 여기서 막히면 처음 결함으로 되돌아간 것이다.
-    fireEvent.click(screen.getByRole('button', { name: '김선발 선발로 올리기' }));
-    expect(screen.getByTestId('pitch')).toHaveTextContent('김선발');
-  });
-
-  it('후보로 내리면 피치 좌표도 함께 지워진다', async () => {
-    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
-    fireEvent.click(screen.getByRole('button', { name: '김선발 후보로 내리기' }));
+    // 대형을 고르면 코트 위 선수가 자리로 옮겨진다(확인 후) — 저장할 변경을 만든다.
+    fireEvent.click(screen.getAllByRole('button', { name: /^1-2-1\s/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '포메이션 바꾸기' }));
     fireEvent.click(screen.getByRole('button', { name: '전술 저장' }));
-
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
-    const payload = mutateAsync.mock.calls[0][0] as {
-      entries: Array<{ displayName: string; started: boolean; positionX: number | null }>;
-    };
-    const moved = payload.entries.find((entry) => entry.displayName === '김선발');
-    expect(moved).toMatchObject({ started: false, positionX: null });
+    expect(savedInput().entries).toEqual([expect.objectContaining({ userId: 'u1', jerseyNumber: 10 })]);
+  });
+});
+
+describe('TacticsBoardClient — 옛 저장 데이터 읽기', () => {
+  // H7 이전 판: 대형 없음(자유 배치), 선발·배치됨 / 선발·배치 전 / 후보 세 가지가 섞여 있다.
+  const legacy = boardData({
+    sportCode: 'football', playersPerSide: 11,
+    lineupConfig: { positions: [], formations: [], minPlayers: 7, maxPlayers: 11 },
+    entries: [
+      boardEntry(),
+      boardEntry({ userId: 'u2', displayName: '박배치전', jerseyNumber: 8, positionX: null, positionY: null }),
+      boardEntry({ userId: 'u3', displayName: '이후보', jerseyNumber: 9, started: false, positionX: null, positionY: null }),
+    ],
   });
 
-  it('이미 보드에 있는 사람은 "팀원 추가" 목록에 다시 뜨지 않는다 (userId 가 없어도)', () => {
-    // 보드 엔트리는 게스트를 위해 userId 가 nullable 이라, userId 로만 거르면 그런 엔트리가
-    // 어떤 팀원과도 안 맞아 **이미 올라간 사람이 목록에 또 뜬다.** alpha 실화면에서 선발
-    // 3명이 그대로 "추가" 목록에 남아 있는 것을 확인했다.
-    apiMocks.useV1TeamMembers.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        items: [
-          { userId: 'u1', displayName: '김선발', role: 'member', status: 'active' },
-          { userId: 'u9', displayName: '한대기', role: 'member', status: 'active' },
-        ],
-        viewerRole: 'manager',
-      },
-    });
-    apiMocks.useV1TacticsBoard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      data: {
-        gameSideId: 'side-1',
-        sideKey: 'HOME',
-        teamNameSnapshot: '성수 FC',
-        formation: null,
-        version: 1,
-        updatedAt: null,
-        updatedByUserId: null,
-        starterCount: 1,
-        benchCount: 0,
-        // userId 없이 저장된 엔트리 — 이름만으로 같은 사람임을 알아봐야 한다.
-        entries: [boardEntry({ userId: null })],
-      },
-    });
-
+  it('자유 배치 좌표는 그대로 코트에, 나머지는 대기로 읽고 아무도 잃지 않는다', () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '박배치전', 8), member('u3', '이후보', 9)]);
+    mockBoard(legacy);
     render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
-    expect(screen.queryByRole('button', { name: '김선발 보드에 추가' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '한대기 보드에 추가' })).toBeInTheDocument();
+
+    expect(screen.getByRole('application', { name: '피치 배치 보드' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '김선발, 등번호 7' })).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: '대기 2명' })).getAllByRole('button').map((chip) => chip.getAttribute('aria-label')))
+      .toEqual(['박배치전(8번) 피치에 놓기', '이후보(9번) 피치에 놓기']);
+    expect(within(screen.getByRole('button', { name: /^포메이션 .*변경하기$/ })).getByText('자유 배치')).toBeInTheDocument();
   });
 
-  it('보드에 있는 사람과 이름이 같은 다른 팀원은 추가 목록에 남는다', () => {
-    // 이름 대조를 무조건 걸면 동명이인이 아무 안내 없이 사라진다 — 중복 노출은 눈에
-    // 보이지만 이건 안 보여서 더 나쁘다. userId 가 있는 엔트리는 id 로 정확히 판정한다.
-    apiMocks.useV1TeamMembers.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        items: [
-          { userId: 'u1', displayName: '김선발', role: 'member', status: 'active' },
-          // 같은 이름, 다른 사람.
-          { userId: 'u2', displayName: '김선발', role: 'member', status: 'active' },
-        ],
-        viewerRole: 'manager',
-      },
-    });
-    apiMocks.useV1TacticsBoard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-      data: {
-        gameSideId: 'side-1',
-        sideKey: 'HOME',
-        teamNameSnapshot: '성수 FC',
-        formation: null,
-        version: 1,
-        updatedAt: null,
-        updatedByUserId: null,
-        starterCount: 1,
-        benchCount: 0,
-        entries: [boardEntry({ userId: 'u1' })],
-      },
-    });
-
+  it('저장하면 코트 위 선수만 선발로 남고, 옛 "배치 전" 선발은 대기(저장 안 함)가 된다', async () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '박배치전', 8), member('u3', '이후보', 9)]);
+    mockBoard(legacy);
     render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
-    // u1 은 이미 보드에 있으니 빠지고, 동명이인 u2 는 남아야 한다 — 둘 다 사라지면 회귀다.
-    expect(screen.getAllByRole('button', { name: '김선발 보드에 추가' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: '김선발 배치 취소' }));
+    fireEvent.click(screen.getByRole('button', { name: '전술 저장' }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(savedInput()).toMatchObject({ formation: null, entries: [] });
   });
+});
 
-  it('일반 팀원에게는 바꾸는 버튼도 저장 버튼도 없다', () => {
-    apiMocks.useV1TeamMembers.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { items: [], viewerRole: 'member' },
-    });
+describe('TacticsBoardClient — 보는 사람', () => {
+  it('일반 팀원은 코트와 대기 명단을 보기만 한다 — 놓기·빼기·저장이 없다', () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '한대기', 3)], 'member');
+    mockBoard(boardData({ entries: [boardEntry()] }));
     render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
-    expect(screen.queryByRole('button', { name: /후보로 내리기|선발로 올리기/ })).not.toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: '김선발, 등번호 7' })).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: '대기 1명' })).getByText('한대기')).toBeInTheDocument();
+    expect(screen.getByText('코트 1명 · 대기 1명.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /코트에 놓기$|배치 취소$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
+    // 왜 못 누르는지 한 줄로 말한다(W3-V3).
+    expect(screen.getByText('보기 전용이에요. 배치는 팀장·매니저가 정해요.')).toBeInTheDocument();
+  });
+
+  it('팀장·매니저에게는 보기 전용 안내가 없다 (대조군)', () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '한대기', 3)], 'owner');
+    mockBoard(boardData({ entries: [boardEntry()] }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.queryByText(/보기 전용/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '한대기(3번) 코트에 놓기' })).toBeInTheDocument();
+  });
+
+  it('보드에 게스트(userId 없음)로 있는 사람은 같은 이름의 팀원 칩을 또 만들지 않는다', () => {
+    mockMembers([member('u1', '김선발', 7), member('u9', '한대기', 3)]);
+    mockBoard(boardData({ entries: [boardEntry({ userId: null })] }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.queryByRole('button', { name: /^김선발\(/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '한대기(3번) 코트에 놓기' })).toBeInTheDocument();
+  });
+
+  it('보드에 있는 사람과 이름만 같은 다른 팀원은 대기에 남는다', () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '김선발', 11)]);
+    mockBoard(boardData({ entries: [boardEntry()] }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.getByRole('button', { name: '김선발(11번) 코트에 놓기' })).toBeInTheDocument();
   });
 });
 
@@ -229,6 +261,7 @@ describe('전술 조회 실패', () => {
     });
     render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
     expect(screen.getByText(statusCode === 403 ? '이 팀의 전술은 볼 수 없어요' : '전술을 불러오지 못했어요')).toBeInTheDocument();
+    if (statusCode === 403) expect(screen.getByText('전술보드는 그 팀의 팀원만 볼 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
     if (statusCode === 500) expect(screen.getByRole('button', { name: /다시 시도/ })).toBeInTheDocument();
   });

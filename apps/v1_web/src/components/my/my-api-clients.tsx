@@ -2,6 +2,7 @@
 
 import { PreferredPositionPicker } from './preferred-position-picker';
 import { ProfilePhotoCropper } from './profile-photo-cropper';
+import { MyDissolvedTeamsSection } from './my-dissolved-teams-section';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -19,7 +20,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
-import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
+import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
   useV1ApproveTeamJoinApplication,
@@ -189,6 +190,7 @@ export function MyTeamsPageClient() {
   const model: MyTeamsViewModel = {
     teams,
     summary: buildTeamSummary(teams),
+    dissolvedSection: <MyDissolvedTeamsSection />,
   };
 
   return <MyTeamsPageView model={model} />;
@@ -2257,7 +2259,7 @@ export function WithdrawalPageClient() {
               </span>
               <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
             </div>
-            <p className="tm-text-body" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
+            <p className="tm-text-body" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·매니저)을 갖고 있으면 탈퇴가 제한돼요.</p>
             <p className="tm-text-body" style={{ margin: '8px 0 0', lineHeight: 1.6 }}>{WITHDRAWAL_GRACE_NOTICE}</p>
           </section>
           <Card pad={16}>
@@ -2433,7 +2435,7 @@ function toMyTeam(item: V1MyTeam): MyTeam {
     sport: item.sport.name,
     region: item.region?.name ?? '지역 미정',
     role: item.role,
-    roleLabel: roleLabel(item.role),
+    roleLabel: teamRoleLabel(item.role) ?? '비회원',
     members: item.memberCount,
     manner: item.trust?.score != null && hasTrustValue(item.trust.trustState) ? String(item.trust.score) : '-',
     next: item.canCreateTeamMatch ? '팀매치 만들 수 있어요' : '팀매치에 참여할 수 있어요',
@@ -2451,7 +2453,7 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
     sport: team.sport.name,
     region: team.region?.name ?? '지역 미정',
     role: team.viewer.role as MyTeam['role'],
-    roleLabel: roleLabel(team.viewer.role),
+    roleLabel: teamRoleLabel(team.viewer.role) ?? '비회원',
     members: team.memberCount,
     manner: team.trust.score && hasTrustValue(team.trust.trustState) ? String(team.trust.score) : '-',
     next: team.profile.activitySummary ?? team.profile.activityAreaText ?? '팀매치에서 일정을 확인해 보세요',
@@ -2493,7 +2495,7 @@ function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boo
  * 상태 라벨만 있으면 승인됐다는 사실은 알아도 다음에 뭘 해야 할지 모른다.
  */
 const JOIN_APPLICATION_HINTS: Record<string, string> = {
-  requested: '관리자가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
+  requested: '팀장·매니저가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
   approved: '가입이 승인됐어요. 이제 팀 활동에 참여할 수 있어요.',
   rejected: '이번에는 승인되지 않았어요. 다시 신청할 수 있어요.',
   withdrawn: '내가 취소한 신청이에요. 다시 신청할 수 있어요.',
@@ -2554,13 +2556,6 @@ function formatGender(gender: 'male' | 'female' | null | undefined) {
   if (gender === 'male') return '남';
   if (gender === 'female') return '여';
   return '성별 미등록';
-}
-
-function roleLabel(role: string) {
-  if (role === 'owner') return '팀장';
-  if (role === 'manager' || role === 'admin') return '운영진';
-  if (role === 'member') return '멤버';
-  return '비회원';
 }
 
 function hasTrustValue(value: string) {

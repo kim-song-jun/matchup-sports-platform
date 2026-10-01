@@ -616,11 +616,6 @@ export type V1Team = {
     displayName: string;
     profileImageUrl: string | null;
   };
-  /** 감독 — manager 역할 멤버가 없으면 null */
-  manager?: {
-    userId: string;
-    displayName: string;
-  } | null;
   viewerRole?: string;
   viewerJoinState?: string;
 };
@@ -728,6 +723,79 @@ export type V1TeamDetail = {
     disabledReason: string | null;
     manageRoute: string | null;
   };
+  /**
+   * 해체(보관)된 팀일 때만 채워진다(Task 180 H3). 이때 `status` 는 'archived' 이고 viewer 는
+   * 누구에게나 비회원 형태라 운영 화면이 닫힌다. `canRestore` 는 팀장이 해체한 팀의 팀장에게 30일 안만 true.
+   */
+  dissolution?: V1TeamDissolutionInfo | null;
+};
+
+export type V1TeamDissolutionInfo = {
+  dissolvedAt: string | null;
+  /** 팀장 해체(owner)만 셀프 복구 대상이고 운영팀 보관(admin)은 운영팀만 푼다. 팀장이 아닌 viewer 에게는 null. */
+  archivedBy: 'owner' | 'admin' | null;
+  /** 셀프 복구 기한. 운영팀 보관이면 null. */
+  restoreDeadlineAt: string | null;
+  canRestore: boolean;
+};
+
+export type V1TeamDissolutionBlockerKind = 'live_game' | 'matched_team_match' | 'league_entry' | 'tournament_entry';
+
+export type V1TeamDissolutionBlocker = {
+  kind: V1TeamDissolutionBlockerKind;
+  items: Array<{
+    id: string;
+    title: string;
+    opponentName: string | null;
+    startAt: string | null;
+    placeName: string | null;
+    /** 대회·리그 참가 항목에만 있다. */
+    registrationStatus: V1TournamentRegistrationStatus | null;
+    /** 정리하러 갈 화면. 갈 곳이 없으면 null. */
+    route: string | null;
+  }>;
+};
+
+/** `GET /teams/:teamId/dissolution-preview` — 팀장 전용 해체 사전 점검. */
+export type V1TeamDissolutionPreview = {
+  teamId: string;
+  teamName: string;
+  canDissolve: boolean;
+  blockers: V1TeamDissolutionBlocker[];
+  cleanup: {
+    recruitingTeamMatchCount: number;
+    outgoingApplicationCount: number;
+    joinApplicationCount: number;
+    invitationCount: number;
+    upcomingSchedules: Array<{ scheduleId: string; title: string; startAt: string }>;
+    notifyMemberCount: number;
+  };
+  restoreWindowDays: number;
+};
+
+export type V1DissolveTeamResult = V1TeamDissolutionInfo & {
+  teamId: string;
+  status: 'archived';
+  cancelledTeamMatchCount: number;
+  cancelledScheduleCount: number;
+  notifiedMemberCount: number;
+  detailRoute: string;
+};
+
+/** `POST /teams/:teamId/restore` — 30일 안이면 팀과 팀 채팅방만 다시 연다. */
+export type V1RestoreTeamResult = { teamId: string; status: 'active'; detailRoute: string };
+
+/** `GET /me/dissolved-teams` — 내가 팀장인 보관 팀. 기간이 지났거나 운영팀이 보관한 팀도 canRestore=false 로 온다. */
+export type V1MyDissolvedTeams = {
+  items: Array<V1TeamDissolutionInfo & {
+    teamId: string;
+    name: string;
+    logoUrl: string | null;
+    sportName: string;
+    memberCount: number;
+    detailRoute: string;
+  }>;
+  restoreWindowDays: number;
 };
 
 export type V1TeamMutationPayload = {
@@ -782,6 +850,9 @@ export type V1TeamJoinEligibility = {
   requiresApproval: boolean;
   immediateJoinSupported: boolean;
 };
+
+/** GET /teams/name-availability — 같은 종목·지역에 같은 이름의 팀이 있는지만(H2). */
+export type V1TeamNameAvailability = { available: boolean };
 
 export type V1TeamJoinApplicationResult = {
   applicationId: string;
@@ -1598,8 +1669,8 @@ export type V1GameRevisionMutationResult = {
 };
 
 // ── 팀 매치 라인업 (Task 14/15) ──
-// GET .../lineup 은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 상대팀 라인업을 읽는
-// 엔드포인트는 없다(정정 요청은 내용을 보지 않고 사유만 남기는 blind 액션).
+// GET .../lineup 은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다. 상대 참석명단은 공개 시각 뒤
+// GET .../lineup/opponent 로만 번호·이름을 읽는다(H5) — 그 전엔 `opponent.submitted` 만 보인다.
 export type V1TeamMatchLineupRole = 'team_owner' | 'team_manager';
 export type V1TeamMatchLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 export type V1TeamMatchLineupLockReason =
@@ -1686,6 +1757,11 @@ export type V1TeamMatchLineup = {
   gameState?: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
   /** @deprecated `editable`/`lockReason`을 사용한다. */
   hasRecordedEvents?: boolean;
+  /** 첫 기록 뒤 결과 확정 전 — 빼기·번호 변경 없이 늦게 온 선수 추가만 열린다(H5). */
+  lateAdditionAllowed?: boolean;
+  ownTeamName?: string;
+  /** 상대 참석명단 요약 — 공개 전에는 제출 여부만, 공개 뒤에는 인원까지. */
+  opponent?: V1TeamMatchLineupOpponentSummary;
   version: number;
   // 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치.
   formation: string | null;
@@ -1701,7 +1777,45 @@ export type V1TeamMatchLineup = {
     displayName: string;
     jerseyNumber: number | null;
     attending: boolean;
+    /** 이 경기 팀 일정 응답(팀장 참고용, 읽기 전용). 연결된 일정이 없으면 null. */
+    rsvpStatus?: V1TeamMatchRsvpStatus | null;
   }>;
+};
+
+export type V1TeamMatchRsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' | 'NO_RESPONSE';
+
+export type V1TeamMatchLineupOpponentSummary = {
+  teamName: string | null;
+  submitted: boolean;
+  published: boolean;
+  /** 공개 뒤에만 숫자다. */
+  participantCount: number | null;
+};
+
+/** GET .../lineup/opponent — 공개 뒤 상대 참석명단(번호·이름만). 공개 전 403, 미제출 404. */
+export type V1TeamMatchOpponentLineup = {
+  teamMatchId: string;
+  teamName: string | null;
+  publicLineupAt: string;
+  participants: Array<{ jerseyNumber: number | null; displayName: string }>;
+};
+
+/** POST .../lineup/late-additions — 현재 제출본에 붙은 행. */
+export type V1TeamMatchLateAdditionPayload = {
+  userId?: string;
+  displayName?: string;
+  jerseyNumber?: number;
+  goalkeeper?: boolean;
+};
+
+export type V1TeamMatchLateAdditionResult = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  lineupId: string;
+  participantId: string;
+  addedAt: string;
+  replayed: boolean;
 };
 
 // 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는
@@ -1976,9 +2090,11 @@ export type V1ChatMessage = {
     displayName: string;
     profileImageUrl: string | null;
   };
-  messageType?: 'text' | 'system';
+  messageType?: 'text' | 'system' | 'image';
   systemEventType?: 'joined' | 'left' | null;
   content: string | null;
+  /** 사진 메시지의 업로드 경로(`/uploads/...`). 숨김·삭제 메시지이거나 업로드가 지워졌으면 null (Task 181). */
+  imageUrl?: string | null;
   status: string;
   sentAt: string;
   mine: boolean;
@@ -2017,7 +2133,9 @@ export type V1ChatRoomResolveResult = {
 export type V1ChatMessageSendResult = {
   messageId: string;
   roomId: string;
+  messageType?: 'text' | 'image';
   content: string;
+  imageUrl?: string | null;
   status: string;
   sentAt: string;
 };
@@ -4407,10 +4525,14 @@ export type V1TeamInvitationSummary = {
   };
 };
 
+/** 지난 초대 1건 — 최근 30일에 수락·거절·취소로 끝난 초대. closedAt 은 끝난 시각 */
+export type V1PastTeamInvitation = V1TeamInvitationSummary & { closedAt: string };
+
 /** GET /teams/:teamId/invitations 응답 */
 export type V1TeamInvitationsPage = {
   teamId: string;
   items: V1TeamInvitationSummary[];
+  pastItems: V1PastTeamInvitation[];
 };
 
 /** 받은 초대 1건 (GET /me/invitations items 요소) */

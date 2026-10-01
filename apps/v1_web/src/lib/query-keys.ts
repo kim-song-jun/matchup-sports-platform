@@ -30,6 +30,8 @@ export const v1Keys = {
   /** 팀 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */
   teamsAll: () => [...v1Keys.all, 'teams'] as const,
   teamRecentVenues: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'recent-venues'] as const,
+  teamDissolutionPreview: (teamId: string) => [...v1Keys.team(teamId), 'dissolution-preview'] as const,
+  myDissolvedTeams: () => [...v1Keys.all, 'me', 'dissolved-teams'] as const,
   teamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'team-matches', filters ?? {}] as const,
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
   /** 팀매치 목록·상세 공통 접두사 — 캐시 탐색용(`matchesAll` 과 같은 목적). */

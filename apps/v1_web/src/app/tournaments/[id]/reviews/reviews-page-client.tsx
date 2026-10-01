@@ -161,7 +161,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
               {tournament ? `${tournament.title} 참가팀 후기` : '참가팀 후기'}
             </h2>
             <p className="tm-text-caption" style={{ margin: '4px 0 0', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              이 대회에 참가한 팀의 팀장·운영진이 남긴 후기예요.
+              이 대회에 참가한 팀의 팀장·매니저가 남긴 후기예요.
             </p>
           </header>
 
@@ -196,7 +196,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
               className="tm-text-caption"
               style={{ color: 'var(--text-caption)', lineHeight: 1.5, margin: '12px 0 4px' }}
             >
-              로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.
+              로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.
             </div>
           ) : null}
 

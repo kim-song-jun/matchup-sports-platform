@@ -76,6 +76,19 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
   });
 });
 
+describe('TournamentOpsShell 대회 아바타 (Task 180 G13 F54)', () => {
+  it('이름이 괄호로 시작해도 아바타는 첫 글자("Q")를 보여 준다', () => {
+    const { container } = render(
+      <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin" tournamentTitle="(QA0929) 마포 주말 리그">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    const avatars = [...container.querySelectorAll('span[aria-hidden="true"]')].filter((node) => node.children.length === 0);
+    expect(avatars.some((node) => node.textContent === 'Q')).toBe(true);
+    expect(avatars.some((node) => node.textContent === '(')).toBe(false);
+  });
+});
+
 describe('TournamentOpsShell nav 항목 (T6-5, D-16)', () => {
   it('SUPPORT_READONLY도 결과 검토/정정이 보인다 — 숨기지 않고 비활성 + 사유', () => {
     render(
@@ -130,5 +143,34 @@ describe('TournamentOpsShell nav 표면 (M5)', () => {
     for (const link of links) {
       expect(link).toHaveAttribute('href', '/admin/live/t-1/operations');
     }
+  });
+});
+
+describe('TournamentOpsShell 모바일 상단 제목 (Task 180 G6-V4)', () => {
+  // 콘솔 경로는 nav 항목에 없어서 상단 제목이 종류별 기본값으로 떨어진다.
+  const mobileTitle = () => screen.getByRole('button', { name: '메뉴 열기' }).closest('header')?.textContent;
+
+  it.each([
+    ['regular_league', '리그 운영'],
+    ['regular_tournament', '대회 운영'],
+    [null, '대회 운영'],
+  ] as const)('경기 콘솔에서 종류가 %s 면 상단 제목은 %s', (kind, title) => {
+    pathnameMock.value = '/admin/live/c-1/fixtures/f-1/operate';
+    render(
+      <TournamentOpsShell tournamentId="c-1" role="PLATFORM_OPS" origin="admin" tournamentKind={kind}>
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(mobileTitle()).toBe(title);
+  });
+
+  it('nav 항목 화면에서는 종류와 무관하게 그 항목 이름이다', () => {
+    pathnameMock.value = '/admin/live/c-1/operations';
+    render(
+      <TournamentOpsShell tournamentId="c-1" role="PLATFORM_OPS" origin="admin" tournamentKind="regular_league">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(mobileTitle()).toBe('운영 보드');
   });
 });

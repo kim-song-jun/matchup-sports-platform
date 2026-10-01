@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { v1Delete, v1Post } from '@/lib/api-client';
+import { V1ApiError, v1Delete, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
+import { extractErrorMessage } from '@/lib/error-message';
 import type { V1MatchLifecycle } from '@/types/api';
 
 export type MatchLifecyclePanelProps = {
@@ -38,7 +39,11 @@ export function MatchLifecyclePanel({ id, domain, status, lifecycle, canManage, 
         await queryClient.invalidateQueries({ queryKey: v1Keys.all });
       }
     },
-    onError: (e) => setError(e instanceof Error ? e.message : '처리에 실패했어요. 다시 시도해 주세요.'),
+    onError: (e) => {
+      const message = extractErrorMessage(e, '처리에 실패했어요. 다시 시도해 주세요.');
+      setError(e instanceof V1ApiError && e.statusCode === 409 && /^[\x00-\x7F]+$/.test(message)
+        ? `매치 상태가 변경됐어요 (${e.code}). 새로고침 후 다시 시도해 주세요.` : message);
+    },
   });
   const onHold = status === 'on_hold';
   if (!onHold && !canManage) return null;

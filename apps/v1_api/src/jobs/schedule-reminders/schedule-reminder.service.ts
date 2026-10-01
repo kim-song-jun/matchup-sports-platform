@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { formatKstMonthDayTime } from '../../common/kst-datetime';
+import { nightPushAllowed } from '../../common/quiet-hours';
+import { NotificationsService, notificationCopyFor, type NotificationEventType } from '../../notifications/notifications.service';
 import { WebPushService } from '../../notifications/web-push.service';
 
 type LockedSchedule = {
@@ -31,27 +33,34 @@ type GuestApplicationNotificationPayload = {
   displayName: string;
 };
 
+/** 일정 생성·취소 알림(H1-schedule-*) outbox 행의 payload — team-schedules.service.ts 가 같은 트랜잭션에서 넣는다. */
+type ScheduleNoticePayload = { scheduleId: string; actorUserId: string };
+
+type ScheduleForNotice = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  title: string;
+  startAt: Date;
+  state: string;
+  visibility: string;
+  cancelReason: string | null;
+};
+
 type ReminderEvent = {
   /** Compound "${teamId}:${scheduleId}" — matches NotificationsService's own targetId shape for these events. */
   targetId: string;
-  deepLink: string;
+  deepLink: string | null;
   title: string;
   body: string;
 };
 
-// Mirrors NotificationsService's EVENT_TITLES/EVENT_BODIES entries for these two event types
-// exactly (see notifications.service.ts). Duplicated locally — not imported — because those
-// tables are module-private there and this class must not depend on
-// NotificationsService.emitNotificationToMany for persistence (see deliverDurableReminder below).
-const RSVP_REMINDER_COPY = {
-  title: '참석 여부를 알려주세요',
-  body: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
-} as const;
-
-const GUEST_RECRUITMENT_CLOSE_REMINDER_COPY = {
-  title: '용병 모집이 곧 마감돼요',
-  body: '모집 마감 전에 신청 현황을 확인해 주세요.',
-} as const;
+/** 문구·딥링크는 NotificationsService 의 표(notificationCopyFor)가 단일 소스다 — 여기서 복사하지 않는다. */
+function scheduleNotice(type: NotificationEventType, teamId: string, scheduleId: string, vars?: Parameters<typeof notificationCopyFor>[3]): ReminderEvent {
+  const targetId = `${teamId}:${scheduleId}`;
+  const copy = notificationCopyFor(type, 'team', targetId, vars);
+  return { targetId, deepLink: copy.deepLink, title: copy.title, body: copy.defaultBody };
+}
 
 // P1-4 fix: title only — the body embeds the applicant's displayName, so it is built per-call
 // (see guestApplicationManagerNotificationHandler below) rather than as a static constant.
@@ -122,11 +131,7 @@ export class ScheduleReminderService {
     const recipients = await this.activeTeamMemberIds(tx, schedule.teamId);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim, recipients, {
-      targetId: `${schedule.teamId}:${schedule.id}`,
-      deepLink: `/teams/${schedule.teamId}/schedules/${schedule.id}`,
-      ...RSVP_REMINDER_COPY,
-    });
+    await this.deliverDurableReminder(tx, claim, recipients, scheduleNotice('schedule_rsvp_deadline_reminder', schedule.teamId, schedule.id), true);
   };
 
   readonly guestRecruitmentCloseReminderHandler: GameOperationHandler = async (claim, tx) => {
@@ -154,11 +159,13 @@ export class ScheduleReminderService {
     const recipients = await this.activeTeamMemberIds(tx, recruitment.teamId);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim, recipients, {
-      targetId: `${recruitment.teamId}:${recruitment.scheduleId}`,
-      deepLink: `/teams/${recruitment.teamId}/schedules/${recruitment.scheduleId}`,
-      ...GUEST_RECRUITMENT_CLOSE_REMINDER_COPY,
-    });
+    await this.deliverDurableReminder(
+      tx,
+      claim,
+      recipients,
+      scheduleNotice('schedule_guest_recruitment_close_reminder', recruitment.teamId, recruitment.scheduleId),
+      true,
+    );
   };
 
   /**
@@ -180,13 +187,87 @@ export class ScheduleReminderService {
     const recipients = await this.activeManagerIds(tx, payload.teamId);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim, recipients, {
-      targetId: `${payload.teamId}:${payload.scheduleId}`,
-      deepLink: `/teams/${payload.teamId}/schedules/${payload.scheduleId}`,
-      title: GUEST_APPLICATION_RECEIVED_TITLE,
-      body: `"${payload.displayName}"님이 용병 모집에 신청했어요.`,
-    });
+    // 용병 신청도 팀 사건 알림이라 밤에는 그 밤에 시작하는 일정일 때만 푸시한다(H1-night).
+    const schedule = await tx.v1TeamSchedule.findUnique({ where: { id: payload.scheduleId }, select: { startAt: true } });
+    await this.deliverDurableReminder(
+      tx,
+      claim,
+      recipients,
+      {
+        targetId: `${payload.teamId}:${payload.scheduleId}`,
+        deepLink: `/teams/${payload.teamId}/schedules/${payload.scheduleId}`,
+        title: GUEST_APPLICATION_RECEIVED_TITLE,
+        body: `"${payload.displayName}"님이 용병 모집에 신청했어요.`,
+      },
+      nightPushAllowed(new Date(), schedule?.startAt ?? null),
+    );
   };
+
+  /** 새 일정(H1-schedule-created): 만든 사람을 뺀 활성 멤버 전원. 워커가 받기 전에 취소됐으면 보내지 않는다. */
+  readonly scheduleCreatedNotificationHandler: GameOperationHandler = async (claim, tx) => {
+    const { scheduleId, actorUserId } = this.scheduleNoticePayload(claim.payload);
+    const schedule = await this.loadScheduleForNotice(tx, scheduleId);
+    if (schedule === null || schedule.state !== 'SCHEDULED') return;
+
+    const recipients = (await this.activeTeamMemberIds(tx, schedule.teamId)).filter((userId) => userId !== actorUserId);
+    await this.deliverScheduleNotice(tx, claim, 'team_schedule_created', schedule, recipients);
+  };
+
+  /**
+   * 일정 취소(H1-schedule-cancelled): '불참'이라고 답한 사람과 취소한 본인을 뺀 활성 멤버 + 승인된 용병.
+   * 용병(비멤버)은 공개 일정일 때만 넣는다 — 비공개 일정 상세는 비멤버에게 404 라 알림이 막다른 길이 된다.
+   */
+  readonly scheduleCancelledNotificationHandler: GameOperationHandler = async (claim, tx) => {
+    const { scheduleId, actorUserId } = this.scheduleNoticePayload(claim.payload);
+    const schedule = await this.loadScheduleForNotice(tx, scheduleId);
+    if (schedule === null || schedule.state !== 'CANCELLED') return;
+
+    const members = await this.activeTeamMemberIds(tx, schedule.teamId);
+    const declined = await tx.v1ScheduleAttendance.findMany({
+      where: { scheduleId, status: 'NOT_GOING' },
+      select: { userId: true },
+    });
+    const guests =
+      schedule.visibility === 'PUBLIC'
+        ? await tx.v1ScheduleGuestApplication.findMany({
+            where: { state: 'APPROVED', recruitment: { scheduleId } },
+            select: { userId: true },
+          })
+        : [];
+    const activeGuests = guests.length === 0 ? [] : await tx.v1User.findMany({
+      where: { id: { in: guests.map((guest) => guest.userId) }, accountStatus: 'active' },
+      select: { id: true },
+    });
+    const excluded = new Set([actorUserId, ...declined.map((row) => row.userId)]);
+    const recipients = [...new Set([...members, ...activeGuests.map((guest) => guest.id)])].filter((userId) => !excluded.has(userId));
+    await this.deliverScheduleNotice(tx, claim, 'team_schedule_cancelled', schedule, recipients);
+  };
+
+  private async deliverScheduleNotice(
+    tx: Prisma.TransactionClient,
+    claim: GameOperationClaim,
+    type: 'team_schedule_created' | 'team_schedule_cancelled',
+    schedule: ScheduleForNotice,
+    recipients: string[],
+  ): Promise<void> {
+    if (recipients.length === 0) return;
+    const when = formatKstMonthDayTime(schedule.startAt);
+    const vars = type === 'team_schedule_cancelled'
+      ? { team: schedule.teamName, title: schedule.title, when, reason: schedule.cancelReason ?? undefined }
+      : { team: schedule.teamName, title: schedule.title, when };
+    const event = scheduleNotice(type, schedule.teamId, schedule.id, vars);
+    await this.deliverDurableReminder(tx, claim, recipients, event, nightPushAllowed(new Date(), schedule.startAt));
+  }
+
+  private async loadScheduleForNotice(tx: Prisma.TransactionClient, scheduleId: string): Promise<ScheduleForNotice | null> {
+    const schedule = await tx.v1TeamSchedule.findUnique({
+      where: { id: scheduleId },
+      select: { id: true, teamId: true, title: true, startAt: true, state: true, visibility: true, cancelReason: true },
+    });
+    if (schedule === null) return null;
+    const team = await tx.v1Team.findUnique({ where: { id: schedule.teamId }, select: { name: true } });
+    return team === null ? null : { ...schedule, teamName: team.name };
+  }
 
   /**
    * Durable delivery for a reminder claim. Everything up to and including the
@@ -243,6 +324,7 @@ export class ScheduleReminderService {
     claim: GameOperationClaim,
     recipients: string[],
     event: ReminderEvent,
+    push: boolean,
   ): Promise<void> {
     const preferences = await tx.v1NotificationPreference.findMany({
       where: { userId: { in: recipients } },
@@ -272,12 +354,13 @@ export class ScheduleReminderService {
       skipDuplicates: true,
     });
 
-    const newlyDeliveredRecipients = enabledRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
+    // 밤에 보류한 푸시(push=false)도 알림함 행은 위에서 이미 남겼다(H1-night).
+    const newlyDeliveredRecipients = push ? enabledRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId))) : [];
 
     for (const userId of newlyDeliveredRecipients) {
       const send = () =>
         void this.webPush
-          ?.sendToUser(userId, { title: event.title, body: event.body, url: event.deepLink })
+          ?.sendToUser(userId, { title: event.title, body: event.body, url: event.deepLink ?? undefined })
           .catch(() => {
             // Best-effort only, and structurally unreachable before the createMany above has
             // resolved — a push failure must never undo or retry the already-durable notification.
@@ -328,6 +411,14 @@ export class ScheduleReminderService {
       throw new Error('Schedule reminder payload has an invalid expectedRecruitmentVersion');
     }
     return value;
+  }
+
+  private scheduleNoticePayload(payload: unknown): ScheduleNoticePayload {
+    const { scheduleId, actorUserId } = (typeof payload === 'object' && payload !== null ? payload : {}) as Record<string, unknown>;
+    if (typeof scheduleId !== 'string' || scheduleId.length === 0 || typeof actorUserId !== 'string' || actorUserId.length === 0) {
+      throw new Error('Schedule notice payload requires scheduleId and actorUserId');
+    }
+    return { scheduleId, actorUserId };
   }
 
   private guestApplicationPayload(payload: unknown): GuestApplicationNotificationPayload {

@@ -30,6 +30,7 @@ import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
+import { teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1AdminUserDetail } from '@/types/api';
 
 function formatVerification(value: string | null) {
@@ -42,7 +43,6 @@ function userTitle(user: V1AdminUserDetail) {
   return formatUserTitle(user);
 }
 
-type TeamMembershipRole = NonNullable<V1AdminUserDetail['teamMemberships']>[number]['role'];
 
 function getTeamRoleCounts(user: V1AdminUserDetail) {
   return {
@@ -51,12 +51,6 @@ function getTeamRoleCounts(user: V1AdminUserDetail) {
     member: user.teamRoleCounts?.member ?? 0,
   };
 }
-
-const TEAM_ROLE_LABEL: Record<TeamMembershipRole, string> = {
-  owner: '팀장',
-  manager: '운영진',
-  member: '멤버',
-};
 
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -240,7 +234,7 @@ export default function AdminUserDetailPage() {
               items={teamMemberships.map((membership) => ({
                 id: membership.membershipId,
                 title: membership.name,
-                meta: `${TEAM_ROLE_LABEL[membership.role]} · ${membership.status} · 멤버 ${membership.memberCount}`,
+                meta: `${teamRoleLabel(membership.role)} · ${membership.status} · 멤버 ${membership.memberCount}`,
               }))}
             />
           </section>
@@ -253,7 +247,7 @@ export default function AdminUserDetailPage() {
               <AdminSummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
               <AdminSummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
               <AdminSummaryItem icon={<Shield size={16} />} label="팀장 팀" value={teamRoles.owner} />
-              <AdminSummaryItem icon={<Shield size={16} />} label="운영진 팀" value={teamRoles.manager} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="매니저 팀" value={teamRoles.manager} />
               <AdminSummaryItem icon={<Users size={16} />} label="소속팀 전체" value={teamMemberships.length} />
               <AdminSummaryItem icon={<Users size={16} />} label="일반 멤버 팀" value={teamRoles.member} />
               <AdminSummaryItem icon={<Clock size={16} />} label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />

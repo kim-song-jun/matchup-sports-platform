@@ -15,7 +15,8 @@ import {
 } from '@prisma/client';
 import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { NotificationsService } from '../notifications/notifications.service';
+import { ChatService, type ChatSystemLine } from '../chat/chat.service';
+import { NotificationsService, notificationPersonName } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -32,6 +33,8 @@ import {
   UpdateTeamDto,
 } from './dto/mutate-team.dto';
 import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
+import type { TeamNameAvailabilityQueryDto } from './dto/teams-query.dto';
+import { assertTeamNameAvailable, hasTeamWithSameName, isSameTeamName } from './team-name';
 import {
   ApproveTeamJoinApplicationDto,
   CreateTeamJoinApplicationDto,
@@ -40,6 +43,7 @@ import {
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
 import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+import { buildDissolutionInfo, loadTeamArchivedBy } from './team-dissolution';
 
 /**
  * 정원 마감 안내 문구.
@@ -57,6 +61,10 @@ const TEAM_FULL_MESSAGE = '정원이 다 찬 팀이에요.';
  * (`@@unique([teamId, applicantUserId])`) 실사용에서 상한에 닿는 경우는 드물다.
  */
 const MY_JOIN_APPLICATIONS_GROUP_LIMIT = 20;
+
+/** 초대 탭 '지난 초대' — 최근 30일에 끝난 초대만, 최대 50건. */
+const PAST_INVITATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const PAST_INVITATION_LIMIT = 50;
 
 type TeamWithRelations = V1Team & {
   sport: { id: string; name: string };
@@ -101,6 +109,7 @@ export class TeamsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly chat: ChatService,
   ) {}
 
   async list(user: V1AuthUser | null, query: TeamsQueryDto) {
@@ -139,10 +148,17 @@ export class TeamsService {
   }
 
   async detail(user: V1AuthUser | null, teamId: string) {
-    const team = await this.getPublicTeam(teamId, user);
-    const viewer = this.getViewer(team, user);
-    const canViewMembers = this.canViewMembers(team, viewer);
-    const canSendContact = await this.canSendContactTo(user, team, viewer);
+    const team = await this.getPublicTeam(teamId, user, { includeDissolved: true });
+    // 해체된 팀은 지난 경기의 팀 링크가 끊기지 않도록 읽기 전용으로 보여 준다. 누구에게나
+    // 비회원 viewer 를 주어 기존 운영 화면(수정·멤버 관리·컨택)이 전부 닫히게 하고, 팀장에게만
+    // 누가 보관했는지와 복구 가능 여부를 dissolution 으로 알린다.
+    const dissolved = team.status === 'archived';
+    const actualViewer = this.getViewer(team, user);
+    const viewerIsOwner = actualViewer.role === 'owner';
+    const viewer = dissolved ? dissolvedTeamViewer() : actualViewer;
+    const archivedBy = dissolved && viewerIsOwner ? (await loadTeamArchivedBy(this.prisma, [team.id]))(team.id) : null;
+    const canViewMembers = !dissolved && this.canViewMembers(team, viewer);
+    const canSendContact = dissolved ? undefined : await this.canSendContactTo(user, team, viewer);
 
     return {
       id: team.id,
@@ -219,6 +235,7 @@ export class TeamsService {
         score: team.trustScore?.mannerScore ? Number(team.trustScore.mannerScore) : null,
       },
       viewer,
+      dissolution: dissolved ? buildDissolutionInfo(team.deletedAt, archivedBy, viewerIsOwner, new Date()) : null,
     };
   }
 
@@ -252,6 +269,7 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await assertTeamNameAvailable(tx, { name: dto.name, sportId: dto.sportId, regionId: dto.regionId });
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const team = await tx.v1Team.create({
         data: {
@@ -316,10 +334,11 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, true, 'team_created_owner_joined');
+      const { joinedLine } = await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, true, 'team_created_owner_joined');
 
-      return { team, membership };
+      return { team, membership, joinedLine };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
     return {
       teamId: result.team.id,
@@ -342,6 +361,9 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     this.assertMemberGoalFitsCurrentMembers(dto.memberGoalCount, team.memberCount);
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 이름·종목·지역이 그대로면 묻지 않는다 — 규칙 전부터 있던 중복 팀도 다른 항목은 고칠 수 있어야 한다.
+      const nameTarget = { name: dto.name, sportId: dto.sportId, regionId: dto.regionId, excludeTeamId: team.id };
+      if (!isSameTeamName(team, nameTarget)) await assertTeamNameAvailable(tx, nameTarget);
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const nextTeam = await tx.v1Team.update({
         where: { id: team.id },
@@ -426,6 +448,22 @@ export class TeamsService {
       membersVisibilityEnabled: updated.membersVisible,
       detailRoute: `/teams/${updated.id}`,
     };
+  }
+
+  /**
+   * 입력 중 이름 확인 — 가능/불가만 알려 주고 겹치는 팀이 어디인지는 말하지 않는다. 답은 "저장하면 이름으로 막히나"와
+   * 같아야 해서, 수정 중인 팀의 이름·종목·지역이 그대로면 update 처럼 묻지 않고 통과시킨다(이미 있던 중복 팀).
+   */
+  async nameAvailability(user: V1AuthUser, query: TeamNameAvailabilityQueryDto) {
+    this.assertActiveAccount(user);
+    if (query.excludeTeamId) {
+      const current = await this.prisma.v1Team.findFirst({
+        where: { id: query.excludeTeamId, deletedAt: null },
+        select: { name: true, sportId: true, regionId: true },
+      });
+      if (current && isSameTeamName(current, query)) return { available: true };
+    }
+    return { available: !(await hasTeamWithSameName(this.prisma, query, new Date())) };
   }
 
   async members(user: V1AuthUser | null, teamId: string, query: TeamMembersQueryDto) {
@@ -615,8 +653,10 @@ export class TeamsService {
    * 따지지 않는다** — 등번호는 권한 계층이 아니라 팀 살림이라, 관리자는 owner의 번호도
    * 정할 수 있어야 한다. 관리 권한(owner/manager) 자체는 그대로 요구한다.
    *
-   * 라인업 화면에서 고친 등번호는 여기로 흘러들어오지 않는다(설계 결정 D5): 한 경기의
-   * 임시 번호가 팀 기본값을 조용히 덮어쓰면, 나중에 아무도 왜 번호가 바뀌었는지 모른다.
+   * 라인업 화면에서 고친 등번호는 여기로 조용히 흘러들어오지 않는다(설계 결정 D5): 한 경기의
+   * 임시 번호가 팀 기본값을 덮어쓰면, 나중에 아무도 왜 번호가 바뀌었는지 모른다. 친선 참석명단의
+   * 번호 시트에서 사용자가 "팀 번호도 함께"를 직접 고를 때만 화면이 이 API 를 따로 부른다(H5 D-5).
+   * 대회·리그 참가 명단의 번호는 그 대회의 원본이라 여기서 바꿔도 따라가지 않는다.
    */
   async changeMembershipJersey(
     user: V1AuthUser,
@@ -740,6 +780,7 @@ export class TeamsService {
 
         return { delegatedOwner, team };
       });
+      this.notifyOwnerDelegated(target.teamId, target.team.name, target.userId, user.id);
 
       return {
         membershipId: result.delegatedOwner.id,
@@ -759,7 +800,7 @@ export class TeamsService {
       });
     }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
-      throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
+      throw stateConflict('매니저는 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -771,7 +812,7 @@ export class TeamsService {
           data: { managerCount: { increment: 1 } },
         });
         if (capGuard.count !== 1) {
-          throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
+          throw stateConflict('매니저는 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
         }
       }
       const updated = await tx.v1TeamMembership.update({
@@ -801,6 +842,13 @@ export class TeamsService {
 
       return { updated, team };
     });
+    void this.notifications.emitNotification(
+      target.userId,
+      dto.role === 'manager' ? 'team_manager_assigned' : 'team_manager_revoked',
+      target.teamId,
+      undefined,
+      { vars: { team: target.team.name } },
+    );
 
     return {
       membershipId: result.updated.id,
@@ -808,6 +856,54 @@ export class TeamsService {
       role: result.updated.role,
       managerCount: result.team.managerCount,
     };
+  }
+
+  /** 스스로 나간 멤버를 발송 시점의 팀장·매니저에게 알린다(나간 본인 제외) — 멤버 탭으로 착지. */
+  private notifyMemberLeft(teamId: string, teamName: string, leftUserId: string, memberCount: number): void {
+    void (async () => {
+      const [managers, leftUser] = await Promise.all([
+        this.prisma.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        }),
+        this.prisma.v1User.findUnique({
+          where: { id: leftUserId },
+          select: { profile: { select: { nickname: true, displayName: true } } },
+        }),
+      ]);
+      const recipients = managers.map((membership) => membership.userId).filter((userId) => userId !== leftUserId);
+      await this.notifications.emitNotificationToMany(recipients, 'team_member_left', teamId, undefined, {
+        vars: { team: teamName, name: notificationPersonName(leftUser?.profile), count: String(memberCount) },
+      });
+    })().catch((err: unknown) => this.logger.warn(`member left notification failed team=${teamId}: ${String(err)}`));
+  }
+
+  /**
+   * 팀장 넘기기 뒤: 새 팀장에게 '팀장이 되었어요', 나머지 매니저에게 '팀장이 바뀌었어요'. 넘긴 사람은 방금
+   * 매니저가 됐지만 자기가 한 일이라 받지 않는다. 수신자는 발송 시점의 매니저 명단이다.
+   */
+  private notifyOwnerDelegated(teamId: string, teamName: string, newOwnerUserId: string, previousOwnerUserId: string): void {
+    void this.notifications.emitNotification(newOwnerUserId, 'team_owner_received', teamId, undefined, {
+      vars: { team: teamName },
+    });
+    void (async () => {
+      const [managers, newOwner] = await Promise.all([
+        this.prisma.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: 'manager' },
+          select: { userId: true },
+        }),
+        this.prisma.v1User.findUnique({
+          where: { id: newOwnerUserId },
+          select: { profile: { select: { nickname: true, displayName: true } } },
+        }),
+      ]);
+      const recipients = managers
+        .map((membership) => membership.userId)
+        .filter((userId) => userId !== previousOwnerUserId && userId !== newOwnerUserId);
+      await this.notifications.emitNotificationToMany(recipients, 'team_owner_changed', teamId, undefined, {
+        vars: { team: teamName, name: notificationPersonName(newOwner?.profile) },
+      });
+    })().catch((err: unknown) => this.logger.warn(`owner delegation notification failed team=${teamId}: ${String(err)}`));
   }
 
   async removeMembership(
@@ -865,7 +961,7 @@ export class TeamsService {
           reason: dto.reason ?? 'team_membership_removed',
         },
       });
-      await this.leaveTeamChatParticipant(
+      const leftLine = await this.leaveTeamChatParticipant(
         tx,
         target.teamId,
         target.userId,
@@ -883,14 +979,18 @@ export class TeamsService {
       });
       await enqueueRosterResync(tx, teamMembersTargets([target.teamId]));
 
-      return { updated, team, removedRosterCount };
+      return { updated, team, removedRosterCount, leftLine };
     });
 
+    if (result.leftLine) void this.chat.deliverSystemLine(result.leftLine);
     if (result.removedRosterCount > 0) {
       this.logger.log(
         `roster cleanup on member removal team=${target.teamId} user=${target.userId} rosters=${result.removedRosterCount}`,
       );
     }
+    void this.notifications.emitNotification(target.userId, 'team_membership_removed', target.teamId, undefined, {
+      vars: { team: target.team.name },
+    });
 
     return {
       membershipId: result.updated.id,
@@ -907,7 +1007,7 @@ export class TeamsService {
   // 호출자 본인의 active membership만 조회한다. 상태는 'removed'가 아닌 'left'로 구분한다.
   async leaveTeam(user: V1AuthUser, teamId: string, dto: LeaveTeamDto) {
     this.assertActiveAccount(user);
-    const { membership } = await this.getActiveTeamMembership(user, teamId);
+    const { team, membership } = await this.getActiveTeamMembership(user, teamId);
 
     const leftAt = new Date();
     const reason = dto.reason ?? 'team_membership_self_leave';
@@ -963,7 +1063,7 @@ export class TeamsService {
           reason,
         },
       });
-      await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
+      const leftLine = await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
 
       // 추방(removeMembership)과 같은 이유로 자진 이탈에서도 대회 명단을 비운다.
       const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, {
@@ -972,14 +1072,16 @@ export class TeamsService {
       });
       await enqueueRosterResync(tx, teamMembersTargets([teamId]));
 
-      return { updated, team: updatedTeam, removedRosterCount };
+      return { updated, team: updatedTeam, removedRosterCount, leftLine };
     });
 
+    if (result.leftLine) void this.chat.deliverSystemLine(result.leftLine);
     if (result.removedRosterCount > 0) {
       this.logger.log(
         `roster cleanup on self leave team=${teamId} user=${user.id} rosters=${result.removedRosterCount}`,
       );
     }
+    this.notifyMemberLeft(teamId, team.name, user.id, result.team.memberCount);
 
     return {
       membershipId: result.updated.id,
@@ -1042,19 +1144,8 @@ export class TeamsService {
       return nextApplication;
     });
 
-    // 알림: 팀 manager+에게 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
-    this.notifications.emitToManyDeferred(
-      async () =>
-        (
-          await this.prisma.v1TeamMembership.findMany({
-            where: { teamId: team.id, status: 'active', role: { in: ['owner', 'manager'] } },
-            select: { userId: true },
-          })
-        ).map((m) => m.userId),
-      'team_join_application_received',
-      team.id,
-      `"${team.name}" 팀 가입 신청을 확인해 주세요.`,
-    );
+    // 팀장·매니저의 '가입 신청' 줄을 올린다(팀별 한 줄 — H1-join-burst). 실패해도 신청은 이미 끝났다.
+    void this.notifications.refreshTeamJoinApplicationsLine(team.id, 'arrival');
 
     return {
       applicationId: application.id,
@@ -1163,6 +1254,7 @@ export class TeamsService {
 
       return nextApplication;
     });
+    void this.notifications.refreshTeamJoinApplicationsLine(updated.teamId, 'recount');
 
     return {
       applicationId: updated.id,
@@ -1260,7 +1352,7 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(
+      const { joinedLine } = await this.ensureTeamChatParticipant(
         tx,
         application.teamId,
         application.applicantUserId,
@@ -1270,9 +1362,11 @@ export class TeamsService {
       );
       if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([application.teamId]));
 
-      return { updatedApplication, membership, team };
+      return { updatedApplication, membership, team, joinedLine };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
+    void this.notifications.refreshTeamJoinApplicationsLine(application.teamId, 'recount');
     // 알림: 신청자에게 수락 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       application.applicantUserId,
@@ -1329,6 +1423,7 @@ export class TeamsService {
       return nextApplication;
     });
 
+    void this.notifications.refreshTeamJoinApplicationsLine(application.teamId, 'recount');
     // 알림: 신청자에게 거절 안내 (fire-and-forget)
     void this.notifications.emitNotification(
       application.applicantUserId,
@@ -1437,36 +1532,49 @@ export class TeamsService {
   async listInvitations(user: V1AuthUser, teamId: string) {
     await this.assertManagerOrOwner(user, teamId);
 
-    const invitations = await this.prisma.v1TeamInvitation.findMany({
-      where: { teamId, status: 'pending' },
-      orderBy: [{ createdAt: 'desc' }],
-      include: {
-        invitedUser: {
-          select: {
-            id: true,
-            profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
-          },
+    const include = {
+      invitedUser: {
+        select: {
+          id: true,
+          profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
         },
+      },
+    } as const;
+    const [invitations, past] = await Promise.all([
+      this.prisma.v1TeamInvitation.findMany({
+        where: { teamId, status: 'pending' },
+        orderBy: [{ createdAt: 'desc' }],
+        include,
+      }),
+      // 지난 초대(H1-invite-declined): 수락·거절·취소로 끝난 초대를 최근 30일만. 끝난 시각은 updatedAt 이다 —
+      // 취소는 respondedAt 을 남기지 않는다.
+      this.prisma.v1TeamInvitation.findMany({
+        where: { teamId, status: { in: ['accepted', 'declined', 'cancelled'] }, updatedAt: { gte: new Date(Date.now() - PAST_INVITATION_WINDOW_MS) } },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: PAST_INVITATION_LIMIT,
+        include,
+      }),
+    ]);
+    const toItem = (inv: (typeof invitations)[number]) => ({
+      invitationId: inv.id,
+      teamId: inv.teamId,
+      invitedUserId: inv.invitedUserId,
+      status: inv.status,
+      message: inv.message,
+      createdAt: inv.createdAt,
+      invitedUser: {
+        userId: inv.invitedUser.id,
+        displayName:
+          inv.invitedUser.profile?.nickname ?? inv.invitedUser.profile?.displayName ??
+          '초대된 사용자',
+        profileImageUrl: inv.invitedUser.profile?.profileImageUrl ?? null,
       },
     });
 
     return {
       teamId,
-      items: invitations.map((inv) => ({
-        invitationId: inv.id,
-        teamId: inv.teamId,
-        invitedUserId: inv.invitedUserId,
-        status: inv.status,
-        message: inv.message,
-        createdAt: inv.createdAt,
-        invitedUser: {
-          userId: inv.invitedUser.id,
-          displayName:
-            inv.invitedUser.profile?.nickname ?? inv.invitedUser.profile?.displayName ??
-            '초대된 사용자',
-          profileImageUrl: inv.invitedUser.profile?.profileImageUrl ?? null,
-        },
-      })),
+      items: invitations.map(toItem),
+      pastItems: past.map((inv) => ({ ...toItem(inv), closedAt: inv.updatedAt })),
     };
   }
 
@@ -1475,7 +1583,7 @@ export class TeamsService {
 
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
       where: { id: invitationId },
-      select: { id: true, teamId: true, invitedUserId: true, status: true, team: { select: { name: true } } },
+      select: { id: true, teamId: true, invitedUserId: true, status: true, updatedAt: true, team: { select: { name: true } } },
     });
     if (!invitation) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
@@ -1499,7 +1607,8 @@ export class TeamsService {
       data: { status: 'cancelled' },
       select: { id: true, status: true },
     });
-    void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name);
+    // 대기 중인 초대 행의 updatedAt 은 보낸(다시 보낸) 시각이다 — 그 뒤의 도착 알림만 이 초대의 것이다.
+    void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name, invitation.updatedAt);
 
     return { invitationId: updated.id, status: updated.status, alreadyCancelled: false };
   }
@@ -1619,6 +1728,7 @@ export class TeamsService {
         invitedUserId: true,
         invitedByUserId: true,
         status: true,
+        updatedAt: true,
         team: {
           select: {
             id: true,
@@ -1661,12 +1771,13 @@ export class TeamsService {
     }
     this.assertTeamHasCapacity(invitation.team);
 
+    const respondedAt = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
       // R15-002: conditional update — rejects if another actor cancelled the invitation
       // between the outer read and transaction start.
       const acceptCount = await tx.v1TeamInvitation.updateMany({
         where: { id: invitation.id, status: 'pending' },
-        data: { status: 'accepted', respondedAt: new Date() },
+        data: { status: 'accepted', respondedAt },
       });
       if (acceptCount.count !== 1) {
         throw stateConflict(
@@ -1721,7 +1832,7 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(
+      const { joinedLine } = await this.ensureTeamChatParticipant(
         tx,
         invitation.teamId,
         user.id,
@@ -1731,17 +1842,24 @@ export class TeamsService {
       );
       if (!wasActive) await enqueueRosterResync(tx, teamMembersTargets([invitation.teamId]));
 
-      return { updatedInvitation, membership, team };
+      return { updatedInvitation, membership, team, joinedLine };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
-    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
-    // 알림: 초대한 사람에게 수락 안내 (fire-and-forget)
-    void this.notifications.emitNotification(
-      invitation.invitedByUserId,
-      'team_invitation_accepted',
-      invitation.teamId,
-      `"${invitation.team.name}" 팀 초대를 수락했어요.`,
-    );
+    await this.notifications.markTeamInvitationHandled({
+      userId: user.id,
+      teamId: invitation.teamId,
+      teamName: invitation.team.name,
+      sentAt: invitation.updatedAt,
+      result: 'accepted',
+    });
+    // 초대한 사람의 '초대 수락' 줄에 더한다(안 읽은 동안은 한 줄 — H1-join-burst).
+    void this.notifications.recordTeamInvitationAccepted({
+      inviterUserId: invitation.invitedByUserId,
+      teamId: invitation.teamId,
+      invitationId: invitation.id,
+      acceptedAt: respondedAt,
+    });
 
     return {
       invitationId: result.updatedInvitation.id,
@@ -1756,7 +1874,16 @@ export class TeamsService {
     this.assertActiveAccount(user);
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
       where: { id: invitationId },
-      select: { id: true, teamId: true, invitedUserId: true, status: true },
+      select: {
+        id: true,
+        teamId: true,
+        invitedUserId: true,
+        invitedByUserId: true,
+        status: true,
+        updatedAt: true,
+        team: { select: { name: true } },
+        invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } },
+      },
     });
     if (!invitation) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
@@ -1780,16 +1907,27 @@ export class TeamsService {
       data: { status: 'declined', respondedAt: new Date() },
       select: { id: true, status: true },
     });
-    await this.notifications.markTeamInvitationHandled(user.id, invitation.teamId);
+    await this.notifications.markTeamInvitationHandled({
+      userId: user.id,
+      teamId: invitation.teamId,
+      teamName: invitation.team.name,
+      sentAt: invitation.updatedAt,
+      result: 'declined',
+    });
+    void this.notifications.emitNotification(invitation.invitedByUserId, 'team_invitation_declined', invitation.teamId, undefined, {
+      vars: { team: invitation.team.name, name: notificationPersonName(invitation.invitedUser.profile) },
+    });
 
     return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };
   }
 
   // ── 팀 초대 끝 ──────────────────────────────────────────────────────
 
-  private async getPublicTeam(teamId: string, user: V1AuthUser | null) {
+  private async getPublicTeam(teamId: string, user: V1AuthUser | null, options?: { includeDissolved?: boolean }) {
     const team = await this.prisma.v1Team.findFirst({
-      where: { id: teamId, status: 'active', deletedAt: null },
+      where: options?.includeDissolved
+        ? { id: teamId, OR: [{ status: 'active', deletedAt: null }, { status: 'archived' }] }
+        : { id: teamId, status: 'active', deletedAt: null },
       include: this.teamInclude(user),
     });
 
@@ -1849,31 +1987,10 @@ export class TeamsService {
       where: { id: participant.id, status: 'active', visibleFromAt: null },
       data: { visibleFromAt: joinedChatAt },
     });
-    if (activated.count > 0 && announceJoin) {
-      const joinedUser = await tx.v1User.findUnique({
-        where: { id: userId },
-        select: { profile: { select: { displayName: true, nickname: true } } },
-      });
-      const displayName =
-        joinedUser?.profile?.nickname ?? joinedUser?.profile?.displayName ??
-        '참여자';
-      const notice = await tx.v1ChatMessage.create({
-        data: {
-          chatRoomId: room.id,
-          senderUserId: userId,
-          body: `${displayName}님이 들어왔습니다`,
-          status: 'sent',
-          messageType: 'system',
-          systemEventType: 'joined',
-          sentAt: joinedChatAt,
-        },
-        select: { sentAt: true },
-      });
-      await tx.v1ChatRoom.update({
-        where: { id: room.id },
-        data: { lastMessageAt: notice.sentAt },
-      });
-    }
+    const joinedLine =
+      activated.count > 0 && announceJoin
+        ? await this.chat.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: joinedChatAt })
+        : null;
 
     if (!existingParticipant || existingParticipant.status !== 'active') {
       await tx.v1StatusChangeLog.create({
@@ -1889,9 +2006,10 @@ export class TeamsService {
       });
     }
 
-    return { room, participant };
+    return { room, participant, joinedLine };
   }
 
+  /** 팀 채팅에서 내보내고 '나갔어요' 줄을 저장한다 — 커밋 뒤 반환된 줄을 deliverSystemLine 으로 알린다. */
   private async leaveTeamChatParticipant(
     tx: Prisma.TransactionClient,
     teamId: string,
@@ -1899,20 +2017,21 @@ export class TeamsService {
     actorUserId: string,
     leftAt: Date,
     reason: string,
-  ) {
+  ): Promise<ChatSystemLine | null> {
     const room = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
     if (!room) return null;
     const participant = await tx.v1ChatRoomParticipant.findUnique({
       where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
       select: { id: true, status: true },
     });
-    if (!participant || participant.status === 'left') return participant;
+    if (!participant || participant.status === 'left') return null;
 
-    const updated = await tx.v1ChatRoomParticipant.update({
+    await tx.v1ChatRoomParticipant.update({
       where: { id: participant.id },
       data: { status: 'left', leftAt },
       select: { id: true },
     });
+    const leftLine = await this.chat.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'left', at: leftAt });
     await tx.v1StatusChangeLog.create({
       data: {
         targetType: 'chat_room_participant',
@@ -1925,7 +2044,7 @@ export class TeamsService {
       },
     });
 
-    return updated;
+    return leftLine;
   }
 
   private async getActiveTeamMembership(user: V1AuthUser, teamId: string) {
@@ -2181,18 +2300,6 @@ export class TeamsService {
         displayName: team.ownerUser.profile?.nickname ?? team.ownerUser.profile?.displayName ?? '팀장',
         profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
       },
-      manager: this.findManager(team),
-    };
-  }
-
-  private findManager(team: TeamWithRelations) {
-    const manager = team.memberships.find((membership) => membership.role === 'manager' && membership.status === 'active');
-    if (!manager) {
-      return null;
-    }
-    return {
-      userId: manager.userId,
-      displayName: manager.user.profile?.nickname ?? manager.user.profile?.displayName ?? '감독',
     };
   }
 
@@ -2458,6 +2565,17 @@ function teamLevelCodeWhere(levelCodes: ReturnType<typeof parseLevelCodes>): Pri
         };
       }),
     },
+  };
+}
+
+function dissolvedTeamViewer() {
+  return {
+    role: 'none',
+    membershipId: null,
+    joinState: 'none',
+    canRequestJoin: false,
+    disabledReason: 'TEAM_DISSOLVED',
+    manageRoute: null,
   };
 }
 

@@ -8,7 +8,9 @@ import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
 import { TeamMatchClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
-import { useV1TeamMatch } from '@/hooks/use-v1-api';
+import { PlusIcon } from '@/components/v1-ui/icons';
+import { LateLineupAdditionSheet } from '@/components/team-matches/late-lineup-addition-sheet';
+import { useV1TeamMatch, useV1TeamMatchLineup } from '@/hooks/use-v1-api';
 import {
   useTeamMatchRecord,
   useMutateTeamMatchRecord,
@@ -255,15 +257,17 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       </div>
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
       {data.canEdit && subMatches.length === 0 && <Button block onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: null }); }} disabled={disabled || controlsOpen}>득점 추가</Button>}
+      {data.teamAuthority && data.phase !== 'cancelled' && <p className={styles.muted}><span className="tm-badge tm-badge-sm tm-badge-blue">팀장 권한</span> 팀장·매니저는 명단에 없어도 기록하고 종료를 확인할 수 있어요.</p>}
       {data.phase === 'official' && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
       {data.operator && <p className={styles.muted}>Teameet 운영으로 양 팀과 함께 기록해요. 수정하면 기존 종료 확인이 초기화되며, 최종 확인은 양 팀이 직접 진행해요.</p>}
-      {!data.participant && !data.operator && <p className={styles.muted}>기록 편집은 양 팀의 제출된 참석명단 참가자와 플랫폼 주관 경기의 운영자에게 열려 있어요.</p>}
+      {!data.participant && !data.operator && <p className={styles.muted}>기록 편집은 양 팀의 참석명단 참가자와 팀장·매니저, 플랫폼 주관 경기의 운영자에게 열려 있어요.</p>}
       {admin && (data.phase === 'legacy' || data.phase === 'managed') && <p className={styles.muted}>이 경기는 공동 기록 대상이 아니에요. 기존 경기 운영 화면을 이용해 주세요.</p>}
       {data.phase === 'scheduled' && <p className={styles.muted}>상대팀 확정 후 경기 시작 시간이 되면 기록할 수 있어요.</p>}
     </section>
 
     <div className={styles.columns}>
       <div className={styles.stack}>
+        {!admin && data.phase === 'live' && <LateAdditionSection teamMatchId={teamMatchId} data={data} />}
         {(subMatches.length > 0 || data.canEdit) && <section className={styles.section} aria-labelledby="submatch-heading">
           <div className={styles.sectionHead}>
             <div>
@@ -351,7 +355,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
                     onCancel={() => setEditing(null)}
                     onSave={(goal) => command({ action: editing.goal ? 'edit' : 'add', ...(editing.goal ? { goalId: editing.goal.id } : {}), ...goal }, editing.version)}
                   />}
-                  <GoalRows data={data} goals={subGoals} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: subMatch.id }); }} onDelete={(goal) => void command({ action: 'delete', goalId: goal.id })} />
+                  <GoalRows data={data} goals={subGoals} publicEvents={data.goalEvents?.filter((event) => event.subMatchId === subMatch.id)} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: subMatch.id }); }} onDelete={(goal) => void command({ action: 'delete', goalId: goal.id })} />
                 </article>;
               })}
             </div>}
@@ -370,7 +374,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
             onCancel={() => setEditing(null)}
             onSave={(goal) => command({ action: editing.goal ? 'edit' : 'add', ...(editing.goal ? { goalId: editing.goal.id } : {}), ...goal }, editing.version)}
           />}
-          <GoalRows data={data} goals={data.goals} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: null }); }} onDelete={(goal) => void command({ action: 'delete', goalId: goal.id })} />
+          <GoalRows data={data} goals={data.goals} publicEvents={data.goalEvents} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: null }); }} onDelete={(goal) => void command({ action: 'delete', goalId: goal.id })} />
         </section>}
       </div>
 
@@ -423,14 +427,46 @@ function TeamMatchClaimEntry({ teamMatchId }: { teamMatchId: string }) {
   return isParticipant ? <TeamMatchClaimMyRecordSection teamMatchId={teamMatchId} /> : null;
 }
 
-function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
+/**
+ * 경기 중 우리 팀 명단과 "늦게 온 선수 추가"(H5 A-4). 추가는 참가팀 팀장·매니저만 하고(서버가 강제),
+ * 첫 기록 뒤 결과 확정 전(`lateAdditionAllowed`)에만 열린다. 참석명단 조회가 팀장·매니저 전용이라 그 밖엔 부르지 않는다.
+ */
+function LateAdditionSection({ teamMatchId, data }: { teamMatchId: string; data: SharedRecord }) {
+  const viewer = useV1TeamMatch(teamMatchId).data?.viewer;
+  const manages = viewer?.manageableHostTeam === true || viewer?.manageableOpponentTeam === true;
+  const lineup = useV1TeamMatchLineup(teamMatchId, { enabled: manages }).data;
+  const [open, setOpen] = useState(false);
+  if (!manages || lineup === undefined || lineup.lateAdditionAllowed !== true) return null;
+  const rows = [...lineup.starters, ...lineup.bench];
+  const ownCount = data.participants.filter((row) => row.sideId === lineup.sideId).length;
+  return <section className={styles.section} aria-labelledby="own-roster-heading">
+    <h2 id="own-roster-heading">우리 팀 명단 {ownCount}명</h2>
+    {data.teamAuthority ? <p className={styles.muted}>나는 이 경기 명단에 없어요.</p> : null}
+    <Button block size="sm" variant="outline" onClick={() => setOpen(true)}><PlusIcon size={16} aria-hidden="true" /> 늦게 온 선수 추가</Button>
+    <LateLineupAdditionSheet
+      open={open}
+      onClose={() => setOpen(false)}
+      teamMatchId={teamMatchId}
+      candidates={(lineup.eligibleMembers ?? [])
+        .filter((member) => !rows.some((row) => 'userId' in row && row.userId === member.userId))
+        .map((member) => ({ userId: member.userId, displayName: member.displayName, jerseyNumber: member.jerseyNumber }))
+        .sort((a, b) => (a.jerseyNumber ?? Number.MAX_SAFE_INTEGER) - (b.jerseyNumber ?? Number.MAX_SAFE_INTEGER) || a.displayName.localeCompare(b.displayName, 'ko'))}
+      takenNumbers={new Set(rows.flatMap((row) => (row.jerseyNumber === null ? [] : [row.jerseyNumber])))}
+    />
+  </section>;
+}
+
+function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDelete }: {
   data: SharedRecord;
   goals: SharedGoal[];
+  /** 편집용 득점(`goals`)을 받지 못하는 사람(명단 밖 팀원·관전자)에게 서버가 주는 확정 득점 — 읽기 전용(W2-V9). */
+  publicEvents?: readonly SharedPublicGoalEvent[];
   disabled: boolean;
   canEdit: boolean;
   onEdit: (goal: SharedGoal) => void;
   onDelete: (goal: SharedGoal) => void;
 }) {
+  if (goals.length === 0 && publicEvents !== undefined && publicEvents.length > 0) return <GoalEventList events={publicEvents} sides={data.sides} />;
   if (goals.length === 0) return <p className={styles.muted}>{data.participant ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
   return <div className={styles.goalList}>{goals.map((goal) => {
     const participant = data.participants.find((row) => row.id === goal.participantId);
@@ -443,6 +479,7 @@ function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
       <div className={styles.goalPlayerText}>
         <div className={styles.goalTitleRow}>
           <strong>{participantName}</strong>
+          {participant?.guest ? <span className="tm-badge tm-badge-sm tm-badge-grey">게스트</span> : null}
           <span className={styles.goalTime} aria-label={goal.minute !== null ? `득점 시간 ${goal.minute}분` : '득점 시간 없음'}>
             {goal.minute !== null ? `${goal.minute}분` : '시간 없음'}
           </span>
@@ -451,6 +488,7 @@ function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
           <span className={styles.goalTeam}>{sideName}</span>
           <span aria-hidden="true">·</span>
           <span>{goal.ownGoal ? '자책골' : '득점'}</span>
+          {participant?.guest ? <><span aria-hidden="true">·</span><span>개인 기록엔 안 남아요</span></> : null}
         </p>
         {goal.ownGoal ? <p className={styles.goalMeta}>{creditedSideName} 득점으로 반영</p> : null}
       </div>
@@ -585,7 +623,7 @@ export function TeamMatchRecordEntry({
           공동 경기 기록 열기
         </Link>
       ) : (
-        <p className={styles.notice}>참석명단에 등록된 참가자는 경기 시작 뒤 공동 기록에 참여할 수 있어요.</p>
+        <p className={styles.notice}>참석명단 참가자와 팀장·매니저는 경기 시작 뒤 공동 기록에 참여할 수 있어요.</p>
       )}
     </section>
   );

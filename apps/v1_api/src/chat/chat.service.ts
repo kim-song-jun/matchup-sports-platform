@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1ChatSystemEventType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { WebPushService } from '../notifications/web-push.service';
@@ -23,6 +23,36 @@ import {
   SendChatMessageDto,
   UpdateMyChatRoomDto,
 } from './dto/chat.dto';
+
+/** 시스템 줄의 chat:message 페이로드 — 텍스트 메시지 페이로드에 종류 두 칸을 더한다. */
+export type ChatSystemLine = {
+  messageId: string;
+  roomId: string;
+  content: string;
+  status: 'sent';
+  sentAt: Date;
+  senderUserId: string;
+  messageType: 'system';
+  systemEventType: V1ChatSystemEventType | null;
+};
+
+/** 입장·퇴장 줄은 event 로 본문을 만들고, 그 밖의 줄(컨택 응답 등)은 enum 을 늘리지 않고 event=null + 호출자 본문을 쓴다. */
+export type ChatSystemLineInput = { chatRoomId: string; userId: string; at: Date } & (
+  | { event: V1ChatSystemEventType; displayName?: string }
+  | { event: null; body: string }
+);
+
+type ChatRecipientRoom = Parameters<typeof currentChatRecipientEntitlementWhere>[0] & { id: string };
+
+const RECIPIENT_ROOM_SELECT = {
+  id: true,
+  matchId: true,
+  teamId: true,
+  teamMatchId: true,
+  teamMatch: { select: { hostTeamId: true, approvedApplicantTeamId: true } },
+  teamContactId: true,
+  teamContact: { select: { fromTeamId: true, toTeamId: true } },
+} satisfies Prisma.V1ChatRoomSelect;
 
 type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
   include: {
@@ -85,7 +115,9 @@ export class ChatService {
     const visibleFromAt = room.participants[0]?.visibleFromAt;
     if (!visibleFromAt) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '먼저 채팅방에 입장해 주세요.' });
     const message = await this.prisma.v1ChatMessage.findFirst({
-      where: { id: messageId, chatRoomId: roomId, messageType: 'text', status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
+      // 사진 메시지도 신고·차단 대상이다 — 사람이 보낸 것 중 입장·퇴장 같은 system 만 뺀다.
+      where: { id: messageId, chatRoomId: roomId, messageType: { not: 'system' }, status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
+      include: { attachmentAsset: { select: { url: true } } },
     });
     if (!message) throw new NotFoundException({ code: 'NOT_FOUND', message: '신고할 메시지를 찾을 수 없어요.' });
     if (message.senderUserId === user.id) throw new BadRequestException({ code: 'INVALID_TARGET', message: '본인의 메시지는 신고하거나 차단할 수 없어요.' });
@@ -109,7 +141,7 @@ export class ChatService {
       const created = await tx.v1Inquiry.create({ data: {
         userId: user.id, category: 'report', title: '채팅 메시지 신고',
         // Keep the server-owned message snapshot so later edits cannot rewrite the evidence.
-        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
+        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}${message.attachmentAsset ? ` (${message.attachmentAsset.url})` : ''}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
         relatedType: 'user', relatedId: message.senderUserId, reportReason: dto.reason,
       } });
       await tx.v1OutboxEvent.create({ data: {
@@ -209,6 +241,7 @@ export class ChatService {
     const messages = await this.prisma.v1ChatMessage.findMany({
       where: { chatRoomId: roomId, sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
       include: {
+        attachmentAsset: { select: { url: true } },
         senderUser: {
           select: {
             id: true,
@@ -244,6 +277,8 @@ export class ChatService {
         messageType: message.messageType,
         systemEventType: message.systemEventType ?? null,
         content: message.status === 'sent' ? message.body : null,
+        // 숨김·삭제 메시지는 본문처럼 사진도 내리지 않는다.
+        imageUrl: message.status === 'sent' ? message.attachmentAsset?.url ?? null : null,
         status: message.status,
         sentAt: message.sentAt,
         mine: message.senderUserId === user.id,
@@ -254,8 +289,10 @@ export class ChatService {
   }
 
   async sendMessage(user: V1AuthUser, roomId: string, dto: SendChatMessageDto) {
-    const content = dto.content.trim();
-    if (!content) throw validationError('content is required', 'content');
+    const content = dto.content?.trim() ?? '';
+    const imageUrl = dto.imageUrl?.trim() ?? '';
+    if (content && imageUrl) throw validationError('content and imageUrl cannot be sent together', 'imageUrl');
+    if (!content && !imageUrl) throw validationError('content is required', 'content');
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.teamContact) {
       const status = contactDisplayStatus(room.teamContact.status, room.teamContact.expiresAt);
@@ -263,32 +300,37 @@ export class ChatService {
     }
     if (room.status !== 'active') throw stateConflict('Chat room is not active');
 
+    // 사진은 **보내는 사람이 올린 이미지 업로드**만 싣는다 — 남의 업로드나 임의 URL 을 채팅에 붙이지 못하게.
+    const image = imageUrl
+      ? await this.prisma.v1UploadAsset.findFirst({
+          where: { url: imageUrl, ownerUserId: user.id, kind: 'image' },
+          select: { id: true, url: true },
+        })
+      : null;
+    if (imageUrl && !image) throw validationError('사진을 찾을 수 없어요. 다시 올려 주세요.', 'imageUrl');
+    // 사진 메시지의 body 는 '사진' — 목록 미리보기·신고 스냅샷·body 만 읽는 옛 경로가 그대로 읽힌다.
+    const body = image ? '사진' : content;
+    const notificationText = image ? '사진을 보냈어요' : content.slice(0, 120);
+
     const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1ChatMessage.create({
-        data: { chatRoomId: room.id, senderUserId: user.id, body: content, status: 'sent' },
+        data: image
+          ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'image', attachmentAssetId: image.id }
+          : { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent' },
       });
       await tx.v1ChatRoom.update({
         where: { id: room.id },
         data: { lastMessageAt: created.sentAt },
       });
-      const recipients = await tx.v1ChatRoomParticipant.findMany({
-        where: {
-          chatRoomId: room.id,
-          status: 'active',
-          userId: { not: user.id },
-          OR: [{ mutedUntil: null }, { mutedUntil: { lte: new Date() } }],
-          AND: [currentChatRecipientEntitlementWhere(room)],
-          user: chatVisibleUserWhere(user.id),
-        },
-        select: { userId: true },
-      });
-      return { message: created, recipientUserIds: recipients.map((participant) => participant.userId) };
+      return { message: created, recipientUserIds: await this.messageRecipientIds(tx, room, user.id) };
     });
 
     const chatMessagePayload = {
       messageId: message.id,
       roomId: room.id,
+      messageType: message.messageType,
       content: message.body,
+      imageUrl: image?.url ?? null,
       status: message.status,
       sentAt: message.sentAt,
       senderUserId: user.id,
@@ -314,7 +356,7 @@ export class ChatService {
             targetType: 'chat',
             targetId: room.id,
             title: roomTitle,
-            body: content.slice(0, 120),
+            body: notificationText,
             deepLink: `/chat/${room.id}`,
           })),
         });
@@ -341,7 +383,7 @@ export class ChatService {
       void this.webPushService
         .sendToUser(recipientUserId, {
           title: roomTitle,
-          body: content.slice(0, 120),
+          body: notificationText,
           url: `/chat/${room.id}`,
         })
         .catch((err) => {
@@ -350,6 +392,73 @@ export class ChatService {
     }
 
     return chatMessagePayload;
+  }
+
+  /** 보낸 사람의 메시지를 실시간으로 받을 참여자 — 텍스트 메시지와 시스템 줄이 같은 규칙을 쓴다. */
+  private async messageRecipientIds(db: Prisma.TransactionClient, room: ChatRecipientRoom, senderUserId: string): Promise<string[]> {
+    const recipients = await db.v1ChatRoomParticipant.findMany({
+      where: {
+        chatRoomId: room.id,
+        status: 'active',
+        userId: { not: senderUserId },
+        OR: [{ mutedUntil: null }, { mutedUntil: { lte: new Date() } }],
+        AND: [currentChatRecipientEntitlementWhere(room)],
+        user: chatVisibleUserWhere(senderUserId),
+      },
+      select: { userId: true },
+    });
+    return recipients.map((participant) => participant.userId);
+  }
+
+  /**
+   * 시스템 줄을 호출자 트랜잭션 안에서 저장한다 — 멤버십·컨택 상태 변경과 함께 커밋되거나 함께 롤백된다.
+   * 커밋 뒤 반환값을 deliverSystemLine 에 넘겨야 방에 실시간으로 뜬다. 내보내기도 'left'(나갔어요)로 쓴다:
+   * 팀 채팅은 팀원 모두가 보므로 누가 내보냈는지를 드러내지 않는다(Task 180 H1-left).
+   */
+  async recordSystemLine(tx: Prisma.TransactionClient, input: ChatSystemLineInput): Promise<ChatSystemLine> {
+    let body: string;
+    if (input.event === null) {
+      body = input.body;
+    } else {
+      const displayName = input.displayName ?? (await systemLineDisplayName(tx, input.userId));
+      body = input.event === 'joined' ? `${displayName}님이 들어왔어요` : `${displayName}님이 나갔어요`;
+    }
+    const message = await tx.v1ChatMessage.create({
+      data: {
+        chatRoomId: input.chatRoomId,
+        senderUserId: input.userId,
+        body,
+        status: 'sent',
+        messageType: 'system',
+        systemEventType: input.event,
+        sentAt: input.at,
+      },
+      select: { id: true, body: true, sentAt: true },
+    });
+    await tx.v1ChatRoom.update({ where: { id: input.chatRoomId }, data: { lastMessageAt: message.sentAt } });
+    return {
+      messageId: message.id,
+      roomId: input.chatRoomId,
+      content: message.body,
+      status: 'sent',
+      sentAt: message.sentAt,
+      senderUserId: input.userId,
+      messageType: 'system',
+      systemEventType: input.event,
+    };
+  }
+
+  /** 커밋된 시스템 줄을 방 참여자에게 chat:message 로 알린다. 알림함·푸시는 없고, 실패해도 던지지 않는다. */
+  async deliverSystemLine(line: ChatSystemLine): Promise<void> {
+    try {
+      const room = await this.prisma.v1ChatRoom.findUnique({ where: { id: line.roomId }, select: RECIPIENT_ROOM_SELECT });
+      if (!room) return;
+      for (const recipientUserId of await this.messageRecipientIds(this.prisma, room, line.senderUserId)) {
+        this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', line);
+      }
+    } catch (err) {
+      this.logger.warn({ roomId: line.roomId, messageId: line.messageId, err }, '채팅 시스템 줄 실시간 전달 실패');
+    }
   }
 
   /**
@@ -561,7 +670,7 @@ export class ChatService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 운영진만 컨택 대화에 참여할 수 있어요.',
+        message: '팀장·매니저만 컨택 대화에 참여할 수 있어요.',
       });
     }
   }
@@ -649,28 +758,15 @@ export class ChatService {
     const enteredAt = new Date();
     const visibleFromAt = sharedHistoryFrom ?? enteredAt;
     const displayName = participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자';
-    await this.prisma.$transaction(async (tx) => {
+    const joinedLine = await this.prisma.$transaction(async (tx) => {
       const entered = await tx.v1ChatRoomParticipant.updateMany({
         where: { id: participant.id, visibleFromAt: null },
         data: { visibleFromAt },
       });
-      if (entered.count === 0) return;
-      const notice = await tx.v1ChatMessage.create({
-        data: {
-          chatRoomId: room.id,
-          senderUserId: userId,
-          body: `${displayName}님이 들어왔습니다`,
-          status: 'sent',
-          messageType: 'system',
-          systemEventType: 'joined',
-          sentAt: enteredAt,
-        },
-      });
-      await tx.v1ChatRoom.update({
-        where: { id: room.id },
-        data: { lastMessageAt: notice.sentAt },
-      });
+      if (entered.count === 0) return null;
+      return this.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: enteredAt, displayName });
     });
+    if (joinedLine) void this.deliverSystemLine(joinedLine);
 
     const current = await this.prisma.v1ChatRoomParticipant.findUnique({
       where: { id: participant.id },
@@ -696,7 +792,8 @@ export class ChatService {
       };
     }>,
   ) {
-    if (message.messageType !== 'text') return 0;
+    // 입장·퇴장 같은 system 만 뺀다 — 사진도 읽어야 할 메시지다.
+    if (message.messageType === 'system') return 0;
     return participants.filter((participant) => {
       if (participant.userId === message.senderUserId) return false;
       if (participant.user?.chatBlocksMade.some((block) => block.blockedUserId === message.senderUserId)
@@ -756,7 +853,7 @@ export class ChatService {
       where: {
         chatRoomId: room.id,
         status: 'sent',
-        messageType: 'text',
+        messageType: { not: 'system' },
         senderUserId: { not: userId },
         senderUser: chatVisibleUserWhere(userId),
         ...(visibleFromAt ? { sentAt: { gte: visibleFromAt, ...(lastReadMessage ? { gt: lastReadMessage.sentAt } : {}) } } : { id: '__never__' }),
@@ -892,6 +989,14 @@ function stateConflict(message: string, code = 'STATE_CONFLICT') {
 
 function chatRoomRoute(roomId: string) {
   return `/chat/${roomId}`;
+}
+
+async function systemLineDisplayName(tx: Prisma.TransactionClient, userId: string): Promise<string> {
+  const user = await tx.v1User.findUnique({
+    where: { id: userId },
+    select: { profile: { select: { nickname: true, displayName: true } } },
+  });
+  return user?.profile?.nickname ?? user?.profile?.displayName ?? '참여자';
 }
 
 /** A block is bilateral within chat, including list previews and delivery recipients. */

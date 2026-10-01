@@ -108,7 +108,7 @@ const PLAYERS: AudiencePage = {
 const TEAMS: AudiencePage = {
   slug: 'teams',
   path: '/for/teams',
-  audienceType: '팀장·팀 운영진',
+  audienceType: '팀장·매니저',
   metaTitle: '팀 운영 안내',
   metaDescription:
     '팀을 만들고 가입 신청을 받아 멤버를 모으고, 매니저와 함께 팀 매치·대회 참가 신청까지 이어서 해요. 팀 만들기는 현재 무료예요.',

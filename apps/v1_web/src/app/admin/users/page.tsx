@@ -234,7 +234,7 @@ function AdminUsersPageContent() {
             },
             {
               key: 'membership',
-              header: '소속 (팀장/운영진/멤버)',
+              header: '소속 (팀장/매니저/멤버)',
               align: 'center',
               width: 'w-[168px]',
               render: (row) => {

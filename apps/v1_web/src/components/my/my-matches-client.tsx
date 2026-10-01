@@ -222,7 +222,7 @@ function buildSummary(mode: 'joined' | 'created', matches: MyMatch[]) {
     { label: '전체', value: matches.length, unit: '건' },
     { label: '개인 매치', value: matches.filter((item) => item.kind === 'personal').length, unit: '건' },
     { label: '팀 매치', value: matches.filter((item) => item.kind === 'team').length, unit: '건' },
-    { label: mode === 'joined' ? '확정' : '진행 중', value: matches.filter((item) => item.status === 'approved' || item.status === 'recruiting').length, unit: '건' },
+    { label: mode === 'joined' ? '확정' : '진행 중', value: matches.filter((item) => ['approved', 'recruiting', 'scheduled', 'in_progress'].includes(item.status)).length, unit: '건' },
   ];
 }
 

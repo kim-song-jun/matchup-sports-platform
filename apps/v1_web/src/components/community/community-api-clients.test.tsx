@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
@@ -24,6 +24,7 @@ const hooks = vi.hoisted(() => ({
   chatRoom: vi.fn(),
   chatMessages: vi.fn(),
   sendChatMessage: vi.fn(),
+  uploadImages: vi.fn(),
   updateMyChatRoom: vi.fn(),
 }));
 
@@ -71,6 +72,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
     useV1ChatRoom: hooks.chatRoom,
     useV1ChatMessages: hooks.chatMessages,
     useV1SendChatMessage: hooks.sendChatMessage,
+    useV1UploadImages: hooks.uploadImages,
     useV1UpdateMyChatRoom: hooks.updateMyChatRoom,
   };
 });
@@ -227,6 +229,36 @@ describe('ChatRoomPageClient', () => {
     expect(screen.queryByRole('link', { name: '채팅 목록으로' })).not.toBeInTheDocument();
   });
 
+  it('F62·F63: 경기 채팅방 카드는 "경기 채팅 · 경기 상세 보기"이고, 차단 관리는 방 맨 위가 아니라 ⋯ 채팅방 메뉴 안에 있다', () => {
+    hooks.chatRoom.mockReturnValue({
+      data: {
+        roomId: 'room-league',
+        roomType: 'team_match',
+        status: 'active',
+        title: '(QA0929) 마포 주말 리그 1주차',
+        linkedTarget: { type: 'team_match', id: 'tm-1', title: '(QA0929) 마포 주말 리그 1주차', route: '/team-matches/tm-1' },
+        me: { participantId: 'participant-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+        participants: [],
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    hooks.chatMessages.mockReturnValue({ data: { items: [], pageInfo: { nextCursor: null } }, isPending: false, isError: false, refetch: vi.fn() });
+
+    renderWithClient(<ChatRoomPageClient roomId="room-league" />);
+
+    expect(screen.getByText('경기 채팅 · 경기 상세 보기')).toBeInTheDocument();
+    expect(screen.queryByText(/팀매치 채팅/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '채팅 차단 관리' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '채팅방 메뉴' }));
+    fireEvent.click(screen.getByRole('button', { name: /채팅 차단 관리/ }));
+
+    expect(screen.queryByRole('dialog', { name: '채팅방 메뉴' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: '채팅 차단 관리' })).toBeInTheDocument();
+  });
+
   it('shows one timestamp at the bottom of each same-sender, same-minute run', () => {
     hooks.chatRoom.mockReturnValue({
       data: {
@@ -333,6 +365,51 @@ describe('ChatRoomPageClient', () => {
   });
 });
 
+describe('ChatRoomPageClient — 입장 전 대화 안내 (H2)', () => {
+  const NOTICE = '들어오기 전 대화는 보이지 않아요';
+
+  function roomOf(roomType: 'team' | 'team_contact' | 'match') {
+    return {
+      roomId: 'room-1', roomType, status: 'active', title: '성수 풋살 크루', teamContact: null,
+      linkedTarget: { type: 'team', id: 'team-1', title: '성수 풋살 크루', route: '/teams/team-1' },
+      me: { participantId: 'p-me', status: 'active', pinned: false, mutedUntil: null, lastReadMessageId: null },
+      participants: [],
+    };
+  }
+
+  function renderRoom(roomType: 'team' | 'team_contact' | 'match', hasNext = false) {
+    hooks.chatRoom.mockReturnValue({ data: roomOf(roomType), isPending: false, isError: false, refetch: vi.fn() });
+    hooks.chatMessages.mockReturnValue({
+      data: { items: [], nextCursor: null, pageInfo: { nextCursor: hasNext ? 'older' : null, hasNext } },
+      isPending: false, isError: false, refetch: vi.fn(),
+    });
+    renderWithClient(<ChatRoomPageClient roomId="room-1" />);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.chatRooms.mockReturnValue({ data: { items: [] }, isPending: false, isError: false, refetch: vi.fn() });
+    hooks.updateChatRoomMe.mockReturnValue({ isPending: false, variables: undefined, mutate: vi.fn() });
+    hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn() });
+    hooks.updateMyChatRoom.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  it('팀 채팅은 대화 맨 위에 입장 전 대화가 안 보인다고 알린다 — 비어 보여도 이유를 안다', () => {
+    renderRoom('team');
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+  });
+
+  it('처음부터 다 보이는 방(팀컨택·매치)에는 붙이지 않는다', () => {
+    renderRoom('team_contact');
+    expect(screen.queryByText(NOTICE)).toBeNull();
+  });
+
+  it('더 오래된 메시지가 남아 있으면 여기가 맨 위가 아니라 붙이지 않는다', () => {
+    renderRoom('team', true);
+    expect(screen.queryByText(NOTICE)).toBeNull();
+  });
+});
+
 function contactRoomDetail(status: 'requested' | 'accepted' | 'declined', mySide: 'from' | 'to') {
   return {
     roomId: 'room-contact',
@@ -401,6 +478,118 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
     expect(screen.getByText('수락됨')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '수락' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '컨택 철회' })).not.toBeInTheDocument();
+  });
+
+  // Enter 경로는 버튼의 disabled 가 없어 onSend 가드(공백·전송 중)만이 빈/중복 전송을 막는다 — 여기서 고정한다.
+  it('Enter 는 앞뒤 공백을 뺀 내용을 보내고, 공백뿐이면 보내지 않는다', () => {
+    const mutate = vi.fn();
+    hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate });
+    hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+    renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+    const input = screen.getByLabelText('메시지 입력');
+
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: ' 안녕\n반가워요 ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ content: '안녕\n반가워요' }, expect.anything());
+  });
+
+  describe('사진 보내기 (Task 181)', () => {
+    const photos = (count: number) => Array.from({ length: count }, (_, i) => new File([`p${i}`], `p${i}.jpg`, { type: 'image/jpeg' }));
+    function arrange(uploadMutateAsync: ReturnType<typeof vi.fn>) {
+      const sendMutateAsync = vi.fn().mockResolvedValue({});
+      hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn(), mutateAsync: sendMutateAsync });
+      hooks.uploadImages.mockReturnValue({ mutateAsync: uploadMutateAsync });
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+      fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+      return { sendMutateAsync };
+    }
+
+    // 업로드 mock — 받은 파일 이름으로 경로를 돌려준다(사진마다 한 장씩 올린다).
+    const uploadEach = () => vi.fn(async ([file]: File[]) => ({ urls: [`/uploads/${file.name}`] }));
+
+    it('사진마다 올리고 바로 보낸다 — 채팅 사진은 메타데이터(EXIF)를 지우는 업로드를 쓴다', async () => {
+      const upload = uploadEach();
+      const { sendMutateAsync } = arrange(upload);
+      const files = photos(2);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
+
+      await waitFor(() => expect(sendMutateAsync).toHaveBeenCalledTimes(2));
+      expect(hooks.uploadImages).toHaveBeenCalledWith({ stripMetadata: true });
+      expect(upload.mock.calls.map(([batch]) => batch.map((file: File) => file.name))).toEqual([['p0.jpg'], ['p1.jpg']]);
+      expect(sendMutateAsync).toHaveBeenNthCalledWith(1, { imageUrl: '/uploads/p0.jpg' });
+      expect(sendMutateAsync).toHaveBeenNthCalledWith(2, { imageUrl: '/uploads/p1.jpg' });
+    });
+
+    it('6장 이상 고르면 앞 5장만 보내고 알려 준다', async () => {
+      const upload = uploadEach();
+      arrange(upload);
+      const files = photos(6);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
+
+      expect(await screen.findByText('사진은 한 번에 5장까지 보낼 수 있어요. 앞의 5장만 보냈어요.')).toBeInTheDocument();
+      // jsdom File 은 모양만 비교되므로 이름으로 본다 — 6번째(p5)는 올리지 않는다.
+      expect(upload.mock.calls.map(([batch]) => batch[0].name)).toEqual(['p0.jpg', 'p1.jpg', 'p2.jpg', 'p3.jpg', 'p4.jpg']);
+    });
+
+    it('중간에 실패하면 몇 장이 갔는지 알리고 거기서 멈춘다 — 다시 고를 때 앞 사진이 중복되지 않게', async () => {
+      const upload = uploadEach();
+      const { sendMutateAsync } = arrange(upload);
+      sendMutateAsync.mockResolvedValueOnce({}).mockRejectedValueOnce({});
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(3) } });
+
+      expect(await screen.findByText('사진 3장 중 1장만 보냈어요. 사진을 보내지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+      // 실패한 2번째 뒤로는 올리지 않는다 — 안 보내질 사진이 저장소에 쌓이지 않는다.
+      expect(upload).toHaveBeenCalledTimes(2);
+      expect(sendMutateAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('업로드가 실패하면 보내지 않고 서버가 준 이유(용량 초과 등)를 보여 준다', async () => {
+      const upload = vi.fn().mockRejectedValue(new V1ApiError({
+        status: 'error',
+        statusCode: 400,
+        code: 'UPLOAD_FILE_TOO_LARGE',
+        message: '파일 크기가 5MB를 초과했어요. (p0.jpg)',
+        details: null,
+        requestId: 'req-1',
+        timestamp: '2026-10-01T00:00:00.000Z',
+      } as ConstructorParameters<typeof V1ApiError>[0]));
+      const { sendMutateAsync } = arrange(upload);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(1) } });
+
+      expect(await screen.findByText('파일 크기가 5MB를 초과했어요. (p0.jpg)')).toBeInTheDocument();
+      expect(sendMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('이유를 모르는 실패는 기본 안내 문구', async () => {
+      const upload = vi.fn().mockRejectedValue({});
+      arrange(upload);
+
+      fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(1) } });
+
+      expect(await screen.findByText('사진을 보내지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+    });
+  });
+
+  it('전송 중에는 Enter 를 다시 눌러도 보내지 않는다', () => {
+    const mutate = vi.fn();
+    hooks.sendChatMessage.mockReturnValue({ isPending: true, isError: false, mutate });
+    hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+    renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+    const input = screen.getByLabelText('메시지 입력');
+
+    fireEvent.change(input, { target: { value: '안녕' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mutate).not.toHaveBeenCalled();
   });
 });
 

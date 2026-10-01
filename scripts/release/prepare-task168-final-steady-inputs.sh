@@ -14,13 +14,14 @@ set -Eeuo pipefail
 # 2026-09-26 adds nullable v1_auth_identities.provider_refresh_token_ciphertext (Apple revoke).
 # 2026-09-27 adds v1_site_info_settings (singleton) and additive v1_inquiries guest-retention/purge columns + categories.
 # 2026-09-28 Task 179 adds v1_game_roster_adjustments and v1_team_member_unavailabilities.
+# 2026-10-01 Task 181: additive chat image message (enum value image + nullable v1_chat_messages.attachment_asset_id FK).
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
 [[ -f "$schema" && -f "$m11" ]] || { echo 'Task168 final-policy source inputs missing' >&2; exit 1; }
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == c36582466894f4373136a9cddfd0c4c0c9d353e853c530ea2c97fa84a46cfef9 \
+[[ "$schema_sha" == bb42ef9a40757b6877989b8cd883d461a714aebbcbd4591753acf0db757aba1a \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

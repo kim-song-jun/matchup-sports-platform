@@ -8,6 +8,11 @@ import {
   InquirySlackNotifier,
 } from '../inquiries/inquiry-slack-notifier';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
+import { LINEUP_INCLUDED_NOTIFICATION_TYPE } from '../team-matches/team-match-lineup.service';
+import {
+  SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
+  SCHEDULE_CREATED_NOTIFICATION_TYPE,
+} from '../team-schedules/team-schedules.service';
 import {
   LINEUP_REMINDER_SCAN_TYPE,
   LineupReminderService,
@@ -62,6 +67,9 @@ async function bootstrap(): Promise<void> {
     'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
     scheduleReminders.guestApplicationManagerNotificationHandler,
   );
+  // 일정 생성·취소 알림(Task 180 H1) — team-schedules.service.ts 가 같은 트랜잭션에 넣은 outbox 행.
+  worker.registerHandler(SCHEDULE_CREATED_NOTIFICATION_TYPE, scheduleReminders.scheduleCreatedNotificationHandler);
+  worker.registerHandler(SCHEDULE_CANCELLED_NOTIFICATION_TYPE, scheduleReminders.scheduleCancelledNotificationHandler);
 
   // 라인업 리마인더 lane. 이벤트가 아니라 "아직 안 한 상태"를 감지해야 하므로 주기
   // 스캔이 필요한데, 두 번째 스케줄러를 들이지 않고 이 워커의 outbox 루프를 그대로
@@ -73,6 +81,8 @@ async function bootstrap(): Promise<void> {
   // 실패해도 예약 체인이 함께 롤백되지 않는다(자세한 이유는 그 서비스의 docblock 참조).
   const lineupReminders = new LineupReminderService(lineupTodos, prisma, webPush);
   worker.registerHandler(LINEUP_REMINDER_SCAN_TYPE, lineupReminders.scanHandler);
+  // 참석명단 포함 알림(Task 180 H1) — team-match-lineup.service.ts 가 제출 트랜잭션에 넣은 outbox 행.
+  worker.registerHandler(LINEUP_INCLUDED_NOTIFICATION_TYPE, lineupReminders.lineupIncludedHandler);
   // 체인의 첫 고리. 이미 예약돼 있으면 슬롯 키가 같아 무시되므로, 워커를 몇 번 재시작해도
   // 스캔이 늘어나지 않는다. 반대로 어떤 이유로 체인이 끊겼더라도 다음 배포 때 되살아난다.
   await prisma.$transaction((tx) => scheduleNextScan(tx, new Date()));

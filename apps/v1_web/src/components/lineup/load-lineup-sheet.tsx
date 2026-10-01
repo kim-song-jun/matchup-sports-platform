@@ -11,13 +11,12 @@ import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 export type LoadableLineup = {
   key: string;
   kind: 'history' | 'preset';
-  /** "제1회 몰큐브컵 · 8강" 또는 프리셋 이름 */
+  /** "9/30 (수) vs 합정 유나이티드 · 8명" 또는 프리셋 이름 — 인원은 제목이 말한다(선발 구분 없음, 정본 §3). */
   title: string;
-  /** "vs FC상대 · 8월 10일" 또는 "선발 11 · 후보 5" */
+  /** 출처("팀 매치"·대회 라운드) 또는 프리셋 인원 "8명" */
   subtitle: string;
   sportName: string | null;
   formation: string | null;
-  starterCount: number;
   entries: LoadableEntry[];
 };
 
@@ -218,11 +217,12 @@ export function LoadLineupSheet({
                       <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                         {item.subtitle}
                       </span>
-                      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-                        <Badge>선발 {item.starterCount}명</Badge>
-                        {item.formation !== null ? <Badge>{item.formation}</Badge> : null}
-                        {sportMismatch ? <Badge tone="warn">{item.sportName} {subjectLabel}</Badge> : null}
-                      </span>
+                      {item.formation !== null || sportMismatch ? (
+                        <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                          {item.formation !== null ? <Badge>{item.formation}</Badge> : null}
+                          {sportMismatch ? <Badge tone="warn">{item.sportName} {subjectLabel}</Badge> : null}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 );

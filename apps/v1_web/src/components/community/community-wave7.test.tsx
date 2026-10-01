@@ -84,6 +84,141 @@ describe('채팅방 빈 상태', () => {
   });
 });
 
+describe('채팅방 입력 — Enter 전송', () => {
+  function renderRoom(onSend = vi.fn()) {
+    renderWithClient(
+      <ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, draft: '안녕하세요', onSend }} roomId="room-1" />,
+    );
+    return { onSend, input: screen.getByRole('textbox', { name: '메시지 입력' }) };
+  }
+
+  it('Enter 로 보낸다', () => {
+    const { onSend, input } = renderRoom();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('한글 조합 중 Enter 는 글자 확정이라 보내지 않는다 (isComposing · Safari keyCode 229)', () => {
+    const { onSend, input } = renderRoom();
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('여러 줄 입력칸이고 Shift+Enter 는 줄바꿈으로 남긴다(기본 동작을 막지 않는다)', () => {
+    const { onSend, input } = renderRoom();
+    expect(input.tagName).toBe('TEXTAREA');
+    // fireEvent 는 preventDefault 되면 false 를 돌려준다 — true 여야 브라우저가 줄바꿈을 넣는다.
+    expect(fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })).toBe(true);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('터치 기기에서는 Enter 가 줄바꿈이다 — 모바일 키보드엔 Shift 가 없어 Enter 가 유일한 줄바꿈', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(pointer: coarse)' })) as typeof window.matchMedia;
+    try {
+      const { onSend, input } = renderRoom();
+      expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(true);
+      expect(onSend).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});
+
+describe('채팅방 + 패널 · 사진 (Task 181)', () => {
+  const withMatchMedia = (coarse: boolean, run: () => void) => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: coarse && query === '(pointer: coarse)' })) as typeof window.matchMedia;
+    try {
+      run();
+    } finally {
+      window.matchMedia = original;
+    }
+  };
+
+  it('+ 는 입력창 아래 패널을 여닫고(× 로 바뀜) ESC 로도 닫힌다', () => {
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn() }} roomId="room-1" />);
+    const toggle = screen.getByRole('button', { name: '보내기 메뉴 열기' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    const panel = screen.getByRole('group', { name: '보내기 메뉴' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', panel.id);
+    expect(screen.getByRole('button', { name: '보내기 메뉴 닫기' })).toBe(toggle);
+    expect(screen.getByRole('button', { name: '앨범' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: '보내기 메뉴' })).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+  });
+
+  it('앨범에서 고른 사진을 넘기고 패널을 닫는다', () => {
+    const onPickImages = vi.fn();
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages }} roomId="room-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+    const files = [new File(['a'], 'a.jpg', { type: 'image/jpeg' }), new File(['b'], 'b.png', { type: 'image/png' })];
+
+    fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files } });
+
+    expect(onPickImages).toHaveBeenCalledWith(files);
+    expect(screen.queryByRole('group', { name: '보내기 메뉴' })).not.toBeInTheDocument();
+  });
+
+  it('입력이 잠긴 방·사진 기능이 없는 방은 + 가 눌리지 않는다', () => {
+    const { unmount } = renderWithClient(
+      <ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), inputLockedMessage: '수락하면 대화할 수 있어요' }} roomId="room-1" />,
+    );
+    expect(screen.getByRole('button', { name: '보내기 메뉴 열기' })).toBeDisabled();
+    unmount();
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={emptyRoom} roomId="room-1" />);
+    expect(screen.getByRole('button', { name: '보내기 메뉴 열기' })).toBeDisabled();
+  });
+
+  it('카메라 칸은 터치 기기에서만, 안드로이드 앱에서는 숨긴다(네이티브 선택기가 촬영을 못 연다)', () => {
+    const model = { ...emptyRoom, onPickImages: vi.fn() };
+    const { unmount } = renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={model} roomId="room-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+    expect(screen.queryByRole('button', { name: '카메라' })).not.toBeInTheDocument();
+    unmount();
+
+    withMatchMedia(true, () => {
+      const first = renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={model} roomId="room-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+      expect(screen.getByRole('button', { name: '카메라' })).toBeInTheDocument();
+      expect(screen.getByTestId('chat-camera-input')).toHaveAttribute('capture', 'environment');
+      first.unmount();
+
+      window.TeameetNative = { postMessage: vi.fn() } as unknown as typeof window.TeameetNative;
+      try {
+        renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={model} roomId="room-1" />);
+        fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+        expect(screen.queryByRole('button', { name: '카메라' })).not.toBeInTheDocument();
+      } finally {
+        delete window.TeameetNative;
+      }
+    });
+  });
+
+  it('사진 말풍선을 누르면 전체 화면으로 보고, 닫기로 돌아온다 · 볼 수 없는 사진은 문구로', () => {
+    const messages: ChatRoomViewModel['messages'] = [
+      { id: 'm1', who: 'other', senderId: 'u2', label: '서연', body: '사진', sentAt: '2026-10-01T01:00:00Z', kind: 'image', imageUrl: '/uploads/2026/10/a.jpg' },
+      { id: 'm2', who: 'other', senderId: 'u2', label: '서연', body: '사진을 볼 수 없어요', sentAt: '2026-10-01T01:01:00Z', kind: 'image', imageUrl: null },
+    ];
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, messages }} roomId="room-1" />);
+    expect(screen.getByText('사진을 볼 수 없어요')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '사진 크게 보기' }));
+    const dialog = screen.getByRole('dialog', { name: '사진 크게 보기' });
+    expect(within(dialog).getByRole('img', { name: '보낸 사진' })).toHaveAttribute('src', '/uploads/2026/10/a.jpg');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog', { name: '사진 크게 보기' })).not.toBeInTheDocument();
+  });
+});
+
 const emptyNotifications: NotificationsViewModel = { status: 'ready', unreadCount: 0, notifications: [] };
 
 describe('알림 빈 상태', () => {

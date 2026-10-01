@@ -56,7 +56,7 @@ function render(ui: ReactElement) {
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-function mockOwnerMembersPage(activeOwnerCount: number) {
+function mockOwnerMembersPage(activeOwnerCount: number, { memberCount = activeOwnerCount, managerCount = 0 }: { memberCount?: number; managerCount?: number } = {}) {
   const leaveMutate = vi.fn();
   teamApiMocks.useV1TeamDetail.mockReturnValue({
     data: {
@@ -84,14 +84,14 @@ function mockOwnerMembersPage(activeOwnerCount: number) {
           canRemove: false,
         },
       ],
-      summary: { ownerCount: activeOwnerCount, managerCount: 0, memberCount: activeOwnerCount },
+      summary: { ownerCount: activeOwnerCount, managerCount, memberCount },
       viewerRole: 'owner',
       pageInfo: { nextCursor: null, hasNext: false },
     },
     isError: false,
   });
   teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
-  teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+  teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
   teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
   teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
   teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
@@ -124,16 +124,11 @@ describe('TeamListPageView', () => {
     expect(screen.queryByText(/내 주변\s+\d+/)).not.toBeInTheDocument();
   });
 
-  it('renders team list cards from the explicit team fields without stale recruiting copy', () => {
+  function listOf(team: Partial<TeamListViewModel['teams'][number]>): TeamListViewModel {
     const base = getTeamListViewModel();
-    const model: TeamListViewModel = {
+    return {
       ...base,
-      summary: {
-        ...base.summary,
-        total: 1,
-        recruiting: 1,
-        nearby: undefined,
-      },
+      summary: { ...base.summary, total: 1, recruiting: 1, nearby: undefined },
       teams: [
         {
           id: 'team-live-1',
@@ -145,70 +140,64 @@ describe('TeamListPageView', () => {
           members: 7,
           capacity: 0,
           status: 'open',
-          statusLabel: '가입 신청 가능',
+          statusLabel: '가입 가능',
           tags: ['레벨 미설정'],
           genderRule: '성별 무관',
-          ownerName: '김도윤',
-          managerName: '박서준',
           intro: '짧은 소개',
           next: '수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ',
+          ...team,
         },
       ],
     };
+  }
 
-    render(<TeamListPageView model={model} />);
+  // G12(F19): 고르는 화면이라 한 줄씩만 — 활동 일정이 있으면 그 한 줄, 팀장 이름은 싣지 않는다.
+  it('목록 카드는 활동 일정 한 줄만 싣고 팀장 줄은 없다', () => {
+    render(<TeamListPageView model={listOf({})} />);
 
     expect(screen.getByText('라이브 팀')).toBeInTheDocument();
-    // 가입 가능은 목록에서 50/50 이 같은 값이라(alpha 실측 2026-09-07) 더는 쓰지 않는다 —
-    // 예외(가입 닫힘·정원 마감)만 배지로 알린다. 아래 별도 describe 에서 그 계약을 지킨다.
-    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
+    expect(screen.queryByText('가입 가능')).not.toBeInTheDocument();
     expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
-    expect(screen.getByText('짧은 소개')).toBeInTheDocument();
-    expect(screen.getByText('팀장 김도윤 · 감독 박서준')).toBeInTheDocument();
-    expect(screen.queryByText('가입 신청은 운영진 승인 후 확정돼요.')).not.toBeInTheDocument();
     expect(screen.getByText('수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ')).toBeInTheDocument();
-    expect(screen.queryByText('자세히 보기 ›')).not.toBeInTheDocument();
-    expect(screen.queryByText('팀 보기 ›')).not.toBeInTheDocument();
-    expect(screen.queryByText('알림받기')).not.toBeInTheDocument();
+    expect(screen.queryByText('짧은 소개')).not.toBeInTheDocument();
+    expect(screen.queryByText(/팀장|감독/)).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();
   });
 
-  it('shows only the owner line and no manager text when the team has no manager', () => {
-    const base = getTeamListViewModel();
-    const model: TeamListViewModel = {
-      ...base,
-      summary: {
-        ...base.summary,
-        total: 1,
-        recruiting: 1,
-        nearby: undefined,
-      },
-      teams: [
-        {
-          id: 'team-live-2',
-          name: '마포 농구 클럽',
-          logo: '마',
-          sport: '농구',
-          sports: ['농구'],
-          region: '서울 마포구',
-          members: 5,
-          capacity: 10,
-          status: 'open',
-          statusLabel: '가입 신청 가능',
-          tags: ['레벨 미설정'],
-          genderRule: '성별 무관',
-          ownerName: '이하나',
-          managerName: null,
-          intro: '',
-          next: '',
-        },
-      ],
-    };
+  it('활동 일정이 없으면 소개를 한 줄로 쓰고, 둘 다 없으면 줄을 그리지 않는다', () => {
+    const { container, rerender } = render(<TeamListPageView model={listOf({ next: '' })} />);
+    expect(screen.getByText('짧은 소개')).toBeInTheDocument();
 
-    render(<TeamListPageView model={model} />);
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TeamListPageView model={listOf({ next: '', intro: '' })} />
+      </QueryClientProvider>,
+    );
+    expect(container.querySelector('.tm-team-card-activity')).toBeNull();
+  });
+});
 
-    expect(screen.getByText('팀장 이하나')).toBeInTheDocument();
-    expect(screen.queryByText(/감독/)).not.toBeInTheDocument();
+describe('TeamDetailPageView — 가입 상태 낱말 (H2 S-1)', () => {
+  function infoRowValue(label: string) {
+    const row = screen.getAllByText(label).map((node) => node.closest('.tm-team-info-row')).find(Boolean);
+    return row?.lastElementChild?.textContent;
+  }
+
+  it('가입을 닫은 팀은 배지와 표가 같은 말(가입 닫힘)을 쓴다', () => {
+    const base = getTeamDetailViewModel('default');
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'closed', statusLabel: '가입 닫힘' } }} />);
+
+    expect(screen.getAllByText('가입 닫힘', { selector: '.tm-badge' }).length).toBeGreaterThan(0);
+    expect(infoRowValue('가입 신청')).toBe('가입 닫힘');
+    expect(screen.queryByText('모집 여부')).toBeNull();
+  });
+
+  it('가입 가능은 기본 상태라 배지 없이 표에만 적는다', () => {
+    const base = getTeamDetailViewModel('default');
+    render(<TeamDetailPageView model={{ ...base, team: { ...base.team, status: 'open', statusLabel: '가입 가능' } }} />);
+
+    expect(screen.queryByText('가입 가능', { selector: '.tm-badge' })).toBeNull();
+    expect(infoRowValue('가입 신청')).toBe('가입 가능');
   });
 });
 
@@ -228,7 +217,7 @@ describe('TeamDetailPageView', () => {
         members: 7,
         capacity: 12,
         status: 'open',
-        statusLabel: '가입 신청 가능',
+        statusLabel: '가입 가능',
         tags: [],
         genderRule: '성별 무관',
         intro: introduction,
@@ -279,7 +268,7 @@ describe('TeamDetailPageView', () => {
         members: 7,
         capacity: 12,
         status: 'open',
-        statusLabel: '가입 신청 가능',
+        statusLabel: '가입 가능',
         tags: [],
         genderRule: '성별 무관',
         intro: '',
@@ -333,12 +322,12 @@ describe('TeamDetailPageView', () => {
     // 토스트는 사라지지만 이 안내는 남아야 한다 — 모바일/데스크톱 레이아웃 양쪽에 렌더된다.
     expect(screen.getAllByText('승인 대기 중').length).toBeGreaterThan(0);
     expect(
-      screen.getAllByText('관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.').length,
+      screen.getAllByText('팀장·매니저가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.').length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText('2026. 07. 20. 신청').length).toBeGreaterThan(0);
   });
 
-  it('가입 신청 가능 상태에서는 승인 대기 안내를 띄우지 않는다', () => {
+  it('가입 가능 상태에서는 승인 대기 안내를 띄우지 않는다', () => {
     render(<TeamDetailPageView model={getTeamDetailViewModel('default')} />);
 
     expect(screen.queryByText('승인 대기 중')).not.toBeInTheDocument();
@@ -378,6 +367,7 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
           successMessage: null,
         },
         items: [],
+        pastItems: [],
         listLoading: false,
         listError: false,
         onRetry: vi.fn(),
@@ -469,8 +459,9 @@ describe('TeamFormPageView', () => {
 
     render(<TeamFormPageView model={model} />);
 
-    expect(screen.getByText('가입 신청 상태')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '가입 신청 가능' })).toHaveAttribute('aria-pressed', 'true');
+    // 폼도 배지·표·목록과 같은 두 낱말(H2 S-2).
+    expect(screen.getByRole('group', { name: '가입 신청 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '가입 가능' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
 
@@ -500,6 +491,17 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
     };
   }
 
+  it('같은 이름의 팀이 있으면 이름 칸이 그 이유를 설명으로 달고, 없으면 멀쩡하다 (H2)', () => {
+    const { rerender } = render(<TeamFormPageView model={formModel({ nameError: '같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.' })} />);
+    const input = screen.getByRole('textbox', { name: '팀 이름' });
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription('같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.');
+
+    rerender(<TeamFormPageView model={formModel({})} />);
+    expect(screen.getByRole('textbox', { name: '팀 이름' })).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText(/같은 이름의 팀이 있어요/)).toBeNull();
+  });
+
   it('minCapacity 아래로는 고를 수 없고 이유를 알려 준다', () => {
     const onFieldChange = vi.fn();
     render(<TeamFormPageView model={formModel({ minCapacity: 12, onFieldChange }, 12)} />);
@@ -508,7 +510,7 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
     const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value));
     expect(Math.min(...values)).toBe(12);
     expect(screen.getByRole('button', { name: '정원 한 명 줄이기' })).toBeDisabled();
-    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요.')).toBeInTheDocument();
+    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요. 정원이 다 차면 자동으로 “정원 마감”으로 보여요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '정원 한 명 늘리기' }));
     expect(onFieldChange).toHaveBeenCalledWith('capacity', 13);
@@ -538,8 +540,70 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
   });
 });
 
-describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
-  it('일반 멤버는 관리자 문구·가입 신청 탭·비활성 관리 버튼 없이 본인 탈퇴만 본다', () => {
+// G12 B-1(F22·F23): 만들기 첫 화면은 이름·종목·지역만 — 선택 항목은 "더 꾸미기"로 접어 둔다.
+describe('TeamFormPageView — 만들기 첫 화면', () => {
+  function createModel(form: Partial<NonNullable<TeamFormViewModel['form']>> = {}): TeamFormViewModel {
+    return {
+      mode: 'create',
+      team: {
+        name: '', logoUrl: null, coverImageUrl: null, sport: '풋살', region: '서울 마포구',
+        description: '', sports: ['풋살'], city: '서울', county: '마포구', level: '', genderRule: '성별 무관',
+        activityDays: [], activityFrequency: '', activityTimeSlots: [], activityTypes: [], activityMemo: '', capacity: 24,
+      },
+      form: {
+        sportId: 'sport-1', regionId: 'region-1', regions: [{ id: 'region-1', name: '서울 마포구' }],
+        sports: [{ id: 'sport-1', name: '풋살' }], joinPolicy: 'approval_required',
+        onFieldChange: vi.fn(), onSportChange: vi.fn(), onRegionChange: vi.fn(), onJoinPolicyChange: vi.fn(), onSubmit: vi.fn(),
+        ...form,
+      },
+    };
+  }
+
+  it('선택 항목은 더 꾸미기를 열어야 보인다', () => {
+    render(<TeamFormPageView model={createModel()} />);
+
+    const more = screen.getByRole('button', { name: /더 꾸미기/ });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('상단 이미지')).not.toBeVisible();
+    expect(screen.queryByRole('combobox', { name: '정원' })).not.toBeInTheDocument();
+
+    fireEvent.click(more);
+
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
+  });
+
+  it('로고는 한 줄로 두고 바꾸기를 눌러야 고르는 칸이 열린다', () => {
+    render(<TeamFormPageView model={createModel()} />);
+    expect(screen.queryByRole('group', { name: '기본 팀 로고 선택' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '바꾸기' }));
+
+    expect(screen.getByRole('group', { name: '기본 팀 로고 선택' })).toBeInTheDocument();
+  });
+
+  it('내 지역으로 채웠으면 그렇게 알리고, 아니면 알리지 않는다', () => {
+    const view = render(<TeamFormPageView model={createModel({ regionPrefilled: true })} />);
+    expect(screen.getByText('내 활동 지역으로 채웠어요. 바꿀 수 있어요.')).toBeInTheDocument();
+
+    view.rerender(<QueryClientProvider client={new QueryClient()}><TeamFormPageView model={createModel({ regionPrefilled: false })} /></QueryClientProvider>);
+    expect(screen.queryByText('내 활동 지역으로 채웠어요. 바꿀 수 있어요.')).not.toBeInTheDocument();
+  });
+
+  it('수정 화면은 접지 않고 모든 항목을 바로 보인다', () => {
+    render(<TeamFormPageView model={{ ...createModel(), mode: 'edit' }} />);
+
+    expect(screen.queryByRole('button', { name: /더 꾸미기/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
+  });
+});
+
+describe('TeamMembersPageView — 멤버 행과 ⋯ 시트 (H2 A-1·A-2)', () => {
+  function memberRow(index: number, extra: Partial<TeamMembersViewModel['members'][number]> = {}): TeamMembersViewModel['members'][number] {
+    return { id: `m-${index}`, name: `선수${String(index).padStart(2, '0')}`, role: '멤버', meta: '가입 2026. 09. 30.', actions: [], ...extra };
+  }
+
+  it('일반 멤버는 권한 안내·가입 신청 탭 없이 멤버 목록만 보고, 동작이 없는 행에는 ⋯ 가 없다', () => {
     const base = getTeamMembersViewModel();
     const model: TeamMembersViewModel = {
       ...base,
@@ -551,72 +615,120 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
         { key: 'invitations', label: '초대', count: 2, onSelect: vi.fn() },
       ],
       members: [
-        { name: '김도윤', role: '팀장', meta: '가입 2024.03', actions: [] },
-        {
-          name: '이하나',
-          role: '멤버',
-          meta: '가입 2024.05',
-          actions: [],
-          selfLeave: { disabled: false, pending: false, onSelect: vi.fn() },
-        },
+        { id: 'm-owner', name: '김도윤', role: '팀장', roleTone: 'owner', meta: '가입 2024.03', actions: [] },
+        memberRow(1, { name: '이하나', actions: [{ key: 'leave', label: '팀 나가기', risky: true, destructive: true, onSelect: vi.fn() }] }),
       ],
     };
 
     render(<TeamMembersPageView model={model} />);
 
     expect(screen.getByRole('heading', { level: 1, name: '성수 러너스 FC · 멤버 목록' })).toBeInTheDocument();
-    expect(screen.queryByText('권한 규칙')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^가입 신청/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^초대/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '관리' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/확인 창을 거쳐요/)).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: '멤버 탭 선택' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '팀 나가기' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '김도윤 관리' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이하나 관리' })).toBeEnabled();
+    // 팀장만 배지를 달고, 기본 역할인 멤버는 배지가 없다.
+    expect(screen.getByText('팀장')).toHaveClass('tm-badge');
+    expect(screen.queryByText('멤버', { selector: '.tm-badge' })).toBeNull();
   });
 
-  it('본인 행에만 "팀 나가기" 버튼이 보이고 클릭 시 onSelect가 호출된다', () => {
-    const onSelect = vi.fn();
-    const base = getTeamMembersViewModel();
+  it('⋯ 시트는 되돌리기 어려운 동작을 소제목 아래로 떼고, 고르면 시트를 닫고 동작을 부른다', () => {
+    const onRemove = vi.fn();
+    const onDemote = vi.fn();
     const model: TeamMembersViewModel = {
-      ...base,
+      ...getTeamMembersViewModel(),
       members: [
-        { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
-        {
-          name: '이하나',
-          role: '멤버',
-          meta: 'MF · 최근 4경기',
-          actions: [],
-          selfLeave: { disabled: false, pending: false, onSelect },
-        },
+        memberRow(1, {
+          name: '박서준',
+          role: '매니저',
+          roleTone: 'manager',
+          meta: '7번 · 가입 2026. 09. 30.',
+          actions: [
+            { key: 'remove', label: '팀에서 내보내기', risky: true, destructive: true, onSelect: onRemove },
+            { key: 'demote', label: '멤버로 내리기', description: '매니저 권한이 없어져요', onSelect: onDemote },
+          ],
+        }),
       ],
     };
 
     render(<TeamMembersPageView model={model} />);
+    fireEvent.click(screen.getByRole('button', { name: '박서준 관리' }));
 
-    const leaveButtons = screen.getAllByRole('button', { name: '팀 나가기' });
-    // 본인(이하나) 행에만 1개만 렌더된다 — 김도윤 행에는 selfLeave가 없으므로 버튼 없음
-    expect(leaveButtons).toHaveLength(1);
+    const sheet = screen.getByRole('dialog', { name: '박서준' });
+    expect(within(sheet).getByText('매니저 · 7번 · 가입 2026. 09. 30.')).toBeInTheDocument();
+    const labels = within(sheet).getAllByRole('button').map((button) => button.textContent);
+    // 닫기 · 위험하지 않은 동작 · (소제목) · 위험 동작 순서
+    expect(labels.slice(1)).toEqual(['멤버로 내리기매니저 권한이 없어져요', '팀에서 내보내기']);
+    const heading = within(sheet).getByText('되돌리기 어려운 동작');
+    expect(heading.compareDocumentPosition(within(sheet).getByRole('button', { name: '팀에서 내보내기' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(within(sheet).getByRole('button', { name: /멤버로 내리기/ })) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
 
-    fireEvent.click(leaveButtons[0]);
-    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(sheet).getByRole('button', { name: '팀에서 내보내기' }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: '박서준' })).toBeNull();
   });
 
-  it('단독 owner는 active owner 요약에 따라 "팀 나가기"가 비활성화된다', () => {
+  it('검색은 멤버가 8명부터 생기고, 이름 일부나 등번호로 찾는다', () => {
+    const seven = Array.from({ length: 7 }, (_, index) => memberRow(index + 1));
+    const first = render(<TeamMembersPageView model={{ ...getTeamMembersViewModel(), members: seven }} />);
+    expect(screen.queryByRole('searchbox', { name: '멤버 검색' })).toBeNull();
+    expect(screen.getByText('멤버 7명')).toBeInTheDocument();
+
+    const eight = [...seven, memberRow(8, { name: '골키퍼김', jerseyNumber: 12, meta: '12번 · 가입 2026. 09. 30.' })];
+    first.unmount();
+    render(<TeamMembersPageView model={{ ...getTeamMembersViewModel(), members: eight }} />);
+    const search = screen.getByRole('searchbox', { name: '멤버 검색' });
+
+    fireEvent.change(search, { target: { value: '12번' } });
+    expect(screen.getByText('검색 결과 1명')).toBeInTheDocument();
+    expect(screen.getByText('골키퍼김')).toBeInTheDocument();
+    expect(screen.queryByText('선수01')).toBeNull();
+
+    fireEvent.change(search, { target: { value: '선수0' } });
+    expect(screen.getByText('검색 결과 7명')).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '없는사람' } });
+    expect(screen.getByText('‘없는사람’에 맞는 멤버가 없어요.')).toBeInTheDocument();
+  });
+});
+
+describe('TeamMembersPageClient — 팀 나가기 (self-leave)', () => {
+  it('팀장 혼자 남은 팀이면 나가기 항목을 두지 않는다 — 이유는 혼자 남은 팀장 카드(H3)가 한 번만 말한다', () => {
     mockOwnerMembersPage(1);
 
     render(<TeamMembersPageClient teamId="team-1" />);
 
-    const button = screen.getByRole('button', { name: /팀 나가기/ });
+    expect(screen.queryByRole('button', { name: '김도윤 관리' })).toBeNull();
+    expect(screen.queryByText(/넘겨야/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/팀 나가기는 쓸 수 없어요/)).toHaveLength(1);
+  });
+
+  it('다른 멤버가 있는 단독 팀장은 "팀 나가기"가 비활성이고, 매니저가 없으면 지정부터 하라고 알려 준다', () => {
+    mockOwnerMembersPage(1, { memberCount: 3, managerCount: 0 });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+
+    const button = within(screen.getByRole('dialog', { name: '김도윤' })).getByRole('button', { name: /팀 나가기/ });
     expect(button).toBeDisabled();
-    // 이유는 aria-label 이 아니라 화면에 보이는 문장이고, 버튼이 그 문장을 설명으로 가리킨다.
-    const reason = screen.getByText(/팀장을 운영진에게 넘겨야 나갈 수 있어요/);
-    expect(reason).toBeVisible();
-    expect(button).toHaveAccessibleDescription(reason.textContent ?? '');
+    expect(button).toHaveTextContent('팀을 나가려면 먼저 매니저에게 팀장을 넘겨야 해요. 멤버 한 명을 매니저로 지정한 뒤 넘겨 주세요.');
+  });
+
+  it('매니저가 있으면 넘기라는 말만 한다', () => {
+    mockOwnerMembersPage(1, { memberCount: 3, managerCount: 1 });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+
+    const button = within(screen.getByRole('dialog', { name: '김도윤' })).getByRole('button', { name: /팀 나가기/ });
+    expect(button).toHaveTextContent(/^팀 나가기팀을 나가려면 먼저 매니저에게 팀장을 넘겨야 해요\.$/);
   });
 
   it('나갈 수 있는 팀장에게는 비활성 이유를 보여주지 않는다', () => {
     mockOwnerMembersPage(2);
 
     render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
 
     expect(screen.queryByText(/넘겨야 나갈 수 있어요/)).not.toBeInTheDocument();
   });
@@ -625,12 +737,12 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     const leaveMutate = mockOwnerMembersPage(2);
 
     render(<TeamMembersPageClient teamId="team-1" />);
-
-    const button = screen.getByRole('button', { name: '팀 나가기' });
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+    const button = within(screen.getByRole('dialog', { name: '김도윤' })).getByRole('button', { name: '팀 나가기' });
     expect(button).toBeEnabled();
 
     fireEvent.click(button);
-    expect(screen.getByRole('dialog', { name: '팀 나가기' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '팀 나가기' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '나가기' }));
 
     await waitFor(() => expect(leaveMutate).toHaveBeenCalledWith(
@@ -647,6 +759,7 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
           { invitationId: 'inv-a', invitedUser: { userId: 'u-a', displayName: '김도윤', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
           { invitationId: 'inv-b', invitedUser: { userId: 'u-b', displayName: '박서준', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
         ],
+        pastItems: [],
       },
       isLoading: false,
       isError: false,
@@ -672,6 +785,36 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     await waitFor(() => expect(cancelMutate).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('button', { name: '김도윤님 초대 취소' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '박서준님 초대 취소' })).toBeDisabled();
+  });
+
+  it('알림이 가리킨 ?tab=invitations 로 들어오면 초대 탭이 바로 열리고, 지난 초대가 끝난 이유와 함께 보인다', () => {
+    mockOwnerMembersPage(1);
+    navMocks.searchParams.mockReturnValue(new URLSearchParams('tab=invitations'));
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({
+      data: {
+        items: [],
+        pastItems: [
+          { invitationId: 'inv-d', invitedUser: { userId: 'u-d', displayName: '선수17', profileImageUrl: null }, status: 'declined', message: null, createdAt: '2026-09-20T00:00:00Z', closedAt: '2026-09-29T15:00:00Z' },
+          { invitationId: 'inv-c', invitedUser: { userId: 'u-c', displayName: '선수18', profileImageUrl: null }, status: 'cancelled', message: null, createdAt: '2026-09-20T00:00:00Z', closedAt: '2026-09-28T15:00:00Z' },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    try {
+      render(<TeamMembersPageClient teamId="team-1" />);
+
+      expect(screen.getByRole('button', { name: /^초대 \d+$/ })).toHaveAttribute('aria-pressed', 'true');
+      const past = screen.getByRole('list', { name: '지난 초대' });
+      expect(within(past).getByText('선수17')).toBeInTheDocument();
+      expect(within(past).getByText('거절')).toBeInTheDocument();
+      expect(within(past).getByText('취소')).toBeInTheDocument();
+      // 끝난 초대는 되돌릴 수 없다 — 취소 버튼이 없다.
+      expect(within(past).queryByRole('button')).toBeNull();
+    } finally {
+      navMocks.searchParams.mockImplementation(() => new URLSearchParams());
+    }
   });
 });
 
@@ -885,7 +1028,7 @@ describe('TeamDetailPageView — 내 리그 섹션', () => {
  * 팀 카드 밀도 (2026-09-07 alpha 실측 · 사용자 A안 확정).
  *
  * 카드 217px 중 맨 아래 49px(구분선 + 액션 행)이 '활동 일정'과 '가입 상태'를 담고 있었는데,
- * 상태 문구는 **50팀 중 50팀이 같은 값**('가입 신청 가능')이었다. 머리말에도
+ * 상태 문구는 **50팀 중 50팀이 같은 값**('가입 가능')이었다. 머리말에도
  * "50팀 · 가입 가능 50" 이 이미 있어, 그 49px 은 정보량 0 이었다.
  *
  * 그래서 ① 가입 가능은 안 쓰고 예외만 배지로 알리고 ② 활동 일정은 있을 때만 한 줄로 쓴다.
@@ -903,16 +1046,16 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
   }
 
   it('구분선이 있던 액션 행 자체를 그리지 않는다', () => {
-    const { container } = render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+    const { container } = render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 가능' })} />);
 
     expect(container.querySelector('.tm-team-card-action-row')).toBeNull();
     expect(container.querySelector('.tm-team-card-action-status')).toBeNull();
   });
 
   it("가입 가능한 팀에는 상태 배지를 붙이지 않는다 — 목록에서 전부 같은 값이다", () => {
-    render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+    render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 가능' })} />);
 
-    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
+    expect(screen.queryByText('가입 가능')).not.toBeInTheDocument();
   });
 
   it('가입이 막힌 팀에만 상태 배지를 붙이고, 스크린리더에도 읽힌다', () => {
@@ -925,22 +1068,19 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(badge!.closest('[aria-hidden="true"]')).toBeNull();
   });
 
-  it("활동 일정이 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
-    const { container } = render(<TeamListPageView model={listWith({ next: '' })} />);
+  it("활동 일정·소개가 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
+    const { container } = render(<TeamListPageView model={listWith({ next: '', intro: '' })} />);
 
     expect(screen.queryByText('활동 일정 미정')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-team-card-activity')).toBeNull();
   });
 
-  it('FAB 가림 보호는 활동 줄이 없는 카드에도 걸린다 — 마지막 자식 기준이다', () => {
-    // 활동 줄에만 걸면 그 줄이 없는 카드는 마지막 줄(소개)이 FAB 에 가려진다(#1095 Copilot).
+  // G12(F96): 카드 마지막 자식에 FAB 몫 64px 를 비워 두면 소개·활동 줄이 없는 카드는 팀 이름이
+  // 그만큼 좁아져 줄바꿈된다. 목록 아래 여백이 FAB 를 비키므로 카드 안에서는 비우지 않는다.
+  it('팀 카드 안에 FAB 몫의 오른쪽 여백을 비워 두지 않는다', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-    const block = css.match(/@media \(max-width: 767px\) \{\s*\.tm-team-list \.tm-team-card > :last-child \{[^}]*\}/);
 
-    expect(block).not.toBeNull();
-    expect(block![0]).toContain('padding-right: 64px');
-    // 예전처럼 활동 줄만 겨냥하는 규칙이 남아 있으면 의도가 반쯤만 지켜진다.
-    expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
+    expect(css).not.toMatch(/\.tm-team-card[^{]*>\s*:last-child\s*\{[^}]*padding-right/);
   });
 
   /**
@@ -980,19 +1120,18 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(tagRule).not.toMatch(/max-width:\s*62%/);
   });
 
-  it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {
+  it('소개가 없으면 지역·종목을 문장으로 되풀이하지 않는다', () => {
     // 예전 폴백 `{지역}에서 활동하는 {종목} 팀이에요.` 는 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)
     // 과 같은 말이라 정보가 되지 않았다. alpha 50팀 중 25팀이 그 문장을 보여주고 있었다.
-    const { container } = render(<TeamListPageView model={listWith({ intro: '' })} />);
+    render(<TeamListPageView model={listWith({ intro: '', next: '' })} />);
 
-    expect(container.querySelector('.tm-team-intro-box')).toBeNull();
     expect(screen.queryByText(/에서 활동하는 .+ 팀이에요\./)).not.toBeInTheDocument();
   });
 
-  it('소개가 있으면 그대로 쓴다', () => {
-    const { container } = render(<TeamListPageView model={listWith({ intro: '매주 토요일에 모여요' })} />);
+  it('활동 일정이 없고 소개가 있으면 소개를 한 줄로 쓴다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ intro: '매주 토요일에 모여요', next: '' })} />);
 
-    expect(container.querySelector('.tm-team-intro-box')?.textContent).toContain('매주 토요일에 모여요');
+    expect(container.querySelector('.tm-team-card-activity')?.textContent).toBe('매주 토요일에 모여요');
   });
 
   it('활동 일정이 있으면 그대로 한 줄로 쓴다', () => {

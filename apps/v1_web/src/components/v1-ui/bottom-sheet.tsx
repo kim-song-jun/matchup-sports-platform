@@ -25,14 +25,27 @@ interface BottomSheetBaseProps {
    * `mounted`/`closing`을 직접 쓰는 별도 패턴을 그대로 유지한다.)
    */
   open: boolean;
-  /**
-   * 시트를 닫은 목록 URL. 시트가 scrim 을 직접 그리고, 드래그·ESC·scrim·시트 안 링크 이동을 모두
-   * 여기서 처리한다 — 목적지가 시트를 열기 전 항목이면 history back, 아니면 replace.
-   * push 로 닫으면 항목이 하나 더 쌓여 다음 뒤로가기가 시트를 다시 연다.
-   */
-  closeHref: string;
   children: ReactNode;
 }
+
+type BottomSheetCloseProps =
+  | {
+      /**
+       * 시트를 닫은 목록 URL. 시트가 scrim 을 직접 그리고, 드래그·ESC·scrim·시트 안 링크 이동을 모두
+       * 여기서 처리한다 — 목적지가 시트를 열기 전 항목이면 history back, 아니면 replace.
+       * push 로 닫으면 항목이 하나 더 쌓여 다음 뒤로가기가 시트를 다시 연다.
+       */
+      closeHref: string;
+      onClose?: undefined;
+    }
+  | {
+      /**
+       * URL 이 아닌 부모 상태로 여닫는 시트(상세 화면의 ⋯ 메뉴처럼 확인 창을 위에 겹쳐 띄우는 곳).
+       * 뒤로가기 닫기는 오버레이 히스토리가 맡는다. 시트 안 링크는 소비처가 `overlayLinkClick` 으로 처리한다.
+       */
+      onClose: () => void;
+      closeHref?: undefined;
+    };
 
 /**
  * `title` 또는 `ariaLabel` 중 하나는 반드시 있어야 한다 — dialog 는 접근 가능한 이름이
@@ -41,6 +54,7 @@ interface BottomSheetBaseProps {
  * 만 넘긴다 — `title` 은 헤더까지 이 컴포넌트가 그려줘야 하는 향후 소비처를 위해 남겨 둔다.
  */
 export type BottomSheetProps = BottomSheetBaseProps &
+  BottomSheetCloseProps &
   (
     | { title: string; ariaLabel?: string }
     | { title?: undefined; ariaLabel: string }
@@ -69,7 +83,7 @@ const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, [role="button"
  * 없으므로 임계치 미만이면 무조건 원위치, 초과면 무조건 닫는다.
  */
 export function BottomSheet(props: BottomSheetProps) {
-  const { open, closeHref, children, title, ariaLabel } = props;
+  const { open, closeHref, onClose, children, title, ariaLabel } = props;
   const router = useRouter();
 
   const navigate = useCallback(
@@ -84,7 +98,10 @@ export function BottomSheet(props: BottomSheetProps) {
     },
     [router],
   );
-  const onRequestClose = useCallback(() => navigate(closeHref), [closeHref, navigate]);
+  const onRequestClose = useCallback(() => {
+    if (onClose) onClose();
+    else if (closeHref !== undefined) navigate(closeHref);
+  }, [closeHref, navigate, onClose]);
 
   // 시트 안의 링크(칩·초기화·적용·닫기)는 push 대신 navigate 로 — 시트 항목을 쌓지 않는다.
   const onLinkClick = useCallback(
@@ -113,10 +130,11 @@ export function BottomSheet(props: BottomSheetProps) {
   // trap·스크롤 잠금·초기 포커스만 그대로 재사용한다(모달 접근성 인프라는 이미 검증된
   // 자산이므로 새로 만들지 않는다). backdrop 클릭 닫기는 scrim 이 별도 `<Link>` 이므로
   // 훅의 onBackdropClick 은 쓰지 않는다.
+  // 부모 상태로 여는 시트는 실제 open 을 넘겨 오버레이 히스토리(뒤로가기 닫기)에 올린다.
   const { dialogRef, initialFocusRef } = useModalA11y<HTMLButtonElement, HTMLElement>({
-    open: true,
+    open: onClose ? open : true,
     onClose: onRequestClose,
-    closeOnBack: false, // 열림이 URL 항목이라 뒤로가기가 이미 닫는다.
+    closeOnBack: Boolean(onClose), // URL 시트는 열림이 URL 항목이라 뒤로가기가 이미 닫는다.
   });
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -162,8 +180,12 @@ export function BottomSheet(props: BottomSheetProps) {
 
   return (
     <>
-    <Link className="tm-filter-scrim" href={closeHref} aria-label="필터 닫기" onClick={onLinkClick} />
-    <div className="tm-filter-layer" onClickCapture={onLinkClick}>
+    {closeHref !== undefined ? (
+      <Link className="tm-filter-scrim" href={closeHref} aria-label="필터 닫기" onClick={onLinkClick} />
+    ) : (
+      <div className="tm-filter-scrim" aria-hidden="true" onClick={onRequestClose} />
+    )}
+    <div className="tm-filter-layer" onClickCapture={closeHref !== undefined ? onLinkClick : undefined}>
       <section
         ref={dialogRef}
         className={`tm-filter-sheet${isDragging ? ' is-dragging' : ''}`}
@@ -177,6 +199,8 @@ export function BottomSheet(props: BottomSheetProps) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
+        {/* title 을 넘기는 시트는 헤더를 이 컴포넌트가 그리므로 드래그 손잡이도 여기서 앞에 둔다. */}
+        {title ? <div className="tm-filter-sheet-handle" aria-hidden="true" /> : null}
         {title ? (
           <div className="tm-filter-sheet-head" style={{ marginBottom: 4 }}>
             <p id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>

@@ -143,6 +143,12 @@ export type TeamMatchDetailViewModel = {
       trustState?: string | null;
       href?: string;
       applicationId?: string;
+      /** 서버 신청 상태 원문(requested·approved…). 호스트 카드는 라벨(`status`)이 아니라 이 값으로 고른다. */
+      applicationStatus?: string;
+      appliedByName?: string | null;
+      appliedAtLabel?: string | null;
+      /** 신청할 때 남긴 한마디. */
+      message?: string | null;
       onApprove?: () => void;
       onReject?: () => void;
       actionPending?: boolean;
@@ -162,8 +168,11 @@ export type TeamMatchDetailViewModel = {
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;
+  /** 히어로 ⋯ 메뉴의 실행 항목(모집 마감·재개·취소). */
   hostActions?: Array<{
     label: string;
+    /** 메뉴 행 아래 한 줄 — 누르면 무엇이 되는지. */
+    description?: string;
     tone?: 'neutral' | 'primary' | 'danger';
     pending?: boolean;
     confirm?: {
@@ -171,9 +180,58 @@ export type TeamMatchDetailViewModel = {
       message: string;
       confirmLabel: string;
       cancelLabel?: string;
+      /** 기본 'danger'(취소). 되돌릴 길이 있는 모집 마감은 'default'. */
+      tone?: 'default' | 'danger';
     };
     onClick: () => void | Promise<unknown>;
   }>;
+  /** 호스트의 신청 목록을 아직 받는 중 — 알림으로 들어온 호스트에게 "신청 없음"을 먼저 보이지 않는다. */
+  applicationsPending?: boolean;
+  /** 호스트의 신청 목록 조회가 실패했다 — 빈 목록이 아니라 모르는 상태라 "신청 없음"을 말하지 않는다. */
+  applicationsError?: { retry: () => void };
+  /** 히어로 ⋯ 메뉴의 나머지 두 행 — 정보 수정(잠겼으면 이유)과 처리된 신청 기록. */
+  manageMenu?: {
+    edit: { href: string; lockedReason?: undefined } | { href?: undefined; lockedReason: string };
+    history: Array<{ key: string; name: string; statusLabel: string; timeLabel: string | null }>;
+  };
+  /** 하단 바의 두 번째 버튼(호스트·참가팀의 다음 할 일). 없으면 신청 CTA(applyLabel·onApply)를 그린다. */
+  nextAction?: {
+    label: string;
+    tone: 'primary' | 'neutral';
+    href?: string;
+    onClick?: () => Promise<unknown>;
+  };
+  /** 하단 바 상태 줄의 캡션을 바꿀 때만(예: '모집 상태', '경기 준비'). */
+  statusCaption?: string;
+  /** 상대가 정해진 뒤 참가팀 소속이 보는 진행 체크리스트. */
+  progress?: {
+    opponentName: string;
+    confirmedAtLabel: string | null;
+    /** 친선 참석명단 제출 여부. 모르면 null — 표시하지 않는다. */
+    lineupSubmitted: boolean | null;
+    /** 호스트에게만 — 상대가 정해져 수정이 잠긴 이유. */
+    lockNote: string | null;
+    /** 친선 참석명단 칸의 우리 인원·상대 명단 상태(H5 D-1). 명단을 못 읽었으면 null. */
+    attendance?: {
+      /** 제출했을 때의 인원. 제출 전이면 null. */
+      ownCount: number | null;
+      opponent: {
+        name: string;
+        badge: { tone: 'blue' | 'green' | 'grey'; label: string };
+        note: string;
+        /** 공개된 상대 명단(읽기 전용) — 공개 전이면 null. */
+        viewHref: string | null;
+      } | null;
+    } | null;
+  };
+  /** 승인 대기 중인 신청 팀(히어로 "우리 팀" 자리). */
+  myApplicationTeam?: { teamId: string; name: string } | null;
+  /** 신청 가능한 팀이 2개 이상인 팀장의 팀 선택 시트(N-1). */
+  applyTeamPicker?: {
+    teams: Array<{ teamId: string; name: string; roleLabel: string; eligible: boolean; reason: string | null }>;
+    defaultTeamId: string;
+    submit: (teamId: string, message: string | null) => Promise<unknown>;
+  };
   // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match
   // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
   // an atomic side effect of submitting a validated result revision on that screen.

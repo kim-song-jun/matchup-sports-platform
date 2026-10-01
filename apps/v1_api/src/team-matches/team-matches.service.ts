@@ -23,6 +23,7 @@ import type {
   GameSourceCreationInput,
 } from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
+import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   cascadeCancelTeamMatchSchedulesInTx,
@@ -751,7 +752,7 @@ export class TeamMatchesService {
       const teamMatchUpdated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: {
-          status: 'recruiting',
+          status: requiresReconfirmation ? 'recruiting' : current.status,
           sportId: dto.sportId,
           regionId: dto.regionId,
           title: dto.title,
@@ -777,7 +778,7 @@ export class TeamMatchesService {
         data: { status: 'expired', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
       await tx.v1StatusChangeLog.create({ data: {
-        targetType: 'team_match', targetId: teamMatch.id, fromStatus: current.status, toStatus: 'recruiting',
+        targetType: 'team_match', targetId: teamMatch.id, fromStatus: current.status, toStatus: teamMatchUpdated.status,
         actorType: 'user', actorUserId: user.id, reason: requiresReconfirmation ? 'schedule_or_place_changed_reapply_required' : 'host_updated',
       } });
       await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
@@ -1088,19 +1089,22 @@ export class TeamMatchesService {
     });
 
     // 팀 주최 모집은 호스트 관리자에게 알리고, 플랫폼 모집은 관리자 상세의 신청 목록에서
-    // 처리한다. hostTeamId=null 을 가짜 팀 알림 대상으로 만들지 않는다.
-    if (teamMatch.hostTeamId) {
+    // 처리한다. hostTeamId=null 을 가짜 팀 알림 대상으로 만들지 않는다. 신청이 받아진 매치는
+    // 시작 시각이 있다(없으면 NOT_RECRUITING). 제목에 신청 팀을 싣는다(H1-teammatch-applied).
+    const hostTeamId = teamMatch.hostTeamId;
+    if (hostTeamId !== null && teamMatch.hostTeam !== null && teamMatch.startAt !== null) {
       this.notifications.emitToManyDeferred(
         async () =>
           (
             await this.prisma.v1TeamMembership.findMany({
-              where: { teamId: teamMatch.hostTeamId!, status: 'active', role: { in: ['owner', 'manager'] } },
+              where: { teamId: hostTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
               select: { userId: true },
             })
           ).map((m) => m.userId),
         'team_match_application_received',
         teamMatch.id,
-        `"${teamMatch.title}" 팀매치 신청을 확인해 주세요.`,
+        undefined,
+        { vars: { name: applicantMembership.team.name, team: teamMatch.hostTeam.name, when: formatKstMonthDayTime(teamMatch.startAt) } },
       );
     }
 
@@ -1406,7 +1410,7 @@ export class TeamMatchesService {
       result.autoRejectedApplicantTeamIds,
       'team_match_application_rejected',
       application.teamMatchId,
-      `"${application.teamMatch.title}" 팀매치의 상대팀이 확정되어 신청이 종료됐어요.`,
+      `"${application.teamMatch.title}" 팀매치는 다른 팀으로 정해졌어요. 다른 팀매치를 둘러봐요.`,
     );
 
     return {
@@ -1867,7 +1871,7 @@ export class TeamMatchesService {
   private async assertCanManageTeam(userId: string, teamId: string) {
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: { teamId, userId, status: 'active', role: { in: ['owner', 'manager'] }, team: { status: 'active', deletedAt: null } },
-      select: { id: true, team: { select: { sportId: true } } },
+      select: { id: true, team: { select: { sportId: true, name: true } } },
     });
     if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only team owners or managers can manage team matches' });
     return membership;

@@ -142,9 +142,15 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 아니라 수락·거절을 하는 `/my/invitations`다. 딥링크는 알림 생성 시 `V1Notification.deepLink`에 저장되므로
 이미 만들어진 알림은 바뀌지 않는다.
 
-초대를 수락·거절하면 그 팀에서 온 미열람 `team_invitation_received` 알림(딥링크 `/my/invitations`)을 읽음 처리한다.
-초대가 취소되면 같은 알림을 읽음 처리하고 제목·본문을 "팀 초대가 취소됐어요"로 바꾸며 딥링크를 팀 상세
-`/teams/:teamId`로 옮긴다. 두 경우 모두 알림 갱신 실패는 로그만 남기고 수락·거절·취소 응답을 바꾸지 않는다.
+팀이 해체(보관)되면 `team_dissolved`(targetType `team`, targetId 팀 id, 딥링크 `/teams/:teamId` = 해체된 팀 읽기 전용
+화면, `teamEnabled` 게이팅)를 팀원(해체한 본인 제외)과 대기 중이던 가입 신청자에게 한 번 보낸다. 제목 "팀이 해체됐어요",
+팀원 본문 `"팀명" · 지난 기록은 그대로 남아요.` — 자세한 범위는 [Teams](./teams.md) "팀 해체(보관)·복구".
+
+초대를 수락·거절·취소하면 **그 초대의** 미열람 `team_invitation_received` 알림(딥링크 `/my/invitations`, 초대가
+보내진 시각 이후에 만들어진 것)만 읽음 처리하고 결과에 맞게 바꾼다 — 같은 팀의 옛 초대 알림은 건드리지 않는다.
+수락은 "팀 초대를 수락했어요 · "팀명" 멤버가 됐어요."(팀 상세), 거절은 "팀 초대를 거절했어요"(공개 팀 상세),
+취소는 "팀 초대가 취소됐어요"(팀 상세) — 셋 다 딥링크가 `/teams/:teamId` 로 옮겨 가 빈 초대함으로 가지 않는다.
+알림 갱신 실패는 로그만 남기고 수락·거절·취소 응답을 바꾸지 않는다.
 
 일반 팀매치 완료 알림 `team_match_completed`는 후기 작성 화면(`/my/reviews/team_match/:id`)으로 연결되므로 수신자를
 후기 작성 자격과 같은 판정으로 거른다 — 명단(계정 연결 참가자 1명 이상)이 있는 사이드는 명단에 있는 팀장·매니저만 받고,
@@ -184,6 +190,40 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
   `team-match-completed:{teamMatchId}:{userId}` · `tournament-fixture-completed:{teamMatchId}:{userId}` 로 정정 재확정에도 한 번이다.
   수신 설정은 리그 `teamMatchEnabled`, 대회 `activityEnabled`(기존 축 유지). 대회 결과 알림의 targetId 는 대회 id 에서
   `{tournamentId}:{teamMatchId}` 로 바뀌었다(딥링크는 같다).
+
+## 팀·라인업 사건 알림 (Task 180 H1)
+
+사건마다 한 건이 기본이다. 수신자는 발송 시점의 역할·명단으로 계산하고, 일으킨 본인은 받지 않는다. 문구 조사는 "님이·팀이"로 고정한다.
+
+| 알림 | 수신자 | 제목 / 본문 | 딥링크 |
+|---|---|---|---|
+| `team_manager_assigned` · `team_manager_revoked` | 바뀐 본인 | 매니저가 되었어요 / 매니저에서 멤버로 바뀌었어요 · `"팀명" · …` | 팀 상세 |
+| `team_owner_received` · `team_owner_changed` | 새 팀장 · 나머지 매니저(넘긴 본인 제외) | 팀장이 되었어요 / 팀장이 바뀌었어요 · `"팀명" · 새 팀장은 ○○님이에요.` | 새 팀장 `/teams/:id/members`, 나머지 팀 상세 |
+| `team_membership_removed` | 내보내진 본인(이유 없음) | 팀에서 제외됐어요 / `"팀명" · 이 팀의 일정과 채팅은 더 볼 수 없어요.` | 공개 팀 상세 |
+| `team_member_left` | 팀장·매니저 | ○○님이 팀을 나갔어요 / `"팀명" · 지금 멤버는 N명이에요.` | `/teams/:id/members` |
+| `team_invitation_declined` | 초대한 사람 | ○○님이 초대를 거절했어요 | `/teams/:id/members?tab=invitations` |
+| `team_join_application_received` | 팀장·매니저 — **팀별 한 줄** | ○○님이 가입을 신청했어요 → 두 건 이상 `가입 신청 N건이 기다려요` / `"팀명" · ○○님 외 N명 · 승인하거나 거절해 주세요.` | `/teams/:id/members?tab=requests` |
+| `team_invitation_accepted` | 초대한 사람 — **안 읽은 동안 한 줄** | ○○님이 초대를 수락했어요 → `○○님 외 N명이 초대를 수락했어요` / `"팀명" 멤버가 됐어요.` | 팀 상세 |
+| `team_schedule_created` | 활성 멤버(만든 사람 제외) | 새 일정이 올라왔어요 / `"팀명" · 제목 · 10/6 (화) 19:00. 참석 여부를 알려 주세요.` | 일정 상세 |
+| `team_schedule_cancelled` | '불참' 응답자·취소한 본인을 뺀 활성 멤버 + 승인된 용병(공개 일정일 때만) | 일정이 취소됐어요 / `"팀명" · 제목(10/6 (화) 19:00) · 취소 사유` | 일정 상세 |
+| `team_match_application_received` | 호스트 팀 팀장·매니저 | ○○ 팀이 팀매치를 신청했어요 / `"우리 팀명" · 친선 팀매치 · 일시 · 승인하거나 거절해 주세요.` | `/team-matches/:id` |
+| `team_match_lineup_included` | 제출된 친선 참석명단의 선수(지금도 활성 팀원) | 참석명단에 올랐어요 / `"팀명" · vs 상대팀 · 일시 · 장소` | `/team-matches/:id` |
+
+- **몰림 줄**: 가입 신청 줄은 `businessKey` `team-join-pending:{teamId}:{userId}`, 초대 수락 줄은
+  `team-invite-accepted:{teamId}:{inviterId}:{첫 수락 ms}:{invitationId}` 로 찾는다(스키마 변경 없음). 새 건은 줄을 맨 위로
+  올리고(createdAt 갱신) 읽은 줄이면 다시 안 읽음 + 푸시, 안 읽은 동안의 추가분은 문구만 바꾸고 푸시하지 않는다. 가입 신청을
+  처리하면 남은 대기 건수로 지금 팀장·매니저의 줄을 다시 쓰고, 0건이면 줄을 읽음으로 둔다.
+- **참석명단 포함**: 경기·사람당 한 번(`lineup-included:{gameId}:{userId}`) — 다시 제출하면 새로 오른 사람만 받고 빠진 사람에게는
+  보내지 않는다. 킥오프 2시간 안에 제출하면 킥오프 알림 키(`game-kickoff:…`)로 써서 뒤이은 킥오프 알림과 한 건으로 합친다.
+  첫 기록 뒤 늦게 추가된 선수(`POST /team-matches/:id/lineup/late-additions`, 게스트 제외)는 추가할 때 **그 사람에게만** 한 번 간다 —
+  outbox 키 `team-match-lineup-included:{lineupId}:{userId}`, payload `{ lineupId, userId }`(제출본에 원래 있던 선수는 이때 받지 않는다).
+- **발송 경로**: 일정 생성·취소와 참석명단 포함은 같은 트랜잭션의 outbox 행(`SCHEDULE_CREATED_NOTIFICATION`·
+  `SCHEDULE_CANCELLED_NOTIFICATION`·`TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION`)을 게임 운영 워커가 받아 쓴다(실시간 소켓 이벤트 없음 — 목록 polling 으로 보인다).
+- **밤(KST 21~09시)**: 팀(`teamEnabled`)·경기(`teamMatchEnabled`) 사건 알림은 알림함 행만 남기고 푸시하지 않는다(아침에 몰아 보내지도 않음).
+  그 밤이 끝나기(다음 9시) 전에 시작하는 일정·경기에 관한 알림은 밤에도 푸시한다.
+- **참석명단 미제출 안내**(팀장·매니저, `teamEnabled`): 킥오프 2시간 전 알림의 시각이 밤이면 밤이 시작되기 전 마지막 스캔(20:45~21:00)에
+  앞당겨 보내고(본문에 킥오프 일시), 그 뒤에 잡힌 경기면 알림함에만 남긴다. 킥오프 시각이 지나도 미제출이면 `경기 시간이 됐어요 — 참석명단을 제출해 주세요`
+  를 한 번 보낸다(밤이면 알림함만).
 
 ## Delivery Architecture
 

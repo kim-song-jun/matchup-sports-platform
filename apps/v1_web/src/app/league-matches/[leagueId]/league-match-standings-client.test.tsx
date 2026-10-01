@@ -161,12 +161,14 @@ describe('LeagueMatchStandingsClient', () => {
     await waitFor(() => expect(queryImageBySrc(container, '/uploads/teams/seongsu.png')).not.toBeNull());
   });
 
-  it('미확정 경기가 있으면 0경기 순위표와 확인 중 배너가 함께 보인다', async () => {
-    // 실계약: 서버는 결과 확정 전에도 팀당 1행(played=0)을 항상 반환한다 —
-    // "standings 빈 배열 + pendingFixtures 존재"는 서버가 만들 수 없는 상태.
+  it('F45·F46: 한 경기도 안 치렀으면 0경기 순위표·확인 중·동률 안내 대신 참가 팀과 시즌 시작 전 한 줄', async () => {
+    // 실계약: 서버는 결과 확정 전에도 팀당 1행(played=0)을 항상 반환하고, 전원 0점이면 동률 그룹도 준다.
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'],
+        fixtures: [{ teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '망원', status: 'matched' }],
+      },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -177,6 +179,7 @@ describe('LeagueMatchStandingsClient', () => {
           { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
         ],
         pendingFixtures: [{ teamMatchId: 'tm-1', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z' }],
+        tieBreakGroups: [{ teamIds: ['t1', 't2'], teamNames: ['성수 FC', '망원 FC'] }],
       },
     } as never);
     useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
@@ -187,13 +190,16 @@ describe('LeagueMatchStandingsClient', () => {
       </Providers>,
     );
 
-    await waitFor(() => expect(screen.getByText('확인 중')).toBeInTheDocument());
-    // 팀 이름은 이제 순위표와 미확정 경기 목록 양쪽에 나온다 -- 이 테스트가 확인하려는 건
-    // "순위표에 0경기 행이 뜬다"이므로 표 안으로 범위를 좁힌다(다중 매치로 깨지지 않게).
-    const standingsTable = within(screen.getByRole('table'));
-    expect(standingsTable.getByText('성수 FC')).toBeInTheDocument();
-    expect(standingsTable.getByText('망원 FC')).toBeInTheDocument();
-    expect(screen.getByText('— 1경기가 아직 결과 확정 전이에요')).toBeInTheDocument();
+    expect(await screen.findByText('시즌 시작 전')).toBeInTheDocument();
+    expect(screen.getByText(/^첫 경기 .+부터 순위가 생겨요$/)).toBeInTheDocument();
+    expect(screen.getByText('참가 팀')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByText('확인 중')).not.toBeInTheDocument();
+    expect(screen.queryByText(/임의로 정해진/)).not.toBeInTheDocument();
+    // 경기 단계 집계 칩 — 순위표 자리와 일정이 같은 말을 한다.
+    expect(screen.getByText('예정 1')).toBeInTheDocument();
+    expect(screen.getByText('결과 대기 0')).toBeInTheDocument();
+    expect(screen.getByText('종료 0')).toBeInTheDocument();
   });
 
   it('리그 조회가 실패하면 에러 상태와 재시도 버튼을 보여준다', async () => {
@@ -280,6 +286,9 @@ describe('LeagueMatchStandingsClient', () => {
     expect(scheduled?.textContent).toContain('성수 FC');
     expect(scheduled?.textContent).toContain('망원 FC');
     expect(scheduled?.textContent).toContain('예정');
+    // F47 — 리그 대진은 원래 매칭된 경기라 "매칭됨" 배지 없이 경기 단계 칩 하나만, '예정'을 두 번 적지 않는다.
+    expect(scheduled?.textContent).not.toContain('매칭됨');
+    expect(scheduled?.textContent?.match(/예정/g)).toHaveLength(1);
 
     const scored = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-11"]');
     expect(scored?.textContent).toContain('3 : 1');
@@ -324,14 +333,16 @@ describe('LeagueMatchStandingsClient', () => {
   });
 
   /**
-   * [P2] "확인 중" 배너가 21경기를 팀명·날짜로 다시 나열하던 것(바로 아래 "경기 일정"
-   * 섹션과 완전히 중복)을 없앤다 — 배너는 한 줄 요약 + "경기 일정에서 보기" 링크만 남고,
-   * 개별 대진 링크(a[href=".../fixtures/:id"])는 배너 안에서 더 이상 만들어지지 않는다.
+   * 킥오프가 지났는데 결과가 없는 경기가 있으면 "결과 대기" 한 줄 — 미확정 경기를 팀명·날짜로 다시
+   * 나열하지 않고(목록의 주인 자리는 "경기 일정" 섹션 하나) 그리로 보내는 버튼만 둔다.
    */
-  it('미확정 경기 배너는 팀명·날짜를 다시 나열하지 않고 "경기 일정에서 보기" 한 줄로 요약한다', async () => {
+  it('결과 대기 경기가 있으면 그 수를 말하고 "경기 일정에서 보기" 한 줄로 요약한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
-      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'],
+        fixtures: [{ teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T10:00:00.000Z', placeName: '망원', status: 'matched' }],
+      },
     } as never);
     useV1LeagueMatchStandingsMock.mockReturnValue({
       data: {
@@ -341,21 +352,22 @@ describe('LeagueMatchStandingsClient', () => {
           { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
           { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 },
         ],
-        pendingFixtures: [{ teamMatchId: 'tm-1', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z' }],
+        pendingFixtures: [{ teamMatchId: 'tm-1', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T10:00:00.000Z' }],
       },
     } as never);
     useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
 
-    const { container } = render(
+    render(
       <Providers>
         <LeagueMatchStandingsClient leagueId="league-1" />
       </Providers>,
     );
 
-    await waitFor(() => expect(screen.getByText('확인 중')).toBeInTheDocument());
-    // 배너 안에는 더 이상 개별 대진 링크가 없다 — 목록의 주인 자리는 "경기 일정" 섹션 하나다.
-    expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-1"]')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '경기 일정에서 보기' })).toBeInTheDocument();
+    const line = await screen.findByText('킥오프가 지난 1경기의 결과를 기다려요');
+    const box = line.parentElement as HTMLElement;
+    expect(within(box).queryAllByRole('link')).toHaveLength(0);
+    expect(within(box).getByRole('button', { name: '경기 일정에서 보기' })).toBeInTheDocument();
+    expect(within(box).getByText('결과 대기 1')).toBeInTheDocument();
   });
 
   it('취소된 대진은 점수 대신 "집계 제외"로 표시한다', async () => {

@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export type MyUser = {
   /**
    * 공개 프로필(`/users/:id`) 진입에 쓴다. 로딩·에러 중에는 아직 모르므로 `null` 이고,
@@ -131,6 +133,8 @@ export type MyTeam = {
 export type MyTeamsViewModel = {
   teams: MyTeam[];
   summary: Array<{ label: string; value: number | string; unit?: string }>;
+  /** 소속 팀 아래 "해체한 팀"(Task 180 H3) — 스스로 조회하는 섹션이라 노드로 받는다. */
+  dissolvedSection?: ReactNode;
 };
 
 

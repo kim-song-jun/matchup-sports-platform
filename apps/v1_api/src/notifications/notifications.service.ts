@@ -2,6 +2,7 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { isQuietHour, nightPushAllowed } from '../common/quiet-hours';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   NotificationsQueryDto,
@@ -48,10 +49,26 @@ export type NotificationEventType =
   | 'tournament_award_received'
   | 'team_invitation_received'
   | 'team_invitation_accepted'
+  // 팀 역할 변경(Task 180 H1-roles): 바뀐 본인에게, 팀장이 바뀌면 나머지 매니저에게도.
+  | 'team_manager_assigned'
+  | 'team_manager_revoked'
+  | 'team_owner_received'
+  | 'team_owner_changed'
+  // 내보내진 본인에게(이유는 싣지 않는다) — Task 180 H1-removed.
+  | 'team_membership_removed'
+  // 스스로 나간 멤버를 팀장·매니저에게(H1-left). 팀 채팅의 '나갔어요' 줄은 ChatService.recordSystemLine 이 쓴다.
+  | 'team_member_left'
+  // 초대한 사람에게(H1-invite-declined). 이유·다시 초대 권유는 싣지 않는다.
+  | 'team_invitation_declined'
+  // 팀 일정 생성·취소(H1-schedule-*). 워커(jobs/schedule-reminders)가 outbox 로 받아 쓴다 — targetId "${teamId}:${scheduleId}".
+  | 'team_schedule_created'
+  | 'team_schedule_cancelled'
   | 'team_contact_received'
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
+  // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
+  | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
   // once the reminder's outbox row (inserted by TeamSchedulesService.triggerReminder) is claimed.
   // (P1-4 fix: 'schedule_guest_application_received' — the interactive, GuestRecruitmentService-
@@ -97,6 +114,8 @@ export type NotificationEventType =
   // 대회 경기는 targetType 'tournament' + "${tournamentId}:${teamMatchId}", 나머지는 'team_match' + teamMatchId.
   | 'game_day_before_reminder'
   | 'game_kickoff_reminder'
+  // 친선 참석명단에 오른 선수에게(H1-lineup-included). 발송은 워커(jobs/lineup-reminders)가 outbox 로 받아 쓴다.
+  | 'team_match_lineup_included'
   // 내 기록 연결(claim) 승인 요청 (2026-08-26, attest UI C안): 신청이 들어오면 확인자
   // 후보에게 알린다 — 요청이 24시간 뒤 만료되는데 알림 없이는 확인자가 신청 사실
   // 자체를 알 수 없었다. 소스별로 딥링크·게이트가 달라 두 타입으로 나눈다.
@@ -139,12 +158,65 @@ type NotificationPrefField = keyof Pick<
   'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled' | 'importantEnabled'
 >;
 
+/**
+ * 밤(KST 21~9시)에는 알림함에만 쌓고 푸시를 보내지 않는 축 — 팀·팀매치 사건 알림(Task 180 H1-night).
+ * 아침에 몰아 보내지 않는다. 그 밤이 끝나기 전에 시작하는 일정·경기에 관한 알림만 예외로 밤에도 푸시한다.
+ */
+const NIGHT_HELD_PREF_FIELDS: ReadonlySet<NotificationPrefField> = new Set(['teamEnabled', 'teamMatchEnabled']);
+
+/** 팀 멤버십이 바뀐 사건 알림(Task 180 H1). targetType 'team' · targetId teamId · 수신 설정 teamEnabled. */
+const TEAM_MEMBERSHIP_EVENTS: ReadonlySet<NotificationEventType> = new Set([
+  'team_manager_assigned',
+  'team_manager_revoked',
+  'team_owner_received',
+  'team_owner_changed',
+  'team_membership_removed',
+  'team_member_left',
+  'team_invitation_declined',
+]);
+
+/** targetId 가 "${teamId}:${scheduleId}" 인 일정 알림 — 야간 예외 판정에 일정 시작 시각을 읽는다. */
+const SCHEDULE_TARGET_EVENTS: ReadonlySet<NotificationEventType> = new Set([
+  'schedule_rsvp_deadline_reminder',
+  'schedule_guest_recruitment_close_reminder',
+  'team_schedule_created',
+  'team_schedule_cancelled',
+]);
+
+/**
+ * 문구 표(EVENT_TITLES·EVENT_BODIES)의 `{name}` 같은 자리에 들어갈 값. 호출부는 값만 넘기고 문장은 표가 정한다.
+ * 채우지 못한 자리가 남으면 그 알림은 만들지 않는다(`{team}` 이 사용자에게 보이면 안 된다).
+ */
+export type NotificationCopyVars = Readonly<
+  Partial<Record<'name' | 'team' | 'count' | 'others' | 'title' | 'when' | 'reason' | 'matchup', string>>
+>;
+
+export interface NotificationEmitOptions {
+  readonly vars?: NotificationCopyVars;
+}
+
+/** 알림 문구에 넣을 사람 이름 — 화면의 멤버 목록과 같은 우선순위(닉네임 → 표시 이름). */
+export function notificationPersonName(profile: { nickname: string | null; displayName: string | null } | null | undefined): string {
+  return profile?.nickname ?? profile?.displayName ?? '팀원';
+}
+
+export function renderNotificationCopy(template: string, vars: NotificationCopyVars = {}): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const value = vars[key as keyof NotificationCopyVars];
+    if (value === undefined) throw new Error(`notification copy var missing: ${key}`);
+    return value;
+  });
+}
+
 /** Preference field in V1NotificationPreference that gates the event type. */
 function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
   // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
   // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
   if (type === 'inquiry_answered') {
     return 'importantEnabled';
+  }
+  if (type === 'team_dissolved') {
+    return 'teamEnabled';
   }
   if (
     type === 'match_application_received' ||
@@ -158,14 +230,14 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
   ) {
     return 'matchEnabled';
   }
+  if (TEAM_MEMBERSHIP_EVENTS.has(type)) return 'teamEnabled';
   if (
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
-    type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder' ||
+    SCHEDULE_TARGET_EVENTS.has(type) ||
     type === 'team_contact_received' ||
     type === 'team_contact_accepted' ||
     type === 'team_contact_declined'
@@ -186,6 +258,7 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'league_team_match_completed' ||
     type === 'game_day_before_reminder' ||
     type === 'game_kickoff_reminder' ||
+    type === 'team_match_lineup_included' ||
     type === 'team_match_identity_attest_requested' ||
     type === 'team_match_identity_attest_expired' ||
     type === 'team_match_identity_attest_approved' ||
@@ -232,6 +305,9 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (type === 'inquiry_answered') {
     return 'inquiry';
   }
+  if (type === 'team_dissolved') {
+    return 'team';
+  }
   if (
     type === 'match_application_received' ||
     type === 'match_application_approved' ||
@@ -255,13 +331,13 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     return 'chat';
   }
   if (
+    TEAM_MEMBERSHIP_EVENTS.has(type) ||
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
-    type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder'
+    SCHEDULE_TARGET_EVENTS.has(type)
   ) {
     return 'team';
   }
@@ -343,10 +419,11 @@ export function notificationCopyFor(
   type: NotificationEventType,
   targetType: V1NotificationTargetType,
   targetId: string | null,
+  vars?: NotificationCopyVars,
 ): { title: string; defaultBody: string; deepLink: string | null } {
   return {
-    title: EVENT_TITLES[type],
-    defaultBody: EVENT_BODIES[type],
+    title: renderNotificationCopy(EVENT_TITLES[type], vars),
+    defaultBody: renderNotificationCopy(EVENT_BODIES[type], vars),
     deepLink: deepLinkForEvent(type, targetType, targetId),
   };
 }
@@ -360,6 +437,13 @@ function deepLinkForEvent(
   targetId: string | null,
 ): string | null {
   if (type === 'team_join_application_received' && targetId) {
+    return `/teams/${targetId}/members?tab=requests`;
+  }
+  if (type === 'team_invitation_declined' && targetId) {
+    return `/teams/${targetId}/members?tab=invitations`;
+  }
+  // 새 팀장·나간 멤버 알림은 멤버 관리(멤버 탭)로 — 나머지 역할 알림은 기본 팀 상세로 간다.
+  if ((type === 'team_owner_received' || type === 'team_member_left') && targetId) {
     return `/teams/${targetId}/members`;
   }
   // 초대받은 사람이 수락·거절하는 곳은 팀 상세가 아니라 내 초대함이다. targetId 는 팀 id 그대로다.
@@ -408,10 +492,7 @@ function deepLinkForEvent(
   // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
   // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in
   // this service.
-  if (
-    (type === 'schedule_rsvp_deadline_reminder' || type === 'schedule_guest_recruitment_close_reminder') &&
-    targetId
-  ) {
+  if (SCHEDULE_TARGET_EVENTS.has(type) && targetId) {
     const [teamId, scheduleId] = targetId.split(':');
     if (teamId && scheduleId) {
       return `/teams/${teamId}/schedules/${scheduleId}`;
@@ -476,13 +557,13 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_updated: '매치 일정·장소가 변경됐어요',
   match_proceed_confirmed: '매치 진행이 확정됐어요',
   match_completed: '매치가 완료됐어요. 리뷰를 남겨보세요!',
-  team_join_application_received: '팀 가입 신청이 도착했어요',
+  team_join_application_received: '{name}님이 가입을 신청했어요',
   team_join_application_accepted: '팀 가입 신청이 수락됐어요',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요',
   team_contact_received: '새 팀 컨택이 도착했어요',
   team_contact_accepted: '팀 컨택이 수락됐어요',
   team_contact_declined: '팀 컨택이 거절됐어요',
-  team_match_application_received: '팀매치 신청이 도착했어요',
+  team_match_application_received: '{name} 팀이 팀매치를 신청했어요',
   team_match_application_withdrawn: '팀매치 신청이 취소됐어요',
   team_match_application_approved: '팀매치 신청이 승인됐어요',
   team_match_application_rejected: '팀매치 신청이 거절됐어요',
@@ -500,8 +581,18 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_payment_confirmed: '입금이 확인됐어요',
   tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
-  team_invitation_accepted: '팀 초대를 수락했어요',
+  team_invitation_accepted: '{name}님이 초대를 수락했어요',
+  team_manager_assigned: '매니저가 되었어요',
+  team_manager_revoked: '매니저에서 멤버로 바뀌었어요',
+  team_owner_received: '팀장이 되었어요',
+  team_owner_changed: '팀장이 바뀌었어요',
+  team_membership_removed: '팀에서 제외됐어요',
+  team_member_left: '{name}님이 팀을 나갔어요',
+  team_invitation_declined: '{name}님이 초대를 거절했어요',
+  team_schedule_created: '새 일정이 올라왔어요',
+  team_schedule_cancelled: '일정이 취소됐어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
+  team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
   league_fixture_scheduled: '리그 대진이 확정됐어요',
@@ -515,6 +606,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   // 발송 경로가 앞에 "9/30 (수) 01:10 " 을 붙인다 — 자정을 넘긴 경기가 "내일"로 읽히지 않게 날짜를 쓴다.
   game_day_before_reminder: '경기가 있어요',
   game_kickoff_reminder: '2시간 뒤 경기가 시작돼요',
+  team_match_lineup_included: '참석명단에 올랐어요',
   team_match_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   tournament_identity_attest_requested: '기록 연결 승인 요청이 도착했어요',
   team_match_identity_attest_expired: '기록 연결 요청이 만료됐어요',
@@ -541,13 +633,13 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   match_updated: '변경 내용을 확인하고 다시 신청해 주세요.',
   match_proceed_confirmed: '현재 확정 인원으로 진행해요.',
   match_completed: '함께한 매치의 리뷰를 남겨보세요.',
-  team_join_application_received: '팀 가입 신청을 확인해 주세요.',
+  team_join_application_received: '"{team}" · 승인하거나 거절해 주세요.',
   team_join_application_accepted: '팀 가입이 승인됐어요.',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요.',
   team_contact_received: '상대 팀이 보낸 컨택을 확인해 주세요.',
   team_contact_accepted: '이제 상대 팀과 대화할 수 있어요.',
   team_contact_declined: '아쉽지만 이번에는 성사되지 않았어요.',
-  team_match_application_received: '팀매치 신청을 확인해 주세요.',
+  team_match_application_received: '"{team}" · 친선 팀매치 · {when} · 승인하거나 거절해 주세요.',
   team_match_application_withdrawn: '상대팀 신청이 취소됐어요.',
   team_match_application_approved: '팀매치 신청이 승인됐어요.',
   team_match_application_rejected: '팀매치 신청이 거절됐어요.',
@@ -565,8 +657,20 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_payment_confirmed: '운영진 확정을 기다려 주세요.',
   tournament_announcement_published: '공지를 확인해 보세요.',
   team_invitation_received: '팀 초대를 확인해 보세요.',
-  team_invitation_accepted: '팀 초대를 수락했어요.',
+  team_invitation_accepted: '"{team}" 멤버가 됐어요.',
+  team_manager_assigned: '"{team}" · 가입 신청과 팀 일정을 관리할 수 있어요.',
+  team_manager_revoked: '"{team}" · 팀 관리 메뉴는 더 보이지 않아요.',
+  team_owner_received: '"{team}" · 팀장을 넘겨받았어요. 멤버 관리와 팀 정보를 바꿀 수 있어요.',
+  team_owner_changed: '"{team}" · 새 팀장은 {name}님이에요.',
+  // 착지는 권한이 없어도 열리는 공개 팀 상세(기본 경로) — 다시 가입 신청할 수 있다.
+  team_membership_removed: '"{team}" · 이 팀의 일정과 채팅은 더 볼 수 없어요.',
+  team_member_left: '"{team}" · 지금 멤버는 {count}명이에요.',
+  team_invitation_declined: '"{team}" 팀 초대가 거절됐어요.',
+  team_schedule_created: '"{team}" · {title} · {when}. 참석 여부를 알려 주세요.',
+  // 취소 사유는 팀장·매니저가 적은 문장 그대로다.
+  team_schedule_cancelled: '"{team}" · {title}({when}) · {reason}',
   inquiry_answered: '답변 내용을 확인해 주세요.',
+  team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
   league_fixture_scheduled: '리그 대진 일정을 확인해 주세요.',
@@ -580,6 +684,8 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   // 두 경기 전 알림의 본문 끝 문장이다 — 발송 경로가 "vs 상대 · 장소." 뒤에 붙인다.
   game_day_before_reminder: '출전 명단은 경기 전까지 바뀔 수 있어요.',
   game_kickoff_reminder: '지금 출전 명단에 있어요.',
+  // matchup = "vs 상대팀 · 일시 · 장소"(장소는 있을 때만) — 발송 경로가 조립한다.
+  team_match_lineup_included: '"{team}" · {matchup}',
   team_match_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   tournament_identity_attest_requested: '경기 명단의 기록 연결 요청을 24시간 안에 확인해 주세요.',
   team_match_identity_attest_expired: '24시간 안에 확인되지 않아 만료됐어요. 다시 신청할 수 있어요.',
@@ -589,6 +695,49 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_match_identity_attest_rejected: '연결 요청이 거절됐어요. 다시 신청할 수 있어요.',
   tournament_identity_attest_rejected: '연결 요청이 거절됐어요. 다시 신청할 수 있어요.',
 };
+
+/**
+ * 몰림 줄(H1-join-burst)의 두 건 이상 문구. 한 건일 때는 위 표의 문구를 그대로 쓴다.
+ * 가입 신청은 지금 남은 대기 건수, 초대 수락은 그 줄을 안 읽은 동안 쌓인 수락 수다.
+ */
+const BURST_TITLES = {
+  team_join_application_received: '가입 신청 {count}건이 기다려요',
+  team_invitation_accepted: '{name}님 외 {others}명이 초대를 수락했어요',
+} as const satisfies Partial<Record<NotificationEventType, string>>;
+const BURST_BODIES = {
+  team_join_application_received: '"{team}" · {name}님 외 {others}명 · 승인하거나 거절해 주세요.',
+  team_invitation_accepted: '"{team}" 멤버가 됐어요.',
+} as const satisfies Partial<Record<NotificationEventType, string>>;
+
+type BurstEvent = keyof typeof BURST_TITLES;
+
+function burstCopy(type: BurstEvent, count: number, team: string, name: string): { title: string; body: string } {
+  const vars = { team, name, count: String(count), others: String(count - 1) };
+  return count > 1
+    ? { title: renderNotificationCopy(BURST_TITLES[type], vars), body: renderNotificationCopy(BURST_BODIES[type], vars) }
+    : { title: renderNotificationCopy(EVENT_TITLES[type], vars), body: renderNotificationCopy(EVENT_BODIES[type], vars) };
+}
+
+const joinLineKey = (teamId: string, userId: string) => `team-join-pending:${teamId}:${userId}`;
+const acceptedLinePrefix = (teamId: string, inviterUserId: string) => `team-invite-accepted:${teamId}:${inviterUserId}:`;
+
+/**
+ * 같은 줄을 고치는 요청을 트랜잭션 끝까지 한 줄로 세운다. 줄 키가 요청마다 다를 수 있어(초대 수락) 유니크 제약만으로는
+ * 두 요청이 모두 "열린 줄 없음"·"읽은 줄"을 보고 줄이나 푸시를 두 번 만든다. 푸시는 커밋 뒤에 보낸다.
+ */
+function lockNotificationLine(tx: Prisma.TransactionClient, key: string) {
+  return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+}
+
+type DeliveredNotification = {
+  id: string;
+  targetType: V1NotificationTargetType;
+  targetId: string | null;
+  title: string;
+  body: string | null;
+  deepLink: string | null;
+};
+type LineDelivery = { userId: string; notification: DeliveredNotification; push: boolean };
 
 @Injectable()
 export class NotificationsService {
@@ -609,43 +758,49 @@ export class NotificationsService {
     type: NotificationEventType,
     targetId: string | null,
     body?: string,
+    options?: NotificationEmitOptions,
   ): Promise<void> {
-    const targetType = targetTypeForEvent(type);
-    const deepLink = deepLinkForEvent(type, targetType, targetId);
-    const title = EVENT_TITLES[type];
-    const prefField = preferenceFieldForEvent(type);
-
-    this.emitNotificationFireAndForget(
-      userId,
-      targetType,
-      targetId,
-      title,
-      body ?? EVENT_BODIES[type],
-      deepLink,
-      prefField,
-    );
+    this.dispatch([userId], type, targetId, body, options);
   }
 
-  /** 아직 처리 전인 "팀 초대 도착" 알림 — 사용자·팀이 같고 도착지가 초대함이며 읽지 않은 것. */
-  private pendingTeamInvitationNotifications(userId: string, teamId: string) {
+  /**
+   * 그 초대의 아직 처리 전인 "팀 초대 도착" 알림 — 사용자·팀이 같고 도착지가 초대함이며 읽지 않은 것 중 초대가 보내진
+   * 뒤에 만들어진 것. 초대 행은 다시 초대할 때 재사용되므로(팀·사람당 하나) 보낸 시각으로 옛 초대의 알림을 가른다.
+   */
+  private pendingTeamInvitationNotifications(userId: string, teamId: string, sentAt: Date) {
     return {
       recipientUserId: userId,
       targetType: 'team' as const,
       targetId: teamId,
       deepLink: TEAM_INVITATION_INBOX_LINK,
       readAt: null,
+      createdAt: { gte: sentAt },
     };
   }
 
   /**
-   * 초대를 수락·거절하면 그 초대의 도착 알림을 읽음 처리한다 — 처리한 뒤에도 안 읽음으로 남아
-   * 아직 할 일이 있는 것처럼 보이던 문제. 알림 실패는 이미 끝난 수락·거절을 깨지 않는다.
+   * 초대를 수락·거절하면 그 초대의 도착 알림을 결과 문구로 바꾸고 읽음 처리한다 — 그대로 두면 눌러서 들어간 초대함이
+   * 비어 있다. 수락은 팀 상세, 거절은 공개 팀 상세(같은 주소가 비멤버에게는 공개 화면)로 보낸다.
+   * 알림 실패는 이미 끝난 수락·거절을 깨지 않는다.
    */
-  async markTeamInvitationHandled(userId: string, teamId: string): Promise<void> {
+  async markTeamInvitationHandled(input: {
+    userId: string;
+    teamId: string;
+    teamName: string;
+    sentAt: Date;
+    result: 'accepted' | 'declined';
+  }): Promise<void> {
+    const { userId, teamId, teamName, sentAt, result } = input;
     try {
       await this.prisma.v1Notification.updateMany({
-        where: this.pendingTeamInvitationNotifications(userId, teamId),
-        data: { readAt: new Date() },
+        where: this.pendingTeamInvitationNotifications(userId, teamId, sentAt),
+        data: {
+          readAt: new Date(),
+          ...(result === 'accepted'
+            ? { title: '팀 초대를 수락했어요', body: `"${teamName}" 멤버가 됐어요.` }
+            : { title: '팀 초대를 거절했어요', body: `"${teamName}" 팀 초대를 거절했어요.` }),
+          deepLink: `/teams/${teamId}`,
+        },
       });
     } catch (err) {
       this.logger.warn({ userId, teamId, err }, '팀 초대 알림 읽음 처리 실패');
@@ -656,10 +811,10 @@ export class NotificationsService {
    * 초대가 취소되면 받은 사람의 도착 알림을 "취소됐어요"로 바꾸고 읽음 처리한다. 그대로 두면 눌러서
    * 들어간 내 초대함이 "초대가 없어요"만 말한다. 도착지는 초대함 대신 팀 상세로 옮긴다.
    */
-  async markTeamInvitationCancelled(userId: string, teamId: string, teamName: string): Promise<void> {
+  async markTeamInvitationCancelled(userId: string, teamId: string, teamName: string, sentAt: Date): Promise<void> {
     try {
       await this.prisma.v1Notification.updateMany({
-        where: this.pendingTeamInvitationNotifications(userId, teamId),
+        where: this.pendingTeamInvitationNotifications(userId, teamId, sentAt),
         data: {
           readAt: new Date(),
           title: '팀 초대가 취소됐어요',
@@ -680,19 +835,9 @@ export class NotificationsService {
     type: NotificationEventType,
     targetId: string | null,
     body?: string,
+    options?: NotificationEmitOptions,
   ): Promise<void> {
-    if (userIds.length === 0) return;
-    for (const userId of userIds) {
-      this.emitNotificationFireAndForget(
-        userId,
-        targetTypeForEvent(type),
-        targetId,
-        EVENT_TITLES[type],
-        body ?? EVENT_BODIES[type],
-        deepLinkForEvent(type, targetTypeForEvent(type), targetId),
-        preferenceFieldForEvent(type),
-      );
-    }
+    this.dispatch(userIds, type, targetId, body, options);
   }
 
   /**
@@ -705,73 +850,241 @@ export class NotificationsService {
     type: NotificationEventType,
     targetId: string | null,
     body?: string,
+    options?: NotificationEmitOptions,
   ): void {
     void (async () => {
       const userIds = await resolveUserIds();
-      await this.emitNotificationToMany(userIds, type, targetId, body);
+      this.dispatch(userIds, type, targetId, body, options);
     })().catch((e: unknown) => this.logger.warn({ type, err: e }, '알림 발송 실패'));
   }
 
-  private emitNotificationFireAndForget(
-    userId: string,
+  /**
+   * 가입 신청 알림을 팀·받는 사람마다 한 줄로 유지한다(H1-join-burst). 새 신청(arrival)은 그 줄을 맨 위로 올리고,
+   * 읽은 줄이었으면 다시 안 읽음으로 열어 푸시한다 — 안 읽은 동안의 추가분은 문구만 바꾸고 푸시하지 않는다.
+   * 처리(recount)는 남은 건수로 문구를 고치고 0건이면 읽음으로 둔다. 실패해도 가입 신청 처리를 깨지 않는다.
+   */
+  async refreshTeamJoinApplicationsLine(teamId: string, trigger: 'arrival' | 'recount'): Promise<void> {
+    try {
+      const pushAllowed = trigger === 'arrival' && (await this.pushAllowedNow('team_join_application_received', 'team', teamId));
+      const deliveries = await this.prisma.$transaction(async (tx) => {
+        await lockNotificationLine(tx, joinLineKey(teamId, ''));
+        const team = await tx.v1Team.findUnique({ where: { id: teamId }, select: { name: true } });
+        const pendingCount = await tx.v1TeamJoinApplication.count({ where: { teamId, status: 'requested' } });
+        const latest = await tx.v1TeamJoinApplication.findFirst({
+          where: { teamId, status: 'requested' },
+          orderBy: [{ updatedAt: 'desc' }],
+          select: { applicantUser: { select: { profile: { select: { nickname: true, displayName: true } } } } },
+        });
+        const lines: LineDelivery[] = [];
+        if (team === null) return lines;
+        const lineWhere = { targetType: 'team' as const, targetId: teamId, businessKey: { startsWith: joinLineKey(teamId, '') } };
+        if (pendingCount === 0 || latest === null) {
+          await tx.v1Notification.updateMany({ where: { ...lineWhere, readAt: null }, data: { readAt: new Date() } });
+          return lines;
+        }
+        const copy = burstCopy('team_join_application_received', pendingCount, team.name, notificationPersonName(latest.applicantUser.profile));
+        const managers = await tx.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        });
+        if (trigger === 'recount') {
+          // 지금 팀장·매니저의 줄만 고친다 — 역할을 잃은 사람의 옛 줄에 새 신청자 이름을 싣지 않는다.
+          const recipientUserId = { in: managers.map((manager) => manager.userId) };
+          await tx.v1Notification.updateMany({ where: { ...lineWhere, recipientUserId }, data: copy });
+          return lines;
+        }
+        const deepLink = deepLinkForEvent('team_join_application_received', 'team', teamId);
+        for (const { userId } of managers) {
+          if (!(await this.preferenceEnabled(userId, 'teamEnabled', tx))) continue;
+          const businessKey = joinLineKey(teamId, userId);
+          const existing = await tx.v1Notification.findUnique({ where: { businessKey }, select: { id: true, readAt: true } });
+          const notification = existing === null
+            ? await tx.v1Notification.create({ data: { businessKey, recipientUserId: userId, targetType: 'team', targetId: teamId, deepLink, ...copy } })
+            : await tx.v1Notification.update({ where: { id: existing.id }, data: { ...copy, deepLink, readAt: null, createdAt: new Date() } });
+          // 안 읽은 줄에 더해진 신청은 푸시하지 않는다 — 새 줄이거나 읽은 줄을 다시 열 때만.
+          lines.push({ userId, notification, push: pushAllowed && existing?.readAt !== null });
+        }
+        return lines;
+      });
+      for (const { userId, notification, push } of deliveries) this.deliver(userId, notification, push);
+    } catch (err) {
+      this.logger.warn({ teamId, trigger, err }, '가입 신청 알림 줄 갱신 실패');
+    }
+  }
+
+  /**
+   * 초대 수락 알림을 초대한 사람·팀마다 한 줄로 모은다(H1-join-burst). 안 읽은 줄이 있으면 그 줄에 더하고(푸시 없음),
+   * 없으면 새 줄을 열어 푸시한다. 줄의 키에 첫 수락 시각을 박아 두고 그 뒤의 수락만 센다 — 읽은 뒤의 수락은 새 줄이다.
+   */
+  async recordTeamInvitationAccepted(input: {
+    inviterUserId: string;
+    teamId: string;
+    invitationId: string;
+    acceptedAt: Date;
+  }): Promise<void> {
+    const { inviterUserId, teamId, invitationId, acceptedAt } = input;
+    try {
+      if (!(await this.preferenceEnabled(inviterUserId, 'teamEnabled'))) return;
+      const pushAllowed = await this.pushAllowedNow('team_invitation_accepted', 'team', teamId);
+      const prefix = acceptedLinePrefix(teamId, inviterUserId);
+      const delivery = await this.prisma.$transaction(async (tx): Promise<LineDelivery | null> => {
+        await lockNotificationLine(tx, prefix);
+        const team = await tx.v1Team.findUnique({ where: { id: teamId }, select: { name: true } });
+        if (team === null) return null;
+        const open = await tx.v1Notification.findFirst({
+          where: { recipientUserId: inviterUserId, readAt: null, targetType: 'team', targetId: teamId, businessKey: { startsWith: prefix } },
+          orderBy: [{ createdAt: 'desc' }],
+          select: { id: true, businessKey: true },
+        });
+        const invitation = await tx.v1TeamInvitation.findUnique({
+          where: { id: invitationId },
+          select: { invitedUser: { select: { profile: { select: { nickname: true, displayName: true } } } } },
+        });
+        // 잠금을 먼저 잡은 쪽이 더 늦게 수락했을 수 있다 — 줄을 연 시각보다 이른 이 수락도 창에 넣는다.
+        const openedAtMs = open?.businessKey ? Number(open.businessKey.slice(prefix.length).split(':')[0]) : Infinity;
+        const count = await tx.v1TeamInvitation.count({
+          where: { teamId, invitedByUserId: inviterUserId, status: 'accepted', respondedAt: { gte: new Date(Math.min(openedAtMs, acceptedAt.getTime())) } },
+        });
+        const copy = burstCopy('team_invitation_accepted', Math.max(count, 1), team.name, notificationPersonName(invitation?.invitedUser.profile));
+        if (open !== null) {
+          const notification = await tx.v1Notification.update({ where: { id: open.id }, data: { ...copy, createdAt: new Date() } });
+          return { userId: inviterUserId, notification, push: false };
+        }
+        const notification = await tx.v1Notification.create({ data: {
+          businessKey: `${prefix}${acceptedAt.getTime()}:${invitationId}`,
+          recipientUserId: inviterUserId,
+          targetType: 'team',
+          targetId: teamId,
+          deepLink: deepLinkForEvent('team_invitation_accepted', 'team', teamId),
+          ...copy,
+        } });
+        return { userId: inviterUserId, notification, push: pushAllowed };
+      });
+      if (delivery !== null) this.deliver(delivery.userId, delivery.notification, delivery.push);
+    } catch (err) {
+      this.logger.warn({ teamId, inviterUserId, err }, '초대 수락 알림 줄 갱신 실패');
+    }
+  }
+
+  private dispatch(
+    userIds: readonly string[],
+    type: NotificationEventType,
+    targetId: string | null,
+    body: string | undefined,
+    options: NotificationEmitOptions | undefined,
+  ): void {
+    if (userIds.length === 0) return;
+    const targetType = targetTypeForEvent(type);
+    let message: { targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string; deepLink: string | null };
+    try {
+      message = {
+        targetType,
+        targetId,
+        title: renderNotificationCopy(EVENT_TITLES[type], options?.vars),
+        body: body ?? renderNotificationCopy(EVENT_BODIES[type], options?.vars),
+        deepLink: deepLinkForEvent(type, targetType, targetId),
+      };
+    } catch (err) {
+      this.logger.warn({ type, targetId, err }, '알림 문구를 채우지 못해 발송하지 않습니다');
+      return;
+    }
+    const prefField = preferenceFieldForEvent(type);
+    void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
+      for (const userId of userIds) {
+        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed).catch((err: unknown) => {
+          this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
+        });
+      }
+    });
+  }
+
+  /**
+   * 지금 이 알림을 푸시해도 되는가(H1-night). 밤에는 팀·팀매치 사건 알림의 푸시를 보류하되, 그 밤이
+   * 끝나기(다음 9시) 전에 시작하는 일정·경기 알림은 보낸다. 시작 시각을 못 읽으면 보류 쪽으로 둔다 —
+   * 알림함 기록은 어느 쪽이든 남는다.
+   */
+  private async pushAllowedNow(
+    type: NotificationEventType,
     targetType: V1NotificationTargetType,
     targetId: string | null,
-    title: string,
-    body: string | null,
-    deepLink: string | null,
-    prefField: NotificationPrefField,
-  ): void {
-    this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
-      (err: unknown) => {
-        this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
-      },
-    );
+  ): Promise<boolean> {
+    const now = new Date();
+    if (!NIGHT_HELD_PREF_FIELDS.has(preferenceFieldForEvent(type)) || !isQuietHour(now)) return true;
+    try {
+      return nightPushAllowed(now, await this.eventStartsAt(type, targetType, targetId));
+    } catch (err) {
+      this.logger.warn({ type, targetId, err }, '야간 푸시 판정용 시작 시각 조회 실패 — 푸시를 보류합니다');
+      return false;
+    }
+  }
+
+  /** 알림이 가리키는 일정·경기의 시작 시각. 팀매치 알림은 targetId 가 팀매치 id 다(리그 대진 알림은 리그 id 라 null). */
+  private async eventStartsAt(
+    type: NotificationEventType,
+    targetType: V1NotificationTargetType,
+    targetId: string | null,
+  ): Promise<Date | null> {
+    if (targetId === null) return null;
+    const scheduleId = SCHEDULE_TARGET_EVENTS.has(type) ? targetId.split(':')[1] : undefined;
+    if (scheduleId !== undefined) {
+      const schedule = await this.prisma.v1TeamSchedule.findUnique({ where: { id: scheduleId }, select: { startAt: true } });
+      return schedule?.startAt ?? null;
+    }
+    if (targetType !== 'team_match') return null;
+    const teamMatch = await this.prisma.v1TeamMatch.findUnique({ where: { id: targetId }, select: { startAt: true } });
+    return teamMatch?.startAt ?? null;
   }
 
   private async createNotificationWithPrefCheck(
     userId: string,
-    targetType: V1NotificationTargetType,
-    targetId: string | null,
-    title: string,
-    body: string | null,
-    deepLink: string | null,
+    message: {
+      targetType: V1NotificationTargetType;
+      targetId: string | null;
+      title: string;
+      body: string | null;
+      deepLink: string | null;
+    },
     prefField: NotificationPrefField,
+    pushAllowed: boolean,
   ): Promise<void> {
-    const pref = await this.prisma.v1NotificationPreference.findUnique({
+    if (!(await this.preferenceEnabled(userId, prefField))) return;
+    const notification = await this.prisma.v1Notification.create({ data: { recipientUserId: userId, ...message } });
+    this.deliver(userId, notification, pushAllowed);
+  }
+
+  /** 수신 설정 행이 없으면 켜진 것으로 본다. */
+  private async preferenceEnabled(
+    userId: string,
+    prefField: NotificationPrefField,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<boolean> {
+    const pref = await db.v1NotificationPreference.findUnique({
       where: { userId },
       select: { [prefField]: true },
     });
-    // If no preference row, default is enabled (treat as true).
-    const enabled = pref ? (pref as Record<string, boolean>)[prefField] !== false : true;
-    if (!enabled) return;
+    return pref ? (pref as Record<string, boolean>)[prefField] !== false : true;
+  }
 
-    const notification = await this.prisma.v1Notification.create({
-      data: {
-        recipientUserId: userId,
-        targetType,
-        targetId,
-        title,
-        body,
-        deepLink,
-      },
-    });
-
-    // emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의
-    // 시도는 계속되어야 한다(ChatService.sendMessage의 개별 try/catch 격리 패턴과 동일).
-    // realtimeNotifier는 REALTIME_NOTIFIER 포트(realtime-notifier.port.ts)를 통해 주입되며,
-    // 구현체는 호출 측(HTTP 앱 vs 워커)마다 다르다 — 자세한 내용은 그 파일 참조.
+  /**
+   * 이미 저장된 알림 행을 실시간으로 알리고, 허용되면 푸시한다.
+   * emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의 시도는 계속되어야 한다.
+   * realtimeNotifier 구현체는 호출 측(HTTP 앱 vs 워커)마다 다르다 — realtime-notifier.port.ts 참조.
+   */
+  private deliver(userId: string, notification: DeliveredNotification, push: boolean): void {
+    const { targetType, targetId } = notification;
     try {
       this.realtimeNotifier.emitToUser(userId, 'notification:new', notification);
     } catch (err) {
       this.logger.warn({ userId, targetType, targetId, err }, '실시간 알림 전송 실패');
     }
 
+    if (!push) return;
     void this.webPushService
       .sendToUser(userId, {
         notificationId: notification.id,
-        title,
-        body: body ?? undefined,
-        url: deepLink ?? undefined,
+        title: notification.title,
+        body: notification.body ?? undefined,
+        url: notification.deepLink ?? undefined,
       })
       .catch((err: unknown) => {
         this.logger.warn({ userId, targetType, targetId, err }, '푸시 알림 발송 실패');

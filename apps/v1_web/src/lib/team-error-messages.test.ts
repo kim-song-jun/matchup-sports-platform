@@ -12,7 +12,7 @@ describe('teamErrorMessage', () => {
     expect(teamErrorMessage(forbidden, '실패')).toBe('팀장·매니저만 할 수 있어요. 필요하면 팀장에게 알려 주세요.');
 
     const limit = apiError('MANAGER_LIMIT_EXCEEDED', 'Manager count cannot exceed 5');
-    expect(teamErrorMessage(limit, '실패')).toContain('운영진은 최대 5명이에요');
+    expect(teamErrorMessage(limit, '실패')).toContain('매니저는 최대 5명이에요');
   });
 
   it('정원 검증 실패는 현재 팀원 수를 알려 주고, 다른 필드 검증 실패에는 붙지 않는다', () => {

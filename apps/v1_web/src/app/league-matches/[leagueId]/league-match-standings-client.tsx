@@ -21,10 +21,20 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
-import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from '@/lib/league-fixture-meta';
+import { fixtureResultLabel, isUpcomingFixture, type TeamLookupEntry } from '@/lib/league-fixture-meta';
+import {
+  countLeagueFixturePhases,
+  leagueFixtureCountChips,
+  leagueFixturePhase,
+  leagueSeasonStage,
+  leagueSeasonStageLine,
+  leagueStandingsHaveResults,
+  leagueStateChip,
+  matchPhaseChip,
+} from '@/lib/competition-status';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import type {
   V1LeagueChampionTeam,
   V1LeagueFixture,
@@ -45,10 +55,6 @@ const PROMOTION_META: Record<'promoted' | 'relegated' | 'stayed' | 'withdrawn', 
   stayed: { label: '잔류', glyph: '–', className: 'text-[var(--text-muted)]' },
   withdrawn: { label: '불참', glyph: '×', className: 'text-amber-700 dark:text-amber-300' },
 };
-
-// FIXTURE_STATUS_META/fixtureStatusMeta/fixtureResultLabel/isUpcomingFixture 는
-// ./league-fixture-meta.ts 로 이동 — 리그 경기 상세(fixtures/[fixtureId])와 같은
-// 판정을 공유하기 위해서다.
 
 /**
  * 승격/강등/잔류/불참 뱃지 — 열(390px 이상)과 팀명 아래 인라인(390px 미만) 양쪽에서 재사용한다.
@@ -634,19 +640,10 @@ export default function LeagueMatchStandingsClient({
   const hasPromotionForecast = (standings?.promotionForecast ?? null) !== null;
   const showPromotionColumn = hasConfirmedPromotion || hasPromotionForecast;
 
-  // 이슈 4 — "아직 한 경기도 안 치렀다"의 판정 기준. state==='draft' 단일 신호도
-  // 후보였지만, 서버 쪽 "draft→active는 대진 생성 시" 불변식(league-match-public.service.ts
-  // 주석)에 암묵적으로 기대는 대신 순위표 응답 자체가 들고 있는 값으로 직접 판정한다 --
-  // 이 불변식이 나중에 바뀌어도 이 조건은 계속 맞는다.
-  // 두 조건을 모두 걸어야 하는 이유: played 합계 0만 보면 "대진은 이미 잡혔는데 아직
-  // 결과만 확정 안 된" 정상적인 0-0-0 순위표(바로 아래 "확인 중" 배너가 뜨는 상태)까지
-  // 참가팀 목록으로 잘못 바뀐다. pendingFixtures가 함께 비어 있어야 "아예 대진조차
-  // 없다"는 뜻이 된다.
-  const preparingNoGames =
-    standings !== undefined &&
-    standings.standings.length > 0 &&
-    standings.pendingFixtures.length === 0 &&
-    standings.standings.every((row) => row.played === 0);
+  // 한 팀도 치른 경기가 없으면 순위는 동점자 사전순 폴백일 뿐이라 참가 팀 목록을 보여 준다
+  // (대진이 잡혀 있어도 — 옛 0-0-0 순위표 + "확인 중" 상자 조합 대신, F45·F46).
+  const showParticipantList =
+    standings !== undefined && standings.standings.length > 0 && !leagueStandingsHaveResults(standings.standings);
 
   // 이슈 3 — 대진은 항상 startAt 오름차순(과거→미래)으로 온다. 시즌 중반 리그일수록
   // "우리 팀 다음 경기"를 찾으려면 이미 끝난 경기를 여러 개 지나야 한다(alpha 실측).
@@ -656,7 +653,9 @@ export default function LeagueMatchStandingsClient({
   const fixtures = series?.fixtures ?? [];
   const visibleFixtures = showUpcomingOnly ? fixtures.filter(isUpcomingFixture) : fixtures;
   // 오름차순 정렬 전제이므로 필터링된 배열의 첫 항목이 곧 가장 가까운 다음 경기다.
-  const nextUpcomingFixtureId = fixtures.find(isUpcomingFixture)?.teamMatchId ?? null;
+  const nextUpcomingFixture = fixtures.find(isUpcomingFixture) ?? null;
+  const nextUpcomingFixtureId = nextUpcomingFixture?.teamMatchId ?? null;
+  const phaseCounts = countLeagueFixturePhases(fixtures);
 
   // 잘못된 leagueId 딥링크(404 등)는 빈 화면이 아니라 에러 안내 + 재시도로 처리한다.
   if (seriesQuery.isError) {
@@ -680,7 +679,11 @@ export default function LeagueMatchStandingsClient({
     );
   }
 
-  const stateMeta = LEAGUE_STATE_META[series.state];
+  const seasonStage = leagueSeasonStage(series.state, phaseCounts);
+  const stageLine = leagueSeasonStageLine(seasonStage, {
+    counts: phaseCounts,
+    nextStartLabel: nextUpcomingFixture === null ? null : formatTournamentDateTimeShort(nextUpcomingFixture.startAt) ?? null,
+  });
   // 라벨을 모르는 기준은 formatTieBreakRule 이 버리므로 전부 모르면 빈 문자열이 된다 —
   // 그때 "순위 규칙: " 만 남은 줄이 뜨지 않도록 여기서 미리 계산해 줄 자체를 감춘다.
   const tieBreakRule = standings === undefined ? '' : formatTieBreakRule(standings.tieBreakOrder);
@@ -711,7 +714,7 @@ export default function LeagueMatchStandingsClient({
       )}
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h2>
-        <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
+        <StatusChip chip={leagueStateChip(series.state)} size="md" />
       </div>
       <LeagueRegistrationCta
         leagueId={leagueId}
@@ -742,13 +745,12 @@ export default function LeagueMatchStandingsClient({
         <nav aria-label="같은 시리즈의 다른 리그" className="mt-2">
           <ul className="flex flex-wrap gap-2">
             {series.seriesSiblings.map((sibling) => {
-              const siblingStateMeta = LEAGUE_STATE_META[sibling.state];
               return (
                 <li key={sibling.leagueId}>
                   <Link href={withFromPath(`/league-matches/${sibling.leagueId}`, selfHref)} className="tm-chip">
                     {sibling.seasonNo}시즌 · {sibling.tierLabel}
                     {/* 상태를 컬러 뱃지 + 텍스트로 함께 표기 — 컬러만으로 진행 여부를 전달하지 않는다. */}
-                    <span className={`tm-badge tm-badge-sm ${siblingStateMeta.badgeClass}`}>{siblingStateMeta.label}</span>
+                    <StatusChip chip={leagueStateChip(sibling.state)} />
                   </Link>
                 </li>
               );
@@ -761,7 +763,7 @@ export default function LeagueMatchStandingsClient({
       )}
       {/* 감사 H-2 — 승강 슬롯 규칙 요약. 확정 전(promotionForecast != null)에만 뜨고,
           게임을 아직 안 치른 시즌에도 "규칙 자체"는 이미 정해져 있어 계속 보여준다
-          (row별 예상 승강은 preparingNoGames 분기에서 표를 아예 안 그려 자연히 숨는다). */}
+          (row별 예상 승강은 참가 팀 목록 분기에서 표를 아예 안 그려 자연히 숨는다). */}
       {standings?.promotionForecast != null && (
         <p className="mt-1 text-xs text-[var(--text-muted)]">
           {standings.promotionForecast.skippedByMajorityGuard
@@ -772,11 +774,8 @@ export default function LeagueMatchStandingsClient({
 
       <section className="mt-6">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          {/* 이슈 4 — 아직 한 경기도 안 치른 리그는 표 자체가 "참가 팀"으로 바뀌므로
-              제목도 그에 맞춰 바꾼다("순위표"라는 제목 아래 순위 아닌 목록이 뜨면
-              혼란스럽다). */}
           <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
-            {preparingNoGames ? '참가 팀' : '순위표'}
+            {showParticipantList ? '참가 팀' : '순위표'}
           </h2>
           {series.state === 'completed' && <span className="tm-badge tm-badge-sm tm-badge-green">최종 순위</span>}
         </div>
@@ -803,7 +802,7 @@ export default function LeagueMatchStandingsClient({
             cta="경기 일정 보기"
             ctaHref="#league-schedule"
           />
-        ) : preparingNoGames ? (
+        ) : showParticipantList ? (
           <ParticipantTeamList teams={standings.standings} from={selfHref} />
         ) : (
           <>
@@ -917,28 +916,34 @@ export default function LeagueMatchStandingsClient({
           </>
         )}
 
-        {standings !== undefined && standings.pendingFixtures.length > 0 && (
-          <div className="mt-3 rounded-lg bg-[var(--surface-soft)] p-3">
-            <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-              <span aria-hidden="true">•</span>
-              {/* "확인 중"을 별도 텍스트 노드로 둔다 — 뒤에 카운트 문구를 이어붙이면
-                  screen.getByText('확인 중')이 정확히 일치하는 텍스트 노드를 못 찾아
-                  테스트가 항상 실패한다(RTL 기본 매처는 exact match). */}
-              <span className="font-medium text-[var(--text-strong)]">확인 중</span>
-              <span>— {standings.pendingFixtures.length}경기가 아직 결과 확정 전이에요</span>
-            </div>
-            {/* [P2] 미확정 경기를 팀명·날짜로 다시 나열하지 않는다 — 그 목록의 주인 자리는
-                바로 아래 "경기 일정" 섹션 하나다. 여기는 요약 한 줄 + 그 목록으로 보내는
-                링크만 남긴다. 해시 앵커(<a href="#...">)는 히스토리 항목을 남기므로 위
-                scrollToSchedule과 같은 스크롤 전용 button을 쓴다. */}
-            <button
-              type="button"
-              onClick={scrollToSchedule}
-              className="tm-pressable mt-2 flex min-h-[44px] w-full items-center justify-between rounded-lg px-2 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]"
-            >
-              경기 일정에서 보기
-              <ChevronRightIcon size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
+        {/* 시즌 단계 한 줄 + 경기 단계 집계(F45·F46) — 옛 "확인 중" 상자와 0경기 동률 안내를 대신한다. */}
+        {stageLine !== null && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-soft)] p-3 text-xs text-[var(--text-muted)]">
+            <span className="font-semibold text-[var(--text-strong)]">{stageLine.title}</span>
+            {stageLine.text !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{stageLine.text}</span>
+              </>
+            )}
+            {fixtures.length > 0 && (
+              <span className="mt-1 flex w-full flex-wrap gap-2">
+                {leagueFixtureCountChips(phaseCounts).map((chip) => (
+                  <StatusChip key={chip.label} chip={chip} />
+                ))}
+              </span>
+            )}
+            {/* 결과를 기다리는 경기의 자리는 아래 "경기 일정" 하나다 — 해시 앵커 대신 스크롤 전용 버튼. */}
+            {seasonStage === 'awaiting_result' && (
+              <button
+                type="button"
+                onClick={scrollToSchedule}
+                className="tm-pressable mt-1 flex min-h-[44px] w-full items-center justify-between rounded-lg px-2 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]"
+              >
+                경기 일정에서 보기
+                <ChevronRightIcon size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -990,7 +995,7 @@ export default function LeagueMatchStandingsClient({
         ) : (
           <ul className="space-y-2">
             {visibleFixtures.map((fixture) => {
-              const statusMeta = fixtureStatusMeta(fixture.status);
+              const phaseChip = matchPhaseChip(leagueFixturePhase(fixture));
               const result = fixtureResultLabel(fixture);
               const isNextUpcoming = fixture.teamMatchId === nextUpcomingFixtureId;
               return (
@@ -1010,15 +1015,18 @@ export default function LeagueMatchStandingsClient({
                       <span>{formatTournamentDateTimeShort(fixture.startAt) ?? '일정 미정'}</span>
                       <span aria-hidden="true">·</span>
                       <span>{fixture.placeName || '장소 미정'}</span>
-                      <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
+                      {/* 경기 단계 칩 하나 — 리그 대진은 원래 매칭된 경기라 "매칭됨" 배지는 두지 않는다(F47). */}
+                      <StatusChip chip={phaseChip} />
                       {/* 이슈 2(감사 보통) — 몰수 스코어는 "몰수" 뱃지가 붙어도 숫자 자체가
                           bold 로 강조돼 실제 득점(예: 1:0 승리)과 똑같은 무게로 읽혔다.
                           몰수 스코어는 더 이상 굵게 강조하지 않고, 뱃지 옆에 "관례 스코어"임을
                           텍스트로 덧붙인다 — 기존 "몰수" 뱃지(정확히 이 문구를 단언하는
                           테스트가 있다)는 그대로 두고 별도 span으로만 보강한다. */}
-                      <span className={result.hasScore && !result.isForfeit ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-strong)]'}>
-                        {result.text}
-                      </span>
+                      {result.hasScore || result.text !== phaseChip.label ? (
+                        <span className={result.hasScore && !result.isForfeit ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-strong)]'}>
+                          {result.text}
+                        </span>
+                      ) : null}
                       {result.isForfeit ? (
                         <>
                           <span className="tm-badge tm-badge-sm tm-badge-grey">몰수</span>

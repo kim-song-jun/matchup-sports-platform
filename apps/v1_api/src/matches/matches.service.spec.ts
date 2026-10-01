@@ -1259,6 +1259,20 @@ describe('MatchesService — on-hold lifecycle', () => {
     expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress', editable: false });
   });
 
+  it('returns to on hold when the last confirmed guest leaves after the host confirms', async () => {
+    const row = matchRow({ startAt: PAST, endAt: FUTURE, proceedConfirmedAt: new Date() });
+    const { service, db } = makeService(row, 2);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress' });
+    db.v1MatchParticipant.count.mockImplementation(async ({ where }: any) => where.role === 'host' ? 1 : where.role === 'participant' ? 0 : 1);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'on_hold', editable: true });
+  });
+
+  it('rejects cancellation after a confirmed match has begun', async () => {
+    const { service, db } = makeService(matchRow({ startAt: PAST, endAt: FUTURE, proceedConfirmedAt: new Date() }), 3);
+    await expect(service.cancel(host, 'match-1', {})).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(db.v1Match.update).not.toHaveBeenCalled();
+  });
+
   it('confirmation before kickoff is scheduled, not in progress', async () => {
     const { service } = makeService(matchRow({ deadlineAt: PAST }), 3);
     expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'scheduled' });
@@ -1305,6 +1319,22 @@ describe('MatchesService — on-hold lifecycle', () => {
     expect(saved.proceedConfirmedAt).toBeNull();
     expect(active.size).toBe(0);
     expect(applications.map(a => a.status)).toEqual(['withdrawn', 'expired']);
+  });
+
+  it('editing only the description preserves a closed match and its proceed decision', async () => {
+    const confirmedAt = new Date();
+    const row = matchRow({ status: 'closed', proceedConfirmedAt: confirmedAt, deadlineAt: PAST });
+    const { service, db } = makeService(row, 3);
+    db.v1Sport = { findFirst: jest.fn().mockResolvedValue({ id: 'sport-1' }) };
+    db.v1Region = { findFirst: jest.fn().mockResolvedValue({ id: 'region-1' }) };
+    const result = await service.update(host, 'match-1', {
+      sportId: 'sport-1', regionId: 'region-1', title: row.title, description: '설명 수정', manualPlaceName: row.placeName,
+      capacity: row.maxParticipants, startsAt: row.startAt.toISOString(), deadlineAt: PAST.toISOString(),
+      version: row.updatedAt.toISOString(),
+    });
+    expect(result.status).toBe('closed');
+    expect(row.proceedConfirmedAt).toEqual(confirmedAt);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'scheduled' });
   });
 
   it('withdrawn application history still prevents deletion', async () => {

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
+import { StatusChip } from '@/components/v1-ui/status-chip';
+import { ARRIVAL_PENDING_CHIP, arrivalCheckInUsed } from '@/lib/competition-status';
 import { jerseyText } from './player-label';
 
 /**
@@ -131,6 +133,11 @@ export function LineupGrid({
    * 유지"가 유일한 규칙이다.
    */
   const [query, setQuery] = useState('');
+  // 도착 확인을 한 경기에서만 "도착 전"을 가른다(F71). 검인 전 선수도 기록 대상이라 고를 수 있게 둔다 —
+  // 현장에서 검인을 놓친 선수의 득점을 막으면 기록이 틀어진다. 판단은 보이는 팀이 아니라 경기 전체로.
+  const checkInUsed = arrivalCheckInUsed(
+    sides.flatMap((side) => latestLineupForDisplay(lineups, side.id)?.participants ?? []),
+  );
 
   return (
     <div>
@@ -219,38 +226,48 @@ export function LineupGrid({
                 </div>
               ) : (
                 <ul className="flex flex-col gap-2" role="list">
-                  {participants.map((participant) => (
-                    <li key={participant.id}>
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => onSelectPlayer({ sideId: side.id, participant })}
-                        aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록`}
-                        className={[
-                          'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
-                          'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
-                          disabled ? 'cursor-not-allowed opacity-50' : '',
-                        ].join(' ')}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)] text-xs font-bold tabular-nums text-[var(--text-muted)]"
+                  {participants.map((participant) => {
+                    const arrivalPending = checkInUsed && participant.arrivedAt === null;
+                    return (
+                      <li key={participant.id}>
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => onSelectPlayer({ sideId: side.id, participant })}
+                          aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
+                          className={[
+                            'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
+                            'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                            disabled ? 'cursor-not-allowed opacity-50' : '',
+                          ].join(' ')}
                         >
-                          {jerseyText(participant.jerseyNumber)}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-[var(--text-strong)]">
-                            {participant.displayNameSnapshot}
+                          <span
+                            aria-hidden="true"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)] text-xs font-bold tabular-nums text-[var(--text-muted)]"
+                          >
+                            {jerseyText(participant.jerseyNumber)}
                           </span>
-                          {participant.position ? (
-                            <span className="block text-xs text-[var(--text-muted)]">
-                              {participant.position}
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block truncate text-sm font-medium ${arrivalPending ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
+                            >
+                              {participant.displayNameSnapshot}
+                            </span>
+                            {participant.position ? (
+                              <span className="block text-xs text-[var(--text-muted)]">
+                                {participant.position}
+                              </span>
+                            ) : null}
+                          </span>
+                          {arrivalPending ? (
+                            <span className="shrink-0">
+                              <StatusChip chip={ARRIVAL_PENDING_CHIP} />
                             </span>
                           ) : null}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>

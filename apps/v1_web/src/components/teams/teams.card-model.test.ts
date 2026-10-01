@@ -3,7 +3,7 @@
  * 서버 프리렌더가 이 함수를 마스터 종목 없이도 호출하므로 두 경로를 모두 고정한다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildTeamSportChips, toTeam } from './teams.card-model';
+import { buildTeamSportChips, formatTeamRegion, toTeam } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
 import type { V1Sport, V1Team } from '@/types/api';
 
@@ -68,7 +68,6 @@ describe('buildTeamSportChips', () => {
  * 모르는 것을 문장으로 만들지 않는다.
  */
 describe('toTeam — 소개문', () => {
-  const base = getTeamListViewModel().teams[0];
   // `as never` 로 캐스팅하면 타입 검사가 통째로 꺼져 `toTeam` 이 실제로 읽는 필드가 빠져도
   // 컴파일러가 못 잡는다(#1105 Copilot). 같은 파일 위쪽과 같은 `Partial<T>` → `T` 패턴을 쓴다.
   const api = (over: Partial<V1Team>): V1Team => ({
@@ -77,13 +76,25 @@ describe('toTeam — 소개문', () => {
   } as unknown as V1Team);
 
   it('서버가 소개를 안 주면 빈 문자열이다 — 지역·종목으로 문장을 만들지 않는다', () => {
-    const intro = toTeam(api({}), base).intro;
+    const intro = toTeam(api({})).intro;
 
     expect(intro).toBe('');
     expect(intro).not.toMatch(/에서 활동하는/);
   });
 
   it('서버가 준 소개는 그대로 쓴다', () => {
-    expect(toTeam(api({ introductionPreview: '매주 토요일에 모여요' }), base).intro).toBe('매주 토요일에 모여요');
+    expect(toTeam(api({ introductionPreview: '매주 토요일에 모여요' })).intro).toBe('매주 토요일에 모여요');
+  });
+});
+
+// G12(F20): "경기 전체"는 종목 앱에서 "경기(시합) 전체"로 읽힌다 — 시/도 전체만 정식 이름으로 푼다.
+describe('formatTeamRegion — 시/도 전체 표기', () => {
+  it('경기 시/도 전체는 "경기도 전체"로 쓴다', () => {
+    expect(formatTeamRegion({ name: '경기', parentName: null })).toBe('경기도 전체');
+  });
+
+  it('다른 시/도와 구/군 표기는 그대로다', () => {
+    expect(formatTeamRegion({ name: '서울', parentName: null })).toBe('서울 전체');
+    expect(formatTeamRegion({ name: '수원시', parentName: '경기' })).toBe('경기 수원시');
   });
 });

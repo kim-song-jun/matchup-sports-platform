@@ -102,6 +102,8 @@ export class TeamMatchRecordService {
       name: participant.displayNameSnapshot,
       jerseyNumber: participant.jerseyNumber,
       profileImageUrl: imageByUserId.get(userIdByParticipant.get(participant.id) ?? '') ?? null,
+      // 계정이 없는 출전자 — 개인 기록에 남지 않으므로 화면이 "게스트"로 구분한다(L22).
+      guest: !userIdByParticipant.has(participant.id),
     }));
   }
 
@@ -132,9 +134,38 @@ export class TeamMatchRecordService {
       select: { participantId: true },
     });
     const entries = roster.filter((p) => p.userId === user.id || (!p.userId && links.some((link) => link.participantId === p.id)));
-    if (entries.length === 1) return { ...entries[0], operator: false as const, adminId: null };
+    if (entries.length === 1) return { ...entries[0], operator: false as const, teamAuthority: false, adminId: null };
+    if (entries.length === 0) {
+      const captain = await this.teamAuthorityActor(tx, game, user.id);
+      if (captain) return captain;
+    }
     const admin = await platformMatchOperator(tx, user, game.teamMatch!);
-    return admin ? { sideId: null, displayNameSnapshot: 'Teameet 운영', operator: true as const, adminId: admin.id } : null;
+    return admin ? { sideId: null, displayNameSnapshot: 'Teameet 운영', operator: true as const, teamAuthority: false, adminId: admin.id } : null;
+  }
+
+  /**
+   * 명단 밖 팀장·매니저도 자기 팀 쪽으로 기록·종료 확인을 한다(H5 결정 A) — 감독처럼 안 뛰는 사람을
+   * 출전으로 넣지 않게. 이력 이름에 "팀장 권한"을 붙인다. 양 팀 모두 관리하면 어느 쪽인지 모르니 주지 않는다.
+   * **친선만** — 대회·리그는 참가팀이 결과를 만들거나 확인하지 않는다(정본 §4, 403 유지).
+   */
+  private async teamAuthorityActor(tx: Tx, game: Loaded, userId: string) {
+    if (game.teamMatch!.leagueId || game.teamMatch!.tournamentId) return null;
+    const teamIds = game.sides.flatMap((side) => (side.teamId ? [side.teamId] : []));
+    const memberships = await tx.v1TeamMembership.findMany({
+      where: { userId, teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { teamId: true, user: { select: { profile: { select: { nickname: true, displayName: true } } } } },
+    });
+    const sides = game.sides.filter((side) => memberships.some((membership) => membership.teamId === side.teamId));
+    if (sides.length !== 1) return null;
+    const profile = memberships[0].user.profile;
+    const name = profile?.nickname || profile?.displayName || '팀원';
+    return {
+      sideId: sides[0].id,
+      displayNameSnapshot: `${name} · 팀장 권한`,
+      operator: false as const,
+      teamAuthority: true,
+      adminId: null,
+    };
   }
 
   /**
@@ -219,7 +250,7 @@ export class TeamMatchRecordService {
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
-      canEdit: !!actor && phase === 'live' && readiness.lineupReady, participant: !!actor && !actor.operator, operator: actor?.operator ?? false, ownSideId,
+      canEdit: !!actor && phase === 'live' && readiness.lineupReady, participant: !!actor && !actor.operator, operator: actor?.operator ?? false, teamAuthority: actor?.teamAuthority ?? false, ownSideId,
       ...readiness,
       sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
@@ -241,7 +272,7 @@ export class TeamMatchRecordService {
         throw conflict('ROSTER_INCOMPLETE', '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.');
       }
       const actor = await this.actor(tx, game, user);
-      if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자와 플랫폼 주관 경기의 운영자만 기록할 수 있어요.' });
+      if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 참석명단 참가자와 팀장·매니저, 플랫폼 주관 경기의 운영자만 기록할 수 있어요.' });
       if (actor.operator && (dto.action === 'confirm' || dto.action === 'reopen')) {
         throw new ForbiddenException({ code: 'TEAM_CONFIRMATION_REQUIRED', message: '경기 종료 확인은 양 팀 참가자가 직접 진행해 주세요.' });
       }

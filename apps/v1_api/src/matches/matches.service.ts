@@ -667,8 +667,8 @@ export class MatchesService {
       const updated = await tx.v1Match.update({
         where: { id: match.id },
         data: {
-          status: 'recruiting',
-          proceedConfirmedAt: null,
+          status: requiresReconfirmation ? 'recruiting' : current.status,
+          proceedConfirmedAt: requiresReconfirmation ? null : current.proceedConfirmedAt,
           sportId: dto.sportId,
           regionId: dto.regionId,
           title: dto.title,
@@ -720,7 +720,7 @@ export class MatchesService {
         });
       }
 
-      await tx.v1StatusChangeLog.create({ data: { targetType: 'match', targetId: match.id, fromStatus: current.status, toStatus: 'recruiting', actorType: 'user', actorUserId: user.id, reason: requiresReconfirmation ? 'schedule_or_place_changed_reapply_required' : 'host_updated' } });
+      await tx.v1StatusChangeLog.create({ data: { targetType: 'match', targetId: match.id, fromStatus: current.status, toStatus: updated.status, actorType: 'user', actorUserId: user.id, reason: requiresReconfirmation ? 'schedule_or_place_changed_reapply_required' : 'host_updated' } });
       return { updated, hostParticipant, recipients };
     });
     const { updated, hostParticipant } = result;
@@ -757,6 +757,13 @@ export class MatchesService {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
       const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
       if (!current || !['recruiting', 'closed'].includes(current.status)) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
+      const [participantCount, activeHostParticipantCount] = await Promise.all([
+        this.getActiveParticipantCount(match.id, tx, true),
+        this.getActiveHostParticipantCount(match.id, user.id, tx),
+      ]);
+      if (['in_progress', 'completion_pending'].includes(this.getApiStatus(current, participantCount, activeHostParticipantCount))) {
+        throw stateConflict('진행 중이거나 종료 확인 중인 매치는 취소할 수 없어요.');
+      }
       await tx.v1Match.update({
         where: { id: match.id },
         data: {
@@ -1594,7 +1601,7 @@ export class MatchesService {
   private getApiStatus(match: V1Match, participantCount: number, hostParticipantCount = 0) {
     if (!['recruiting', 'closed'].includes(match.status)) return match.status;
     const count = participantCount;
-    const canProceed = (Boolean(match.proceedConfirmedAt) && match.startAt <= new Date()) || count > hostParticipantCount && (Boolean(match.proceedConfirmedAt) || count >= match.maxParticipants);
+    const canProceed = count > hostParticipantCount && (Boolean(match.proceedConfirmedAt) || count >= match.maxParticipants);
     if (match.startAt <= new Date()) return canProceed ? ((match.endAt ?? match.startAt) <= new Date() ? 'completion_pending' : 'in_progress') : 'on_hold';
     if (match.proceedConfirmedAt && count > hostParticipantCount) return 'scheduled';
     if ((match.deadlineAt && match.deadlineAt <= new Date()) && !canProceed) return 'on_hold';

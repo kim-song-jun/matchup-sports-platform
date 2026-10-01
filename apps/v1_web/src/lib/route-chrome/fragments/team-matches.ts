@@ -72,6 +72,16 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
       desktopHead: true,
     },
   },
+  // 상대 참석명단(H5 D-2) — 공개 뒤 읽기 전용. 입구가 팀매치 상세의 참석명단 카드라 그리로 돌아간다.
+  {
+    pattern: '/team-matches/:id/lineup/opponent',
+    chrome: {
+      title: '상대 참석명단',
+      bottomNav: false,
+      backHref: (p) => `/team-matches/${p.id}`,
+      desktopHead: true,
+    },
+  },
   // 공동 경기 기록 — team-match-shared-record.tsx. 이 엔트리가 없으면 세그먼트 수가 같은
   // /team-matches/:id/lineup 등에 걸리지 않고 아예 매치되는 표 행이 없어 resolveRouteChrome이
   // null을 반환한다 — 앱 셸(뒤로가기·홈·알림·하단 내비) 전체가 빠지는 것도 그래서다

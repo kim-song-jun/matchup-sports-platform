@@ -4,8 +4,22 @@ import type { CompetitionRosterCheck, LineupTodo, LineupTodoService } from '../.
 import type { WebPushService } from '../../notifications/web-push.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
-import { collectAttendeeReminderRows, type ReminderRow } from './game-attendee-reminders';
-import { isQuietHour, kstMidnight, kstParts } from './quiet-hours';
+import {
+  collectAttendeeReminderRows,
+  KICKOFF_REMINDER_LEAD_MS,
+  kickoffReminderKey,
+  type ReminderRow,
+} from './game-attendee-reminders';
+import { formatKstMonthDayTime } from '../../common/kst-datetime';
+import {
+  isEveningCutoffScan,
+  isQuietHour,
+  kstMidnight,
+  kstParts,
+  nightPushAllowed,
+  quietHoursEndAfter,
+} from '../../common/quiet-hours';
+import { notificationCopyFor } from '../../notifications/notifications.service';
 
 const deliveryLogger = new Logger('LineupReminderDelivery');
 
@@ -15,6 +29,9 @@ const SCAN_INTERVAL_MS = 15 * 60 * 1000;
 
 /** 최종 확인 알림을 보내는 창 — 킥오프 2시간 전부터 킥오프까지. */
 const FINAL_REMINDER_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** 킥오프가 지난 미제출 안내(Task 180 H5) 창 — 스캔이 15분 주기라 30분이면 스캔 하나를 놓쳐도 다음 스캔이 보낸다. */
+const KICKOFF_MISSING_WINDOW_MS = 30 * 60 * 1000;
 
 export const LINEUP_REMINDER_SCAN_TYPE = 'LINEUP_REMINDER_SCAN';
 
@@ -77,22 +94,30 @@ export class LineupReminderService {
   };
 
   private async runScan(tx: Prisma.TransactionClient, now: Date, claim: GameOperationClaim): Promise<void> {
-    // 야간에는 아무것도 보내지 않는다. 다음 스캔 예약은 scanHandler에서 스캔 전에 이미
-    // 커밋됐으므로 아침 9시 이후 첫 스캔이 그날치를 보낸다.
-    if (isQuietHour(now)) return;
+    const quiet = isQuietHour(now);
+    // 킥오프가 막 지난 경기까지 모은다 — 킥오프 시각 미제출 안내가 그 경기를 본다.
+    const todos = await this.todoService.listAllPending(new Date(now.getTime() - KICKOFF_MISSING_WINDOW_MS));
+    const upcoming = todos.filter((todo) => todo.scheduledAt === null || todo.scheduledAt >= now);
+    const started = todos.filter((todo) => todo.scheduledAt !== null && todo.scheduledAt < now);
 
-    const todos = await this.todoService.listAllPending(now);
-    const rosterChecks = await this.todoService.listCompetitionRosterChecks(kstMidnight(now, 1), kstMidnight(now, 2));
-
-    const { dateKey } = kstParts(now);
-    const messages = [
-      ...buildDailyMessages(todos, dateKey),
-      ...buildFinalMessages(todos, now),
-      ...buildRosterCheckMessages(rosterChecks),
+    // 킥오프가 코앞인 미제출 안내는 밤에도 알림함에 남기고 푸시만 낮에 한다(L35). 2시간 전 시각이 밤에 걸리는 경기는
+    // 밤이 시작되기 전 마지막 스캔이 앞당겨 푸시한다 — 이후 밤 스캔은 같은 키라 다시 만들지 않는다.
+    const urgent = [
+      ...buildFinalMessages(upcoming, now),
+      ...(isEveningCutoffScan(now) ? buildOvernightFinalMessages(upcoming, now) : []),
+      ...buildKickoffMissingMessages(started, now),
     ];
+    for (const message of urgent) {
+      await this.deliver(tx, message, claim, !quiet);
+    }
+    // 나머지는 야간에 보내지 않는다. 다음 스캔 예약은 scanHandler에서 스캔 전에 이미
+    // 커밋됐으므로 아침 9시 이후 첫 스캔이 그날치를 보낸다.
+    if (quiet) return;
 
-    for (const message of messages) {
-      await this.deliver(tx, message, claim);
+    const rosterChecks = await this.todoService.listCompetitionRosterChecks(kstMidnight(now, 1), kstMidnight(now, 2));
+    const { dateKey } = kstParts(now);
+    for (const message of [...buildDailyMessages(upcoming, dateKey), ...buildRosterCheckMessages(rosterChecks)]) {
+      await this.deliver(tx, message, claim, true);
     }
     // 경기 알림은 "경기·대회" 수신 설정(teamMatchEnabled)을 따른다 — 위 팀 운영 알림(teamEnabled)과 축이 다르다.
     await deliverReminderRows(tx, await collectAttendeeReminderRows(tx, now), {
@@ -107,6 +132,7 @@ export class LineupReminderService {
     tx: Prisma.TransactionClient,
     message: ReminderMessage & { teamId: string },
     claim: GameOperationClaim,
+    push: boolean,
   ): Promise<void> {
     const managers = await tx.v1TeamMembership.findMany({
       where: { teamId: message.teamId, status: 'active', role: { in: ['owner', 'manager'] } },
@@ -121,8 +147,87 @@ export class LineupReminderService {
       deepLink: message.deepLink,
       businessKey: `${message.keyPrefix}:${userId}`,
     }));
-    await deliverReminderRows(tx, rows, { prefField: 'teamEnabled', webPush: this.webPush, claim });
+    await deliverReminderRows(tx, rows, { prefField: 'teamEnabled', webPush: this.webPush, claim, push });
   }
+
+  /**
+   * 친선 참석명단 제출(H1-lineup-included) — 제출된 리비전의 선수 중 지금도 팀 활성 멤버인 사람에게 '참석명단에 올랐어요'.
+   * 경기·사람당 한 번이라 다시 제출하면 새로 오른 사람만 받고, 빠진 사람에게는 보내지 않는다. 킥오프 2시간 안의
+   * 제출은 킥오프 알림의 키로 써서 뒤이은 스캔이 같은 사람에게 킥오프 알림을 또 보내지 않는다(한 건만).
+   * payload 에 userId 가 있으면(첫 기록 뒤 늦게 추가 — H5) 그 사람만 본다.
+   */
+  readonly lineupIncludedHandler: GameOperationHandler = async (claim, tx) => {
+    const { lineupId, addedUserId } = lineupNoticeOf(claim.payload);
+    const lineup = await tx.v1GameLineup.findUnique({
+      where: { id: lineupId },
+      select: { id: true, gameId: true, sideId: true, state: true, invalidatedAt: true },
+    });
+    if (lineup === null || lineup.state === 'DRAFT' || lineup.invalidatedAt !== null) return;
+    const side = await tx.v1GameSide.findUnique({ where: { id: lineup.sideId }, select: { teamId: true } });
+    const match = await tx.v1TeamMatch.findFirst({
+      where: { game: { is: { id: lineup.gameId } }, status: 'matched', deletedAt: null, leagueId: null, tournamentId: null },
+      select: {
+        id: true,
+        startAt: true,
+        placeName: true,
+        hostTeamId: true,
+        hostTeam: { select: { name: true } },
+        approvedApplicantTeam: { select: { name: true } },
+      },
+    });
+    const teamId = side?.teamId ?? null;
+    if (match === null || match.startAt === null || teamId === null || match.hostTeam === null || match.approvedApplicantTeam === null) return;
+    const [ownTeam, opponent] = teamId === match.hostTeamId ? [match.hostTeam, match.approvedApplicantTeam] : [match.approvedApplicantTeam, match.hostTeam];
+
+    const listed = await tx.v1GameParticipant.findMany({ where: { lineupId, userId: addedUserId ?? { not: null } }, select: { userId: true } });
+    const members = await tx.v1TeamMembership.findMany({
+      where: { teamId, status: 'active', userId: { in: listed.flatMap((row) => (row.userId === null ? [] : [row.userId])) } },
+      select: { userId: true },
+    });
+    const now = new Date();
+    const startAt = match.startAt;
+    const includedKey = (userId: string) => `lineup-included:${lineup.gameId}:${userId}`;
+    const alreadyNotified = new Set(
+      (
+        await tx.v1Notification.findMany({
+          where: { businessKey: { in: members.flatMap(({ userId }) => [includedKey(userId), kickoffReminderKey(lineup.gameId, startAt, userId)]) } },
+          select: { businessKey: true },
+        })
+      ).map((row) => row.businessKey),
+    );
+    const withinKickoffLead = now.getTime() >= startAt.getTime() - KICKOFF_REMINDER_LEAD_MS;
+    const place = match.placeName === null ? '' : ` · ${match.placeName}`;
+    const copy = notificationCopyFor('team_match_lineup_included', 'team_match', match.id, {
+      team: ownTeam.name,
+      matchup: `vs ${opponent.name} · ${formatKstMonthDayTime(startAt)}${place}`,
+    });
+    const rows: ReminderRow[] = members
+      .filter(({ userId }) => !alreadyNotified.has(includedKey(userId)) && !alreadyNotified.has(kickoffReminderKey(lineup.gameId, startAt, userId)))
+      .map(({ userId }) => ({
+        userId,
+        targetType: 'team_match',
+        targetId: match.id,
+        title: copy.title,
+        body: copy.defaultBody,
+        deepLink: copy.deepLink,
+        businessKey: withinKickoffLead ? kickoffReminderKey(lineup.gameId, startAt, userId) : includedKey(userId),
+      }));
+    await deliverReminderRows(tx, rows, {
+      prefField: 'teamMatchEnabled',
+      webPush: this.webPush,
+      claim,
+      push: nightPushAllowed(now, startAt),
+    });
+  };
+}
+
+function lineupNoticeOf(payload: unknown): { lineupId: string; addedUserId: string | undefined } {
+  const value = typeof payload === 'object' && payload !== null ? (payload as { lineupId?: unknown; userId?: unknown }) : {};
+  if (typeof value.lineupId !== 'string' || value.lineupId.length === 0) throw new Error('Lineup included notice payload requires lineupId');
+  if (value.userId !== undefined && (typeof value.userId !== 'string' || value.userId.length === 0)) {
+    throw new Error('Lineup included notice payload userId must be a non-empty string');
+  }
+  return { lineupId: value.lineupId, addedUserId: value.userId };
 }
 
 /**
@@ -134,7 +239,7 @@ export class LineupReminderService {
 export async function deliverReminderRows(
   tx: Prisma.TransactionClient,
   rows: readonly ReminderRow[],
-  options: { prefField: 'teamEnabled' | 'teamMatchEnabled'; webPush?: WebPushService; claim?: GameOperationClaim },
+  options: { prefField: 'teamEnabled' | 'teamMatchEnabled'; webPush?: WebPushService; claim?: GameOperationClaim; push?: boolean },
 ): Promise<void> {
   if (rows.length === 0) return;
   const preferences = await tx.v1NotificationPreference.findMany({
@@ -164,6 +269,8 @@ export async function deliverReminderRows(
     skipDuplicates: true,
   });
 
+  // push=false 는 밤에 보류한 알림 — 알림함 행은 위에서 이미 남겼다(H1-night).
+  if (options.push === false) return;
   for (const row of enabled.filter((candidate) => !deliveredKeys.has(candidate.businessKey))) {
     const send = () =>
       void options.webPush
@@ -229,6 +336,54 @@ export function buildFinalMessages(
       // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
       keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
     }));
+}
+
+/**
+ * 킥오프 2시간 전 시각이 밤(KST 21~9시)에 걸려 그 창에서는 푸시할 수 없는 경기 — 밤이 시작되기 전 마지막 스캔이
+ * 최종 확인을 앞당겨 보낸다(Task 180 L35). 시각이 "곧"이 아니므로 본문에 킥오프 일시를 붙인다. 키는 최종 확인과 같다.
+ */
+export function buildOvernightFinalMessages(
+  todos: LineupTodo[],
+  now: Date,
+): Array<ReminderMessage & { teamId: string }> {
+  const nightEnd = quietHoursEndAfter(now).getTime();
+  return todos.flatMap((todo) => {
+    const startAt = todo.scheduledAt;
+    if (startAt === null) return [];
+    const reminderAt = startAt.getTime() - FINAL_REMINDER_WINDOW_MS;
+    if (reminderAt <= now.getTime() || reminderAt >= nightEnd) return [];
+    return [{
+      teamId: todo.teamId,
+      targetId: todo.teamId,
+      title: '곧 경기가 시작돼요 — 참석명단을 확인해 주세요',
+      body: `${formatKstMonthDayTime(startAt)} ${todo.title} 참석명단이 ${todo.state === 'MISSING' ? '아직 비어 있어요' : '아직 제출 전이에요'}.`,
+      deepLink: todo.deepLink,
+      keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
+    }];
+  });
+}
+
+/**
+ * 킥오프 시각이 지났는데 아직 참석명단을 안 낸 팀의 팀장·매니저에게 한 번(Task 180 H5) — 양 팀 명단이 모두 제출돼야
+ * 기록을 시작할 수 있다. 경기 일정마다 한 번이라 키에 킥오프 시각을 넣는다.
+ */
+export function buildKickoffMissingMessages(
+  todos: LineupTodo[],
+  now: Date,
+): Array<ReminderMessage & { teamId: string }> {
+  return todos.flatMap((todo) => {
+    const startAt = todo.scheduledAt;
+    if (startAt === null || startAt > now || now.getTime() - startAt.getTime() >= KICKOFF_MISSING_WINDOW_MS) return [];
+    const opponent = todo.opponentName !== null ? ` vs ${todo.opponentName}` : '';
+    return [{
+      teamId: todo.teamId,
+      targetId: todo.teamId,
+      title: '경기 시간이 됐어요 — 참석명단을 제출해 주세요',
+      body: `${todo.title}${opponent} · 참석명단을 내야 경기 기록을 시작할 수 있어요.`,
+      deepLink: todo.deepLink,
+      keyPrefix: `lineup-kickoff-missing:${todo.gameId}:${todo.teamId}:${startAt.getTime()}`,
+    }];
+  });
 }
 
 /**

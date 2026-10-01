@@ -3,7 +3,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { compressImagesForUpload } from '@/lib/image-compress';
+import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compress';
 import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
@@ -144,9 +144,14 @@ import type {
   V1Sport,
   V1Team,
   V1TeamDetail,
+  V1TeamDissolutionPreview,
+  V1DissolveTeamResult,
+  V1RestoreTeamResult,
+  V1MyDissolvedTeams,
   V1TeamJoinApplicationResult,
   V1TeamJoinApplicationsPage,
   V1TeamJoinEligibility,
+  V1TeamNameAvailability,
   V1TeamMembersPage,
   V1TeamMembershipMutationResult,
   V1TeamMatch,
@@ -160,6 +165,9 @@ import type {
   V1TeamMatchLineupSavePayload,
   V1TeamMatchLineupSaveResult,
   V1TeamMatchLineupSubmitResult,
+  V1TeamMatchLateAdditionPayload,
+  V1TeamMatchLateAdditionResult,
+  V1TeamMatchOpponentLineup,
   V1TeamMatchMutationPayload,
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
@@ -1108,6 +1116,16 @@ export function useV1TeamJoinEligibility(teamId: string, options?: { enabled?: b
   });
 }
 
+/** 팀 만들기·수정 입력 중 이름 확인. null 이면 묻지 않는다. */
+export function useV1TeamNameAvailability(params: { name: string; sportId: string; regionId: string; excludeTeamId?: string } | null) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'team-name-availability', params] as const,
+    queryFn: () => v1Get<V1TeamNameAvailability>('/teams/name-availability', params ?? undefined),
+    enabled: params !== null,
+    retry: false,
+  });
+}
+
 /**
  * 가입 신청/철회 후 다시 읽어야 하는 쿼리들.
  *
@@ -1249,6 +1267,49 @@ export function useV1LeaveTeam(teamId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
+  });
+}
+
+// ── Team dissolution (Task 180 H3) — 팀장 전용 해체(보관)·30일 복구 ─────────────
+export function useV1TeamDissolutionPreview(teamId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamDissolutionPreview(teamId),
+    queryFn: () => v1Get<V1TeamDissolutionPreview>(`/teams/${teamId}/dissolution-preview`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+  });
+}
+
+/** 해체·복구 뒤 팀이 목록·내 팀·해체한 팀·팀매치(자동 취소)·채팅방(보관/재개)에서 바뀐다. */
+function invalidateTeamLifecycleCaches(queryClient: QueryClient) {
+  // teamsAll 이 이 팀의 상세·멤버·해체 점검까지 덮는다.
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamsAll() });
+  queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
+  queryClient.invalidateQueries({ queryKey: v1Keys.myDissolvedTeams() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamMatchesAll() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+}
+
+export function useV1DissolveTeam(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { confirmTeamName: string }) => v1Post<V1DissolveTeamResult>(`/teams/${teamId}/dissolve`, body),
+    onSuccess: () => invalidateTeamLifecycleCaches(queryClient),
+  });
+}
+
+export function useV1RestoreTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId }: { teamId: string }) => v1Post<V1RestoreTeamResult>(`/teams/${teamId}/restore`, {}),
+    onSuccess: () => invalidateTeamLifecycleCaches(queryClient),
+  });
+}
+
+export function useV1MyDissolvedTeams(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.myDissolvedTeams(),
+    queryFn: () => v1Get<V1MyDissolvedTeams>('/me/dissolved-teams'),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -1806,6 +1867,31 @@ export function useV1TeamMatchLineup(teamMatchId: string, options?: { enabled?: 
   });
 }
 
+/** 상대 참석명단(공개 뒤 번호·이름만). 공개 전 403·미제출 404 는 재시도해도 같은 답이다. */
+export function useV1TeamMatchOpponentLineup(teamMatchId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup', 'opponent'] as const,
+    queryFn: () => v1Get<V1TeamMatchOpponentLineup>(`/team-matches/${teamMatchId}/lineup/opponent`),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+/** 첫 기록 뒤 늦게 온 선수 추가 — 성공하면 참석명단과 공동 기록(변경 이력)을 다시 읽는다. */
+export function useV1AddLateTeamMatchLineupParticipant(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; payload: V1TeamMatchLateAdditionPayload }) =>
+      v1Post<V1TeamMatchLateAdditionResult>(`/team-matches/${teamMatchId}/lineup/late-additions`, vars.payload, {
+        headers: { 'Idempotency-Key': vars.idempotencyKey },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+      void queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'shared-record'] });
+    },
+  });
+}
+
 export function useV1CreateGameResultRevision(gameId: string, teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2256,6 +2342,11 @@ export type V1TacticsBoard = {
   updatedByUserId: string | null;
   starterCount: number;
   benchCount: number;
+  /** Task 180 H7 — 코트 모양·대형 목록의 근거. optional 은 API/Web 순차 배포 창의 구버전 응답용. */
+  sportCode?: string | null;
+  /** GK 포함 한 팀 경기 인원. 친선은 경기방식("5:5"), 대회·리그는 출전 인원. */
+  playersPerSide?: number;
+  lineupConfig?: import('@/types/api').V1LineupConfig;
   entries: V1TacticsBoardEntry[];
 };
 
@@ -2536,7 +2627,8 @@ export function useV1ResolveChatRoom() {
 export function useV1SendChatMessage(roomId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { content: string }) => v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
+    // 텍스트 또는 사진(내가 올린 업로드 경로) 중 하나 — 서버가 둘 다·둘 다 없음을 400 으로 막는다.
+    mutationFn: (body: { content: string } | { imageUrl: string }) => v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
       queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
@@ -2872,7 +2964,7 @@ export function useV1WithdrawalRequest() {
  * 전송 전에 compressImagesForUpload 로 한 장씩 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을
  * 그대로 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
  */
-export function useV1UploadImages() {
+export function useV1UploadImages(options?: CompressOptions) {
   return useMutation({
     mutationFn: async (files: File | File[] | FileList) => {
       const formData = new FormData();
@@ -2881,7 +2973,7 @@ export function useV1UploadImages() {
         : Array.isArray(files)
           ? files
           : [files];
-      const prepared = await compressImagesForUpload(fileArray);
+      const prepared = await compressImagesForUpload(fileArray, undefined, options);
       prepared.forEach((file) => formData.append('files', file));
       return v1MultipartPost<V1UploadImagesResult>('/uploads', formData);
     },

@@ -40,7 +40,11 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (which is where `PUBLIC_LIVE=off` lands a `live` policy) keeps the
   confirmed score. `scoreHidden` is `true` only when an official result
   exists and is being withheld; a fixture that has not been played yet
-  reports `false`. Standings keep counting the official facts.
+  reports `false`. Standings keep counting the official facts. Each fixture
+  also carries `gameState` (`SCHEDULED|LIVE|PAUSED|ENDED|CANCELLED`) — `null`
+  when there is no game or the effective visibility is `hidden` — so a match
+  that kicked off before its scheduled time reads as live, not upcoming
+  (Task 180 W4-V13).
 - `GET /api/v1/league-matches/:leagueId/standings` returns standings and
   fixtures.
 - `GET /api/v1/admin/league-matches/:leagueId` 의 각 `fixtures[]` 는 결과 진행 단계 `resultStage` 와 별개로 경기(Game)의

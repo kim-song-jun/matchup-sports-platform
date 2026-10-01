@@ -24,7 +24,7 @@ function row(over: Partial<LeagueFixtureListRow> = {}): LeagueFixtureListRow {
     startAt: START,
     placeName: '풋살장 A',
     status: 'matched',
-    game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } },
+    game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } },
     ...over,
   };
 }
@@ -105,7 +105,7 @@ describe('toLeagueFixtureList', () => {
   it('가려진 대진의 몰수 뱃지도 함께 지운다', () => {
     // 몰수 뱃지는 "1:0 으로 확정" 을 그대로 말한다 — 숫자만 가리면 가린 적이 없는 것과 같다.
     const [item] = toLeagueFixtureList(
-      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
+      [row({ game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
       new Map([['game-1', fact({ homeScore: 1, awayScore: 0, resultRevision: { reason: null, outcomeReason: 'FORFEIT' } })]]),
       true,
     );
@@ -114,7 +114,7 @@ describe('toLeagueFixtureList', () => {
 
   it('STATUS_ONLY 정책은 플래그가 켜져 있어도 점수를 가린다', () => {
     const [item] = toLeagueFixtureList(
-      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
+      [row({ game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
       new Map([['game-1', fact()]]),
       true,
     );
@@ -124,7 +124,7 @@ describe('toLeagueFixtureList', () => {
   it('OFFICIAL_ONLY 정책은 확정 점수를 그대로 공개한다', () => {
     // 이 모드가 감추는 것은 **확정 전** 숫자다. 목록은 확정 사실만 싣는다.
     const [item] = toLeagueFixtureList(
-      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'OFFICIAL_ONLY' } } })],
+      [row({ game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'OFFICIAL_ONLY' } } })],
       new Map([['game-1', fact()]]),
       true,
     );
@@ -135,7 +135,7 @@ describe('toLeagueFixtureList', () => {
     // 주차 라벨과 '다음 경기' 강조가 이 배열의 길이·순서에서 파생된다 — 행을 빼면 같은
     // 경기의 주차가 보는 사람마다 달라진다. fail-closed 는 점수에만 적용한다.
     const items = toLeagueFixtureList(
-      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: null } })],
+      [row({ game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: null } })],
       new Map([['game-1', fact()]]),
       true,
     );
@@ -147,7 +147,7 @@ describe('toLeagueFixtureList', () => {
     // scoreHidden 은 "확정됐는데 공개만 안 한다" 는 뜻이다. 아직 치르지 않은 경기까지
     // true 로 내보내면 화면이 '예정' 대신 '점수 비공개' 라고 적어 관전자를 오해시킨다.
     const [item] = toLeagueFixtureList(
-      [row({ game: { id: 'game-1', currentOfficialRevisionId: null, visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
+      [row({ game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: null, visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
       new Map(),
       true,
     );
@@ -158,6 +158,33 @@ describe('toLeagueFixtureList', () => {
     // `?? 'HIDDEN'` 를 게임 없는 행에까지 적용하면 앞으로의 일정이 통째로 가려진다.
     const [item] = toLeagueFixtureList([row({ game: null })], new Map(), false);
     expect(item).toMatchObject({ scoreHidden: false, homeScore: null });
+  });
+
+  // W4-V13 — 예정 시각 전에 시작한 경기가 공개 일정에서 '예정'·'다음 경기'로 보였다. 화면은 이 값이
+  // 있어야 시각보다 실제 진행 상태를 먼저 본다.
+  it('진행 중인 경기는 게임 상태를 싣는다 — 상태만 공개하는 정책에서도', () => {
+    const live = { id: 'game-1', state: 'LIVE' as const, currentOfficialRevisionId: null };
+    const items = toLeagueFixtureList(
+      [
+        row({ id: 'a', game: { ...live, visibilityPolicy: { mode: 'LIVE' } } }),
+        row({ id: 'b', game: { ...live, visibilityPolicy: { mode: 'STATUS_ONLY' } } }),
+      ],
+      new Map(),
+      true,
+    );
+    expect(items.map((item) => item.gameState)).toEqual(['LIVE', 'LIVE']);
+  });
+
+  it('경기 상세가 404 인 hidden 정책·게임 없는 대진은 진행 여부를 싣지 않는다', () => {
+    const items = toLeagueFixtureList(
+      [
+        row({ id: 'a', game: { id: 'game-1', state: 'LIVE', currentOfficialRevisionId: null, visibilityPolicy: { mode: 'HIDDEN' } } }),
+        row({ id: 'b', game: null }),
+      ],
+      new Map(),
+      true,
+    );
+    expect(items.map((item) => item.gameState)).toEqual([null, null]);
   });
 
   it('취소·무효 대진도 목록에는 남는다', () => {

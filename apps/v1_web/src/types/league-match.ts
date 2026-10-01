@@ -126,8 +126,9 @@ export interface V1LeagueFixture {
    */
   resultStage?: 'not_entered' | 'draft' | 'awaiting_approval' | 'change_requested' | 'official' | 'voided';
   /**
-   * 경기(Game)의 진행 상태 — 어드민 상세에서만 채워진다. 결과 단계와 **다른 축**이다: 결과 단계는
-   * 진행 중과 시작 전을 둘 다 `not_entered` 로 말하므로, "지금 뛰는 경기"는 이 값으로만 안다.
+   * 경기(Game)의 진행 상태. 결과 단계와 **다른 축**이다: 결과 단계는 진행 중과 시작 전을 둘 다
+   * `not_entered` 로 말하므로, "지금 뛰는 경기"는 이 값으로만 안다. 공개 상세에도 실린다(W4-V13) —
+   * 경기 상세가 404 인 비공개 정책이면 null. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
    */
   gameState?: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED' | null;
   /**

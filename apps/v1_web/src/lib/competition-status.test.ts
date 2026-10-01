@@ -13,6 +13,7 @@ import {
   rosterPermissionHint,
   shouldOfferRecordClaim,
   splitByArrival,
+  withPublicRecordGameState,
 } from './competition-status';
 
 const NOW = Date.parse('2026-09-30T12:00:00Z');
@@ -32,8 +33,32 @@ describe('leagueFixturePhase — 리그 대진 한 경기의 단계', () => {
     ['점수 비공개(확정)', fixture({ startAt: PAST, scoreHidden: true }), 'ended'],
     ['어드민이 본 진행 중 경기', fixture({ startAt: PAST, gameState: 'LIVE' }), 'live'],
     ['취소는 점수가 있어도 취소', fixture({ status: 'cancelled', homeScore: 1, awayScore: 0 }), 'cancelled'],
+    // W4-V13 — 게임 상태가 있으면 킥오프 예정 시각보다 먼저 본다.
+    ['예정 시각 전에 시작한 경기', fixture({ gameState: 'LIVE' }), 'live'],
+    ['예정 시각 전에 끝난 경기(결과 미확정)', fixture({ gameState: 'ENDED' }), 'awaiting_result'],
+    ['게임이 취소된 경기', fixture({ gameState: 'CANCELLED' }), 'cancelled'],
+    ['게임이 시작 전이면 시각대로', fixture({ gameState: 'SCHEDULED' }), 'scheduled'],
   ] as const)('%s → %s', (_, input, expected) => {
     expect(leagueFixturePhase(input, NOW)).toBe(expected);
+  });
+
+  it('일찍 시작한 경기는 "예정" 집계에 들지 않는다 — 시즌 줄·칩이 같은 함수를 탄다', () => {
+    const counts = countLeagueFixturePhases([fixture({ gameState: 'LIVE' }), fixture({ gameState: 'ENDED' }), fixture()], NOW);
+    expect(counts).toEqual({ scheduled: 1, awaitingResult: 1, live: 1, ended: 0 });
+  });
+});
+
+describe('withPublicRecordGameState — 경기 상세가 기록 응답으로 단계를 정한다', () => {
+  it('기록이 끝났다고 하면 대진 목록의 낡은 LIVE 를 덮는다', () => {
+    const stale = fixture({ gameState: 'LIVE' });
+    expect(leagueFixturePhase(withPublicRecordGameState(stale, 'ended'), NOW)).toBe('awaiting_result');
+    expect(leagueFixturePhase(withPublicRecordGameState(fixture(), 'live'), NOW)).toBe('live');
+  });
+
+  it('기록이 없거나 모르는 값이면 대진 그대로다', () => {
+    const live = fixture({ gameState: 'LIVE' });
+    expect(withPublicRecordGameState(live, undefined)).toBe(live);
+    expect(withPublicRecordGameState(live, 'something_new')).toBe(live);
   });
 });
 

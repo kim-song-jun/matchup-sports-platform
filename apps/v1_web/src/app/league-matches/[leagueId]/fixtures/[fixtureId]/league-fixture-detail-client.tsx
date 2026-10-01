@@ -18,7 +18,13 @@ import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel } from '@/lib/league-fixture-meta';
-import { leagueFixturePhase, leagueStateChip, matchPhaseChip, shouldOfferRecordClaim } from '@/lib/competition-status';
+import {
+  leagueFixturePhase,
+  leagueStateChip,
+  matchPhaseChip,
+  shouldOfferRecordClaim,
+  withPublicRecordGameState,
+} from '@/lib/competition-status';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { V1LeagueFixture, V1LeagueStandingRow } from '@/types/league-match';
@@ -184,11 +190,11 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     );
   }
 
-  // 공개 대진에는 운영 상태가 없어 진행 중은 기록(record) 응답으로만 안다.
-  const fixturePhase = leagueFixturePhase(fixture);
-  const phase = recordQuery.data?.status === 'live' ? 'live' : fixturePhase;
-  const phaseChip = matchPhaseChip(phase, { withSubject: true });
-  const result = fixtureResultLabel(fixture);
+  // 칩과 가운데 칸은 같은 입력에서 나와야 서로 견줄 수 있다 — 기록 응답의 진행 상태를 덧씌운 대진 하나로 둘 다 계산한다.
+  const phaseFixture = withPublicRecordGameState(fixture, recordQuery.data?.status);
+  const fixturePhase = leagueFixturePhase(phaseFixture);
+  const phaseChip = matchPhaseChip(fixturePhase, { withSubject: true });
+  const result = fixtureResultLabel(phaseFixture);
   const round = roundLabel(series.fixtures, fixture);
   const homeRow = rowByTeam.get(fixture.homeTeamId);
   const awayRow = fixture.awayTeamId !== null ? rowByTeam.get(fixture.awayTeamId) : undefined;
@@ -325,8 +331,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
                 <span className="text-2xl font-bold text-[var(--text-strong)]">{result.text}</span>
               ) : (
                 <span className="text-sm font-semibold text-[var(--text-muted)]">
-                  {/* 단계는 위 경기 칩이 말한다 — 여기는 그와 다른 말('집계 제외'·'점수 비공개')만.
-                      result.text 는 대진 단계에서 나오므로 live 로 덮기 전 단계와 견준다. */}
+                  {/* 단계는 위 경기 칩이 말한다 — 여기는 그와 다른 말('집계 제외'·'점수 비공개')만. */}
                   {result.text === matchPhaseChip(fixturePhase).label ? 'vs' : result.text}
                 </span>
               )}

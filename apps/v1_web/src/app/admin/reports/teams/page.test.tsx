@@ -79,6 +79,20 @@ describe('AdminReportedTeamsPage', () => {
     expect(rows[1]).toHaveTextContent('A팀');
   });
 
+  it('안내 문구는 순위가 전체 누적 기준이고 최근 기간은 별도 열임을 말한다', () => {
+    reportedTeamsMock.mockReturnValue({
+      data: { items: [rowA()], windowDays: 30 },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<AdminReportedTeamsPage />);
+
+    expect(screen.getByText(/전체 누적 신고 건수 순/)).toBeInTheDocument();
+    expect(screen.queryByText(/최근 30일 동안 반복 신고된/)).not.toBeInTheDocument();
+  });
+
   it('행을 누르면 그 팀의 신고만 필터된 문의 목록으로 간다', () => {
     reportedTeamsMock.mockReturnValue({
       data: { items: [rowA()], windowDays: 30 },

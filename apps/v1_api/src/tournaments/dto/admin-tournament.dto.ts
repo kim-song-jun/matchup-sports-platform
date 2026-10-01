@@ -87,10 +87,10 @@ export class CreateTournamentDto {
   @IsDateString()
   registrationDeadlineAt?: string;
 
-  /** 선수(명단) 제출 마감 시각. 폼에서는 필수 입력을 유도하되(대회 시작 D-7 23:59 자동 제안), API/스키마 레벨은 optional 유지. */
+  /** 선수(명단) 제출 마감 시각. 비우면(생략·null) 마감 없음. 정하면 신청 마감과 같거나 그 뒤여야 한다(서비스가 검증). */
   @IsOptional()
   @IsDateString()
-  rosterDeadlineAt?: string;
+  rosterDeadlineAt?: string | null;
 
   @IsOptional()
   @IsDateString()
@@ -408,7 +408,7 @@ export class UpdateTournamentDto {
   @IsDateString()
   registrationDeadlineAt?: string | null;
 
-  /** 선수(명단) 제출 마감 시각. 폼에서는 필수 입력을 유도하되(대회 시작 D-7 23:59 자동 제안), API/스키마 레벨은 optional 유지. */
+  /** 선수(명단) 제출 마감 시각. 비우면 마감 없음. 정하면 신청 마감과 같거나 그 뒤여야 한다(서비스가 검증). */
   @IsOptional()
   @IsDateString()
   rosterDeadlineAt?: string | null;

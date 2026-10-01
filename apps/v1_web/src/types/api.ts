@@ -4320,8 +4320,8 @@ export type V1CreateTournamentPayload = {
   title: string;
   format?: V1TournamentFormat;
   registrationDeadlineAt?: string;
-  /** 명단(선수단) 제출 마감일 */
-  rosterDeadlineAt?: string;
+  /** 명단(선수단) 제출 마감일. null = 마감 없음 */
+  rosterDeadlineAt?: string | null;
   scheduledAt?: string;
   scheduledEndAt?: string | null;
   venue?: string;

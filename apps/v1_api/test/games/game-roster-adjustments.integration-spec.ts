@@ -469,6 +469,31 @@ describe('경기 명단 조정 API (Task 179)', () => {
       expect(view.body.data.counts).toEqual({ base: 3, participating: 2, excluded: 1, unavailable: 0, suspended: 0 });
     });
 
+    // alpha 재현(2026-10-01): LIVE 경기 화면이 시작 뒤 참가 명단에 넣은 선수를 출전으로 보여 줬다.
+    // 동기화는 시작 뒤 멈추므로 기록 명단에는 없다 — 화면도 기록 명단을 보여야 한다.
+    it('시작된 경기는 시작 뒤 참가 명단에 넣은 선수를 출전으로 보이지 않고, 시작 전 경기는 보인다', async () => {
+      const f = await seedTournament();
+      const [a1, a2] = f.teamA.members;
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'LIVE' } });
+      const a3 = await makeUser('a3');
+      await prisma.v1TeamMembership.create({ data: { teamId: f.teamA.id, userId: a3, role: 'member', status: 'active' } });
+      await app.get(TournamentPlayersService).addPlayer(
+        { id: f.teamA.ownerId, email: `${f.teamA.ownerId}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' },
+        f.tournament.id,
+        f.registrations.get(f.teamA.id)!,
+        { userId: a3 } as never,
+      );
+      await drainOutboxWorker(prisma);
+
+      const live = (await getAs(`${f.sidePath('g1', f.teamA.id)}/roster`, f.teamA.ownerId)).body.data;
+      expect(live.participants.map((row: { userId: string }) => row.userId).sort()).toEqual([a1, a2].sort());
+      expect(live.base.map((row: { userId: string }) => row.userId)).not.toContain(a3);
+      expect(live.counts.participating).toBe(2);
+
+      const scheduled = (await getAs(`${f.sidePath('g2', f.teamA.id)}/roster`, f.teamA.ownerId)).body.data;
+      expect(scheduled.participants.map((row: { userId: string }) => row.userId)).toContain(a3);
+    });
+
     it('폐기한 라인업 쓰기 라우트(경기·대회 운영 어댑터)는 HTTP 로도 인가 뒤 409 이고 명단을 바꾸지 않는다', async () => {
       const f = await seedTournament();
       const g1 = f.games.g1;

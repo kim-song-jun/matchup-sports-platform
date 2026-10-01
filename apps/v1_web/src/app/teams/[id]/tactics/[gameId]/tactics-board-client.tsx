@@ -154,8 +154,8 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
         paddingTop: 16,
         paddingLeft: 'var(--v1-shell-page-x)',
         paddingRight: 'var(--v1-shell-page-x)',
-        // 하단 고정 저장 바(.tm-fixed-cta)가 본문 끝을 덮지 않게 그 높이만큼 비운다.
-        paddingBottom: canEdit ? 112 : 16,
+        // 하단 고정 저장 바(.tm-fixed-cta)가 본문 끝을 덮지 않게 그 높이만큼 비운다 — 바는 안전영역만큼 커진다.
+        paddingBottom: canEdit ? 'calc(112px + var(--v1-shell-safe-bottom))' : 16,
       }}
     >
       <AlertBanner

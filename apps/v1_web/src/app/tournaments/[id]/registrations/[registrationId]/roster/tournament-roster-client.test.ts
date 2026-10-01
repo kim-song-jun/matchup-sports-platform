@@ -62,7 +62,7 @@ describe('isTournamentRosterMutable', () => {
   it('does not block while the tournament is still loading (status undefined)', () => {
     expect(isTournamentRosterMutable(undefined)).toBe(true);
     expect(isTournamentRosterMutable(null)).toBe(true);
-    expect(isTournamentRosterMutable({ status: undefined })).toBe(true);
+    expect(isTournamentRosterMutable({ status: undefined, kind: null })).toBe(true);
   });
 });
 

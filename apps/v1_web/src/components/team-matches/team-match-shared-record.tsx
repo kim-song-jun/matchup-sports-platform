@@ -189,6 +189,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   const [endPrompt, setEndPrompt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const previousVersion = useRef<number | null>(null);
+  const goalFormOpener = useRef<HTMLElement | null>(null);
   const { confirm, ConfirmModal: confirmModal } = useConfirm();
   const data = query.data;
   const router = useRouter();
@@ -206,6 +207,21 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
     if (data && previousVersion.current !== null && previousVersion.current !== data.version) setAnnouncement('공동 경기 기록이 업데이트됐어요.');
     if (data) previousVersion.current = data.version;
   }, [data]);
+
+  // 폼이 닫히면(취소·저장) 연 버튼으로 포커스를 돌려 키보드·스크린리더 사용자가 작업 맥락을 잃지 않게 한다.
+  const goalFormOpen = editing !== null;
+  useEffect(() => {
+    if (goalFormOpen) return;
+    const opener = goalFormOpener.current;
+    goalFormOpener.current = null;
+    if (opener?.isConnected) opener.focus();
+  }, [goalFormOpen]);
+  function openGoalForm(opener: HTMLElement, goal: SharedGoal | null, subMatchId: string | null) {
+    if (!data) return;
+    goalFormOpener.current = opener;
+    mutation.reset();
+    setEditing({ goal, version: data.version, subMatchId });
+  }
 
   const uncertain = mutation.isError && (!(mutation.error instanceof V1ApiError) || isV1NetworkError(mutation.error) || mutation.error.statusCode >= 500);
   async function command(input: Omit<RecordCommand, 'commandId' | 'expectedVersion'>, version = data?.version ?? 0) {
@@ -271,7 +287,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
         <div className={styles.team}>{away?.name}</div>
       </div>
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
-      {data.canEdit && subMatches.length === 0 && <Button block onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: null }); }} disabled={disabled || controlsOpen}>득점 추가</Button>}
+      {data.canEdit && subMatches.length === 0 && <Button block onClick={(event) => openGoalForm(event.currentTarget, null, null)} disabled={disabled || controlsOpen}>득점 추가</Button>}
       {data.teamAuthority && data.phase !== 'cancelled' && <p className={styles.muted}><span className="tm-badge tm-badge-sm tm-badge-blue">팀장 권한</span> 팀장·매니저는 명단에 없어도 기록하고 종료를 확인할 수 있어요.</p>}
       {data.phase === 'official' && !data.canEdit && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
       {data.operator && (data.phase === 'official'
@@ -360,7 +376,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
                       <Button size="sm" variant="ghost" disabled={disabled || controlsOpen} onClick={() => void command({ action: 'submatch_delete', subMatchId: subMatch.id })}>삭제</Button>
                     </div>}
                   </div>}
-                  {data.canEdit && <Button block size="sm" variant="outline" disabled={disabled || controlsOpen} onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: subMatch.id }); }}>이 서브매치에 득점 추가</Button>}
+                  {data.canEdit && <Button block size="sm" variant="outline" disabled={disabled || controlsOpen} onClick={(event) => openGoalForm(event.currentTarget, null, subMatch.id)}>이 서브매치에 득점 추가</Button>}
                   {editing && editing.subMatchId === subMatch.id && data.canEdit && <GoalForm
                     key={editing.goal?.id ?? `new-${subMatch.id}`}
                     data={data}
@@ -372,7 +388,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
                     onCancel={() => setEditing(null)}
                     onSave={(goal) => command({ action: editing.goal ? 'edit' : 'add', ...(editing.goal ? { goalId: editing.goal.id } : {}), ...goal }, editing.version)}
                   />}
-                  <GoalRows data={data} goals={subGoals} publicEvents={data.goalEvents?.filter((event) => event.subMatchId === subMatch.id)} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: subMatch.id }); }} onDelete={deleteGoal} />
+                  <GoalRows data={data} goals={subGoals} publicEvents={data.goalEvents?.filter((event) => event.subMatchId === subMatch.id)} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal, opener) => openGoalForm(opener, goal, subMatch.id)} onDelete={deleteGoal} />
                 </article>;
               })}
             </div>}
@@ -391,7 +407,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
             onCancel={() => setEditing(null)}
             onSave={(goal) => command({ action: editing.goal ? 'edit' : 'add', ...(editing.goal ? { goalId: editing.goal.id } : {}), ...goal }, editing.version)}
           />}
-          <GoalRows data={data} goals={data.goals} publicEvents={data.goalEvents} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: null }); }} onDelete={deleteGoal} />
+          <GoalRows data={data} goals={data.goals} publicEvents={data.goalEvents} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal, opener) => openGoalForm(opener, goal, null)} onDelete={deleteGoal} />
         </section>}
       </div>
 
@@ -481,7 +497,7 @@ function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDele
   publicEvents?: readonly SharedPublicGoalEvent[];
   disabled: boolean;
   canEdit: boolean;
-  onEdit: (goal: SharedGoal) => void;
+  onEdit: (goal: SharedGoal, opener: HTMLElement) => void;
   onDelete: (goal: SharedGoal) => void;
 }) {
   if (goals.length === 0 && publicEvents !== undefined && publicEvents.length > 0) return <GoalEventList events={publicEvents} sides={data.sides} />;
@@ -512,7 +528,7 @@ function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDele
       </div>
     </div>
     {canEdit && <div className={styles.goalActions} role="group" aria-label={`${participantName} 득점 관리`}>
-      <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${goalLabel(data, goal)} 수정`} onClick={() => onEdit(goal)}>수정</Button>
+      <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${goalLabel(data, goal)} 수정`} onClick={(event) => onEdit(goal, event.currentTarget)}>수정</Button>
       <Button size="sm" variant="ghost" className={styles.goalDeleteAction} disabled={disabled} aria-label={`${goalLabel(data, goal)} 삭제`} onClick={() => onDelete(goal)}>삭제</Button>
     </div>}
   </div>})}</div>;
@@ -537,7 +553,19 @@ function GoalForm({ data, goal, subMatchId, disabled, stale, onCancel, onRefresh
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   useEffect(() => setDuplicateConfirmed(false), [sideId, participantId, minute, ownGoal]);
 
-  return <form className={styles.form} aria-label={goal ? '득점 수정' : '득점 추가'} onSubmit={(event) => {
+  // 폼은 트리거보다 한참 아래(서브매치 영역 뒤)에 열릴 수 있다 — 보이게 스크롤하고 첫 입력에 포커스한다.
+  // 포커스의 기본 스크롤은 막는다(긴 폼에서 첫 입력 기준으로 튀어 폼 머리가 잘린다).
+  // 스크롤 주체는 window 가 아니라 .tm-scroll-area 라 scrollIntoView 가 맞다.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    form.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
+    form.querySelector<HTMLElement>('select, input')?.focus({ preventScroll: true });
+  }, []);
+
+  return <form ref={formRef} className={styles.form} aria-label={goal ? '득점 수정' : '득점 추가'} onSubmit={(event) => {
     event.preventDefault();
     if (!stale && (!duplicate || duplicateConfirmed)) void onSave({ sideId, participantId: participantId || null, ownGoal, minute: minute === '' ? null : Number(minute), subMatchId });
   }}>

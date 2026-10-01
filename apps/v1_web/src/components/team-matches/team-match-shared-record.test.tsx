@@ -226,6 +226,47 @@ describe('shared record participant flow', () => {
     fireEvent.click(screen.getByRole('button', { name: '득점 등록' }));
     await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'add', expectedVersion: 3, sideId: 'home', participantId: 'h1', minute: 12, ownGoal: false })));
   });
+  it('득점 폼이 열리면 폼을 보이게 스크롤하고 첫 입력에 포커스하며, 닫으면 연 버튼으로 포커스가 돌아간다', () => {
+    // jsdom 은 레이아웃이 없어 scrollIntoView 가 없다 — 호출 인자만 본다.
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      const trigger = screen.getByRole('button', { name: '득점 추가' });
+      trigger.focus();
+      fireEvent.click(trigger);
+      const form = screen.getByRole('form', { name: '득점 추가' });
+      expect(document.activeElement).toBe(within(form).getByLabelText('득점 팀'));
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(form);
+      expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'nearest' }));
+
+      fireEvent.click(within(form).getByRole('button', { name: '취소' }));
+      expect(screen.queryByRole('form', { name: '득점 추가' })).toBeNull();
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: '득점 추가' }));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it('서브매치의 득점 폼도 같은 방식으로 포커스를 옮기고 닫으면 그 서브매치 버튼으로 돌아간다(대조군)', () => {
+    state.data = {
+      ...state.data,
+      subMatches: [
+        { id: '11111111-1111-4111-8111-111111111111', title: '1경기', order: 0, scores: [] },
+        { id: '22222222-2222-4222-8222-222222222222', title: '2경기', order: 1, scores: [] },
+      ],
+    };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    const second = screen.getAllByRole('button', { name: '이 서브매치에 득점 추가' })[1];
+    fireEvent.click(second);
+    const form = screen.getByRole('form', { name: '득점 추가' });
+    expect(document.activeElement).toBe(within(form).getByLabelText('득점 팀'));
+    fireEvent.click(within(form).getByRole('button', { name: '취소' }));
+    expect(document.activeElement).toBe(screen.getAllByRole('button', { name: '이 서브매치에 득점 추가' })[1]);
+  });
+
   it('shows player photos and offers the opposing roster for an own goal', () => {
     const { container } = render(<TeamMatchSharedRecord teamMatchId="match" />);
     fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));

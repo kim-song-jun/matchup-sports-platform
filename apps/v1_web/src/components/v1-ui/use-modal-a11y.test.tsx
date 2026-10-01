@@ -4,7 +4,7 @@
  * 고정돼 있지 않던) 동작을 여기서 고정한다.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useModalA11y } from './use-modal-a11y';
 
@@ -242,6 +242,7 @@ describe('useModalA11y', () => {
     }
   });
 
+  describe.each([['일반', undefined], ['StrictMode', StrictMode]] as const)('%s 렌더', (_label, wrapper) => {
   it('시트 안 입력이 autoFocus 여도 Escape 로 닫으면 트리거 버튼으로 돌아온다', async () => {
     // autoFocus 는 마운트 커밋에서 이미 적용된다 — 그 뒤에 이전 포커스를 읽으면 입력이 잡힌다.
     function Host() {
@@ -264,7 +265,7 @@ describe('useModalA11y', () => {
         </section>
       );
     }
-    render(<Host />);
+    render(<Host />, { wrapper });
     const trigger = screen.getByRole('button', { name: '등번호' });
     trigger.focus();
     fireEvent.click(trigger);
@@ -295,7 +296,7 @@ describe('useModalA11y', () => {
         </>
       );
     }
-    render(<Host />);
+    render(<Host />, { wrapper });
     for (const name of ['첫째', '둘째']) {
       const trigger = screen.getByRole('button', { name });
       trigger.focus();
@@ -306,5 +307,6 @@ describe('useModalA11y', () => {
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
       expect(document.activeElement).toBe(trigger);
     }
+  });
   });
 });

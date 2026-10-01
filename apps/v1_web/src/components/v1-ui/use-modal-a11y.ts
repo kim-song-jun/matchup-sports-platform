@@ -187,11 +187,23 @@ export function useModalA11y<
   // 조건부 마운트형(열려 있는 채 언마운트) 모달에서도 복원된다 — LogDetailModal 류가 후자다.
   // mounted 기준이다. open 으로 하면 퇴장 애니메이션이 도는 동안 모달은 화면에
   // 있는데 포커스만 뒤로 가서, 그 사이 Tab·ESC 가 모달 밖으로 샌다.
+  // cleanup 은 ref 를 비우지 않는다 — StrictMode(dev)는 effect 를 마운트→정리→마운트로 한 번 더 돌리는데, 비우면 복귀
+  // 대상이 사라진다. 그 가짜 정리가 포커스를 트리거로 옮겼다면 다시 마운트될 때 모달 안 원래 컨트롤로 돌려놓는다.
+  const refocusAfterRemountRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) {
+      refocusAfterRemountRef.current = null; // 진짜 닫힘 — 다음 열림에 넘기지 않는다
+      return;
+    }
+    const resumed = refocusAfterRemountRef.current;
+    refocusAfterRemountRef.current = null;
+    if (resumed?.isConnected) resumed.focus();
     return () => {
+      // StrictMode 의 가짜 정리에서는 ref 가 이미 떼어져 dialogRef 로 안쪽 여부를 못 가른다.
       const previous = returnFocusRef.current;
-      returnFocusRef.current = null;
+      const active = document.activeElement;
+      refocusAfterRemountRef.current =
+        active instanceof HTMLElement && active !== document.body && active !== previous ? active : null;
       if (previous && typeof (previous as HTMLElement).focus === 'function') {
         (previous as HTMLElement).focus();
       }

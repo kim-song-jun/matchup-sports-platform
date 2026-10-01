@@ -574,4 +574,6 @@ export interface PublicTournamentPlayerRecordsResponse {
   readonly tournamentId: string;
   readonly goals: readonly PublicTournamentPlayerRecordRow[];
   readonly assists: readonly PublicTournamentPlayerRecordRow[];
+  /** 리그 `V1LeaguePlayerRecordsResponse.hiddenByEligibility` 와 같은 의미 — 빈 상태 문구를 가른다. */
+  readonly hiddenByEligibility: boolean;
 }

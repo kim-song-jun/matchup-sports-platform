@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { competitionRanks } from '@/lib/competition-ranks';
+import { playerRecordEmptyTitle, playerRecordsCombinedEmptySub } from '@/lib/player-record-empty-copy';
 import type { PublicTournamentPlayerRecordRow } from './types';
 
 /**
@@ -22,6 +23,7 @@ import type { PublicTournamentPlayerRecordRow } from './types';
 export function TournamentPlayerRecordsSections({
   goals,
   assists,
+  hiddenByEligibility,
   isLoading,
   isError,
   errorMessage,
@@ -31,6 +33,8 @@ export function TournamentPlayerRecordsSections({
 }: {
   goals: readonly PublicTournamentPlayerRecordRow[] | undefined;
   assists: readonly PublicTournamentPlayerRecordRow[] | undefined;
+  /** 기록은 있지만 공개 자격이 없어 가려졌는가 — 빈 상태 문구를 가른다. */
+  hiddenByEligibility: boolean;
   isLoading: boolean;
   isError: boolean;
   errorMessage: string;
@@ -66,7 +70,10 @@ export function TournamentPlayerRecordsSections({
     return emptyBehavior === 'hide' ? null : wrap(
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>개인 기록</h3>
-        <EmptyState title="아직 기록이 없어요" sub="확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요." />
+        <EmptyState
+          title={playerRecordEmptyTitle(hiddenByEligibility)}
+          sub={playerRecordsCombinedEmptySub(hiddenByEligibility)}
+        />
       </section>,
     );
   }

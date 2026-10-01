@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
+import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
 import { calculateLeagueStandingsWithTieBreakInfo, LeagueTieBreakCriterion, resolveLeagueChampions } from './league-standings';
@@ -729,7 +729,7 @@ export class LeagueMatchPublicService {
       if (row.resultRevision.officialAt === null) continue;
       const eligibilityRow = eligibility.get(row.participantId);
       if (eligibilityRow === undefined || !isParticipantPubliclyEligible(eligibilityRow)) {
-        if (row.goals > 0 || row.assists > 0) hiddenByEligibility = true;
+        if (isRankedRecordHiddenByEligibility(row, eligibilityRow)) hiddenByEligibility = true;
         continue;
       }
       const userId = eligibilityRow.linkedUserId!;

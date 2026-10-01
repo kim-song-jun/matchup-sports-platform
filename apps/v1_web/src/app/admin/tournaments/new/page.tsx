@@ -143,11 +143,10 @@ export default function AdminTournamentsNewPage() {
   useEffect(() => {
     if (!focusFirstErrorRef.current) return;
     focusFirstErrorRef.current = false;
-    const alert = formRef.current?.querySelector<HTMLElement>('[role="alert"]');
+    // 오류 문구가 `data-error-focus` 로 가리키는 입력에 포커스한다. 그룹 오류는 그룹의 첫 입력을 가리킨다.
+    const alert = formRef.current?.querySelector<HTMLElement>('[role="alert"][data-error-focus]');
     if (!alert) return;
-    const controlId = alert.parentElement?.querySelector('label')?.getAttribute('for');
-    const control = controlId ? document.getElementById(controlId) : null;
-    // 라벨 없는 그룹 오류(혼성 쿼터 등)는 포커스할 컨트롤이 없어 오류 문구까지만 스크롤한다.
+    const control = document.getElementById(alert.dataset.errorFocus ?? '');
     (control ?? alert).scrollIntoView({ block: 'center', behavior: scrollBehavior() });
     control?.focus({ preventScroll: true });
   }, [errors]);
@@ -1075,7 +1074,7 @@ function ParticipationStep({
             />
           </div>
           {errors.genderQuota ? (
-            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red700)]">
+            <p role="alert" data-error-focus="gender-min-male" className="mt-3 text-xs font-semibold text-[var(--red700)]">
               {errors.genderQuota}
             </p>
           ) : null}
@@ -1449,7 +1448,7 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-[var(--red700)]">
+        <p role="alert" data-error-focus={id} className="text-xs font-medium text-[var(--red700)]">
           {error}
         </p>
       ) : hint ? (

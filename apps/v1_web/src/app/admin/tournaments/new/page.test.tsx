@@ -970,6 +970,18 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       expect(scrollTo).not.toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
     });
 
+    it('혼성 정원 그룹 오류는 그 그룹의 첫 입력(남성 최소)에 포커스한다', () => {
+      renderInScroller();
+      goToParticipationStep();
+      fireEvent.change(screen.getByLabelText(/최대 선수 수/), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText('남성 최소'), { target: { value: '8' } });
+      fireEvent.change(screen.getByLabelText('여성 최소'), { target: { value: '8' } });
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByText('성별 최소 인원 합이 최대 선수 수를 넘을 수 없어요.')).toBeInTheDocument();
+      expect(screen.getByLabelText('남성 최소')).toHaveFocus();
+    });
+
     it('종목만 채우고 넘기면 두 번째 오류 필드(대회명)로 포커스한다', () => {
       renderInScroller();
       fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });

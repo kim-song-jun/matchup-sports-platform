@@ -1303,6 +1303,17 @@ export function TournamentRosterPageClient({
     }
   }, [canEditRoster]);
 
+  // 훅은 아래 로딩·오류 early return 보다 위에 있어야 한다 — 뒤에 두면 로딩 → 데이터 렌더에서 훅 개수가 달라져 화면이 깨진다.
+  const handleFooterNeededChange = useCallback((formId: string, needed: boolean) => {
+    setFooterDraftIds((prev) => {
+      if (prev.has(formId) === needed) return prev;
+      const next = new Set(prev);
+      if (needed) next.add(formId);
+      else next.delete(formId);
+      return next;
+    });
+  }, []);
+
   if (isLoading) {
     return (
               <div
@@ -1332,16 +1343,6 @@ export function TournamentRosterPageClient({
         </div>
       );
   }
-
-  const handleFooterNeededChange = useCallback((formId: string, needed: boolean) => {
-    setFooterDraftIds((prev) => {
-      if (prev.has(formId) === needed) return prev;
-      const next = new Set(prev);
-      if (needed) next.add(formId);
-      else next.delete(formId);
-      return next;
-    });
-  }, []);
 
   function handleAddDraftForm() {
     if (!canAddDraftForm) return;

@@ -1132,6 +1132,31 @@ describe('TournamentRosterPageClient — 선수 등록 하단 영역(#1430)', ()
     return { ...view, queryClient };
   }
 
+  it('명단을 불러오는 중 화면에서 데이터가 도착해도 화면이 깨지지 않는다(훅 순서)', () => {
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isPending: true,
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    const { rerender, unmount, queryClient } = renderRoster();
+    expect(screen.getByLabelText('명단 불러오는 중')).toBeInTheDocument();
+
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [], belowMinimum: true },
+      isLoading: false,
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: '선수 추가' })).toBeInTheDocument();
+    unmount();
+    queryClient.clear();
+  });
+
   it('폼을 열면 제출 "선수 등록"은 전용 하단 영역에, 상단은 "선수 추가"로 갈린다', async () => {
     const { container, unmount, queryClient } = renderRoster();
     expect(container.querySelector('.tm-fixed-cta')).toBeNull();

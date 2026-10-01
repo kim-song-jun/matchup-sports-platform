@@ -160,6 +160,64 @@ Actions → `deploy.yml` → "Run workflow" → 아래 입력으로 수동 실�
 
 "단계별 확인 방법"·"부록 B" 참고.
 
+### 9. 승격 뒤 — 리그 대진 제목 라운드 키 백필 (dry-run → 사용자 승인 → apply)
+
+리그 대진 생성기와 어드민 수동 대진은 팀매치 제목을 `대회명 · league_r1 3` 처럼 라운드 키 원값으로
+저장해 왔다. #1459 부터 새 제목은 `대회명 · 조별리그 1라운드 3` 으로 저장되지만, 이미 저장된 행은
+팀 일정·채팅방 제목에 원값 그대로 보인다. `scripts/qa/backfill-league-round-titles.sql` 이 그 행만 고친다.
+
+- **언제**: #1459 가 들어간 `main` 이 배포되고 8번까지 끝난 뒤. A~B 구간에는 돌리지 않는다
+  ("금지 사항"의 수동 SQL 금지는 그 구간 이야기다).
+- **무엇을**: 대회 상세(`v1_tournament_match_details`)가 붙은 `v1_team_matches.title`, 그 팀매치에
+  연결된 `v1_team_schedules.title` 중 `league_r[0-9]+` 가 들어 있는 행만 그 부분을 `조별리그 N라운드` 로
+  바꾼다. 일정은 `version` 도 올린다. 채팅방 제목은 저장값이 아니고, 알림·채팅 공유 카드·감사 로그는
+  이미 나간 기록이라 두지 않는다.
+- **안전장치**: dry-run 이 기본이고 읽기 전용 트랜잭션이다. `apply=1` 이어도 한 트랜잭션이고, 변환식
+  자체 검사([1])가 틀리거나 적용 뒤 대상이 남으면 롤백한다. 다시 돌리면 0건이다.
+- **alpha 와 다른 점**: alpha 는 `scripts/qa/backfill-league-round-titles-alpha.sh` 로 돌리고, 그 스크립트는
+  prod 를 고를 수 없다. prod 는 부록 B 와 같은 경로(SSM → EC2 → `postgres:16-alpine` 의 psql → RDS)로
+  같은 SQL 을 보낸다.
+
+1. **dry-run.** 로컬에서 SQL 을 base64 로 싣고 `APPLY=0` 으로 보낸다. `<PROD_EC2_INSTANCE_ID>` 등
+   자리표시자는 부록 B 와 같다.
+
+   ```bash
+   APPLY=0   # 사용자 승인 뒤에만 1
+   SQL_B64="$(base64 < scripts/qa/backfill-league-round-titles.sql | tr -d '\n')"
+   REMOTE="$(cat <<REMOTE
+   set -Eeuo pipefail
+   V1_API_IMAGE="\$(sudo jq -er '.active.images.api.uri' <PROD_RELEASE_STATE_FILE>)"
+   V1_WEB_IMAGE="\$(sudo jq -er '.active.images.web.uri' <PROD_RELEASE_STATE_FILE>)"
+   export V1_API_IMAGE V1_WEB_IMAGE
+   compose=(sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose --project-name deploy
+     -f <PROD_LIVE_DIR>/deploy/docker-compose.prod.yml --env-file <PROD_LIVE_DIR>/deploy/.env)
+   URL="\$("\${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "\$DATABASE_URL"')"
+   [[ -n "\${URL}" ]]
+   SQL_FILE="\$(mktemp)"
+   printf '%s' '${SQL_B64}' | base64 -d > "\${SQL_FILE}"
+   sudo docker run --rm --network deploy_default --env-file /dev/stdin \
+     -v "\${SQL_FILE}:/backfill.sql:ro" postgres:16-alpine \
+     sh -c 'exec psql "\$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -v apply=${APPLY} -f /backfill.sql' \
+     < <(printf 'DATABASE_URL=%s\n' "\${URL}")
+   rm -f "\${SQL_FILE}"
+   REMOTE
+   )"
+   # shorthand(commands=[...]) 는 이스케이프를 망친다 — 항상 JSON 으로 넘긴다.
+   aws ssm send-command --instance-ids <PROD_EC2_INSTANCE_ID> --document-name AWS-RunShellScript \
+     --parameters "$(jq -nc --arg c "${REMOTE}" '{commands:[$c]}')" --query 'Command.CommandId' --output text
+   # 끝나면 get-command-invocation 의 StandardOutputContent·StandardErrorContent 를 둘 다 본다.
+   ```
+
+2. **출력을 읽는다.** `[1] selftest_failures` 는 0 이어야 한다. `[2]` 가 바꿀 행 수, `[3]` 은 바꾸지 않는
+   참고 수치다 — `team_matches_without_details` 가 0 이 아니면 대회 밖 팀매치 제목에도 원값이 있다는 뜻이니
+   적용하지 말고 원인부터 본다. `[4]` 의 전후 예시가 `조별리그 N라운드` 인지 확인한다.
+3. **사용자 승인.** dry-run 출력 전체를 그대로 보여 주고 승인받는다. 바뀌기 전 값은 `league_rN` 원값이라
+   되돌릴 일은 없다고 보지만, 승인 요청에 그 판단과 dry-run 출력 보관 위치를 함께 적는다.
+4. **apply.** 같은 명령을 `APPLY=1` 로 보낸다. 출력의 `[5]` 에서 `updated` 가 `[2]` 와 같고
+   `remaining` 이 0 이어야 한다. 그렇지 않으면 스크립트가 스스로 롤백하고 오류로 끝난다.
+5. **재확인.** `APPLY=0` 으로 한 번 더 보내 `[2]` 가 0건인지 본다. 공개 API
+   `GET /api/v1/tournaments/:id/schedule` 같은 비인증 응답에서 해당 대회 경기 제목을 확인한다.
+
 ## 단계별 확인 방법
 
 모든 확인은 **식별자(엔드포인트·인스턴스 ID 등)를 직접 적지 않고** 이미 등록된 GitHub

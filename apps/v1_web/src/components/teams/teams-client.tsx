@@ -218,8 +218,16 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
   // 기본값 '/teams'로 고정돼 있었다 — public-profile-client.tsx와 동일한 ShellOverride로 메운다.
   const searchParams = useSearchParams();
   const fromPath = sanitizeRedirectPath(searchParams.get('from'));
-  // 팀 만들기가 성공 뒤 붙여 보낸다 — 만든 직후 첫 화면에만 성공·다음 할 일을 보인다.
-  const justCreatedParam = searchParams.get('created') === '1';
+  // 팀 만들기가 성공 뒤 붙여 보낸다 — 만든 직후 첫 화면에만 성공·다음 할 일을 보인다. 처음 값을 붙잡고 URL 에선
+  // 지운다(히스토리 교체) — 남겨 두면 새로고침·뒤로가기·공유 링크마다 안내가 다시 뜬다.
+  const [justCreatedParam] = useState(() => searchParams.get('created') === '1');
+  useEffect(() => {
+    if (searchParams.get('created') !== '1') return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete('created');
+    const rest = next.toString();
+    router.replace(rest ? `/teams/${teamId}?${rest}` : `/teams/${teamId}`, { scroll: false });
+  }, [router, searchParams, teamId]);
   // 이 화면에서 나가는 링크의 출처 — 받은 출처까지 담아야 하위 화면에서 돌아와도 처음 출처가 남는다.
   const selfHref = withFromPath(`/teams/${teamId}`, fromPath);
   // The current /auth/me result is the only authority for protected actions. A

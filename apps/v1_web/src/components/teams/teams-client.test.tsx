@@ -618,6 +618,27 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
       );
     });
 
+    it('안내는 처음 연 화면에만 — 표시를 URL 에서 지우되(다른 파라미터는 남김) 그 화면에선 계속 보이고, 다시 열면 없다', () => {
+      routerMocks.replace.mockClear();
+      navigationMocks.searchParams = new URLSearchParams('created=1&from=%2Fmy%2Fteams');
+      viewAs('owner');
+      const view = render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
+      expect(routerMocks.replace).toHaveBeenCalledTimes(1);
+      expect(routerMocks.replace).toHaveBeenCalledWith('/teams/team-1?from=%2Fmy%2Fteams', { scroll: false });
+
+      // replace 가 반영된 URL 로 같은 화면이 다시 그려져도 안내는 남는다.
+      navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+      view.rerender(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
+      expect(routerMocks.replace).toHaveBeenCalledTimes(1);
+      view.unmount();
+
+      // 새로고침·뒤로가기로 다시 열면 URL 에 표시가 없어 안내도 없다.
+      render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByText('팀을 만들었어요')).toBeNull();
+    });
+
     it('표시가 없거나 팀장이 아니면 성공 안내를 보이지 않는다', () => {
       viewAs('owner');
       const view = render(<TeamDetailPageClient teamId="team-1" />);

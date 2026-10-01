@@ -31,6 +31,31 @@ alpha(`alpha.teameet.co.kr`)에서는 끝났고, 이 문서는 그 다음 단계
 
 모두 승격 PR(`dev` → `main`)을 **머지하기 전에** 끝내 둔다.
 
+### 릴리스 워크플로가 아직 main에 없는 경우
+
+`promote-main.yml`이 dev에만 있고 기본 브랜치 main에는 없다면 `gh workflow run ... --ref dev`도
+404로 실패할 수 있다. workflow_dispatch는 기본 브랜치에 워크플로가 있어야 한다.
+이 문제를 해결하려고 main에 파일을 직접 push하지 않는다. 최신 dev에서 격리 feature 브랜치를
+만든 뒤 아래 **로컬 준비 전용 모드**로 Changeset을 소비하고 두 앱의 버전·CHANGELOG diff를 만든다.
+
+```bash
+git fetch origin dev main
+# 다른 작업 트리의 WIP를 보존하고 별도 worktree를 사용한다.
+git worktree add /tmp/teameet-release-prep -b fix/production-release-prep origin/dev
+cd /tmp/teameet-release-prep
+CONFIRMATION=PROMOTE bash scripts/release/promote-main.sh --prepare-only
+git diff --check
+git diff --stat
+```
+
+이 모드는 alpha SHA·버전을 먼저 확인하며 stage/commit/push/dispatch를 하지 않는다.
+**`--prepare-only`를 빼면 기존 모드는 dev push와 alpha dispatch까지 실행한다.**
+준비한 diff는 dev 대상 PR로 전달하고, 그 결과의 새 dev SHA에서 API·Web·Gates·CodeQL과 alpha를
+다시 확인한다. 추가 Changeset이 들어왔다면 다시 소비해야 한다. 2026-10-01 준비 결과와
+남은 운영 조건은 [GO/NO-GO 보고서](prod-readiness-2026-10-01.md)를 참고한다.
+
+GitHub 동작 근거: [수동 워크플로 실행 문서](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
 - [ ] **리허설 증거 문구를 미리 준비한다.** GitHub Actions 의 workflow_dispatch 입력
       `task168_rehearsal_evidence` 는 이 전환을 사전에 리허설했다는 증거를 담는 자유 텍스트다
       (예: `"task-6-report.md rehearsal 2026-09-27, drift 0, ledger clean"`). 빈 문자열이면
@@ -226,7 +251,9 @@ Stage A 가 뜬 백업(`backup.dump`, `pg_restore -Fc` 형식)은 EC2 호스트�
 
 1. 복원 대상 DB(운영 중인 RDS 인스턴스가 아니라 **새로 만든 인스턴스 또는 별도 DB**)를 준비한다.
    운영 중인 인스턴스에 그대로 덮어쓰지 않는다.
-2. `pg_restore --clean --if-exists -d <복원 대상 DATABASE_URL> backup.dump`.
+2. 승인된 복원 대상의 libpq service 설정과 비밀번호 파일(0600)을 준비한다. 운영 DB 연결이 아닌지
+   확인한 뒤 `PGSERVICE=task168_restore pg_restore --clean --if-exists backup.dump`를 실행한다.
+   접속 URL·비밀번호를 `-d` 등 명령줄 인자로 넘기거나 로그에 출력하지 않는다.
 3. 애플리케이션이 그 DB 를 가리키도록 하기 전에 반드시 부록 B 의 원장 쿼리로 원장 상태가
    Stage A 시작 전과 같은지 확인한다.
 4. 이 복원·전환은 **직접 사용자 승인** 후에만 실행한다(alpha-data-writes-need-user-approval
@@ -239,7 +266,9 @@ Stage A 가 뜬 백업(`backup.dump`, `pg_restore -Fc` 형식)은 EC2 호스트�
 
 1. AWS 콘솔 → RDS → 대상 인스턴스 → "작업(Actions)" → "특정 시점으로 복원(Restore to point
    in time)". quiesce 영수증(`quiesce.json`)에 기록된 시각 **직전**을 목표 시각으로 고른다 —
-   quiesce 이후에는 쓰기가 없었으므로 그 시각 자체나 그 이후 아무 시각이나 안전하다.
+   실제 복원 가능 시간창 안에서 **Stage A의 첫 DB 변경보다 앞선 시점**을 확정한다.
+   API·워커가 멈춰도 마이그레이션과 전환 도구는 DB를 변경하므로, quiesce 이후의 임의 시각은
+   안전한 복원 시점으로 간주하지 않는다. 복원한 원장·스키마·행 수를 검증한 후 연결을 바꾼다.
 2. 복원은 **새 인스턴스**로 생성된다(원본을 덮어쓰지 않음) — 엔드포인트가 바뀐다.
 3. 애플리케이션을 그 새 인스턴스로 돌리기 전에 부록 B 쿼리로 원장·핵심 테이블 행 수를 확인한다.
 4. 확인 후 `.env` 의 DB 접속 정보(`V1_DB_HOST` 등 키 이름)를 새 인스턴스로 갱신 — 이 문서엔
@@ -248,8 +277,8 @@ Stage A 가 뜬 백업(`backup.dump`, `pg_restore -Fc` 형식)은 EC2 호스트�
 
 ### 이전 릴리스 재배포가 막히는 조건
 
-M11 이 이미 원장에 적용된 뒤에는 `assert_task168_m11_restore_target_safe()` 가 다음을 모두
-만족할 때만 롤백/복원 대상을 허용한다 — 즉 셋 중 하나라도 걸리면 **자동으로 거부**된다:
+`assert_task168_m11_restore_target_safe()` 는 다음 세 조건이 **모두 참이면** 롤백/복원 대상을
+거부한다:
 
 1. Task168 Stage A 전환 영수증(`transition.json`)이 이 환경에 존재한다(없으면 애초에 이
    가드 자체가 발동하지 않는다 — M11 을 겪은 적 없는 환경).
@@ -379,6 +408,9 @@ WHERE migration_name = '20260911090000_retire_tournament_fixture_tables';
 --         finished_at 있음, rolled_back_at 없음(NULL)
 
 -- 3) Stage A 완료 후 ~ Stage B 이전: 전환 seal(트리거) 상태 — "5|5|3|0|0|0" 이어야 정상
+-- M11 이후에는 제거된 테이블을 조회하지 않는다(psql 조건 분기).
+SELECT to_regclass('v1_tournament_fixtures') IS NOT NULL AS legacy_present \gset
+\if :legacy_present
 SELECT
   (SELECT count(*) FROM pg_trigger WHERE tgname='v1_tournament_fixture_retired_write' AND tgenabled='A') || '|' ||
   (SELECT count(*) FROM pg_trigger WHERE tgname='v1_tournament_fixture_retired_row_write' AND tgenabled='A') || '|' ||
@@ -386,6 +418,7 @@ SELECT
   (SELECT count(*) FROM v1_games WHERE source_type::text='TOURNAMENT_FIXTURE' OR tournament_fixture_id IS NOT NULL) || '|' ||
   (SELECT count(*) FROM v1_tournament_staff_fixture_scopes WHERE fixture_id IS NOT NULL) || '|' ||
   (SELECT count(*) FROM v1_operation_audits WHERE fixture_id IS NOT NULL);
+\endif
 
 -- 4) Stage B 완료 후(M11 적용 후): 레거시 테이블·트리거가 실제로 사라졌는지 — "0|0" 이어야 정상
 SELECT

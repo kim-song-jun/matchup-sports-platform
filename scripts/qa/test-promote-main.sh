@@ -366,4 +366,45 @@ test_gate_failure_blocks_link
 test_existing_pr_reused
 test_push_conflict_guides_retry
 
+test_prepare_only() {
+  reset_fakes
+  local pair origin work before_head before_main before_dev before_index
+  pair="$(make_repo_pair 0.4.0)"
+  origin="$(sed -n 1p <<< "${pair}")"
+  work="$(sed -n 2p <<< "${pair}")"
+  add_pending_changeset "${work}" pending-prepare v1_api patch
+  export REPO_ROOT="${work}" CONFIRMATION=PROMOTE
+  if main --prepare-only > "${TEST_ROOT}/prepare-denied.log" 2>&1; then
+    fail 'prepare-only must refuse dev'
+  fi
+  [[ "${FAKE_PNPM_CALLS}" -eq 0 ]] || fail 'protected branch changed files'
+  git -C "${work}" checkout -qb fix/prepare-fixture
+  before_head="$(git -C "${work}" rev-parse HEAD)"
+  before_main="$(git -C "${origin}" rev-parse main)"
+  before_dev="$(git -C "${origin}" rev-parse dev)"
+  before_index="$(git -C "${work}" write-tree)"
+  FAKE_ALPHA_SHA="${before_head}"
+  FAKE_ALPHA_RELEASE="$(resolve_expected_release "${work}")"
+  printf 'preserve this WIP\n' > "${work}/unrelated-wip.txt"
+  if main --prepare-only > "${TEST_ROOT}/prepare-dirty-denied.log" 2>&1; then
+    fail 'prepare-only must refuse untracked WIP'
+  fi
+  grep -q 'requires a clean worktree' "${TEST_ROOT}/prepare-dirty-denied.log" || fail 'dirty-tree refusal missing'
+  [[ "${FAKE_PNPM_CALLS}" -eq 0 ]] || fail 'dirty-tree refusal consumed changesets'
+  [[ -e "${work}/.changeset/pending-prepare.md" ]] || fail 'dirty-tree refusal deleted changeset'
+  rm "${work}/unrelated-wip.txt"
+  main --prepare-only > "${TEST_ROOT}/prepare.log" 2>&1 || fail "prepare-only failed: $(cat "${TEST_ROOT}/prepare.log")"
+  [[ "${FAKE_PNPM_CALLS}" -eq 1 && "${FAKE_GH_WORKFLOW_RUN_CALLS}" -eq 0 ]] || fail 'prepare-only dispatched'
+  [[ "$(git -C "${work}" rev-parse HEAD)" == "${before_head}" ]] || fail 'prepare-only committed'
+  [[ "$(git -C "${origin}" rev-parse dev)" == "${before_dev}" ]] || fail 'prepare-only pushed dev'
+  [[ "$(git -C "${origin}" rev-parse main)" == "${before_main}" ]] || fail 'prepare-only changed main'
+  [[ "$(git -C "${work}" write-tree)" == "${before_index}" ]] || fail 'prepare-only staged'
+  [[ ! -e "${work}/.changeset/pending-prepare.md" ]] || fail 'prepare-only did not consume changesets'
+  grep -q 'Verified dev -> main release promotion' "${TEST_ROOT}/prepare.log" || fail 'prepare-only skipped gate'
+  rm -rf "${origin}" "${work}"
+  echo '[test-promote-main] prepare-only -> release diff, unchanged index/refs, no dispatch: OK'
+}
+
+test_prepare_only
+
 echo "[test-promote-main] all scenarios passed"

@@ -275,6 +275,20 @@ describe('UploadsService.storeChatFile (Task 181 ③)', () => {
     await expect(service.storeChatFile(await tempUpload('메모.txt', '안녕하세요'), 'user-1')).resolves.toMatchObject({ mimeType: 'text/plain; charset=utf-8' });
   });
 
+  it('경로를 포함한 요청 이름도 고정 확장자로 비공개 저장하고 prototype 키는 거부한다', async () => {
+    await service.storeChatFile(await tempUpload('../../outside.PDF', '%PDF-1.7'), 'user-1');
+    const data = tx.v1UploadAsset.create.mock.calls[0][0].data;
+    expect(data.originalName).toBe('outside.PDF');
+    expect(data.storagePath).toMatch(/^\.private\/\d{4}\/\d{2}\/[0-9a-f-]+\.pdf$/);
+    await expect(fs.readFile(path.join(UploadsService.UPLOAD_BASE, data.storagePath), 'utf8')).resolves.toBe('%PDF-1.7');
+    for (const extension of ['constructor', '__proto__', 'toString']) {
+      const file = await tempUpload(`payload.${extension}`, '%PDF-1.7');
+      await expect(service.storeChatFile(file, 'user-1')).rejects.toMatchObject({ response: { code: 'UPLOAD_FILE_TYPE_INVALID' } });
+      await expect(fs.stat(file.path)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+    expect(tx.v1UploadAsset.create).toHaveBeenCalledTimes(1);
+  });
+
   it('실행 파일·HTML 같은 형식은 받지 않고 임시 파일을 지운다', async () => {
     const exe = await tempUpload('setup.exe', 'MZ...');
     await expect(service.storeChatFile(exe, 'user-1')).rejects.toMatchObject({ response: { code: 'UPLOAD_FILE_TYPE_INVALID' } });

@@ -2,6 +2,32 @@
 
 Status: Implemented — 승격(dev→main)과 Stage A/B 실행은 사용자 결정 대기. 런북 `docs/ops/prod-task168-transition-runbook.md`.
 
+## Progress Snapshot — 2026-10-01 production readiness
+
+판정 **NO-GO**, 보고서 `docs/ops/prod-readiness-2026-10-01.md`, PR 본문 초안
+`docs/ops/prod-promotion-pr1325-body.md`. 사용자 요청에 따라 다음 운영 확인은 한 단계씩 진행한다.
+
+- [x] 규칙/런북/현재 배포 경로 읽기, 원격 재fetch: dev `3aac46ec1`, main `f49742f45`, main-only 0/dev-only 4322.
+- [x] 기존 dirty tree를 보존하고 `/tmp/teameet-prod-readiness-20261001`의 별도 수정 브랜치 사용.
+- [x] 최신 PR 실패 확인: Changeset 77. 인증된 Gates 실패 로그 확인, High 6건 검토/오탐 처리.
+- [x] prepare-only 로컬 실행 경로·고정 업로드 확장자·dockerignore·PITR/완료 쿼리 설명 보강.
+- [x] promote 계약 8 시나리오, upload 16 tests, Task 168 계약, production security, surface gate 통과.
+- [x] 별도 release-only worktree `/tmp/teameet-prod-release-candidate-20261001`: 75개 소비, 앱 1.1.0, 로컬 승격 정책 통과.
+- [x] alpha/prod 실제 웹/API SHA·DB health·308 및 공개 경기 44/44·32/32 확인.
+- [x] GitHub CLI 2.102.0 설치·기존 seeungmin 인증 확인. 전체 thread 26/미해결 4, CodeQL 44/48 PR 인스턴스 open/high 조회.
+- [x] baseline/CodeQL thread 3개 resolved, High 6건 false positive/CodeQL PASS. Docker thread 1개는 dev 반영 대기.
+- [x] 실제 multer 경로 위조 3 요청, surface 정상/거부, callback 6/6 PASS.
+- [x] #1325 본문을 최신 범위/검증/NO-GO/사용자 운영 순서로 게시.
+- [ ] dev 대상 준비 수정 초안 PR CI와 리뷰.
+- [ ] 수정 PR → dev 검증 → 최신 dev에서 릴리스 재생성/PR → 새 SHA CI/alpha 재검증.
+- [ ] 현재 188개 migration chain의 원본 리허설·DB ledger/PITR·권장 스냅샷 증거 확보.
+- [ ] 공지·연속 운영자·main SHA 동결 확정, 인증 시나리오 확인 → GO 재판정.
+
+Owned: release script/test, upload service/test, dockerignore, 이 task 및 운영 보고서/런북,
+AGENTS/CLAUDE/compatibility 문서, 자체 patch Changeset. Forbidden: 기존 shared-tree WIP,
+main push/merge, production approval, production DB mutation. release-only 후보는 과거 c4467dab1 기반으로 재생성 필요. 준비 수정은 dev 대상 초안 PR로 전달한다.
+기존 09-27 리허설(178개) 기록을 현재 188개 체인의 실증 완료로 취급하지 않는다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development. 체크박스로 진행을 추적한다.
 
 **Goal:** dev→main 승격 후 프로덕션 DB 를 Task168 최종 스키마로 옮기는 Stage A / Stage B 두 번의 배포 경로를 만든다.

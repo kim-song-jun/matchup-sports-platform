@@ -264,14 +264,16 @@ export class UploadsService {
     }
     const name = sanitizeChatFileName(file.originalname);
     const ext = path.extname(name).slice(1).toLowerCase();
-    const type = CHAT_FILE_TYPES[ext];
-    if (!type) {
+    // Use the registry's literal key for storage, never the request's extension.
+    const acceptedType = Object.entries(CHAT_FILE_TYPES).find(([allowed]) => allowed === ext);
+    if (!acceptedType) {
       await this.unlinkTemps([file]);
       throw new BadRequestException({
         code: 'UPLOAD_FILE_TYPE_INVALID',
         message: `보낼 수 없는 파일 형식이에요. ${CHAT_FILE_TYPE_LABEL} 파일만 보낼 수 있어요.`,
       });
     }
+    const [storageExtension, type] = acceptedType;
     let byteSize: number;
     let signatureValid: boolean;
     try {
@@ -296,7 +298,7 @@ export class UploadsService {
       UploadsService.PRIVATE_DIR,
       now.getFullYear().toString(),
       String(now.getMonth() + 1).padStart(2, '0'),
-      `${randomUUID()}.${ext}`,
+      `${randomUUID()}.${storageExtension}`,
     );
     const destPath = path.join(UploadsService.UPLOAD_BASE, storagePath);
     let moved = false;

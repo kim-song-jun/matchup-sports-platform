@@ -230,6 +230,26 @@ write_summary() {
 }
 
 main() {
+  local prepare_only=false
+  case "${1:-}" in
+    '') ;;
+    --prepare-only) prepare_only=true ;;
+    *) log "Unknown argument: $1"; return 1 ;;
+  esac
+  if [[ "${prepare_only}" == true ]]; then
+    local branch
+    branch="$(git -C "${REPO_ROOT}" branch --show-current)" || return 1
+    if [[ -z "${branch}" || "${branch}" == main || "${branch}" == dev ]]; then
+      log "--prepare-only requires an isolated feature branch (not main/dev or detached HEAD)"
+      return 1
+    fi
+    if ! git -C "${REPO_ROOT}" diff --quiet ||
+      ! git -C "${REPO_ROOT}" diff --cached --quiet ||
+      [[ -n "$(git -C "${REPO_ROOT}" ls-files --others --exclude-standard)" ]]; then
+      log "--prepare-only requires a clean worktree; preserve existing WIP and use a fresh worktree"
+      return 1
+    fi
+  fi
   require_confirmation || return 1
 
   local dev_sha
@@ -249,6 +269,32 @@ main() {
 
   local changesets_count
   changesets_count="$(jq -er '.changesets | length' <<< "${metadata}")"
+
+  # Bootstrap locally when workflow_dispatch cannot find the workflow on main.
+  # Prepare a reviewable release diff; never stage, commit, push or dispatch.
+  if [[ "${prepare_only}" == true ]]; then
+    if [[ "${changesets_count}" -gt 0 ]]; then
+      run_changesets_version || return 1
+      local prepared_versions expected_version
+      prepared_versions="$(node -e 'const fs=require("fs"); for(const p of ["v1_api","v1_web"]) console.log(JSON.parse(fs.readFileSync(process.argv[1]+"/apps/"+p+"/package.json")).version)' "${REPO_ROOT}")" || return 1
+      expected_version="$(jq -er '.stableVersion' <<< "${metadata}")" || return 1
+      [[ "${prepared_versions}" == "${expected_version}"$'\n'"${expected_version}" ]] || {
+        log "Changesets output does not match the planned fixed version"; return 1;
+      }
+    fi
+    local prepared_files main_versions
+    prepared_files="$(mktemp)"
+    compute_gate_changed_files "${MAIN_REF}" "${DEV_REF}" "${prepared_files}" || { rm -f "${prepared_files}"; return 1; }
+    git -C "${REPO_ROOT}" diff --name-only HEAD >> "${prepared_files}"
+    sort -u -o "${prepared_files}" "${prepared_files}"
+    main_versions="$(resolve_versions_at "${MAIN_REF}")" || { rm -f "${prepared_files}"; return 1; }
+    local prepare_rc=0
+    run_promotion_gate "${prepared_files}" "${main_versions%% *}" "${main_versions##* }" || prepare_rc=$?
+    rm -f "${prepared_files}"
+    [[ "${prepare_rc}" -eq 0 ]] || return "${prepare_rc}"
+    log "Local release candidate prepared. Review the diff and deliver it through a PR to dev; rerun CI and alpha verification on the resulting dev SHA."
+    return 0
+  fi
 
   local versioned=false
   if [[ "${changesets_count}" -gt 0 ]]; then

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -219,5 +221,34 @@ describe('ConfirmModal focus after a failed request', () => {
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(confirmButton).toHaveFocus();
+  });
+});
+
+describe('ConfirmModal layer (W3-V10)', () => {
+  const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+  const zOf = (css: string, pattern: RegExp) => {
+    const value = pattern.exec(css)?.[1];
+    if (value === undefined) throw new Error(`z-index not found: ${pattern}`);
+    return Number(value);
+  };
+
+  it('mounts on document.body, outside the page wrapper, on the modal layer', () => {
+    const { container } = render(
+      <div style={{ viewTransitionName: 'page-content' }}>
+        <ConfirmModal open title="일정을 취소할까요?" message="되돌릴 수 없어요." onConfirm={vi.fn()} onCancel={vi.fn()} />
+      </div>,
+    );
+
+    const backdrop = screen.getByRole('dialog').parentElement;
+    expect(container.contains(backdrop)).toBe(false);
+    expect(backdrop?.parentElement).toBe(document.body);
+    expect(backdrop?.style.zIndex).toBe('var(--z-modal)');
+  });
+
+  it('keeps the modal layer above the shell chrome and the desktop nav', () => {
+    const tokens = read('src/app/tokens.css');
+    const modal = zOf(tokens, /--z-modal:\s*(\d+)/);
+    expect(modal).toBeGreaterThan(zOf(tokens, /--z-chrome:\s*(\d+)/));
+    expect(modal).toBeGreaterThan(zOf(read('src/app/desktop/_shell.css'), /\.tm-desktop-nav\s*\{[^}]*z-index:\s*(\d+)/));
   });
 });

@@ -225,24 +225,24 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
     return Array.from(document.querySelectorAll('button.tm-btn-primary'));
   }
 
-  it('평시엔 헤더 "+ 추가"만 primary 다', () => {
+  it('평시엔 헤더 "선수 추가"만 primary 다', () => {
     renderRoster();
 
     expect(primaryButtons()).toHaveLength(1);
-    expect(screen.getByRole('button', { name: '선수 추가하기' })).toHaveClass('tm-btn-primary');
+    expect(screen.getByRole('button', { name: '선수 추가' })).toHaveClass('tm-btn-primary');
   });
 
-  it('추가 칸을 열면 헤더는 outline 으로, 그 칸의 "추가"만 primary 로 바뀐다', () => {
+  it('추가 칸을 열면 헤더는 outline 으로, 그 칸의 "선수 등록"만 primary 로 바뀐다', () => {
     renderRoster();
 
-    fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
 
-    const headerAdd = screen.getByRole('button', { name: '선수 추가하기' });
+    const headerAdd = screen.getByRole('button', { name: '선수 추가' });
     expect(headerAdd).toHaveClass('tm-btn-outline');
     expect(headerAdd).not.toHaveClass('tm-btn-primary');
     const primaries = primaryButtons();
     expect(primaries).toHaveLength(1);
-    expect(primaries[0]).toHaveTextContent('추가');
+    expect(primaries[0]).toHaveTextContent('선수 등록');
   });
 
   it('행 수정을 열면 헤더는 outline, 그 행의 "저장"만 primary 다', () => {
@@ -252,7 +252,7 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
 
     const save = screen.getByRole('button', { name: '저장' });
     expect(save).toHaveClass('tm-btn-primary');
-    expect(screen.getByRole('button', { name: '선수 추가하기' })).toHaveClass('tm-btn-outline');
+    expect(screen.getByRole('button', { name: '선수 추가' })).toHaveClass('tm-btn-outline');
     expect(primaryButtons()).toHaveLength(1);
   });
 
@@ -260,10 +260,10 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
     renderRoster();
 
     fireEvent.click(screen.getByRole('button', { name: '홍길동 수정' }));
-    fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
 
     expect(primaryButtons()).toHaveLength(1);
-    expect(primaryButtons()[0]).toHaveTextContent('추가');
+    expect(primaryButtons()[0]).toHaveTextContent('선수 등록');
     expect(screen.getByRole('button', { name: '저장' })).toHaveClass('tm-btn-outline');
   });
 });

@@ -1436,7 +1436,13 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     competitionId: tournamentId,
     fromHref: searchParams.get('from'),
   });
-  const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
+  const {
+    data: myTeamsData,
+    isLoading: loadingTeams,
+    isError: teamsError,
+    error: teamsErr,
+    refetch: refetchTeams,
+  } = useV1MyTeams();
   const {
     data: registrations = [],
     isLoading: loadingRegistrations,
@@ -1478,11 +1484,22 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
       );
   }
 
-  if (registrationsError) {
-    const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  // 팀 조회 실패를 빈 팀 목록으로 흘리면 "관리 권한 없음" 과 구분되지 않아 수정 CTA 가 조용히 사라진다.
+  if (registrationsError || teamsError) {
+    const msg = registrationsError
+      ? extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
+      : extractErrorMessage(teamsErr, '관리 권한을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    const retry = () => {
+      if (registrationsError) void refetchRegistrations();
+      if (teamsError) void refetchTeams();
+    };
     return (
               <div style={{ padding: '0 20px', marginTop: 24 }}>
-          <ErrorState message={msg} onRetry={() => void refetchRegistrations()} />
+          <ErrorState
+            title={registrationsError ? undefined : '팀 정보를 불러오지 못했어요'}
+            message={msg}
+            onRetry={retry}
+          />
           <Link
             href={detailHref}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"

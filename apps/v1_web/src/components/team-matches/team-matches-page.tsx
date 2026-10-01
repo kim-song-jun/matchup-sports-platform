@@ -264,6 +264,17 @@ function HeroTeamLink({ href, name, align, children }: { href?: string; name: st
   );
 }
 
+/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. */
+function HeroTrustBadge({ trustState, align }: { trustState?: string | null; align: 'left' | 'right' }) {
+  const label = trustState ? trustStateLabel(trustState) : null;
+  if (!label) return null;
+  return (
+    <div style={{ marginTop: 4, textAlign: align }}>
+      <span className="tm-badge tm-badge-sm tm-badge-blue">{label}</span>
+    </div>
+  );
+}
+
 function HeroTeamChevron() {
   return <ChevronRightIcon size={14} aria-hidden="true" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 2, color: 'var(--overlay-white-72)' }} />;
 }
@@ -497,6 +508,13 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       <span className="tm-badge" style={{ background: 'var(--static-white)', color: 'var(--static-ink)' }}>{heroStatus}</span>
     </div>
   ) : null;
+  // 팀 카드를 그리지 않을 때(confirmedOpponent) 카드가 말하던 수준 라벨·신뢰 배지를 히어로가 이어받는다.
+  const hostHeroSub = [
+    match.hostTeamRatingScore == null ? null : `팀 평점 ${match.hostTeamRatingScore.toFixed(1)}`,
+    match.hostTeamWins == null ? null : `${match.hostTeamWins}승`,
+    confirmedOpponent ? match.hostTeamLevelLabel : null,
+  ].filter(Boolean).join(' · ');
+  const opponentHeroSub = confirmedOpponent ? [confirmedOpponent.meta, confirmedOpponent.levelLabel].filter(Boolean).join(' · ') : '';
   const opponentSub = teamMatchOpponentSub(mode, match, Boolean(model.applicationsError));
   // 취소·모집 마감·수정은 화면 본문이 아니라 히어로 ⋯ 메뉴에 둔다(H6 manage-menu A).
   const manageMenuButton = mode === 'mine' && model.manageMenu ? (
@@ -624,20 +642,15 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                     <HeroTeamLink href={confirmedOpponent ? match.hostTeamHref ?? `/teams/${match.hostTeamId}` : undefined} name={match.hostTeam} align="left">
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
                       <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
-                      {match.hostTeamRatingScore != null || match.hostTeamWins != null ? (
-                        <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>
-                          {[
-                            match.hostTeamRatingScore == null ? null : `팀 평점 ${match.hostTeamRatingScore.toFixed(1)}`,
-                            match.hostTeamWins == null ? null : `${match.hostTeamWins}승`,
-                          ].filter(Boolean).join(' · ')}
-                        </div>
-                      ) : null}
+                      {hostHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{hostHeroSub}</div> : null}
+                      {confirmedOpponent ? <HeroTrustBadge trustState={match.hostTeamTrustState} align="left" /> : null}
                     </HeroTeamLink>
                     <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
                     <HeroTeamLink href={confirmedOpponent?.href} name={confirmedOpponent?.name ?? ''} align="right">
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{(mode === 'pending' && model.myApplicationTeam) || model.viewerOnApplicantSide ? '우리 팀' : '상대팀'}</div>
                       <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
-                      {confirmedOpponent?.meta ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{confirmedOpponent.meta}</div> : null}
+                      {opponentHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentHeroSub}</div> : null}
+                      {confirmedOpponent ? <HeroTrustBadge trustState={confirmedOpponent.trustState} align="right" /> : null}
                       {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentSub}</div> : null}
                     </HeroTeamLink>
                   </div>

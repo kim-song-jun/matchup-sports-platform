@@ -1274,6 +1274,24 @@ describe('TeamMatchDetailPageView — 히어로가 두 팀을 요약한다 (#142
     expect(container.querySelector('.tm-team-match-team-cards')).toBeNull();
   });
 
+  it('카드가 말하던 수준 라벨과 신뢰 배지를 히어로 팀 칸이 이어받는다', () => {
+    const model = confirmedModel({ hostTeamLevelLabel: '중급', hostTeamTrustState: 'verified', applicantTeams: [{ ...opponent, levelLabel: '상급', trustState: 'estimated' }] });
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+
+    expect(hero.getByText('팀 평점 4.0 · 9승 · 상급')).toBeInTheDocument();
+    expect(hero.getByText('중급')).toBeInTheDocument();
+    expect(hero.getByText('인증팀')).toBeInTheDocument();
+    expect(hero.getByText('누적 중')).toBeInTheDocument();
+  });
+
+  it('대조군 — 표시하지 않는 신뢰 상태(sample)는 배지가 없다', () => {
+    const model = confirmedModel({ hostTeamTrustState: 'sample', applicantTeams: [{ ...opponent, trustState: 'sample' }] });
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(container.querySelector('.tm-team-vs-row .tm-badge')).toBeNull();
+  });
+
   it('대조군 — 상대가 아직 없으면 팀 카드가 그대로 남고 히어로 팀 칸은 링크가 아니다', () => {
     const { container } = renderPage(<TeamMatchDetailPageView model={confirmedModel({ applicantTeams: [] })} />);
 

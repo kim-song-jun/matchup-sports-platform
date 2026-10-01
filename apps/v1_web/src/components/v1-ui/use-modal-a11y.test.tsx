@@ -143,8 +143,10 @@ describe('useModalA11y', () => {
     expect(document.body.style.overflow).toBe('hidden');
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(document.body.style.overflow).toBe('');
+    // 해제는 패널을 걷는 커밋 뒤 별도 작업(useEffect cleanup)으로 온다 — 패널이 사라진 것을 기다리면
+    // 해제 전에 단언할 수 있다(CI 간헐 실패). 해제 자체를 기다리고, 새면 시간 초과로 실패한다.
+    await waitFor(() => expect(document.body.style.overflow).toBe(''));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('잠그기 전에 있던 인라인 값은 마지막 오버레이가 닫힐 때 그대로 돌아온다', () => {

@@ -7,10 +7,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1NotificationUnreadSummary: vi.fn(),
 }));
 
-const navigation = vi.hoisted(() => ({ path: '/home', search: '' }));
+const navigation = vi.hoisted(() => ({ path: '/home', search: '' as string | null }));
 vi.mock('next/navigation', () => ({
   usePathname: () => navigation.path,
-  useSearchParams: () => new URLSearchParams(navigation.search),
+  useSearchParams: () => navigation.search === null ? null : new URLSearchParams(navigation.search),
 }));
 
 const useV1NotificationUnreadSummaryMock = vi.mocked(useV1NotificationUnreadSummary);
@@ -64,6 +64,14 @@ describe('NotificationBellLink', () => {
     const href = screen.getByRole('link', { name: '알림' }).getAttribute('href')!;
     expect(new URL(href, 'https://teameet.test').searchParams.get('from'))
       .toBe('/my/matches/joined?type=team&from=%2Fmy');
+  });
+
+  it('검색 파라미터가 아직 없으면 현재 경로를 출발 화면으로 보존한다', () => {
+    navigation.path = '/my';
+    navigation.search = null;
+    mockUnreadCount(0);
+    render(<NotificationBellLink className="bell" />);
+    expect(screen.getByRole('link', { name: '알림' })).toHaveAttribute('href', '/notifications?from=%2Fmy');
   });
 
   it('does not request the protected unread summary without a stored session', () => {

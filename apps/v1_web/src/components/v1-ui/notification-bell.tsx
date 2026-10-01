@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { Suspense, useEffect, useState, type ComponentProps } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { withFromPath } from '@/lib/session-storage';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { BellIcon } from './icons';
 
 type NotificationBellProps = {
@@ -97,7 +96,7 @@ function UnreadIndicator({
 
 function NotificationBellOriginLink(props: Omit<ComponentProps<typeof Link>, 'href'>) {
   const pathname = usePathname();
-  const query = useSearchParams().toString();
+  const query = useSearchParams()?.toString() ?? '';
   const source = `${pathname ?? '/home'}${query ? `?${query}` : ''}`;
   return <Link {...props} href={withFromPath('/notifications', source)} />;
 }

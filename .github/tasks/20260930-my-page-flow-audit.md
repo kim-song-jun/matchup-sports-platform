@@ -202,11 +202,15 @@ Owned: 관련 apps/v1_web 컴포넌트·라우트·테스트, 이 task, docs/sce
 Forbidden: 공유 작업트리 WIP, main 승격, API/DB/fixture reset, 실제 탈퇴·SMS/푸시 발송.
 
 ### Progress Snapshot
-구현 완료, 로컬 회귀 10파일 123테스트 통과(기존 서버 route 테스트 3개 포함).
+구현 완료, 로컬 회귀 12파일 148테스트 통과(기존 서버 route 테스트 3개 포함).
 생년월일 RED: 기존 구분자 값이 이중 구분자로 표시되어 실패 → 수정 후 정상 표시·PATCH payload 통과.
 TypeScript tsc --noEmit 오류 0, v1 패턴 검사 통과. 관련 TODO/FIXME/HACK/XXX 없음.
 격리 의존성 설치 과정은 lockfile을 변경하지 않았다. 공유 작업트리 변경은 포함하지 않는다.
-PR 리뷰 및 배포·재검증 대기.
+공개 약관·설정발 비밀번호 화면도 AppBackLink history/replace 계약으로 복귀한다.
+리뷰에서 확인된 계정 맥락 오해를 해소: 설정발 재설정은 로그인한 계정의 휴대폰/이메일과 일치해야 새 비밀번호를 입력·저장한다.
+기존 재설정 API와 세션 정책은 변경하지 않는다.
+첫 Web CI는 공통 셸 테스트의 nullable searchParams에서 실패했다. 알림 링크에서 nullable 경로를 처리하고 셸 15개 회귀를 통과시켰다.
+PR 재리뷰 및 배포·재검증 대기.
 
 ### Security / Ambiguity
 복귀 경로는 sanitizeRedirectPath/withFromPath 기존 보호를 재사용한다.

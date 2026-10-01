@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AuthBackButton } from './auth-back-button';
 import { AuthFixedCta } from './auth-fixed-cta';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
@@ -164,10 +165,12 @@ export function AuthIllustration({ name, className }: { name: string; className?
   );
 }
 
-export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, skipHref, fixedAction, className, stage }: {
+export function AuthFrame({ children, topTitle, backHref, appBack = false, onBack, backLabel, skipHref, fixedAction, className, stage }: {
   children: ReactNode;
   topTitle?: string;
   backHref?: string;
+  /** 인증 화면을 앱 설정에서 열었으면 앱의 history/replace 복귀 계약을 따른다. */
+  appBack?: boolean;
   /**
    * 이동이 아니라 동작(확인 모달 → 로그아웃 등)이 필요한 뒤로가기. backHref 와 배타적으로 쓰며,
    * 둘 다 없으면 상단 좌측이 비어 화면을 빠져나갈 방법이 사라진다.
@@ -207,7 +210,9 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
       {hasBack ? (
         <div className="tm-onboarding-desktop-nav tm-show-desktop">
           {backHref ? (
-            <Link className="tm-onboarding-desktop-back" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
+            appBack ? <AppBackLink className="tm-onboarding-desktop-back" fallbackHref={backHref}>
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </AppBackLink> : <Link className="tm-onboarding-desktop-back" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
               <ChevronLeftIcon size={22} strokeWidth={2.2} />
             </Link>
           ) : (
@@ -221,7 +226,9 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
         <header className="tm-auth-topbar">
           <div className="tm-auth-topbar-left">
             {backHref ? (
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
+              appBack ? <AppBackLink className="tm-btn tm-btn-icon tm-btn-ghost" fallbackHref={backHref}>
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </AppBackLink> : <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
             ) : onBack ? (

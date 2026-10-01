@@ -2,6 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountRecoveryClient } from './account-recovery-client';
 
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), back: vi.fn() }),
+}));
+
 const hooks = vi.hoisted(() => ({
   findAccountMutateAsync: vi.fn(),
   resetPasswordMutateAsync: vi.fn(),
@@ -11,6 +16,7 @@ const hooks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1AuthMe: () => ({ data: { user: { email: 'runner@example.com', phone: '01012345678' } }, isError: false }),
   useV1FindAccountByPhone: () => ({ mutateAsync: hooks.findAccountMutateAsync, isPending: false }),
   useV1ResetPasswordByPhone: () => ({ mutateAsync: hooks.resetPasswordMutateAsync, isPending: false }),
   useV1ResetPasswordByEmail: () => ({
@@ -76,6 +82,15 @@ describe('AccountRecoveryClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
     expect(await screen.findByRole('link', { name: '계정 설정으로 돌아가기' })).toHaveAttribute('href', '/my/settings');
     expect(hooks.resetPasswordMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ proofToken: 'RESET-TOKEN' }));
+  });
+
+  it('설정에서 다른 계정의 번호를 인증해도 현재 계정 비밀번호 변경으로 처리하지 않는다', async () => {
+    render(<AccountRecoveryClient initialMode="reset-password" backHref="/my/settings" />);
+    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: '01099998888' } });
+    fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+    expect(await screen.findByText('로그인한 계정의 휴대폰 번호 또는 이메일로 본인인증해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
+    expect(hooks.resetPasswordMutateAsync).not.toHaveBeenCalled();
   });
 
   // 가입용 증명으로 남의 비밀번호를 바꿀 수 없어야 하므로, 이 화면은 반드시 재설정 용도를 요청한다.

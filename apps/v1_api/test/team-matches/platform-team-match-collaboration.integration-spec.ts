@@ -46,7 +46,9 @@ describe('platform team match collaboration (real DB)', () => {
     await records.mutate(actor(f.userIds[2]), f.match.id, command('add', 2, f.sides[0].id));
     await records.mutate(actor(f.userIds[0]), f.match.id, command('confirm', 3));
     expect((await records.mutate(actor(f.userIds[2]), f.match.id, command('confirm', 4))).phase).toBe('official');
-    await expect(records.mutate(f.operator, f.match.id, command('add', 5, f.sides[0].id))).rejects.toMatchObject({ response: { code: 'RECORD_NOT_EDITABLE' } });
+    // 2026-10-01: 확정 뒤에도 어드민은 고친다(새 공식 리비전) — 참가자는 여전히 잠겨 있다.
+    await expect(records.mutate(actor(f.userIds[0]), f.match.id, command('add', 5, f.sides[0].id))).rejects.toMatchObject({ response: { code: 'RECORD_NOT_EDITABLE' } });
+    expect(await records.mutate(f.operator, f.match.id, command('add', 5, f.sides[0].id))).toMatchObject({ phase: 'official', canEdit: true });
   });
 
   it('denies ordinary matches, support, revoked admins and suspended accounts', async () => {

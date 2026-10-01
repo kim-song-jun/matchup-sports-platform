@@ -196,6 +196,29 @@ const resultReviewKeys = {
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 /**
+ * 보드 API 한 페이지 상한(100)에서 멈추면 101번째 경기부터 검토·정정 목록과 `?fixtureId=` 딥링크에서
+ * 사라져 어드민이 그 결과를 고칠 수 없다 — 다음 커서가 없을 때까지 읽어 한 목록으로 합친다.
+ */
+async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
+  const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
+  const items: TournamentOperationsBoardItem[] = [];
+  const liveWarnings: TournamentOperationsBoardResponse['liveWarnings'] = [];
+  let cursor: string | null = null;
+  let page: TournamentOperationsBoardResponse;
+  do {
+    page = await v1Get<TournamentOperationsBoardResponse>(path, {
+      status: 'ENDED',
+      limit: 100,
+      ...(cursor === null ? {} : { cursor }),
+    });
+    items.push(...page.items);
+    liveWarnings.push(...page.liveWarnings);
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+  return { ...page, items, liveWarnings, nextCursor: null };
+}
+
+/**
  * Ended fixtures for a tournament, via the Task 18 operations board
  * (`GET /tournament-ops/tournaments/:tournamentId/operations?status=ENDED`).
  * A "review" candidate is `gameState === 'ENDED' && revisionId === null`
@@ -207,11 +230,7 @@ const resultReviewKeys = {
 export function useTournamentEndedFixtures(tournamentId: string) {
   return useQuery({
     queryKey: resultReviewKeys.board(tournamentId, 'ENDED'),
-    queryFn: () =>
-      v1Get<TournamentOperationsBoardResponse>(
-        `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`,
-        { status: 'ENDED', limit: 100 },
-      ),
+    queryFn: () => fetchAllEndedFixtures(tournamentId),
     enabled: Boolean(tournamentId),
     staleTime: 15_000,
   });

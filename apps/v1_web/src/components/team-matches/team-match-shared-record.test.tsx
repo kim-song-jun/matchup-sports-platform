@@ -318,6 +318,23 @@ describe('shared record participant flow', () => {
     rerender(<TeamMatchSharedRecord teamMatchId="match" />);
     expect(screen.queryByRole('button', { name: '우리 팀 종료 확인' })).toBeNull();
   });
+  // 2026-10-01 — 확정 뒤 편집 여부는 서버의 canEdit(플랫폼 어드민만 참)을 그대로 따른다.
+  it('확정 뒤 어드민은 잠김 안내 대신 정정 안내를 보고, 득점을 고쳐 보낸다', async () => {
+    state.data = {
+      ...state.data, phase: 'official', canEdit: true, participant: false, operator: true, ownSideId: null,
+      officialAt: state.data.serverTime,
+      goals: [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 10, subMatchId: null }],
+    };
+    render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+    expect(screen.queryByText('결과가 확정되어 기록이 잠겼어요.')).toBeNull();
+    expect(screen.getByText(/고칠 때마다 새 공식 결과로 남아/)).toBeInTheDocument();
+    expect(screen.queryByText(/수정하면 기존 종료 확인이 초기화되며/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: '경기 종료 확인' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
+    fireEvent.change(screen.getByRole('combobox', { name: '득점 팀' }), { target: { value: 'away' } });
+    fireEvent.click(screen.getByRole('button', { name: '득점 등록' }));
+    await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'add', sideId: 'away', expectedVersion: 3 })));
+  });
   it('flags a potentially duplicate goal instead of blindly adding it', () => {
     state.data.goals = [{ id: 'g1', sideId: 'home', participantId: null, ownGoal: false, minute: null, subMatchId: null }];
     render(<TeamMatchSharedRecord teamMatchId="match" />);

@@ -543,8 +543,8 @@ export class LeagueMatchPublicService {
         startAt: true,
         status: true,
         // 감사 L-E finding 2/5 수정: 무효(VOID) 처리된 대진은 currentOfficialRevisionId가
-        // null로 풀리는 게 아니라 VOID 리비전 자신을 계속 가리킨다(voidTeamMatchResult,
-        // games.service.ts). fact 유무만으로는 "아직 결과가 없어 미확정"과 "결과가 있었지만
+        // null로 풀리는 게 아니라 VOID 리비전 자신을 계속 가리킨다(voidResultRevision,
+        // tournament-result-review.service.ts). fact 유무만으로는 "아직 결과가 없어 미확정"과 "결과가 있었지만
         // 무효 처리됨"을 구분할 수 없으므로(둘 다 fact가 없다) 포인터가 가리키는 리비전의
         // state를 직접 읽어야 한다.
         game: { select: { id: true, currentOfficialRevisionId: true, currentOfficialRevision: { select: { state: true } } } },

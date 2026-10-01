@@ -215,8 +215,10 @@ Actions → `deploy.yml` → "Run workflow" → 아래 입력으로 수동 실�
    되돌릴 일은 없다고 보지만, 승인 요청에 그 판단과 dry-run 출력 보관 위치를 함께 적는다.
 4. **apply.** 같은 명령을 `APPLY=1` 로 보낸다. 출력의 `[5]` 에서 `updated` 가 `[2]` 와 같고
    `remaining` 이 0 이어야 한다. 그렇지 않으면 스크립트가 스스로 롤백하고 오류로 끝난다.
-5. **재확인.** `APPLY=0` 으로 한 번 더 보내 `[2]` 가 0건인지 본다. 공개 API
-   `GET /api/v1/tournaments/:id/schedule` 같은 비인증 응답에서 해당 대회 경기 제목을 확인한다.
+5. **재확인.** `APPLY=0` 으로 한 번 더 보내 `[2]` 가 0건인지 본다. 화면 확인은 저장된 제목을 그대로
+   내보내는 응답으로 한다 — 참가 팀 멤버로 로그인한 `GET /api/v1/teams/:teamId/schedules` 의 `title`.
+   공개 대회 API(`/tournaments/:id/schedule`·`/matches/:fixtureId`)는 제목이 아니라 라운드 값을 따로
+   내보내므로 이 확인에 쓸 수 없다.
 
 ## 단계별 확인 방법
 

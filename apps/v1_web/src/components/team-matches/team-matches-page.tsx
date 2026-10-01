@@ -601,7 +601,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 backgroundSize: 'cover',
               } : undefined}
             >
-              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className="tm-team-vs-hero-illustration" />}
+              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="88px" className="tm-team-vs-hero-illustration" />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href={model.detailBackHref ?? '/team-matches'} aria-label="뒤로가기">

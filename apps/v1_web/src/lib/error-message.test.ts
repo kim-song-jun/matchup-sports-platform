@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { V1ApiError, v1MultipartPost, v1Post } from './api-client';
+import {
+  V1ApiError,
+  V1_OFFLINE_WRITE_MESSAGE,
+  isV1NetworkError,
+  retryTransientFailure,
+  v1Get,
+  v1MultipartPost,
+  v1Post,
+} from './api-client';
 import * as clientErrorReporter from './client-error-reporter';
 import { extractErrorCode, extractErrorMessage } from './error-message';
 
@@ -55,6 +63,32 @@ describe('extractErrorMessage — 서버가 메시지를 주지 않은 실패만
     expect(error).toMatchObject({ statusCode: 0, code: 'NETWORK_ERROR', cause: offline });
     expect(extractErrorMessage(error, FALLBACK)).toBe(FALLBACK);
     expect(extractErrorMessage(await rejection(v1MultipartPost('/uploads', new FormData())), FALLBACK)).toBe(FALLBACK);
+  });
+
+  // W6-V1: 오프라인 쓰기는 기다리지 않고 바로 실패한다 — 그 실패가 이유와 할 일을 말해야 한다.
+  it('브라우저가 오프라인이면 응답 없는 쓰기 실패는 연결 문구를 보여 주고, 네트워크 실패 분류는 그대로다', async () => {
+    const offline = new TypeError('Failed to fetch');
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(offline));
+
+    const error = await rejection(v1Post('/teams/team-1/dissolve', {}));
+    expect(extractErrorMessage(error, FALLBACK)).toBe(V1_OFFLINE_WRITE_MESSAGE);
+    expect(error).toMatchObject({ statusCode: 0, code: 'NETWORK_ERROR', cause: offline });
+    expect(isV1NetworkError(error)).toBe(true);
+    expect(retryTransientFailure(0, error)).toBe(true);
+    expect(extractErrorMessage(await rejection(v1MultipartPost('/uploads', new FormData())), FALLBACK)).toBe(V1_OFFLINE_WRITE_MESSAGE);
+  });
+
+  it('대조군 — 오프라인이어도 조회 실패, 응답이 온 실패(본문 없는 502·서버 메시지)는 종전대로다', async () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    expect(extractErrorMessage(await rejection(v1Get('/teams/team-1')), FALLBACK)).toBe(FALLBACK);
+
+    stubFetch({ ok: false, status: 502, statusText: 'Bad Gateway', json: htmlBody });
+    expect(extractErrorMessage(await rejection(v1Post('/teams/team-1/dissolve', {})), FALLBACK)).toBe(FALLBACK);
+
+    stubFetch({ ok: false, status: 403, json: envelope(403, '팀장만 팀을 해체하거나 복구할 수 있어요.') });
+    expect(extractErrorMessage(await rejection(v1Post('/teams/team-1/dissolve', {})), FALLBACK)).toBe('팀장만 팀을 해체하거나 복구할 수 있어요.');
   });
 
   it('대조군 — 요청 취소(AbortError·취소된 signal)는 감싸지 않고 그대로 던진다', async () => {

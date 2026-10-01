@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
@@ -54,6 +54,19 @@ describe('AuthFrame 데스크톱 스테이지', () => {
     const img = aside!.querySelector('img.tm-auth-stage-illustration');
     expect(img).not.toBeNull();
     expect(decodeURIComponent(img!.getAttribute('src') ?? '')).toContain('/illustrations/auth-notice-640.webp');
+  });
+
+  it('eyebrow 를 생략하면 브랜드 줄 하나만 남고, 주면 브랜드 줄 아래에 한 번 더 그린다', () => {
+    const base = { slogan: '슬로건', sub: '부제', illustration: 'auth-welcome' };
+    const { container, rerender } = render(<AuthFrame stage={base}>본문</AuthFrame>);
+    expect(container.querySelectorAll('.tm-auth-stage-brand')).toHaveLength(1);
+    expect(container.querySelector('.tm-auth-stage-eyebrow')).toBeNull();
+    rerender(<AuthFrame stage={{ ...base, eyebrow: '준비 완료' }}>본문</AuthFrame>);
+    expect(container.querySelector('.tm-auth-stage-eyebrow')).toHaveTextContent('준비 완료');
+  });
+
+  it('환영 스테이지는 브랜드명과 같은 글자의 eyebrow 를 두지 않는다', () => {
+    expect(AUTH_WELCOME_STAGE.eyebrow).toBeUndefined();
   });
 
   it('stage 가 없으면 aside 도 staged 클래스도 없다 — 약관·계정 삭제 안내는 폰 카드를 유지한다', () => {

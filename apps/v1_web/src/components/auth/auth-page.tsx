@@ -117,7 +117,8 @@ export function SignupCompletePageView({ model }: { model: SignupCompleteViewMod
  * 같은 문험은 같은 스테이지를 쓴다 — 화면마다 다른 그림을 만들지 않는다(agy-3d-graphic 스킬).
  */
 export type AuthStage = {
-  eyebrow: string;
+  /** 브랜드 줄과 이름이 겹치지 않는 스테이지(환영)에서는 생략한다. */
+  eyebrow?: string;
   slogan: string;
   sub: string;
   /** public/illustrations/<name>-640.webp */
@@ -125,7 +126,6 @@ export type AuthStage = {
 };
 
 export const AUTH_WELCOME_STAGE: AuthStage = {
-  eyebrow: 'Teameet',
   slogan: '같이 뛸 사람이\n기다리고 있어요',
   sub: '종목·실력·지역만 알려주면 딱 맞는 매치와 팀을 찾아드려요.',
   illustration: 'auth-welcome',
@@ -191,7 +191,7 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
       {stage ? (
         <aside className="tm-auth-stage tm-show-desktop">
           <div className="tm-auth-stage-brand"><BrandMark size={28} alt="" /><span>teameet</span></div>
-          <div className="tm-auth-stage-eyebrow tm-text-label">{stage.eyebrow}</div>
+          {stage.eyebrow ? <div className="tm-auth-stage-eyebrow tm-text-label">{stage.eyebrow}</div> : null}
           <div className="tm-auth-stage-slogan">{stage.slogan}</div>
           <p className="tm-auth-stage-sub tm-text-body">{stage.sub}</p>
           <div className="tm-auth-stage-well">

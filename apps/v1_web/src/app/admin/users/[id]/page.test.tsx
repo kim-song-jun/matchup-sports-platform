@@ -2,6 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import AdminUserDetailPage from './page';
 
+const state = vi.hoisted(() => ({ noMatches: false }));
+
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'user-1' }),
   useRouter: () => ({ push: vi.fn() }),
@@ -34,7 +36,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
       hostedMatchCount: 1,
       ownedTeamCount: 2,
       teamRoleCounts: { owner: 1, manager: 1, member: 0 },
-      hostedMatches: [{ matchId: 'match 1', title: 'QA 리그 1경기', status: 'completed', startAt: '2026-09-30T10:00:00.000Z' }],
+      hostedMatches: state.noMatches
+        ? []
+        : [{ matchId: 'match 1', title: 'QA 리그 1경기', status: 'completed', startAt: '2026-09-30T10:00:00.000Z' }],
       ownedTeams: [
         { teamId: 'team-a', name: 'QA 팀A', status: 'active', memberCount: 12 },
         { teamId: 'team-c', name: '소유만 한 팀', status: 'archived', memberCount: 1 },
@@ -88,5 +92,17 @@ describe('AdminUserDetailPage — 팀 한 번만, 상세 링크, 한국어 상�
     expect(within(match).getByText('완료')).toBeInTheDocument();
     const ownedOnly = screen.getByRole('link', { name: '소유만 한 팀' }).closest('li') as HTMLElement;
     expect(within(ownedOnly).getByText('보관')).toBeInTheDocument();
+  });
+
+  it('매치 섹션 제목은 개수를 붙이고, 0건이면 개수 없이 빈 안내를 보인다', () => {
+    const { unmount } = render(<AdminUserDetailPage />);
+    expect(screen.getByRole('heading', { name: '최근 매치 1개' })).toBeInTheDocument();
+    unmount();
+
+    state.noMatches = true;
+    render(<AdminUserDetailPage />);
+    expect(screen.getByRole('heading', { name: '최근 매치' })).toBeInTheDocument();
+    expect(screen.getByText('최근 생성한 매치가 없어요.')).toBeInTheDocument();
+    state.noMatches = false;
   });
 });

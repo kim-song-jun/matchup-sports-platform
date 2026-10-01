@@ -203,7 +203,7 @@ export default function AdminUserDetailPage() {
           </ListSection>
 
           <ListSection
-            title={`최근 매치 (최근 ${user.hostedMatches.length}개)`}
+            title={user.hostedMatches.length > 0 ? `최근 매치 ${user.hostedMatches.length}개` : '최근 매치'}
             manageHref="/admin/matches"
             manageLabel="매치 관리"
             empty="최근 생성한 매치가 없어요."

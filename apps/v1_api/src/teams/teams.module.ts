@@ -6,12 +6,14 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { TeamDissolutionController } from './team-dissolution.controller';
 import { TeamDissolutionService } from './team-dissolution.service';
+import { TeamInviteLinksController } from './team-invite-links.controller';
+import { TeamInviteLinksService } from './team-invite-links.service';
 import { TeamsController } from './teams.controller';
 import { TeamsService } from './teams.service';
 
 @Module({
   imports: [NotificationsModule, ChatModule],
-  controllers: [TeamsController, TeamDissolutionController],
-  providers: [TeamsService, TeamDissolutionService, OptionalV1AuthGuard, V1AuthGuard, CreatorProfileGuard],
+  controllers: [TeamsController, TeamDissolutionController, TeamInviteLinksController],
+  providers: [TeamsService, TeamDissolutionService, TeamInviteLinksService, OptionalV1AuthGuard, V1AuthGuard, CreatorProfileGuard],
 })
 export class TeamsModule {}

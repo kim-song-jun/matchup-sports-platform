@@ -137,6 +137,8 @@ export async function dissolveTeamInTx(
       data: { status: 'cancelled' },
     });
   }
+  // 복구해도 옛 초대 링크는 되살아나지 않는다 — 다시 모으려면 새 링크를 만든다.
+  await tx.v1TeamInviteLink.updateMany({ where: { teamId, revokedAt: null }, data: { revokedAt: now, revokedByUserId: reviewerUserId } });
 
   const cancelledScheduleCount = await cancelUpcomingTeamSchedulesInTx(tx, teamId, now);
   await tx.v1ChatRoom.updateMany({ where: { teamId }, data: { status: 'archived' } });

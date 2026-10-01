@@ -32,7 +32,7 @@ import {
   TeamMembersQueryDto,
   UpdateTeamDto,
 } from './dto/mutate-team.dto';
-import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
+import { CreateTeamInvitationDto, CreateTeamInvitationsBatchDto } from './dto/create-team-invitation.dto';
 import type { TeamNameAvailabilityQueryDto } from './dto/teams-query.dto';
 import { assertTeamNameAvailable, hasTeamWithSameName, isSameTeamName } from './team-name';
 import {
@@ -95,6 +95,13 @@ type TeamWithRelations = V1Team & {
     id: string;
     profile: { nickname: string; displayName: string | null; profileImageUrl: string | null } | null;
   };
+};
+
+/** 여러 명 초대의 항목별 결과. 'ambiguous' 는 같은 닉네임이 여럿이라 고를 수 없을 때(이메일로 다시 적게 한다). */
+export type TeamInvitationBatchResult = {
+  recipient: string;
+  status: 'invited' | 'already_invited' | 'already_member' | 'not_found' | 'ambiguous' | 'duplicate';
+  invitationId: string | null;
 };
 
 type TeamCapacityLike = {
@@ -1098,6 +1105,18 @@ export class TeamsService {
     teamId: string,
     dto: CreateTeamJoinApplicationDto,
   ) {
+    return this.submitJoinApplication(user, teamId, { message: dto.message ?? null, via: 'direct' });
+  }
+
+  /**
+   * 가입 신청의 단일 경로. 초대 링크로 온 신청도 여기서 같은 규칙(가입 닫힘·정원·이미 멤버·대기 중)을 탄다 —
+   * 링크는 신청을 여는 입구일 뿐 승인 권한(팀장·매니저)을 바꾸지 않는다.
+   */
+  async submitJoinApplication(
+    user: V1AuthUser,
+    teamId: string,
+    input: { message: string | null; via: 'direct' | 'invite_link' },
+  ) {
     this.assertActiveAccount(user);
     const team = await this.getPublicTeam(teamId, user);
     const viewer = this.getViewer(team, user);
@@ -1114,7 +1133,7 @@ export class TeamsService {
             where: { id: existing.id },
             data: {
               status: 'requested',
-              message: dto.message ?? null,
+              message: input.message,
               reviewedByUserId: null,
               reviewedAt: null,
               withdrawnAt: null,
@@ -1125,7 +1144,7 @@ export class TeamsService {
               teamId: team.id,
               applicantUserId: user.id,
               status: 'requested',
-              message: dto.message ?? null,
+              message: input.message,
             },
           });
 
@@ -1137,7 +1156,7 @@ export class TeamsService {
           toStatus: 'requested',
           actorType: 'user',
           actorUserId: user.id,
-          reason: existing ? 'team_join_application_resubmitted' : 'team_join_application_created',
+          reason: `${existing ? 'team_join_application_resubmitted' : 'team_join_application_created'}${input.via === 'invite_link' ? '_via_invite_link' : ''}`,
         },
       });
 
@@ -1443,20 +1462,7 @@ export class TeamsService {
   // ── 팀 초대 (이메일 기반) ────────────────────────────────────────────
 
   async createInvitation(user: V1AuthUser, teamId: string, dto: CreateTeamInvitationDto) {
-    this.assertActiveAccount(user);
-    await this.assertManagerOrOwner(user, teamId);
-
-    const team = await this.prisma.v1Team.findFirst({
-      where: { id: teamId, deletedAt: null },
-      select: { id: true, name: true, status: true, memberCount: true, profile: { select: { memberGoalCount: true } } },
-    });
-    if (!team) {
-      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
-    }
-    if (team.status !== 'active') {
-      throw stateConflict('Team is not active', 'STATE_CONFLICT');
-    }
-    this.assertTeamHasCapacity(team);
+    const team = await this.assertCanInvite(user, teamId);
 
     // 저장된 이메일은 전부 normalizeEmail 표준형이라 조회도 같은 표준형이어야 한다.
     const invitedUser = await this.prisma.v1User.findUnique({
@@ -1467,66 +1473,145 @@ export class TeamsService {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User with this email was not found' });
     }
 
+    const result = await this.inviteUser(user.id, team, invitedUser.id, dto.message ?? null);
+    if (result.outcome === 'already_member') {
+      throw new ConflictException({ code: 'ALREADY_MEMBER', message: 'User is already an active team member' });
+    }
+    return {
+      invitationId: result.invitationId,
+      teamId,
+      invitedUserId: invitedUser.id,
+      status: 'pending' as const,
+      alreadyInvited: result.outcome === 'already_invited',
+    };
+  }
+
+  /**
+   * 여러 명을 한 번에 초대한다(G12 F27). 받는 사람은 이메일(`@` 포함) 또는 닉네임을 **정확히** 적은 값이다 —
+   * 일반 사용자에게 사용자 검색을 열지 않으려고 부분 일치는 하지 않는다. 결과는 적은 값마다 하나씩 돌려준다.
+   */
+  async createInvitationsBatch(user: V1AuthUser, teamId: string, dto: CreateTeamInvitationsBatchDto) {
+    const team = await this.assertCanInvite(user, teamId);
+
+    const entries = dto.recipients.map((raw) => {
+      const recipient = raw.trim();
+      return recipient.includes('@')
+        ? { recipient, kind: 'email' as const, key: normalizeEmail(recipient) }
+        : { recipient, kind: 'nickname' as const, key: recipient };
+    });
+    const emails = entries.filter((entry) => entry.kind === 'email').map((entry) => entry.key);
+    const nicknames = entries.filter((entry) => entry.kind === 'nickname').map((entry) => entry.key);
+    const users = await this.prisma.v1User.findMany({
+      where: {
+        deletedAt: null,
+        OR: [{ email: { in: emails } }, { profile: { nickname: { in: nicknames }, deletedAt: null } }],
+      },
+      select: { id: true, email: true, profile: { select: { nickname: true } } },
+    });
+
+    const seenKeys = new Set<string>();
+    const seenUserIds = new Set<string>();
+    const results: TeamInvitationBatchResult[] = [];
+    for (const entry of entries) {
+      const dedupeKey = `${entry.kind}:${entry.key}`;
+      if (seenKeys.has(dedupeKey)) {
+        results.push({ recipient: entry.recipient, status: 'duplicate', invitationId: null });
+        continue;
+      }
+      seenKeys.add(dedupeKey);
+      const matches = users.filter((candidate) =>
+        entry.kind === 'email' ? candidate.email === entry.key : candidate.profile?.nickname === entry.key,
+      );
+      if (matches.length !== 1) {
+        results.push({ recipient: entry.recipient, status: matches.length === 0 ? 'not_found' : 'ambiguous', invitationId: null });
+        continue;
+      }
+      const invitedUserId = matches[0].id;
+      // 같은 사람을 이메일·닉네임으로 두 번 적어도 초대는 한 번이다.
+      if (seenUserIds.has(invitedUserId)) {
+        results.push({ recipient: entry.recipient, status: 'duplicate', invitationId: null });
+        continue;
+      }
+      seenUserIds.add(invitedUserId);
+      const result = await this.inviteUser(user.id, team, invitedUserId, dto.message ?? null);
+      results.push({ recipient: entry.recipient, status: result.outcome, invitationId: result.invitationId });
+    }
+
+    return {
+      teamId,
+      invitedCount: results.filter((result) => result.status === 'invited').length,
+      results,
+    };
+  }
+
+  /** 초대(이메일·여러 명·링크)를 보낼 수 있는가 — 활성 계정의 팀장·매니저, 활성 팀, 정원 여유. */
+  async assertCanInvite(user: V1AuthUser, teamId: string) {
+    this.assertActiveAccount(user);
+    await this.assertManagerOrOwner(user, teamId);
+    const team = await this.prisma.v1Team.findFirst({
+      where: { id: teamId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        joinPolicy: true,
+        memberCount: true,
+        profile: { select: { memberGoalCount: true } },
+      },
+    });
+    if (!team) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
+    }
+    if (team.status !== 'active') {
+      throw stateConflict('Team is not active', 'STATE_CONFLICT');
+    }
+    this.assertTeamHasCapacity(team);
+    return team;
+  }
+
+  /** 한 사람에게 대기 중 초대를 하나 둔다. 이미 대기 중이면 그대로, 끝난 초대(거절·취소·수락)는 다시 연다. */
+  private async inviteUser(
+    actorUserId: string,
+    team: { id: string; name: string },
+    invitedUserId: string,
+    message: string | null,
+  ): Promise<{ outcome: 'invited' | 'already_invited'; invitationId: string } | { outcome: 'already_member'; invitationId: null }> {
     const existingMembership = await this.prisma.v1TeamMembership.findUnique({
-      where: { teamId_userId: { teamId, userId: invitedUser.id } },
+      where: { teamId_userId: { teamId: team.id, userId: invitedUserId } },
       select: { status: true },
     });
     if (existingMembership?.status === 'active') {
-      throw new ConflictException({ code: 'ALREADY_MEMBER', message: 'User is already an active team member' });
+      return { outcome: 'already_member', invitationId: null };
     }
 
     const existing = await this.prisma.v1TeamInvitation.findUnique({
-      where: { teamId_invitedUserId: { teamId, invitedUserId: invitedUser.id } },
+      where: { teamId_invitedUserId: { teamId: team.id, invitedUserId } },
       select: { id: true, status: true },
     });
-
     if (existing?.status === 'pending') {
-      return {
-        invitationId: existing.id,
-        teamId,
-        invitedUserId: invitedUser.id,
-        status: 'pending' as const,
-        alreadyInvited: true,
-      };
+      return { outcome: 'already_invited', invitationId: existing.id };
     }
 
     const invitation = existing
       ? await this.prisma.v1TeamInvitation.update({
           where: { id: existing.id },
-          data: {
-            status: 'pending',
-            invitedByUserId: user.id,
-            message: dto.message ?? null,
-            respondedAt: null,
-          },
-          select: { id: true, status: true },
+          data: { status: 'pending', invitedByUserId: actorUserId, message, respondedAt: null },
+          select: { id: true },
         })
       : await this.prisma.v1TeamInvitation.create({
-          data: {
-            teamId,
-            invitedUserId: invitedUser.id,
-            invitedByUserId: user.id,
-            status: 'pending',
-            message: dto.message ?? null,
-          },
-          select: { id: true, status: true },
+          data: { teamId: team.id, invitedUserId, invitedByUserId: actorUserId, status: 'pending', message },
+          select: { id: true },
         });
 
     // 알림: 초대받은 사용자에게 안내 (fire-and-forget)
     void this.notifications.emitNotification(
-      invitedUser.id,
+      invitedUserId,
       'team_invitation_received',
-      teamId,
+      team.id,
       `"${team.name}" 팀의 초대를 확인해 보세요.`,
     );
 
-    return {
-      invitationId: invitation.id,
-      teamId,
-      invitedUserId: invitedUser.id,
-      status: invitation.status,
-      alreadyInvited: false,
-    };
+    return { outcome: 'invited', invitationId: invitation.id };
   }
 
   async listInvitations(user: V1AuthUser, teamId: string) {
@@ -2126,7 +2211,7 @@ export class TeamsService {
     return application;
   }
 
-  private async assertManagerOrOwner(user: V1AuthUser, teamId: string) {
+  async assertManagerOrOwner(user: V1AuthUser, teamId: string) {
     await this.getManagementActor(user, teamId);
   }
 
@@ -2524,7 +2609,7 @@ function formatActivityTypes(types: string[]) {
   return types.map((type) => ACTIVITY_TYPE_LABELS[type]).filter(Boolean).join('/') || null;
 }
 
-function formatRegionDisplayName(region?: { name: string; parent?: { name: string } | null } | null) {
+export function formatRegionDisplayName(region?: { name: string; parent?: { name: string } | null } | null) {
   if (!region) return null;
   return region.parent?.name ? `${region.parent.name} ${region.name}` : `${region.name} 전체`;
 }

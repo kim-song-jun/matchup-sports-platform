@@ -59,6 +59,7 @@ function setup(team: { status: string; deletedAt: Date | null }, options: SetupO
     v1TeamMatchApplication: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
     v1TeamJoinApplication: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
     v1TeamInvitation: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
+    v1TeamInviteLink: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
     v1ScheduleGuestRecruitment: { updateMany: jest.fn() },
     v1ChatRoom: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },

@@ -112,4 +112,20 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
       desktopHead: true,
     },
   },
+  {
+    // Task 180 G12 — 멤버 모으기(초대 링크·여러 명 초대). "팀 홈으로" 가 하단 고정이라 탭바를 숨긴다.
+    pattern: '/teams/:id/invite',
+    chrome: {
+      title: '멤버 모으기',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
+  {
+    // Task 180 G12 — 초대 링크 착지. 비로그인도 팀 요약을 보고, 신청은 로그인 뒤 같은 주소로 돌아와 한다.
+    pattern: '/invite/:token',
+    chrome: { title: '팀 초대', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
+  },
 ];

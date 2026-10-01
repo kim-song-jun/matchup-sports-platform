@@ -433,7 +433,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
         ? {
             membersHref: withFromPath(`/teams/${teamId}/members`, fromPath ? selfHref : null),
             editHref: withFromPath(`/teams/${teamId}/edit`, selfHref),
-            inviteHref: `/teams/${teamId}/members?tab=invitations`,
+            inviteHref: `/teams/${teamId}/invite`,
           }
         : undefined,
     onShare: () => shareTeam(query.data),
@@ -778,6 +778,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         : undefined,
     invitations: canManageInvitations
       ? {
+          gatherHref: `/teams/${teamId}/invite`,
           form: {
             email: inviteEmail,
             message: inviteMessage,

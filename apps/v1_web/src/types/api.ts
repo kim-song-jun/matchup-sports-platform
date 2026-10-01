@@ -4614,6 +4614,45 @@ export type V1InvitationActionResult = {
   alreadyProcessed?: boolean;
 };
 
+/** POST /teams/:teamId/invitations/batch 항목별 결과 */
+export type V1TeamInvitationBatchStatus =
+  | 'invited'
+  | 'already_invited'
+  | 'already_member'
+  | 'not_found'
+  | 'ambiguous'
+  | 'duplicate';
+
+export type V1TeamInvitationBatchResult = {
+  teamId: string;
+  invitedCount: number;
+  results: Array<{ recipient: string; status: V1TeamInvitationBatchStatus; invitationId: string | null }>;
+};
+
+/** GET /teams/:teamId/invite-link — none 이면 아직 없거나(또는 다시 보여 줄 수 없어) 새로 만들면 된다. */
+export type V1TeamInviteLink = {
+  teamId: string;
+  status: 'active' | 'expired' | 'none';
+  token: string | null;
+  expiresAt: string | null;
+  createdAt: string | null;
+};
+
+/** POST /teams/:teamId/invite-link(/reissue) */
+export type V1TeamInviteLinkIssueResult = V1TeamInviteLink & { created: boolean };
+
+/** GET /team-invite-links/:token — viewer 는 비로그인이면 null */
+export type V1TeamInviteLinkPreview = {
+  team: { id: string; name: string; sportName: string; regionName: string | null; logoUrl: string | null };
+  expiresAt: string;
+  viewer: {
+    joinState: string;
+    eligible: boolean;
+    reasonCode: string;
+    message: string;
+  } | null;
+};
+
 /** 어드민이 편집하는 외부 연동 키의 출처 — 어떤 값이 실제로 쓰이고 있는지 화면에 안내하기 위함. */
 export type V1IntegrationKeySource = 'admin' | 'env' | 'none';
 

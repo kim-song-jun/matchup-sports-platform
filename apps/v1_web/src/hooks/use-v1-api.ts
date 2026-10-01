@@ -4361,6 +4361,14 @@ export function invalidateRosterViews(
     queryClient.invalidateQueries({
       predicate: (query) => query.queryKey[1] === 'teams' && query.queryKey[3] === 'competition-entries',
     }),
+    // 시작 전 경기 명단은 참가 명단에서 계산된다 — 경기 명단·다가오는 경기 요약·선수×경기 표가 같이 낡는다(같은
+    // 이유로 키 모양으로 찾는다). 안 하면 경기 명단으로 돌아왔을 때 빠진 선수가 "새로 추가"로 남는다(W7-V2).
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[1] === 'teams' &&
+        (query.queryKey[3] === 'games' || query.queryKey[3] === 'game-rosters' || query.queryKey[3] === 'upcoming-games'),
+    }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.adminGameRostersAll() }),
     queryClient.invalidateQueries({
       queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
     }),

@@ -179,6 +179,27 @@ describe('CompetitionEntrySection — 팀원·여러 팀', () => {
     expect(within(entry).getByText(/팀장·매니저가 바꿔요/)).toBeInTheDocument();
   });
 
+  // 명단 배지는 "내 신청"·팀 상세와 한 기준(rosterStateBadgeLabel) — 막힌 사유가 먼저, 그다음 권한.
+  it('멤버의 열린 명단은 "팀장에게 요청" 배지 — 대조군: 팀장은 배지 없음, 실제 마감은 멤버에게도 마감 사유', async () => {
+    myTeams = [{ teamId: 'team-a', role: 'member', name: '마포 FC' }];
+    const { unmount } = renderSection();
+    expect(within(await card('마포 FC')).getByText('팀장에게 요청')).toBeInTheDocument();
+    unmount();
+
+    myTeams = [{ teamId: 'team-a', role: 'owner', name: '마포 FC' }];
+    const owner = renderSection();
+    expect(await screen.findByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toBeInTheDocument();
+    expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
+    owner.unmount();
+
+    myTeams = [{ teamId: 'team-a', role: 'member', name: '마포 FC' }];
+    competition = { ...competition, rosterDeadlineAt: PAST };
+    renderSection();
+    const closed = await card('마포 FC');
+    expect(within(closed).getByText('제출 마감')).toBeInTheDocument();
+    expect(within(closed).queryByText('팀장에게 요청')).not.toBeInTheDocument();
+  });
+
   it('두 팀으로 신청했으면 팀마다 카드가 있고, 역할도 팀마다 따로 본다', async () => {
     registrations = [
       registration(),

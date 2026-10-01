@@ -9,6 +9,7 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { ChevronRight, UsersRound } from 'lucide-react';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import {
@@ -41,8 +42,18 @@ import type {
   V1TournamentPaymentMethod,
   V1MyTeam,
 } from '@/types/api';
-import { getRosterDeadlineState, isTournamentRosterMutable } from '@/lib/roster-editability';
-import { teamRoleLabel, tournamentRegistrationStatusConfig as registrationStatusConfig } from '@/lib/v1-status-labels';
+import { registrationRosterBlockReason, rosterStateBadgeLabel } from '@/lib/roster-editability';
+import { isTeamOperatorRole } from '@/lib/team-role';
+import {
+  competitionKindLabel,
+  teamRoleLabel,
+  tournamentRegistrationStatusConfig as registrationStatusConfig,
+} from '@/lib/v1-status-labels';
+
+/** 정규 리그를 "대회"라고 부르지 않는다("리그 상세 보기"). 종류를 모르면(로딩 실패) 대회 말투를 쓴다. */
+function competitionNoun(isLeague: boolean): string {
+  return competitionKindLabel(isLeague ? 'LEAGUE' : 'TOURNAMENT');
+}
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
   if (!data) return [];
@@ -232,11 +243,13 @@ function RegistrationPass({
   paymentSummary,
   rosterCount,
   /**
-   * 지금 명단을 **고칠 수 있는가.** 링크 자체는 잠겨도 남긴다(감사 #51 — 대회 당일 팀장이
-   * 확정 명단을 확인할 길을 없애지 않는다). 다만 못 고치는 상태에서 "수정하기" 라고 부르면
-   * 눌러 들어가서야 막힌 걸 안다 — 라벨을 실제 상태에 맞춘다.
+   * 명단이 **누구에게나** 닫혔는가(잠금·제출 마감·종료·취소). 링크 자체는 닫혀도 남긴다(감사 #51 —
+   * 대회 당일 팀장이 확정 명단을 확인할 길을 없애지 않는다). 못 고치는 상태에서 "수정하기" 라고
+   * 부르면 눌러 들어가서야 막힌 걸 안다 — 라벨을 실제 상태에 맞춘다.
    */
-  rosterEditable,
+  rosterBlocked,
+  /** 팀장·매니저인가. 멤버는 열린 명단도 못 고친다 — 그건 "마감" 이 아니라 권한이다. */
+  canManageRoster,
   minPlayers,
   belowMinimum,
 }: {
@@ -251,7 +264,8 @@ function RegistrationPass({
   venue: string | null;
   paymentSummary: string | null;
   rosterCount: number;
-  rosterEditable: boolean;
+  rosterBlocked: boolean;
+  canManageRoster: boolean;
   minPlayers: number;
   belowMinimum: boolean;
 }) {
@@ -311,6 +325,13 @@ function RegistrationPass({
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
   const dateStr = formatMonthDayRange(scheduledAt, scheduledEndAt);
+  const rosterLink = rosterBlocked
+    ? { text: '명단 확인', ariaLabel: '선수 명단 확인하기' }
+    : !canManageRoster
+      ? { text: '명단 보기', ariaLabel: '선수 명단 보기' }
+      : belowMinimum
+        ? { text: '선수 등록', ariaLabel: '선수 명단 등록하기' }
+        : { text: '선수 수정', ariaLabel: '선수 명단 수정하기' };
   /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
   const showRosterFooter = status === 'confirmed' || status === 'paid';
 
@@ -377,11 +398,9 @@ function RegistrationPass({
           <div style={{ minWidth: 0 }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>선수 명단</div>
             <div className="tm-text-micro" style={{ color: 'var(--text-body)', marginTop: 1 }}>
-              {/* **라벨과 같은 조건을 쓴다.** 예전엔 이 텍스트만 `isRosterLocked` 를 봐서,
-                  마감이 지났거나 대회가 끝난 상태에서 aria-label 은 "확인하기" 인데 화면
-                  글자는 "등록 완료" 로 남았다 — 한 줄 안에서 두 말이 갈렸다(Copilot 지적).
-                  "마감" 은 이제 **못 고치는 상태 전부**를 뜻한다(잠금·제출 마감·대회 종료). */}
-              {!rosterEditable
+              {/* 링크 라벨과 같은 `rosterBlocked` 를 본다 — "마감" 은 누구도 못 고치는 상태 전부
+                  (잠금·제출 마감·종료)이고, 멤버가 못 고치는 건 마감이 아니다. */}
+              {rosterBlocked
                 ? belowMinimum
                   ? `${rosterCount}명 / 최소 ${minPlayers}명 · 마감`
                   : `${rosterCount}명 · 마감`
@@ -399,20 +418,14 @@ function RegistrationPass({
           <Link
             href={rosterHref}
             className="tm-text-label"
-            aria-label={
-              !rosterEditable
-                ? '선수 명단 확인하기'
-                : belowMinimum
-                  ? '선수 명단 등록하기'
-                  : '선수 명단 수정하기'
-            }
+            aria-label={rosterLink.ariaLabel}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 1,
               color: 'var(--blue700)', fontWeight: 700, flexShrink: 0,
               minHeight: 44, paddingLeft: 8,
             }}
           >
-            {!rosterEditable ? '명단 확인' : belowMinimum ? '선수 등록' : '선수 수정'}
+            {rosterLink.text}
             <ChevronRight size={16} />
           </Link>
         </div>
@@ -650,21 +663,13 @@ function RegistrationDetailView({
   const showConfirmedAt = shouldShowConfirmedAt(registration.status, registration.confirmedAt);
   const isRosterEditBlockedByStatus =
     registration.status === 'cancel_requested' || registration.status === 'cancelled';
-  // **명단 화면과 같은 헬퍼로 판정한다.** 예전엔 이 카드가 잠금·신청상태만 보고
-  // "수정 가능" 이라고 말했는데, 명단 화면은 **대회 상태(완료·취소)와 명단 제출 마감**도
-  // 본다. 그래서 마감이 지난 명단에 카드가 초록 배지를 달아 두고, 눌러 들어가면
-  // "제출 마감" 이라 아무것도 못 고치는 상태가 났다(#4 후속).
-  const isTournamentRosterClosed = !isTournamentRosterMutable(tournament);
-  const rosterDeadlineState = getRosterDeadlineState(
-    tournament.rosterDeadlineAt,
-    registration.rosterDeadlineOverrideAt,
-  );
-  const isRosterEditable =
-    canManageRegistration &&
-    !isRosterLocked &&
-    !isRosterEditBlockedByStatus &&
-    !isTournamentRosterClosed &&
-    !rosterDeadlineState.blocked;
+  // 레일·패스·명단 카드가 명단 화면과 **같은 판정 하나**를 본다. 막힌 사유(누구도 못 고침)와 권한(멤버는
+  // 못 고침)을 한 값으로 섞으면 같은 화면이 "마감" 과 "수정 가능" 을 함께 말한다(W7-V1).
+  const rosterBlockReason = registrationRosterBlockReason(tournament, registration);
+  const isRosterEditable = canManageRegistration && rosterBlockReason === null;
+  // null 이면 고칠 수 있는 사람이 보고 있다 — 자리마다 "수정 가능" 배지나 수정 버튼을 그린다.
+  const rosterStateBadge = rosterStateBadgeLabel(rosterBlockReason, canManageRegistration);
+  const detailLabel = `${competitionNoun(tournament.kind === 'regular_league')} 상세 보기`;
   const canCancelRequest =
     canManageRegistration &&
     (
@@ -770,16 +775,12 @@ function RegistrationDetailView({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>선수 명단</span>
-          {belowMinimum && !isRosterEditBlockedByStatus && isRosterEditable ? (
+          {belowMinimum && isRosterEditable ? (
             <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
               {rosterShortagebadge(registration.status).label}
             </span>
-          ) : isTournamentRosterClosed || isRosterEditBlockedByStatus ? (
-            <span className="tm-badge tm-badge-grey">수정 불가</span>
-          ) : isRosterLocked ? (
-            <span className="tm-badge tm-badge-grey">마감</span>
-          ) : rosterDeadlineState.blocked ? (
-            <span className="tm-badge tm-badge-grey">제출 마감</span>
+          ) : rosterStateBadge !== null ? (
+            <span className="tm-badge tm-badge-grey">{rosterStateBadge}</span>
           ) : (
             <span className="tm-badge tm-badge-green">수정 가능</span>
           )}
@@ -827,7 +828,7 @@ function RegistrationDetailView({
         className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
         style={{ marginBottom: 8 }}
       >
-        대회 상세 보기
+        {detailLabel}
       </Link>
 
       {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
@@ -888,7 +889,8 @@ function RegistrationDetailView({
               sportCode={tournament.sportCode}
               title={tournament.title}
               teamName={teamData?.name ?? null}
-              rosterEditable={isRosterEditable}
+              rosterBlocked={rosterBlockReason !== null}
+              canManageRoster={canManageRegistration}
               scheduledAt={tournament.scheduledAt}
               scheduledEndAt={tournament.scheduledEndAt}
               venue={tournament.venue}
@@ -923,7 +925,7 @@ function RegistrationDetailView({
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {belowMinimum && !isRosterEditBlockedByStatus && isRosterEditable ? (
+                    {belowMinimum && isRosterEditable ? (
                       /* P0: status-aware badge — shared helper keeps rail and body in sync */
                       <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
                         {rosterShortagebadge(registration.status).label}
@@ -931,14 +933,8 @@ function RegistrationDetailView({
                     ) : null}
                     {/* 위 레일과 **같은 판정**을 쓴다 — 한쪽만 고치면 같은 화면의 두 자리가
                         서로 다른 말을 한다(#4 후속에서 실제로 그랬다). */}
-                    {isTournamentRosterClosed || isRosterEditBlockedByStatus ? (
-                      <span className="tm-badge tm-badge-grey">수정 불가</span>
-                    ) : null}
-                    {isRosterLocked ? (
-                      <span className="tm-badge tm-badge-grey">마감</span>
-                    ) : null}
-                    {!isTournamentRosterClosed && !isRosterEditBlockedByStatus && !isRosterLocked && rosterDeadlineState.blocked ? (
-                      <span className="tm-badge tm-badge-grey">제출 마감</span>
+                    {rosterStateBadge !== null ? (
+                      <span className="tm-badge tm-badge-grey">{rosterStateBadge}</span>
                     ) : null}
                     {isRosterEditable ? (
                       <Link
@@ -962,17 +958,11 @@ function RegistrationDetailView({
                     ) : null}
                   </div>
                 </div>
+                {/* 이 카드는 확정·결제 전 신청에만 뜬다(확정 뒤엔 패스 카드가 명단을 맡는다). */}
                 {belowMinimum && !isRosterEditBlockedByStatus ? (
-                  /* P0: copy branches on whether confirmation is still blocked */
-                  registration.status === 'confirmed' || registration.status === 'paid' ? (
-                    <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      대회 전까지 선수를 더 등록할 수 있어요.
-                    </p>
-                  ) : (
-                    <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      최소 인원을 채워야 참가 확정이 가능해요.
-                    </p>
-                  )
+                  <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    최소 인원을 채워야 참가 확정이 가능해요.
+                  </p>
                 ) : null}
               </Card>
             </section>
@@ -1137,7 +1127,7 @@ function RegistrationDetailView({
                 href={detailHref}
                 className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
               >
-                대회 상세 보기
+                {detailLabel}
               </Link>
             </div>
           </div>
@@ -1251,7 +1241,7 @@ function TeamRegistrationHub({
   isLeague?: boolean;
 }) {
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
-  const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
+  const emptyState = getTournamentTeamEmptyState(hasAnyTeam, isLeague);
   const canStartNewRegistration = blockReason === null;
   // 정원이 입금대기 팀으로 차 있으면 "확정 5 / 8"만 보고 여유가 있다고 오해하게 된다.
   // 재신청이 막히는 이유를 이 화면에서 바로 읽을 수 있게 정원 구성을 그대로 노출한다.
@@ -1304,7 +1294,11 @@ function TeamRegistrationHub({
               받지 않아요")와 정면으로 어긋난다 — 팀을 만들어도 이 대회엔 신청할 수 없다. */}
           <EmptyState
             title={emptyState.title}
-            sub={canStartNewRegistration ? emptyState.description : '이 대회는 지금 참가 신청을 받지 않아요.'}
+            sub={
+              canStartNewRegistration
+                ? emptyState.description
+                : `이 ${competitionNoun(isLeague)}는 지금 참가 신청을 받지 않아요.`
+            }
             cta={canStartNewRegistration ? '팀 만들기' : undefined}
             onCta={canStartNewRegistration ? () => { window.location.href = '/teams/new'; } : undefined}
             icon={<UsersRound size={36} strokeWidth={1.5} />}
@@ -1418,12 +1412,17 @@ function TeamRegistrationHub({
 export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
   const searchParams = useSearchParams();
   const selectedRegistrationId = searchParams.get('reg');
-  // 대회 상세로 돌아가는 CTA는 받은 from 을 잇고, '다시 신청하기'는 이 화면 자신을
-  // apply 의 from 으로 실어 apply → 이 화면 → 상세 순으로 돌아오게 한다.
-  const detailHref = withFromPath(`/tournaments/${tournamentId}`, searchParams.get('from'));
   const selfHref = useCurrentHref();
   const applyHref = withFromPath(`/tournaments/${tournamentId}/apply`, selfHref);
   const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
+  // 상세로 돌아가는 CTA는 받은 from 을 잇고, '다시 신청하기'는 이 화면 자신을
+  // apply 의 from 으로 실어 apply → 이 화면 → 상세 순으로 돌아오게 한다.
+  const isRegularLeague = tournament?.kind === 'regular_league';
+  const detailHref = competitionDetailHref({
+    isRegularLeague,
+    competitionId: tournamentId,
+    fromHref: searchParams.get('from'),
+  });
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const {
     data: registrations = [],
@@ -1443,8 +1442,14 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   // topbar 뒤로가기가 같은 라우트의 목록(TeamRegistrationHub, 쿼리 없는 /my)으로 가야
   // 한다. selectedRegistrationId가 아니라 selectedRegistration(실제로 매칭된 신청 존재
   // 여부)로 분기한다 — 잘못된/만료된 reg 값이면 아래에서 이미 목록 뷰로 폴백하므로
-  // undefined로 둬 테이블 기본값(대회 상세)을 그대로 쓴다.
-  useShellOverride({ backHref: selectedRegistration ? `/tournaments/${tournamentId}/my` : undefined });
+  // undefined로 둬 테이블 기본값(대회 상세)을 그대로 쓴다. 테이블은 종류를 모르므로 리그만 리그 상세로 덮는다.
+  useShellOverride({
+    backHref: selectedRegistration
+      ? `/tournaments/${tournamentId}/my`
+      : isRegularLeague
+        ? competitionDetailHref({ isRegularLeague, competitionId: tournamentId })
+        : undefined,
+  });
 
   if (isLoading) {
     return (
@@ -1470,7 +1475,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >
-            대회 상세로 돌아가기
+            {competitionNoun(isRegularLeague)} 상세로 돌아가기
           </Link>
         </div>
       );
@@ -1515,7 +1520,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   }
 
   const selectedTeam = teams.find((team) => team.teamId === selectedRegistration.teamId);
-  const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
+  const canManageSelectedRegistration = isTeamOperatorRole(selectedTeam?.role);
 
   return (
           <RegistrationDetailView

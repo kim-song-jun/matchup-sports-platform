@@ -424,6 +424,73 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
   });
 });
 
+/**
+ * W7-V1 — 멤버가 연 "내 신청" 패스 카드는 열린 명단을 "10명 · 마감" 이라 했고, 같은 화면 레일은 "수정 가능" 이었다.
+ * 못 고치는 이유가 마감(누구나)인지 권한(멤버만)인지 갈라, 패스 카드와 레일이 한 판정을 본다.
+ */
+describe('MyRegistrationPageClient — 멤버가 보는 명단 상태', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams('reg=registration-1');
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({
+      data: { players: Array.from({ length: 10 }, (_, index) => ({ id: `player-${index}` })), belowMinimum: false },
+    });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status: 'confirmed' })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  function arrange(role: V1MyTeam['role'], tournament: Partial<V1TournamentDetail>) {
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: { items: [makeTeam({ role, canManage: role !== 'member' })] },
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(tournament), isLoading: false });
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    const rail = screen.getByRole('complementary', { name: '신청 요약' });
+    return { text: container.textContent ?? '', railText: rail.textContent ?? '' };
+  }
+
+  const OPEN_DRAFT_LEAGUE = { kind: 'regular_league', status: 'draft' } as const;
+
+  it('열린 명단을 멤버가 보면 "마감" 이 아니라 등록 수와 [명단 보기] 다', () => {
+    const { text, railText } = arrange('member', OPEN_DRAFT_LEAGUE);
+
+    expect(text).toContain('10명 등록 완료');
+    expect(text).not.toContain('· 마감');
+    expect(screen.getByRole('link', { name: '선수 명단 보기' })).toHaveTextContent('명단 보기');
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+    // 레일도 같은 판정 — 멤버에게 "수정 가능" 은 고칠 수 없는 사람에게 고칠 수 있다고 하는 말이다.
+    expect(railText).toContain('팀장에게 요청');
+    expect(railText).not.toContain('수정 가능');
+  });
+
+  it('대조군: 팀장은 같은 명단에서 "수정 가능" 과 [선수 수정] 이다', () => {
+    const { text, railText } = arrange('owner', OPEN_DRAFT_LEAGUE);
+
+    expect(text).toContain('10명 등록 완료');
+    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+    expect(railText).toContain('수정 가능');
+    expect(railText).not.toContain('팀장에게 요청');
+  });
+
+  it('대조군: 실제로 마감된 명단은 멤버에게도 "마감" 이고 레일은 마감 사유를 말한다', () => {
+    const { text, railText } = arrange('member', { rosterDeadlineAt: '2020-01-01T00:00:00.000Z' });
+
+    expect(text).toContain('10명 · 마감');
+    expect(text).not.toContain('등록 완료');
+    expect(screen.getByRole('link', { name: '선수 명단 확인하기' })).toHaveTextContent('명단 확인');
+    expect(railText).toContain('제출 마감');
+    expect(railText).not.toContain('팀장에게 요청');
+  });
+});
+
 // 대회 상세·재신청으로 이동하는 CTA 들이 from 을 어떻게 잇는지.
 describe('MyRegistrationPageClient — 대회 상세·재신청 CTA 는 from 을 잇는다', () => {
   beforeEach(() => {
@@ -523,5 +590,91 @@ describe('MyRegistrationPageClient — 대회 상세·재신청 CTA 는 from 을
       'href',
       `/tournaments/tournament-1?from=${encodeURIComponent('/home')}`,
     );
+  });
+});
+
+// W7-V4 — 리그 신청의 "내 신청" 레일 버튼이 "대회 상세 보기" 였다. 대회 쪽 "대회 상세 보기" 는 위 describe 가 지킨다.
+describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+  });
+
+  it('리그 신청 상세의 상세 버튼은 레일·모바일 모두 "리그 상세 보기" 이고, 화면에 "대회" 가 없다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'draft', title: 'QA 0930 test' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const links = screen.getAllByRole('link', { name: '리그 상세 보기' });
+    expect(links).toHaveLength(2);
+    // 리그 상세는 다른 화면과 같은 `/league-matches/:id` 다(대회 상세 경로는 리그 거울 화면).
+    for (const link of links) expect(link).toHaveAttribute('href', '/league-matches/tournament-1');
+    expect(container.textContent).not.toContain('대회');
+  });
+
+  it('리그 목록 뷰의 셸 뒤로가기도 리그 상세로 간다 — 테이블 기본값은 대회 상세라 리그만 덮는다', () => {
+    searchParams = new URLSearchParams();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'draft' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    const probe = render(<BackHrefProbe />);
+
+    expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/league-matches/tournament-1');
+  });
+
+  it('신청을 받지 않는 리그의 팀 없음 안내도 "이 리그는" 이다', () => {
+    searchParams = new URLSearchParams();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [] }, isLoading: false });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'completed' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('이 리그는 지금 참가 신청을 받지 않아요.')).toBeInTheDocument();
+  });
+
+  it('리그 종목에 맞는 팀이 없으면 "이 리그에 신청할 수 있는 팀이 없어요" — 신청 화면과 같은 문구다', () => {
+    searchParams = new URLSearchParams();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: { items: [makeTeam({ sport: { sportId: 'sport-running', name: '러닝' } })] },
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'draft' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('이 리그에 신청할 수 있는 팀이 없어요')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('대회');
   });
 });

@@ -108,6 +108,19 @@ export const ROSTER_BLOCK_BADGE_LABEL: Record<NonNullable<RosterEditBlockReason>
   deadline: '제출 마감',
 };
 
+/** 멤버에게 보이는 명단 배지 — 멤버가 못 고치는 건 마감이 아니라 권한이다. */
+export const ROSTER_VIEW_ONLY_BADGE_LABEL = '팀장에게 요청';
+
+/**
+ * 명단 상태 배지 문구 — 막힌 사유가 먼저(누구에게나 참이다), 그다음 권한(멤버는 열린 명단도 못 고친다).
+ * null 이면 팀장·매니저가 열린 명단을 보고 있다 — "수정 가능"·마감일 안내는 화면이 고른다.
+ * 명단 화면 카드는 멤버에게 사유 대신 요청 문구를 쓰고 사유를 안내 상자로 미룬다(F99) — 이 함수를 쓰지 않는다.
+ */
+export function rosterStateBadgeLabel(blockReason: RosterEditBlockReason, canManageRoster: boolean): string | null {
+  if (blockReason !== null) return ROSTER_BLOCK_BADGE_LABEL[blockReason];
+  return canManageRoster ? null : ROSTER_VIEW_ONLY_BADGE_LABEL;
+}
+
 /**
  * 신청 하나의 명단이 지금 막혔는지 — 명단 화면이 따로 세는 네 조건을 한 번에 본다.
  * 팀장·매니저인지는 묻지 않는다(그건 보는 사람의 문제라 호출하는 화면이 따로 판정한다).

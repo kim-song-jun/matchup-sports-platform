@@ -40,3 +40,16 @@ export function fixtureDetailHref(input: {
     : `/tournaments/${competition}/matches/${fixture}`;
   return withFromPath(path, input.fromHref);
 }
+
+/** 대회·리그 상세. 리그 상세는 `/league-matches/:id` 다 — 판정은 위와 같이 `kind === 'regular_league'`. */
+export function competitionDetailHref(input: {
+  readonly isRegularLeague: boolean;
+  readonly competitionId: string;
+  readonly fromHref?: string | null;
+}): string {
+  const competition = encodeURIComponent(input.competitionId);
+  return withFromPath(
+    input.isRegularLeague ? `/league-matches/${competition}` : `/tournaments/${competition}`,
+    input.fromHref,
+  );
+}

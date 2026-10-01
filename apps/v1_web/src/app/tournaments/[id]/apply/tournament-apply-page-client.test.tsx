@@ -776,5 +776,71 @@ describe('TournamentApplyPageClient GA events', () => {
       const cta = await screen.findByRole('link', { name: '대회 상세로 돌아가기' });
       expect(cta).toHaveAttribute('href', '/tournaments/tournament-1');
     });
+
+    it('리그면 CTA 가 "리그 상세로 돌아가기"이고 리그 상세 경로로 간다', async () => {
+      searchParams = new URLSearchParams({ from: '/home' });
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind: 'regular_league', status: 'completed' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      const cta = await screen.findByRole('link', { name: '리그 상세로 돌아가기' });
+      expect(cta).toHaveAttribute('href', `/league-matches/tournament-1?from=${encodeURIComponent('/home')}`);
+      expect(screen.queryByText(/대회 상세로 돌아가기/)).not.toBeInTheDocument();
+    });
+
+    it('리그의 본인인증 게이트도 "리그 신청은…"이라고 말한다', async () => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind: 'regular_league', status: 'open' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      tournamentApplyApiMocks.useV1AuthMe.mockReturnValue({
+        data: { verification: { phoneVerified: false } },
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(await screen.findByText(/리그 신청은 휴대폰 본인인증을 마친 계정만/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '리그 상세로 돌아가기' })).toHaveAttribute('href', '/league-matches/tournament-1');
+    });
+  });
+
+  // 내 신청 화면과 같이 쓰는 문구(getTournamentTeamEmptyState) — 리그면 "리그"라고 부른다.
+  describe('신청할 수 있는 팀이 없을 때의 안내', () => {
+    beforeEach(() => {
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1MyTeams.mockReturnValue({
+        data: { items: [makeTeam({ sport: { sportId: 'sport-running', name: '러닝' } })] },
+        isLoading: false,
+      });
+    });
+
+    it.each([
+      ['regular_league', '이 리그에 신청할 수 있는 팀이 없어요', '리그와 같은 종목'],
+      ['regular_tournament', '이 대회에 신청할 수 있는 팀이 없어요', '대회와 같은 종목'],
+    ] as const)('%s 는 "%s"', async (kind, title, description) => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind, status: 'open' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(await screen.findByText(title)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(description))).toBeInTheDocument();
+    });
   });
 });

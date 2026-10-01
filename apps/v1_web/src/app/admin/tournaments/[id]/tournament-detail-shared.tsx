@@ -256,9 +256,9 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-dropdown)] w-full max-w-[480px]"
+        className="bg-[var(--card-surface)] rounded-2xl overflow-hidden shadow-[var(--shadow-dropdown)] w-full max-w-[480px] flex flex-col max-h-[calc(var(--teameet-visual-viewport-height,100dvh)-2rem)]"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+        <div className="flex shrink-0 items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2 id={titleId} className="text-sm font-bold text-[var(--text-strong)]">
             {title}
           </h2>
@@ -272,7 +272,7 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
             <X size={18} aria-hidden="true" />
           </button>
         </div>
-        <div className="px-5 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">{children}</div>
       </div>
     </div>
   );

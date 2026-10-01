@@ -1194,6 +1194,36 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
   });
 
+  it('listPlayersForAdmin: 저장된 등번호를 싣고, 번호 없는 선수는 null 로 둔다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' },
+      tournament: { minPlayers: 2 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow({ id: 'p-7', userId: 'u-7' }), user: { phone: null } },
+      { ...playerRow({ id: 'p-1', userId: 'u-1' }), user: { phone: null } },
+      { ...playerRow({ id: 'p-none', userId: 'u-none' }), user: { phone: null } },
+    ]);
+    // 번호 없는 선수는 readJerseyNumbers 결과에 아예 들어오지 않는다.
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'p-7', jersey_number: 7 },
+      { id: 'p-1', jersey_number: 1 },
+    ]);
+
+    const result = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(result.players.map((p) => [p.id, p.jerseyNumber])).toEqual([
+      ['p-7', 7],
+      ['p-1', 1],
+      ['p-none', null],
+    ]);
+    expect((prisma.$queryRaw.mock.calls[0] as unknown[]).slice(1)).toEqual(['reg-1']);
+  });
+
   it('listPlayersForAdmin: marks the team owner and sorts them before other players', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({

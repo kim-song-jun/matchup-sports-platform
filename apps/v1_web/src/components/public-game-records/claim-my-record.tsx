@@ -49,12 +49,12 @@ export function ClaimMyRecordSection({
   fixtureId: string;
 }) {
   const [open, setOpen] = useState(false);
-  const viewer = useClaimViewer();
+  const { viewer, recheck } = useClaimViewer();
   // 목록 조회 자체가 인가(참가팀 멤버)를 태우므로, 모달을 열기 전에는 부르지 않는다 --
   // 관전자가 이 페이지를 열 때마다 403 을 만들 이유가 없다.
   const claimable = useV1ClaimableParticipants(tournamentId, fixtureId, { enabled: open && viewer === 'verified' });
   const request = useV1RequestIdentityLink(tournamentId, fixtureId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} claimable={claimable} request={request} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} />;
 }
 
 type ClaimViewer = 'pending' | 'guest' | 'error' | 'verified';
@@ -63,12 +63,13 @@ type ClaimViewer = 'pending' | 'guest' | 'error' | 'verified';
  * 후보 조회·신청은 로그인이 필요한 API 라, 판정이 끝나 `verified` 일 때만 호출한다.
  * 대회 경기 상세는 비로그인 관전자에게도 열려 있어서 이 판정이 없으면 401 원문이 모달에 샌다.
  */
-function useClaimViewer(): ClaimViewer {
+function useClaimViewer(): { viewer: ClaimViewer; recheck: () => void } {
   const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
-  if (isUnauthenticatedError(authMe.error)) return 'guest';
-  if (authMe.isError) return 'error';
-  if (authMe.data?.user?.id) return 'verified';
-  return 'pending';
+  const recheck = () => void authMe.refetch();
+  if (isUnauthenticatedError(authMe.error)) return { viewer: 'guest', recheck };
+  if (authMe.isError) return { viewer: 'error', recheck };
+  if (authMe.data?.user?.id) return { viewer: 'verified', recheck };
+  return { viewer: 'pending', recheck };
 }
 
 /**
@@ -85,10 +86,10 @@ export function LeagueClaimMyRecordSection({
   variant?: ClaimEntryVariant;
 }) {
   const [open, setOpen] = useState(false);
-  const viewer = useClaimViewer();
+  const { viewer, recheck } = useClaimViewer();
   const claimable = useV1LeagueClaimableParticipants(leagueId, teamMatchId, { enabled: open && viewer === 'verified' });
   const request = useV1LeagueRequestIdentityLink(leagueId, teamMatchId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} claimable={claimable} request={request} variant={variant} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} variant={variant} />;
 }
 
 type ClaimEntryVariant = 'card' | 'link';
@@ -96,16 +97,17 @@ type ClaimEntryVariant = 'card' | 'link';
 /** 팀매치 상세용 — 후보 목록 API만 팀매치 스코프로 바꾸고 화면·신청 계약은 공유한다. */
 export function TeamMatchClaimMyRecordSection({ teamMatchId }: { teamMatchId: string }) {
   const [open, setOpen] = useState(false);
-  const viewer = useClaimViewer();
+  const { viewer, recheck } = useClaimViewer();
   const claimable = useV1TeamMatchClaimableParticipants(teamMatchId, { enabled: open && viewer === 'verified' });
   const request = useV1TeamMatchRequestIdentityLink(teamMatchId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} claimable={claimable} request={request} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} />;
 }
 
 function ClaimMyRecordView({
   open,
   onOpenChange,
   viewer,
+  onRecheckViewer,
   claimable,
   request,
   variant = 'card',
@@ -113,6 +115,7 @@ function ClaimMyRecordView({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   viewer: ClaimViewer;
+  onRecheckViewer: () => void;
   claimable: ReturnType<typeof useV1ClaimableParticipants>;
   request: ReturnType<typeof useV1RequestIdentityLink>;
   variant?: ClaimEntryVariant;
@@ -215,6 +218,15 @@ function ClaimMyRecordView({
                   로그인한 뒤 명단에서 본인을 찾아 내 기록으로 연결할 수 있어요.
                 </div>
               </>
+            ) : viewer === 'error' ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  로그인 상태를 확인하지 못했어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  잠시 후 다시 확인해 주세요.
+                </div>
+              </>
             ) : loaded && !hasCandidates ? (
               <>
                 <div id="claim-my-record-title" className="tm-text-heading">
@@ -245,12 +257,8 @@ function ClaimMyRecordView({
             )}
 
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-              {viewer === 'guest' ? null : viewer === 'pending' || claimable.isLoading ? (
+              {viewer === 'guest' || viewer === 'error' ? null : viewer === 'pending' || claimable.isLoading ? (
                 <div className="tm-text-caption">불러오는 중이에요…</div>
-              ) : viewer === 'error' ? (
-                <div className="tm-text-caption" style={{ color: 'var(--red700)' }}>
-                  로그인 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.
-                </div>
               ) : claimable.isError ? (
                 <div className="tm-text-caption" style={{ color: 'var(--red700)' }}>
                   {extractErrorMessage(claimable.error, '명단을 불러오지 못했어요.')}
@@ -306,7 +314,7 @@ function ClaimMyRecordView({
                 style={{ flex: 1, minHeight: 44, ...(loaded && !hasCandidates ? { background: 'var(--static-blue)' } : {}) }}
                 onClick={() => onOpenChange(false)}
               >
-                {loaded && !hasCandidates ? '닫기' : '취소'}
+                {viewer === 'error' || (loaded && !hasCandidates) ? '닫기' : '취소'}
               </button>
               {viewer === 'guest' ? (
                 <Link
@@ -316,6 +324,15 @@ function ClaimMyRecordView({
                 >
                   로그인하기
                 </Link>
+              ) : viewer === 'error' ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-md tm-btn-primary"
+                  style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
+                  onClick={onRecheckViewer}
+                >
+                  다시 확인
+                </button>
               ) : loaded && !hasCandidates ? null : (
               <button
                 type="button"

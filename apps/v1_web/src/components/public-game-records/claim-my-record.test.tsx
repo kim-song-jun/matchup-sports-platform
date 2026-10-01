@@ -160,7 +160,14 @@ describe('LeagueClaimMyRecordSection — 명단 카드 아래 한 줄(G13 F61)',
 describe('비로그인(게스트) — 이슈 #1401', () => {
   const guestAuth = {
     data: undefined,
-    error: new V1ApiError({ statusCode: 401, code: 'UNAUTHENTICATED', message: 'V1 authentication is required' }),
+    error: new V1ApiError({
+      status: 'error',
+      statusCode: 401,
+      code: 'UNAUTHENTICATED',
+      message: 'V1 authentication is required',
+      requestId: 'req-1',
+      timestamp: '2026-10-01T00:00:00.000Z',
+    }),
     isError: true,
     isPending: false,
     isFetching: false,
@@ -209,5 +216,27 @@ describe('비로그인(게스트) — 이슈 #1401', () => {
       { gameId: 'g-1', participantId: 'p-1', expectedVersion: 3 },
       expect.anything(),
     );
+  });
+
+  it('/auth/me 가 5xx 로 실패하면 신청 UI 대신 확인 실패 안내와 다시 확인·닫기만 보인다', () => {
+    authMeMock.mockReturnValue({
+      data: undefined,
+      error: new V1ApiError({ status: 'error', statusCode: 503, code: 'INTERNAL_ERROR', message: 'down', timestamp: '2026-10-01T00:00:00.000Z' }),
+      isError: true,
+      isPending: false,
+      isFetching: false,
+    } as never);
+    claimableMock.mockClear();
+    claimableMock.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
+
+    render(<ClaimMyRecordSection tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(claimableMock).not.toHaveBeenCalledWith('t-1', 'f-1', { enabled: true });
+    expect(screen.getByText('로그인 상태를 확인하지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByText('명단에서 본인을 골라 주세요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이 선수가 저예요' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '닫기' })).toBeInTheDocument();
   });
 });

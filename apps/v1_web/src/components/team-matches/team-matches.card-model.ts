@@ -6,6 +6,7 @@
  * 그려야 한다.
  */
 import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
+import { toKstDateString } from '@/lib/kst-calendar';
 import type { TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 
@@ -216,5 +217,21 @@ export function parseCosts(value: string | null | undefined) {
   return {
     cost: amounts[0] ?? null,
     opponentCost: amounts[1] ?? null,
+  };
+}
+
+/**
+ * 목록 상단 요약(`N개 · 오늘 N · 모집 중 N`). 서버는 전체 집계를 주지 않으므로 세 값 모두
+ * **지금 화면에 올라온 항목** 기준이다. 오늘은 KST 날짜, 모집 중은 카드가 '신청 가능'으로 그리는 기준.
+ */
+export function summarizeTeamMatches(items: V1TeamMatch[]): TeamMatchListViewModel['summary'] {
+  const today = toKstDateString(new Date());
+  return {
+    count: items.length,
+    today: items.filter((item) => {
+      const startsAt = new Date(item.startsAt);
+      return !Number.isNaN(startsAt.getTime()) && toKstDateString(startsAt) === today;
+    }).length,
+    urgent: items.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
   };
 }

@@ -11,7 +11,7 @@ export { AdminDataTable } from './admin-data-table';
 export type { AdminTableColumn, AdminTablePagination } from './admin-data-table';
 export { AdminCardList } from './admin-card-list';
 export type { AdminCardModel, AdminCardMeta } from './admin-card-list';
-export { AdminLeagueStatePill, AdminStatusPill, STATUS_META } from './admin-status-pill';
+export { AdminLeagueStatePill, AdminMatchPhasePill, AdminStatusPill, STATUS_META } from './admin-status-pill';
 export type { StatusMeta } from './admin-status-pill';
 
 // ── Filter / search ───────────────────────────────────────────────────────

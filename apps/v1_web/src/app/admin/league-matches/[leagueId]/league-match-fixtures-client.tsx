@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useId, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
-import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminMatchPhasePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
@@ -30,6 +30,7 @@ import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { LeagueNextActionCard } from './league-next-action-card';
 import { pickLeagueNextAction } from '@/lib/league-next-action';
+import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
 import { expandWeeklyFixtureDates } from '@/lib/league-fixture-dates';
 import { toKstDateString } from '@/lib/kst-calendar';
@@ -968,17 +969,17 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
               },
               // D6(2026-08-24 확정): '결과' 열은 대진 상태와 다른 축이다 — status 는 "대진이 성사됐는가",
               // resultStage 는 "결과가 어디까지 왔는가". 합치면 취소·매칭 같은 대진 자체의 상태가 결과
-              // 단계에 가려진다. 그래서 취소된 대진은 결과 단계 대신 취소 상태를 이 자리에 그린다.
+              // 단계에 가려진다. 취소·결과 전 경기(예정·진행 중)는 결과 단계 대신 경기 단계를 그린다.
               {
                 key: 'result',
                 header: '결과',
                 render: (row) => {
-                  if (row.status === 'cancelled') return <AdminStatusPill status={row.status} />;
-                  const stage = row.resultStage ?? 'not_entered';
+                  const cell = leagueFixtureResultCell(row);
+                  if (cell.kind === 'phase') return <AdminMatchPhasePill phase={cell.phase} />;
                   const hasScore = row.homeScore !== null && row.homeScore !== undefined;
                   return (
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <AdminStatusPill status={`result_${stage}`} />
+                      <AdminStatusPill status={`result_${cell.stage}`} />
                       {hasScore ? (
                         <span className="text-sm font-medium tabular-nums text-[var(--text-strong)]">
                           {row.homeScore} : {row.awayScore}

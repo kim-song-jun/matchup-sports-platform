@@ -1702,10 +1702,16 @@ function ActionErrorNotice({ message }: { message?: string | null }) {
 }
 
 function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembersViewModel['invitations']> }) {
-  const { form, items, pastItems, listLoading, listError, onRetry } = invitations;
+  const { gatherHref, form, items, pastItems, listLoading, listError, onRetry } = invitations;
 
   return (
     <section className="tm-member-section">
+      {gatherHref ? (
+        <Link className="tm-card tm-pressable tm-team-shortcut" href={gatherHref} style={{ marginBottom: 20 }}>
+          <span className="tm-text-label">초대 링크·여러 명 초대</span>
+          <span className="tm-text-caption">단톡방에 링크를 올리거나 여러 명을 한 번에 불러요.</span>
+        </Link>
+      ) : null}
       <div className="tm-text-label">이메일로 초대</div>
       <div className="tm-text-caption" style={{ marginTop: 3 }}>이메일 주소로 팀원을 직접 초대할 수 있어요.</div>
 

@@ -255,6 +255,8 @@ export type TeamMembersViewModel = {
   approveAll?: { count: number; pending: boolean; onSelect: () => void };
   /** owner/manager 전용 — 보낸 초대 목록 + 초대 폼 */
   invitations?: {
+    /** 초대 링크·여러 명 초대 화면(멤버 모으기) 입구 */
+    gatherHref?: string;
     /** 이메일 입력 폼 */
     form: {
       email: string;

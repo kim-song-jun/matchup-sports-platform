@@ -614,7 +614,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
 
       expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
       screen.getAllByRole('link', { name: '멤버 초대' }).forEach((link) =>
-        expect(link).toHaveAttribute('href', '/teams/team-1/members?tab=invitations'),
+        expect(link).toHaveAttribute('href', '/teams/team-1/invite'),
       );
     });
 

@@ -87,6 +87,20 @@ export function sentInvitationStatusLabel(status: string): string {
   return SENT_INVITATION_STATUS[status] ?? '종료';
 }
 
+/** 여러 명 초대의 항목별 결과(POST /teams/:teamId/invitations/batch). */
+const TEAM_INVITATION_BATCH_STATUS: Record<string, string> = {
+  invited: '초대를 보냈어요',
+  already_invited: '이미 초대했어요',
+  already_member: '이미 멤버예요',
+  not_found: '가입한 사람을 찾지 못했어요',
+  ambiguous: '같은 닉네임이 여럿이에요 · 이메일로 적어 주세요',
+  duplicate: '같은 사람이 겹쳐 한 번만 보냈어요',
+};
+
+export function teamInvitationBatchStatusLabel(status: string): string {
+  return TEAM_INVITATION_BATCH_STATUS[status] ?? '초대하지 못했어요';
+}
+
 /** 팀 멤버십 상태. */
 const TEAM_MEMBER_STATUS: Record<string, string> = {
   active: '활동 중',

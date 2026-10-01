@@ -259,6 +259,10 @@ import type {
   V1ReceivedInvitationsPage,
   V1SendInvitationResult,
   V1InvitationActionResult,
+  V1TeamInvitationBatchResult,
+  V1TeamInviteLink,
+  V1TeamInviteLinkIssueResult,
+  V1TeamInviteLinkPreview,
   V1IntegrationSettings,
   V1UpdateIntegrationSettingsPayload,
   V1ReviewPolicySettings,
@@ -5162,6 +5166,64 @@ export function useV1DeclineTeamInvitation() {
       queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+/** POST /teams/:teamId/invitations/batch — 이메일·닉네임 여러 명 한 번에(항목별 결과) */
+export function useV1SendTeamInvitationsBatch(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { recipients: string[]; message?: string }) =>
+      v1Post<V1TeamInvitationBatchResult>(`/teams/${teamId}/invitations/batch`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamInvitations(teamId) });
+    },
+  });
+}
+
+/** GET /teams/:teamId/invite-link — 지금 초대 링크(팀장·매니저) */
+export function useV1TeamInviteLink(teamId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.teamInviteLink(teamId),
+    queryFn: () => v1Get<V1TeamInviteLink>(`/teams/${teamId}/invite-link`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+  });
+}
+
+/** POST /teams/:teamId/invite-link(만들기 — 살아 있으면 그대로) · /reissue(이전 링크 무효) */
+export function useV1WriteTeamInviteLink(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reissue }: { reissue: boolean }) =>
+      v1Post<V1TeamInviteLinkIssueResult>(`/teams/${teamId}/invite-link${reissue ? '/reissue' : ''}`),
+    onSuccess: (link) => {
+      queryClient.setQueryData<V1TeamInviteLink>(v1Keys.teamInviteLink(teamId), link);
+    },
+  });
+}
+
+/** GET /team-invite-links/:token — 링크 미리보기. 404·410 은 다시 물어도 같으니 재시도하지 않는다. */
+export function useV1TeamInviteLinkPreview(token: string) {
+  return useQuery({
+    queryKey: v1Keys.teamInviteLinkPreview(token),
+    queryFn: () => v1Get<V1TeamInviteLinkPreview>(`/team-invite-links/${encodeURIComponent(token)}`),
+    enabled: Boolean(token),
+    retry: false,
+  });
+}
+
+/** POST /team-invite-links/:token/join-applications — 링크로 가입 신청(승인 대기) */
+export function useV1JoinTeamByInviteLink(token: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-invite-links/${encodeURIComponent(token)}/join-applications`),
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: v1Keys.teamInviteLinkPreview(token) }),
+        refetchTeamJoinState(queryClient, result.teamId),
+      ]);
     },
   });
 }

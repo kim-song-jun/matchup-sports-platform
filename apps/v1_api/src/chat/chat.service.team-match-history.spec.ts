@@ -72,6 +72,7 @@ function chatWorld(kind: RoomKind) {
         : null)),
       findMany: jest.fn(async () => [roomShape(participants.map(withUser))]),
       update: jest.fn(async ({ data }: { data: Row }) => Object.assign(room, data)),
+      updateMany: jest.fn(async ({ data }: { data: Row }) => { Object.assign(room, data); return { count: 1 }; }),
     },
     v1ChatRoomParticipant: {
       findUnique: jest.fn(async ({ where }: { where: Row }) => participants.find((row) => (where.id

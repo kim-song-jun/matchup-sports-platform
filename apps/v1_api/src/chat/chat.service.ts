@@ -40,7 +40,7 @@ export type ChatSystemLine = {
 };
 
 /** 입장·퇴장 줄은 event 로 본문을 만들고, 그 밖의 줄(컨택 응답 등)은 enum 을 늘리지 않고 event=null + 호출자 본문을 쓴다. */
-export type ChatSystemLineInput = { chatRoomId: string; userId: string; at: Date } & (
+export type ChatSystemLineInput = { chatRoomId: string; userId: string; at: Date; backdated?: boolean } & (
   | { event: V1ChatSystemEventType; displayName?: string }
   | { event: null; body: string }
 );
@@ -550,7 +550,15 @@ export class ChatService {
       },
       select: { id: true, body: true, sentAt: true },
     });
-    await tx.v1ChatRoom.update({ where: { id: input.chatRoomId }, data: { lastMessageAt: message.sentAt } });
+    if (input.backdated) {
+      // 지난 시각(참가 승인 시각)에 남기는 줄은 방 목록 정렬을 되돌리지 않게 더 늦을 때만 민다.
+      await tx.v1ChatRoom.updateMany({
+        where: { id: input.chatRoomId, OR: [{ lastMessageAt: null }, { lastMessageAt: { lt: message.sentAt } }] },
+        data: { lastMessageAt: message.sentAt },
+      });
+    } else {
+      await tx.v1ChatRoom.update({ where: { id: input.chatRoomId }, data: { lastMessageAt: message.sentAt } });
+    }
     return {
       messageId: message.id,
       roomId: input.chatRoomId,
@@ -576,7 +584,8 @@ export class ChatService {
     const room = await tx.v1ChatRoom.upsert({
       where: { matchId: input.matchId },
       update: {},
-      create: { matchId: input.matchId, status: 'active' },
+      // 방 생성 시각 = 승인 시각 — 주최자(방 생성 시각부터)가 첫 참가자의 '들어왔어요'(승인 시각)를 몇 ms 차이로 놓치지 않게.
+      create: { matchId: input.matchId, status: 'active', createdAt: input.approvedAt },
       select: { id: true, createdAt: true },
     });
     await this.pullMatchChatHost(tx, room.id, input.hostUserId, room.createdAt);
@@ -899,11 +908,8 @@ export class ChatService {
     // 보낸 메시지를 나중에 들어온 사람이 못 보면 안 된다. 개인매치 방은 참가 승인 시각부터(주최자는
     // 방 생성 시각부터) 본다 — 승인 뒤 방을 늦게 열어도 그 사이 메시지가 보여야 한다. 다른 방은 입장
     // 시점부터만 보인다.
-    const sharedHistoryFrom = room.teamMatchId
-      ? room.createdAt
-      : room.matchId
-        ? await this.matchChatHistoryFrom(room.matchId, room.createdAt, userId)
-        : null;
+    const matchHistory = room.matchId ? await this.matchChatHistory(room.matchId, room.createdAt, userId) : null;
+    const sharedHistoryFrom = room.teamMatchId ? room.createdAt : (matchHistory?.from ?? null);
     if (participant.visibleFromAt) {
       if (sharedHistoryFrom && participant.visibleFromAt > sharedHistoryFrom) {
         // 이 규칙 이전에 입장 시각으로 잡힌 참가자 — 백필 없이 접근 시점에 당긴다.
@@ -918,16 +924,25 @@ export class ChatService {
 
     const enteredAt = new Date();
     const visibleFromAt = sharedHistoryFrom ?? enteredAt;
+    // 개인매치의 '들어왔어요'는 방을 처음 연 때가 아니라 참가 승인 순간이다. 승인 때 등록되기 전(#1427 이전)에 승인된
+    // 참가자도 승인 시각(방이 그보다 늦게 생겼으면 방 생성 시각)에 남긴다. 주최자는 승인이 없어 남기지 않는다.
+    const joinedAt = room.matchId ? (matchHistory?.joinedAt ?? null) : enteredAt;
     const displayName = participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자';
     const joinedLine = await this.prisma.$transaction(async (tx) => {
       const entered = await tx.v1ChatRoomParticipant.updateMany({
         where: { id: participant.id, visibleFromAt: null },
         data: { visibleFromAt },
       });
-      if (entered.count === 0) return null;
-      return this.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at: enteredAt, displayName });
+      if (entered.count === 0 || !joinedAt) return null;
+      // 이미 '들어왔어요'가 있으면(방을 나갔다 다시 연 경우) 승인 시각에 또 남기지 않고 지금 남긴다.
+      const at = joinedAt === enteredAt
+        || (await tx.v1ChatMessage.count({ where: { chatRoomId: room.id, senderUserId: userId, systemEventType: 'joined' } })) === 0
+        ? joinedAt
+        : enteredAt;
+      return this.recordSystemLine(tx, { chatRoomId: room.id, userId, event: 'joined', at, displayName, backdated: at !== enteredAt });
     });
-    if (joinedLine) void this.deliverSystemLine(joinedLine);
+    // 지난 시각에 남긴 줄은 실시간으로 밀어 넣지 않는다 — 열려 있는 방의 맨 아래에 붙어 순서가 어긋난다.
+    if (joinedLine && joinedLine.sentAt.getTime() === enteredAt.getTime()) void this.deliverSystemLine(joinedLine);
 
     const current = await this.prisma.v1ChatRoomParticipant.findUnique({
       where: { id: participant.id },
@@ -938,10 +953,15 @@ export class ChatService {
   }
 
   /**
-   * 개인매치 방의 열람 시작 — 주최자는 방 생성 시각, 확정 참가자는 참가 승인 시각. 승인 때 등록되기 전
-   * (이 규칙 이전)에 승인된 참가자도 열람 경계가 비었거나 입장 시각으로 늦게 잡혀 있을 수 있어 여기서 당긴다.
+   * 개인매치 방의 열람 시작(from)과 '들어왔어요' 시각(joinedAt) — 주최자는 방 생성 시각부터 보고 입장 줄은 없다.
+   * 확정 참가자는 참가 승인 시각부터 보고, 입장 줄도 승인 시각(방이 더 늦게 생겼으면 방 생성 시각)이다. 승인 때
+   * 등록되기 전(이 규칙 이전)에 승인된 참가자도 열람 경계가 비었거나 입장 시각으로 늦게 잡혀 있을 수 있어 여기서 당긴다.
    */
-  private async matchChatHistoryFrom(matchId: string, roomCreatedAt: Date, userId: string): Promise<Date | null> {
+  private async matchChatHistory(
+    matchId: string,
+    roomCreatedAt: Date,
+    userId: string,
+  ): Promise<{ from: Date | null; joinedAt: Date | null }> {
     const match = await this.prisma.v1Match.findUnique({
       where: { id: matchId },
       select: {
@@ -949,9 +969,10 @@ export class ChatService {
         participants: { where: { userId, status: { in: ['active', 'completed'] } }, select: { approvedAt: true } },
       },
     });
-    if (!match) return null;
-    if (match.hostUserId === userId) return roomCreatedAt;
-    return match.participants[0]?.approvedAt ?? null;
+    if (!match) return { from: null, joinedAt: null };
+    if (match.hostUserId === userId) return { from: roomCreatedAt, joinedAt: null };
+    const approvedAt = match.participants[0]?.approvedAt ?? null;
+    return { from: approvedAt, joinedAt: approvedAt && (approvedAt > roomCreatedAt ? approvedAt : roomCreatedAt) };
   }
 
   private unreadCountForMessage(

@@ -61,6 +61,12 @@ and therefore has no host participant row.
   messages sent since approval. Participants approved before this rule (no row, `null`, or an entry-time
   boundary) are pulled back to their approval time — host: `room.created_at` — on the next room access
   (no backfill, the same pattern as `team_match`). Messages before the approval stay hidden.
+- Personal-match joined lines ("○○님이 들어왔어요") mark the **approval moment**, not the first room entry. A room
+  first created by an approval gets `created_at` = that approval time so the host sees the first line too. A
+  participant approved before this rule who enters with no boundary gets the line at `approved_at` (or
+  `room.created_at` if the room is newer); such a past-dated line is not pushed over realtime and only moves
+  `last_message_at` forward. Someone who already has a joined line (re-entry after leaving) gets it at entry
+  time. The host has no joined line.
 - A `team_match` room is visible to every participant from the room's creation (`visible_from_at =
   room.created_at`, the same invariant as `team_contact`), so messages the other team's leader sent
   before this participant entered are listed and counted as unread. The joined system message is still

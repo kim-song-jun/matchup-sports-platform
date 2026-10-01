@@ -113,7 +113,7 @@ function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail 
       ? { status: 'loading' as const, items: [] }
       : { status: 'ready' as const, items: query.data?.items ?? [] };
 
-  return <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} state={state} />;
+  return <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} groups={tournament.groups} state={state} />;
 }
 
 export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: string }) {

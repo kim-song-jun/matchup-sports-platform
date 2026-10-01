@@ -36,7 +36,7 @@ import {
   type SchedulePhaseLabels,
 } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
-import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
 /**
  * 참가팀 공개 정책 통일(fix/v1-publish) — side 자체가 null이면 슬롯 미배정("미정"),
@@ -312,7 +312,7 @@ function ScheduleRow({
   tournamentId,
   entry,
   isMine,
-  showGroupLabel = true,
+  groupHeading = null,
   isRegularLeague,
   fromHref,
 }: {
@@ -320,8 +320,8 @@ function ScheduleRow({
   entry: PublicScheduleEntry;
   /** 로그인한 팀장의 팀 경기인가(`useV1MyTournamentFixtures`) — 공개 방문자는 항상 false. */
   isMine: boolean;
-  /** 그룹 제목("A조")이 바로 위에 있으면 카드 안에서 같은 말을 되풀이하지 않는다. */
-  showGroupLabel?: boolean;
+  /** 바로 위에 그린 묶음 제목("A조"·"4강"). 카드는 그 말을 되풀이하지 않는다. */
+  groupHeading?: string | null;
   /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
   isRegularLeague: boolean;
   /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
@@ -329,6 +329,12 @@ function ScheduleRow({
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
+  const matchLabel = competitionMatchLabel({
+    groupName: entry.groupName,
+    round: entry.round,
+    legNumber: entry.legNumber,
+    withinGroup: groupHeading !== null,
+  });
   const row = (
     <Link
       // **리그는 라우트가 다르다.** 이 화면은 대회와 리그가 같은 일정 응답을 쓰는데,
@@ -373,8 +379,7 @@ function ScheduleRow({
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {showGroupLabel ? entry.groupName ?? tournamentRoundLabel(entry.round) : ''}
-          {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
+          {matchLabel === groupHeading ? '' : matchLabel}
           <VideoBadge hasVideo={entry.hasVideo} />
           {venue ? (
             // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는
@@ -605,7 +610,7 @@ function ScheduleGroupBlock({
             tournamentId={tournamentId}
             entry={entry}
             isMine={myFixtureIds.has(entry.fixtureId)}
-            showGroupLabel={!showGroupHeading}
+            groupHeading={showGroupHeading ? group.label : null}
             isRegularLeague={isRegularLeague}
             fromHref={fromHref}
           />

@@ -1292,6 +1292,31 @@ describe('FixtureCard — 진행 상태 배지', () => {
   // 중복해서 단언하지 않는다. 이 결함의 범위는 **진행 상태 배지**뿐이다.
 });
 
+// W9-V2 — "조별 일정" 은 조로 묶지 않고 한 줄로 흐르는데 카드가 "조별리그 2라운드" 만 써서
+// A조·B조 경기를 가를 수 없었고, 같은 경기가 경기 상세에서는 "A조 2차" 로 불렸다.
+describe('TournamentDetailView — 조별 일정의 경기 이름', () => {
+  it('카드마다 그 경기의 조 이름을 라운드 앞에 붙인다', () => {
+    const groupA = makeGroup({ id: 'group-a', phase: 'group', name: 'A조' });
+    const groupB = makeGroup({ id: 'group-b', phase: 'group', name: 'B조' });
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'in_progress',
+      format: 'group_knockout',
+      groups: [groupA, groupB],
+      fixtures: [
+        makeFixture({ id: 'a-2', groupId: 'group-a', round: 'league_r2', fixtureNumber: 3, legNumber: 2 }),
+        makeFixture({ id: 'b-2', groupId: 'group-b', round: 'league_r2', fixtureNumber: 4, legNumber: 2 }),
+      ],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('A조 · 조별리그 2라운드')).toBeInTheDocument();
+    expect(screen.getByText('B조 · 조별리그 2라운드')).toBeInTheDocument();
+    expect(screen.queryByText(/2차/)).not.toBeInTheDocument();
+  });
+});
+
 /**
  * 정원 진행바의 `aria-label` 은 **스크린리더 사용자가 듣는 유일한 문구**다. 화면 라벨만
  * 고치고 여길 두면 무료 대회에서 "입금 대기" 를 듣게 된다 — 눈으로는 안 보이는 회귀라

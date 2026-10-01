@@ -640,6 +640,40 @@ describe('ScheduleContent — 시간 미정 경기', () => {
  * 이유를 관전자가 목록에서 추적할 수 없다(alpha 실측: 세 팀이 나란히 2점인데 그중 두
  * 경기가 몰수라는 사실이 목록 어디에도 없었다).
  */
+// W9-V2 — 같은 경기를 경기 상세는 "A조 2차"(회전 번호), 대회 상세는 "조별리그 2라운드" 로 불렀다.
+// 묶음 머리가 이미 말한 것(조 이름·결선 라운드)만 카드에서 빼고 나머지는 같은 이름을 쓴다.
+describe('ScheduleContent — 묶음 안 카드의 경기 이름', () => {
+  it('조 묶음 안의 카드는 조 이름 없이 라운드만 쓴다', () => {
+    const data = makeData({
+      items: [
+        fixtureEntry({ fixtureId: 'a-1', groupName: 'A조', round: 'league_r1', fixtureNumber: 1, legNumber: 1 }),
+        fixtureEntry({ fixtureId: 'a-2', groupName: 'A조', round: 'league_r2', fixtureNumber: 2, legNumber: 2 }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getAllByText('A조')).toHaveLength(1);
+    expect(screen.getByText('조별리그 1라운드')).toBeInTheDocument();
+    expect(screen.getByText('조별리그 2라운드')).toBeInTheDocument();
+    expect(screen.queryByText(/2차/)).not.toBeInTheDocument();
+  });
+
+  it('결선 라운드 묶음 안에서는 머리("4강")를 되풀이하지 않고 2차전만 표시한다', () => {
+    const data = makeData({
+      items: [
+        fixtureEntry({ fixtureId: 's-1', round: 'semi', fixtureNumber: 3, legNumber: 1 }),
+        fixtureEntry({ fixtureId: 's-2', round: 'semi', fixtureNumber: 3, legNumber: 2 }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getAllByText('4강')).toHaveLength(1);
+    expect(screen.getByText('4강 2차')).toBeInTheDocument();
+  });
+});
+
 describe('ScheduleContent — 몰수·중단 배지', () => {
   it('몰수로 끝난 경기 카드에 사유 라벨을 붙인다', () => {
     const data = makeData({

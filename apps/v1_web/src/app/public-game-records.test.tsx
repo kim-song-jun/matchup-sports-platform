@@ -163,6 +163,24 @@ describe('MatchDetailContent — 동의 게이트된 신원 표시', () => {
  * 단언을 그대로 두면 세 번째 테스트("배지를 렌더하지 않는다")가 **role 이 없다는 이유만으로
  * 항상 통과**해 버려, 배지가 잘못 뜨는 회귀를 못 잡는다. 표시 텍스트로 고정한다.
  */
+// W9-V2 — 이 머리는 `groupName ?? round` 에 회전 번호를 붙여 "A조 2차" 라 불렀고, 대회 상세는 같은 경기를
+// "조별리그 2라운드" 라 불렀다. 2026-10-02 사용자 확정: 둘 다 "A조 · 조별리그 2라운드".
+describe('MatchDetailContent — 경기 이름 머리', () => {
+  it('조별 경기는 조 이름과 라운드를 함께 쓰고 회전 번호를 붙이지 않는다', () => {
+    render(<MatchDetailContent data={makeMatch({ groupId: 'group-a', groupName: 'A조', round: 'league_r2', legNumber: 2 })} />);
+
+    expect(screen.getByText('A조 · 조별리그 2라운드')).toBeInTheDocument();
+    expect(screen.queryByText(/2차/)).not.toBeInTheDocument();
+  });
+
+  it('결선은 결선 조가 있어도 라운드 이름만 쓰고, 2차전은 그대로 표시한다', () => {
+    render(<MatchDetailContent data={makeMatch({ groupId: 'group-semi', groupName: '4강', round: 'semi', legNumber: 2 })} />);
+
+    expect(screen.getByText('4강 2차')).toBeInTheDocument();
+    expect(screen.queryByText(/4강 · /)).not.toBeInTheDocument();
+  });
+});
+
 describe('MatchDetailContent — 정정/무효 상태 표시', () => {
   it('void 상태는 무효 처리 배지를 보여준다', () => {
     render(<MatchDetailContent data={makeMatch({ resultState: 'void' })} />);

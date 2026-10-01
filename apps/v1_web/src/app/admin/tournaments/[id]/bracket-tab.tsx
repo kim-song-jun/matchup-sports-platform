@@ -17,6 +17,7 @@ import { V1ApiError, v1Post } from '@/lib/api-client';
 // 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
 // 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
 import { knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
@@ -101,6 +102,12 @@ export function describeLeagueReplace(details: unknown): { replaceable: boolean;
 }
 
 // ── Tab: Bracket ──────────────────────────────────────────────────────────
+
+/** "경기 일정 전체보기" 는 모든 조를 한 표에 섞는다 — 조 이름까지 붙인 경기 이름으로 행을 가린다. */
+function bracketFixtureLabel(f: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
+  const groupName = groups.find((group) => group.id === f.groupId)?.name ?? null;
+  return `${competitionMatchLabel({ groupName, round: f.round, legNumber: f.legNumber })} ${f.fixtureNumber}번 경기`;
+}
 
 export function BracketTab({
   tournamentId,
@@ -203,7 +210,7 @@ export function BracketTab({
   const handleDeleteFixture = async (f: V1AdminBracketFixture) => {
     const ok = await confirmModal({
       title: '경기 삭제',
-      message: `${f.round} ${f.fixtureNumber}번 경기를 삭제할까요? 되돌릴 수 없어요.`,
+      message: `${bracketFixtureLabel(f, bracket?.groups ?? [])}를 삭제할까요? 되돌릴 수 없어요.`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -661,7 +668,15 @@ export function BracketTab({
               {
                 key: 'round',
                 header: '라운드',
-                render: (f) => <span className="text-[var(--text-muted)]">{f.round}</span>,
+                render: (f) => (
+                  <span className="text-[var(--text-muted)]">
+                    {competitionMatchLabel({
+                      groupName: groups.find((group) => group.id === f.groupId)?.name ?? null,
+                      round: f.round,
+                      legNumber: f.legNumber,
+                    })}
+                  </span>
+                ),
               },
               {
                 key: 'fixtureNumber',
@@ -729,7 +744,7 @@ export function BracketTab({
                       setEditFxHomeRegId(f.homeRegistrationId ?? '');
                       setEditFxAwayRegId(f.awayRegistrationId ?? '');
                     }}
-                    aria-label={`${f.round} ${f.fixtureNumber}번 경기 수정`}
+                    aria-label={`${bracketFixtureLabel(f, groups)} 수정`}
                     className="tm-on-tint inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
@@ -737,7 +752,7 @@ export function BracketTab({
                   {canOperate && (
                     <Link
                       href={operateHref}
-                      aria-label={`${f.round} ${f.fixtureNumber}번 경기 운영 콘솔 열기`}
+                      aria-label={`${bracketFixtureLabel(f, groups)} 운영 콘솔 열기`}
                       className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--green700)] bg-[var(--green50)] hover:bg-[var(--green100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       운영 콘솔 열기
@@ -751,7 +766,7 @@ export function BracketTab({
                       사용자가 음성 명령("결과 검토하러 가기 클릭")으로 못 찾는 문제가 있었다. */}
                   <Link
                     href={resultConsoleHref}
-                    aria-label={`${f.round} ${f.fixtureNumber}번 경기 ${resultConsoleLabel}`}
+                    aria-label={`${bracketFixtureLabel(f, groups)} ${resultConsoleLabel}`}
                     className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     {resultConsoleLabel}
@@ -766,7 +781,7 @@ export function BracketTab({
                     <button
                       type="button"
                       onClick={() => void handleDeleteFixture(f)}
-                      aria-label={`${f.round} ${f.fixtureNumber}번 경기 삭제`}
+                      aria-label={`${bracketFixtureLabel(f, groups)} 삭제`}
                       className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       <Trash2 size={13} aria-hidden="true" />

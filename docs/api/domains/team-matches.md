@@ -202,7 +202,7 @@ Query:
 |---|---|---|---|
 | `sportId` | uuid | No | `v1_master_sports.id` |
 | `query` | string | No | title/description/place/team 검색 |
-| `genderRule` | string | No | `성별 무관`, `남`, `여`만 받는다(그 외 400). 응답은 옛 별칭(`any`·`무관`)을 `성별 무관`으로 접고, 정본이 아닌 저장값은 `null`이다. 목록 필터 `genderRule=성별 무관`(또는 `무관`)은 별칭으로 저장된 행도 포함한다 |
+| `genderRule` | string | No | `성별 무관`, `남`, `여`, `무관`만 받는다(그 외 400, `무관`은 `성별 무관`과 같은 필터). 작성·수정 본문은 `무관` 없이 정본 세 값만 받는다. 응답은 옛 별칭(`any`·`무관`)을 `성별 무관`으로 접고, 정본이 아닌 저장값은 `null`이다. 목록 필터 `genderRule=성별 무관`(또는 `무관`)은 별칭으로 저장된 행도 포함한다 |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `regionId` | uuid | No | — |
 | `status` | recruiting/closed/matched/cancelled/completed/expired | No | 기본 recruiting |

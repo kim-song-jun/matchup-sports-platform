@@ -86,12 +86,16 @@ type AdminListSummary = {
   byStatus: Record<string, number>;
   byCategory?: Record<string, number>;
   byAudience?: Record<string, number>;
+  byReportReason?: Record<string, number>; // inquiries 전용
+  reportReasonTotal?: number; // inquiries 전용
 };
 ```
 
 적용 엔드포인트는 `GET /api/v1/admin/users`, `matches`, `teams`, `team-matches`, `tournaments`, `inquiries`, `notices`, `popups`, `admins`다. `summary`는 cursor와 limit의 영향을 받지 않으므로 첫 페이지와 추가 로드 응답에서 같은 필터 조건이면 동일하다. 검색어나 종목 같은 비상태 조건은 집계에 반영하지만, `byStatus`는 현재 선택한 status를 제외하고 계산하여 모든 상태 칩의 전환 가능 건수를 유지한다.
 
 문의 `byCategory`는 현재 category를 제외하고 검색어와 status를 반영한다. 공지 `byAudience`는 현재 audience를 제외하고 검색어, status, category를 반영한다. 따라서 보조 필터의 `전체` 숫자는 해당 facet map 값의 합으로 계산한다. 알려진 상태·분류·대상 키는 결과가 없어도 `0`을 반환한다.
+
+`byReportReason`과 `reportReasonTotal`은 `GET /api/v1/admin/inquiries`에만 오며, 현재 reportReason을 제외하고 status·category·reportedTeamId·검색어를 반영한다. `byReportReason`은 지정된 사유 5개만 센다. `reportReasonTotal`은 같은 조건의 총 건수로 사유 미지정(null) 신고를 포함하므로 '전체 사유' 숫자는 이 값을 쓴다. 따라서 사유별 건수의 합보다 클 수 있다(사유 없이 접수된 신고, 분류 필터가 없으면 신고가 아닌 문의까지).
 
 ## 요청/응답 핵심 계약
 

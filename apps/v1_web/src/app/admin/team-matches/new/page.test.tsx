@@ -112,6 +112,16 @@ describe('AdminTeamMatchNewPage', () => {
     expect(screen.getByText('비워두면 경기 시작 전까지 신청을 받아요.')).toBeInTheDocument();
   });
 
+  it('시작 시각을 KST 기준으로 검증한다 — KST 로 과거면 막고 미래면 통과한다 (TZ=UTC 러너)', () => {
+    useCreate.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    render(<AdminTeamMatchNewPage />);
+    // 시스템 시각 2026-09-21T00:00Z = KST 09:00. 08:00 KST 는 과거(로컬=UTC 해석이면 08:00Z 라 미래로 오판).
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-09-21T08:00' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('시작 시간은 지금 이후');
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-09-21T10:00' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('blocks a past deadline before making any request, then accepts a next-day end', async () => {
     const mutateAsync = vi.fn().mockResolvedValue({ detailRoute: '/admin/team-matches/tm-1' });
     useCreate.mockReturnValue({ mutateAsync, isPending: false } as never);

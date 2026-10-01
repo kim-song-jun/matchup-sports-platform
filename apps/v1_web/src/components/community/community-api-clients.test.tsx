@@ -603,7 +603,7 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
       expect(new URLSearchParams(href.split('?')[1]).get('from')).toContain('/chat');
     });
 
-    it('시트를 열 때만 불러오고, 지난 매치는 빼고 중복 없이 빠른 순 · 고르면 공유로 보낸다', async () => {
+    it('시트를 열 때만 불러오고, 지난·취소 매치는 빼고 중복 없이 빠른 순 · 고르면 공유로 보낸다', async () => {
       const mutate = vi.fn();
       hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate, mutateAsync: vi.fn() });
       hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn() });
@@ -612,10 +612,12 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
         data: options?.enabled ? { items: [{ id: 'sch-1', title: '토요일 친선', startAt: '2099-10-04T10:00:00.000Z', teamName: '번개 FC' }], nextCursor: null } : undefined,
         isPending: !options?.enabled, isError: false, refetch: vi.fn(),
       })) as never);
-      const match = (id: string, startsAt: string) => ({ id, title: `매치 ${id}`, startsAt, placeName: '성수' });
+      const match = (id: string, startsAt: string, status = 'open') => ({ id, title: `매치 ${id}`, startsAt, placeName: '성수', status });
       hooks.myMatches.mockImplementation(((filters: { mode: string }, options?: { enabled?: boolean }) => ({
         data: options?.enabled
-          ? { items: filters.mode === 'joined' ? [match('late', '2099-10-09T10:00:00.000Z'), match('past', '2000-01-01T00:00:00.000Z')] : [match('early', '2099-10-02T10:00:00.000Z'), match('late', '2099-10-09T10:00:00.000Z')] }
+          ? { items: filters.mode === 'joined'
+            ? [match('late', '2099-10-09T10:00:00.000Z'), match('past', '2000-01-01T00:00:00.000Z'), match('gone', '2099-10-05T10:00:00.000Z', 'cancelled')]
+            : [match('early', '2099-10-02T10:00:00.000Z'), match('late', '2099-10-09T10:00:00.000Z')] }
           : undefined,
         isPending: !options?.enabled, isError: false, refetch: vi.fn(),
       })) as never);

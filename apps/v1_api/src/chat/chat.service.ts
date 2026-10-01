@@ -302,7 +302,7 @@ export class ChatService {
     if (target.kind === 'team_schedule') {
       const schedule = await this.prisma.v1TeamSchedule.findFirst({
         where: { id: target.targetId },
-        select: { id: true, teamId: true, teamMatchId: true, title: true, startAt: true, visibility: true },
+        select: { id: true, teamId: true, teamMatchId: true, title: true, startAt: true, visibility: true, state: true },
       });
       const team = schedule
         ? await this.prisma.v1Team.findFirst({ where: { id: schedule.teamId, status: 'active', deletedAt: null }, select: { name: true } })
@@ -313,6 +313,8 @@ export class ChatService {
       if (!schedule || !team || (schedule.visibility !== 'PUBLIC' && !member)) {
         throw validationError('공유할 일정을 찾을 수 없어요.', 'share');
       }
+      // 카드는 보낼 때의 스냅숏이라 취소·끝난 일정을 보내면 받는 사람이 진행되는 줄 안다.
+      if (schedule.state !== 'SCHEDULED') throw validationError('취소됐거나 끝난 일정은 공유할 수 없어요.', 'share');
       const teamMatch = schedule.teamMatchId
         ? await this.prisma.v1TeamMatch.findFirst({ where: { id: schedule.teamMatchId, deletedAt: null }, select: { placeName: true } })
         : null;
@@ -326,11 +328,17 @@ export class ChatService {
         route: teamMatch && schedule.teamMatchId ? `/team-matches/${schedule.teamMatchId}` : `/teams/${schedule.teamId}/schedules/${schedule.id}`,
       };
     }
+    // 종류를 명시적으로 가른다 — 검증을 빠져나온 이상한 값이 매치 분기로 떨어져 `id: undefined` 조회(= 아무 매치)가
+    // 되지 않게(#1398 리뷰).
+    if (target.kind !== 'match' || !target.targetId) throw validationError('공유할 대상을 알 수 없어요.', 'share');
     const match = await this.prisma.v1Match.findFirst({
       where: { id: target.targetId, deletedAt: null },
-      select: { id: true, title: true, startAt: true, placeName: true },
+      select: { id: true, title: true, startAt: true, placeName: true, status: true },
     });
     if (!match) throw validationError('공유할 매치를 찾을 수 없어요.', 'share');
+    if (match.status === 'cancelled' || match.status === 'archived') {
+      throw validationError('취소된 매치는 공유할 수 없어요.', 'share');
+    }
     return {
       kind: 'match',
       targetId: match.id,

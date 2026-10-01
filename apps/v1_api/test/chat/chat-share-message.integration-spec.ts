@@ -43,6 +43,9 @@ describe('chat share messages with PostgreSQL', () => {
     });
     await request(app.getHttpServer()).post(base).set('x-v1-user-id', ids.b).send({ share: { kind: 'team_schedule', targetId: otherSchedule } }).expect(400);
     await request(app.getHttpServer()).post(base).set('x-v1-user-id', ids.b).send({ share: { kind: 'bogus', targetId: ownSchedule } }).expect(400);
+    // 객체가 아닌 share 는 검증에서 막힌다 — 빈 배열이 ValidateNested 를 통과해 아무 매치나 카드가 되던 구멍(#1398 리뷰).
+    await request(app.getHttpServer()).post(base).set('x-v1-user-id', ids.b).send({ share: [] }).expect(400);
+    await request(app.getHttpServer()).post(base).set('x-v1-user-id', ids.b).send({ share: 'x' }).expect(400);
   });
 
   it('매치는 매치 화면 카드로 공유된다', async () => {

@@ -355,7 +355,7 @@ describe('ChatService', () => {
 
     it('팀원이 팀 매치 일정을 공유하면 상대 팀도 열 수 있는 팀 매치 화면 카드로 저장한다', async () => {
       arrangeSend();
-      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-1', teamId: 'team-1', teamMatchId: 'tm-1', title: '토요일 친선', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM' });
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-1', teamId: 'team-1', teamMatchId: 'tm-1', title: '토요일 친선', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
       prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
       prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
       prisma.v1TeamMatch.findFirst.mockResolvedValue({ placeName: '잠실 풋살장' });
@@ -372,7 +372,7 @@ describe('ChatService', () => {
 
     it('팀원이 아니면 비공개 팀 일정을 공유할 수 없다(400, 존재를 드러내지 않음) · 공개 일정은 된다', async () => {
       arrangeSend();
-      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '팀 훈련', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'TEAM' });
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '팀 훈련', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
       prisma.v1Team.findFirst.mockResolvedValue({ name: '천둥 FC' });
       prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
 
@@ -381,7 +381,7 @@ describe('ChatService', () => {
       });
       expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
 
-      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '공개 연습', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'PUBLIC' });
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '공개 연습', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'PUBLIC', state: 'SCHEDULED' });
       const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-2' } });
       expect(result.shareCard).toMatchObject({ route: '/teams/team-2/schedules/sch-2', place: null, sub: '천둥 FC' });
     });
@@ -390,7 +390,7 @@ describe('ChatService', () => {
       arrangeSend();
       const entitlement = await prisma.v1Match.findFirst();
       prisma.v1Match.findFirst.mockImplementation(async (args?: { select?: { placeName?: boolean } }) =>
-        args?.select?.placeName ? { id: 'match-9', title: '수요일 저녁 풋살', startAt: new Date('2026-10-08T11:00:00Z'), placeName: '성수 풋살파크' } : entitlement,
+        args?.select?.placeName ? { id: 'match-9', title: '수요일 저녁 풋살', startAt: new Date('2026-10-08T11:00:00Z'), placeName: '성수 풋살파크', status: 'recruiting' } : entitlement,
       );
 
       const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'match', targetId: 'match-9' } });
@@ -399,6 +399,33 @@ describe('ChatService', () => {
       expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: [expect.objectContaining({ body: '매치를 공유했어요 · 수요일 저녁 풋살' })] }),
       );
+    });
+
+    it('취소·끝난 일정, 취소·보관된 매치는 공유할 수 없다 — 카드는 스냅숏이라 받는 사람이 진행되는 줄 안다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-3', teamId: 'team-1', teamMatchId: null, title: '취소된 훈련', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'TEAM', state: 'CANCELLED' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      await expect(service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-3' } })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'share' } },
+      });
+
+      const entitlement = await prisma.v1Match.findFirst();
+      prisma.v1Match.findFirst.mockImplementation(async (args?: { select?: { placeName?: boolean } }) =>
+        args?.select?.placeName ? { id: 'match-x', title: '취소된 매치', startAt: new Date('2026-10-08T11:00:00Z'), placeName: '성수', status: 'cancelled' } : entitlement,
+      );
+      await expect(service.sendMessage(userA, 'room-1', { share: { kind: 'match', targetId: 'match-x' } })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'share' } },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('검증을 빠져나온 이상한 종류는 매치 분기로 떨어지지 않고 400 — 아무 매치나 카드가 되지 않게', async () => {
+      arrangeSend();
+      await expect(
+        service.sendMessage(userA, 'room-1', { share: {} as unknown as { kind: 'match'; targetId: string } }),
+      ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED', details: { field: 'share' } } });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
     });
 
     it('공유와 텍스트·사진을 함께 보내면 400', async () => {

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { ChatService } from '../chat/chat.service';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { archiveEndedContactRooms } from './contact-room-archive';
@@ -25,11 +26,7 @@ const RETRY_AFTER_SECONDS = 24 * 60 * 60;
 /** 무응답 컨택이 만료되기까지의 일수. 확정값 — 스펙 §6. */
 const EXPIRY_DAYS = 7;
 
-/**
- * 응답(수락/거절/철회)이 방에 남기는 시스템 메시지 본문 — 스펙 §3.4.
- * `V1ChatSystemEventType` 은 joined|left 뿐이고 컬럼이 nullable이라 enum 을 늘리지 않고
- * `systemEventType: null` + 이 본문 그대로를 쓴다.
- */
+/** 응답(수락/거절/철회)이 방에 남기는 시스템 줄 본문 — 스펙 §3.4. ChatService.recordSystemLine 에 event=null 로 넘긴다. */
 const CONTACT_SYSTEM_MESSAGE: Record<'accepted' | 'declined' | 'withdrawn', string> = {
   accepted: '컨택을 수락했어요',
   declined: '컨택을 거절했어요',
@@ -47,6 +44,7 @@ export class TeamContactsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly chat: ChatService,
   ) {}
 
   /**
@@ -213,49 +211,36 @@ export class TeamContactsService {
       );
     }
 
-    // updateMany + 응답 시스템 메시지(스펙 §3.4) + room.lastMessageAt 갱신을 하나의
-    // 트랜잭션으로 묶는다 — 상태 전이와 메시지 기록이 따로 커밋되면 "수락은 됐는데
-    // 시스템 메시지는 없는" 반쪽짜리 결과가 남을 수 있다.
-    const { count, chatRoomId } = await this.prisma.$transaction(async (tx) => {
+    // 상태 전이와 응답 시스템 줄(스펙 §3.4)을 한 트랜잭션으로 묶는다 — 따로 커밋되면
+    // "수락은 됐는데 시스템 줄은 없는" 반쪽짜리 결과가 남을 수 있다.
+    const respondedAt = new Date();
+    const { count, chatRoomId, systemLine } = await this.prisma.$transaction(async (tx) => {
       const updateResult = await tx.v1TeamContact.updateMany({
         where: { id: contactId, status: 'requested' },
-        data: {
-          status: nextStatus,
-          respondedByUserId: user.id,
-          respondedAt: new Date(),
-          declineReason,
-        },
+        data: { status: nextStatus, respondedByUserId: user.id, respondedAt, declineReason },
       });
-      if (updateResult.count === 0) {
-        return { count: 0, chatRoomId: null as string | null };
-      }
+      if (updateResult.count === 0) return { count: 0, chatRoomId: null, systemLine: null };
 
       // 방이 없는 레거시 행(백필 이전 데이터) 방어 — 있으면 항상 있어야 정상이다.
-      const room = await tx.v1ChatRoom.findUnique({
-        where: { teamContactId: contactId },
-        select: { id: true },
+      const room = await tx.v1ChatRoom.findUnique({ where: { teamContactId: contactId }, select: { id: true } });
+      if (!room) return { count: updateResult.count, chatRoomId: null, systemLine: null };
+
+      const line = await this.chat.recordSystemLine(tx, {
+        chatRoomId: room.id,
+        userId: user.id,
+        at: respondedAt,
+        event: null,
+        body: CONTACT_SYSTEM_MESSAGE[nextStatus],
       });
-      if (room) {
-        const message = await tx.v1ChatMessage.create({
-          data: {
-            chatRoomId: room.id,
-            senderUserId: user.id,
-            body: CONTACT_SYSTEM_MESSAGE[nextStatus],
-            status: 'sent',
-            messageType: 'system',
-            systemEventType: null,
-            sentAt: new Date(),
-          },
-        });
-        // 거절·철회된 컨택 방은 목록에서 치운다("종료된 컨택 보기" 로만 조회, 딥링크는 계속 열림).
-        // 수락은 대화가 시작되는 시점이라 그대로 active 다.
-        await tx.v1ChatRoom.update({
-          where: { id: room.id },
-          data: { lastMessageAt: message.sentAt, ...(nextStatus === 'accepted' ? {} : { status: 'archived' }) },
-        });
+      // 거절·철회된 컨택 방은 목록에서 치운다("종료된 컨택 보기" 로만 조회, 딥링크는 계속 열림).
+      // 수락은 대화가 시작되는 시점이라 그대로 active 다.
+      if (nextStatus !== 'accepted') {
+        await tx.v1ChatRoom.update({ where: { id: room.id }, data: { status: 'archived' } });
       }
-      return { count: updateResult.count, chatRoomId: room?.id ?? null };
+      return { count: updateResult.count, chatRoomId: room.id, systemLine: line };
     });
+    // 커밋 뒤에만 방 참여자에게 띄운다 — 실패해도 응답은 성공이다.
+    if (systemLine) void this.chat.deliverSystemLine(systemLine);
 
     if (count === 0) {
       // 우리가 requested 를 읽은 뒤 누군가 먼저 처리했다.

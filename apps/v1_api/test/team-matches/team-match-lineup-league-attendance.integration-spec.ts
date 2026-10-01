@@ -139,6 +139,9 @@ describe('팀매치 참석명단 — 팀장·운영진 직접 등록', () => {
         { teamId: ids.hostTeam, userId: ids.hostP2, role: 'member', status: 'active' },
         { teamId: ids.hostTeam, userId: ids.hostNotAttending, role: 'member', status: 'active' },
         { teamId: ids.opponentTeam, userId: ids.opponentOwner, role: 'owner', status: 'active' },
+        // W4-V4 — 두 팀 소속(활성) 한 명과 상대 팀을 떠난 한 명. 서버는 막지 않으므로 위 저장 계약은 그대로다.
+        { teamId: ids.opponentTeam, userId: ids.hostP2, role: 'member', status: 'active' },
+        { teamId: ids.opponentTeam, userId: ids.hostNotAttending, role: 'member', status: 'left' },
       ],
     });
 
@@ -300,5 +303,14 @@ describe('팀매치 참석명단 — 팀장·운영진 직접 등록', () => {
 
     const friendly = await service.getLineup(authUser(ids.hostOwner), ids.friendlyMatch);
     expect(friendly.eligibleMembers?.every((m) => m.attending)).toBe(true);
+  });
+
+  // 실제 멤버십 테이블로 잰다 — 양 팀 활성 / 상대 팀을 떠남 / 우리 팀만, 세 대조군.
+  it('eligibleMembers 는 상대 팀에도 활성 멤버인 우리 팀원만 alsoOpponentMember 로 표시한다 (W4-V4)', async () => {
+    const friendly = await service.getLineup(authUser(ids.hostOwner), ids.friendlyMatch);
+    const flags = new Map(friendly.eligibleMembers.map((member) => [member.userId, member.alsoOpponentMember]));
+    expect(flags.get(ids.hostP2)).toBe(true);
+    expect(flags.get(ids.hostNotAttending)).toBe(false);
+    expect(flags.get(ids.hostOwner)).toBe(false);
   });
 });

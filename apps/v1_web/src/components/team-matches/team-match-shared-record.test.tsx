@@ -2,15 +2,16 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchSharedRecord, TeamMatchRecordEntry } from './team-match-shared-record';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
+import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
-const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn(), search: '' }));
+const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn(), replace: vi.fn(), search: '', mutationError: undefined as unknown }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: state.replace }),
   useSearchParams: () => new URLSearchParams(state.search),
 }));
 vi.mock('@/hooks/use-team-match-record', () => ({
   useTeamMatchRecord: () => ({ data: state.data, isError: false, refetch: state.refetch }),
-  useMutateTeamMatchRecord: () => ({ mutateAsync: state.mutate, isPending: false, isError: false, reset: vi.fn() }),
+  useMutateTeamMatchRecord: () => ({ mutateAsync: state.mutate, isPending: false, isError: state.mutationError !== undefined, error: state.mutationError, reset: vi.fn() }),
 }));
 // 신원 연결 입구는 리그 경기 상세와 같은 컴포넌트다(자체 테스트 있음) — 여기서는 노출 조건만 본다.
 const claim = vi.hoisted(() => ({ viewer: undefined as Record<string, unknown> | undefined }));
@@ -29,6 +30,7 @@ vi.mock('@/components/public-game-records/claim-my-record', () => ({
   TeamMatchClaimMyRecordSection: ({ teamMatchId }: { teamMatchId: string }) => <button type="button">명단에서 나 찾기 ({teamMatchId})</button>,
 }));
 beforeEach(() => {
+  state.mutationError = undefined;
   claim.viewer = undefined;
   lineup.data = undefined;
   lineup.calls = [];
@@ -49,6 +51,22 @@ beforeEach(() => {
   };
 });
 describe('shared record participant flow', () => {
+  it('응답 없이 끊긴 저장은 서버 처리 여부를 모르니 재시도를 주고, 서버가 거절한 저장은 그 이유만 보여 준다(대조군)', () => {
+    state.mutationError = new V1ApiError(
+      { status: 'error', timestamp: '', statusCode: 0, code: V1_NETWORK_ERROR_CODE, message: 'Failed to fetch' },
+      { displayableMessage: false },
+    );
+    const offline = render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요.저장 여부를 확인하지 못했어요.');
+    expect(screen.getByRole('button', { name: '저장 재시도' })).toBeInTheDocument();
+    offline.unmount();
+
+    state.mutationError = new V1ApiError({ status: 'error', timestamp: '', statusCode: 409, code: 'VERSION_CONFLICT', message: '다른 참가자가 먼저 고쳤어요.' });
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('다른 참가자가 먼저 고쳤어요.');
+    expect(screen.queryByRole('button', { name: '저장 재시도' })).not.toBeInTheDocument();
+  });
+
   it('platform operators can record both sides, see history, but cannot confirm for a team', async () => {
     state.data = { ...state.data, participant: false, operator: true, ownSideId: null };
     render(<TeamMatchSharedRecord teamMatchId="match" admin />);

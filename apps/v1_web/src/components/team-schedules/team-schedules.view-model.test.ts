@@ -146,8 +146,8 @@ describe('team-schedules view-model — API failure / 409 conflict mapping', () 
   });
 
   it('surfaces a real Error message instead of the fallback when one is present', () => {
-    const networkError = new TypeError('Failed to fetch');
-    expect(mapScheduleErrorMessage(networkError, '기본 메시지')).toBe('Failed to fetch');
+    const thrown = new Error('일정 시간이 올바르지 않아요.');
+    expect(mapScheduleErrorMessage(thrown, '기본 메시지')).toBe('일정 시간이 올바르지 않아요.');
   });
 });
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { v1MultipartPost, v1Post } from './api-client';
+import { V1ApiError, v1MultipartPost, v1Post } from './api-client';
 import * as clientErrorReporter from './client-error-reporter';
 import { extractErrorCode, extractErrorMessage } from './error-message';
 
@@ -43,6 +43,31 @@ describe('extractErrorMessage — 서버가 메시지를 주지 않은 실패만
   it('업로드도 에러 봉투가 아닌 실패면 fallback 이다', async () => {
     stubFetch({ ok: false, status: 502, statusText: 'Bad Gateway', json: htmlBody });
     expect(extractErrorMessage(await rejection(v1MultipartPost('/uploads', new FormData())), FALLBACK)).toBe(FALLBACK);
+  });
+
+  it('응답이 아예 없으면(fetch reject) "Failed to fetch" 대신 fallback 이고, 원래 오류는 cause 로 남는다', async () => {
+    const offline = new TypeError('Failed to fetch');
+    vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(offline));
+
+    const error = await rejection(v1Post('/teams/team-1/dissolve', {}));
+    expect(error).toBeInstanceOf(V1ApiError);
+    expect(error).toMatchObject({ statusCode: 0, code: 'NETWORK_ERROR', cause: offline });
+    expect(extractErrorMessage(error, FALLBACK)).toBe(FALLBACK);
+    expect(extractErrorMessage(await rejection(v1MultipartPost('/uploads', new FormData())), FALLBACK)).toBe(FALLBACK);
+  });
+
+  it('대조군 — 요청 취소(AbortError·취소된 signal)는 감싸지 않고 그대로 던진다', async () => {
+    const abort = new DOMException('The operation was aborted.', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abort));
+    expect(await rejection(v1Post('/teams/team-1/dissolve', {}))).toBe(abort);
+    expect(await rejection(v1MultipartPost('/uploads', new FormData()))).toBe(abort);
+
+    const controller = new AbortController();
+    const reason = new Error('명령 응답 제한 시간 초과');
+    controller.abort(reason);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(reason));
+    expect(await rejection(v1Post('/games/g-1/commands/end', {}, { signal: controller.signal }))).toBe(reason);
   });
 
   it('대조군 — 서버가 준 메시지(문장·검증 메시지 배열)는 종전대로 그대로 보여 준다', async () => {

@@ -37,7 +37,7 @@ import {
 } from '@/lib/game-operations-clock';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
-import { V1ApiError } from '@/lib/api-client';
+import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
 import { MatchupTitle } from './matchup-title';
@@ -857,7 +857,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           }
         } catch (error) {
           if (ownsAttempt()) {
-            const uncertain = !(error instanceof V1ApiError) || error.statusCode === 408 || error.statusCode >= 500;
+            const uncertain = !(error instanceof V1ApiError) || isV1NetworkError(error) || error.statusCode === 408 || error.statusCode >= 500;
             setCommandError(
               uncertain
                 ? null

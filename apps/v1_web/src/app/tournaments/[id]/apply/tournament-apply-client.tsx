@@ -149,7 +149,7 @@ function StepIndicator({ current, isFreeEntry }: { current: ApplyStep; isFreeEnt
   );
 }
 
-/* ── Order Summary Card (shared between desktop rail + mobile recap) ── */
+/* ── Order Summary (desktop rail 은 rail 껍질이 곧 표면, 모바일 recap 은 Card) ── */
 
 function OrderSummaryCard({
   tournament,
@@ -157,54 +157,72 @@ function OrderSummaryCard({
   depositorName,
   step,
   compact = false,
+  surface = 'card',
 }: {
   tournament: V1TournamentDetail;
   selectedTeam: V1MyTeam | undefined;
   depositorName: string;
   step?: ApplyStep;
   compact?: boolean;
+  /** 'rail' 은 Card 를 두르지 않는다 — `.tm-tournament-form-rail` 껍질 안에 또 하나의 표면을 만들면 글자 폭이 줄고 대회명이 꺾인다. */
+  surface?: 'card' | 'rail';
 }) {
   // Hide payment-related rows on step 'team' (not yet entered).
   // **무료 대회에서는 아예 보여 주지 않는다** — 결제 수단·입금자명을 묻지 않는데 요약만
   // "계좌이체" 라고 말하면, 참가자는 내지도 않을 돈의 결제 수단을 확인하게 된다.
   const showPaymentRows = step !== 'team' && tournament.entryFee > 0;
+  const isRail = surface === 'rail';
+
+  const rows = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <InfoRow label="대회명" value={tournament.title} stacked={isRail} />
+      <InfoRow
+        label="참가 팀"
+        value={selectedTeam ? selectedTeam.name : '—'}
+      />
+      <InfoRow
+        label="참가비"
+        value={formatEntryFee(tournament.entryFee)}
+        isLast={!showPaymentRows}
+      />
+      {showPaymentRows ? (
+        <>
+          <InfoRow label="결제 수단" value="계좌이체" />
+          <InfoRow
+            label="입금자명"
+            value={depositorName.trim().length > 0 ? depositorName.trim() : '—'}
+            isLast
+          />
+        </>
+      ) : null}
+    </div>
+  );
+
+  const heading = (
+    <div
+      className="tm-text-label"
+      style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 12 }}
+    >
+      신청 요약
+    </div>
+  );
+
+  if (isRail) {
+    return (
+      <div>
+        {heading}
+        {rows}
+      </div>
+    );
+  }
 
   return (
     <Card
       pad={compact ? 12 : 16}
       style={compact ? { background: 'var(--grey50)' } : undefined}
-      aria-label="신청 요약"
     >
-      {!compact && (
-        <div
-          className="tm-text-label"
-          style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 12 }}
-        >
-          신청 요약
-        </div>
-      )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <InfoRow label="대회명" value={tournament.title} />
-        <InfoRow
-          label="참가 팀"
-          value={selectedTeam ? selectedTeam.name : '—'}
-        />
-        <InfoRow
-          label="참가비"
-          value={formatEntryFee(tournament.entryFee)}
-          isLast={!showPaymentRows}
-        />
-        {showPaymentRows ? (
-          <>
-            <InfoRow label="결제 수단" value="계좌이체" />
-            <InfoRow
-              label="입금자명"
-              value={depositorName.trim().length > 0 ? depositorName.trim() : '—'}
-              isLast
-            />
-          </>
-        ) : null}
-      </div>
+      {!compact && heading}
+      {rows}
     </Card>
   );
 }
@@ -243,6 +261,7 @@ function DesktopRailSummary({
         selectedTeam={selectedTeam}
         depositorName={depositorName}
         step={step}
+        surface="rail"
       />
 
       {step === 'team' && (
@@ -966,7 +985,7 @@ function AgreementsStep({
                 id={`agree-${term.code}`}
                 label={term.title}
                 consentType={term.requirement === 'required' ? 'required' : 'optional'}
-                summary={term.subtitle ?? term.changeSummary ?? `${term.version} 약관`}
+                summary={term.subtitle ?? undefined}
                 checked={isChecked(term)}
                 onChange={(value) => {
                   const acceptedTermsDocumentIds = value
@@ -1080,8 +1099,8 @@ function AgreementsStep({
         </Card>
       ) : null}
 
-      {/* Mobile recap before CTA — shows total before committing */}
-      <div style={{ marginTop: 20 }}>
+      {/* Mobile recap before CTA — 데스크톱은 오른쪽 rail 이 같은 요약을 상시 보여 준다 */}
+      <div className="tm-hide-desktop" style={{ marginTop: 20 }}>
         <p
           className="tm-text-micro"
           style={{ color: 'var(--text-caption)', marginBottom: 8, fontWeight: 600 }}

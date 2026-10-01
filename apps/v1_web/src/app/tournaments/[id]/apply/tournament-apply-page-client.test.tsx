@@ -390,6 +390,71 @@ describe('TournamentApplyPageClient GA events', () => {
     expect(screen.getByText('이 대회는 무료로 참가할 수 있어요.')).toBeInTheDocument();
   });
 
+  async function openAgreementsStep() {
+    tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' }),
+      isPending: false,
+    });
+    tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    });
+    render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+    const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+    fireEvent.click(nextButton);
+    await screen.findByLabelText('전체 동의');
+  }
+
+  describe('약관 행 설명 (#1429)', () => {
+    it('설명(subtitle)이 없는 약관은 변경 이력·버전명으로 채우지 않고 설명 줄을 그리지 않는다', async () => {
+      tournamentApplyApiMocks.useV1CurrentTerms.mockReturnValue({
+        data: {
+          context: 'tournament_application',
+          ready: true,
+          compliance: null,
+          items: [
+            { documentId: '11111111-1111-4111-8111-111111111111', code: 'tournament_rules', title: '대회 규정', subtitle: '참가 기준', changeSummary: '규정 개정', content: '규정 본문', version: 'v1.1', requirement: 'required' },
+            { documentId: '44444444-4444-4444-8444-444444444444', code: 'tournament_media', title: '사진·영상 동의', subtitle: null, changeSummary: '신규 정책 최초 발행', content: '미디어 본문', version: 'v1.1', requirement: 'optional' },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      });
+      await openAgreementsStep();
+
+      // 대조군: 설명이 있는 약관은 변경 이력이 아니라 설명을 그대로 보여 준다.
+      expect(screen.getByText('참가 기준')).toBeInTheDocument();
+      expect(screen.queryByText('규정 개정')).not.toBeInTheDocument();
+      expect(screen.queryByText('신규 정책 최초 발행')).not.toBeInTheDocument();
+      expect(screen.queryByText('v1.1 약관')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('신청 요약 rail (#1443)', () => {
+    it('rail 은 요약 표면 하나만 그리고 안에 또 하나의 요약 카드를 넣지 않는다', async () => {
+      await openAgreementsStep();
+      const rail = screen.getByRole('complementary', { name: '신청 요약' });
+      expect(rail.querySelector('.tm-card')).toBeNull();
+      expect(rail).toHaveTextContent('대회명');
+      expect(rail).toHaveTextContent('참가 팀');
+    });
+
+    it('rail 의 대회명은 라벨 위·값 아래로 쌓고 참가 팀 같은 짧은 값은 한 줄 행으로 둔다', async () => {
+      await openAgreementsStep();
+      const rail = screen.getByRole('complementary', { name: '신청 요약' });
+      const rows = Array.from(rail.querySelectorAll<HTMLElement>('.tm-info-row'));
+      const byLabel = (label: string) => rows.find((row) => row.textContent?.startsWith(label));
+      expect(byLabel('대회명')?.style.flexDirection).toBe('column');
+      expect(byLabel('참가 팀')?.style.flexDirection).toBe('');
+    });
+
+    it('왼쪽 본문의 recap 은 모바일 전용이라 데스크톱에서 숨는다', async () => {
+      await openAgreementsStep();
+      const recapTitle = screen.getByText('신청 내용을 확인해 주세요');
+      expect(recapTitle.closest('.tm-hide-desktop')).not.toBeNull();
+    });
+  });
+
   it('참가비가 없는 대회는 입금자명 없이도 제출할 수 있다', async () => {
     // 입금자명이 `canSubmit` 의 필수 조건이라 무료 대회에서도 버튼이 잠겨 있었다.
     tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({

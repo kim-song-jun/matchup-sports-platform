@@ -285,6 +285,9 @@ export class TeamMatchLineupService {
           // 두 곳에서 갈리지 않도록 같은 헬퍼(latestConsentSnapshotByLinkId /
           // carryRevokedConsent)를 공유한다.
           const carriedConsentByUserId = await loadRevokedConsentByUserId(tx, previous?.id ?? null);
+          // 이미 낸 명단의 저장은 곧바로 새 제출본이다(Task 180 R-2). 초안으로 내리면 상대 '제출 완료'·공개 뒤
+          // 상대 명단·할 일·킥오프 안내는 '제출 전'으로 돌아가는데 경기 기록은 옛 제출본을 쓴다.
+          const resubmission = isSubmittedLineupState(previous?.state);
           const lineup = await tx.v1GameLineup.create({
             data: {
               gameId: context.gameId,
@@ -292,6 +295,7 @@ export class TeamMatchLineupService {
               revision: (previous?.revision ?? 0) + 1,
               supersedesId: previous?.id,
               formation: dto.formation,
+              ...(resubmission ? { state: V1GameLineupState.SUBMITTED, submittedAt: new Date() } : {}),
             },
           });
           // createMany 대신 한 행씩 create 하는 이유: createMany 는 생성된 id 를 돌려주지
@@ -348,6 +352,11 @@ export class TeamMatchLineupService {
             // (userId === null)는 위에서 이미 걸러져 여기 도달하지 않는다.
             await carryRevokedConsent(tx, created.id, carriedConsentByUserId.get(entry.userId));
           }
+          if (resubmission) {
+            // submitLineup 과 같은 부수효과 — 공개 시각은 이미 박혀 있으면 그대로, 포함 알림은 워커가 받은 사람을 거른다.
+            await this.ensureDefaultPublicLineupTime(tx, context.gameId, context.startAt);
+            await enqueueLineupIncludedNotice(tx, lineup.id);
+          }
           return {
             teamMatchId,
             gameId: context.gameId,
@@ -391,18 +400,27 @@ export class TeamMatchLineupService {
               message: '제출할 참석명단 초안이 없어요. 먼저 참석명단을 작성해 주세요.',
             });
           }
-          if (lineup.state !== V1GameLineupState.DRAFT) {
-            throw new ConflictException({
-              code: 'LINEUP_ALREADY_SUBMITTED',
-              message: '이미 제출된 참석명단이에요.',
-            });
-          }
           if (lineup.revision !== dto.expectedVersion) {
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
               message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
               details: { expectedVersion: dto.expectedVersion, currentVersion: lineup.revision },
             });
+          }
+          // 이미 낸 그 리비전을 다시 내는 요청은 아무것도 바꾸지 않고 지금 상태로 성공한다(Task 180 R-2). 저장이 곧바로
+          // 제출본을 만들므로 "저장 → 제출" 순서로 부르는 클라이언트가 여기 닿는다 — 리비전·알림·공개 시각은 그대로다.
+          if (isSubmittedLineupState(lineup.state)) {
+            const visibility = await tx.v1GameVisibilityPolicy.findUnique({ where: { gameId: context.gameId } });
+            return {
+              teamMatchId,
+              gameId: context.gameId,
+              sideId: context.ownSideId,
+              lineupId: lineup.id,
+              revision: lineup.revision,
+              state: lineup.state,
+              version: lineup.revision,
+              publicLineupAt: visibility?.lineupAt?.toISOString() ?? null,
+            };
           }
           const submitted = await tx.v1GameLineup.update({
             where: { id: lineup.id },

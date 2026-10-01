@@ -379,7 +379,7 @@ describe('Task 14 team-match lineup builder', () => {
     expect(view.starters.map((starter) => starter.displayName)).toContain('용병 게스트');
   });
 
-  it('saves a valid draft, rejects a stale-version resave, submits it, and allows direct re-edit before kickoff', async () => {
+  it('saves a valid draft, rejects a stale-version resave, submits it, and turns a re-edit before kickoff into a new submission', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const saved = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-draft-1', {
@@ -413,7 +413,10 @@ describe('Task 14 team-match lineup builder', () => {
 
     // Two concurrent submits racing against the SAME still-DRAFT revision,
     // each with its own Idempotency-Key (so neither is an idempotent replay
-    // of the other) — SERIALIZABLE isolation must let exactly one win.
+    // of the other) — SERIALIZABLE isolation must let exactly one write win.
+    // Task 180 R-2: re-submitting an already-submitted revision is a no-op
+    // success, so the loser either fails the serialization check or (if it
+    // started after the winner committed) succeeds without writing anything.
     const race = await Promise.allSettled([
       service.submitLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-submit-race-a', {
         expectedVersion: saved.version,
@@ -426,10 +429,18 @@ describe('Task 14 team-match lineup builder', () => {
       (outcome): outcome is PromiseFulfilledResult<Awaited<ReturnType<typeof service.submitLineup>>> =>
         outcome.status === 'fulfilled',
     );
-    expect(fulfilled).toHaveLength(1);
-    expect(race.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
+    expect(fulfilled.length).toBeGreaterThanOrEqual(1);
+    for (const outcome of race) {
+      if (outcome.status === 'rejected') expectHttpCode(outcome.reason, 409, 'COMMAND_CONCURRENCY_CONFLICT');
+    }
+    expect(new Set(fulfilled.map((outcome) => outcome.value.lineupId)).size).toBe(1);
 
     const submitted = fulfilled[0].value;
+    const submittedRow = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: submitted.lineupId } });
+    expect(submittedRow.version).toBe(1);
+    expect(
+      await prisma.v1OutboxEvent.count({ where: { aggregateId: submitted.lineupId, type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION' } }),
+    ).toBe(1);
     expect(submitted.state).toBe('SUBMITTED');
     expect(submitted.publicLineupAt).not.toBeNull();
 
@@ -450,9 +461,15 @@ describe('Task 14 team-match lineup builder', () => {
         bench: [],
       },
     );
+    // Task 180 R-2: 이미 낸 명단의 저장은 초안으로 내려가지 않고 곧바로 새 제출본이 된다.
     expect(editAfterSubmit).toEqual(
-      expect.objectContaining({ state: 'DRAFT', version: submitted.version + 1 }),
+      expect.objectContaining({ state: 'SUBMITTED', version: submitted.version + 1 }),
     );
+    const resubmitted = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: editAfterSubmit.lineupId } });
+    expect(resubmitted).toEqual(expect.objectContaining({ state: 'SUBMITTED', supersedesId: submitted.lineupId, submittedAt: expect.any(Date) }));
+    // 공개 시각은 첫 제출 때 박힌 값 그대로다.
+    const policyAfterResubmit = await prisma.v1GameVisibilityPolicy.findUniqueOrThrow({ where: { gameId: submitted.gameId } });
+    expect(policyAfterResubmit.lineupAt?.getTime()).toBe(policy.lineupAt?.getTime());
   });
 
   it('lets the opponent manager request a change on the other side before lock, but not on their own side', async () => {

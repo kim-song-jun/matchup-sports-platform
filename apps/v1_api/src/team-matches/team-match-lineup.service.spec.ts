@@ -40,7 +40,9 @@ interface FakeState {
   participants: Array<{ id: string; lineupId: string; sideId: string | null; userId: string | null; displayNameSnapshot: string; position: string | null; jerseyNumber?: number | null }>;
   linkEvents: Array<{ participantId: string; linkId: string; eventVersion: number; action: string; userId: string; actorType: string; actorUserId: string | null; systemActor?: string | null; effectiveAt: Date }>;
   links: Array<{ participantId: string; linkId: string; userId: string }>;
-  lineups: Array<{ id: string; gameId: string; sideId: string; revision: number; state: V1GameLineupState; version: number; formation: string | null; supersedesId: string | null }>;
+  lineups: Array<{ id: string; gameId: string; sideId: string; revision: number; state: V1GameLineupState; version: number; formation: string | null; supersedesId: string | null; submittedAt?: Date | null }>;
+  /** V1GameVisibilityPolicy — null 이면 정책 행이 없다. 제출이 lineupAt 을 박는다. */
+  policy: { lineupAt: Date | null } | null;
   idempotency: Array<{ key: string; payloadHash: string; responseBody: unknown }>;
   /** 참가자 단위 공개 제외/허용 override (V1ParticipantConsentSnapshot). */
   consentSnapshots: Array<{ participantId: string; linkId: string; consentVersion: number; state: V1ConsentState; policyHash: string; actorUserId: string }>;
@@ -91,6 +93,7 @@ function createFake(options: {
     recordChanges: [],
     scheduleReads: 0,
     outbox: [],
+    policy: options.publicLineupAt === undefined ? null : { lineupAt: options.publicLineupAt },
   };
   let participantSeq = 0;
   let lineupSeq = 0;
@@ -151,7 +154,12 @@ function createFake(options: {
       },
     },
     v1GameVisibilityPolicy: {
-      findUnique: async () => (options.publicLineupAt === undefined ? null : { lineupAt: options.publicLineupAt }),
+      findUnique: async () => state.policy,
+      updateMany: async (args: { where: { lineupAt: null }; data: { lineupAt: Date } }) => {
+        if (state.policy === null || state.policy.lineupAt !== args.where.lineupAt) return { count: 0 };
+        state.policy = { lineupAt: args.data.lineupAt };
+        return { count: 1 };
+      },
     },
     v1GameSide: {
       findMany: async () => [
@@ -228,19 +236,26 @@ function createFake(options: {
           .sort((a, b) => b.revision - a.revision);
         return matches[0] ?? null;
       },
-      create: async (args: { data: { gameId: string; sideId: string; revision: number; supersedesId?: string; formation?: string } }) => {
+      create: async (args: { data: { gameId: string; sideId: string; revision: number; supersedesId?: string; formation?: string; state?: V1GameLineupState; submittedAt?: Date } }) => {
         lineupSeq += 1;
         const row = {
           id: `lineup-${lineupSeq}`,
           gameId: args.data.gameId,
           sideId: args.data.sideId,
           revision: args.data.revision,
-          state: V1GameLineupState.DRAFT,
+          state: args.data.state ?? V1GameLineupState.DRAFT,
           version: 0,
           formation: args.data.formation ?? null,
           supersedesId: args.data.supersedesId ?? null,
+          submittedAt: args.data.submittedAt ?? null,
         };
         state.lineups.push(row);
+        return row;
+      },
+      update: async (args: { where: { id: string }; data: { state: V1GameLineupState; submittedAt: Date } }) => {
+        const row = state.lineups.find((lineup) => lineup.id === args.where.id);
+        if (row === undefined) throw new Error('record not found: v1_game_lineups');
+        Object.assign(row, { state: args.data.state, submittedAt: args.data.submittedAt, version: row.version + 1 });
         return row;
       },
     },
@@ -1314,5 +1329,146 @@ describe('TeamMatchLineupService.getLineup — 팀 일정 응답은 읽기 전�
       lockReason: 'records_exist',
       lateAdditionAllowed: true,
     });
+  });
+});
+
+/** 홈 팀 명단 한 벌(리비전 2, user-1 #1 · user-2 #2) — 상태만 바꿔 제출본/초안 대조군을 만든다. */
+function seedHomeLineup(state: FakeState, lineupState: V1GameLineupState) {
+  state.lineups.push({ id: 'home-r2', gameId: 'game-1', sideId: 'side-home', revision: 2, state: lineupState, version: 0, formation: null, supersedesId: null });
+  state.participants.push(
+    { id: 'home-r2-p1', lineupId: 'home-r2', sideId: 'side-home', userId: 'user-1', displayNameSnapshot: 'user-1 님', position: null, jerseyNumber: 1 },
+    { id: 'home-r2-p2', lineupId: 'home-r2', sideId: 'side-home', userId: 'user-2', displayNameSnapshot: 'user-2 님', position: null, jerseyNumber: 2 },
+  );
+}
+
+/** user-2 를 빼고 user-3 을 넣은 명단. */
+const swapUser2ForUser3 = { expectedVersion: 2, participants: [{ userId: 'user-1', jerseyNumber: 1 }, { userId: 'user-3', jerseyNumber: 3 }] };
+
+describe('TeamMatchLineupService.saveLineup — 이미 낸 명단의 저장은 곧바로 새 제출본 (Task 180 R-2)', () => {
+  const kickoff = new Date('2026-10-13T11:00:00.000Z');
+
+  it('새 리비전이 제출본으로 생겨, 상대 팀은 계속 "제출 완료"를 보고 공개 뒤에는 바뀐 명단을 본다', async () => {
+    const { state, prisma, managerMembership } = createFake({ publicLineupAt: new Date(Date.now() - 1000) });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const saved = await service.saveLineup(manager, 'team-match-1', 'resubmit-1', swapUser2ForUser3);
+
+    expect(saved).toMatchObject({ revision: 3, state: V1GameLineupState.SUBMITTED });
+    expect(state.lineups.at(-1)).toMatchObject({ revision: 3, state: V1GameLineupState.SUBMITTED, submittedAt: expect.any(Date), supersedesId: 'home-r2' });
+    // 상대 팀 팀장이 보는 쪽 — 요약과 명단 조회는 최신 리비전을 읽는다.
+    managerMembership.teamId = 'team-away';
+    expect((await service.getLineup(manager, 'team-match-1')).opponent).toMatchObject({ submitted: true, published: true, participantCount: 2 });
+    expect((await service.getOpponentLineup(manager, 'team-match-1')).participants.map((row) => row.jerseyNumber)).toEqual([1, 3]);
+  });
+
+  it('부수효과는 저장 → 제출 경로와 같다 — 공개 시각을 박고 새 제출본의 포함 알림을 한 번만 넣는다', async () => {
+    const viaSave = createFake({ startAt: kickoff, publicLineupAt: null });
+    seedHomeLineup(viaSave.state, V1GameLineupState.SUBMITTED);
+    const saveService = new TeamMatchLineupService(viaSave.prisma, audit);
+    const saved = await saveService.saveLineup(manager, 'team-match-1', 'resubmit-effects', swapUser2ForUser3);
+    // 같은 요청 재시도는 제출본·알림을 늘리지 않는다.
+    await saveService.saveLineup(manager, 'team-match-1', 'resubmit-effects', swapUser2ForUser3);
+
+    // 대조군: 예전 [다시 제출] 이 거치던 "초안 → 제출".
+    const viaSubmit = createFake({ startAt: kickoff, publicLineupAt: null });
+    seedHomeLineup(viaSubmit.state, V1GameLineupState.DRAFT);
+    const submitted = await new TeamMatchLineupService(viaSubmit.prisma, audit).submitLineup(manager, 'team-match-1', 'submit-effects', { expectedVersion: 2 });
+
+    const publicAt = new Date(kickoff.getTime() - 60 * 60 * 1000);
+    expect(viaSave.state.policy).toEqual({ lineupAt: publicAt });
+    expect(viaSubmit.state.policy).toEqual({ lineupAt: publicAt });
+    const notice = (lineupId: string) => ({ businessKey: `team-match-lineup-included:${lineupId}`, type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION', aggregateId: lineupId, payload: { lineupId } });
+    expect(viaSave.state.outbox).toEqual([notice(saved.lineupId)]);
+    expect(viaSubmit.state.outbox).toEqual([notice(submitted.lineupId)]);
+    expect(viaSave.state.lineups).toHaveLength(2);
+  });
+
+  it('제출 전(초안) 명단의 저장은 그대로 초안이다 — 공개 시각·알림도 건드리지 않는다(대조군)', async () => {
+    const { state, prisma, managerMembership } = createFake({ startAt: kickoff, publicLineupAt: null });
+    seedHomeLineup(state, V1GameLineupState.DRAFT);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const saved = await service.saveLineup(manager, 'team-match-1', 'draft-save', swapUser2ForUser3);
+
+    expect(saved).toMatchObject({ revision: 3, state: V1GameLineupState.DRAFT });
+    expect(state.lineups.at(-1)).toMatchObject({ state: V1GameLineupState.DRAFT, submittedAt: null });
+    expect(state.policy).toEqual({ lineupAt: null });
+    expect(state.outbox).toEqual([]);
+    managerMembership.teamId = 'team-away';
+    expect((await service.getLineup(manager, 'team-match-1')).opponent).toMatchObject({ submitted: false });
+  });
+
+  it('첫 기록 뒤 잠긴 제출본의 저장은 기존 409 이고 새 제출본·알림을 만들지 않는다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, publicLineupAt: null });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.saveLineup(manager, 'team-match-1', 'locked-resubmit', swapUser2ForUser3)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' }),
+    });
+    expect(state.lineups.map((row) => [row.id, row.state])).toEqual([['home-r2', V1GameLineupState.SUBMITTED]]);
+    expect(state.outbox).toEqual([]);
+    expect(state.policy).toEqual({ lineupAt: null });
+  });
+});
+
+describe('TeamMatchLineupService.submitLineup — 이미 낸 리비전을 다시 내면 그대로 성공 (Task 180 R-2)', () => {
+  const publicAt = new Date('2026-10-13T10:00:00.000Z');
+
+  it('옛 화면 순서(저장 → 제출)로 와도 성공하고, 제출은 리비전·알림·공개 시각을 하나도 더 만들지 않는다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: publicAt });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const saved = await service.saveLineup(manager, 'team-match-1', 'old-client-save', swapUser2ForUser3);
+    const before = { lineups: structuredClone(state.lineups), outbox: structuredClone(state.outbox) };
+    const submitted = await service.submitLineup(manager, 'team-match-1', 'old-client-submit', { expectedVersion: saved.revision });
+
+    expect(submitted).toMatchObject({
+      lineupId: saved.lineupId,
+      revision: 3,
+      state: V1GameLineupState.SUBMITTED,
+      version: 3,
+      publicLineupAt: publicAt.toISOString(),
+      replayed: false,
+    });
+    expect(state.lineups).toEqual(before.lineups);
+    expect(state.outbox).toEqual(before.outbox);
+    expect(state.policy).toEqual({ lineupAt: publicAt });
+  });
+
+  it('리비전이 그새 바뀌었으면 이미 낸 명단이어도 버전 충돌이다 — 남이 낸 명단을 내 제출로 알리지 않는다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: publicAt });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.submitLineup(manager, 'team-match-1', 'stale-submit', { expectedVersion: 1 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'VERSION_CONFLICT', details: { expectedVersion: 1, currentVersion: 2 } }),
+    });
+  });
+
+  it('초안은 그대로 제출된다 — 상태·제출 시각·공개 시각·포함 알림(대조군)', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: null });
+    seedHomeLineup(state, V1GameLineupState.DRAFT);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const submitted = await service.submitLineup(manager, 'team-match-1', 'draft-submit', { expectedVersion: 2 });
+
+    expect(submitted).toMatchObject({ lineupId: 'home-r2', state: V1GameLineupState.SUBMITTED, publicLineupAt: expect.any(String) });
+    expect(state.lineups).toEqual([expect.objectContaining({ id: 'home-r2', state: V1GameLineupState.SUBMITTED, submittedAt: expect.any(Date), version: 1 })]);
+    expect(state.outbox.map((row) => row.businessKey)).toEqual(['team-match-lineup-included:home-r2']);
+    expect(state.policy?.lineupAt).toBeInstanceOf(Date);
+  });
+
+  it('첫 기록 뒤에는 이미 낸 명단이어도 기존 잠금 409 다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, publicLineupAt: publicAt });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.submitLineup(manager, 'team-match-1', 'locked-submit', { expectedVersion: 2 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' }),
+    });
+    expect(state.idempotency).toHaveLength(0);
   });
 });

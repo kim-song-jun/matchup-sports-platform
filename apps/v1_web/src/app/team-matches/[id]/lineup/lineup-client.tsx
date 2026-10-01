@@ -52,9 +52,12 @@ import {
   describePublicationCountdown,
   describePublicationNotice,
   describeRemaining,
+  describeResubmitted,
   formatPublicationTime,
   hydrateLineupEditorState,
   isCompetitionLineupRoute,
+  isLineupSubmitted,
+  RESUBMIT_PENDING_NOTICE,
   serverRosterEntries,
   isRosterMemberPlaced,
   addGuestToLineup,
@@ -164,7 +167,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
   const submitMutation = useV1SubmitTeamMatchLineup(teamMatchId);
-  const [lastSubmittedRevision, setLastSubmittedRevision] = useState<number | null>(null);
+  const [submittedRevision, setSubmittedRevision] = useState<number | null>(null);
+  const [resubmittedAt, setResubmittedAt] = useState<number | null>(null);
+  const submittedLineup = lineupQuery.data ? isLineupSubmitted(lineupQuery.data, submittedRevision) : false;
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
   const matchCancelled = teamMatchQuery.data ? getStatus(teamMatchQuery.data) === 'cancelled' : false;
@@ -243,6 +248,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             return prev === current ? updated : { ...updated, dirty: true };
           });
           setSaveStatus('saved');
+          // 낸 명단의 저장은 서버가 곧바로 새 제출본으로 만든다(R-2). 초안 저장이면 지난 "다시 제출했어요"를 지운다.
+          setResubmittedAt(result.state === 'SUBMITTED' ? Date.now() : null);
           if (pendingSubmitRef.current) {
             if (editedDuringSave) {
               // 방금 저장에 실리지 못한 편집이 남아 있다 — 디바운스를 기다리지 않고
@@ -266,7 +273,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             setSubmitFlowPending(false);
             setSaveErrorMessage('변경사항을 저장하지 못해 참석명단을 제출할 수 없어요. 다시 시도해 주세요.');
           } else {
-            setSaveErrorMessage(extractErrorMessage(error, '변경사항을 저장하지 못했어요.'));
+            setSaveErrorMessage(
+              extractErrorMessage(error, submittedLineup ? '참석명단을 다시 제출하지 못했어요.' : '변경사항을 저장하지 못했어요.'),
+            );
           }
         },
         onSettled: () => {
@@ -287,7 +296,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       { idempotencyKey: randomUuid(), expectedVersion },
       {
         onSuccess: () => {
-          setLastSubmittedRevision(expectedVersion);
+          setSubmittedRevision(expectedVersion);
           // 불러오기·프리셋 저장 결과 안내는 제출 전 작업의 것이다 — 제출 뒤에도 남으면 지금 상태처럼 읽힌다.
           setLoadNotice(null);
         },
@@ -371,6 +380,21 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       pendingRemovalTimerRef.current = null;
     }
     setPendingRemoval(null);
+  }
+
+  /** [변경 취소](R-2) — 낸 뒤 고친 내용을 버리고 서버의 제출본으로 돌아간다. 실행 취소·불러오기 안내도 그 편집의 것이라 함께 지운다. */
+  function handleDiscardChanges() {
+    if (pendingRemovalTimerRef.current !== null) {
+      window.clearTimeout(pendingRemovalTimerRef.current);
+      pendingRemovalTimerRef.current = null;
+    }
+    setPendingRemoval(null);
+    setLoadNotice(null);
+    setSaveStatus('idle');
+    setSaveErrorMessage(null);
+    void lineupQuery.refetch().then((result) => {
+      if (result.data) setState(hydrateLineupEditorState(result.data));
+    });
   }
 
   if (teamMatchQuery.isLoading || lineupQuery.isLoading || myTeamsQuery.isLoading) {
@@ -594,11 +618,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
   const validationErrors = validateLineupForSubmit(state);
   const publicationLabel = matchCancelled ? null : describePublicationCountdown(publicAt, now);
-  const submittedWithoutChanges =
-    !state.dirty &&
-    (lineupQuery.data.state === 'SUBMITTED' ||
-      lineupQuery.data.state === 'LOCKED' ||
-      lastSubmittedRevision === state.baseRevision);
 
   // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
   // 보내야 한다. 자동저장은 900ms 디바운스 뒤에야 실행되므로, 방금 입력을 마치자마자 제출을
@@ -626,14 +645,15 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const badgeClass = `tm-badge ${phase.editable ? 'tm-badge-blue' : 'tm-badge-grey'}`;
   const submitButtons = editable ? (
     <SubmitButtons
+      submitted={submittedLineup}
       dirty={state.dirty}
       saving={saveStatus === 'saving'}
       submitPending={submitMutation.isPending}
       submitFlowPending={submitFlowPending}
       blocked={validationErrors.length > 0}
-      submittedWithoutChanges={submittedWithoutChanges}
       onSave={() => runQueuedSave()}
       onSubmit={handleSubmit}
+      onDiscard={handleDiscardChanges}
     />
   ) : null;
 
@@ -714,19 +734,27 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         <div style={{ marginBottom: 12 }} aria-live="polite">
           {saveStatus === 'saving' ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              저장 중…
+              {submittedLineup ? '다시 제출하는 중…' : '저장 중…'}
             </p>
           ) : saveStatus === 'error' && saveErrorMessage ? (
             <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
               {saveErrorMessage}
             </p>
+          ) : state.dirty && submittedLineup ? (
+            <p className="tm-text-caption" style={{ color: 'var(--orange700)', margin: 0, lineHeight: 1.6, wordBreak: 'keep-all' }}>
+              {RESUBMIT_PENDING_NOTICE}
+            </p>
           ) : state.dirty ? (
             <p className="tm-text-caption" style={{ color: 'var(--orange700)' }}>
               저장하지 않은 변경사항이 있어요.
             </p>
-          ) : saveStatus === 'saved' ? (
+          ) : saveStatus === 'saved' && !submittedLineup ? (
             <p className="tm-text-caption" style={{ color: 'var(--green700)' }}>
               저장했어요.
+            </p>
+          ) : saveStatus === 'saved' && resubmittedAt !== null ? (
+            <p className="tm-text-caption" style={{ color: 'var(--green700)', margin: 0, lineHeight: 1.6, wordBreak: 'keep-all' }}>
+              {describeResubmitted(resubmittedAt, publicAt, now)}
             </p>
           ) : null}
         </div>
@@ -1014,20 +1042,39 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 }
 
 /**
- * 저장·제출 두 버튼 — 모바일 고정 CTA 와 데스크톱 요약 카드가 같은 것을 쓴다.
- * 저장은 누른 순간에만 나간다(2026-08 사용자 요청). 제출은 dirty 면 먼저 저장을 밀어넣고 그 ack 의
+ * 하단 두 버튼 — 모바일 고정 CTA 와 데스크톱 요약 카드가 같은 것을 쓴다.
+ * 내기 전: [저장]·[참석명단 제출하기]. 저장은 누른 순간에만 나가고, 제출은 dirty 면 먼저 저장을 밀어넣고 그 ack 의
  * revision 으로 이어 제출한다(flush-then-submit — 옛 revision 이 제출돼 잠기지 않게).
+ * 낸 뒤(R-2): [변경 취소]·[다시 제출하기]. 다시 제출은 저장 요청 하나다 — 서버가 낸 명단의 저장을 곧바로 새 제출본으로 만든다.
  */
 function SubmitButtons(props: {
+  submitted: boolean;
   dirty: boolean;
   saving: boolean;
   submitPending: boolean;
   submitFlowPending: boolean;
   blocked: boolean;
-  submittedWithoutChanges: boolean;
   onSave: () => void;
   onSubmit: () => void;
+  onDiscard: () => void;
 }) {
+  if (props.submitted) {
+    return (
+      <>
+        <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" disabled={!props.dirty || props.saving} onClick={props.onDiscard}>
+          변경 취소
+        </button>
+        <button
+          type="button"
+          className="tm-btn tm-btn-lg tm-btn-primary"
+          disabled={!props.dirty || props.saving || props.blocked}
+          onClick={props.onSave}
+        >
+          {props.saving ? '다시 제출하는 중…' : props.dirty ? '다시 제출하기' : '제출 완료'}
+        </button>
+      </>
+    );
+  }
   return (
     <>
       <button
@@ -1041,16 +1088,10 @@ function SubmitButtons(props: {
       <button
         type="button"
         className="tm-btn tm-btn-lg tm-btn-primary"
-        disabled={props.blocked || props.submitPending || props.submitFlowPending || props.submittedWithoutChanges}
+        disabled={props.blocked || props.submitPending || props.submitFlowPending}
         onClick={props.onSubmit}
       >
-        {props.submitPending
-          ? '제출 중…'
-          : props.submitFlowPending
-            ? '변경사항 저장 중…'
-            : props.submittedWithoutChanges
-              ? '제출 완료'
-              : '참석명단 제출하기'}
+        {props.submitPending ? '제출 중…' : props.submitFlowPending ? '변경사항 저장 중…' : '참석명단 제출하기'}
       </button>
     </>
   );

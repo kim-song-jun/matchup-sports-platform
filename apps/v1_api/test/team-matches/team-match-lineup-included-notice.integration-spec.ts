@@ -33,15 +33,18 @@ const ids = {
 };
 const authUser = (id: string) => ({ id, email: `${id}@example.test`, accountStatus: 'active' as const, onboardingStatus: 'completed' as const });
 
-async function submit(participants: string[], key: string) {
+async function save(participants: string[], key: string) {
   const { version } = await lineups.getLineup(authUser(ids.owner), ids.teamMatch);
-  const saved = await lineups.saveLineup(authUser(ids.owner), ids.teamMatch, `${key}-save`, {
+  return lineups.saveLineup(authUser(ids.owner), ids.teamMatch, `${key}-save`, {
     expectedVersion: version,
     participants: participants.map((userId, index) => ({ userId, jerseyNumber: index + 1, goalkeeper: index === 0 })),
   });
-  const submitted = await lineups.submitLineup(authUser(ids.owner), ids.teamMatch, `${key}-submit`, { expectedVersion: saved.version });
-  const outbox = await prisma.v1OutboxEvent.findUniqueOrThrow({ where: { businessKey: `team-match-lineup-included:${submitted.lineupId}` } });
-  expect(outbox).toMatchObject({ type: LINEUP_INCLUDED_NOTIFICATION_TYPE, payload: { lineupId: submitted.lineupId } });
+}
+
+/** 그 제출본의 outbox 행이 같은 트랜잭션에 들어 있는지 보고 워커 핸들러에 태운다. */
+async function deliverIncludedNotice(lineupId: string) {
+  const outbox = await prisma.v1OutboxEvent.findUniqueOrThrow({ where: { businessKey: `team-match-lineup-included:${lineupId}` } });
+  expect(outbox).toMatchObject({ type: LINEUP_INCLUDED_NOTIFICATION_TYPE, payload: { lineupId } });
   const claim: GameOperationClaim = { ...outbox, leaseOwner: 'spec', leaseUntil: new Date(), afterCommit: [] };
   await prisma.$transaction((tx) => reminders.lineupIncludedHandler(claim, tx));
 }
@@ -114,10 +117,16 @@ describe('Task 180 H1 — 참석명단 포함 알림(제출 → outbox → 워�
   });
 
   it('제출한 명단의 선수만 받고, 다시 제출하면 새로 오른 사람만 받는다 — 빠진 사람·팀장(명단 밖)은 받지 않는다', async () => {
-    await submit([ids.p1, ids.p2], 'h1-first');
+    const draft = await save([ids.p1, ids.p2], 'h1-first');
+    expect(draft.state).toBe('DRAFT');
+    const first = await lineups.submitLineup(authUser(ids.owner), ids.teamMatch, 'h1-first-submit', { expectedVersion: draft.version });
+    await deliverIncludedNotice(first.lineupId);
     expect(await recipients()).toEqual([ids.p1, ids.p2].sort());
 
-    await submit([ids.p1, ids.p3], 'h1-second');
+    // Task 180 R-2: 이미 낸 명단은 저장 한 번이 곧 다시 제출이다 — 제출 API 를 따로 부르지 않는다.
+    const resubmitted = await save([ids.p1, ids.p3], 'h1-second');
+    expect(resubmitted.state).toBe('SUBMITTED');
+    await deliverIncludedNotice(resubmitted.lineupId);
     expect(await recipients()).toEqual([ids.p1, ids.p2, ids.p3].sort());
     const body = await prisma.v1Notification.findFirstOrThrow({ where: { targetId: ids.teamMatch, recipientUserId: ids.p3 }, select: { body: true, deepLink: true } });
     expect(body).toMatchObject({ deepLink: `/team-matches/${ids.teamMatch}` });

@@ -573,6 +573,30 @@ export function describeLineupPhase(
   return { label: '초안', editable: true, helperText: '' };
 }
 
+/**
+ * 지금 낸 명단인가(Task 180 R-2) — 그렇다면 [저장] 없이 [변경 취소]·[다시 제출하기]만 있다. 서버도 이 명단의
+ * 저장을 곧바로 새 제출본으로 만든다. `submittedRevision`(이 화면에서 방금 낸 리비전)은 제출 성공부터 재조회
+ * 응답까지의 틈만 메운다 — 서버가 그보다 새 리비전(상대 팀 정정 요청이 만든 초안 등)을 주면 서버 상태를 따른다.
+ */
+export function isLineupSubmitted(
+  server: { state: V1TeamMatchLineupState; revision: number },
+  submittedRevision: number | null,
+): boolean {
+  if (server.state === 'SUBMITTED' || server.state === 'LOCKED') return true;
+  return submittedRevision !== null && server.revision <= submittedRevision;
+}
+
+/** 낸 명단을 고치는 중(R-2 A-1) — 다시 내기 전까지 상대 팀에는 원래 제출본이 보인다. */
+export const RESUBMIT_PENDING_NOTICE = '제출한 명단과 달라요. [다시 제출하기]를 눌러야 바뀐 명단이 상대 팀에 보여요.';
+
+/** 다시 제출한 뒤 한 줄(R-2 A-2) — 공개 전이면 상대에게 언제 바뀐 명단이 보이는지까지 말한다. */
+export function describeResubmitted(resubmittedAt: number, publicAt: string | null, now: number): string {
+  const head = `다시 제출했어요(${formatKstMeridiemTime(new Date(resubmittedAt).toISOString())}).`;
+  if (publicAt === null) return head;
+  if (Date.parse(publicAt) <= now) return `${head} 상대 팀에도 바뀐 명단이 보여요.`;
+  return `${head} 상대 팀에는 계속 "제출 완료"로 보이고, ${formatPublicationTime(publicAt, now)}에 바뀐 명단이 공개돼요.`;
+}
+
 const PUBLIC_LINEUP_LEAD_MS = 60 * 60 * 1000;
 
 /**

@@ -1311,6 +1311,8 @@ export const v1MswHandlers = [
       ...v1TeamMatchLineupFixture,
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
+      // 서버와 같다(Task 180 R-2): 이미 낸 명단의 저장은 곧바로 새 제출본, 초안의 저장은 초안.
+      state: v1TeamMatchLineupFixture.state === 'DRAFT' ? 'DRAFT' : 'SUBMITTED',
       formation: body.formation ?? null,
       // 서버(`rosterOf`)와 **같은 규칙**: `participants` 가 **비어 있지 않을 때만** 그것이
       // 명단이고, 그 밖에는 옛 `starters`+`bench` 를 합친다. `??` 로 쓰면 빈 배열에서
@@ -1351,10 +1353,13 @@ export const v1MswHandlers = [
     });
   }),
   http.post(`${api}/team-matches/:teamMatchId/lineup/submit`, () => {
-    v1TeamMatchLineupFixture.state = 'SUBMITTED';
-    v1TeamMatchLineupFixture.version += 1;
-    const publicLineupAt = new Date().toISOString();
-    v1TeamMatchLineupFixture.publicLineupAt = publicLineupAt;
+    // 서버와 같다(Task 180 R-2): 이미 낸 명단을 다시 내면 아무것도 바꾸지 않고 지금 상태로 성공한다.
+    if (v1TeamMatchLineupFixture.state === 'DRAFT') {
+      v1TeamMatchLineupFixture.state = 'SUBMITTED';
+      v1TeamMatchLineupFixture.version += 1;
+      v1TeamMatchLineupFixture.publicLineupAt = new Date().toISOString();
+    }
+    const publicLineupAt = v1TeamMatchLineupFixture.publicLineupAt;
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
       gameId: v1TeamMatchLineupFixture.gameId,

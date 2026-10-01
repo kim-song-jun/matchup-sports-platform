@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -254,12 +254,31 @@ const LINEUP_ACTION_COPY = {
   'match-roster': { title: '경기 명단', description: '참가 명단 선수가 출전해요. 이번 경기에 빠지는 선수만 빼 주세요.', cta: '명단 조정' },
 } as const;
 
+/** 히어로의 팀 칸 — href 가 있으면 칸 전체가 팀 화면으로 가는 링크(44px 이상)다. */
+function HeroTeamLink({ href, name, align, children }: { href?: string; name: string; align: 'left' | 'right'; children: React.ReactNode }) {
+  if (!href) return <div style={{ textAlign: align }}>{children}</div>;
+  return (
+    <Link className="tm-pressable" href={href} aria-label={`${name} 팀 보기`} style={{ display: 'block', minHeight: 44, textAlign: align }}>
+      {children}
+    </Link>
+  );
+}
+
+function HeroTeamChevron() {
+  return <ChevronRightIcon size={14} aria-hidden="true" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 2, color: 'var(--overlay-white-72)' }} />;
+}
+
 export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode; lifecyclePanel?: React.ReactNode }) {
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
   const shouldShowHostTeamCard = !match.platformManaged || hasAssignedHostTeam;
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
+  // 두 팀이 모두 정해지면 히어로가 두 팀을 요약하고 팀 이름이 팀 화면으로 가는 입구다 — 아래 팀 카드는 같은 정보를 반복하므로 그리지 않는다.
+  // 플랫폼 주관 매치는 제외한다: 운영 주체와 팀 로고·신뢰 배지를 카드로 따로 보여 주는 화면이라 그대로 둔다.
+  const confirmedOpponent = !match.platformManaged && hasAssignedHostTeam
+    ? match.applicantTeams.find((team) => team.status === '승인 완료' && team.href)
+    : undefined;
   const locked = mode === 'pending' || mode === 'approved' || mode === 'cancelled';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 수정' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   // 호스트의 "지금 할 일" — 대기 중인 신청. 라벨(status)이 아니라 서버 상태 원문으로 고른다.
@@ -435,7 +454,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
     && teams.findIndex((candidate) => candidate.href === team.href) === index
   ));
   const hasTeamViewCards = Boolean(hostTeamCard) || applicantTeamViewCards.length > 0;
-  const teamViewCards = hasTeamViewCards ? (
+  const teamViewCards = hasTeamViewCards && !confirmedOpponent ? (
     <div className="tm-team-match-team-cards" style={{ display: 'grid', gap: 12 }} aria-label="팀 보기">
       {hostTeamCard}
       {applicantTeamViewCards.map((team) => (
@@ -602,9 +621,9 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 <div>
                   {heroStatusBadge}
                   <div className="tm-team-vs-row">
-                    <div>
+                    <HeroTeamLink href={confirmedOpponent ? match.hostTeamHref ?? `/teams/${match.hostTeamId}` : undefined} name={match.hostTeam} align="left">
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
-                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
                       {match.hostTeamRatingScore != null || match.hostTeamWins != null ? (
                         <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>
                           {[
@@ -613,13 +632,14 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                           ].filter(Boolean).join(' · ')}
                         </div>
                       ) : null}
-                    </div>
+                    </HeroTeamLink>
                     <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
-                    <div style={{ textAlign: 'right' }}>
+                    <HeroTeamLink href={confirmedOpponent?.href} name={confirmedOpponent?.name ?? ''} align="right">
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{(mode === 'pending' && model.myApplicationTeam) || model.viewerOnApplicantSide ? '우리 팀' : '상대팀'}</div>
-                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}</div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
+                      {confirmedOpponent?.meta ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{confirmedOpponent.meta}</div> : null}
                       {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentSub}</div> : null}
-                    </div>
+                    </HeroTeamLink>
                   </div>
                   {match.platformManaged ? (
                     <div className="tm-text-caption" style={{ color: 'var(--overlay-white-86)', textAlign: 'center', marginTop: 20 }}>플랫폼 주관</div>
@@ -633,6 +653,12 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
             {/* 히어로(뒤로가기 포함) 다음, 본문 앞 — 내비게이션이 항상 먼저 보이게 유지한다. */}
             {recordEntry}
             <div className="tm-match-detail-body">
+              {/* 지금 할 일 — 데스크톱은 우측 CTA 카드가 맡고, 모바일은 하단 바 대신 본문 맨 위에도 둔다. */}
+              {model.progress && nextAction?.href && nextAction.tone === 'primary' ? (
+                <div className="tm-hide-desktop" style={{ marginTop: 12 }}>
+                  <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={nextAction.href}>{nextAction.label}</Link>
+                </div>
+              ) : null}
               {nowCard}
               {/* ── 그룹 1: 일정 · 장소 ── */}
               <div className="tm-info-group">

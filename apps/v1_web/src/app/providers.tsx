@@ -1,6 +1,5 @@
 'use client';
 
-import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { type ReactNode, useState } from 'react';
 import { PendingSocialSignupGate } from '@/components/auth/pending-social-signup-gate';
@@ -19,25 +18,11 @@ import {
   PERSIST_BUSTER,
   PERSIST_MAX_AGE_MS,
 } from '@/lib/query-persist';
+import { createV1QueryClient } from '@/lib/query-client';
 import { NativeAppSurface } from '@/components/providers/native-app-surface';
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60_000,
-            gcTime: 10 * 60_000,
-            retry: 1,
-            refetchOnWindowFocus: false,
-          },
-          mutations: {
-            retry: false,
-          },
-        },
-      }),
-  );
+  const [queryClient] = useState(createV1QueryClient);
   const [persister] = useState(() => createV1Persister());
 
   return (

@@ -65,6 +65,11 @@ describe('match lifecycle actions', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it.each(['in_progress', 'completion_pending'])('does not offer cancellation while %s', (status) => {
+    mount(<MatchLifecyclePanel id="test" domain="matches" status={status} lifecycle={{ ...lifecycle, canConfirmProceed: false }} canManage current={3} capacity={10} />);
+    expect(screen.queryByRole('button', { name: '매치 취소' })).not.toBeInTheDocument();
+  });
+
   it('deletion waits for server success before navigating to the list', async () => {
     let deleted = false;
     let reads = 0;

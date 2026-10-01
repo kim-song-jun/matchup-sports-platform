@@ -47,7 +47,7 @@ export function MatchLifecyclePanel({ id, domain, status, lifecycle, canManage, 
   });
   const onHold = status === 'on_hold';
   if (!onHold && !canManage) return null;
-  const terminal = ['completed', 'cancelled', 'archived'].includes(status);
+  const terminal = ['in_progress', 'completion_pending', 'completed', 'cancelled', 'archived'].includes(status);
   return (
     <section style={{ padding: 20, margin: '16px 0', background: 'var(--bg-card, white)', borderRadius: 'var(--radius-container)' }} aria-label="매치 진행 상태">
       <h2 className="tm-text-body-lg" style={{ margin: 0 }}>{onHold ? '보류 · 진행 결정 대기' : status === 'in_progress' ? '진행 중' : status === 'completion_pending' ? '종료 확인 필요' : status === 'scheduled' ? '진행 확정' : status === 'cancelled' ? '취소된 매치' : status === 'completed' ? '완료된 매치' : '매치 관리'}</h2>

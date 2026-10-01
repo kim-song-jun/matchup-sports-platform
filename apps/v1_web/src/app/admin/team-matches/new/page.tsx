@@ -13,6 +13,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { MultiPresetChipSelector } from '@/components/v1-ui/create-form-fields';
+import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
 import { GENDER_RULE_OPTIONS } from '@/lib/v1-status-labels';
@@ -70,9 +71,7 @@ export default function AdminTeamMatchNewPage() {
   const selectedSport = sports?.find((sport) => sport.id === sportId);
   const matchFormatOptions = useMemo(() => formatOptions(selectedSport), [selectedSport]);
 
-  const startDate = startsAt ? new Date(startsAt) : null;
-  const deadlineDate = deadlineAt ? new Date(deadlineAt) : null;
-  const endDate = endsAt ? new Date(endsAt) : null;
+  const startIso = fromDatetimeLocalValue(startsAt);
   const dateErrors = teamMatchDateErrors({ startsAt, endsAt, deadlineAt });
   const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
   const canSubmit =
@@ -99,7 +98,7 @@ export default function AdminTeamMatchNewPage() {
   };
 
   const submit = async () => {
-    if (!canSubmit || !startDate) return;
+    if (!canSubmit || !startIso) return;
     try {
       const result = await createRecruitment.mutateAsync({
         clientCommandId: randomUuid(),
@@ -108,9 +107,9 @@ export default function AdminTeamMatchNewPage() {
         title: title.trim(),
         description: description.trim() || null,
         imageUrl: imageUrl || null,
-        startsAt: startDate.toISOString(),
-        endsAt: endDate?.toISOString() ?? null,
-        deadlineAt: deadlineDate?.toISOString() ?? null,
+        startsAt: startIso,
+        endsAt: fromDatetimeLocalValue(endsAt) ?? null,
+        deadlineAt: fromDatetimeLocalValue(deadlineAt) ?? null,
         manualPlaceName: placeName.trim(),
         addressText: addressText.trim() || null,
         costNote: moneyNote(totalCost, opponentCost),

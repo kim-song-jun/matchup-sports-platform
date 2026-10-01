@@ -103,6 +103,19 @@ describe('AdminTeamMatchEditPage', () => {
     expect(push).toHaveBeenCalledWith('/admin/team-matches/tm-1');
   });
 
+  it('기존 값을 열고 그대로 저장하면 같은 ISO 가 나간다 (브라우저 TZ=UTC 라도 KST 로 왕복)', async () => {
+    render(<AdminTeamMatchEditPage />);
+
+    expect(screen.getByLabelText('경기 시작')).toHaveValue('2026-10-20T19:00');
+    fireEvent.click(screen.getByRole('button', { name: '수정 내용 저장' }));
+
+    await waitFor(() => expect(update.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      startsAt: DETAIL.startAt,
+      endsAt: DETAIL.endAt,
+      deadlineAt: DETAIL.deadlineAt,
+    })));
+  });
+
   it('does not render an edit form after the match is finalized', () => {
     hooks.detail = { ...hooks.detail, data: { ...DETAIL, status: 'matched' } };
     render(<AdminTeamMatchEditPage />);

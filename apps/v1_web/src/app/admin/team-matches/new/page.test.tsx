@@ -82,8 +82,8 @@ describe('AdminTeamMatchNewPage', () => {
       regionId: 'region-gangnam',
       title: '관리자 모집전',
       manualPlaceName: '잠실 풋살장',
-      deadlineAt: new Date('2026-10-18T19:00').toISOString(),
-      startsAt: new Date('2026-10-20T19:00').toISOString(),
+      deadlineAt: '2026-10-18T10:00:00.000Z',
+      startsAt: '2026-10-20T10:00:00.000Z',
       costNote: '총 90,000원 · 상대팀 30,000원',
       minLevelCode: 'intermediate',
       maxLevelCode: 'intermediate',
@@ -128,7 +128,7 @@ describe('AdminTeamMatchNewPage', () => {
     expect(submit).toBeEnabled();
     fireEvent.click(submit);
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
-      endsAt: new Date('2026-10-21T01:00').toISOString(), deadlineAt: null,
+      endsAt: '2026-10-20T16:00:00.000Z', deadlineAt: null,
     })));
   });
 

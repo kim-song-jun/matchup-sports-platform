@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminEmpty, AdminPageHeader, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
-import { toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import {
   useV1AdminMe,
   useV1AdminTeamMatch,
@@ -65,7 +65,8 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   };
 
   const submit = async () => {
-    if (!canSubmit) return;
+    const startsAtIso = fromDatetimeLocalValue(startsAt);
+    if (!canSubmit || !startsAtIso) return;
     try {
       const result = await mutation.mutateAsync({
         clientCommandId: randomUuid(),
@@ -75,9 +76,9 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
         title: title.trim(),
         description: description.trim() || null,
         imageUrl: imageUrl || null,
-        startsAt: new Date(startsAt).toISOString(),
-        endsAt: endsAt ? new Date(endsAt).toISOString() : null,
-        deadlineAt: deadlineAt ? new Date(deadlineAt).toISOString() : null,
+        startsAt: startsAtIso,
+        endsAt: fromDatetimeLocalValue(endsAt) ?? null,
+        deadlineAt: fromDatetimeLocalValue(deadlineAt) ?? null,
         manualPlaceName: placeName.trim(),
         addressText: addressText.trim() || null,
         costNote: costNote.trim() || null,

@@ -71,6 +71,7 @@
 - Game이 `LIVE`/`PAUSED`일 때는 양 팀 중 한쪽 최신 revision이 아직 미제출인 동안만 복구할 수 있다. 양 팀 최신 revision이 모두 `SUBMITTED`/`LOCKED`가 되면 즉시 잠긴다.
 - 일반 경기 이벤트, 공동 기록, 결과 revision 중 하나라도 생기면 참석명단 수정은 `409 LINEUP_LOCKED_FOR_DIRECT_EDIT`로 거절된다. 구버전의 `confirmRecordedDataRisk` 값으로 우회할 수 없다.
 - 명단 mutation과 공동 기록/Game command는 같은 Game 행을 잠근 뒤 상태를 다시 읽어 동시 요청에서 참가자 ID가 기록 뒤에 바뀌지 않게 한다.
+- **제출 뒤 저장 (Task 180 R-2)**: 우리 최신 revision 이 `SUBMITTED`/`LOCKED` 이면 `PUT .../lineup` 은 초안으로 내리지 않고 새 revision 을 곧바로 `SUBMITTED`(`submittedAt` = 저장 시각)로 만든다 — 응답 `state: "SUBMITTED"`. `POST .../submit` 과 같은 부수효과가 같은 트랜잭션에서 난다: 공개 시각(`V1GameVisibilityPolicy.lineupAt`)이 비어 있으면 킥오프 1시간 전으로 박고(이미 있으면 그대로), 새 제출본의 참석명단 포함 알림 outbox(`team-match-lineup-included:{lineupId}`)를 넣는다(이미 받은 사람은 워커가 거른다). 그래서 다시 제출은 요청 한 번이고, 뒤이어 `POST .../submit` 을 부르면 409 `LINEUP_ALREADY_SUBMITTED` 다. 제출 전(초안) 명단의 저장은 그대로 `DRAFT` 이고, 잠금(`LINEUP_LOCKED_FOR_DIRECT_EDIT`)·버전(`VERSION_CONFLICT`) 판정은 바뀌지 않는다.
 
 ### 첫 기록 뒤 "추가만" · 상대 참석명단 · 응답 칩 (Task 180 H5)
 
@@ -119,7 +120,7 @@
 | POST | `/team-match-applications/:applicationId/reject` | Yes(host team owner/manager) | 신청 거절 |
 | GET | `/me/team-matches` | Yes | 내 팀매치 워크리스트(`scope=hosted|applied|created|all`, `teamId?`, `status?`) |
 | GET | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 조회 |
-| PUT | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 draft 저장 |
+| PUT | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 저장 — 제출 전이면 초안, 이미 낸 명단이면 곧바로 새 제출본(Task 180 R-2) |
 | POST | `/team-matches/:teamMatchId/lineup/submit` | Yes | 참석명단 제출 |
 | POST | `/team-matches/:teamMatchId/lineup/change-request` | Yes | 상대측 라인업 변경 요청 |
 | GET | `/teams/:teamId/recent-venues` | Yes | 최근 사용 장소(생성 폼 자동완성) |
@@ -333,7 +334,7 @@ Rules:
 ## Team-match lineup
 
 - `GET /team-matches/:teamMatchId/lineup` reads the viewer's team lineup.
-- `PUT /team-matches/:teamMatchId/lineup` saves a draft through `TeamMatchLineupService`.
+- `PUT /team-matches/:teamMatchId/lineup` saves through `TeamMatchLineupService`: a draft stays `DRAFT`, but once the latest revision is `SUBMITTED`/`LOCKED` the save creates a new `SUBMITTED` revision directly (Task 180 R-2, see "제출 뒤 저장" above).
 - Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
 - Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement. The RSVP is echoed read-only as `eligibleMembers[].rsvpStatus` (Task 180 H5). A member who is also an active member of the opponent team is flagged `eligibleMembers[].alsoOpponentMember` (Task 180 W4-V4) — informational only; saving that member on both sides is not rejected.
 - Opponent-side lineup access and change requests require an approved opponent team. The opponent's numbers and names are readable only after the public lineup time (`GET .../lineup/opponent`, see "첫 기록 뒤 추가만" above).

@@ -285,6 +285,9 @@ export class TeamMatchLineupService {
           // 두 곳에서 갈리지 않도록 같은 헬퍼(latestConsentSnapshotByLinkId /
           // carryRevokedConsent)를 공유한다.
           const carriedConsentByUserId = await loadRevokedConsentByUserId(tx, previous?.id ?? null);
+          // 이미 낸 명단의 저장은 곧바로 새 제출본이다(Task 180 R-2). 초안으로 내리면 상대 '제출 완료'·공개 뒤
+          // 상대 명단·할 일·킥오프 안내는 '제출 전'으로 돌아가는데 경기 기록은 옛 제출본을 쓴다.
+          const resubmission = isSubmittedLineupState(previous?.state);
           const lineup = await tx.v1GameLineup.create({
             data: {
               gameId: context.gameId,
@@ -292,6 +295,7 @@ export class TeamMatchLineupService {
               revision: (previous?.revision ?? 0) + 1,
               supersedesId: previous?.id,
               formation: dto.formation,
+              ...(resubmission ? { state: V1GameLineupState.SUBMITTED, submittedAt: new Date() } : {}),
             },
           });
           // createMany 대신 한 행씩 create 하는 이유: createMany 는 생성된 id 를 돌려주지
@@ -347,6 +351,11 @@ export class TeamMatchLineupService {
             // 사람이 있다 — 사람 기준으로 이어야 그 경우까지 끊기지 않는다. 게스트
             // (userId === null)는 위에서 이미 걸러져 여기 도달하지 않는다.
             await carryRevokedConsent(tx, created.id, carriedConsentByUserId.get(entry.userId));
+          }
+          if (resubmission) {
+            // submitLineup 과 같은 부수효과 — 공개 시각은 이미 박혀 있으면 그대로, 포함 알림은 워커가 받은 사람을 거른다.
+            await this.ensureDefaultPublicLineupTime(tx, context.gameId, context.startAt);
+            await enqueueLineupIncludedNotice(tx, lineup.id);
           }
           return {
             teamMatchId,

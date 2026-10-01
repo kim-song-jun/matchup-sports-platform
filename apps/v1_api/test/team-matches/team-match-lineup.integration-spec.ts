@@ -379,7 +379,7 @@ describe('Task 14 team-match lineup builder', () => {
     expect(view.starters.map((starter) => starter.displayName)).toContain('용병 게스트');
   });
 
-  it('saves a valid draft, rejects a stale-version resave, submits it, and allows direct re-edit before kickoff', async () => {
+  it('saves a valid draft, rejects a stale-version resave, submits it, and turns a re-edit before kickoff into a new submission', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const saved = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-draft-1', {
@@ -450,9 +450,15 @@ describe('Task 14 team-match lineup builder', () => {
         bench: [],
       },
     );
+    // Task 180 R-2: 이미 낸 명단의 저장은 초안으로 내려가지 않고 곧바로 새 제출본이 된다.
     expect(editAfterSubmit).toEqual(
-      expect.objectContaining({ state: 'DRAFT', version: submitted.version + 1 }),
+      expect.objectContaining({ state: 'SUBMITTED', version: submitted.version + 1 }),
     );
+    const resubmitted = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: editAfterSubmit.lineupId } });
+    expect(resubmitted).toEqual(expect.objectContaining({ state: 'SUBMITTED', supersedesId: submitted.lineupId, submittedAt: expect.any(Date) }));
+    // 공개 시각은 첫 제출 때 박힌 값 그대로다.
+    const policyAfterResubmit = await prisma.v1GameVisibilityPolicy.findUniqueOrThrow({ where: { gameId: submitted.gameId } });
+    expect(policyAfterResubmit.lineupAt?.getTime()).toBe(policy.lineupAt?.getTime());
   });
 
   it('lets the opponent manager request a change on the other side before lock, but not on their own side', async () => {

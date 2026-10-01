@@ -1059,6 +1059,7 @@ describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받
 describe('TournamentRosterPageClient — 선수 등록 하단 영역(#1430)', () => {
   const addMutate = vi.fn();
   let fetchSpy: MockInstance<typeof fetch>;
+  let memberItems: ReturnType<typeof memberItem>[];
 
   function memberItem(userId: string, name: string, phone = '01012345678') {
     return {
@@ -1079,6 +1080,7 @@ describe('TournamentRosterPageClient — 선수 등록 하단 영역(#1430)', ()
   }
 
   beforeEach(() => {
+    memberItems = [memberItem('u-1', '김하나'), memberItem('u-2', '이둘'), memberItem('u-3', '박셋', '')];
     addMutate.mockReset().mockResolvedValue({});
     useV1TournamentMock.mockReturnValue({
       data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
@@ -1100,7 +1102,7 @@ describe('TournamentRosterPageClient — 선수 등록 하단 영역(#1430)', ()
     useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
     useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
     const page = {
-      items: [memberItem('u-1', '김하나'), memberItem('u-2', '이둘'), memberItem('u-3', '박셋', '')],
+      items: memberItems,
       summary: { ownerCount: 0, managerCount: 0, memberCount: 2 },
       viewerRole: 'owner',
       pageInfo: { nextCursor: null, hasNext: false },
@@ -1184,6 +1186,18 @@ describe('TournamentRosterPageClient — 선수 등록 하단 영역(#1430)', ()
 
     await waitFor(() => expect(addMutate).toHaveBeenCalledTimes(1));
     expect(addMutate.mock.calls[0][0]).toMatchObject({ userId: 'u-1', realName: '김하나', birthDate: '1995-03-21' });
+    unmount();
+    queryClient.clear();
+  });
+
+  it('팀원이 0명이면 안내만 보이고 빈 하단 영역·하단 여백을 만들지 않는다', async () => {
+    memberItems.length = 0; // fetch 목이 같은 배열을 본다
+    const { container, unmount, queryClient } = renderRoster();
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+
+    expect(await screen.findByText('팀원이 없어요')).toBeInTheDocument();
+    expect(container.querySelector('.tm-fixed-cta')).toBeNull();
+    expect(container.querySelector('.tm-tournament-roster-body')).toHaveStyle({ paddingBottom: '48px' });
     unmount();
     queryClient.clear();
   });

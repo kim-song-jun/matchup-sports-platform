@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -396,6 +396,7 @@ function AddPlayerForm({
   isActive,
   multipleDrafts,
   onActivate,
+  onFooterNeededChange,
 }: {
   formId: string;
   teamId: string;
@@ -414,6 +415,8 @@ function AddPlayerForm({
   isActive: boolean;
   multipleDrafts: boolean;
   onActivate: (formId: string) => void;
+  /** 이 칸이 하단 제출 영역을 실제로 채우는지(팀원 없음 안내 상태에서는 채우지 않는다). */
+  onFooterNeededChange: (formId: string, needed: boolean) => void;
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
   const [birthDateError, setBirthDateError] = useState<string | null>(null);
@@ -504,6 +507,10 @@ function AddPlayerForm({
   // 제출도 불가능하다(canSubmit이 form.userId를 요구). 크리플드 폼을 보여주는 대신
   // 폼 전체를 "먼저 멤버를 추가하라" 안내로 대체한다.
   const noMembers = !membersLoading && !membersError && members.length === 0;
+  useEffect(() => {
+    onFooterNeededChange(formId, !noMembers);
+    return () => onFooterNeededChange(formId, false);
+  }, [formId, noMembers, onFooterNeededChange]);
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
@@ -1226,6 +1233,7 @@ export function TournamentRosterPageClient({
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
   // 추가 칸이 여러 개여도 하단 제출 영역은 하나다 — 마지막으로 포커스한(없으면 마지막으로 연) 칸을 제출한다.
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [footerDraftIds, setFooterDraftIds] = useState<ReadonlySet<string>>(() => new Set());
   const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   // [primary cap] 한 번에 한 행만 편집 모드로 둔다 — PlayerRow가 각자 로컬 상태로
@@ -1280,7 +1288,7 @@ export function TournamentRosterPageClient({
     () => new Set(players.map((player) => player.userId)),
     [players],
   );
-  const showSubmitFooter = canEditRoster && draftForms.length > 0;
+  const showSubmitFooter = canEditRoster && footerDraftIds.size > 0;
   const activeDraftFormId =
     draftForms.find((form) => form.id === activeDraftId)?.id ?? draftForms[draftForms.length - 1]?.id ?? null;
   const canAddDraftForm = canEditRoster && players.length + draftForms.length < maxPlayers;
@@ -1324,6 +1332,16 @@ export function TournamentRosterPageClient({
         </div>
       );
   }
+
+  const handleFooterNeededChange = useCallback((formId: string, needed: boolean) => {
+    setFooterDraftIds((prev) => {
+      if (prev.has(formId) === needed) return prev;
+      const next = new Set(prev);
+      if (needed) next.add(formId);
+      else next.delete(formId);
+      return next;
+    });
+  }, []);
 
   function handleAddDraftForm() {
     if (!canAddDraftForm) return;
@@ -1660,6 +1678,7 @@ export function TournamentRosterPageClient({
                   isActive={draftForm.id === activeDraftFormId}
                   multipleDrafts={draftForms.length > 1}
                   onActivate={setActiveDraftId}
+                  onFooterNeededChange={handleFooterNeededChange}
                 />
               );
             })}

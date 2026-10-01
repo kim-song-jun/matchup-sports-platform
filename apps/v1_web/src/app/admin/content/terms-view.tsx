@@ -466,14 +466,23 @@ export function TermsView() {
                   ) : null}
                 </div>
                 {placements.map((placement, index) => (
-                  <div key={`${placement.context}-${index}`} className="grid gap-2 rounded-xl bg-[var(--surface-soft)] p-3 sm:grid-cols-[1fr_1fr_90px_auto] sm:items-center">
-                    <select className={fieldClass} value={placement.context} onChange={(event) => setPlacementContext(index, event.target.value as V1ManagedTermsContext)} disabled={!canWrite}>
-                      {Object.entries(contextLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                    <select className={fieldClass} value={placement.requirement} onChange={(event) => setPlacement(index, { requirement: event.target.value as V1ManagedTermsRequirement })} disabled={!canWrite}>
-                      {requirementsForContext(placement.context).map((value) => <option key={value} value={value}>{requirementLabel[value]}</option>)}
-                    </select>
-                    <input className={fieldClass} type="number" min={0} max={1000} value={placement.displayOrder} onChange={(event) => setPlacement(index, { displayOrder: Number(event.target.value) })} disabled={!canWrite} aria-label="노출 순서" />
+                  <div key={`${placement.context}-${index}`} className="grid gap-2 rounded-xl bg-[var(--surface-soft)] p-3 sm:grid-cols-[1fr_1fr_90px_auto] sm:items-end">
+                    <label className="space-y-1">
+                      <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">노출 위치</span>
+                      <select className={fieldClass} value={placement.context} onChange={(event) => setPlacementContext(index, event.target.value as V1ManagedTermsContext)} disabled={!canWrite}>
+                        {Object.entries(contextLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">동의 유형</span>
+                      <select className={fieldClass} value={placement.requirement} onChange={(event) => setPlacement(index, { requirement: event.target.value as V1ManagedTermsRequirement })} disabled={!canWrite}>
+                        {requirementsForContext(placement.context).map((value) => <option key={value} value={value}>{requirementLabel[value]}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">노출 순서</span>
+                      <input className={fieldClass} type="number" min={0} max={1000} value={placement.displayOrder} onChange={(event) => setPlacement(index, { displayOrder: Number(event.target.value) })} disabled={!canWrite} />
+                    </label>
                     <label className="tm-on-tint flex min-h-[44px] items-center gap-2 px-1 text-xs text-[var(--text-muted)]">
                       <input type="checkbox" checked={placement.isActive} onChange={(event) => setPlacement(index, { isActive: event.target.checked })} disabled={!canWrite} />
                       노출

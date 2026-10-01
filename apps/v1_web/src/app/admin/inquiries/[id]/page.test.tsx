@@ -117,6 +117,13 @@ describe('AdminInquiryDetailPage — 신고 대상 팀 롤업/조치', () => {
     expect(screen.getByRole('button', { name: /답변 등록/ })).toBeEnabled();
   });
 
+  it('답변 입력과 상태 select 가 접근 가능한 이름으로 찾힌다', () => {
+    mockInquiryDetail();
+    render(<AdminInquiryDetailPage />);
+    expect(screen.getByRole('textbox', { name: '답변 내용' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '문의 처리 상태' })).toBeInTheDocument();
+  });
+
   it('신고 상세에 대상 팀의 누적 요약이 보인다', () => {
     mockInquiryDetail();
     render(<AdminInquiryDetailPage />);

@@ -572,49 +572,35 @@ export class ChatService {
   async joinMatchChatOnApproval(
     tx: Prisma.TransactionClient,
     input: { matchId: string; hostUserId: string; userId: string; approvedAt: Date },
-  ): Promise<ChatSystemLine | null> {
+  ): Promise<ChatSystemLine> {
     const room = await tx.v1ChatRoom.upsert({
       where: { matchId: input.matchId },
       update: {},
       create: { matchId: input.matchId, status: 'active' },
       select: { id: true, createdAt: true },
     });
-    // 주최자가 스스로 나간 방엔 다시 넣지 않는다 — 매치 상세에서 다시 열면 돌아온다.
-    await this.pullMatchChatParticipant(tx, room.id, input.hostUserId, room.createdAt, false);
-    const joined = await this.pullMatchChatParticipant(tx, room.id, input.userId, input.approvedAt, true);
-    return joined
-      ? this.recordSystemLine(tx, { chatRoomId: room.id, userId: input.userId, event: 'joined', at: input.approvedAt })
-      : null;
+    await this.pullMatchChatHost(tx, room.id, input.hostUserId, room.createdAt);
+    // 승인은 늘 새 참여다(참가 중엔 다시 신청할 수 없다). 예전 참여의 행이 남아 있어도 이번 승인 시각부터
+    // 다시 본다 — 취소돼 있던 동안의 대화가 재승인 뒤에 보이면 안 된다(#1427 리뷰).
+    await tx.v1ChatRoomParticipant.upsert({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId: input.userId } },
+      update: { status: 'active', leftAt: null, lastReadMessageId: null, visibleFromAt: input.approvedAt },
+      create: { chatRoomId: room.id, userId: input.userId, status: 'active', visibleFromAt: input.approvedAt },
+    });
+    return this.recordSystemLine(tx, { chatRoomId: room.id, userId: input.userId, event: 'joined', at: input.approvedAt });
   }
 
-  /** 열람 경계를 `from` 으로 당긴다(이미 더 이르면 그대로). 방에 처음 들어오는 것이면 true. */
-  private async pullMatchChatParticipant(
-    tx: Prisma.TransactionClient,
-    chatRoomId: string,
-    userId: string,
-    from: Date,
-    rejoinIfLeft: boolean,
-  ): Promise<boolean> {
+  /** 주최자를 방 생성 시각부터 보이게 둔다(이미 더 이르면 그대로). 스스로 나간 방엔 다시 넣지 않는다 — 매치 상세에서 다시 열면 돌아온다. */
+  private async pullMatchChatHost(tx: Prisma.TransactionClient, chatRoomId: string, userId: string, from: Date) {
     const existing = await tx.v1ChatRoomParticipant.findUnique({
       where: { chatRoomId_userId: { chatRoomId, userId } },
       select: { id: true, status: true, visibleFromAt: true },
     });
     if (!existing) {
       await tx.v1ChatRoomParticipant.create({ data: { chatRoomId, userId, status: 'active', visibleFromAt: from } });
-      return true;
-    }
-    if (existing.status === 'left') {
-      if (!rejoinIfLeft) return false;
-      await tx.v1ChatRoomParticipant.update({
-        where: { id: existing.id },
-        data: { status: 'active', leftAt: null, lastReadMessageId: null, visibleFromAt: from },
-      });
-      return true;
-    }
-    if (!existing.visibleFromAt || existing.visibleFromAt > from) {
+    } else if (existing.status === 'active' && (!existing.visibleFromAt || existing.visibleFromAt > from)) {
       await tx.v1ChatRoomParticipant.update({ where: { id: existing.id }, data: { visibleFromAt: from } });
     }
-    return !existing.visibleFromAt;
   }
 
   /** 커밋된 시스템 줄을 방 참여자에게 chat:message 로 알린다. 알림함·푸시는 없고, 실패해도 던지지 않는다. */

@@ -53,7 +53,9 @@ and therefore has no host participant row.
   detail/message entry sets it and creates the joined system message.
 - Personal match: approving an application (`POST /match-applications/:id/approve`) creates or finds the
   match room in the same transaction, registers the approved participant with `visible_from_at` = the
-  approval time (`v1_match_participants.approved_at`) plus the joined system message, and registers the host
+  approval time (`v1_match_participants.approved_at`) plus the joined system message — every approval resets it
+  (and `last_read_message_id`), so a participant re-approved after cancelling never sees the cancelled period —
+  and registers the host
   with `visible_from_at = room.created_at` (a host who left the room is not re-added). So the room shows in
   both users' chat list with unread counts and notifications from approval, and opening it late still shows
   messages sent since approval. Participants approved before this rule (no row, `null`, or an entry-time

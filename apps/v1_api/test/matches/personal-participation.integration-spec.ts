@@ -356,6 +356,25 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     expect(items.map((m: { content: string }) => m.content)).toEqual(expect.arrayContaining(['토요일에 봬요', expect.stringContaining('들어왔어요')]));
   });
 
+  it('참가를 취소했다가 다시 승인되면 이번 승인 시각부터 보인다 — 취소돼 있던 동안의 대화는 안 보인다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    await join(id, outsider); // 취소 기간에도 방에 확정 참가자가 남아 대화가 오간다
+    const room = await db.v1ChatRoom.findUniqueOrThrow({ where: { matchId: id } });
+    await post(member, `/chat/rooms/${room.id}/messages`, { content: '참가할게요' }).expect(201);
+    await post(member, `/match-applications/${applicationId}/withdraw`).expect(201);
+    await post(host, `/chat/rooms/${room.id}/messages`, { content: '취소 기간 대화' }).expect(201);
+
+    await post(member, `/matches/${id}/applications`).expect(201);
+    await post(host, `/match-applications/${applicationId}/approve`).expect(201);
+    const { approvedAt } = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    expect(await db.v1ChatRoomParticipant.findUnique({ where: { chatRoomId_userId: { chatRoomId: room.id, userId: member } } })).toMatchObject({ status: 'active', visibleFromAt: approvedAt });
+    await post(host, `/chat/rooms/${room.id}/messages`, { content: '다시 환영해요' }).expect(201);
+    const contents = (await get(member, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items.map((m: { content: string }) => m.content);
+    expect(contents).toContain('다시 환영해요');
+    expect(contents).not.toContain('취소 기간 대화');
+  });
+
   it('이 규칙 이전에 승인된 참가자도(방 미등록·입장 시각으로 늦게 잡힘) 승인 이후 메시지를 본다', async () => {
     const id = await createMatch();
     const applicationId = await join(id);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
 import { useOverlayHistory } from './use-overlay-history';
 import { useTopmostEscape } from './use-topmost-escape';
@@ -190,7 +190,8 @@ export function useModalA11y<
   // cleanup 은 ref 를 비우지 않는다 — StrictMode(dev)는 effect 를 마운트→정리→마운트로 한 번 더 돌리는데, 비우면 복귀
   // 대상이 사라진다. 그 가짜 정리가 포커스를 트리거로 옮겼다면 다시 마운트될 때 모달 안 원래 컨트롤로 돌려놓는다.
   const refocusAfterRemountRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  // layout effect: 패널 DOM 이 걷히는 커밋 안에서 복원한다. passive effect 면 DOM 이 사라진 뒤 한 틈 동안 포커스가 body 에 있다.
+  useLayoutEffect(() => {
     if (!mounted) {
       refocusAfterRemountRef.current = null; // 진짜 닫힘 — 다음 열림에 넘기지 않는다
       return;

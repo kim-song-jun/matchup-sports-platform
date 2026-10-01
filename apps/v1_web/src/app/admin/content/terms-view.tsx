@@ -339,7 +339,7 @@ export function TermsView() {
         </button>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.65fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.65fr)]">
         <section className="min-w-0 space-y-3" aria-label="약관 정책 목록">
           <div className="grid gap-2 sm:grid-cols-[1fr_150px]">
             <input

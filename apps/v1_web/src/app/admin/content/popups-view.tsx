@@ -321,7 +321,7 @@ function AdminPopupsPageContent() {
         </button>
       </div>
 
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="팝업 전체 목록">
           <AdminFilterBar
             searchLabel="팝업 검색"
@@ -557,7 +557,7 @@ function PopupForm({
         <fieldset className="rounded-xl border border-[var(--border)] p-3">
           <legend className="px-1 text-sm font-semibold text-[var(--text-body)]">노출 화면</legend>
           <p className="mb-3 text-xs leading-5 text-[var(--text-muted)]">팝업을 보여줄 화면을 하나 이상 선택해 주세요. 상세·등록 화면도 해당 영역에 포함돼요.</p>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
             {POPUP_TARGET_OPTIONS.map((option) => {
               const checked = targetScreens.includes(option.value);
               return (
@@ -607,11 +607,11 @@ function PopupForm({
             />
           </label>
         </fieldset>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-2"><span className="text-sm font-semibold text-[var(--text-body)]">이동 링크 <span className="font-normal text-[var(--text-muted)]">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="/matches 또는 https://..." /></label>
           <label className="flex flex-col gap-2"><span className="text-sm font-semibold text-[var(--text-body)]">버튼 문구 <span className="font-normal text-[var(--text-muted)]">(선택)</span></span><input value={linkLabel} onChange={(event) => onLinkLabelChange(event.target.value)} maxLength={40} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="자세히 보기" /></label>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-2"><span className="text-sm font-semibold text-[var(--text-body)]">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" /></label>
           <label className="flex flex-col gap-2"><span className="text-sm font-semibold text-[var(--text-body)]">노출 종료</span><input type="datetime-local" value={displayEndAt} min={displayStartAt || undefined} onChange={(event) => onDisplayEndAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" /></label>
         </div>

@@ -218,7 +218,7 @@ export function NoticesView() {
 
   return (
     <>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex flex-col gap-4 min-w-0" aria-label="공지 목록">
           <AdminFilterBar
             searchLabel="공지 검색"

@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { useId } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { StatusChip } from '@/components/v1-ui/status-chip';
 import { MyParticipationChip } from '@/components/teams/my-participation-chip';
 import { TeamGameKindBadge } from '@/components/teams/team-game-kind-badge';
+import { matchPhaseChip } from '@/lib/competition-status';
 import { teamGameDetailHref, teamGameRosterHref } from '@/lib/team-game-links';
 import { describeUpcomingGameTime } from '@/lib/upcoming-game-time';
 import type { V1HomeNextGame } from '@/types/api';
@@ -13,10 +15,12 @@ import type { V1HomeNextGame } from '@/types/api';
  * 홈 맨 위 "다음 경기" — 내 팀의 앞으로의 경기 중 가장 가까운 하나(리그·대회·친선).
  * 출전 여부는 서버가 판정해 내려 준 값(`viewerParticipating`)만 읽는다. 빠진 경기는 칩 없이 그린다.
  * 팀장·매니저는 같은 카드의 주 버튼이 "명단 확인"이 된다. 링크는 팀원이 열 수 있는 화면만 낸다.
+ * 서버는 킥오프 뒤에도 결과가 나가기 전(최대 3시간)이면 그 경기를 내려 준다 — 그때는 "진행 중" 칩을 단다.
  */
 export function NextGameCard({ game, now = new Date() }: { game: V1HomeNextGame; now?: Date }) {
   const headingId = useId();
   const time = describeUpcomingGameTime(game.scheduledAt, now);
+  const started = time?.started === true;
   const linkInput = { competitionKind: game.competitionKind, competitionId: game.competitionId, teamMatchId: game.teamMatchId };
   const detailHref = teamGameDetailHref(linkInput, '/home');
   const rosterHref = teamGameRosterHref({
@@ -32,7 +36,7 @@ export function NextGameCard({ game, now = new Date() }: { game: V1HomeNextGame;
   const teamLine = [
     game.teamName,
     game.participantCount !== null ? `${game.participantCount}명 출전` : null,
-    game.viewerCanManage && game.participantCount !== null ? '경기 시작 전까지 바꿀 수 있어요' : null,
+    game.viewerCanManage && game.participantCount !== null && !started ? '경기 시작 전까지 바꿀 수 있어요' : null,
   ]
     .filter((part) => part !== null)
     .join(' · ');
@@ -52,6 +56,7 @@ export function NextGameCard({ game, now = new Date() }: { game: V1HomeNextGame;
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="tm-text-caption-strong" style={{ color: 'var(--blue700)' }}>다음 경기</span>
+          {started ? <StatusChip chip={matchPhaseChip('live')} /> : null}
           {time?.countdown ? (
             <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ background: 'var(--surface)', color: 'var(--blue700)' }}>
               {time.countdown}

@@ -44,6 +44,37 @@ export type ChatListViewModel = {
   };
 };
 
+/** 말풍선에 그리는 공유 카드. href 는 돌아올 곳(?from)까지 붙인 경로다. */
+export type ChatShareCardModel = {
+  label: string;
+  title: string;
+  when: string | null;
+  place: string | null;
+  sub: string | null;
+  href: string;
+};
+
+/** 공유 선택 시트의 한 줄. */
+export type ChatShareCandidate = {
+  kind: 'team_schedule' | 'match';
+  targetId: string;
+  title: string;
+  when: string | null;
+  sub: string | null;
+};
+
+/** 공유 선택 시트 — 열릴 때만 내 팀 일정·내 매치를 불러온다. */
+export type ChatShareSheetModel = {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  status: 'loading' | 'error' | 'ready';
+  schedules: ChatShareCandidate[];
+  matches: ChatShareCandidate[];
+  onPick: (candidate: ChatShareCandidate) => void;
+  onRetry?: () => void;
+};
+
 export type ChatRoomViewModel = {
   onMessageSafety?: (message: { id: string; label: string }) => void;
   onManageBlocked?: () => void;
@@ -62,8 +93,12 @@ export type ChatRoomViewModel = {
     sentAt: string;
     unreadCount?: number;
     /** 사진 메시지. `imageUrl` 이 null 이면 볼 수 없는 사진(숨김·삭제·업로드 삭제). */
-    kind?: 'image';
+    kind?: 'image' | 'share' | 'file';
     imageUrl?: string | null;
+    /** 일정·매치 공유 카드. 없으면(숨김·삭제) body 대체 문구만 보인다. */
+    share?: ChatShareCardModel | null;
+    /** 파일 메시지 — 이름·크기·받기 경로(참여자 인증). 없으면(숨김·삭제) body 대체 문구만 보인다. */
+    file?: { name: string; sizeLabel: string; href: string } | null;
   }>;
   status?: 'loading' | 'error' | 'ready';
   emptyTitle?: string;
@@ -77,8 +112,14 @@ export type ChatRoomViewModel = {
   onPickImages?: (files: File[]) => void;
   /** 사진 업로드·전송 중. */
   sendingImages?: boolean;
-  /** 사진 전송 실패·안내 문구. */
+  /** + 패널의 "파일"에서 고른 문서(Task 181 ③). 없으면 칸이 안 보인다. */
+  onPickFile?: (file: File) => void;
+  /** 파일 업로드·전송 중. */
+  sendingFile?: boolean;
+  /** 사진·공유 전송 실패·안내 문구. */
   imageNotice?: string;
+  /** + 패널의 "일정·매치" — 없으면 칸이 안 보인다. */
+  share?: ChatShareSheetModel;
   onRetry?: () => void;
   /** 다시 불러와도 소용없는 막힘(권한 없음)일 때 재시도 대신 돌아갈 곳. */
   errorBack?: { href: string; label: string };

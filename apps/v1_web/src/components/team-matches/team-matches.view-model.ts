@@ -100,7 +100,7 @@ export function getTeamMatchListViewModel(): TeamMatchListViewModel {
       { label: '러닝', count: 3 },
       { label: '수영', count: 2 },
     ],
-    summary: { count: 28, today: 5, urgent: 3 },
+    summary: { count: 0, today: 0, urgent: 0 },
     matches: teamMatches,
   };
 }

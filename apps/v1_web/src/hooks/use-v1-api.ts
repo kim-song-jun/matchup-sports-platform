@@ -1,7 +1,7 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
+import { getV1ApiBaseUrl, v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compress';
 import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
@@ -92,6 +92,8 @@ import type {
   V1CurrentTerms,
   V1ChatMessage,
   V1ChatMessageSendResult,
+  V1ChatShareKind,
+  V1ChatFileUploadResult,
   V1ChatRoom,
   V1ChatRoomDetail,
   V1ChatRoomLeaveResult,
@@ -667,10 +669,11 @@ export function useV1Matches(filters?: ListFilters, options?: QueryOptions & { s
   });
 }
 
-export function useV1MyMatches(filters?: ListFilters) {
+export function useV1MyMatches(filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'matches', filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1Match>>('/me/matches', filters),
+    enabled: options?.enabled,
   });
 }
 
@@ -1651,10 +1654,11 @@ export function useV1ApplyGuestRecruitment(teamId: string, scheduleId: string) {
   });
 }
 
-export function useV1MySchedule(filters?: ListFilters) {
+export function useV1MySchedule(filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: v1Keys.mySchedule(filters),
     queryFn: () => v1Get<V1MySchedulePage>('/me/schedule', filters),
+    enabled: options?.enabled,
   });
 }
 
@@ -2629,7 +2633,8 @@ export function useV1SendChatMessage(roomId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     // 텍스트 또는 사진(내가 올린 업로드 경로) 중 하나 — 서버가 둘 다·둘 다 없음을 400 으로 막는다.
-    mutationFn: (body: { content: string } | { imageUrl: string }) => v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
+    mutationFn: (body: { content: string } | { imageUrl: string } | { share: { kind: V1ChatShareKind; targetId: string } } | { fileId: string }) =>
+      v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
       queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
@@ -2965,6 +2970,25 @@ export function useV1WithdrawalRequest() {
  * 전송 전에 compressImagesForUpload 로 한 장씩 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을
  * 그대로 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
  */
+/**
+ * 채팅 파일 업로드(Task 181 ③) — 문서 한 개, multipart field `file`. 응답은 `{ fileId, name, size, mimeType }` 이고
+ * 공개 URL 은 없다(파일은 방 참여자만 `chatMessageFileUrl` 로 받는다).
+ */
+export function useV1UploadChatFile() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return v1MultipartPost<V1ChatFileUploadResult>('/uploads/files', formData);
+    },
+  });
+}
+
+/** 파일 메시지 받기 경로 — 쿠키 인증으로 브라우저·앱 셸이 바로 내려받는다(참여자만, 응답은 attachment). */
+export function chatMessageFileUrl(roomId: string, messageId: string) {
+  return `${getV1ApiBaseUrl()}/chat/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(messageId)}/file`;
+}
+
 export function useV1UploadImages(options?: CompressOptions) {
   return useMutation({
     mutationFn: async (files: File | File[] | FileList) => {

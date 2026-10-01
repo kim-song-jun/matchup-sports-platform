@@ -2090,11 +2090,15 @@ export type V1ChatMessage = {
     displayName: string;
     profileImageUrl: string | null;
   };
-  messageType?: 'text' | 'system' | 'image';
+  messageType?: 'text' | 'system' | 'image' | 'share' | 'file';
   systemEventType?: 'joined' | 'left' | null;
   content: string | null;
   /** 사진 메시지의 업로드 경로(`/uploads/...`). 숨김·삭제 메시지이거나 업로드가 지워졌으면 null (Task 181). */
   imageUrl?: string | null;
+  /** 일정·매치 공유 카드(보낼 때 스냅숏). 숨김·삭제 메시지면 null (Task 181 ②). */
+  shareCard?: V1ChatShareCard | null;
+  /** 파일 메시지(이름·크기만). 받기는 참여자 인증 경로 — `chatMessageFileUrl`. 숨김·삭제면 null (Task 181 ③). */
+  file?: V1ChatFile | null;
   status: string;
   sentAt: string;
   mine: boolean;
@@ -2130,12 +2134,32 @@ export type V1ChatRoomResolveResult = {
   route: string;
 };
 
+export type V1ChatShareKind = 'team_schedule' | 'match';
+
+export type V1ChatFile = { name: string; size: number; mimeType: string };
+
+/** `POST /uploads/files` — 채팅 파일 업로드 결과. 공개 URL 은 없다. */
+export type V1ChatFileUploadResult = { fileId: string; name: string; size: number; mimeType: string };
+
+export type V1ChatShareCard = {
+  kind: V1ChatShareKind;
+  targetId: string;
+  title: string;
+  startAt: string | null;
+  place: string | null;
+  sub: string | null;
+  /** 같은 출처 경로(`/team-matches/:id` · `/teams/:teamId/schedules/:id` · `/matches/:id`). */
+  route: string;
+};
+
 export type V1ChatMessageSendResult = {
   messageId: string;
   roomId: string;
-  messageType?: 'text' | 'image';
+  messageType?: 'text' | 'image' | 'share' | 'file';
   content: string;
   imageUrl?: string | null;
+  shareCard?: V1ChatShareCard | null;
+  file?: V1ChatFile | null;
   status: string;
   sentAt: string;
 };

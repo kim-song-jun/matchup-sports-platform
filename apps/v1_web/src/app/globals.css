@@ -5359,6 +5359,166 @@ textarea.tm-chat-input-placeholder::placeholder {
   object-fit: cover;
 }
 
+/* 일정·매치 공유 카드(Task 181 ②) — 내 말풍선이어도 파란 바탕 대신 카드 바탕(본문 링크가 읽히게). */
+.tm-chat-bubble.tm-chat-bubble-share {
+  padding: 0;
+  background: var(--card-surface);
+  color: var(--text-strong);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.tm-chat-share-card {
+  min-width: 200px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-strong);
+  text-decoration: none;
+  border-radius: inherit;
+}
+
+.tm-chat-share-card:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: -2px;
+}
+
+.tm-chat-share-card-kind {
+  color: var(--blue700);
+  font-weight: 700;
+}
+
+.tm-chat-share-card-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.tm-chat-share-card .tm-text-caption {
+  color: var(--text-muted);
+}
+
+.tm-chat-share-card .tm-chat-share-card-cta {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--blue700);
+  font-weight: 600;
+}
+
+/* 파일 말풍선(Task 181 ③) — 공유 카드와 같은 카드 바탕, 이름·크기 + 받기 아이콘. */
+.tm-chat-file-card {
+  min-width: 220px;
+  max-width: 100%;
+  min-height: 56px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-strong);
+  text-decoration: none;
+  border-radius: inherit;
+}
+
+.tm-chat-file-card:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: -2px;
+}
+
+.tm-chat-file-card-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+  color: var(--blue700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tm-chat-file-card-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tm-chat-file-card-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tm-chat-file-card .tm-text-caption {
+  color: var(--text-muted);
+}
+
+.tm-chat-file-card-download {
+  flex: 0 0 auto;
+  color: var(--blue700);
+}
+
+.tm-chat-share-sheet {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tm-chat-share-sheet-note {
+  padding: 16px 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.tm-chat-share-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+
+.tm-chat-share-row {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--card-surface);
+  color: var(--text-strong);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.tm-chat-share-row:hover {
+  background: var(--surface-soft);
+}
+
+.tm-chat-share-row:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-chat-share-row-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.tm-chat-share-row .tm-text-caption {
+  color: var(--text-muted);
+}
+
 .tm-chat-image-viewer {
   position: fixed;
   inset: 0;
@@ -7870,9 +8030,14 @@ textarea.tm-chat-input-placeholder::placeholder {
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
-.tm-video-strip-item {
+/* 목록 의미(role=listitem)를 wrapper 가 맡는다 — 스트립의 flex 자식 크기는 wrapper 가 정하고 안쪽 링크·버튼은 폭을 채운다 */
+.tm-video-strip-cell {
   flex: none;
   width: 168px;
+}
+.tm-video-strip-item {
+  display: block;
+  width: 100%;
   padding: 0;
   border: none;
   background: none;

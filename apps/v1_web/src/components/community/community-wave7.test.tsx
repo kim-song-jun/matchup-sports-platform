@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
+import { formatFileSize } from './chat-plus-panel';
 import type { ChatListViewModel, ChatRoomViewModel, NotificationsViewModel } from './community.types';
 
 vi.mock('next/navigation', () => ({
@@ -216,6 +217,116 @@ describe('채팅방 + 패널 · 사진 (Task 181)', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog', { name: '사진 크게 보기' })).not.toBeInTheDocument();
+  });
+});
+
+describe('채팅방 일정·매치 공유 (Task 181 ②)', () => {
+  const shareModel = (overrides: Partial<NonNullable<ChatRoomViewModel['share']>> = {}): NonNullable<ChatRoomViewModel['share']> => ({
+    open: false,
+    onOpen: vi.fn(),
+    onClose: vi.fn(),
+    status: 'ready',
+    schedules: [{ kind: 'team_schedule', targetId: 'sch-1', title: '토요일 친선', when: '10/4 (토) 19:00', sub: '번개 FC' }],
+    matches: [{ kind: 'match', targetId: 'm-1', title: '수요일 저녁 풋살', when: '10/8 (수) 20:00', sub: '성수 풋살파크' }],
+    onPick: vi.fn(),
+    onRetry: vi.fn(),
+    ...overrides,
+  });
+
+  it('+ 패널의 "일정·매치" 칸은 공유 시트를 열고 패널을 닫는다', () => {
+    const share = shareModel();
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share }} roomId="room-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '일정·매치' }));
+
+    expect(share.onOpen).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('group', { name: '보내기 메뉴' })).not.toBeInTheDocument();
+  });
+
+  it('시트에서 팀 일정·매치 탭을 바꿔 고르면 그 항목을 넘긴다', () => {
+    const share = shareModel({ open: true });
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share }} roomId="room-1" />);
+    const sheet = screen.getByRole('dialog', { name: '일정·매치 공유' });
+
+    fireEvent.click(within(sheet).getByRole('button', { name: /토요일 친선/ }));
+    expect(share.onPick).toHaveBeenCalledWith(share.schedules[0]);
+
+    fireEvent.click(within(sheet).getByRole('tab', { name: '매치' }));
+    expect(within(sheet).getByText('10/8 (수) 20:00 · 성수 풋살파크')).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: /수요일 저녁 풋살/ }));
+    expect(share.onPick).toHaveBeenLastCalledWith(share.matches[0]);
+  });
+
+  it('비었거나·불러오는 중이거나·실패하면 그 상태를 알리고 실패는 다시 불러온다', () => {
+    const { unmount } = renderWithClient(
+      <ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share: shareModel({ open: true, schedules: [] }) }} roomId="room-1" />,
+    );
+    expect(screen.getByText('다가오는 팀 일정이 없어요.')).toBeInTheDocument();
+    unmount();
+
+    const failing = shareModel({ open: true, status: 'error' });
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), share: failing }} roomId="room-1" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('목록을 불러오지 못했어요.');
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(failing.onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('공유 카드는 종류·제목·일시·장소를 보여 주고 누르면 그 화면으로 간다', () => {
+    const messages: ChatRoomViewModel['messages'] = [{
+      id: 's1', who: 'me', senderId: 'u1', label: '나', body: '[매치] 수요일 저녁 풋살', sentAt: '2026-10-01T01:00:00Z', kind: 'share',
+      share: { label: '매치', title: '수요일 저녁 풋살', when: '10/8 (수) 20:00', place: '성수 풋살파크', sub: null, href: '/matches/m-1?from=%2Fchat%2Froom-1' },
+    }];
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, messages }} roomId="room-1" />);
+
+    const card = screen.getByRole('link', { name: /매치 공유/ });
+    expect(card).toHaveAttribute('href', '/matches/m-1?from=%2Fchat%2Froom-1');
+    expect(within(card).getByText('수요일 저녁 풋살')).toBeInTheDocument();
+    expect(within(card).getByText('성수 풋살파크')).toBeInTheDocument();
+  });
+});
+
+describe('채팅방 파일 보내기 (Task 181 ③)', () => {
+  it('+ 패널의 "파일" 칸에서 고른 문서를 넘기고 패널을 닫는다', () => {
+    const onPickFile = vi.fn();
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), onPickFile }} roomId="room-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+    expect(screen.getByRole('button', { name: '파일' })).toBeInTheDocument();
+    expect(screen.getByTestId('chat-file-input')).toHaveAttribute('accept', expect.stringContaining('.hwp'));
+    const doc = new File(['%PDF-'], '경기 일정표.pdf', { type: 'application/pdf' });
+
+    fireEvent.change(screen.getByTestId('chat-file-input'), { target: { files: [doc] } });
+
+    expect(onPickFile).toHaveBeenCalledWith(doc);
+    expect(screen.queryByRole('group', { name: '보내기 메뉴' })).not.toBeInTheDocument();
+  });
+
+  it('파일 말풍선은 이름·크기를 보여 주고 참여자 인증 경로로 내려받는다', () => {
+    const messages: ChatRoomViewModel['messages'] = [{
+      id: 'f1', who: 'other', senderId: 'u2', label: '서연', body: '[파일] 경기 일정표.pdf', sentAt: '2026-10-01T01:00:00Z', kind: 'file',
+      file: { name: '경기 일정표.pdf', sizeLabel: '1.2MB', href: '/api/v1/chat/rooms/room-1/messages/f1/file' },
+    }];
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, messages }} roomId="room-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 일정표.pdf 파일 받기, 1.2MB' });
+    expect(link).toHaveAttribute('href', '/api/v1/chat/rooms/room-1/messages/f1/file');
+    expect(link).toHaveAttribute('download', '경기 일정표.pdf');
+  });
+
+  it('보내는 중이면 알리고 + 패널 칸을 잠근다', () => {
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), onPickFile: vi.fn(), sendingFile: true }} roomId="room-1" />);
+    expect(screen.getByRole('status')).toHaveTextContent('파일을 보내는 중이에요…');
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+    expect(screen.getByRole('button', { name: '파일' })).toBeDisabled();
+  });
+});
+
+describe('formatFileSize', () => {
+  it('B · KB · MB 로 줄여 쓴다', () => {
+    expect(formatFileSize(820)).toBe('820B');
+    expect(formatFileSize(12 * 1024 + 300)).toBe('12KB');
+    expect(formatFileSize(3.4 * 1024 * 1024)).toBe('3.4MB');
+    expect(formatFileSize(2 * 1024 * 1024)).toBe('2MB');
   });
 });
 

@@ -42,6 +42,7 @@ import {
   getRosterDeadlineState,
   isTournamentRosterMutable,
   ROSTER_BLOCK_BADGE_LABEL,
+  ROSTER_VIEW_ONLY_BADGE_LABEL,
   rosterEditBlockReason,
   tournamentRosterClosedMessage,
   type RosterDeadlineState,
@@ -172,7 +173,7 @@ export function TournamentRosterDeadlineCard({
   });
   const canEditRoster = canManageRoster && blockReason === null;
   const rosterEditBadge = !canManageRoster
-    ? '팀장에게 요청'
+    ? ROSTER_VIEW_ONLY_BADGE_LABEL
     : blockReason === null
       ? '수정 가능'
       : ROSTER_BLOCK_BADGE_LABEL[blockReason];

@@ -108,6 +108,9 @@ export const ROSTER_BLOCK_BADGE_LABEL: Record<NonNullable<RosterEditBlockReason>
   deadline: '제출 마감',
 };
 
+/** 멤버에게 보이는 명단 배지 — 멤버가 못 고치는 건 마감이 아니라 권한이다. */
+export const ROSTER_VIEW_ONLY_BADGE_LABEL = '팀장에게 요청';
+
 /**
  * 신청 하나의 명단이 지금 막혔는지 — 명단 화면이 따로 세는 네 조건을 한 번에 본다.
  * 팀장·매니저인지는 묻지 않는다(그건 보는 사람의 문제라 호출하는 화면이 따로 판정한다).

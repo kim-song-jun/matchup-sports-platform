@@ -49,3 +49,11 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual` creates one
   fixture with `homeTeamId`, `awayTeamId`, `startsAt`, and optional
   `durationMinutes`, `placeName`, and `title`.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel`
+  (`{ reason }`) cancels one fixture; an already-cancelled fixture returns
+  `alreadyProcessed: true`. A fixture whose game is in progress (`LIVE` or
+  `PAUSED`) returns `409 LEAGUE_FIXTURE_GAME_IN_PROGRESS` — the game would
+  otherwise stay running with no way to end it. End it from the live console
+  (forfeit/abandon end) first. Scheduled and ended games stay cancellable
+  (ended ones for result corrections). The admin fixture table disables the
+  cancel action on the same condition.

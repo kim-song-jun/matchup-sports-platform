@@ -1943,4 +1943,21 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     expect(within(byeSheet).getByRole('button', { name: /^일정 수정/ })).toBeInTheDocument();
     expect(within(byeSheet).queryByRole('button', { name: /^몰수패 처리/ })).toBeNull();
   });
+
+  // W4-V14 — 진행 중 경기의 대진을 취소하면 게임이 진행 중으로 남는다. 서버가 409 로 막는 조건과 같다.
+  it.each(['LIVE', 'PAUSED'])('경기가 %s 인 대진은 취소 항목이 비활성이고 이유를 적는다', (gameState) => {
+    renderLeague([{ ...base, teamMatchId: 'tm-live', title: '1주차', startAt: W1, gameState }]);
+
+    const cancel = within(openRowMenu('1주차')).getByRole('button', { name: /^대진 취소/ });
+    expect(cancel).toBeDisabled();
+    expect(cancel).toHaveTextContent('경기가 진행 중이에요');
+  });
+
+  it.each(['SCHEDULED', 'ENDED'])('경기가 %s 인 대진은 그대로 취소할 수 있다', (gameState) => {
+    renderLeague([{ ...base, teamMatchId: 'tm-1', title: '1주차', startAt: W1, gameState }]);
+
+    const cancel = within(openRowMenu('1주차')).getByRole('button', { name: /^대진 취소/ });
+    expect(cancel).not.toBeDisabled();
+    expect(cancel).not.toHaveTextContent('경기가 진행 중이에요');
+  });
 });

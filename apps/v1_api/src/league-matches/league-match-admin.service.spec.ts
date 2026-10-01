@@ -975,6 +975,68 @@ describe('LeagueMatchAdminService.removeTeam — 대진 취소 알림과 제외 
   });
 });
 
+describe('LeagueMatchAdminService.cancelFixture — 진행 중 경기의 대진 취소 (W4-V14)', () => {
+  const LEAGUE_ID = 'league-1';
+  const FIXTURE_ID = 'fixture-1';
+
+  function makePrisma(gameState: string) {
+    const prisma: any = {
+      v1TeamMatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: FIXTURE_ID,
+          leagueId: LEAGUE_ID,
+          status: 'matched',
+          title: '1주차 A vs B',
+          hostTeamId: 'team-a',
+          approvedApplicantTeamId: 'team-b',
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      // settle() 이 조기 반환하도록 진행중이 아닌 리그를 둔다(removeTeam 스펙과 같은 이유).
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: LEAGUE_ID, status: 'draft' }) },
+      v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TeamSchedule: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      // 대진의 게임 행만 상태로 답하고, 나머지 락 조회는 리그 행으로 답한다.
+      $queryRaw: jest.fn().mockImplementation(async (strings: TemplateStringsArray) =>
+        strings.join('?').includes('v1_games') ? [{ state: gameState }] : [{ id: LEAGUE_ID }],
+      ),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    prisma.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma);
+    return prisma;
+  }
+
+  function makeService(prisma: unknown) {
+    const adminContext = {
+      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row-1', userId: adminUser.id, adminRole: 'ops' }),
+      logAdminAction: jest.fn().mockResolvedValue(undefined),
+    };
+    return new LeagueMatchAdminService(prisma as any, adminContext as any, {} as any, { emitToManyDeferred: jest.fn() } as any);
+  }
+
+  it.each(['LIVE', 'PAUSED'])('경기가 %s 이면 409 로 막고 대진을 건드리지 않는다', async (gameState) => {
+    const prisma = makePrisma(gameState);
+
+    await expect(makeService(prisma).cancelFixture(adminUser, LEAGUE_ID, FIXTURE_ID, { reason: '우천' })).rejects.toMatchObject({
+      response: { code: 'LEAGUE_FIXTURE_GAME_IN_PROGRESS' },
+    });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  // 대조군 — 시작 전 경기는 그대로 취소되고, 끝난 경기도 정정용 취소(C-4/R8)가 막히지 않는다.
+  it.each(['SCHEDULED', 'ENDED'])('경기가 %s 이면 대진을 취소한다', async (gameState) => {
+    const prisma = makePrisma(gameState);
+
+    const result = await makeService(prisma).cancelFixture(adminUser, LEAGUE_ID, FIXTURE_ID, { reason: '우천' });
+
+    expect(result).toMatchObject({ teamMatchId: FIXTURE_ID, status: 'cancelled', alreadyProcessed: false });
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: FIXTURE_ID }, data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
+  });
+});
+
 describe('GamesService.createFromSourceInTransaction — 대회 경로 회귀 방지', () => {
   it('userId 가 실린 참가자에는 예전처럼 ROSTER_ASSERTED 연결이 생긴다', async () => {
     const { state, games, tx } = createFake();

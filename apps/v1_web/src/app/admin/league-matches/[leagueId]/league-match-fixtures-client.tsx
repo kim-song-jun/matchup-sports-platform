@@ -289,11 +289,15 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         },
       });
     }
+    // 진행 중 경기는 서버가 취소를 409 LEAGUE_FIXTURE_GAME_IN_PROGRESS 로 막는다 — 같은 조건·같은 뜻으로 미리 막는다.
+    const gameInProgress = row.gameState === 'LIVE' || row.gameState === 'PAUSED';
     actions.push({
       key: 'cancel',
       label: '대진 취소',
       description: '이 경기를 순위 집계에서 빼요. 되돌릴 수 없어요',
       destructive: true,
+      disabled: gameInProgress,
+      disabledReason: gameInProgress ? "경기가 진행 중이에요. 콘솔의 '몰수·중단으로 종료'로 먼저 끝내 주세요" : null,
       onSelect: () => {
         setMenuFixture(null);
         setCancelTarget(row);

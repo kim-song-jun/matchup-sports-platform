@@ -26,6 +26,7 @@ import {
 } from './reviews.view-model';
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
 import type { V1ReceivedReviewDetail, V1ReviewReceivedSummaryResponse, V1ReviewTargetType } from '@/types/api';
+import { nextStarValue, STAR_VALUES } from '@/lib/star-rating-keys';
 
 type QueryStateProps = {
   errorMessage: string | null;
@@ -728,18 +729,6 @@ function ReviewMetricEditor({
       ) : null}
     </>
   );
-}
-
-const STAR_VALUES = [1, 2, 3, 4, 5] as const;
-
-// radiogroup 방향키 계약: 오른쪽·아래 = 다음, 왼쪽·위 = 이전(끝에서 처음으로 순환), Home·End = 양 끝.
-function nextStarValue(key: string, current: number): number | null {
-  const last = STAR_VALUES.length;
-  if (key === 'ArrowRight' || key === 'ArrowDown') return current === last ? 1 : current + 1;
-  if (key === 'ArrowLeft' || key === 'ArrowUp') return current === 1 ? last : current - 1;
-  if (key === 'Home') return 1;
-  if (key === 'End') return last;
-  return null;
 }
 
 function StarRating({ compact, disabled, label, onChange, rating }: { compact?: boolean; disabled?: boolean; label: string; onChange: (rating: number) => void; rating: number | null }) {

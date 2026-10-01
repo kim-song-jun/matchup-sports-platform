@@ -79,14 +79,19 @@ export function selectLineupParticipantsWithDraftFallback<T extends LineupRevisi
   participants: readonly T[],
   lineups: readonly LineupRevision[],
 ): T[] {
-  const sidesWithOperable = new Set(
-    lineups.filter((lineup) => OPERABLE_LINEUP_STATES.has(lineup.state)).map((lineup) => lineup.sideId),
-  );
+  const sidesWithOperable = sidesWithSubmittedLineup(lineups);
   return pickParticipantsOfChosenRevisions(
     participants,
     // 제출본이 있는 사이드는 제출본만, 없는 사이드는 전부(=최신 DRAFT 가 뽑힌다).
     lineups.filter((lineup) =>
       sidesWithOperable.has(lineup.sideId) ? OPERABLE_LINEUP_STATES.has(lineup.state) : true,
     ),
+  );
+}
+
+/** 제출본(SUBMITTED/LOCKED)이 있는 사이드 — 위 폴백 셀렉터가 그 사이드에서 초안 대신 제출본을 고르는 기준과 같다. */
+export function sidesWithSubmittedLineup(lineups: readonly LineupRevision[]): ReadonlySet<string> {
+  return new Set(
+    lineups.filter((lineup) => OPERABLE_LINEUP_STATES.has(lineup.state)).map((lineup) => lineup.sideId),
   );
 }

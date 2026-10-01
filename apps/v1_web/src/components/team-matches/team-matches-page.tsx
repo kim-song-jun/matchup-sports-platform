@@ -276,7 +276,7 @@ function HeroTrustBadge({ trustState, align }: { trustState?: string | null; ali
 }
 
 function HeroTeamChevron() {
-  return <ChevronRightIcon size={14} aria-hidden="true" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 2, color: 'var(--overlay-white-72)' }} />;
+  return <ChevronRightIcon size={14} aria-hidden="true" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 2, color: 'var(--overlay-white-90)' }} />;
 }
 
 export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode; lifecyclePanel?: React.ReactNode }) {
@@ -601,7 +601,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 backgroundSize: 'cover',
               } : undefined}
             >
-              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className="tm-team-vs-hero-illustration" />}
+              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="88px" className="tm-team-vs-hero-illustration" />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href={model.detailBackHref ?? '/team-matches'} aria-label="뒤로가기">
@@ -622,16 +622,16 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                   {heroStatusBadge}
                   <div className="tm-team-vs-row">
                     {['홈팀', 'vs', '어웨이팀'].map((side) => side === 'vs' ? (
-                      <div key={side} className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
+                      <div key={side} className="tm-text-label" style={{ color: 'var(--overlay-white-90)' }}>vs</div>
                     ) : (
                       <div key={side} style={{ textAlign: side === '홈팀' ? 'left' : 'right' }}>
-                        <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{side}</div>
+                        <div className="tm-text-caption" style={{ color: 'var(--overlay-white-90)' }}>{side}</div>
                         <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.closed ? '미정' : '모집 중'}</div>
-                        <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>팀 확정 전</div>
+                        <div className="tm-text-micro" style={{ color: 'var(--overlay-white-90)' }}>팀 확정 전</div>
                       </div>
                     ))}
                   </div>
-                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-86)', textAlign: 'center', marginTop: 20 }}>
+                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-90)', textAlign: 'center', marginTop: 20 }}>
                     {match.closed ? '플랫폼 주관 · 참가팀 미정' : '플랫폼 주관 · 참가할 두 팀을 모집해요'}
                   </div>
                 </div>
@@ -640,27 +640,27 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                   {heroStatusBadge}
                   <div className="tm-team-vs-row">
                     <HeroTeamLink href={confirmedOpponent ? match.hostTeamHref ?? `/teams/${match.hostTeamId}` : undefined} name={match.hostTeam} align="left">
-                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
+                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-90)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
                       <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
-                      {hostHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{hostHeroSub}</div> : null}
+                      {hostHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-90)' }}>{hostHeroSub}</div> : null}
                       {confirmedOpponent ? <HeroTrustBadge trustState={match.hostTeamTrustState} align="left" /> : null}
                     </HeroTeamLink>
-                    <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
+                    <div className="tm-text-label" style={{ color: 'var(--overlay-white-90)' }}>vs</div>
                     <HeroTeamLink href={confirmedOpponent?.href} name={confirmedOpponent?.name ?? ''} align="right">
-                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{(mode === 'pending' && model.myApplicationTeam) || model.viewerOnApplicantSide ? '우리 팀' : '상대팀'}</div>
+                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-90)' }}>{(mode === 'pending' && model.myApplicationTeam) || model.viewerOnApplicantSide ? '우리 팀' : '상대팀'}</div>
                       <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
-                      {opponentHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentHeroSub}</div> : null}
+                      {opponentHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-90)' }}>{opponentHeroSub}</div> : null}
                       {confirmedOpponent ? <HeroTrustBadge trustState={confirmedOpponent.trustState} align="right" /> : null}
-                      {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentSub}</div> : null}
+                      {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-90)' }}>{opponentSub}</div> : null}
                     </HeroTeamLink>
                   </div>
                   {match.platformManaged ? (
-                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-86)', textAlign: 'center', marginTop: 20 }}>플랫폼 주관</div>
+                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-90)', textAlign: 'center', marginTop: 20 }}>플랫폼 주관</div>
                   ) : null}
                 </div>
               )}
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}
-              {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
+              {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--overlay-white-90)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
             {lifecyclePanel}
             {/* 히어로(뒤로가기 포함) 다음, 본문 앞 — 내비게이션이 항상 먼저 보이게 유지한다. */}

@@ -1292,6 +1292,15 @@ describe('TeamMatchDetailPageView — 히어로가 두 팀을 요약한다 (#142
     expect(container.querySelector('.tm-team-vs-row .tm-badge')).toBeNull();
   });
 
+  // WCAG AA — 파란 히어로 위 작은 글씨는 .90 흰색(4.71:1) 이상이어야 한다. 더 옅은 overlay 토큰으로 돌아가면 이 계약이 깨진다.
+  it('히어로 안 글씨는 옅은 흰색 토큰(.68·.72·.76·.86)을 쓰지 않는다', () => {
+    const { container } = renderPage(<TeamMatchDetailPageView model={confirmedModel()} />);
+    const colors = Array.from(container.querySelectorAll<HTMLElement>('.tm-team-vs-hero [style*="color"]')).map((el) => el.getAttribute('style') ?? '');
+
+    expect(colors.some((style) => style.includes('--overlay-white-90'))).toBe(true);
+    expect(colors.filter((style) => /--overlay-white-(68|72|76|86)\b/.test(style))).toEqual([]);
+  });
+
   it('대조군 — 상대가 아직 없으면 팀 카드가 그대로 남고 히어로 팀 칸은 링크가 아니다', () => {
     const { container } = renderPage(<TeamMatchDetailPageView model={confirmedModel({ applicantTeams: [] })} />);
 

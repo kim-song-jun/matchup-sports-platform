@@ -123,7 +123,8 @@ export default function AdminUserDetailPage() {
     );
   }
 
-  const teams = mergeUserTeams(user.ownedTeams, user.teamMemberships ?? []);
+  const teamMemberships = user.teamMemberships ?? [];
+  const teams = mergeUserTeams(user.ownedTeams, teamMemberships);
   const teamRoles = getTeamRoleCounts(user);
 
   return (
@@ -232,7 +233,7 @@ export default function AdminUserDetailPage() {
               <DefinitionRow label="생성/소유 팀" value={user.ownedTeamCount} />
               <DefinitionRow label="팀장 팀" value={teamRoles.owner} />
               <DefinitionRow label="매니저 팀" value={teamRoles.manager} />
-              <DefinitionRow label="소속팀 전체" value={teams.length} />
+              <DefinitionRow label="소속팀 전체" value={teamMemberships.length} />
               <DefinitionRow label="일반 멤버 팀" value={teamRoles.member} />
               <DefinitionRow label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
             </dl>

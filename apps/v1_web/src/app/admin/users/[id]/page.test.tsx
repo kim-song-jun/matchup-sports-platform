@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import AdminUserDetailPage from './page';
 
-const state = vi.hoisted(() => ({ noMatches: false }));
+const state = vi.hoisted(() => ({ noMatches: false, withOwnedOnlyTeam: true }));
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'user-1' }),
@@ -41,7 +41,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
         : [{ matchId: 'match 1', title: 'QA 리그 1경기', status: 'completed', startAt: '2026-09-30T10:00:00.000Z' }],
       ownedTeams: [
         { teamId: 'team-a', name: 'QA 팀A', status: 'active', memberCount: 12 },
-        { teamId: 'team-c', name: '소유만 한 팀', status: 'archived', memberCount: 1 },
+        ...(state.withOwnedOnlyTeam
+          ? [{ teamId: 'team-c', name: '소유만 한 팀', status: 'archived', memberCount: 1 }]
+          : []),
       ],
       teamMemberships: [
         { membershipId: 'm-1', teamId: 'team-a', name: 'QA 팀A', status: 'active', memberCount: 12, role: 'owner', joinedAt: null },
@@ -104,5 +106,22 @@ describe('AdminUserDetailPage — 팀 한 번만, 상세 링크, 한국어 상�
     expect(screen.getByRole('heading', { name: '최근 매치' })).toBeInTheDocument();
     expect(screen.getByText('최근 생성한 매치가 없어요.')).toBeInTheDocument();
     state.noMatches = false;
+  });
+
+  it('소속팀 전체는 소유만 한 팀을 빼고 역할별 행 합과 같다', () => {
+    const summaryValue = (label: string) =>
+      Number(screen.getByText(label).parentElement?.querySelector('dd')?.textContent);
+    const roleSum = () => summaryValue('팀장 팀') + summaryValue('매니저 팀') + summaryValue('일반 멤버 팀');
+
+    const { unmount } = render(<AdminUserDetailPage />);
+    expect(screen.getByText('소속 팀 3개')).toBeInTheDocument();
+    expect(summaryValue('소속팀 전체')).toBe(2);
+    expect(summaryValue('소속팀 전체')).toBe(roleSum());
+    unmount();
+
+    state.withOwnedOnlyTeam = false;
+    render(<AdminUserDetailPage />);
+    expect(summaryValue('소속팀 전체')).toBe(roleSum());
+    state.withOwnedOnlyTeam = true;
   });
 });

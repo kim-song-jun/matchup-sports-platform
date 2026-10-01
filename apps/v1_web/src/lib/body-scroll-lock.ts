@@ -14,7 +14,11 @@ export function lockBodyScroll(): () => void {
   if (holders === 0) inlineBeforeLock = document.body.style.overflow;
   holders += 1;
   document.body.style.overflow = 'hidden';
+  let released = false;
+  // 같은 해제를 두 번 부르면(이중 cleanup 등) 다른 오버레이의 잠금 몫까지 빠진다 — 한 번만 센다.
   return () => {
+    if (released) return;
+    released = true;
     holders -= 1;
     if (holders === 0) document.body.style.overflow = inlineBeforeLock;
   };

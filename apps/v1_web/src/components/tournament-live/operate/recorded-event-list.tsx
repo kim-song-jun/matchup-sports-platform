@@ -151,7 +151,10 @@ export function RecordedEventList({
   const orderedEvents = order === 'newest-first' ? [...events].reverse() : events;
 
   return (
-    <ul className="flex flex-col gap-2" aria-label="기록된 이벤트 목록">
+    <ul
+      className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)]"
+      aria-label="기록된 이벤트 목록"
+    >
       {orderedEvents.map((event) => {
         const canAttachAssist =
           onAttachAssist !== undefined &&
@@ -171,7 +174,7 @@ export function RecordedEventList({
         return (
           <li
             key={event.id}
-            className="flex items-stretch gap-2 rounded-lg border border-[var(--border)] px-3 py-2"
+            className="flex items-stretch gap-2 px-3 py-2"
           >
             <div className="@container flex min-w-0 flex-1 flex-col gap-2">
             {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·

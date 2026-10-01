@@ -139,6 +139,15 @@ function previousTournament(): V1Tournament {
   };
 }
 
+// jsdom 은 scrollIntoView 를 구현하지 않는다 — 불가피한 브라우저 API 스텁. 파일 전체에 두고 복구한다.
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
+
 function renderPage() {
   return render(
     <Providers>
@@ -203,8 +212,6 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // jsdom 은 scrollIntoView 를 구현하지 않는다 — 불가피한 브라우저 API 스텁.
-    Element.prototype.scrollIntoView = vi.fn();
     searchParamsValue = new URLSearchParams();
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false });
     useV1MasterSportsMock.mockReturnValue({

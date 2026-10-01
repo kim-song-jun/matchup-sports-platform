@@ -5,7 +5,6 @@ export type TeamStatus = 'open' | 'reviewing' | 'closed' | 'mine';
 export type TeamModel = {
   id: string;
   name: string;
-  logo: string;
   logoUrl?: string | null;
   coverImageUrl?: string | null;
   sport: string;

@@ -1610,6 +1610,49 @@ describe('TeamMatchLineupPageClient — H5 참석명단', () => {
     expect(screen.getByRole('button', { name: '홍길동 등번호 11번 바꾸기' })).toBeInTheDocument();
   });
 
+  // W4-V10 결정 C — 전술보드는 팀 번호만 읽는다(H7). 팀 번호가 없는 선수는 입구에서 "함께"가 기본이다.
+  it('W4-V10: 팀 번호가 없는 선수는 "팀 번호도 함께"가 기본이라 그대로 저장하면 팀 번호도 생긴다', () => {
+    hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onSuccess: () => void }) => options.onSuccess());
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [...members, { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: null }] },
+      isLoading: false,
+    });
+    renderLineup({ starters: [starter('user-3', '이영희', null)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '이영희 등번호 넣기' }));
+    const sheet = screen.getByRole('dialog', { name: '이영희 등번호' });
+    expect(within(sheet).getByLabelText('팀 번호도 함께 바꿔요')).toBeChecked();
+    expect(within(sheet).getByText(/지금 팀 번호가 없어서 함께 저장하는 게 기본이에요/)).toBeInTheDocument();
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '10' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '10번으로 저장' }));
+
+    expect(hoisted.changeJerseyMutate).toHaveBeenCalledWith({ membershipId: 'm-3', jerseyNumber: 10 }, expect.anything());
+  });
+
+  it('W4-V10: "이 경기만"으로 팀 번호와 달라지면 그 결과를 바로 알린다 — 팀 번호가 있는 선수는 지금처럼 "이 경기만"이 기본', () => {
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [...members, { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: null }] },
+      isLoading: false,
+    });
+    renderLineup({ starters: [starter('user-1', '홍길동', 7), starter('user-3', '이영희', null)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '이영희 등번호 넣기' }));
+    const sheet = screen.getByRole('dialog', { name: '이영희 등번호' });
+    fireEvent.click(within(sheet).getByLabelText('이 경기만 바꿔요'));
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '10' } });
+    expect(within(sheet).getByText('이 경기 참석명단에만 10번이 돼요. 전술보드와 다음 경기에는 팀 번호(없음)가 보여요.')).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: '10번으로 저장' }));
+    expect(hoisted.changeJerseyMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 등번호 7번 바꾸기' }));
+    const other = screen.getByRole('dialog', { name: '홍길동 등번호' });
+    expect(within(other).getByLabelText('이 경기만 바꿔요')).toBeChecked();
+    // 팀 번호와 같은 동안은 알릴 차이가 없다.
+    expect(within(other).queryByText(/이 경기 참석명단에만/)).not.toBeInTheDocument();
+    fireEvent.change(within(other).getByLabelText('등번호'), { target: { value: '11' } });
+    expect(within(other).getByText('이 경기 참석명단에만 11번이 돼요. 전술보드와 다음 경기에는 팀 번호(7번)가 보여요.')).toBeInTheDocument();
+  });
+
   it('D-5 번호 시트: 팀 번호 저장이 실패하면 초안도 그대로 두고 이유를 보인다', () => {
     hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onError: (error: Error) => void }) =>
       options.onError(new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_JERSEY_NUMBER_TAKEN', message: '이미 같은 등번호를 쓰는 팀원이 있어요.', timestamp: '2026-09-30T00:00:00.000Z' })),

@@ -33,7 +33,7 @@ interface Props {
 
 /**
  * 친선 참석명단의 등번호 시트(H5 D-5). 팀 번호가 처음 값이고 이 경기만 덮어쓸 수 있다. "팀 번호도 함께"를 고르면
- * 팀 번호(다음 경기·대회 신청의 처음 값)도 바뀐다 — 이미 낸 대회·리그 참가 명단 번호는 그 대회의 원본이라 따라가지 않는다.
+ * 팀 번호(전술보드·다음 경기·대회 신청의 처음 값)도 바뀐다 — 이미 낸 대회·리그 참가 명단 번호는 그 대회의 원본이라 따라가지 않는다.
  */
 export function LineupJerseySheet({ open, onClose, target, holderOf, pending, error, onSave }: Props) {
   const titleId = useId();
@@ -81,10 +81,19 @@ function JerseyForm({ target, holderOf, pending, error, onSave }: Omit<Props, 'o
   const fieldId = useId();
   const scopeName = useId();
   const [text, setText] = useState(target.jerseyNumber === null ? '' : String(target.jerseyNumber));
-  const [scope, setScope] = useState<LineupJerseyScope>('match');
+  // 전술보드는 팀 번호만 읽는다(H7). 팀 번호가 없으면 처음 정한 번호를 팀 번호로도 남기는 게 기본이다(W4-V10).
+  const [scope, setScope] = useState<LineupJerseyScope>(
+    target.canChangeTeamNumber && target.teamJerseyNumber === null ? 'team' : 'match',
+  );
   const parsed = parseJerseyInput(text);
   const value = parsed.ok ? (parsed.value ?? null) : null;
   const holder = value === null ? null : holderOf(value);
+  const teamNumberText = target.teamJerseyNumber === null ? '없음' : `${target.teamJerseyNumber}번`;
+  // "이 경기만"으로 팀 번호와 달라지는 순간 — 보드·다음 경기에서 놀라지 않게 결과를 바로 말한다.
+  const matchOnlyNotice =
+    scope === 'match' && parsed.ok && value !== target.teamJerseyNumber
+      ? `${value === null ? '이 경기 참석명단에서만 번호를 비워요.' : `이 경기 참석명단에만 ${value}번이 돼요.`} 전술보드와 다음 경기에는 팀 번호(${teamNumberText})가 보여요.`
+      : null;
   const changed =
     parsed.ok &&
     (value !== target.jerseyNumber || (scope === 'team' && value !== target.teamJerseyNumber));
@@ -131,10 +140,18 @@ function JerseyForm({ target, holderOf, pending, error, onSave }: Omit<Props, 'o
           <legend className="sr-only">번호를 어디에 저장할까요</legend>
           <ScopeOption name={scopeName} checked={scope === 'match'} onChange={() => setScope('match')} label="이 경기만 바꿔요" />
           <ScopeOption name={scopeName} checked={scope === 'team'} onChange={() => setScope('team')} label="팀 번호도 함께 바꿔요" />
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
-            팀 번호는 다음 경기와 대회 신청의 처음 값이 돼요. 지금 팀 번호는{' '}
-            {target.teamJerseyNumber === null ? '없어요.' : `${target.teamJerseyNumber}번이에요.`}
-          </p>
+          {matchOnlyNotice !== null ? (
+            <p className="tm-text-caption" style={{ color: 'var(--orange700)', margin: '4px 0 0', lineHeight: 1.5, fontWeight: 600 }}>
+              {matchOnlyNotice}
+            </p>
+          ) : (
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
+              팀 번호는 전술보드와 다음 경기·대회 신청의 처음 값이 돼요.{' '}
+              {target.teamJerseyNumber === null
+                ? '지금 팀 번호가 없어서 함께 저장하는 게 기본이에요.'
+                : `지금 팀 번호는 ${target.teamJerseyNumber}번이에요.`}
+            </p>
+          )}
         </fieldset>
       ) : (
         <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>

@@ -2806,8 +2806,10 @@ export class GamesService {
     // 참가자로 기록된다. 여기만 엄격 셀렉터로 남기면 그 경기의 선수들은 **연결 후보에
     // 아예 안 뜨고**, 결과에는 실려 있는데 본인 기록으로는 영영 못 가져가는 상태가 된다.
     const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
-    if (participants.length === 0) {
-      return { gameId, version: game.version, participants: [] };
+    // 후보가 0명일 때 화면이 "아직 명단이 없음"과 "모두 연결됨"을 가르는 값 — 공식 결과와 같은 셀렉터로 센다.
+    const rosterCount = participants.length;
+    if (rosterCount === 0) {
+      return { gameId, version: game.version, rosterCount, participants: [] };
     }
     // 이미 연결된 참가자는 뺀다 -- 남의 연결을 빼앗는 경로를 애초에 안 만든다.
     // (설령 목록에 넣어도 requestIdentityLink 가 409 로 막지만, 고를 수 있게 보여주는
@@ -2850,7 +2852,7 @@ export class GamesService {
     // Linked or pending participants are excluded before side validation. A stale
     // side on an ineligible row must not block a claimable teammate (51dedb/eb3d428).
     if (eligibleParticipants.length === 0) {
-      return { gameId, version: game.version, participants: [] };
+      return { gameId, version: game.version, rosterCount, participants: [] };
     }
     const sides = await this.prisma.v1GameSide.findMany({
       where: {
@@ -2869,6 +2871,7 @@ export class GamesService {
     return {
       gameId,
       version: game.version,
+      rosterCount,
       participants: eligibleParticipants
         .map((participant) => ({
           participantId: participant.id,

@@ -79,7 +79,7 @@ export function TeamMatchClaimMyRecordSection({ teamMatchId }: { teamMatchId: st
   const [open, setOpen] = useState(false);
   const claimable = useV1TeamMatchClaimableParticipants(teamMatchId, { enabled: open });
   const request = useV1TeamMatchRequestIdentityLink(teamMatchId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} rosterLabel="참석명단" />;
 }
 
 function ClaimMyRecordView({
@@ -88,12 +88,15 @@ function ClaimMyRecordView({
   claimable,
   request,
   variant = 'card',
+  rosterLabel = '경기 명단',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   claimable: ReturnType<typeof useV1ClaimableParticipants>;
   request: ReturnType<typeof useV1RequestIdentityLink>;
   variant?: ClaimEntryVariant;
+  /** 빈 명단 안내에 쓰는 이름 — 친선은 팀이 내는 "참석명단", 대회·리그는 "경기 명단". */
+  rosterLabel?: '경기 명단' | '참석명단';
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +115,8 @@ function ClaimMyRecordView({
   // 그 버튼을 아예 렌더하지 않고 닫기만 남긴다.
   const loaded = claimable.data !== undefined;
   const hasCandidates = (claimable.data?.participants.length ?? 0) > 0;
+  // 후보 0명은 두 상태다 — 명단 자체가 아직 없거나, 명단의 모두가 이미 연결(신청 중)됐거나.
+  const rosterEmpty = loaded && claimable.data?.rosterCount === 0;
 
   // 신청이 끝나면 배너를 접는다. 같은 경기에 두 번 신청할 이유가 없고, 남겨 두면
   // "아직 안 됐나?" 하고 다시 누르게 된다.
@@ -184,7 +189,16 @@ function ClaimMyRecordView({
               그렇게 읽혔다. 0건은 정상 상태이므로 결론을 먼저 말하고, 그래도 기록이
               안 보이는 진짜 원인(공개 동의)으로 이어 준다.
             */}
-            {loaded && !hasCandidates ? (
+            {rosterEmpty ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  아직 제출된 {rosterLabel}이 없어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  {rosterLabel}이 올라오면 여기서 내 이름을 찾아 계정에 연결할 수 있어요.
+                </div>
+              </>
+            ) : loaded && !hasCandidates ? (
               <>
                 <div id="claim-my-record-title" className="tm-text-heading">
                   연결할 참가자가 없어요

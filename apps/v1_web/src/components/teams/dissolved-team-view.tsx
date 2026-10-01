@@ -49,7 +49,8 @@ export function DissolvedTeamView({ team, selfHref }: { team: V1TeamDetail; self
         <Card pad={16} className="tm-on-tint" style={{ background: 'var(--grey50)' }}>
           <h2 className="tm-text-label" style={{ margin: 0 }}>잘못 해체했나요?</h2>
           <p className="tm-text-caption" style={{ margin: '4px 0 0', lineHeight: 1.55 }}>
-            {deadlineLabel ? `${deadlineLabel}까지` : '해체하고 30일 안에'} 마이 &gt; 팀 &gt; 해체한 팀에서 복구할 수 있어요.
+            {/* 여러 줄 글에 &gt; 같은 엔티티가 있으면 Next(SWC)가 첫 공백을 지운다 — 공백을 따로 둔다. */}
+            {deadlineLabel ? `${deadlineLabel}까지` : '해체하고 30일 안에'}{' '}마이 &gt; 팀 &gt; 해체한 팀에서 복구할 수 있어요.
             취소된 경기·일정은 되살아나지 않고 팀 채팅만 다시 열려요.
           </p>
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/teams" style={{ marginTop: 12 }}>

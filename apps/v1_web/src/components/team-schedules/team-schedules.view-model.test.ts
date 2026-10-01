@@ -8,6 +8,7 @@ import {
   dateKeyOf,
   fromDatetimeLocalValue,
   isDeadlinePassed,
+  kstMonthStart,
   isScheduleManagerRole,
   isScheduleMemberRole,
   isScheduleStaleConflict,
@@ -251,13 +252,43 @@ describe('team-schedules view-model — deadline helpers', () => {
   });
 });
 
-describe('team-schedules view-model — datetime-local round-trip', () => {
-  it('round-trips an ISO string through toDatetimeLocalValue/fromDatetimeLocalValue', () => {
-    const original = new Date(2026, 7, 10, 19, 30, 0, 0).toISOString();
-    const local = toDatetimeLocalValue(original);
-    expect(local).toBe('2026-08-10T19:30');
-    const backToIso = fromDatetimeLocalValue(local);
-    expect(backToIso).toBe(original);
+describe('team-schedules view-model — KST 날짜 기준 (브라우저 시간대 무관)', () => {
+  // vitest 는 TZ=UTC 로 돈다 — KST 자정 직후(10/4 00:30)가 UTC 로는 10/3 15:30 이라 로컬 getter 면 갈린다.
+  const KST_OCT4_0030 = '2026-10-03T15:30:00.000Z';
+  const KST_OCT3_2359 = '2026-10-03T14:59:00.000Z';
+
+  it('dateKeyOf 는 KST 달력 날짜를 돌려준다 (자정 경계 양쪽)', () => {
+    expect(dateKeyOf(KST_OCT4_0030)).toBe('2026-10-04');
+    expect(dateKeyOf(KST_OCT3_2359)).toBe('2026-10-03');
+    expect(dateKeyOf('2026-12-31T15:00:00.000Z')).toBe('2027-01-01');
+    expect(dateKeyOf('not-a-date')).toBe('');
+  });
+
+  it('캘린더 칸의 건수는 카드에 표시되는 KST 날짜와 같은 칸에 잡힌다', () => {
+    const items = [
+      schedule({ id: 'late-night', startAt: KST_OCT4_0030, endAt: '2026-10-03T17:30:00.000Z' }),
+      schedule({ id: 'evening', startAt: KST_OCT3_2359, endAt: '2026-10-03T16:00:00.000Z' }),
+    ];
+    const days = buildScheduleCalendarMonth(items, new Date(2026, 9, 1), '2026-10-01').weeks.flat();
+    expect(days.find((day) => day.dateKey === '2026-10-03')?.scheduleCount).toBe(1);
+    expect(days.find((day) => day.dateKey === '2026-10-04')?.scheduleCount).toBe(1);
+
+    const listItems = items.map((item) => toScheduleListItemModel(item, 'team-1'));
+    expect(listItems.find((item) => item.id === 'late-night')?.dateKey).toBe('2026-10-04');
+    expect(listItems.find((item) => item.id === 'evening')?.dateKey).toBe('2026-10-03');
+  });
+
+  it('datetime-local 값은 KST 벽시계로 읽고 쓴다', () => {
+    expect(toDatetimeLocalValue(KST_OCT4_0030)).toBe('2026-10-04T00:30');
+    expect(fromDatetimeLocalValue('2026-10-04T00:30')).toBe(KST_OCT4_0030);
+    // 이슈 #1425: 10/1 23:59 입력은 KST 10/1 23:59 = 14:59Z 여야 한다(로컬 해석이면 다른 시각).
+    expect(fromDatetimeLocalValue('2026-10-01T23:59')).toBe('2026-10-01T14:59:00.000Z');
+  });
+
+  it('ISO → 입력값 → ISO 왕복이 값을 바꾸지 않는다', () => {
+    for (const iso of [KST_OCT4_0030, KST_OCT3_2359, '2026-12-31T15:00:00.000Z']) {
+      expect(fromDatetimeLocalValue(toDatetimeLocalValue(iso))).toBe(iso);
+    }
   });
 
   it('returns an empty string / undefined for missing or invalid input', () => {
@@ -267,19 +298,19 @@ describe('team-schedules view-model — datetime-local round-trip', () => {
     expect(fromDatetimeLocalValue('')).toBeUndefined();
     expect(fromDatetimeLocalValue('not-a-date')).toBeUndefined();
   });
+
+  it('kstMonthStart 는 KST 기준 이번 달 1일을 돌려준다 (UTC 로는 아직 전달)', () => {
+    const month = kstMonthStart(new Date('2026-09-30T15:30:00.000Z'));
+    expect([month.getFullYear(), month.getMonth(), month.getDate()]).toEqual([2026, 9, 1]);
+  });
 });
 
 describe('team-schedules view-model — calendar month grid', () => {
   it('builds a 6-week grid whose day-count buckets match the input schedules', () => {
-    // 로컬 Date 생성자로 만든 시각을 그대로 왕복시킨다 — 하드코딩된 UTC ISO 문자열 두 개가
-    // "같은 날"인지는 실행 환경의 타임존에 따라 갈릴 수 있어(예: UTC-8에서
-    // 2026-08-05T01:00:00Z는 전날 오후로 밀린다), 로컬 생성자를 쓰면 인코딩(테스트 데이터
-    // 준비)과 디코딩(dateKeyOf의 로컬 getter 판독)이 항상 같은 로컬 달력을 가리켜
-    // 실행 타임존과 무관하게 안정적이다.
     const items = [
-      schedule({ id: 'a', startAt: new Date(2026, 7, 5, 9, 0, 0).toISOString() }),
-      schedule({ id: 'b', startAt: new Date(2026, 7, 5, 18, 0, 0).toISOString() }),
-      schedule({ id: 'c', startAt: new Date(2026, 7, 20, 9, 0, 0).toISOString() }),
+      schedule({ id: 'a', startAt: '2026-08-05T00:00:00.000Z' }),
+      schedule({ id: 'b', startAt: '2026-08-05T09:00:00.000Z' }),
+      schedule({ id: 'c', startAt: '2026-08-20T00:00:00.000Z' }),
     ];
     const model = buildScheduleCalendarMonth(items, new Date(2026, 7, 1), '2026-08-01');
 
@@ -288,10 +319,8 @@ describe('team-schedules view-model — calendar month grid', () => {
     expect(model.weeks.every((week) => week.length === 7)).toBe(true);
 
     const allDays = model.weeks.flat();
-    const aug5 = allDays.find((day) => day.dateKey === dateKeyOf(items[0].startAt));
-    expect(aug5?.scheduleCount).toBe(2);
-    const aug20 = allDays.find((day) => day.dateKey === dateKeyOf(items[2].startAt));
-    expect(aug20?.scheduleCount).toBe(1);
+    expect(allDays.find((day) => day.dateKey === '2026-08-05')?.scheduleCount).toBe(2);
+    expect(allDays.find((day) => day.dateKey === '2026-08-20')?.scheduleCount).toBe(1);
 
     // 데이터가 없는 날짜는 0건으로 남아야 한다 (합계가 새지 않는지 확인)
     const totalCounted = allDays.reduce((sum, day) => sum + day.scheduleCount, 0);

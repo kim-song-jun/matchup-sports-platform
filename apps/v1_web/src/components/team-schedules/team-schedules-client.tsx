@@ -63,6 +63,7 @@ import {
   attendanceStatusLabel,
   buildScheduleCalendarMonth,
   dateKeyOf,
+  kstMonthStart,
   fromDatetimeLocalValue,
   guestRecruitmentStateLabel,
   isDeadlinePassed,
@@ -112,10 +113,6 @@ function mapReviewApplicationErrorMessage(err: unknown, fallback: string): strin
   return mapScheduleErrorMessage(err, fallback);
 }
 
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
 // ── 목록 ──────────────────────────────────────────────────────────────────────
 
 export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
@@ -123,7 +120,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [typeFilter, setTypeFilter] = useState<ScheduleTypeFilter>('all');
   const [stateFilter, setStateFilter] = useState<ScheduleStateFilter>('all');
-  const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
+  const [monthDate, setMonthDate] = useState(() => kstMonthStart(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
   // 서버 캡(최대 100)을 그대로 사용 — 캘린더가 한 달 치를 필터 없이 훑어보려면

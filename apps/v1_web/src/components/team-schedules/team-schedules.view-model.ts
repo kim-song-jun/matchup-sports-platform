@@ -1,4 +1,5 @@
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { KST_OFFSET_MS, toKstDateString } from '@/lib/kst-calendar';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type {
   V1AttendanceStatus,
@@ -171,13 +172,17 @@ export function isScheduleStaleConflict(err: unknown): boolean {
 
 // ── 목록 항목 변환 ────────────────────────────────────────────────────────────
 
+/** 일정이 속한 날짜 키. 카드 표시(KST 고정)와 같은 기준이어야 달력 선택이 카드 날짜와 맞는다. */
 export function dateKeyOf(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return toKstDateString(d);
+}
+
+/** 달력 그리드의 기준 달 — KST 기준 `instant` 가 속한 달의 1일(그리드 연산은 로컬 Date 로 하는 순수 달력 계산). */
+export function kstMonthStart(instant: Date): Date {
+  const [year, month] = toKstDateString(instant).split('-').map(Number);
+  return new Date(year, month - 1, 1);
 }
 
 export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId: string): ScheduleListItemModel {
@@ -236,20 +241,19 @@ export function isDeadlinePassed(deadline: string | null): boolean {
 }
 
 // ── <input type="datetime-local"> 변환 ────────────────────────────────────────
-// datetime-local 값은 타임존이 없는 "로컬 벽시계" 문자열이다. new Date(그 문자열)은
-// ECMA-262 Date Time String Format 규격상 타임존 오프셋이 없으면 로컬 시간으로 해석되므로
-// (날짜만 있는 형식만 UTC), toISOString()으로의 왕복이 안전하다.
+// datetime-local 값은 오프셋 없는 벽시계 문자열이다. 이 저장소의 일정은 전부 KST 기준이라
+// 브라우저 시간대와 무관하게 KST 벽시계로 읽고 쓴다(서버로 가는 값은 그대로 ISO UTC).
 export function toDatetimeLocalValue(iso: string | null | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return new Date(d.getTime() + KST_OFFSET_MS).toISOString().slice(0, 16);
 }
 
 export function fromDatetimeLocalValue(value: string): string | undefined {
   if (!value) return undefined;
-  const d = new Date(value);
+  const withSeconds = /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+  const d = new Date(`${withSeconds}+09:00`);
   if (Number.isNaN(d.getTime())) return undefined;
   return d.toISOString();
 }
@@ -282,8 +286,8 @@ export function buildScheduleCalendarMonth(
     for (let day = 0; day < 7; day += 1) {
       const current = new Date(gridStart);
       current.setDate(gridStart.getDate() + week * 7 + day);
-      // 로컬 캘린더 필드를 직접 읽는다 — dateKeyOf(iso)와 동일한 포맷(YYYY-MM-DD)이어야
-      // items의 startAt에서 뽑은 키와 정확히 매치한다.
+      // 순수 달력 연산(시각 없음)이라 로컬 필드로 키를 만들어도 시간대와 무관하다 —
+      // dateKeyOf(KST)와 같은 YYYY-MM-DD 포맷이어야 매치한다.
       const localKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
       days.push({
         dateKey: localKey,

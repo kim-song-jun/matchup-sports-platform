@@ -41,7 +41,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
       return;
     }
     // `datetime-local` → ISO 변환은 **공용 헬퍼**를 쓴다. 이 변환은 타임존이 걸린
-    // 자리라(입력은 로컬 벽시계, 저장은 UTC) 화면마다 따로 구현하면 한 곳만 고쳐진다.
+    // 자리라(입력은 KST 벽시계, 저장은 UTC) 화면마다 따로 구현하면 한 곳만 고쳐진다.
     const iso = fromDatetimeLocalValue(deadline);
     if (iso === undefined) {
       showToast('신청 마감 일시를 읽을 수 없어요.', 'error');
@@ -107,7 +107,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-xs text-[var(--text-muted)]" htmlFor="league-registration-deadline">
-            신청 마감
+            신청 마감 (한국 시간)
             <input
               id="league-registration-deadline"
               type="datetime-local"

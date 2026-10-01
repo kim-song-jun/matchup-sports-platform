@@ -126,7 +126,7 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
   it('returns empty lists before the bracket is published, without querying games', async () => {
     const prisma = buildPrisma({ bracketPublishedAt: null });
     const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
-    expect(result).toEqual({ tournamentId: 'tour-1', goals: [], assists: [] });
+    expect(result).toEqual({ tournamentId: 'tour-1', goals: [], assists: [], hiddenByEligibility: false });
     expect((prisma as unknown as { v1Game: { findMany: jest.Mock } }).v1Game.findMany).not.toHaveBeenCalled();
   });
 
@@ -230,5 +230,36 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
     });
     const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
     expect(result.goals).toEqual([]);
+  });
+
+  // hiddenByEligibility 는 리그 playerRecords 와 같은 의미 — 대조군 양쪽(가려짐 / 실제 0건·공개됨).
+  it.each([
+    ['동의 없는 연동 선수의 기록', {
+      participantRows: [{ participantId: 'p-no', goals: 2, assists: 0, resultRevision: OFFICIAL }],
+      identityLinks: [{ participantId: 'p-no', userId: 'user-no' }],
+    }, true],
+    ['연동 자체가 없는 선수의 기록', {
+      participantRows: [{ participantId: 'p-name', goals: 0, assists: 1, resultRevision: OFFICIAL }],
+    }, true],
+    ['실제로 득점·도움이 0건', {
+      participantRows: [{ participantId: 'p-zero', goals: 0, assists: 0, resultRevision: OFFICIAL }],
+    }, false],
+    ['경기 기록 자체가 없음', { participantRows: [] }, false],
+    ['공식 확정 전 기록은 공개 자격과 무관', {
+      participantRows: [{ participantId: 'p-draft', goals: 3, assists: 0, resultRevision: { officialAt: null } }],
+    }, false],
+    ['동의한 선수만 있음', {
+      participantRows: [{ participantId: 'p-yes', goals: 1, assists: 0, resultRevision: OFFICIAL }],
+      identityLinks: [{ participantId: 'p-yes', userId: 'user-yes' }],
+      userConsents: [{ userId: 'user-yes', state: 'GRANTED' }],
+      users: [{ id: 'user-yes', profile: { nickname: 'y' } }],
+    }, false],
+  ])('hiddenByEligibility: %s', async (_name, rows, expected) => {
+    const prisma = buildPrisma({
+      games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } }],
+      ...rows,
+    });
+    const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
+    expect(result.hiddenByEligibility).toBe(expected);
   });
 });

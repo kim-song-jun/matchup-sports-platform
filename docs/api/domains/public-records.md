@@ -66,7 +66,7 @@ existing file changed.
 |---|---|---|
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
-| `GET /tournaments/:id/player-records` | -- | `{ tournamentId, goals[], assists[] }` -- per-user `{ userId, nickname, profileHref, goals, assists }`, desc-sorted, top 30 each |
+| `GET /tournaments/:id/player-records` | -- | `{ tournamentId, goals[], assists[], hiddenByEligibility }` -- per-user `{ userId, nickname, profileHref, goals, assists }`, desc-sorted, top 30 each; `hiddenByEligibility` is true when a row with goals/assists was left out for lack of public eligibility (same rule as the league endpoint, `isRankedRecordHiddenByEligibility`) |
 | `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, availableSeasons[], items[] (including opponentTeamLogoUrl), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 

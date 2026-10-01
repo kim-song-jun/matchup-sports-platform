@@ -7,6 +7,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { TeamDissolutionService } from '../../src/teams/team-dissolution.service';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -88,9 +89,22 @@ describe('팀 초대 링크·여러 명 초대 계약', () => {
     }
     await prisma.v1Region.create({ data: { id: regionId, code: `${PREFIX}-region-code`, name: '링크지역', level: 1 } });
     await prisma.v1User.createMany({
-      data: userIds.map((id) => ({ id, email: `${id}@integration.test`, accountStatus: 'active' as const, onboardingStatus: 'completed' as const })),
+      // 휴대폰 인증 게이트가 쓰기 요청을 막는다 — 모든 사용자를 인증된 상태로 둔다.
+      data: userIds.map((id) => ({
+        id,
+        email: `${id}@integration.test`,
+        accountStatus: 'active' as const,
+        onboardingStatus: 'completed' as const,
+        phoneVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+      })),
     });
     await prisma.v1UserProfile.createMany({ data: userIds.map((id) => ({ userId: id, nickname: `${id}-nick` })) });
+    // 약관 재동의 게이트도 쓰기 요청을 막는다 — 지금 필수인 가입 약관에 모두 동의한 상태로 둔다.
+    const terms = app.get(ManagedTermsRuntimeService);
+    const requiredDocumentIds = (await terms.currentSignupTerms()).items
+      .filter((item) => item.requirement === 'required')
+      .map((item) => item.documentId);
+    await Promise.all(userIds.map((id) => terms.acceptSignupTerms(id, requiredDocumentIds)));
     await prisma.v1Team.create({
       data: { id: teamId, name: '링크 테스트팀', sportId, regionId, ownerUserId: ownerId, status: 'active', memberCount: 3, managerCount: 1 },
     });

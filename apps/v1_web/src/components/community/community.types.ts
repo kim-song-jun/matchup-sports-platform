@@ -105,7 +105,8 @@ export type ChatRoomViewModel = {
   emptyBody?: string;
   draft?: string;
   sending?: boolean;
-  sendError?: boolean;
+  /** 보내기 실패 문구 — 서버·연결 이유가 있으면 그 문장, 없으면 기본 안내. 실패가 없으면 undefined. */
+  sendError?: string;
   onDraftChange?: (value: string) => void;
   onSend?: () => void;
   /** + 패널에서 고른 사진(앨범·카메라). 없으면 + 가 비활성이다. */

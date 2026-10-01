@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TermsClient } from './terms-client';
+import { v1Post } from '@/lib/api-client';
 
 const router = vi.hoisted(() => ({
   push: vi.fn(),
@@ -154,6 +155,32 @@ describe('TermsClient social navigation contract', () => {
 
     // Then
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/social'));
+  });
+});
+
+// V7: 응답 없는 실패의 원문("Failed to fetch")은 화면 문구가 아니다.
+describe('TermsClient 응답 없는 실패', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsValue = new URLSearchParams('mode=social');
+    currentTermsValue = currentTerms();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    hooks.completeSocialTermsMutate.mockImplementation((body: unknown, callbacks: { onError: (error: unknown) => void }) => {
+      void v1Post('/auth/social/terms', body).catch(callbacks.onError);
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('약관 저장 요청이 응답 없이 실패하면 영어 원문 대신 해요체 안내를 보여 준다', async () => {
+    render(<TermsClient />);
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
+    const continueButton = screen.getByRole('button', { name: '동의하고 회원가입하기' });
+    await waitFor(() => expect(continueButton).toBeEnabled());
+
+    fireEvent.click(continueButton);
+
+    expect(await screen.findByText('약관 동의를 저장하지 못했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
   });
 });
 

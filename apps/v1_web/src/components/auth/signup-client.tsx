@@ -40,6 +40,7 @@ import {
   normalizeSignupDisplayName,
   SIGNUP_PROFILE_ERROR_MESSAGES,
 } from './signup-profile-validation';
+import { extractErrorMessage } from '@/lib/error-message';
 
 type WizardStep = 'account' | 'verify' | 'profile';
 
@@ -329,7 +330,7 @@ export function SignupClient() {
         router.replace('/terms?mode=signup');
         return;
       }
-      setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
+      setError(extractErrorMessage(nextError, '회원가입에 실패했어요.'));
     }
   };
   const primary =

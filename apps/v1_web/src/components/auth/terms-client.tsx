@@ -19,6 +19,7 @@ import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
 import { useSocialSignupExit } from './use-social-signup-exit';
+import { extractErrorMessage } from '@/lib/error-message';
 
 export function TermsClient() {
   const model = getTermsViewModel();
@@ -129,7 +130,7 @@ export function TermsClient() {
               return;
             }
 
-            setError(nextError instanceof Error ? nextError.message : '약관 동의를 저장하지 못했어요.');
+            setError(extractErrorMessage(nextError, '약관 동의를 저장하지 못했어요.'));
           },
         },
       );
@@ -153,7 +154,7 @@ export function TermsClient() {
             router.replace(redirect ?? '/home');
           },
           onError: (nextError) =>
-            setError(nextError instanceof Error ? nextError.message : '약관 동의를 저장하지 못했어요.'),
+            setError(extractErrorMessage(nextError, '약관 동의를 저장하지 못했어요.')),
         },
       );
       return;

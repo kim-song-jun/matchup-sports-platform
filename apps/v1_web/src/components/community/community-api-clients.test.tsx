@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { V1ApiError } from '@/lib/api-client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError, V1_OFFLINE_WRITE_MESSAGE } from '@/lib/api-client';
+import * as clientErrorReporter from '@/lib/client-error-reporter';
 import type { NotificationsViewModel } from './community.types';
 import { ChatListPageClient, ChatRoomPageClient, NotificationsPageClient } from './community-api-clients';
 
@@ -718,6 +719,43 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
     fireEvent.change(input, { target: { value: '안녕' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  // W6-V1: 쓰기 실패는 화면마다 같은 이유를 보여야 한다 — 채팅만 고정 문구로 이유를 버리고 있었다.
+  describe('보내기 실패 문구', () => {
+    const FALLBACK = '메시지를 전송하지 못했어요. 다시 시도해 주세요.';
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    async function sendAndFail(fetchResult: () => Promise<unknown>) {
+      const actual = await vi.importActual<typeof import('@/hooks/use-v1-api')>('@/hooks/use-v1-api');
+      hooks.sendChatMessage.mockImplementation(actual.useV1SendChatMessage);
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+      vi.stubGlobal('fetch', vi.fn(fetchResult));
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+      const input = screen.getByLabelText('메시지 입력');
+      fireEvent.change(input, { target: { value: '안녕' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      return input;
+    }
+
+    it('오프라인이면 연결 문구를 보여 주고, 쓴 글은 그대로 남긴다', async () => {
+      vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+      const input = await sendAndFail(() => Promise.reject(new TypeError('Failed to fetch')));
+
+      expect(await screen.findByText(V1_OFFLINE_WRITE_MESSAGE)).toBeInTheDocument();
+      expect(screen.queryByText(FALLBACK)).not.toBeInTheDocument();
+      expect(input).toHaveValue('안녕');
+    });
+
+    it('대조군 — 이유를 모르는 실패(본문 없는 502)는 종전 문구다', async () => {
+      await sendAndFail(() => Promise.resolve({ ok: false, status: 502, statusText: 'Bad Gateway', json: async () => { throw new SyntaxError('Unexpected token <'); } }));
+
+      expect(await screen.findByText(FALLBACK)).toBeInTheDocument();
+    });
   });
 });
 

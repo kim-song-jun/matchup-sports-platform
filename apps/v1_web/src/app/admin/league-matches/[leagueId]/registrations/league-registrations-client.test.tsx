@@ -112,17 +112,13 @@ describe('리그 참가 신청 관리', () => {
     }
   });
 
-  it('미래 시각이면 ISO 로 보낸다', () => {
+  it('미래 시각이면 입력값을 KST 로 해석한 ISO 로 보낸다', () => {
     render(<LeagueRegistrationsClient leagueId="league-1" />);
-    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    // `datetime-local` 은 로컬 시각 문자열이다 — 리터럴로 쓰면 TZ 가 다른 CI 에서 결과가 갈린다.
-    const local = new Date(future.getTime() - future.getTimezoneOffset() * 60_000)
-      .toISOString()
-      .slice(0, 16);
-    fireEvent.change(screen.getByLabelText(/신청 마감/), { target: { value: local } });
+    // 테스트 러너는 TZ=UTC 라 브라우저 로컬 해석이면 23:59Z 가 된다 — KST 면 14:59Z.
+    fireEvent.change(screen.getByLabelText(/신청 마감/), { target: { value: '2099-10-01T23:59' } });
     fireEvent.click(screen.getByRole('button', { name: '신청 열기' }));
     expect(openMutate).toHaveBeenCalledTimes(1);
-    expect(openMutate.mock.calls[0][0]).toEqual({ registrationDeadlineAt: new Date(local).toISOString() });
+    expect(openMutate.mock.calls[0][0]).toEqual({ registrationDeadlineAt: '2099-10-01T14:59:00.000Z' });
   });
 
   it('이미 열려 있으면 버튼이 "마감 변경" 이다 — 같은 경로로 연장한다', () => {

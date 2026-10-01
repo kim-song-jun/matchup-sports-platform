@@ -103,6 +103,28 @@ describe('AdminTeamMatchEditPage', () => {
     expect(push).toHaveBeenCalledWith('/admin/team-matches/tm-1');
   });
 
+  it('기존 값을 열고 그대로 저장하면 같은 ISO 가 나간다 (브라우저 TZ=UTC 라도 KST 로 왕복)', async () => {
+    render(<AdminTeamMatchEditPage />);
+
+    expect(screen.getByLabelText('경기 시작')).toHaveValue('2026-10-20T19:00');
+    fireEvent.click(screen.getByRole('button', { name: '수정 내용 저장' }));
+
+    await waitFor(() => expect(update.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      startsAt: DETAIL.startAt,
+      endsAt: DETAIL.endAt,
+      deadlineAt: DETAIL.deadlineAt,
+    })));
+  });
+
+  it('시작 시각을 KST 기준으로 검증한다 — KST 로 과거면 막고 미래면 통과한다 (TZ=UTC 러너)', () => {
+    render(<AdminTeamMatchEditPage />);
+    // 시스템 시각 2026-09-24T00:00Z = KST 09:00. 08:00 KST 는 과거(로컬=UTC 해석이면 미래로 오판).
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-09-24T08:00' } });
+    expect(screen.getAllByText('시작 시간은 지금 이후로 설정해 주세요').length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('경기 시작'), { target: { value: '2026-09-24T10:00' } });
+    expect(screen.queryByText('시작 시간은 지금 이후로 설정해 주세요')).toBeNull();
+  });
+
   it('does not render an edit form after the match is finalized', () => {
     hooks.detail = { ...hooks.detail, data: { ...DETAIL, status: 'matched' } };
     render(<AdminTeamMatchEditPage />);

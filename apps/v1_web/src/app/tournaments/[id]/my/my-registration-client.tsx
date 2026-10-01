@@ -723,7 +723,9 @@ function RegistrationDetailView({
     registration.status === 'cancel_requested'
       ? '취소 요청을 검토 중이에요. 처리 결과를 안내받기 전에는 추가 입금을 하지 마세요.'
       : registration.status === 'payment_checking'
-        ? '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
+        ? tournament.entryFee === 0
+          ? '신청이 접수됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
+          : '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
         : registration.status === 'awaiting_payment'
           ? paymentInstructions
             ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.'

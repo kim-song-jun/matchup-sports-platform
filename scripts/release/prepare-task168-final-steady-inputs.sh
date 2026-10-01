@@ -15,6 +15,8 @@ set -Eeuo pipefail
 # 2026-09-27 adds v1_site_info_settings (singleton) and additive v1_inquiries guest-retention/purge columns + categories.
 # 2026-09-28 Task 179 adds v1_game_roster_adjustments and v1_team_member_unavailabilities.
 # 2026-10-01 Task 181: additive chat image message (enum value image + nullable v1_chat_messages.attachment_asset_id FK).
+# 2026-10-01 Task 181 ②: additive chat share card (enum value share + nullable v1_chat_messages.share_card JSONB).
+# 2026-10-01 Task 181 ③: additive chat file message (enum values file + nullable v1_upload_assets.original_name).
 # 2026-10-01 Task 180 G12 adds v1_team_invite_links.
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
@@ -22,7 +24,7 @@ m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_table
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == 1aef3ddd40bf896084d066d335e2a17c4e14198923820aaabdf7c0df09e9fd0c \
+[[ "$schema_sha" == 3caf90ad046677aaa8f8d9f2d7738bd7ee20bfb106b61802fe63189ef7ddc813 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

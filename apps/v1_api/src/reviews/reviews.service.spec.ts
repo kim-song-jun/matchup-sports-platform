@@ -509,7 +509,7 @@ describe('ReviewsService', () => {
 
   it('team_match: 결과가 무효(VOID)로 뒤집혔으면 평가를 열지 않는다', async () => {
     // 무효화는 V1TeamMatch.status/completedAt 을 건드리지 않고 게임의 공식 리비전만
-    // VOID 로 바꾼다(games.service.ts voidTeamMatchResult). status/completedAt 만 보면
+    // VOID 로 바꾼다(tournament-result-review.service.ts voidResultRevision). status/completedAt 만 보면
     // 무효 경기와 정상 완료 경기를 구별할 수 없어, 없던 일이 된 경기에 계속 평가를
     // 남길 수 있었다.
     const prisma = {

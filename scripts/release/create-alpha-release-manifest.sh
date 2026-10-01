@@ -111,7 +111,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   PREVIOUS_SHA="$RELEASE_SHA"
   PREVIOUS_STAGE=final
   MIGRATION_BASE_SHA="$RELEASE_SHA"
-  TASK168_SCHEMA_SHA256=1aef3ddd40bf896084d066d335e2a17c4e14198923820aaabdf7c0df09e9fd0c
+  TASK168_SCHEMA_SHA256=3caf90ad046677aaa8f8d9f2d7738bd7ee20bfb106b61802fe63189ef7ddc813
   TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
   api_digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   web_digest=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
@@ -299,7 +299,7 @@ fi
 for name in RELEASE_SHA RELEASE_VERSION REGISTRY DEPLOY_BUCKET EXPECTED_BUCKET_OWNER SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG PREVIOUS_SHA PREVIOUS_STAGE MIGRATION_BASE_SHA TASK168_SCHEMA_SHA256 TASK168_M11_SHA256; do
   [[ -n "${!name:-}" ]] || { echo "$name is required" >&2; exit 1; }
 done
-[[ "$TASK168_SCHEMA_SHA256" == 1aef3ddd40bf896084d066d335e2a17c4e14198923820aaabdf7c0df09e9fd0c && "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
+[[ "$TASK168_SCHEMA_SHA256" == 3caf90ad046677aaa8f8d9f2d7738bd7ee20bfb106b61802fe63189ef7ddc813 && "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
 
 if [[ "$PREVIOUS_STAGE" == final && "$PREVIOUS_SHA" != none ]]; then
   rollback_compatible_with="$PREVIOUS_SHA"

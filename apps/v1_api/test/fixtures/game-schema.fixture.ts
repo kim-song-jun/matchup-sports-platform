@@ -549,10 +549,12 @@ export const gameSchemaSourceManifest = {
   // Existing game models and bound historical migration remain unchanged.
   // 2026-10-01 Task 181: additive chat image message (enum value + nullable attachment FK).
   // Existing game models and bound historical migration remain unchanged.
+  // 2026-10-01 Task 181 ②: additive chat share card (enum value + nullable JSONB column), merged with dev's match proceed-confirmation change.
+  // 2026-10-01 Task 181 ③: additive chat file message (enum values + nullable original_name).
   // 2026-10-01 Task 180 G12: additive V1TeamInviteLink table (+ V1Team/V1User back-relations) backed by
-  // 20261001090000_v1_team_invite_links. No game model changed; bound historical migration unchanged.
-  // 2026-10-01 merge: dev's Task 181 + this branch's Task 180 G12, re-pinned on the merged file.
-  schema: '1aef3ddd40bf896084d066d335e2a17c4e14198923820aaabdf7c0df09e9fd0c',
+  // 20261001210000_v1_team_invite_links. No game model changed; bound historical migration unchanged.
+  // 2026-10-01 merge: dev's Task 181 ②③ + this branch's Task 180 G12, re-pinned on the merged file.
+  schema: '3caf90ad046677aaa8f8d9f2d7738bd7ee20bfb106b61802fe63189ef7ddc813',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

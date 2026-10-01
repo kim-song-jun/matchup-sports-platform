@@ -213,6 +213,8 @@ export function friendlyRsvpLabel(status: string): string {
 
 /** 개인 매치가 시작된 뒤의 표시 상태(displayState) 라벨. 시작 전·완료 상태는 null — 호출부의 기존 라벨을 쓴다. */
 export function personalMatchLifecycleLabel(displayState: string | null | undefined, isHost: boolean): string | null {
+  if (displayState === 'on_hold') return '보류';
+  if (displayState === 'scheduled') return '진행 확정';
   if (displayState === 'in_progress') return '진행중';
   if (displayState === 'completion_pending') return isHost ? '종료 확인 필요' : '종료 확인 중';
   return null;

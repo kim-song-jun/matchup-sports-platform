@@ -13,6 +13,7 @@ describe('SimpleModal 높이 제한', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog.className).toContain('max-h-[calc(var(--teameet-visual-viewport-height,100dvh)-2rem)]');
     expect(dialog.className).toContain('flex-col');
+    expect(dialog.className).toContain('overflow-hidden');
 
     const header = screen.getByRole('heading', { name: '명단 검토' }).parentElement!;
     expect(header.className).toContain('shrink-0');

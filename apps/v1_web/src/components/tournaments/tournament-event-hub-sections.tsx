@@ -27,7 +27,7 @@ export function getParticipantTeamBuckets(
   };
 }
 
-export function TournamentApplicationGuideSection() {
+export function TournamentApplicationGuideSection({ isFreeEntry }: { isFreeEntry: boolean }) {
   const steps = [
     {
       title: '팀 준비',
@@ -37,10 +37,15 @@ export function TournamentApplicationGuideSection() {
       title: '팀 선택',
       body: '참가 신청에서 신청할 팀을 고르고, 팀원을 선택해요. 팀원은 미선택 상태로 진행하거나 추후 수정할 수 있어요.',
     },
-    {
-      title: '2시간 내 입금 확인',
-      body: '계좌 안내 후 2시간 안에 입금이 확인되지 않으면 신청이 취소될 수 있어요. 입금 확인 후 대회 참가가 확정돼요.',
-    },
+    isFreeEntry
+      ? {
+          title: '운영진 확인',
+          body: '신청하면 바로 접수돼요. 입금 절차는 없어요. 운영진이 신청 내용을 확인하면 대회 참가가 확정돼요.',
+        }
+      : {
+          title: '2시간 내 입금 확인',
+          body: '계좌 안내 후 2시간 안에 입금이 확인되지 않으면 신청이 취소될 수 있어요. 입금 확인 후 대회 참가가 확정돼요.',
+        },
     {
       title: '선수단 확정',
       body: '대회 페이지 내에서 선수단을 등록하고 수정해요. 마감일 전까지 등록을 완료해 주세요.',
@@ -61,7 +66,7 @@ export function TournamentApplicationGuideSection() {
           이 대회는 팀 단위로 신청해요
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
-          팀장·매니저가 팀을 선택해 신청하고, 입금 확인 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
+          팀장·매니저가 팀을 선택해 신청하고, {isFreeEntry ? '운영진 확인' : '입금 확인'} 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
         </div>
         <ol style={{ display: 'grid', gap: 12, listStyle: 'none', margin: '16px 0 0', padding: 0 }}>
           {steps.map((step, index) => (

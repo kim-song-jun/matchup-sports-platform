@@ -275,6 +275,8 @@ enum V1ChatMessageType {
   system
   /// 사진 메시지 — `attachmentAssetId` 가 보낸 사람의 이미지 업로드를 가리킨다(Task 181).
   image
+  /// 일정·매치 공유 카드 — `shareCard` 에 보낼 때의 스냅숏이 있다(Task 181 ②).
+  share
 }
 
 enum V1ChatSystemEventType {
@@ -2077,6 +2079,9 @@ model V1ChatMessage {
   systemEventType V1ChatSystemEventType? @map("system_event_type")
   /// 사진 메시지의 업로드. 업로드가 지워지면 null — 메시지는 남고 사진만 사라진다.
   attachmentAssetId String?              @map("attachment_asset_id")
+  /// 공유 카드 스냅숏 `{ kind, targetId, title, startAt, place, sub, route }` — 보낼 때 보내는 사람의
+  /// 열람 권한을 확인하고 찍는다. 받는 사람이 카드를 눌러 여는 화면의 권한은 그 화면이 따로 본다.
+  shareCard       Json?                  @map("share_card")
   sentAt          DateTime               @default(now()) @map("sent_at")
   hiddenAt        DateTime?              @map("hidden_at")
   deletedAt       DateTime?              @map("deleted_at")

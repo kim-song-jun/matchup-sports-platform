@@ -549,7 +549,8 @@ export const gameSchemaSourceManifest = {
   // Existing game models and bound historical migration remain unchanged.
   // 2026-10-01 Task 181: additive chat image message (enum value + nullable attachment FK).
   // Existing game models and bound historical migration remain unchanged.
-  schema: 'cd63ac41c85c862d5fb8903146e0183dee92ac19e4dacfe7b200d373b36e760d',
+  // 2026-10-01 Task 181 ②: additive chat share card (enum value + nullable JSONB column).
+  schema: '373524c21be6aa93277a2f2f9f66f7a7db0d7e4be0c691fed645260ff40e2417',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

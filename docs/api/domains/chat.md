@@ -11,7 +11,7 @@ V1 session authentication and current room entitlement are required. Development
 | POST | `/chat/rooms/resolve` | `{ targetType: match \| team \| team_match \| team_contact, targetId }`; checks domain membership |
 | GET | `/chat/rooms/:roomId` | room, linked target, current participant and context |
 | GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since the participant's visibility boundary |
-| POST | `/chat/rooms/:roomId/messages` | exactly one of `{ content }` (nonblank, max 2,000) or `{ imageUrl }` (sender's own image upload from `POST /uploads`, else 400 `VALIDATION_FAILED` field `imageUrl`); both/neither → 400; active room, accepted team contact if applicable. Returns `{ messageId, roomId, messageType, content, imageUrl, status, sentAt, senderUserId }` |
+| POST | `/chat/rooms/:roomId/messages` | exactly one of `{ content }` (nonblank, max 2,000), `{ imageUrl }` (sender's own image upload from `POST /uploads`, else 400 `VALIDATION_FAILED` field `imageUrl`) or `{ share: { kind: team_schedule \| match, targetId } }` (sender must be able to view the target, else 400 field `share`); several/none → 400; active room, accepted team contact if applicable. Returns `{ messageId, roomId, messageType, content, imageUrl, shareCard, status, sentAt, senderUserId }` |
 | PATCH | `/chat/rooms/:roomId/me` | optional `pinned`, `lastReadMessageId`, `mutedUntil` |
 | POST | `/chat/rooms/:roomId/leave` | optional `reason`, max 500 |
 | POST | `/chat/rooms/:roomId/messages/:messageId/report` | `{ reason, detail? }`; returns `{ inquiryId }` |
@@ -67,13 +67,21 @@ and therefore has no host participant row.
   recipients a text message from that user would reach — the actor is excluded, and a declined/withdrawn
   contact room still receives the line although it is archived (payload = text payload + `messageType`,
   `systemEventType`). No notification row or push is created, and a socket failure is logged, not surfaced.
-- Message rows include `messageType` (`text | system | image`), `systemEventType`, `imageUrl`, and `unreadCount`.
-  `unreadCount` is computed per text/image message from active participants whose visibility boundary includes that
+- Message rows include `messageType` (`text | system | image | share`), `systemEventType`, `imageUrl`, `shareCard`, and `unreadCount`.
+  `unreadCount` is computed per non-system message from active participants whose visibility boundary includes that
   message and whose `lastReadMessageId` is older or empty; system messages always return `0`.
 - Image messages (Task 181): `messageType = "image"`, `body`/`content = "사진"` (so previews, report snapshots and
   body-only readers stay readable), `imageUrl` = the referenced `V1UploadAsset.url`. `imageUrl` is `null` when the
   message is hidden/deleted (same rule as `content`) or the upload was deleted (FK `ON DELETE SET NULL`).
   Notification/push body is "사진을 보냈어요". Room-list `unreadCount` counts every non-system message.
+- Share messages (Task 181 ②): `messageType = "share"`, `content = "[일정] 제목" | "[매치] 제목"`, `shareCard` =
+  `{ kind, targetId, title, startAt, place, sub, route }` snapshotted at send time. Visibility is checked against the
+  **sender** with the same rules as the target's own detail page: a team schedule needs an active, non-deleted team and
+  either `visibility = PUBLIC` or an active membership; a match must not be deleted. A team-match schedule's card routes
+  to `/team-matches/:id` (the opposing team can open it), otherwise `/teams/:teamId/schedules/:id`; matches route to
+  `/matches/:id`. The target page enforces the recipient's own access. `shareCard` is `null` when hidden/deleted or when
+  the stored JSON is malformed (`route` must be a same-origin path). Notification body "일정을 공유했어요 · 제목" /
+  "매치를 공유했어요 · 제목".
 - Image privacy: chat photos are served from the same **public, unguessable UUID path** (`/uploads/...`) as other
   uploads — anyone holding the URL can open it (no room-membership check on the static file). The web client always
   re-encodes chat photos before upload (`useV1UploadImages({ stripMetadata: true })`) so EXIF (GPS location, device)

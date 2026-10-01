@@ -25,6 +25,9 @@ const hooks = vi.hoisted(() => ({
   chatMessages: vi.fn(),
   sendChatMessage: vi.fn(),
   uploadImages: vi.fn(),
+  // 공유 시트는 열 때만 부른다 — 기본은 "아직 안 부름".
+  mySchedule: vi.fn(() => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() })),
+  myMatches: vi.fn(() => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() })),
   updateMyChatRoom: vi.fn(),
 }));
 
@@ -73,6 +76,8 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
     useV1ChatMessages: hooks.chatMessages,
     useV1SendChatMessage: hooks.sendChatMessage,
     useV1UploadImages: hooks.uploadImages,
+    useV1MySchedule: hooks.mySchedule,
+    useV1MyMatches: hooks.myMatches,
     useV1UpdateMyChatRoom: hooks.updateMyChatRoom,
   };
 });
@@ -577,6 +582,60 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
       fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(1) } });
 
       expect(await screen.findByText('사진을 보내지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+    });
+  });
+
+  describe('일정·매치 공유 (Task 181 ②)', () => {
+    it('받은 공유 카드는 그 화면으로 가고, 뒤로가기가 이 채팅방으로 돌아오게 출처를 싣는다', () => {
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      hooks.chatMessages.mockReturnValue({
+        data: { items: [{
+          messageId: 'share-1', messageType: 'share', content: '[매치] 수요일 저녁 풋살', status: 'sent', sentAt: '2026-10-01T01:00:00.000Z', mine: false,
+          sender: { userId: 'u-2', displayName: '서연', profileImageUrl: null },
+          shareCard: { kind: 'match', targetId: 'm-1', title: '수요일 저녁 풋살', startAt: '2026-10-08T11:00:00.000Z', place: '성수 풋살파크', sub: null, route: '/matches/m-1' },
+        }] },
+        isPending: false, isError: false, refetch: vi.fn(),
+      });
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+
+      const href = screen.getByRole('link', { name: /매치 공유/ }).getAttribute('href') ?? '';
+      expect(href.startsWith('/matches/m-1?')).toBe(true);
+      expect(new URLSearchParams(href.split('?')[1]).get('from')).toContain('/chat');
+    });
+
+    it('시트를 열 때만 불러오고, 지난 매치는 빼고 중복 없이 빠른 순 · 고르면 공유로 보낸다', async () => {
+      const mutate = vi.fn();
+      hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate, mutateAsync: vi.fn() });
+      hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn() });
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      hooks.mySchedule.mockImplementation(((_filters: unknown, options?: { enabled?: boolean }) => ({
+        data: options?.enabled ? { items: [{ id: 'sch-1', title: '토요일 친선', startAt: '2099-10-04T10:00:00.000Z', teamName: '번개 FC' }], nextCursor: null } : undefined,
+        isPending: !options?.enabled, isError: false, refetch: vi.fn(),
+      })) as never);
+      const match = (id: string, startsAt: string) => ({ id, title: `매치 ${id}`, startsAt, placeName: '성수' });
+      hooks.myMatches.mockImplementation(((filters: { mode: string }, options?: { enabled?: boolean }) => ({
+        data: options?.enabled
+          ? { items: filters.mode === 'joined' ? [match('late', '2099-10-09T10:00:00.000Z'), match('past', '2000-01-01T00:00:00.000Z')] : [match('early', '2099-10-02T10:00:00.000Z'), match('late', '2099-10-09T10:00:00.000Z')] }
+          : undefined,
+        isPending: !options?.enabled, isError: false, refetch: vi.fn(),
+      })) as never);
+
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+      // 닫혀 있는 동안은 부르지 않는다.
+      expect(hooks.mySchedule).toHaveBeenLastCalledWith(expect.anything(), { enabled: false });
+
+      fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+      fireEvent.click(screen.getByRole('button', { name: '일정·매치' }));
+      const sheet = await screen.findByRole('dialog', { name: '일정·매치 공유' });
+      expect(hooks.mySchedule).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'scheduled' }), { enabled: true });
+
+      fireEvent.click(screen.getByRole('tab', { name: '매치' }));
+      const titles = Array.from(sheet.querySelectorAll('.tm-chat-share-row-title')).map((node) => node.textContent);
+      expect(titles).toEqual(['매치 early', '매치 late']);
+
+      fireEvent.click(screen.getByRole('button', { name: /매치 early/ }));
+      expect(mutate).toHaveBeenCalledWith({ share: { kind: 'match', targetId: 'early' } }, expect.anything());
+      expect(screen.queryByRole('dialog', { name: '일정·매치 공유' })).not.toBeInTheDocument();
     });
   });
 

@@ -20,7 +20,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { ChatService } from './chat.service';
+import { ChatService, parseShareCard } from './chat.service';
 
 // ─── shared test fixtures ──────────────────────────────────────────────────────
 
@@ -132,6 +132,8 @@ describe('ChatService', () => {
     v1TeamMembership: { findFirst: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock };
     v1UploadAsset: { findFirst: jest.Mock };
+    v1TeamSchedule: { findFirst: jest.Mock };
+    v1Team: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
   const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
@@ -173,6 +175,8 @@ describe('ChatService', () => {
       v1TeamMembership: { findFirst: jest.fn() },
       v1TeamMatch: { findFirst: jest.fn() },
       v1UploadAsset: { findFirst: jest.fn() },
+      v1TeamSchedule: { findFirst: jest.fn() },
+      v1Team: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     };
     // Default $transaction: pass-through (runs the callback with the same prisma stub)
@@ -337,6 +341,76 @@ describe('ChatService', () => {
       await expect(service.sendMessage(userA, 'room-1', { content: '안녕', imageUrl: '/uploads/a.jpg' })).rejects.toThrow(BadRequestException);
       await expect(service.sendMessage(userA, 'room-1', {})).rejects.toThrow(BadRequestException);
       expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sendMessage: 일정·매치 공유 (Task 181 ②)', () => {
+    const sentAt = new Date('2026-10-01T10:00:00Z');
+    const arrangeSend = () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom());
+      prisma.v1ChatMessage.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'msg-share', sentAt, status: 'sent', ...data }));
+      prisma.v1ChatRoom.update.mockResolvedValue({});
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: userB.id }]);
+    };
+
+    it('팀원이 팀 매치 일정을 공유하면 상대 팀도 열 수 있는 팀 매치 화면 카드로 저장한다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-1', teamId: 'team-1', teamMatchId: 'tm-1', title: '토요일 친선', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ placeName: '잠실 풋살장' });
+
+      const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-1' } });
+
+      const card = { kind: 'team_schedule', targetId: 'sch-1', title: '토요일 친선', startAt: '2026-10-04T10:00:00.000Z', place: '잠실 풋살장', sub: '번개 FC', route: '/team-matches/tm-1' };
+      expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({ messageType: 'share', body: '[일정] 토요일 친선', shareCard: card }) });
+      expect(result).toMatchObject({ messageType: 'share', content: '[일정] 토요일 친선', shareCard: card });
+      expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [expect.objectContaining({ body: '일정을 공유했어요 · 토요일 친선' })] }),
+      );
+    });
+
+    it('팀원이 아니면 비공개 팀 일정을 공유할 수 없다(400, 존재를 드러내지 않음) · 공개 일정은 된다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '팀 훈련', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'TEAM' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '천둥 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+
+      await expect(service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-2' } })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'share' } },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '공개 연습', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'PUBLIC' });
+      const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-2' } });
+      expect(result.shareCard).toMatchObject({ route: '/teams/team-2/schedules/sch-2', place: null, sub: '천둥 FC' });
+    });
+
+    it('매치 공유는 매치 화면 카드 · 알림은 "매치를 공유했어요"', async () => {
+      arrangeSend();
+      const entitlement = await prisma.v1Match.findFirst();
+      prisma.v1Match.findFirst.mockImplementation(async (args?: { select?: { placeName?: boolean } }) =>
+        args?.select?.placeName ? { id: 'match-9', title: '수요일 저녁 풋살', startAt: new Date('2026-10-08T11:00:00Z'), placeName: '성수 풋살파크' } : entitlement,
+      );
+
+      const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'match', targetId: 'match-9' } });
+
+      expect(result.shareCard).toEqual({ kind: 'match', targetId: 'match-9', title: '수요일 저녁 풋살', startAt: '2026-10-08T11:00:00.000Z', place: '성수 풋살파크', sub: null, route: '/matches/match-9' });
+      expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [expect.objectContaining({ body: '매치를 공유했어요 · 수요일 저녁 풋살' })] }),
+      );
+    });
+
+    it('공유와 텍스트·사진을 함께 보내면 400', async () => {
+      await expect(service.sendMessage(userA, 'room-1', { content: '이거 봐', share: { kind: 'match', targetId: 'match-9' } })).rejects.toThrow(BadRequestException);
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('parseShareCard: 모양이 어긋나거나 경로가 / 로 시작하지 않으면 카드 없이(null)', () => {
+      expect(parseShareCard({ kind: 'match', targetId: 'm', title: 't', route: 'https://evil.example' })).toBeNull();
+      expect(parseShareCard({ kind: 'nope', targetId: 'm', title: 't', route: '/matches/m' })).toBeNull();
+      expect(parseShareCard(null)).toBeNull();
+      expect(parseShareCard({ kind: 'match', targetId: 'm', title: 't', route: '/matches/m' })).toEqual({ kind: 'match', targetId: 'm', title: 't', startAt: null, place: null, sub: null, route: '/matches/m' });
     });
   });
 

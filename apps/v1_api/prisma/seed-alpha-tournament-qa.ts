@@ -11,7 +11,7 @@ import {
 // 건 이 이미지에 없는 `../src/...` import 다.
 import { seedAlphaQaSquads } from './seed-alpha-qa-squads';
 import { deterministicCanonicalMatchId, ensureCanonicalOfficialResult, ensureCanonicalTournamentMatch, findTournamentOnSurfaceOrThrow } from './canonical-tournament-seed';
-import { seedTournamentRoundLabel } from './seed-tournament-round-label';
+import { seedCompetitionMatchLabel } from './seed-tournament-round-label';
 
 // canonical 풋살 competition config 의 id.
 //
@@ -618,7 +618,7 @@ export async function createCompetitionData(
       tournamentId: scenario.id,
       sportId: resolvedSportId,
       competitionConfigVersionId,
-      title: `${scenario.title} · ${seedTournamentRoundLabel(round)} ${fixtureNumber}`,
+      title: `${scenario.title} · ${seedCompetitionMatchLabel({ groupName: round === 'group' ? group.name : null, round })} ${fixtureNumber}`,
       startAt: new Date(scheduledAt.getTime() + rows.length * 90 * 60 * 1000),
       placeName: `서울 송파 풋살파크 ${round === 'group' ? `${fixtureNumber}구장` : '결선구장'}`,
       status: statusFor(scenario.status),

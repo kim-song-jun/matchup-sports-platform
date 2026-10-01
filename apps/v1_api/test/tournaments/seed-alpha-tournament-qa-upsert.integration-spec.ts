@@ -7,7 +7,7 @@ import {
   type TeamSeed,
 } from '../../prisma/seed-alpha-tournament-qa';
 import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
-import { tournamentRoundLabel } from '../../src/tournaments/tournament-round-label';
+import { competitionMatchLabel } from '../../src/tournaments/tournament-round-label';
 
 /**
  * Part 2 (delete→upsert 근본 해소): the alpha QA seed no longer deletes the fixed
@@ -213,12 +213,18 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
     await seedScenarioOnce();
     const fixtures = await prisma.v1TournamentMatchDetails.findMany({
       where: { tournamentId: ids.tournament },
-      select: { round: true, fixtureNumber: true, teamMatch: { select: { title: true } } },
+      select: { round: true, fixtureNumber: true, group: { select: { name: true } }, teamMatch: { select: { title: true } } },
     });
     expect(new Set(fixtures.map((fixture) => fixture.round))).toEqual(new Set(['group', 'semi', 'final', 'third_place']));
     expect(fixtures.map((fixture) => fixture.teamMatch.title)).toEqual(
-      fixtures.map((fixture) => `${scenario.title} · ${tournamentRoundLabel(fixture.round)} ${fixture.fixtureNumber}`),
+      fixtures.map(
+        (fixture) =>
+          `${scenario.title} · ${competitionMatchLabel({ groupName: fixture.group?.name, round: fixture.round })} ${fixture.fixtureNumber}`,
+      ),
     );
+    // W9-V2 — 조별 경기는 조 이름이 붙고, 조 없는 결선은 라운드만.
+    expect(fixtures.find((fixture) => fixture.round === 'group')?.teamMatch.title).toContain('· A조 · 조별리그 ');
+    expect(fixtures.find((fixture) => fixture.round === 'final')?.teamMatch.title).toBe(`${scenario.title} · 결승 1`);
   });
 
   it('preserves an anonymous historical participant snapshot when re-seeding an existing canonical game', async () => {

@@ -33,6 +33,7 @@ function fakeTx(options: {
   alreadyDelivered: string[];
   /** 공식 결과 참가자(출전자). */
   resultRows?: Array<{ participantId: string; sideId: string; userId: string; goals: number; assists: number }>;
+  details?: { round: string; legNumber: number; group: { name: string } | null };
 }) {
   const createMany = jest.fn().mockResolvedValue({ count: 0 });
   const resultRows = options.resultRows ?? [];
@@ -49,7 +50,9 @@ function fakeTx(options: {
     },
     v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
     v1ParticipantIdentityLinkEvent: { findMany: jest.fn().mockResolvedValue([]) },
-    v1TournamentMatchDetails: { findUnique: jest.fn().mockResolvedValue({ round: 'final' }) },
+    v1TournamentMatchDetails: {
+      findUnique: jest.fn().mockResolvedValue(options.details ?? { round: 'final', legNumber: 1, group: null }),
+    },
     v1NotificationPreference: {
       findMany: jest.fn().mockResolvedValue(options.preferences),
     },
@@ -118,6 +121,20 @@ describe('TournamentFixtureCompletionNotificationService', () => {
     // 승패는 받는 사람 팀 기준이다.
     expect(rows.find((row: { recipientUserId: string }) => row.recipientUserId === 'captain-away').body).toBe(
       '테스트 대회 · 결승 · 홈팀FC 2 : 1 원정팀FC · 패배.',
+    );
+  });
+
+  // W9-V2 — 알림도 화면과 같은 경기 이름("A조 · 조별리그 2라운드")을 쓴다. 예전엔 조 이름이 빠졌다.
+  it('names a group-stage fixture with its group and round, as every screen does', async () => {
+    const { tx, createMany } = fakeTx({
+      memberships: [{ userId: 'captain-home' }],
+      preferences: [],
+      alreadyDelivered: [],
+      details: { round: 'league_r2', legNumber: 2, group: { name: 'A조' } },
+    });
+    await new TournamentFixtureCompletionNotificationService().project(tx, revisionFixture());
+    expect(createMany.mock.calls[0][0].data[0].body).toBe(
+      '테스트 대회 · A조 · 조별리그 2라운드 · 홈팀FC 2 : 1 원정팀FC · 승리.',
     );
   });
 

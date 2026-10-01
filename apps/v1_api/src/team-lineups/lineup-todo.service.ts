@@ -8,7 +8,7 @@ import { loadCompetitionRosterBase, loadGameRoster } from '../games/roster/game-
 import { summarizeGameRoster, type GameRosterSummary } from '../games/roster/game-roster-matrix';
 import { PrismaService } from '../prisma/prisma.service';
 import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
-import { tournamentRoundLabel } from '../tournaments/tournament-round-label';
+import { competitionMatchLabel } from '../tournaments/tournament-round-label';
 
 /** 라인업이 아직 끝나지 않은 상태. 완료(SUBMITTED/LOCKED)는 아예 목록에 오르지 않는다. */
 export type LineupTodoState = 'MISSING' | 'DRAFT';
@@ -225,7 +225,7 @@ export class LineupTodoService {
         leagueId: true,
         tournamentId: true,
         tournament: { select: { title: true } },
-        tournamentDetails: { select: { round: true } },
+        tournamentDetails: { select: { round: true, legNumber: true, group: { select: { name: true } } } },
         // 리그 제목은 관계로 가져온다 — Prisma 가 대진 목록에 딸린 리그를 id IN (...) 한 번으로
         // 모아 오므로 대진 수(최대 500)만큼 쿼리가 늘지 않는다.
         league: { select: { title: true } },
@@ -286,7 +286,14 @@ export class LineupTodoService {
       const competitionKind = isTournamentMatch ? 'TOURNAMENT' as const : leagueTitle === null ? 'FRIENDLY' as const : 'LEAGUE' as const;
       const weekNumber = weekNumberByTeamMatchId.get(match.id);
       const title = isTournamentMatch
-        ? [tournamentTitle, tournamentRoundLabel(match.tournamentDetails!.round)].filter(Boolean).join(' · ')
+        ? [
+            tournamentTitle,
+            competitionMatchLabel({
+              groupName: match.tournamentDetails!.group?.name,
+              round: match.tournamentDetails!.round,
+              legNumber: match.tournamentDetails!.legNumber,
+            }),
+          ].filter(Boolean).join(' · ')
         : leagueTitle === null || weekNumber === undefined ? '팀 매치' : `${leagueTitle} ${weekNumber}주차`;
       for (const side of sides) {
         if (side.teamId === null || side.teamName === null) continue;

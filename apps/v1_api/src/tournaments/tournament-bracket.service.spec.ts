@@ -723,6 +723,25 @@ describe('TournamentBracketService', () => {
     });
   });
 
+  // W9-V2 — 저장되는 팀매치 제목도 화면과 같은 경기 이름을 쓴다(조별은 조 이름 + 라운드, 결선은 라운드만).
+  it.each([
+    ['조별 경기', { groupId: 'group-1', round: '조별 2라운드', fixtureNumber: 1 }, '테스트 대회 · A조 · 조별 2라운드 1'],
+    ['조 없는 결선 2차전', { round: '4강', fixtureNumber: 3, legNumber: 2 }, '테스트 대회 · 4강 2차 3'],
+  ])('createFixture: %s 의 팀매치 제목', async (_case, dto, title) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+    prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({
+      ...canonicalDetailsRow().teamMatch,
+      hostTeamId: null,
+      approvedApplicantTeamId: null,
+    });
+
+    await service.createFixture(ownerUser, 'tournament-1', dto);
+
+    expect(prisma.v1TeamMatch.create.mock.calls.map((call: [{ data: { title: string } }]) => call[0].data.title)).toEqual([title]);
+  });
+
   it('createFixture: missing canonical parent is rejected', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());

@@ -25,6 +25,8 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { appRoute } from '@/lib/app-route';
 import { withFromPath } from '@/lib/session-storage';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
+import { competitionKindLabel } from '@/lib/v1-status-labels';
 import { formatEntryFee } from '@/lib/date-utils';
 import {
   filterTournamentTeamsBySport,
@@ -1792,6 +1794,11 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       );
   }
 
+  // 여기부터는 대회·리그를 안다 — 돌아가기 CTA 도 종류에 맞는 이름과 상세 경로를 쓴다.
+  const isRegularLeague = tournament.kind === 'regular_league';
+  const competitionNoun = competitionKindLabel(isRegularLeague ? 'LEAGUE' : 'TOURNAMENT');
+  const loadedDetailHref = competitionDetailHref({ isRegularLeague, competitionId: tournamentId, fromHref: searchParams.get('from') });
+
   // 대회 신청은 본인확인이 전제다(서버도 submit에서 403 PHONE_NOT_VERIFIED로 막는다).
   // 이미 인증한 사용자는 이 화면을 보지 않고 그대로 통과하고, 미인증이면 인증 화면으로 보낸 뒤
   // 인증이 끝나면 이 신청 화면으로 정확히 되돌아오게 한다.
@@ -1799,7 +1806,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     return (
               <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
-            message="대회 신청은 휴대폰 본인인증을 마친 계정만 할 수 있어요. 인증 후 이 화면으로 돌아옵니다."
+            message={`${competitionNoun} 신청은 휴대폰 본인인증을 마친 계정만 할 수 있어요. 인증 후 이 화면으로 돌아옵니다.`}
             tone="info"
           />
           <Link
@@ -1810,11 +1817,11 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             본인인증 하러 가기
           </Link>
           <Link
-            href={detailHrefWithFrom}
+            href={loadedDetailHref}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 12 }}
           >
-            대회 상세로 돌아가기
+            {competitionNoun} 상세로 돌아가기
           </Link>
         </div>
       );
@@ -1832,11 +1839,11 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             tone="info"
           />
           <Link
-            href={detailHrefWithFrom}
+            href={loadedDetailHref}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >
-            대회 상세로 돌아가기
+            {competitionNoun} 상세로 돌아가기
           </Link>
         </div>
       );

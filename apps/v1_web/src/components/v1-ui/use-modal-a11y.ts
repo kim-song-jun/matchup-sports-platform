@@ -174,15 +174,36 @@ export function useModalA11y<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // 열릴 때 이전 포커스를 저장하고, 닫힐 때(ESC/backdrop/취소/제출 전 경로) 복원한다.
-  // cleanup 기반이라 open 토글형 모달뿐 아니라 조건부 마운트형(열려 있는 채 언마운트)
-  // 모달에서도 복원된다 — LogDetailModal 류가 후자다.
+  // 열리는 **렌더**에서 이전 포커스를 잡는다 — 패널 안 autoFocus 는 마운트 커밋에서 이미 적용돼, effect 에서
+  // 읽으면 곧 사라질 입력이 복원 대상이 되고 닫을 때 포커스가 body 로 떨어진다. 렌더 시점에는 아직 트리거에 있다.
+  const returnFocusRef = useRef<Element | null>(null);
+  const wasOpenRef = useRef(false);
+  if (open && !wasOpenRef.current && !dialogRef.current?.contains(document.activeElement)) {
+    returnFocusRef.current = document.activeElement;
+  }
+  wasOpenRef.current = open;
+
+  // 닫힐 때(ESC/backdrop/취소/제출 전 경로) 복원한다. cleanup 기반이라 open 토글형뿐 아니라
+  // 조건부 마운트형(열려 있는 채 언마운트) 모달에서도 복원된다 — LogDetailModal 류가 후자다.
   // mounted 기준이다. open 으로 하면 퇴장 애니메이션이 도는 동안 모달은 화면에
   // 있는데 포커스만 뒤로 가서, 그 사이 Tab·ESC 가 모달 밖으로 샌다.
+  // cleanup 은 ref 를 비우지 않는다 — StrictMode(dev)는 effect 를 마운트→정리→마운트로 한 번 더 돌리는데, 비우면 복귀
+  // 대상이 사라진다. 그 가짜 정리가 포커스를 트리거로 옮겼다면 다시 마운트될 때 모달 안 원래 컨트롤로 돌려놓는다.
+  const refocusAfterRemountRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (!mounted) return;
-    const previous = document.activeElement;
+    if (!mounted) {
+      refocusAfterRemountRef.current = null; // 진짜 닫힘 — 다음 열림에 넘기지 않는다
+      return;
+    }
+    const resumed = refocusAfterRemountRef.current;
+    refocusAfterRemountRef.current = null;
+    if (resumed?.isConnected) resumed.focus();
     return () => {
+      // StrictMode 의 가짜 정리에서는 ref 가 이미 떼어져 dialogRef 로 안쪽 여부를 못 가른다.
+      const previous = returnFocusRef.current;
+      const active = document.activeElement;
+      refocusAfterRemountRef.current =
+        active instanceof HTMLElement && active !== document.body && active !== previous ? active : null;
       if (previous && typeof (previous as HTMLElement).focus === 'function') {
         (previous as HTMLElement).focus();
       }

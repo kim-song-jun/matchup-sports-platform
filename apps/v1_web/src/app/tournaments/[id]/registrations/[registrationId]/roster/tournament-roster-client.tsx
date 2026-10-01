@@ -825,7 +825,6 @@ function FormField({
   label,
   required,
   hint,
-  errorMessage,
   children,
   labelId,
 }: {
@@ -833,8 +832,6 @@ function FormField({
   label: string;
   required?: boolean;
   hint?: string;
-  /** Inline validation error shown below the field in red. */
-  errorMessage?: string;
   children: React.ReactNode;
   /** Optional id for the label element, used when the child is a radiogroup that needs aria-labelledby. */
   labelId?: string;
@@ -853,16 +850,7 @@ function FormField({
         ) : null}
       </label>
       {children}
-      {errorMessage ? (
-        <p
-          id={`${id}-error`}
-          role="alert"
-          className="tm-text-micro"
-          style={{ color: 'var(--red700)', marginTop: 4 }}
-        >
-          {errorMessage}
-        </p>
-      ) : hint ? (
+      {hint ? (
         <p className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
           {hint}
         </p>

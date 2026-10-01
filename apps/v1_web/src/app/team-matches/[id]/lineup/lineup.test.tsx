@@ -1929,7 +1929,7 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 5, state: 'SUBMITTED' }));
     act(() => hoisted.saveMutate.mock.calls[0][1].onSettled());
 
-    // 서버가 저장을 곧바로 제출본으로 만들므로 제출 API 는 부르지 않는다(부르면 409 LINEUP_ALREADY_SUBMITTED).
+    // 서버가 저장을 곧바로 제출본으로 만들므로 제출 API 는 더 부르지 않는다(불러도 아무것도 바꾸지 않는 멱등 성공이다).
     expect(hoisted.submitMutate).not.toHaveBeenCalled();
     expect(screen.getByText(/^다시 제출했어요\(오[전후] \d{1,2}:\d{2}\)\./)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '변경 취소' })).toBeDisabled();

@@ -413,7 +413,10 @@ describe('Task 14 team-match lineup builder', () => {
 
     // Two concurrent submits racing against the SAME still-DRAFT revision,
     // each with its own Idempotency-Key (so neither is an idempotent replay
-    // of the other) — SERIALIZABLE isolation must let exactly one win.
+    // of the other) — SERIALIZABLE isolation must let exactly one write win.
+    // Task 180 R-2: re-submitting an already-submitted revision is a no-op
+    // success, so the loser either fails the serialization check or (if it
+    // started after the winner committed) succeeds without writing anything.
     const race = await Promise.allSettled([
       service.submitLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-submit-race-a', {
         expectedVersion: saved.version,
@@ -426,10 +429,18 @@ describe('Task 14 team-match lineup builder', () => {
       (outcome): outcome is PromiseFulfilledResult<Awaited<ReturnType<typeof service.submitLineup>>> =>
         outcome.status === 'fulfilled',
     );
-    expect(fulfilled).toHaveLength(1);
-    expect(race.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
+    expect(fulfilled.length).toBeGreaterThanOrEqual(1);
+    for (const outcome of race) {
+      if (outcome.status === 'rejected') expectHttpCode(outcome.reason, 409, 'COMMAND_CONCURRENCY_CONFLICT');
+    }
+    expect(new Set(fulfilled.map((outcome) => outcome.value.lineupId)).size).toBe(1);
 
     const submitted = fulfilled[0].value;
+    const submittedRow = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: submitted.lineupId } });
+    expect(submittedRow.version).toBe(1);
+    expect(
+      await prisma.v1OutboxEvent.count({ where: { aggregateId: submitted.lineupId, type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION' } }),
+    ).toBe(1);
     expect(submitted.state).toBe('SUBMITTED');
     expect(submitted.publicLineupAt).not.toBeNull();
 

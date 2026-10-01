@@ -1412,3 +1412,63 @@ describe('TeamMatchLineupService.saveLineup — 이미 낸 명단의 저장은 �
     expect(state.policy).toEqual({ lineupAt: null });
   });
 });
+
+describe('TeamMatchLineupService.submitLineup — 이미 낸 리비전을 다시 내면 그대로 성공 (Task 180 R-2)', () => {
+  const publicAt = new Date('2026-10-13T10:00:00.000Z');
+
+  it('옛 화면 순서(저장 → 제출)로 와도 성공하고, 제출은 리비전·알림·공개 시각을 하나도 더 만들지 않는다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: publicAt });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const saved = await service.saveLineup(manager, 'team-match-1', 'old-client-save', swapUser2ForUser3);
+    const before = { lineups: structuredClone(state.lineups), outbox: structuredClone(state.outbox) };
+    const submitted = await service.submitLineup(manager, 'team-match-1', 'old-client-submit', { expectedVersion: saved.revision });
+
+    expect(submitted).toMatchObject({
+      lineupId: saved.lineupId,
+      revision: 3,
+      state: V1GameLineupState.SUBMITTED,
+      version: 3,
+      publicLineupAt: publicAt.toISOString(),
+      replayed: false,
+    });
+    expect(state.lineups).toEqual(before.lineups);
+    expect(state.outbox).toEqual(before.outbox);
+    expect(state.policy).toEqual({ lineupAt: publicAt });
+  });
+
+  it('리비전이 그새 바뀌었으면 이미 낸 명단이어도 버전 충돌이다 — 남이 낸 명단을 내 제출로 알리지 않는다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: publicAt });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.submitLineup(manager, 'team-match-1', 'stale-submit', { expectedVersion: 1 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'VERSION_CONFLICT', details: { expectedVersion: 1, currentVersion: 2 } }),
+    });
+  });
+
+  it('초안은 그대로 제출된다 — 상태·제출 시각·공개 시각·포함 알림(대조군)', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: null });
+    seedHomeLineup(state, V1GameLineupState.DRAFT);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const submitted = await service.submitLineup(manager, 'team-match-1', 'draft-submit', { expectedVersion: 2 });
+
+    expect(submitted).toMatchObject({ lineupId: 'home-r2', state: V1GameLineupState.SUBMITTED, publicLineupAt: expect.any(String) });
+    expect(state.lineups).toEqual([expect.objectContaining({ id: 'home-r2', state: V1GameLineupState.SUBMITTED, submittedAt: expect.any(Date), version: 1 })]);
+    expect(state.outbox.map((row) => row.businessKey)).toEqual(['team-match-lineup-included:home-r2']);
+    expect(state.policy?.lineupAt).toBeInstanceOf(Date);
+  });
+
+  it('첫 기록 뒤에는 이미 낸 명단이어도 기존 잠금 409 다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, publicLineupAt: publicAt });
+    seedHomeLineup(state, V1GameLineupState.SUBMITTED);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.submitLineup(manager, 'team-match-1', 'locked-submit', { expectedVersion: 2 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' }),
+    });
+    expect(state.idempotency).toHaveLength(0);
+  });
+});

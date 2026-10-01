@@ -9,6 +9,7 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { ChevronRight, UsersRound } from 'lucide-react';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import {
@@ -1411,12 +1412,17 @@ function TeamRegistrationHub({
 export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
   const searchParams = useSearchParams();
   const selectedRegistrationId = searchParams.get('reg');
-  // 대회 상세로 돌아가는 CTA는 받은 from 을 잇고, '다시 신청하기'는 이 화면 자신을
-  // apply 의 from 으로 실어 apply → 이 화면 → 상세 순으로 돌아오게 한다.
-  const detailHref = withFromPath(`/tournaments/${tournamentId}`, searchParams.get('from'));
   const selfHref = useCurrentHref();
   const applyHref = withFromPath(`/tournaments/${tournamentId}/apply`, selfHref);
   const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
+  // 상세로 돌아가는 CTA는 받은 from 을 잇고, '다시 신청하기'는 이 화면 자신을
+  // apply 의 from 으로 실어 apply → 이 화면 → 상세 순으로 돌아오게 한다.
+  const isRegularLeague = tournament?.kind === 'regular_league';
+  const detailHref = competitionDetailHref({
+    isRegularLeague,
+    competitionId: tournamentId,
+    fromHref: searchParams.get('from'),
+  });
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const {
     data: registrations = [],
@@ -1436,8 +1442,14 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   // topbar 뒤로가기가 같은 라우트의 목록(TeamRegistrationHub, 쿼리 없는 /my)으로 가야
   // 한다. selectedRegistrationId가 아니라 selectedRegistration(실제로 매칭된 신청 존재
   // 여부)로 분기한다 — 잘못된/만료된 reg 값이면 아래에서 이미 목록 뷰로 폴백하므로
-  // undefined로 둬 테이블 기본값(대회 상세)을 그대로 쓴다.
-  useShellOverride({ backHref: selectedRegistration ? `/tournaments/${tournamentId}/my` : undefined });
+  // undefined로 둬 테이블 기본값(대회 상세)을 그대로 쓴다. 테이블은 종류를 모르므로 리그만 리그 상세로 덮는다.
+  useShellOverride({
+    backHref: selectedRegistration
+      ? `/tournaments/${tournamentId}/my`
+      : isRegularLeague
+        ? competitionDetailHref({ isRegularLeague, competitionId: tournamentId })
+        : undefined,
+  });
 
   if (isLoading) {
     return (
@@ -1463,7 +1475,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >
-            {competitionNoun(tournament?.kind === 'regular_league')} 상세로 돌아가기
+            {competitionNoun(isRegularLeague)} 상세로 돌아가기
           </Link>
         </div>
       );

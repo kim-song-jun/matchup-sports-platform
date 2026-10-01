@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { formatTournamentDateMedium } from '@/lib/date-utils';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { registrationRosterPath } from '@/lib/game-roster-routes';
 import { rosterStateBadgeLabel } from '@/lib/roster-editability';
 import { withFromPath } from '@/lib/session-storage';
@@ -57,7 +58,7 @@ export function toCompetitionEntryRows(
       key: entry.registrationId,
       kind: isLeague ? 'LEAGUE' : 'TOURNAMENT',
       title: entry.title,
-      href: withFromPath(isLeague ? `/league-matches/${entry.competitionId}` : `/tournaments/${entry.competitionId}`, selfHref),
+      href: competitionDetailHref({ isRegularLeague: isLeague, competitionId: entry.competitionId, fromHref: selfHref }),
       statusLabel: status.label,
       statusColor: status.textColor,
       playerCount: entry.playerCount,

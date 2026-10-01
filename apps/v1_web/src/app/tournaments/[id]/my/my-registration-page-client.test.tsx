@@ -621,8 +621,29 @@ describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () =
 
     const links = screen.getAllByRole('link', { name: '리그 상세 보기' });
     expect(links).toHaveLength(2);
-    for (const link of links) expect(link).toHaveAttribute('href', '/tournaments/tournament-1');
+    // 리그 상세는 다른 화면과 같은 `/league-matches/:id` 다(대회 상세 경로는 리그 거울 화면).
+    for (const link of links) expect(link).toHaveAttribute('href', '/league-matches/tournament-1');
     expect(container.textContent).not.toContain('대회');
+  });
+
+  it('리그 목록 뷰의 셸 뒤로가기도 리그 상세로 간다 — 테이블 기본값은 대회 상세라 리그만 덮는다', () => {
+    searchParams = new URLSearchParams();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'draft' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    const probe = render(<BackHrefProbe />);
+
+    expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/league-matches/tournament-1');
   });
 
   it('신청을 받지 않는 리그의 팀 없음 안내도 "이 리그는" 이다', () => {

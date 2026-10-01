@@ -71,3 +71,9 @@ Root agent only. 기존 shared-tree WIP 보존. 2026-10-01 사용자 dev 배포 
 - 개인·팀 API 145/145, Web 관련 191/191 및 추가 영문 오류 테스트 5/5 통과. 양 앱 tsc --noEmit, v1 DB guardrails 통과. 최신 dev를 재병합했고 PR CI 재검증 대기.
 - release schema binding은 병합된 Prisma schema의 Git index LF SHA-256 `bb42ef9a40757b6877989b8cd883d461a714aebbcbd4591753acf0db757aba1a`로 고정했다. M11 기존 Git blob SHA-256 `08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323`는 그대로다. Windows checkout의 CRLF 때문에 작업 파일 직접 해시는 CI의 Git blob 해시와 다르다.
 - 실제 alpha 배포 후 인증 주최자 동작 및 전체 route 3폭 검증은 아직 미완료다.
+
+## 2026-10-01 Alpha UI follow-up
+- PR #1388 merged to dev. Alpha returned on_hold for zero-participant personal and zero-opponent team matches after deployment.
+- Headed browser QA at 390/768/1440 found team hold notice before the match hero and mobile back action.
+- Moved the existing notice immediately after the hero; added a DOM-order regression test (RED before, GREEN after).
+- Related team detail suite: 112/112 PASS. Alpha before screenshots: output/playwright/visual-audit/match-on-hold/alpha-after-windows-team/.

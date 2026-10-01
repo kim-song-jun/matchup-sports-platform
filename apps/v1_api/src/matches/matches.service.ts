@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { ChatService } from '../chat/chat.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -46,6 +47,7 @@ export class MatchesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly chat: ChatService,
   ) {}
 
   async list(user: V1AuthUser | null, query: MatchesQueryDto) {
@@ -1251,14 +1253,14 @@ export class MatchesService {
     this.assertApplicationHost(user, application);
 
     if (application.status !== 'requested') {
-      throw stateConflict('Only requested applications can be approved');
+      throw stateConflict('대기 중인 신청만 승인할 수 있어요.');
     }
     if (
       application.match.status !== 'recruiting' ||
       application.match.startAt < new Date() ||
       (application.match.deadlineAt && application.match.deadlineAt < new Date())
     ) {
-      throw stateConflict('Match is not recruiting');
+      throw stateConflict(NOT_RECRUITING_APPROVAL_MESSAGE);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -1276,12 +1278,12 @@ export class MatchesService {
         currentMatch.startAt < now ||
         (currentMatch.deadlineAt && currentMatch.deadlineAt < now)
       ) {
-        throw stateConflict('Match is not recruiting');
+        throw stateConflict(NOT_RECRUITING_APPROVAL_MESSAGE);
       }
 
       const activeParticipantCount = await this.getActiveParticipantCount(application.matchId, tx);
       if (activeParticipantCount >= currentMatch.maxParticipants) {
-        throw stateConflict('Match is full', 'FULL');
+        throw stateConflict('정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.', 'FULL');
       }
 
       const transition = await tx.v1MatchApplication.updateMany({
@@ -1289,11 +1291,11 @@ export class MatchesService {
         data: {
           status: 'approved',
           reviewedByUserId: user.id,
-          reviewedAt: new Date(),
+          reviewedAt: now,
         },
       });
       if (transition.count !== 1) {
-        throw stateConflict('Only requested applications can be approved');
+        throw stateConflict('대기 중인 신청만 승인할 수 있어요.');
       }
 
       const participant = await tx.v1MatchParticipant.upsert({
@@ -1307,7 +1309,7 @@ export class MatchesService {
           applicationId: application.id,
           role: 'participant',
           status: 'active',
-          approvedAt: new Date(),
+          approvedAt: now,
           cancelledAt: null,
         },
         create: {
@@ -1316,8 +1318,16 @@ export class MatchesService {
           applicationId: application.id,
           role: 'participant',
           status: 'active',
-          approvedAt: new Date(),
+          approvedAt: now,
         },
+      });
+
+      // 승인 = 채팅 참여 — 방을 만들거나 찾아 승인 시각부터 보이게 등록한다(방을 늦게 열어도 메시지가 보인다).
+      const joinedLine = await this.chat.joinMatchChatOnApproval(tx, {
+        matchId: application.matchId,
+        hostUserId: application.match.hostUserId,
+        userId: application.applicantUserId,
+        approvedAt: now,
       });
 
       await tx.v1StatusChangeLog.create({
@@ -1335,8 +1345,10 @@ export class MatchesService {
       return {
         updated: { id: application.id, matchId: application.matchId, status: 'approved' as const },
         participant,
+        joinedLine,
       };
     });
+    if (result.joinedLine) void this.chat.deliverSystemLine(result.joinedLine);
 
     // 알림: 신청자에게 승인 안내 (fire-and-forget)
     void this.notifications.emitNotification(
@@ -1361,7 +1373,7 @@ export class MatchesService {
     this.assertApplicationHost(user, application);
 
     if (application.status !== 'requested') {
-      throw stateConflict('Only requested applications can be rejected');
+      throw stateConflict('대기 중인 신청만 거절할 수 있어요.');
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -1374,7 +1386,7 @@ export class MatchesService {
         },
       });
       if (transition.count !== 1) {
-        throw stateConflict('Only requested applications can be rejected');
+        throw stateConflict('대기 중인 신청만 거절할 수 있어요.');
       }
 
       await tx.v1StatusChangeLog.create({
@@ -1798,6 +1810,8 @@ function resolveReopenDeadline(
   if (parsed >= match.startAt) throw validationError('deadlineAt must be before startsAt', 'deadlineAt');
   return parsed;
 }
+
+const NOT_RECRUITING_APPROVAL_MESSAGE = '모집 중인 매치만 승인할 수 있어요. 마감됐거나 시작 시간이 지났어요.';
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {
   return new ConflictException({

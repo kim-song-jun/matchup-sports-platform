@@ -1,6 +1,6 @@
 /**
  * F64 — 팀매치 채팅방은 참가자 전원이 방 생성 시각부터 본다(팀 컨택 방과 같은 불변식).
- * 개인 매치·팀 방은 입장 시점부터만 보이는 규칙 그대로다(대조군).
+ * 개인 매치 방은 참가 승인 시각부터(주최자는 방 생성 시각부터) 본다. 팀 방은 입장 시점부터만(대조군).
  *
  * 조회 조건(sentAt >= visibleFromAt 등)을 직접 평가하는 in-memory fake 위에서 resolve → messages → rooms
  * 를 실제로 밟는다 — mock 이 인자를 무시하면 "나중에 들어온 사람이 못 본다"를 잡을 수 없다.
@@ -47,6 +47,7 @@ function chatWorld(kind: RoomKind) {
   const room: Row = { id: 'room-1', ...link, status: 'active', createdAt: ROOM_CREATED_AT, lastMessageAt: null };
   const participants: Row[] = [];
   const messages: Row[] = [];
+  const approvals = new Map<string, Date>();
   let sequence = 0;
   const nextId = (prefix: string) => `${prefix}-${++sequence}`;
   const profileOf = (userId: string) => ({ nickname: userId === userA.id ? 'Alice' : 'Bob', displayName: null, profileImageUrl: null });
@@ -109,6 +110,11 @@ function chatWorld(kind: RoomKind) {
     },
     // 참여 자격(assertCurrentRoomEntitlement)은 통과시킨다 — 이 스펙은 열람 경계만 본다.
     v1Match: {
+      // 개인 매치 열람 시작(matchChatHistoryFrom) — 묻는 사용자의 참가 승인 시각.
+      findUnique: jest.fn(async ({ select }: { select: Row }) => {
+        const approvedAt = approvals.get(select.participants.where.userId);
+        return { hostUserId: 'host-user', participants: approvedAt ? [{ approvedAt }] : [] };
+      }),
       findFirst: jest.fn(async () => ({
         hostUserId: 'host-user',
         participants: [userA, userB].map((user) => ({ userId: user.id, role: 'participant' })),
@@ -128,6 +134,8 @@ function chatWorld(kind: RoomKind) {
     participants,
     messages,
     as: (userId: string) => { currentUserId = userId; },
+    /** 개인 매치 참가 승인 시각을 심는다. */
+    approve: (userId: string, approvedAt: Date) => { approvals.set(userId, approvedAt); },
     /** 상대가 방에 이미 있었다는 전제 — 입장 절차를 거치지 않고 행을 심는다. */
     seedText: (senderUserId: string, body: string, sentAt: Date) => {
       messages.push({ id: nextId('message'), chatRoomId: room.id, senderUserId, body, status: 'sent', messageType: 'text', systemEventType: null, sentAt });
@@ -216,7 +224,46 @@ describe('ChatService — 팀매치 방 열람 경계 (F64)', () => {
     expect(world.participants.find((row) => row.userId === userA.id)?.visibleFromAt).toEqual(minutesAfterCreation(1));
   });
 
-  it.each<RoomKind>(['match', 'team'])('%s 방은 여전히 입장 이후 메시지만 보인다', async (kind) => {
+  it('개인 매치 방은 참가 승인 시각부터 보인다 — 승인 전 메시지는 안 보이고, 승인 뒤 늦게 열어도 그 사이 메시지는 보인다', async () => {
+    freezeClock(minutesAfterCreation(1));
+    const world = chatWorld('match');
+    const service = await makeService(world.prisma);
+    world.approve(userA.id, ROOM_CREATED_AT);
+    world.approve(userB.id, minutesAfterCreation(3));
+
+    world.as(userA.id);
+    await service.resolve(userA, resolveDto('match'));
+    await service.messages(userA, 'room-1', { limit: 30 });
+    world.seedText(userA.id, '승인 전 메시지', minutesAfterCreation(2));
+    world.seedText(userA.id, '승인 뒤 메시지', minutesAfterCreation(4));
+
+    jest.setSystemTime(minutesAfterCreation(10));
+    world.as(userB.id);
+    await service.resolve(userB, resolveDto('match'));
+    const forB = await service.messages(userB, 'room-1', { limit: 30 });
+
+    expect(textOf(forB.items)).toEqual(['승인 뒤 메시지']);
+    expect(world.participants.find((row) => row.userId === userB.id)?.visibleFromAt).toEqual(minutesAfterCreation(3));
+  });
+
+  it('이미 입장 시각으로 늦게 잡혀 있던 개인 매치 참가자는 접근하면 승인 시각으로 당겨진다', async () => {
+    freezeClock(minutesAfterCreation(10));
+    const world = chatWorld('match');
+    const service = await makeService(world.prisma);
+    world.approve(userB.id, minutesAfterCreation(1));
+    world.seedParticipant(userA.id, minutesAfterCreation(1));
+    world.seedParticipant(userB.id, minutesAfterCreation(5)); // 이전 규칙: 입장 시각부터
+    world.seedText(userA.id, '승인 뒤 입장 전 메시지', minutesAfterCreation(2));
+
+    world.as(userB.id);
+    const forB = await service.messages(userB, 'room-1', { limit: 30 });
+
+    expect(textOf(forB.items)).toEqual(['승인 뒤 입장 전 메시지']);
+    expect(world.participants.find((row) => row.userId === userB.id)?.visibleFromAt).toEqual(minutesAfterCreation(1));
+  });
+
+  it('team 방은 여전히 입장 이후 메시지만 보인다', async () => {
+    const kind: RoomKind = 'team';
     freezeClock(minutesAfterCreation(1));
     const world = chatWorld(kind);
     const service = await makeService(world.prisma);

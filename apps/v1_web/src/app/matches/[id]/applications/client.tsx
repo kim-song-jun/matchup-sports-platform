@@ -123,6 +123,10 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
       ? `${match.participantCount}/${match.capacity}명`
       : null;
   const pendingCount = items.filter((a) => a.status === 'requested').length;
+  // 정원이 찬 채로 남은 신청은 승인해도 서버가 거절한다(FULL) — 미리 막고 이유를 알려 준다.
+  const isFull =
+    typeof match.participantCount === 'number' && typeof match.capacity === 'number'
+    && match.participantCount >= match.capacity;
   const canComplete = match.canComplete === true;
   const actionPending = approveApplication.isPending || rejectApplication.isPending || changeParticipant.isPending || completeMatch.isPending;
   const eligibilityData = eligibility.data;
@@ -264,6 +268,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
                 application={application}
                 profileHref={withFromPath(`/users/${application.applicantUserId}`, applicationsSelfHref)}
                 actionPending={actionPending}
+                isFull={isFull}
                 onApprove={() => handleApprove(application)}
                 onReject={() => handleReject(application)}
                 onChangeParticipant={(reason) => handleChangeParticipant(application, reason)}
@@ -337,6 +342,7 @@ function ApplicationRow({
   application,
   profileHref,
   actionPending,
+  isFull,
   onApprove,
   onReject,
   onChangeParticipant,
@@ -345,6 +351,7 @@ function ApplicationRow({
   application: V1MatchApplication;
   profileHref: string;
   actionPending: boolean;
+  isFull: boolean;
   onApprove: () => void;
   onReject: () => void;
   onChangeParticipant: (reason: string) => void;
@@ -469,37 +476,45 @@ function ApplicationRow({
             관리
           </button>
           {actionsOpen && isPending ? (
-            <div
-              className="tm-member-actions"
-              style={{ marginTop: 12, display: 'flex', gap: 8 }}
-            >
-              <button
-                className="tm-btn tm-btn-sm tm-btn-primary"
-                type="button"
-                style={{ flex: 1 }}
-                disabled={actionPending}
-                aria-label={`${application.displayName} 승인`}
-                onClick={() => {
-                  setActionsOpen(false);
-                  onApprove();
-                }}
+            <>
+              <div
+                className="tm-member-actions"
+                style={{ marginTop: 12, display: 'flex', gap: 8 }}
               >
-                승인
-              </button>
-              <button
-                className="tm-btn tm-btn-sm tm-btn-danger"
-                type="button"
-                style={{ flex: 1 }}
-                disabled={actionPending}
-                aria-label={`${application.displayName} 거절`}
-                onClick={() => {
-                  setActionsOpen(false);
-                  onReject();
-                }}
-              >
-                거절
-              </button>
-            </div>
+                <button
+                  className="tm-btn tm-btn-sm tm-btn-primary"
+                  type="button"
+                  style={{ flex: 1 }}
+                  disabled={actionPending || isFull}
+                  aria-label={`${application.displayName} 승인`}
+                  aria-describedby={isFull ? `approve-full-${application.applicationId}` : undefined}
+                  onClick={() => {
+                    setActionsOpen(false);
+                    onApprove();
+                  }}
+                >
+                  승인
+                </button>
+                <button
+                  className="tm-btn tm-btn-sm tm-btn-danger"
+                  type="button"
+                  style={{ flex: 1 }}
+                  disabled={actionPending}
+                  aria-label={`${application.displayName} 거절`}
+                  onClick={() => {
+                    setActionsOpen(false);
+                    onReject();
+                  }}
+                >
+                  거절
+                </button>
+              </div>
+              {isFull ? (
+                <p id={`approve-full-${application.applicationId}`} className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+                  정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.
+                </p>
+              ) : null}
+            </>
           ) : null}
           {actionsOpen && canChangeParticipant ? (
             <div style={{ marginTop: 12 }}>

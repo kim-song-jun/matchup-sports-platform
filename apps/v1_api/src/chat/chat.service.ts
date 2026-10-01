@@ -563,6 +563,46 @@ export class ChatService {
     };
   }
 
+  /**
+   * 개인매치 참가 승인 — 매치 채팅방을 만들거나 찾아, 승인된 참가자를 **승인 시각부터** 보이게 등록한다.
+   * 주최자도 방 생성 시각부터 보이게 함께 등록한다(처음 승인될 때 방이 생긴다). 그래서 둘 다 방을 늦게
+   * 열어도 그 사이 메시지가 보이고, 채팅 목록·알림도 승인 순간부터 받는다. 호출자 트랜잭션 안에서 돌고,
+   * 커밋 뒤 반환된 '들어왔어요' 줄을 deliverSystemLine 으로 알린다.
+   */
+  async joinMatchChatOnApproval(
+    tx: Prisma.TransactionClient,
+    input: { matchId: string; hostUserId: string; userId: string; approvedAt: Date },
+  ): Promise<ChatSystemLine> {
+    const room = await tx.v1ChatRoom.upsert({
+      where: { matchId: input.matchId },
+      update: {},
+      create: { matchId: input.matchId, status: 'active' },
+      select: { id: true, createdAt: true },
+    });
+    await this.pullMatchChatHost(tx, room.id, input.hostUserId, room.createdAt);
+    // 승인은 늘 새 참여다(참가 중엔 다시 신청할 수 없다). 예전 참여의 행이 남아 있어도 이번 승인 시각부터
+    // 다시 본다 — 취소돼 있던 동안의 대화가 재승인 뒤에 보이면 안 된다(#1427 리뷰).
+    await tx.v1ChatRoomParticipant.upsert({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId: input.userId } },
+      update: { status: 'active', leftAt: null, lastReadMessageId: null, visibleFromAt: input.approvedAt },
+      create: { chatRoomId: room.id, userId: input.userId, status: 'active', visibleFromAt: input.approvedAt },
+    });
+    return this.recordSystemLine(tx, { chatRoomId: room.id, userId: input.userId, event: 'joined', at: input.approvedAt });
+  }
+
+  /** 주최자를 방 생성 시각부터 보이게 둔다(이미 더 이르면 그대로). 스스로 나간 방엔 다시 넣지 않는다 — 매치 상세에서 다시 열면 돌아온다. */
+  private async pullMatchChatHost(tx: Prisma.TransactionClient, chatRoomId: string, userId: string, from: Date) {
+    const existing = await tx.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId, userId } },
+      select: { id: true, status: true, visibleFromAt: true },
+    });
+    if (!existing) {
+      await tx.v1ChatRoomParticipant.create({ data: { chatRoomId, userId, status: 'active', visibleFromAt: from } });
+    } else if (existing.status === 'active' && (!existing.visibleFromAt || existing.visibleFromAt > from)) {
+      await tx.v1ChatRoomParticipant.update({ where: { id: existing.id }, data: { visibleFromAt: from } });
+    }
+  }
+
   /** 커밋된 시스템 줄을 방 참여자에게 chat:message 로 알린다. 알림함·푸시는 없고, 실패해도 던지지 않는다. */
   async deliverSystemLine(line: ChatSystemLine): Promise<void> {
     try {
@@ -856,8 +896,14 @@ export class ChatService {
   private async ensureEntered(userId: string, room: Awaited<ReturnType<ChatService['getActiveParticipantRoom']>>) {
     const participant = room.participants[0];
     // 팀매치 방은 참가자 전원이 방 생성 시각부터 본다(팀 컨택 방과 같은 불변식) — 상대 팀장이 먼저
-    // 보낸 메시지를 나중에 들어온 사람이 못 보면 안 된다. 다른 방은 입장 시점부터만 보인다.
-    const sharedHistoryFrom = room.teamMatchId ? room.createdAt : null;
+    // 보낸 메시지를 나중에 들어온 사람이 못 보면 안 된다. 개인매치 방은 참가 승인 시각부터(주최자는
+    // 방 생성 시각부터) 본다 — 승인 뒤 방을 늦게 열어도 그 사이 메시지가 보여야 한다. 다른 방은 입장
+    // 시점부터만 보인다.
+    const sharedHistoryFrom = room.teamMatchId
+      ? room.createdAt
+      : room.matchId
+        ? await this.matchChatHistoryFrom(room.matchId, room.createdAt, userId)
+        : null;
     if (participant.visibleFromAt) {
       if (sharedHistoryFrom && participant.visibleFromAt > sharedHistoryFrom) {
         // 이 규칙 이전에 입장 시각으로 잡힌 참가자 — 백필 없이 접근 시점에 당긴다.
@@ -889,6 +935,23 @@ export class ChatService {
     });
     participant.visibleFromAt = current?.visibleFromAt ?? visibleFromAt;
     return room;
+  }
+
+  /**
+   * 개인매치 방의 열람 시작 — 주최자는 방 생성 시각, 확정 참가자는 참가 승인 시각. 승인 때 등록되기 전
+   * (이 규칙 이전)에 승인된 참가자도 열람 경계가 비었거나 입장 시각으로 늦게 잡혀 있을 수 있어 여기서 당긴다.
+   */
+  private async matchChatHistoryFrom(matchId: string, roomCreatedAt: Date, userId: string): Promise<Date | null> {
+    const match = await this.prisma.v1Match.findUnique({
+      where: { id: matchId },
+      select: {
+        hostUserId: true,
+        participants: { where: { userId, status: { in: ['active', 'completed'] } }, select: { approvedAt: true } },
+      },
+    });
+    if (!match) return null;
+    if (match.hostUserId === userId) return roomCreatedAt;
+    return match.participants[0]?.approvedAt ?? null;
   }
 
   private unreadCountForMessage(

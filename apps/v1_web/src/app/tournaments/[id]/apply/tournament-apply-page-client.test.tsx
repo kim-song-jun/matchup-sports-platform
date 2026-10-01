@@ -777,4 +777,33 @@ describe('TournamentApplyPageClient GA events', () => {
       expect(cta).toHaveAttribute('href', '/tournaments/tournament-1');
     });
   });
+
+  // 내 신청 화면과 같이 쓰는 문구(getTournamentTeamEmptyState) — 리그면 "리그"라고 부른다.
+  describe('신청할 수 있는 팀이 없을 때의 안내', () => {
+    beforeEach(() => {
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1MyTeams.mockReturnValue({
+        data: { items: [makeTeam({ sport: { sportId: 'sport-running', name: '러닝' } })] },
+        isLoading: false,
+      });
+    });
+
+    it.each([
+      ['regular_league', '이 리그에 신청할 수 있는 팀이 없어요', '리그와 같은 종목'],
+      ['regular_tournament', '이 대회에 신청할 수 있는 팀이 없어요', '대회와 같은 종목'],
+    ] as const)('%s 는 "%s"', async (kind, title, description) => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ kind, status: 'open' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(await screen.findByText(title)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(description))).toBeInTheDocument();
+    });
+  });
 });

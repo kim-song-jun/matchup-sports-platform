@@ -1241,7 +1241,7 @@ function TeamRegistrationHub({
   isLeague?: boolean;
 }) {
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
-  const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
+  const emptyState = getTournamentTeamEmptyState(hasAnyTeam, isLeague);
   const canStartNewRegistration = blockReason === null;
   // 정원이 입금대기 팀으로 차 있으면 "확정 5 / 8"만 보고 여유가 있다고 오해하게 된다.
   // 재신청이 막히는 이유를 이 화면에서 바로 읽을 수 있게 정원 구성을 그대로 노출한다.

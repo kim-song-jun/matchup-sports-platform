@@ -659,4 +659,22 @@ describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () =
 
     expect(screen.getByText('이 리그는 지금 참가 신청을 받지 않아요.')).toBeInTheDocument();
   });
+
+  it('리그 종목에 맞는 팀이 없으면 "이 리그에 신청할 수 있는 팀이 없어요" — 신청 화면과 같은 문구다', () => {
+    searchParams = new URLSearchParams();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: { items: [makeTeam({ sport: { sportId: 'sport-running', name: '러닝' } })] },
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'draft' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('이 리그에 신청할 수 있는 팀이 없어요')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('대회');
+  });
 });

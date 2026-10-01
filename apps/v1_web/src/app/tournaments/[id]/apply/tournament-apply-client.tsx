@@ -306,7 +306,7 @@ function TeamSelectStep({
 }) {
   const managerTeams = teams.filter((t) => t.role === 'owner' || t.role === 'manager');
   const hasManagerTeam = managerTeams.length > 0;
-  const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
+  const emptyState = getTournamentTeamEmptyState(hasAnyTeam, tournament.kind === 'regular_league');
 
   return (
     <div style={{ padding: '0 20px 168px' }}>

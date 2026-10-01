@@ -20,6 +20,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ChatService } from '../chat/chat.service';
 import { MatchesService } from './matches.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 
@@ -134,6 +135,7 @@ describe('MatchesService', () => {
   };
 
   let notifications: { emitNotification: jest.Mock; emitNotificationToMany: jest.Mock };
+  let chat: { joinMatchChatOnApproval: jest.Mock; deliverSystemLine: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -178,11 +180,17 @@ describe('MatchesService', () => {
       emitNotificationToMany: jest.fn().mockResolvedValue(undefined),
     };
 
+    chat = {
+      joinMatchChatOnApproval: jest.fn().mockResolvedValue({ messageId: 'joined-line' }),
+      deliverSystemLine: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MatchesService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: ChatService, useValue: chat },
       ],
     }).compile();
 
@@ -421,8 +429,9 @@ describe('MatchesService', () => {
 
     await expect(service.approveApplication(host, 'app-1', {})).rejects.toThrow(ConflictException);
     await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
-      response: { code: 'FULL' },
+      response: { code: 'FULL', message: '정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.' },
     });
+    expect(chat.joinMatchChatOnApproval).not.toHaveBeenCalled();
     expect(prisma.v1MatchApplication.update).not.toHaveBeenCalled();
     // TOCTOU 방지 락이 정원 재검증보다 먼저, 올바른 matchId로 걸렸는지 확인한다.
     expect(prisma.$queryRaw).toHaveBeenCalled();
@@ -449,6 +458,21 @@ describe('MatchesService', () => {
       response: { code: 'STATE_CONFLICT' },
     });
     expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+  });
+
+  it('approveApplication: 승인과 같은 트랜잭션에서 매치 채팅에 승인 시각으로 등록하고, 커밋 뒤 입장 줄을 알린다', async () => {
+    prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1MatchParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
+
+    await service.approveApplication(host, 'app-1', {});
+
+    const approvedAt = prisma.v1MatchParticipant.upsert.mock.calls[0][0].create.approvedAt;
+    expect(chat.joinMatchChatOnApproval).toHaveBeenCalledWith(prisma, {
+      matchId: 'match-1', hostUserId: host.id, userId: applicationRow().applicantUserId, approvedAt,
+    });
+    expect(chat.deliverSystemLine).toHaveBeenCalledWith({ messageId: 'joined-line' });
   });
 
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────
@@ -1226,7 +1250,7 @@ describe('MatchesService — on-hold lifecycle', () => {
     };
     db.$transaction = async (fn: any) => fn(db);
     const notifications: any = { emitNotificationToMany: jest.fn().mockResolvedValue(undefined) };
-    return { service: new MatchesService(db, notifications), db };
+    return { service: new MatchesService(db, notifications, {} as ChatService), db };
   };
 
   it('past match with no confirmed applicants is editable on hold', async () => {

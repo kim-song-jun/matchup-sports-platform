@@ -127,7 +127,7 @@ describe('ChatService', () => {
     v1Notification: { createMany: jest.Mock };
     v1NotificationPreference: { findMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
-    v1Match: { findFirst: jest.Mock };
+    v1Match: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock };
@@ -166,6 +166,8 @@ describe('ChatService', () => {
       v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
       v1Match: {
+        // 열람 시작(matchChatHistoryFrom) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
+        findUnique: jest.fn().mockResolvedValue({ hostUserId: 'host-user', participants: [] }),
         findFirst: jest.fn().mockResolvedValue({
           hostUserId: 'host-user',
           participants: [{ userId: userA.id, role: 'participant' }],

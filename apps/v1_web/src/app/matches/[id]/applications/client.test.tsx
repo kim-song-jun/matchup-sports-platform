@@ -109,6 +109,30 @@ describe('개인 매치 신청 관리', () => {
     );
   });
 
+  function pendingApplication(match: Record<string, unknown>) {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, ...match } });
+    mocks.applications.mockReturnValue({ data: { pages: [{ items: [{
+      applicationId: 'a2', participantId: null, applicantUserId: 'u2', displayName: '대기자', status: 'requested',
+      participantStatus: null, mannerScore: null, reviewCount: 0, canCancelApproval: false, canMarkCancelled: false,
+    }] }] } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '대기자 신청 관리' }));
+  }
+
+  it('정원이 차면 남은 신청의 승인을 막고, 승인 취소로 자리를 비우면 된다고 알려 준다', () => {
+    pendingApplication({ participantCount: 2, capacity: 2 });
+    const approve = screen.getByRole('button', { name: '대기자 승인' });
+    expect(approve).toBeDisabled();
+    expect(approve).toHaveAccessibleDescription('정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.');
+    expect(screen.getByRole('button', { name: '대기자 거절' })).toBeEnabled();
+  });
+
+  it('자리가 남으면 승인할 수 있고 정원 안내는 없다', () => {
+    pendingApplication({ participantCount: 1, capacity: 2 });
+    expect(screen.getByRole('button', { name: '대기자 승인' })).toBeEnabled();
+    expect(screen.queryByText(/정원이 모두 찼어요/)).toBeNull();
+  });
+
   it('승인 취소는 사유와 확인을 거쳐 실제 참가자 ID로 요청한다', async () => {
     confirmedApplication();
     fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));

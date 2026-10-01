@@ -328,6 +328,54 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     }).expect(409);
   });
 
+  it('정원이 차면 남은 신청 승인은 409 FULL 한국어 안내이고, 기존 승인을 취소하면 승인할 수 있다', async () => {
+    const id = await createMatch({ capacity: 2 });
+    // 정원이 차기 전에 들어온 신청 — 다른 신청을 승인해 2/2 가 된 뒤에도 승인 대기로 남는다.
+    const pending = (await post(outsider, `/matches/${id}/applications`).expect(201)).body.data.applicationId;
+    const memberApplicationId = await join(id);
+    const full = await post(host, `/match-applications/${pending}/approve`).expect(409);
+    expect(full.body).toMatchObject({ code: 'FULL', message: '정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.' });
+    const memberParticipant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId: memberApplicationId } });
+    await post(host, `/match-participants/${memberParticipant.id}/cancel-approval`, { reason: '자리 양보' }).expect(201);
+    await post(host, `/match-applications/${pending}/approve`).expect(201);
+  });
+
+  it('승인하면 매치 채팅방에 승인 시각부터 등록돼, 방을 늦게 열어도 그 사이 메시지가 보인다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    const { approvedAt } = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    const room = await db.v1ChatRoom.findUniqueOrThrow({ where: { matchId: id }, include: { participants: true } });
+    expect(room.participants.find((p) => p.userId === member)).toMatchObject({ status: 'active', visibleFromAt: approvedAt });
+    expect(room.participants.find((p) => p.userId === host)).toMatchObject({ status: 'active', visibleFromAt: room.createdAt });
+
+    // 참가자가 아직 방을 열기 전에 주최자가 보낸 메시지 — 채팅 목록에 미읽음으로 뜨고, 열면 보인다.
+    await post(host, `/chat/rooms/${room.id}/messages`, { content: '토요일에 봬요' }).expect(201);
+    const listed = (await get(member, '/chat/rooms?roomType=match').expect(200)).body.data.items;
+    expect(listed.find((r: { roomId: string }) => r.roomId === room.id)).toMatchObject({ unreadCount: 1 });
+    const items = (await get(member, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items;
+    expect(items.map((m: { content: string }) => m.content)).toEqual(expect.arrayContaining(['토요일에 봬요', expect.stringContaining('들어왔어요')]));
+  });
+
+  it('이 규칙 이전에 승인된 참가자도(방 미등록·입장 시각으로 늦게 잡힘) 승인 이후 메시지를 본다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    const { approvedAt } = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    const room = await db.v1ChatRoom.findUniqueOrThrow({ where: { matchId: id } });
+    await post(host, `/chat/rooms/${room.id}/messages`, { content: '승인 뒤 첫 안내' }).expect(201);
+    // 옛 경로 재현: 승인 때 채팅 참여자로 등록되지 않았던 참가자가 나중에 매치 상세에서 방을 연다.
+    await db.v1ChatRoomParticipant.delete({ where: { chatRoomId_userId: { chatRoomId: room.id, userId: member } } });
+    await post(member, '/chat/rooms/resolve', { targetType: 'match', targetId: id }).expect(201);
+    const items = (await get(member, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items;
+    expect(items.map((m: { content: string }) => m.content)).toContain('승인 뒤 첫 안내');
+    expect(await db.v1ChatRoomParticipant.findUnique({ where: { chatRoomId_userId: { chatRoomId: room.id, userId: member } } })).toMatchObject({ visibleFromAt: approvedAt });
+
+    // 주최자도 입장 시각으로 늦게 잡혀 있었다면 방 생성 시각으로 당긴다 — 참가자가 먼저 보낸 메시지가 보인다.
+    await post(member, `/chat/rooms/${room.id}/messages`, { content: '저도 갈게요' }).expect(201);
+    await db.v1ChatRoomParticipant.update({ where: { chatRoomId_userId: { chatRoomId: room.id, userId: host } }, data: { visibleFromAt: new Date() } });
+    const hostItems = (await get(host, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items;
+    expect(hostItems.map((m: { content: string }) => m.content)).toEqual(expect.arrayContaining(['승인 뒤 첫 안내', '저도 갈게요']));
+  });
+
   it('참가자가 모두 철회된 보류 매치는 완료하지 않고 참여 이력을 늘리지 않는다', async () => {
     const id = await createMatch();
     const applicationId = await join(id);

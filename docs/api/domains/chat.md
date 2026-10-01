@@ -49,13 +49,21 @@ and therefore has no host participant row.
   /chat/rooms/:roomId/messages` returns only messages at or after it, and `PATCH
   /chat/rooms/:roomId/me` rejects `lastReadMessageId` values outside that visible window.
 - Newly created or reactivated team-chat participants set `visible_from_at` at confirmed membership
-  activation; match/team-match participants start with `visible_from_at = null` and the first room
+  activation; team-match participants start with `visible_from_at = null` and the first room
   detail/message entry sets it and creates the joined system message.
+- Personal match: approving an application (`POST /match-applications/:id/approve`) creates or finds the
+  match room in the same transaction, registers the approved participant with `visible_from_at` = the
+  approval time (`v1_match_participants.approved_at`) plus the joined system message, and registers the host
+  with `visible_from_at = room.created_at` (a host who left the room is not re-added). So the room shows in
+  both users' chat list with unread counts and notifications from approval, and opening it late still shows
+  messages sent since approval. Participants approved before this rule (no row, `null`, or an entry-time
+  boundary) are pulled back to their approval time — host: `room.created_at` — on the next room access
+  (no backfill, the same pattern as `team_match`). Messages before the approval stay hidden.
 - A `team_match` room is visible to every participant from the room's creation (`visible_from_at =
   room.created_at`, the same invariant as `team_contact`), so messages the other team's leader sent
   before this participant entered are listed and counted as unread. The joined system message is still
   created at entry time. A participant whose boundary was set to an entry time earlier is pulled back to
-  `room.created_at` on the next room access (no backfill). Match and team rooms keep the entry-time boundary.
+  `room.created_at` on the next room access (no backfill). Team rooms keep the entry-time boundary.
 - Team-membership activation creates one system message (`messageType = "system"`,
   `systemEventType = "joined"`); existing active-member repair does not duplicate it. Leaving or being
   removed from a team writes `systemEventType = "left"` (`○○님이 나갔어요` for both — the room does not

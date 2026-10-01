@@ -46,7 +46,7 @@ describe('ChatService room polish', () => {
   let service: ChatService;
   let prisma: {
     v1ChatRoom: { findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
-    v1Match: { findFirst: jest.Mock };
+    v1Match: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
     v1ChatMessage: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; count: jest.Mock };
     v1ChatRoomParticipant: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
@@ -62,6 +62,8 @@ describe('ChatService room polish', () => {
     prisma = {
       v1ChatRoom: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1Match: {
+        // 열람 시작(matchChatHistoryFrom) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
+        findUnique: jest.fn().mockResolvedValue({ hostUserId: 'host-user', participants: [] }),
         findFirst: jest.fn().mockResolvedValue({
           hostUserId: 'host-user',
           participants: [{ userId: userA.id, role: 'participant' }],

@@ -150,6 +150,10 @@
 - `GET /matches/:id/applications`는 호스트 전용이며 `status=requested|approved|rejected|withdrawn|cancelled_by_host|expired`
   필터와 cursor pagination을 지원한다. 프론트의 승인 대기·확정 명단·전체 이력 탭은 각각 이 실제
   필터를 사용하며 확정 명단에는 호스트도 별도로 표시한다.
+- 승인은 정원이 차 있으면 `409 FULL`("정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요."),
+  모집 중이 아니면(마감·시작 시각 경과·닫힘) `409 STATE_CONFLICT`를 한국어 메시지로 돌려준다. 신청자 관리
+  화면은 `participantCount >= capacity`면 남은 신청의 승인 버튼을 막고 같은 안내를 보여 준다. 승인은 같은
+  트랜잭션에서 참가자를 매치 채팅방에 승인 시각부터 등록한다(chat 계약 참고).
 - 신청자는 `requested` 신청을 철회할 수 있다. `approved` 신청도 매치 시작 전에는 철회할 수 있으며,
   같은 트랜잭션에서 연결 참가자를 `cancelled`로 바꿔 정원, 채팅 권한, 완료 집계에서 즉시 제외한다.
   시작 이후 또는 완료/취소 상태에서는 승인 참가 철회를 `409 STATE_CONFLICT`로 거절한다.

@@ -224,6 +224,32 @@ describe('push/pop 콘텐츠 이중 페이드 억제(D2안 B, 그룹2/F2) — VT
   });
 });
 
+describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹 컨텍스트를 만들지 않는다 (W5 오버레이 가림)', () => {
+  // 래퍼가 스태킹 컨텍스트면 그 안의 fixed 시트·모달은 z-index 와 무관하게 상단바·탭바·FAB·데스크톱
+  // 내비 아래에 깔린다. jsdom 은 스태킹을 못 재므로 원인이 되는 두 선언의 형태를 고정한다.
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const wrapperRules = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(([, selector, body]) => ({ selector: selector.trim(), body }))
+    .filter((rule) => rule.selector.includes('.tm-page-transition-enter'));
+
+  it('view-transition-name 은 전환 중 표시(:root[data-page-transition="active"]) 아래에서만 붙는다', () => {
+    const naming = wrapperRules.filter((rule) => /view-transition-name\s*:/.test(rule.body));
+
+    expect(naming.length).toBeGreaterThan(0);
+    for (const rule of naming) {
+      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+\.tm-page-transition-enter$/);
+      expect(rule.body).toMatch(/view-transition-name:\s*page-content/);
+    }
+  });
+
+  it('CSS 폴백 진입 애니메이션은 끝난 뒤 값을 붙잡지 않는다(fill both·forwards 금지)', () => {
+    const animated = wrapperRules.filter((rule) => /animation\s*:/.test(rule.body) && !/animation\s*:\s*none/.test(rule.body));
+
+    expect(animated.length).toBeGreaterThan(0);
+    for (const rule of animated) expect(rule.body).not.toMatch(/\b(both|forwards)\b/);
+  });
+});
+
 describe('선수 카드 무한 루프 가시성 게이트 (pcard-infinite-loop-no-visibility-gate)', () => {
   it('data-loop-paused="true" 규칙이 스윕·크레스트·프레임 발광·오로라 네 요소를 전부 잡는다', () => {
     // use-loop-pause.ts 가 세팅하는 속성을 globals.css 가 실제로 소비하는지 —

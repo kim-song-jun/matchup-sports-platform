@@ -61,9 +61,13 @@
 
 `--z-top`(90, 라우트 진행바) 위에 새로 얹을 레이어가 없다 — View Transitions는 브라우저가
 `::view-transition` 유사요소를 문서 트리 밖에 별도로 그리므로(진짜 top-layer, `dialog`의
-`::backdrop`과 유사) 우리 z-index 사다리와 경쟁하지 않는다. 셸 요소(topbar/bottom-nav)에
-`view-transition-name`을 붙이는 것은 stacking context를 새로 만드는 게 아니라 VT 스냅샷 그룹을
-지정하는 것뿐이다 — tokens.css의 "31/34/38은 정규화 보류" 결정(같은 파일 주석)과 무관하다.
+`::backdrop`과 유사) 우리 z-index 사다리와 경쟁하지 않는다.
+
+**정정(2026-10-01, W5 오버레이 가림):** `view-transition-name`이 `none`이 아닌 요소는 전환 중이
+아니어도 **stacking context를 만든다**(css-view-transitions-1 §2.1.1 "at any time"). 셸 요소는
+원래 z-index를 가진 stacking context라 영향이 없지만, 페이지 래퍼(`.tm-page-transition-enter`)에
+상시로 달면 그 안의 fixed 시트·모달이 셸 아래에 깔린다. 그래서 래퍼 이름은 전환이 도는 동안에만
+`:root[data-page-transition="active"]` 규칙으로 붙인다(§2.9).
 
 ---
 
@@ -471,22 +475,20 @@ CSS 폴백 경로(`.tm-page-transition-enter`)는 기존 전역 catch-all이 이
 
 ```tsx
 export default function RootTemplate({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="tm-page-transition-enter"
-      style={{ viewTransitionName: 'page-content' }}
-    >
-      {children}
-    </div>
-  );
+  return <div className="tm-page-transition-enter">{children}</div>;
 }
+```
+
+```css
+/* 컨트롤러가 startViewTransition 직전에 달고 transition.finished 에서 뗀다 */
+:root[data-page-transition="active"] .tm-page-transition-enter { view-transition-name: page-content; }
 ```
 
 `template.tsx`는 Next 사양상 **매 네비게이션마다 새 인스턴스로 리마운트**된다(layout.tsx와의
 핵심 차이) — 그래서 CSS 폴백의 `animation`이 매번 재생되고(§2.6), VT 경로에서는 이 리마운트
-자체가 §2.5의 "resolve 신호"가 된다. `view-transition-name: 'page-content'`를 인라인
-`style`로 주는 것은 React 표준 문법이며(camelCase CSS 프로퍼티), Next의 `<ViewTransition>`
-컴포넌트 없이도 100% 동작한다 — §2.1에서 설명했듯 유사요소 시스템은 호출 주체를 가리지 않는다.
+자체가 §2.5의 "resolve 신호"가 된다. 이름을 인라인 `style`로 상시 주면 래퍼가 상시 stacking
+context가 되므로(§1.3 정정) 전환 중 표시가 있을 때만 CSS로 붙인다. CSS 폴백 애니메이션도 같은
+이유로 fill을 `backwards`로 둔다 — `both`면 끝난 뒤에도 transform·opacity가 남는다.
 
 이 wrapper가 `.tm-scroll-area`의 자식이 되므로(Wave 1 이후: `AppChrome`이 layout.tsx로
 올라가고 `{children}`이 `.tm-scroll-area` 안에서 이 template.tsx를 거친다) 슬라이드

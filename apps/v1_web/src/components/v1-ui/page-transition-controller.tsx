@@ -28,6 +28,7 @@ export function PageTransitionController() {
     timeout?: ReturnType<typeof setTimeout>;
     transition?: ViewTransition;
   } | null>(null);
+  const activeTransitionRef = useRef<ViewTransition | null>(null);
   const firstRender = useRef(true);
 
   const settlePending = (skip = false) => {
@@ -57,9 +58,12 @@ export function PageTransitionController() {
       return;
     }
     document.documentElement.dataset.navKind = kind;
+    // 래퍼의 view-transition-name 은 이 표시가 있는 동안에만 붙는다(globals.css) — 상시로 두면
+    // 래퍼가 스태킹 컨텍스트가 되어 페이지 안 시트가 셸 아래에 깔린다. old 스냅샷 캡처 전에 달아야 한다.
+    document.documentElement.dataset.pageTransition = 'active';
     const pending: NonNullable<typeof pendingRef.current> = {};
     pendingRef.current = pending;
-    pending.transition = document.startViewTransition(
+    const transition = document.startViewTransition(
       () =>
         new Promise<void>((resolve) => {
           // 콜백이 실행되기 전에 다음 이동이나 unmount가 발생할 수 있다.
@@ -72,8 +76,17 @@ export function PageTransitionController() {
           pending.timeout = setTimeout(() => settlePending(true), MAX_PENDING_MS);
         })
     );
+    pending.transition = transition;
+    activeTransitionRef.current = transition;
+    // 연타로 앞 전환이 skip 되면 그 finished 가 뒤 전환이 도는 중에 온다 — 마지막 전환만 표시를 뗀다.
+    const release = () => {
+      if (activeTransitionRef.current !== transition) return;
+      activeTransitionRef.current = null;
+      delete document.documentElement.dataset.pageTransition;
+    };
+    void transition.finished.then(release, release);
     // skipTransition()은 ready를 reject할 수 있지만 navigation 실패는 아니다.
-    void pending.transition.ready.catch(() => undefined);
+    void transition.ready.catch(() => undefined);
   };
 
   useNavigationIntent({ onIntent: beginTransition });

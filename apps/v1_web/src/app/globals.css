@@ -9921,6 +9921,13 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    ============================================================================ */
 
 /* ── VT 경로: old/new page-content 유사요소 슬라이드+페이드 ── */
+/* 이름은 전환이 도는 동안에만 붙인다(data-page-transition 은 컨트롤러가 startViewTransition 직전에
+   달고 finished 에서 뗀다). 이름이 있는 요소는 상시 스태킹 컨텍스트라, template.tsx 에 박아 두면
+   페이지 안의 fixed 시트·모달이 z-index 와 무관하게 상단바·탭바·FAB·데스크톱 내비 아래에 깔린다. */
+:root[data-page-transition="active"] .tm-page-transition-enter {
+  view-transition-name: page-content;
+}
+
 @keyframes tm-page-slide {
   from { translate: var(--tm-slide-offset); }
   to { translate: 0; }
@@ -10049,8 +10056,10 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
    CSS.supports('view-transition-name','none') 가 참인 환경에서는 이 블록이 통째로
    적용되지 않고, VT 쪽 규칙만 남는다(최소 재현으로 0건 확인). */
 @supports not (view-transition-name: none) {
-  :root[data-nav-kind="push"] .tm-page-transition-enter { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) both; }
-  :root[data-nav-kind="pop"] .tm-page-transition-enter { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) both; }
+  /* fill 은 `backwards` — `both` 면 끝난 뒤에도 transform·opacity 가 남아 래퍼가 상시 스태킹
+     컨텍스트(+ fixed 의 기준 상자)가 된다. 끝값이 자연값이고 delay 가 0 이라 보이는 차이는 없다. */
+  :root[data-nav-kind="push"] .tm-page-transition-enter { animation: tm-page-fallback-push var(--duration-slower) var(--ease-out) backwards; }
+  :root[data-nav-kind="pop"] .tm-page-transition-enter { animation: tm-page-fallback-pop var(--duration-slower) var(--ease-out) backwards; }
   /* 탭은 VT 지원 경로와 마찬가지로 이 폴백(iOS 16/17 주 경로)에서도 애니메이션을
      걸지 않는다 -- 규칙을 아예 안 두면 "빠뜨렸나"로 읽히므로 명시적으로 none 을
      남긴다. 예전엔 여기서도 opacity 0→1 로 페이드했다(tm-page-fallback-tab, 삭제됨). */

@@ -13,11 +13,11 @@ import type { ReactNode } from 'react';
  * Wave 1(셸 승격)이 끝난 뒤에만 배선한다 — 그 전에 배선하면 아직 자체 AppChrome을 직접
  * 렌더하는 페이지의 셸까지 이 wrapper의 리마운트+애니메이션 대상이 되어 버린다
  * (app-motion-wave-plan.md §2.40).
+ *
+ * `view-transition-name` 을 여기 상시로 달지 않는다 — 이름이 있는 요소는 전환 중이 아니어도
+ * 스태킹 컨텍스트가 되어(css-view-transitions-1 §2.1.1) 페이지 안 시트·모달이 셸 아래에 깔린다.
+ * 이름은 전환이 도는 동안에만 globals.css 의 `:root[data-page-transition]` 규칙이 붙인다.
  */
 export default function RootTemplate({ children }: { children: ReactNode }) {
-  return (
-    <div className="tm-page-transition-enter" style={{ viewTransitionName: 'page-content' }}>
-      {children}
-    </div>
-  );
+  return <div className="tm-page-transition-enter">{children}</div>;
 }

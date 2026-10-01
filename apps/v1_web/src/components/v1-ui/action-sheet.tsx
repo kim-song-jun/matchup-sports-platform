@@ -63,7 +63,8 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
+      className="fixed inset-0 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
+      style={{ zIndex: 'var(--z-modal)' }}
       onClick={onBackdropClick}
     >
       <div

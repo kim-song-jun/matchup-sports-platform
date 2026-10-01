@@ -33,7 +33,7 @@ describe('PageTransitionController — search 이동에는 VT 를 걸지 않는�
     window.history.replaceState(null, '', '/tournaments');
     startViewTransition = vi.fn((cb: () => Promise<void>) => {
       updateCallbackDone = cb();
-      return { skipTransition, ready: Promise.resolve(), updateCallbackDone };
+      return { skipTransition, ready: Promise.resolve(), finished: updateCallbackDone, updateCallbackDone };
     });
     (document as unknown as { startViewTransition: unknown }).startViewTransition = startViewTransition;
     delete document.documentElement.dataset.navKind;
@@ -122,5 +122,73 @@ describe('PageTransitionController pending navigation', () => {
     expect(transitions[0].skipTransition).toHaveBeenCalledOnce();
     await expect(transitions[0].done).resolves.toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+// 래퍼(template.tsx)의 view-transition-name 은 상시로 두면 래퍼가 스태킹 컨텍스트가 되어 페이지 안
+// 시트·모달이 셸 아래에 깔린다(W5 alpha 실측). 그래서 이름은 <html data-page-transition> 이 있는
+// 동안에만 붙고(globals.css), 그 표시를 언제 달고 떼는지가 이 컨트롤러의 계약이다.
+describe('PageTransitionController — 래퍼 이름 표시(data-page-transition)는 전환이 도는 동안에만', () => {
+  type Fake = { skipTransition: ReturnType<typeof vi.fn>; finish: () => void; finished: Promise<void>; markAtStart?: string };
+  const fakes: Fake[] = [];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    route.pathname = '/tournaments';
+    window.history.replaceState(null, '', '/tournaments');
+    fakes.length = 0;
+    delete document.documentElement.dataset.pageTransition;
+    document.startViewTransition = vi.fn((callback: () => Promise<void>) => {
+      let finish!: () => void;
+      const finished = new Promise<void>((resolve) => { finish = resolve; });
+      // old 스냅샷은 호출 직후 프레임에 찍힌다 — 그 전에 표시가 붙어 있어야 page-content 로 잡힌다.
+      const markAtStart = document.documentElement.dataset.pageTransition;
+      const done = callback();
+      const fake: Fake = { skipTransition: vi.fn(() => finish()), finish, finished, markAtStart };
+      fakes.push(fake);
+      return { skipTransition: fake.skipTransition, ready: Promise.resolve(), finished, updateCallbackDone: done };
+    }) as unknown as typeof document.startViewTransition;
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
+    delete document.documentElement.dataset.pageTransition;
+    document.body.innerHTML = '';
+  });
+
+  it('startViewTransition 을 부르기 전에 표시를 달고, 전환이 끝나면 뗀다', async () => {
+    render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+
+    expect(fakes[0].markAtStart).toBe('active');
+    expect(document.documentElement.dataset.pageTransition).toBe('active');
+
+    fakes[0].finish();
+    await fakes[0].finished;
+    expect(document.documentElement.dataset.pageTransition).toBeUndefined();
+  });
+
+  it('연타로 앞 전환이 skip 돼 끝나도, 뒤 전환이 도는 동안에는 표시를 떼지 않는다', async () => {
+    render(<PageTransitionController />);
+    clickAnchor('/tournaments/abc');
+    clickAnchor('/tournaments/def');
+
+    expect(fakes).toHaveLength(2);
+    expect(fakes[0].skipTransition).toHaveBeenCalledOnce();
+    await fakes[0].finished;
+    expect(document.documentElement.dataset.pageTransition).toBe('active');
+
+    fakes[1].finish();
+    await fakes[1].finished;
+    expect(document.documentElement.dataset.pageTransition).toBeUndefined();
+  });
+
+  it('전환을 걸지 않는 검색 이동에는 표시를 달지 않는다 — 달면 뗄 finished 가 없어 상시로 남는다', () => {
+    render(<PageTransitionController />);
+    clickAnchor('/tournaments?filter=1');
+
+    expect(document.startViewTransition).not.toHaveBeenCalled();
+    expect(document.documentElement.dataset.pageTransition).toBeUndefined();
   });
 });

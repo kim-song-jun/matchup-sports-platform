@@ -73,6 +73,7 @@ import {
   matchScheduleDisplay,
   scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
+  scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
   scheduleTypeFilterOptions,
@@ -417,7 +418,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
 
   const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
 
-  const opponentTeamName = opponentMatch.data?.approvedOpponentTeam?.name ?? null;
+  const opponentTeamName = scheduleOpponentTeamName(opponentMatch.data, teamId);
   const opponent: ScheduleDetailViewModel['opponent'] =
     linkedTeamMatchId && opponentTeamName
       ? {

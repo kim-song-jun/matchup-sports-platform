@@ -319,7 +319,10 @@ export function PitchFormationEditor({
         : waiting.length > 0
           ? { text: `대기 선수를 고른 뒤 ${courtNoun}를 누르면 그 자리에 놓여요. 놓은 선수는 끌어서 옮겨요.`, live: false }
           : null;
-  const footnote = guidance?.text ?? summary;
+  // 지금 반응해야 하는 안내(live)는 코트 **위**에 둔다 — 코트 아래는 390 에서 하단 고정 저장 바에
+  // 가려져, 꽉 찬 코트에 칩을 눌러도 아무 일도 없는 것처럼 보였다(W3-V2). 설명·요약은 아래에 남는다.
+  const liveGuidance = guidance?.live ? guidance.text : null;
+  const footnote = guidance !== null && !guidance.live ? guidance.text : summary;
 
   // 모바일 진입점에 지금 무엇이 골라져 있는지 시트 안 목록과 **같은 문구**로 보여준다.
   const mobileFormationLabel =
@@ -350,8 +353,8 @@ export function PitchFormationEditor({
           className="tm-pressable"
           onClick={() => setSheetOpen(true)}
           disabled={!editable}
-          aria-haspopup="dialog"
-          aria-label={`포메이션 ${mobileFormationLabel}, 변경하기`}
+          aria-haspopup={editable ? 'dialog' : undefined}
+          aria-label={editable ? `포메이션 ${mobileFormationLabel}, 변경하기` : `포메이션 ${mobileFormationLabel}`}
           style={{
             width: '100%',
             minHeight: 56,
@@ -386,14 +389,36 @@ export function PitchFormationEditor({
               {mobileFormationLabel}
             </span>
           </span>
-          <span
-            aria-hidden="true"
-            style={{ flexShrink: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-body-lg)', lineHeight: 1 }}
-          >
-            ⌄
-          </span>
+          {editable ? (
+            <span
+              aria-hidden="true"
+              style={{ flexShrink: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-body-lg)', lineHeight: 1 }}
+            >
+              ⌄
+            </span>
+          ) : null}
         </button>
       </div>
+
+      {/* 칩을 고를 때 안내가 새로 끼어들면 코트가 밀려 다음 탭이 어긋난다 — 대기 선수가 있으면 두 줄 자리를 늘 잡아 둔다. */}
+      {liveGuidance !== null || (editable && waiting.length > 0) ? (
+        <div
+          role="status"
+          className="tm-text-caption"
+          style={{ color: 'var(--blue700)', fontWeight: 700, lineHeight: 1.5, minHeight: '3em' }}
+        >
+          {liveGuidance}
+          {selectedWaitingEntry !== null ? (
+            <button
+              type="button"
+              onClick={() => setSelectedWaitingKey(null)}
+              className="tm-btn tm-btn-ghost tm-inline-action"
+            >
+              선택 취소
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap' }}>
         {court === 'futsal' ? (
@@ -415,25 +440,8 @@ export function PitchFormationEditor({
       </div>
 
       {footnote !== null ? (
-        <div
-          role={guidance?.live ? 'status' : undefined}
-          className="tm-text-caption"
-          style={{
-            color: guidance?.live ? 'var(--blue700)' : 'var(--text-muted)',
-            fontWeight: guidance?.live ? 700 : 400,
-            lineHeight: 1.5,
-          }}
-        >
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
           {footnote}
-          {selectedWaitingEntry !== null ? (
-            <button
-              type="button"
-              onClick={() => setSelectedWaitingKey(null)}
-              className="tm-btn tm-btn-ghost tm-inline-action"
-            >
-              선택 취소
-            </button>
-          ) : null}
         </div>
       ) : null}
 
@@ -476,7 +484,8 @@ function buildFormationChangeMessage(summary: FormationChangeSummary | null): st
 /**
  * 코트 밖 선수 칩. 풋살은 코트 옆 세로 줄(코트 높이만큼, 넘치면 그 안에서 스크롤), 축구는 피치 아래
  * 가로 줄이다. 칩 이름은 공통 앞부분만 떼고 5자로 줄이지 않는다 — 전체 이름은 스크린리더 라벨에 있다.
- * 읽기 전용이면 버튼이 아니라 목록 글자로 그린다(누를 수 없는 것을 버튼으로 보이지 않게).
+ * 읽기 전용이면 버튼도, 칩 모양(테두리·알약)도 아닌 목록 글자로 그린다 — 팀장 화면의 눌리는 칩과
+ * 같아 보이면 눌러도 반응이 없는 이유를 모른다.
  */
 function WaitingChips({
   entries,
@@ -518,6 +527,13 @@ function WaitingChips({
     >
       {entries.map((entry) => {
         const selected = !slotMode && selectedKey === entry.key;
+        const readOnlyStyle: React.CSSProperties = {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 0',
+          color: 'var(--text-strong)',
+        };
         const chipStyle: React.CSSProperties = {
           display: 'flex',
           alignItems: 'center',
@@ -575,7 +591,7 @@ function WaitingChips({
                 {content}
               </button>
             ) : (
-              <span title={entry.displayName} style={chipStyle}>
+              <span title={entry.displayName} style={readOnlyStyle}>
                 {content}
               </span>
             )}

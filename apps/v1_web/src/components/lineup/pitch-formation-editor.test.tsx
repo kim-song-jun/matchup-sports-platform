@@ -50,6 +50,11 @@ function renderEditor(overrides: Partial<PitchFormationEditorProps> = {}) {
   return props;
 }
 
+/** 문서 순서상 a 가 b 보다 앞(화면에서는 위)인지. */
+function isBefore(a: Element, b: Element): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
 const waitingTwo = [
   makeEntry({ key: 'a', displayName: '선수다섯', jerseyNumber: 5 }),
   makeEntry({ key: 'b', displayName: '선수여섯', jerseyNumber: 6 }),
@@ -105,16 +110,31 @@ describe('PitchFormationEditor — 대기 칩 한 번 누르기', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '선수다섯(5번) 코트에 놓기' }));
     expect(props.onPlaceInSlot).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent('빈 자리가 없어요');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('빈 자리가 없어요');
+    // 코트 아래는 390 에서 하단 고정 저장 바에 가린다(W3-V2) — 안내는 코트보다 앞(위)에 온다.
+    expect(isBefore(status, screen.getByRole('application', { name: '코트 배치 보드' }))).toBe(true);
   });
 
   it('자유 배치에서는 칩이 "고르기"다 — 코트를 눌러야 놓인다', () => {
     const props = renderEditor({ formation: null, waiting: waitingTwo });
+    // 안내 자리는 고르기 전부터 있다 — 고를 때 새로 끼어들면 코트가 밀려 다음 탭이 어긋난다.
+    const slotBefore = screen.getByRole('status');
+    expect(slotBefore).toHaveTextContent('');
     const chip = screen.getByRole('button', { name: '선수다섯(5번) 코트에 놓기' });
     fireEvent.click(chip);
     expect(chip).toHaveAttribute('aria-pressed', 'true');
     expect(props.onPlaceInSlot).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent('선수다섯 선수를 놓을 자리를 코트에서 눌러 주세요.');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('선수다섯 선수를 놓을 자리를 코트에서 눌러 주세요.');
+    expect(isBefore(status, screen.getByRole('application', { name: '코트 배치 보드' }))).toBe(true);
+
+    expect(status).toBe(slotBefore);
+
+    fireEvent.click(within(status).getByRole('button', { name: '선택 취소' }));
+    expect(chip).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('status')).toBe(slotBefore);
+    expect(slotBefore).toHaveTextContent('');
   });
 
   it('코트 위 선수의 × 는 코트 밖으로 뺀다', () => {
@@ -176,8 +196,23 @@ describe('PitchFormationEditor — 읽기 전용(팀원)', () => {
     expect(screen.queryByRole('button', { name: /코트에 놓기$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /배치 취소$/ })).not.toBeInTheDocument();
     for (const slot of screen.getAllByRole('button', { name: /자리, 비어 있음/ })) expect(slot).toBeDisabled();
-    expect(screen.getByRole('button', { name: /^포메이션 .*변경하기$/ })).toBeDisabled();
-    expect(within(screen.getByRole('list', { name: '대기 2명' })).getByText('선수다섯')).toBeInTheDocument();
+    // 바꿀 수 없는 사람에게 "변경하기"라고 읽어 주지 않는다(W3-V3).
+    const formationEntry = screen.getByRole('button', { name: /^포메이션 / });
+    expect(formationEntry).toBeDisabled();
+    expect(formationEntry).toHaveAccessibleName('포메이션 1-2-1 · 다이아몬드 (필드 4명)');
+    expect(formationEntry).not.toHaveAttribute('aria-haspopup');
+    // 대기 이름은 팀장 화면의 눌리는 칩(테두리 알약)과 다른 모양이다.
+    const waitingName = within(screen.getByRole('list', { name: '대기 2명' })).getByTitle('선수다섯');
+    expect(waitingName.tagName).toBe('SPAN');
+    expect(waitingName.style.border).toBe('');
+    expect(waitingName.style.borderRadius).toBe('');
+  });
+
+  it('편집할 수 있는 사람의 대기 칩은 테두리 알약 버튼이다 (대조군)', () => {
+    renderEditor({ waiting: waitingTwo });
+    const chip = screen.getByRole('button', { name: '선수다섯(5번) 코트에 놓기' });
+    expect(chip.style.borderRadius).toBe('var(--radius-pill)');
+    expect(screen.getByRole('button', { name: /^포메이션 .*, 변경하기$/ })).toHaveAttribute('aria-haspopup', 'dialog');
   });
 });
 

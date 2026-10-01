@@ -115,6 +115,10 @@ describe('TacticsBoardClient — 처음 여는 풋살 보드', () => {
     expect(screen.getAllByRole('button', { name: /^2-2\s/ })[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^2-2-1\s/ })).not.toBeInTheDocument();
     expect(screen.getAllByText('5:5 경기예요. 필드 4명 대형만 보여요.')[0]).toBeInTheDocument();
+    // 정본 "선후발 없음" — 안내 띠가 선발·후보를 말하지 않는다(W3-V5).
+    const banner = screen.getByText(/팀원만 볼 수 있는 배치예요/);
+    expect(banner).toHaveTextContent('성수 FC 팀원만 볼 수 있는 배치예요. 상대 팀과 관중에게는 등번호와 이름만 공개돼요.');
+    expect(banner.textContent).not.toMatch(/선발|후보/);
   });
 
   it('팀원 전원이 대기 칩(등번호 순)이고, 한 번씩 누르면 GK → FX 순서로 코트에 앉아 그대로 저장된다', async () => {
@@ -142,6 +146,17 @@ describe('TacticsBoardClient — 처음 여는 풋살 보드', () => {
       ['선수01', true, true, null],
       ['선수02', true, false, 'FIXO'],
     ]);
+  });
+});
+
+describe('TacticsBoardClient — 페이지 여백', () => {
+  it('좌우는 셸 표준 여백이다 — 390 에서 대기 칩이 화면 끝에 붙지 않게 (W3-V4)', () => {
+    mockMembers([member('u1', '선수01', 1)]);
+    const { container } = render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    const page = container.firstElementChild as HTMLElement;
+    expect(page).toContainElement(screen.getByRole('application', { name: '코트 배치 보드' }));
+    expect(page.style.paddingLeft).toBe('var(--v1-shell-page-x)');
+    expect(page.style.paddingRight).toBe('var(--v1-shell-page-x)');
   });
 });
 
@@ -210,6 +225,16 @@ describe('TacticsBoardClient — 보는 사람', () => {
     expect(screen.getByText('코트 1명 · 대기 1명.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /코트에 놓기$|배치 취소$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
+    // 왜 못 누르는지 한 줄로 말한다(W3-V3).
+    expect(screen.getByText('보기 전용이에요. 배치는 팀장·매니저가 정해요.')).toBeInTheDocument();
+  });
+
+  it('팀장·매니저에게는 보기 전용 안내가 없다 (대조군)', () => {
+    mockMembers([member('u1', '김선발', 7), member('u2', '한대기', 3)], 'owner');
+    mockBoard(boardData({ entries: [boardEntry()] }));
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.queryByText(/보기 전용/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '한대기(3번) 코트에 놓기' })).toBeInTheDocument();
   });
 
   it('보드에 게스트(userId 없음)로 있는 사람은 같은 이름의 팀원 칩을 또 만들지 않는다', () => {

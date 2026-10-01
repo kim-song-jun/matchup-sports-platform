@@ -6,6 +6,7 @@ import type {
   V1ScheduleState,
   V1ScheduleType,
   V1ScheduleVisibility,
+  V1TeamMatch,
   V1TeamScheduleSummary,
 } from '@/types/api';
 import type { ScheduleCalendarDayModel, ScheduleCalendarModel, ScheduleListItemModel } from './team-schedules.types';
@@ -196,6 +197,23 @@ export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId:
     visibilityLabel: scheduleVisibilityLabel(schedule.visibility),
     href: `/teams/${teamId}/schedules/${schedule.id}`,
   };
+}
+
+/**
+ * 연결 경기에서 **이 일정을 가진 팀** 기준의 상대 이름. 매치 상세의 `approvedOpponentTeam` 은 호스트
+ * 기준이라 신청(원정) 팀 일정에서 그대로 쓰면 자기 팀 이름이 나온다(W3-V8, 리그 대진도 같다).
+ * 보는 팀이 어느 쪽도 아니면 추측하지 않고 null.
+ */
+export function scheduleOpponentTeamName(
+  match: Pick<V1TeamMatch, 'hostTeamId' | 'hostTeamName' | 'hostTeam' | 'approvedOpponentTeam'> | undefined,
+  scheduleTeamId: string,
+): string | null {
+  const guest = match?.approvedOpponentTeam ?? null;
+  if (!match || guest === null) return null;
+  const hostTeamId = match.hostTeam?.teamId ?? match.hostTeamId ?? null;
+  if (hostTeamId === scheduleTeamId) return guest.name;
+  if (guest.teamId === scheduleTeamId) return match.hostTeam?.name ?? match.hostTeamName ?? null;
+  return null;
 }
 
 export function scheduleRsvpDeadlineLabel(rsvpDeadlineAt: string | null): string | null {

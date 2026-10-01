@@ -18,11 +18,36 @@ describe('sharedNamePrefixLength — 보드 전원이 같은 앞부분', () => {
     expect(sharedNamePrefixLength(['AB가나다', 'AB라마바'])).toBe(0);
   });
 
-  it('떼고 나면 2자 미만이 남는 사람이 있으면 그만큼 덜 뗀다', () => {
-    // 공통부분은 "QA0929선수0" 이지만 그걸 떼면 "1"·"2" 한 글자만 남는다.
-    const names = ['QA0929선수01', 'QA0929선수02'];
+  it('떼고 나면 2자 미만이 남는 사람이 있으면 떼지 않는다', () => {
+    // "QA0929|김" 은 경계 조건을 통과하지만 한 글자만 남는다.
+    expect(sharedNamePrefixLength(['QA0929김', 'QA0929이'])).toBe(0);
+  });
+
+  it('이름이 숫자로만 갈리면 숫자 앞까지 떼지 않는다 — 이름표가 등번호처럼 읽히지 않게 (W3-V1)', () => {
+    // alpha 실측: "QA0929선수" 까지 떼어 이름표 "10"·"12", 번호 없는 원 안 글자 "1" 이 됐다.
+    const names = ['QA0929선수10', 'QA0929선수11', 'QA0929선수12', 'QA0929선수14'];
     const cut = sharedNamePrefixLength(names);
-    expect(names.map((name) => stripSharedPrefix(name, cut))).toEqual(['01', '02']);
+    expect(names.map((name) => tokenNameLabel(name, cut))).toEqual(['선수10', '선수11', '선수12', '선수14']);
+    expect(names.map((name) => tokenInitial(name, cut))).toEqual(['선', '선', '선', '선']);
+
+    const zeroPadded = ['QA0929선수01', 'QA0929선수02'];
+    const zeroCut = sharedNamePrefixLength(zeroPadded);
+    expect(zeroPadded.map((name) => stripSharedPrefix(name, zeroCut))).toEqual(['선수01', '선수02']);
+  });
+
+  it('떼고 남은 이름이 숫자로 시작하는 사람이 있으면 그 자리에서 떼지 않는다', () => {
+    const names = ['팀A 1번 골키퍼', '팀A 2번 수비'];
+    const cut = sharedNamePrefixLength(names);
+    expect(cut).toBe(0);
+    expect(names.map((name) => tokenInitial(name, cut))).toEqual(['팀', '팀']);
+  });
+
+  it('일반 이름은 그대로 둔다', () => {
+    const names = ['김민수', '박지성', '이강인'];
+    const cut = sharedNamePrefixLength(names);
+    expect(cut).toBe(0);
+    expect(names.map((name) => tokenNameLabel(name, cut))).toEqual(names);
+    expect(names.map((name) => tokenInitial(name, cut))).toEqual(['김', '박', '이']);
   });
 
   it('글자 종류가 바뀌는 자리에서만 자른다 — "수1·수2" 처럼 단어 중간을 끊지 않는다', () => {
@@ -57,7 +82,9 @@ describe('tokenInitial — 번호가 없을 때 원 안 글자', () => {
     expect(tokenInitial('김민수', 0)).toBe('김');
   });
 
-  it('빈 이름은 물음표', () => {
+  it('숫자는 건너뛰고 글자를 쓴다 — 숫자뿐인 이름·빈 이름은 물음표', () => {
+    expect(tokenInitial('7번 김철수', 0)).toBe('번');
+    expect(tokenInitial('1004', 0)).toBe('?');
     expect(tokenInitial('', 0)).toBe('?');
   });
 });

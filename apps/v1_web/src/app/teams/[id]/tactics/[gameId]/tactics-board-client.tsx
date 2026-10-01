@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -149,14 +150,28 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        // 좌우는 셸 표준 여백 — 없으면 390 에서 코트 옆 대기 칩이 화면 끝에 붙어 잘린다(W3-V4).
+        paddingTop: 16,
+        paddingLeft: 'var(--v1-shell-page-x)',
+        paddingRight: 'var(--v1-shell-page-x)',
         // 하단 고정 저장 바(.tm-fixed-cta)가 본문 끝을 덮지 않게 그 높이만큼 비운다.
         paddingBottom: canEdit ? 112 : 16,
       }}
     >
       <AlertBanner
         tone="info"
-        message={`${board.data.teamNameSnapshot} 팀원만 볼 수 있어요. 상대 팀과 관중에게는 등번호와 이름만 공개되고, 선발·후보와 배치는 나가지 않아요.`}
+        message={`${board.data.teamNameSnapshot} 팀원만 볼 수 있는 배치예요. 상대 팀과 관중에게는 등번호와 이름만 공개돼요.`}
       />
+
+      {!canEdit ? (
+        <p
+          className="tm-text-label"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, color: 'var(--text-strong)', fontWeight: 600 }}
+        >
+          <Eye size={16} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+          보기 전용이에요. 배치는 팀장·매니저가 정해요.
+        </p>
+      ) : null}
 
       {notice !== null ? <AlertBanner tone="info" message={notice} /> : null}
       {error !== null ? <AlertBanner tone="error" message={error} /> : null}

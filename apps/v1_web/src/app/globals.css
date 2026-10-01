@@ -4079,7 +4079,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-create-stepper {
-  margin-top: 8px;
+  margin-top: 12px; /* .tm-create-input 과 같은 값 — 옆 칸 입력과 윗선이 어긋나지 않게 */
   /* flex (not grid): a native <select> reports a taller intrinsic height that
      skews grid row sizing; flex centres each control by its own 48px height. */
   display: flex;
@@ -7208,16 +7208,34 @@ textarea.tm-chat-input-placeholder::placeholder {
   gap: 12px;
 }
 
+/* 모바일은 라벨을 입력 위에 두어 입력이 카드 폭을 다 쓰고, 데스크톱(≥1024)은 모든 행이
+   같은 라벨 열을 공유해 입력 시작선이 한 줄로 맞는다. */
 .tm-invitation-form-row {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
 }
 
-/* 폼 내부의 input은 .tm-input 확장 — flex 1로 버튼 옆 채움 */
 .tm-invitation-form .tm-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .tm-invitation-form-row {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: start;
+  }
+
+  /* 라벨 열 높이를 한 줄 입력(44px)과 맞춰 라벨 글자가 입력 글자와 같은 선에 놓이게 한다. */
+  .tm-invitation-form-label {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: nowrap;
+  }
 }
 
 /* 초대 카드 — 보낸 초대/받은 초대 공용 */

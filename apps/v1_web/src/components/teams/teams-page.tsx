@@ -1736,7 +1736,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
           }}
         >
           <div className="tm-invitation-form-row">
-            <label htmlFor="invite-email" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 12 }}>
+            <label htmlFor="invite-email" className="tm-text-label tm-invitation-form-label">
               이메일
             </label>
             <input
@@ -1754,7 +1754,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
             />
           </div>
           <div className="tm-invitation-form-row">
-            <label htmlFor="invite-message" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 12 }}>
+            <label htmlFor="invite-message" className="tm-text-label tm-invitation-form-label">
               메시지
               <span className="tm-text-caption" style={{ fontWeight: 400, marginLeft: 4 }}>(선택)</span>
             </label>
@@ -1763,7 +1763,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
               className="tm-input"
               value={form.message}
               placeholder="함께 하고 싶은 이유를 적어 보세요."
-              rows={2}
+              rows={3}
               maxLength={INVITE_MESSAGE_MAX_LENGTH}
               onChange={(event) => form.onMessageChange(event.target.value)}
               disabled={form.submitting}

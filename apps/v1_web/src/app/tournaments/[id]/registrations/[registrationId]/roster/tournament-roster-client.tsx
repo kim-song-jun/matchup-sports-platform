@@ -163,9 +163,9 @@ export function TournamentRosterDeadlineCard({
     : tournamentStatus && (isTerminalStatus || (deadlineState === 'upcoming' && tournamentStatus !== 'open'))
       ? tournamentStatus
       : null;
-  const seasonStatus = statusOverride ? getTournamentStatusConfig(statusOverride) : null;
-  const deadlineBadge = seasonStatus
-    ? { label: seasonStatus.label, className: seasonStatus.badgeClass }
+  const statusBadge = statusOverride ? getTournamentStatusConfig(statusOverride) : null;
+  const deadlineBadge = statusBadge
+    ? { label: statusBadge.label, className: statusBadge.badgeClass }
     : deadlineState === 'upcoming'
       ? { label: '신청 접수 중', className: 'tm-badge-green' }
       : deadlineState === 'closed'

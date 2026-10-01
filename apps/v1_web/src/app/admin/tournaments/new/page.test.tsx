@@ -561,7 +561,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
-  it('rejects promo priorities outside the API integer range for enabled cards only', () => {
+  it('rejects promo priorities outside the API integer range on enabled cards', () => {
     const state = {
       ...INITIAL_TOURNAMENT_CREATE_STATE,
       promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: true, priority: '-1' },

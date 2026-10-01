@@ -21,7 +21,6 @@ export function toTeam(team: V1Team): TeamModel {
   return {
     id,
     name: team.name,
-    logo: team.name.slice(0, 1),
     logoUrl: team.logoUrl ?? null,
     coverImageUrl: team.coverImageUrl ?? null,
     sport: sportName,

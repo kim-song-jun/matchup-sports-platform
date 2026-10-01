@@ -19,6 +19,10 @@ const PAST = new Date('2026-09-28T10:00:00.000Z');
 const LEAGUE_KICKOFF = new Date('2026-09-29T16:10:00.000Z');
 const FRIENDLY_KICKOFF = new Date('2026-10-03T10:00:00.000Z');
 const OTHER_TEAM_KICKOFF = new Date('2026-09-29T15:30:00.000Z');
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const LEAGUE_STARTED = new Date(LEAGUE_KICKOFF.getTime() + MINUTE);
+const LEAGUE_GRACE_OVER = new Date(LEAGUE_KICKOFF.getTime() + 3 * HOUR + MINUTE);
 
 const TEAM_A = 'team-a';
 const TEAM_B = 'team-b';
@@ -53,6 +57,8 @@ type LineupRow = { id: string; gameId: string; sideId: string; revision: number;
 interface FakeDb {
   lineups: LineupRow[];
   participants: Array<{ lineupId: string; userId: string }>;
+  /** 결과가 나가 `completed` 가 된 팀매치. 나머지는 `matched`. */
+  completedTeamMatchIds?: string[];
 }
 
 function toTeamMatchRow(match: FakeMatch) {
@@ -89,12 +95,15 @@ function buildPrisma(db: FakeDb) {
       ),
     },
     v1TeamMatch: {
-      findMany: jest.fn((args: { where: { status?: string; startAt?: { gte: Date }; OR?: Array<Record<string, { in: string[] }>> } }) => {
-        if (args.where.status !== 'matched') return Promise.resolve([{ leagueId: LEAGUE_ID, startAt: LEAGUE_KICKOFF }]);
+      findMany: jest.fn((args: { where: { leagueId?: unknown; status?: string; startAt?: { gte: Date }; OR?: Array<Record<string, { in: string[] }>> } }) => {
+        // 리그 주차 계산용 형제 대진 조회.
+        if (args.where.leagueId !== undefined) return Promise.resolve([{ leagueId: LEAGUE_ID, startAt: LEAGUE_KICKOFF }]);
         const teamIds = args.where.OR?.[0]?.hostTeamId?.in;
+        const statusOf = (match: FakeMatch) => (db.completedTeamMatchIds?.includes(match.id) ? 'completed' : 'matched');
         return Promise.resolve(
           MATCHES.filter(
             (match) =>
+              statusOf(match) === args.where.status &&
               match.startAt >= (args.where.startAt?.gte ?? new Date(0)) &&
               (teamIds === undefined || teamIds.includes(match.hostTeamId)),
           ).map(toTeamMatchRow),
@@ -183,12 +192,25 @@ describe('TeamUpcomingGamesService.nextForMemberships — 홈 "다음 경기"', 
     }
   });
 
-  it('리그 경기가 지나가면 그다음 친선 경기가 다음 경기가 된다', async () => {
+  it('킥오프가 지나도 결과가 나가기 전이면 3시간까지 그 경기에 머물고, 3시간이 지나면 다음 친선 경기로 넘어간다', async () => {
     const { service, moduleRef } = await buildService(emptyDb());
+    const memberships = [{ teamId: TEAM_A, role: 'member' }];
     try {
-      const afterLeague = new Date(LEAGUE_KICKOFF.getTime() + 60_000);
-      const next = await service.nextForMemberships(PLAYER_IN, [{ teamId: TEAM_A, role: 'member' }], afterLeague);
+      const at = async (now: Date) => (await service.nextForMemberships(PLAYER_IN, memberships, now))?.gameId;
+      expect(await at(LEAGUE_STARTED)).toBe('game-match-league');
+      expect(await at(new Date(LEAGUE_KICKOFF.getTime() + 3 * HOUR))).toBe('game-match-league');
+      const next = await service.nextForMemberships(PLAYER_IN, memberships, LEAGUE_GRACE_OVER);
       expect(next).toMatchObject({ gameId: 'game-match-friendly', competitionKind: 'FRIENDLY', participantCount: null });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('결과가 나가 팀매치가 완료되면 3시간 안이어도 바로 다음 경기로 넘어간다', async () => {
+    const { service, moduleRef } = await buildService({ ...emptyDb(), completedTeamMatchIds: ['match-league'] });
+    try {
+      const next = await service.nextForMemberships(PLAYER_IN, [{ teamId: TEAM_A, role: 'member' }], LEAGUE_STARTED);
+      expect(next?.gameId).toBe('game-match-friendly');
     } finally {
       await moduleRef.close();
     }
@@ -210,7 +232,7 @@ describe('TeamUpcomingGamesService.nextForMemberships — 홈 "다음 경기"', 
   });
 
   it('친선은 최신 제출본 참석명단에 든 사람만 출전 — 임시 저장만 있으면 아무도 아니고, 다시 열린 초안은 제출본을 밀어내지 않는다', async () => {
-    const afterLeague = new Date(LEAGUE_KICKOFF.getTime() + 60_000);
+    const afterLeague = LEAGUE_GRACE_OVER;
     const memberships = [{ teamId: TEAM_A, role: 'member' }];
     const submitted: FakeDb = {
       lineups: [{ id: 'lineup-1', gameId: 'game-match-friendly', sideId: 'side-match-friendly-home', revision: 1, state: 'SUBMITTED' }],
@@ -305,6 +327,18 @@ describe('TeamUpcomingGamesService.listForTeam — 팀 상세 "다가오는 경�
 
       expect(view(asIn.items)).toEqual({ 'game-match-league': true, 'game-match-friendly': false });
       expect(view(asOut.items)).toEqual({ 'game-match-league': false, 'game-match-friendly': true });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('킥오프가 지난 경기는 결과 전이어도 바로 빠진다 — 3시간 머무는 것은 홈 "다음 경기" 뿐이다', async () => {
+    const { service, moduleRef } = await buildService(db());
+    try {
+      const list = await service.listForTeam({ id: PLAYER_IN } as never, TEAM_A, LEAGUE_STARTED);
+      const home = await service.nextForMemberships(PLAYER_IN, [{ teamId: TEAM_A, role: 'member' }], LEAGUE_STARTED);
+      expect(list.items.map((item) => item.gameId)).toEqual(['game-match-friendly']);
+      expect(home?.gameId).toBe('game-match-league');
     } finally {
       await moduleRef.close();
     }

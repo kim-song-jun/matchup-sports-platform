@@ -69,7 +69,7 @@ describe('AdminTeamsPage — 보관(archived)이 막히면', () => {
     memberCount: 5, managerCount: 1, status: 'active', createdAt: '2026-09-01T00:00:00.000Z',
   };
   const serverError = (code: string, message: string, details: unknown) =>
-    new V1ApiError({ status: 'error', statusCode: code === 'TEAM_DISSOLVE_BLOCKED' ? 409 : 403, code, message, details, timestamp: '2026-10-01T00:00:00.000Z' });
+    new V1ApiError({ status: 'error', statusCode: code.startsWith('TEAM_') ? 409 : 403, code, message, details, timestamp: '2026-10-01T00:00:00.000Z' });
 
   beforeEach(() => {
     hooks.capabilities = ['status:write'];
@@ -117,6 +117,27 @@ describe('AdminTeamsPage — 보관(archived)이 막히면', () => {
     expect(screen.getByRole('dialog')).toBe(dialog);
   });
 
+  it('보관을 풀 때 409 TEAM_RESTORE_NAME_TAKEN 이면 창 안에 이유와 팀 상세(이름 바꾸기)로 가는 길을 남긴다', () => {
+    hooks.teams.mockReturnValue({
+      data: { items: [{ ...row, status: 'archived' }], pageInfo: { page: 1, totalPages: 1, total: 1, limit: 20 }, summary: { total: 1, byStatus: { archived: 1 } } },
+      isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    hooks.mutate.mockImplementation((_vars, options: { onError: (err: unknown) => void }) =>
+      options.onError(serverError('TEAM_RESTORE_NAME_TAKEN', '같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.', null)),
+    );
+    render(<AdminTeamsPage />);
+    fireEvent.click(screen.getAllByRole('button', { name: '마포 FC 상태 변경' })[0]);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('변경할 상태'), { target: { value: 'active' } });
+    fireEvent.change(within(dialog).getByLabelText(/사유/), { target: { value: '복구 요청' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인' }));
+
+    const alert = within(dialog).getByRole('alert');
+    expect(alert).toHaveTextContent('같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.');
+    expect(within(alert).getByRole('link', { name: '팀 상세에서 이름 바꾸기' })).toHaveAttribute('href', '/admin/teams/team-1');
+    expect(screen.getByRole('dialog')).toBe(dialog);
+  });
+
   it('다른 거절은 지금처럼 토스트로만 알리고 모달에 목록을 남기지 않는다', () => {
     hooks.mutate.mockImplementation((_vars, options: { onError: (err: unknown) => void }) =>
       options.onError(serverError('PERMISSION_DENIED', '권한이 없어요.', null)),
@@ -124,6 +145,7 @@ describe('AdminTeamsPage — 보관(archived)이 막히면', () => {
     const dialog = submitArchive();
 
     expect(within(dialog).queryByRole('list', { name: '보관을 막는 항목' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: '팀 상세에서 이름 바꾸기' })).not.toBeInTheDocument();
     expect(screen.getByText('권한이 없어요.')).toBeInTheDocument();
   });
 });

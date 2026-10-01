@@ -1,3 +1,5 @@
+import { displayInitials } from '@/lib/display-initials';
+
 /**
  * 코트 위 선수 표기 규칙(Task 180 H7 · N-1). 44px 토큰과 그 아래 이름표에 들어갈 글자를 정한다.
  *
@@ -66,8 +68,7 @@ export function tokenNameLabel(name: string, prefixLength: number): string {
   return chars.length <= TOKEN_NAME_MAX ? chars.join('') : `${chars.slice(0, TOKEN_NAME_MAX - 1).join('')}…`;
 }
 
-/** 번호 없는 토큰의 원 안 글자 — 규칙 2. 숫자·공백이 아닌 첫 글자, 없으면(빈 이름·숫자뿐) 물음표. */
+/** 번호 없는 토큰의 원 안 글자 — 규칙 2. 등번호로 읽히지 않게 숫자도 건너뛴 첫 글자, 없으면(빈 이름·숫자뿐) 물음표. */
 export function tokenInitial(name: string, prefixLength: number): string {
-  const chars = Array.from(stripSharedPrefix(name, prefixLength));
-  return chars.find((ch) => charClass(ch) !== 'digit' && charClass(ch) !== 'space') ?? '?';
+  return displayInitials(stripSharedPrefix(name, prefixLength), { fallback: '?', lettersOnly: true });
 }

@@ -18,3 +18,11 @@ describe('displayInitials (F54)', () => {
     expect(displayInitials(null, { fallback: '채' })).toBe('채');
   });
 });
+
+describe('displayInitials lettersOnly — 숫자가 등번호로 읽히는 자리', () => {
+  it('숫자까지 건너뛰고, 글자가 없으면 대체 글자', () => {
+    expect(displayInitials('(QA0929) 7번', { fallback: '?', lettersOnly: true })).toBe('Q');
+    expect(displayInitials('10 김철수', { fallback: '?', lettersOnly: true })).toBe('김');
+    expect(displayInitials('1004', { fallback: '?', lettersOnly: true })).toBe('?');
+  });
+});

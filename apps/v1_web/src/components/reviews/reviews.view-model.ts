@@ -8,6 +8,7 @@ import type {
   ReviewTargetViewModel,
 } from './reviews.types';
 import type { V1ReceivedReviewDetail, V1ReviewListResponse, V1ReviewReceivedResponse, V1ReviewSourceResponse, V1ReviewSourceType, V1ReviewTarget } from '@/types/api';
+import { displayInitials } from '@/lib/display-initials';
 
 export const REVIEW_TAG_OPTIONS = [
   { code: 'manner', label: '매너가 좋아요' },
@@ -202,7 +203,7 @@ function lockReasonLabel(lockReason: string | null) {
 export function toTargetViewModel(target: V1ReviewTarget, showReviewerTeam = false): ReviewTargetViewModel {
   return {
     ...target,
-    initials: initials(target.name),
+    initials: displayInitials(target.name, { fallback: '리뷰', count: 2 }),
     statusLabel: target.alreadySubmitted || target.review ? '작성됨' : target.locked ? '잠김' : '대기',
     reviewerTeamLabel: showReviewerTeam && target.reviewerTeam ? `${target.reviewerTeam.name} 대표로 작성` : null,
     lockReasonLabel: lockReasonLabel(target.lockReason),
@@ -288,10 +289,6 @@ function averageRating(reviews: V1ReceivedReviewDetail[]) {
   if (reviews.length === 0) return '-';
   const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
   return average.toFixed(average % 1 === 0 ? 0 : 1);
-}
-
-function initials(name: string) {
-  return name.trim().slice(0, 2) || '리뷰';
 }
 
 function isTeamReviewSource(sourceType: V1ReviewSourceType) {

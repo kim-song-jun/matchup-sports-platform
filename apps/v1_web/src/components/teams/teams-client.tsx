@@ -996,7 +996,6 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
   return {
     id: team.teamId,
     name: team.name,
-    logo: team.name.slice(0, 1),
     logoUrl: team.profile.logoUrl ?? null,
     coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,

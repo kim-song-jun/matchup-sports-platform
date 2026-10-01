@@ -112,6 +112,17 @@ describe('AdminPopupsPage', () => {
     }
   });
 
+  // 모바일 가로 넘침(#1463): fieldset 은 기본 min-inline-size: min-content 라 flex-col 자식일 때 안쪽 입력 고유 폭만큼 늘어난다.
+  it('lets the editor fieldsets shrink below their content width with min-w-0', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+    await user.click(screen.getByRole('button', { name: '새 팝업' }));
+
+    const fieldsets = screen.getByLabelText('팝업 생성').querySelectorAll('fieldset');
+    expect(fieldsets).toHaveLength(2);
+    fieldsets.forEach((fieldset) => expect(fieldset).toHaveClass('min-w-0'));
+  });
+
   // 대회별 팝업 화면을 없애고 이 화면 하나로 합쳤다 — 대회 어드민의 '팝업' 항목이 넘겨주는
   // `?targetPath=/tournaments/<id>` 가 곧 "이 대회의 팝업"이라는 유일한 연결고리다.
   it('opens the create form prefilled from a targetPath deep link', async () => {

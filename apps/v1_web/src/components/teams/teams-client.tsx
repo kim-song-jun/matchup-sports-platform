@@ -20,6 +20,7 @@ import {
   useV1RemoveTeamMembership,
   useV1ResolveChatRoom,
   useV1SendTeamInvitation,
+  useV1TeamCompetitionEntries,
   useV1TeamContactSummary,
   useV1TeamDetail,
   useV1TeamInvitations,
@@ -49,6 +50,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TOAST_DURATION_MS, useToast } from '@/components/v1-ui/toast';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { DissolvedTeamView } from './dissolved-team-view';
+import { toCompetitionEntryRows } from './team-competition-entries-section';
 import { MemberUnavailabilitySheet } from '@/components/game-roster/member-unavailability-sheet';
 import { MyUnavailabilityNotice } from '@/components/game-roster/my-unavailability-notice';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -274,8 +276,12 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
    * 대진을 만들 때까지 팀은 자기 참가 사실을 알 수 없었다(2026-08-21 재감사, alpha 의
    * draft 티어 리그 참가팀이 team-matches 0건인 것으로 확인). D-2 가 "참가 인지는
    * 노출로 푼다"고 한 이상 이 경로는 참가 테이블을 봐야 한다. */
+  // 팀원은 신청 상태·명단 입구까지 담은 "참가 중인 대회·리그"(R-1 B)를 보고, 비회원은 공개 리그 목록을 본다.
+  const memberView = authVerified && isTeamMemberRole(query.data?.viewer.role);
+  const entriesQuery = useV1TeamCompetitionEntries(teamId, { enabled: memberView });
   const myLeaguesQuery = useV1LeagueMatches(
     { teamId, limit: 50 },
+    { enabled: !memberView },
   );
   const myLeagues = (myLeaguesQuery.data?.items ?? []).map((item) => ({
     leagueId: item.leagueId,
@@ -449,6 +455,15 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     // 같은 쿼리를 다시 부르게 한다.
     myLeaguesError: myLeaguesQuery.isError,
     onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
+    competitionEntries: memberView
+      ? {
+          rows: entriesQuery.data ? toCompetitionEntryRows(entriesQuery.data, selfHref) : [],
+          viewerCanManageRoster: entriesQuery.data?.viewerCanManageRoster ?? false,
+          loading: entriesQuery.isLoading,
+          error: entriesQuery.isError,
+          onRetry: () => void entriesQuery.refetch(),
+        }
+      : undefined,
   };
 
   return <TeamDetailPageView model={model} />;

@@ -55,6 +55,8 @@ import { TournamentResultReviewService } from '../tournament-operations/results/
 import { PublicRecordsModule } from '../games/public-records/public-records.module';
 import { TournamentPeriodSettingsController } from './competition-config/tournament-period-settings.controller';
 import { TournamentPeriodSettingsService } from './competition-config/tournament-period-settings.service';
+import { TeamCompetitionEntriesController } from './team-competition-entries.controller';
+import { TeamCompetitionEntriesService } from './team-competition-entries.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -90,6 +92,7 @@ import { TournamentPeriodSettingsService } from './competition-config/tournament
     TournamentsReadController,
     TournamentResultReviewController,
     TournamentPeriodSettingsController,
+    TeamCompetitionEntriesController,
   ],
   providers: [
     MockTournamentSeedService,
@@ -107,6 +110,7 @@ import { TournamentPeriodSettingsService } from './competition-config/tournament
     TournamentCampaignReadService,
     TournamentCampaignAdminService,
     TournamentCampaignStatusService,
+    TeamCompetitionEntriesService,
     OptionalV1AuthGuard,
     V1AuthGuard,
     TournamentStaffAccessService,

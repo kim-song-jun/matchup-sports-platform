@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { TeamCompetitionEntriesModel } from './team-competition-entries-section';
 
 export type TeamStatus = 'open' | 'reviewing' | 'closed' | 'mine';
 
@@ -140,6 +141,11 @@ export type TeamDetailViewModel = {
    */
   myLeaguesError?: boolean;
   onRetryMyLeagues?: () => void;
+  /**
+   * 활성 팀원에게만 — "참가 중인 대회·리그"(Task 180 R-1 B). 있으면 "내 리그" 대신 그린다.
+   * 신청 상태·신청 id 는 팀 내부 정보라 비회원은 공개 리그 목록("내 리그")을 그대로 본다.
+   */
+  competitionEntries?: TeamCompetitionEntriesModel;
 };
 
 export type TeamFormMode = 'create' | 'edit';

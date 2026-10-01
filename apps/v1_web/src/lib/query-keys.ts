@@ -57,6 +57,7 @@ export const v1Keys = {
   teamLineupPresets: (teamId: string) => [...v1Keys.team(teamId), 'lineup-presets'] as const,
   lineupTodos: () => [...v1Keys.all, 'me', 'lineup-todos'] as const,
   teamUpcomingGames: (teamId: string) => [...v1Keys.team(teamId), 'upcoming-games'] as const,
+  teamCompetitionEntries: (teamId: string) => [...v1Keys.team(teamId), 'competition-entries'] as const,
   tacticsBoard: (teamId: string, gameId: string) =>
     [...v1Keys.team(teamId), 'tactics-board', gameId] as const,
   /** Task 179 — 경기 한 사이드의 변경 기록 접두사(조정 뒤 무효화 단위). */

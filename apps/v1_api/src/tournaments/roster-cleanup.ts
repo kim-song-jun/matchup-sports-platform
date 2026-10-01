@@ -38,6 +38,33 @@ export function isRosterMutableTournament(tournament: {
   return tournament.kind === V1CompetitionKind.regular_league && tournament.status === V1TournamentStatus.draft;
 }
 
+/** 참가 명단을 못 바꾸는 이유 하나. 웹 `lib/roster-editability.ts` 의 사유 이름과 같다. */
+export type RosterBlockReason = 'closed' | 'locked' | 'cancelled' | 'deadline';
+
+/**
+ * 명단 수정 경로(409)와 팀 참가 목록(표시)이 같은 판정을 쓴다 — 순서는 종료 > 잠금 > 취소 > 제출 마감.
+ * `allowLockedAndExpired` 는 어드민 경로 전용으로 잠금·마감만 넘긴다.
+ */
+export function rosterBlockReason(
+  registration: { status: string; rosterLockedAt: Date | null; rosterDeadlineOverrideAt: Date | null },
+  tournament: { rosterDeadlineAt: Date | null } & Parameters<typeof isRosterMutableTournament>[0],
+  options: { allowLockedAndExpired?: boolean } = {},
+  now: Date = new Date(),
+): RosterBlockReason | null {
+  if (!isRosterMutableTournament(tournament)) return 'closed';
+  if (!options.allowLockedAndExpired && registration.rosterLockedAt) return 'locked';
+  if (registration.status === 'cancel_requested' || registration.status === 'cancelled') return 'cancelled';
+  if (
+    !options.allowLockedAndExpired &&
+    tournament.rosterDeadlineAt &&
+    now > tournament.rosterDeadlineAt &&
+    !registration.rosterDeadlineOverrideAt
+  ) {
+    return 'deadline';
+  }
+  return null;
+}
+
 /** 위 규칙의 Prisma 조건 — 정리 쿼리가 같은 집합을 본다. */
 export const ROSTER_MUTABLE_TOURNAMENT_WHERE = {
   OR: [

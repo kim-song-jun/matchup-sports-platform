@@ -40,6 +40,7 @@
 | POST | `/teams/:teamId/dissolve` | Yes(owner) | 팀 해체(보관) — body `{ confirmTeamName }` |
 | POST | `/teams/:teamId/restore` | Yes(owner) | 해체 30일 안 복구 |
 | GET | `/me/dissolved-teams` | Yes | 내가 팀장인 해체한 팀 목록 |
+| GET | `/teams/:teamId/competition-entries` | Yes(active member) | 이 팀의 대회·리그 신청과 참가 명단 수정 가능 여부 |
 
 `teams.controller.ts`에는 `/teams/:teamId/hub`, `DELETE /teams/:teamId`, `POST/PATCH/DELETE
 /teams/:teamId/members(/:userId)`, `/teams/:teamId/apply`, `GET /teams/me` 라우트가 없다 —
@@ -293,6 +294,24 @@ CAUTION:
   재발급으로 무효 410 `TEAM_INVITE_LINK_REVOKED` · 해체된 팀 410 `TEAM_NOT_ACTIVE`.
 - 레이트 리밋(프로덕션): 만들기·재발급·가입 신청 10회/분, 미리보기 30회/분, 여러 명 초대 10회/분.
 
+## GET /teams/:teamId/competition-entries (Task 180 R-1 B)
+
+팀 상세 "참가 중인 대회·리그" 목록. 신청 상태·신청 id 는 팀 내부 정보라 **활성 팀원만** 본다 —
+팀이 없으면 404 `TEAM_NOT_FOUND`, 팀원이 아니면 403 `PERMISSION_DENIED`(비회원 화면은 공개 리그 목록
+`GET /league-matches?teamId=` 를 그대로 쓴다).
+
+- 응답 `{ teamId, viewerCanManageRoster, items: [...] }` — `viewerCanManageRoster` 는 보는 사람이 팀장·매니저인지.
+- 항목: `competitionId · competitionKind(regular_tournament | regular_league | null) · title · status ·
+  scheduledAt · scheduledEndAt · registrationId · registrationStatus · playerCount · rosterDeadlineAt ·
+  rosterEditable · rosterBlockedBy`.
+- 대회·리그를 함께 담는다. **취소(`cancelled`)된 신청은 빼고**, 종료·취소된 대회는 맨 아래(최근에 끝난 순)에
+  둔다. 나머지는 시작이 이른 순.
+- `rosterEditable`·`rosterBlockedBy` 는 참가 명단 수정 API 와 **같은 판정**(`roster-cleanup.ts` 의
+  `rosterBlockReason`)이다 — `closed`(종료·취소·공개 전 대회, 정규 리그 초안은 수정 가능) > `locked`(운영진 잠금) >
+  `cancelled`(취소 요청 중) > `deadline`(명단 제출 마감, 운영진 예외가 있으면 통과). 팀장·매니저 기준이며 보는
+  사람의 역할은 `viewerCanManageRoster` 로 따로 본다.
+- `playerCount` 는 빠지지 않은 참가 명단 선수 수.
+
 ## Frontend Mapping Notes
 
 - `/me/teams` 원응답은 membership 배열이며, `useMyTeams`가 `MyTeam`으로 평탄화한다.
@@ -312,6 +331,7 @@ CAUTION:
 - `apps/v1_api/src/teams/teams.service.ts`
 - `apps/v1_api/src/teams/team-dissolution*.ts`
 - `apps/v1_api/src/teams/team-invite-link*.ts`
+- `apps/v1_api/src/tournaments/team-competition-entries.*.ts`
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`

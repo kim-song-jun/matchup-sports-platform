@@ -26,6 +26,7 @@ import type {
   V1Settings,
   V1Sport,
   V1Team,
+  V1TeamCompetitionEntries,
   V1TeamMatch,
   V1User,
 } from '@/types/api';
@@ -320,6 +321,42 @@ export const v1MatchesFixture: V1Match[] = [
     host: { userId: 'user-host-1', displayName: '지훈', profileImageUrl: null, trustState: 'trusted' },
   },
 ];
+
+/** 팀 상세 "참가 중인 대회·리그" — 고칠 수 있는 리그 하나와 제출 마감이 지난 대회 하나. */
+export const v1TeamCompetitionEntriesFixture: V1TeamCompetitionEntries = {
+  teamId: 'team-1',
+  viewerCanManageRoster: true,
+  items: [
+    {
+      competitionId: 'league-1',
+      competitionKind: 'regular_league',
+      title: '가을 정규 리그',
+      status: 'draft',
+      scheduledAt: '2026-10-10T01:00:00.000Z',
+      scheduledEndAt: '2026-12-20T01:00:00.000Z',
+      registrationId: 'registration-league-1',
+      registrationStatus: 'confirmed',
+      playerCount: 10,
+      rosterDeadlineAt: null,
+      rosterEditable: true,
+      rosterBlockedBy: null,
+    },
+    {
+      competitionId: 'tournament-1',
+      competitionKind: 'regular_tournament',
+      title: '성수 풋살컵',
+      status: 'in_progress',
+      scheduledAt: '2026-10-04T01:00:00.000Z',
+      scheduledEndAt: '2026-10-05T09:00:00.000Z',
+      registrationId: 'registration-1',
+      registrationStatus: 'confirmed',
+      playerCount: 7,
+      rosterDeadlineAt: '2026-09-26T14:59:00.000Z',
+      rosterEditable: false,
+      rosterBlockedBy: 'deadline',
+    },
+  ],
+};
 
 export const v1TeamsFixture: V1Team[] = [
   {

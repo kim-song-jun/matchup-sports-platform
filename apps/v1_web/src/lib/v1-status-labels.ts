@@ -390,32 +390,37 @@ export function genderRuleLabel(value: string | null | undefined): string {
   return (GENDER_RULE_OPTIONS as readonly string[]).includes(value ?? '') ? (value as string) : '';
 }
 
-/** 대회·리그 참가 신청 상태 배지 — 내 신청 화면과 대회·리그 상세 "우리 팀 참가" 카드가 같은 색·말을 쓴다. */
+type RegistrationTone = 'grey' | 'blue' | 'orange' | 'green' | 'red';
+
+const REGISTRATION_TONE: Record<RegistrationTone, { badgeClass: string; textColor: string }> = {
+  grey: { badgeClass: 'tm-badge-grey', textColor: 'var(--text-muted)' },
+  blue: { badgeClass: 'tm-badge-blue', textColor: 'var(--blue700)' },
+  orange: { badgeClass: 'tm-badge-orange', textColor: 'var(--orange700)' },
+  green: { badgeClass: 'tm-badge-green', textColor: 'var(--green700)' },
+  red: { badgeClass: 'tm-badge-red', textColor: 'var(--red700)' },
+};
+
+const REGISTRATION_STATUS: Record<V1TournamentRegistrationStatus, { tone: RegistrationTone; label: string }> = {
+  draft: { tone: 'grey', label: '임시저장' },
+  submitted: { tone: 'blue', label: '운영진 확인 중' },
+  awaiting_payment: { tone: 'orange', label: '입금 대기' },
+  payment_checking: { tone: 'blue', label: '명단 확인 중' },
+  paid: { tone: 'blue', label: '결제 완료' },
+  confirmed: { tone: 'green', label: '참가 확정' },
+  waitlisted: { tone: 'orange', label: '대기 중' },
+  cancel_requested: { tone: 'red', label: '취소 요청 중' },
+  cancelled: { tone: 'grey', label: '취소' },
+};
+
+/**
+ * 대회·리그 참가 신청 상태 — 내 신청 화면·대회/리그 상세 "우리 팀 참가" 카드·팀 상세 "참가 중인 대회·리그"가
+ * 같은 색·말을 쓴다. 배지는 `badgeClass`, 줄 안의 글자는 `textColor`. 모르는 값은 영문 코드 대신 한글로.
+ */
 export function tournamentRegistrationStatusConfig(status: V1TournamentRegistrationStatus): {
   badgeClass: string;
+  textColor: string;
   label: string;
 } {
-  switch (status) {
-    case 'draft':
-      return { badgeClass: 'tm-badge-grey', label: '임시저장' };
-    case 'submitted':
-      return { badgeClass: 'tm-badge-blue', label: '운영진 확인 중' };
-    case 'awaiting_payment':
-      return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
-    case 'payment_checking':
-      return { badgeClass: 'tm-badge-blue', label: '명단 확인 중' };
-    case 'paid':
-      return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
-    case 'confirmed':
-      return { badgeClass: 'tm-badge-green', label: '참가 확정' };
-    case 'waitlisted':
-      return { badgeClass: 'tm-badge-orange', label: '대기 중' };
-    case 'cancel_requested':
-      return { badgeClass: 'tm-badge-red', label: '취소 요청 중' };
-    case 'cancelled':
-      return { badgeClass: 'tm-badge-grey', label: '취소' };
-    default:
-      // 모르는 값은 영문 코드 대신 한글로(이 모듈 머리 주석).
-      return { badgeClass: 'tm-badge-grey', label: '상태 확인 중' };
-  }
+  const entry: { tone: RegistrationTone; label: string } = REGISTRATION_STATUS[status] ?? { tone: 'grey', label: '상태 확인 중' };
+  return { ...REGISTRATION_TONE[entry.tone], label: entry.label };
 }

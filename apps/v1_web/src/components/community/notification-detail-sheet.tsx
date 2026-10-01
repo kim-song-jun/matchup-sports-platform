@@ -6,6 +6,7 @@ import type { NotificationModel } from './community.types';
 import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 interface NotificationDetailSheetProps {
   /** null이면 닫힌 상태 — 열려 있는 동안에만 알림 모델을 넘긴다. */
@@ -94,14 +95,8 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
   // body 스크롤 잠금도 시트가 사라진 뒤에 푼다 — 닫히는 중에 풀면 시트가 아직
   // 화면에 있는데 뒤 화면이 스크롤된다.
   useEffect(() => {
-    if (mounted) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!mounted) return;
+    return lockBodyScroll();
   }, [mounted]);
 
   // 닫히는 동안 보여줄 내용을 붙들어 둔다 — notification 이 곧 열림 상태라

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 export function useTournamentInquiryDialog(onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -34,11 +35,10 @@ export function useTournamentInquiryDialog(onClose: () => void) {
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const releaseScroll = lockBodyScroll();
     dialogRef.current?.querySelector<HTMLSelectElement>('select')?.focus();
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       const previousFocus = previousFocusRef.current;
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };

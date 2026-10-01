@@ -4,6 +4,7 @@
  * 고정돼 있지 않던) 동작을 여기서 고정한다.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useModalA11y } from './use-modal-a11y';
 
@@ -116,6 +117,43 @@ describe('useModalA11y', () => {
     expect(document.body.style.overflow).toBe('hidden');
     outer.unmount();
     inner.unmount();
+  });
+
+  it('시트에서 다른 시트로 넘어가도 잠금이 이어지고, 둘 다 닫히면 원래 값으로 돌아온다', async () => {
+    // 팀 멤버 ⋯ 시트 → 결장 기간 시트와 같은 모양: 앞 시트는 open=false 로 DOM 을 걷고(잠금 해제는
+    // 다음 커밋), 뒤 시트는 open=true 로 마운트돼 첫 커밋에서 잠근다 — 해제가 잠금보다 늦게 온다.
+    function Flow() {
+      const [step, setStep] = useState<'first' | 'second' | 'done'>('first');
+      return (
+        <>
+          <TestModal open={step === 'first'} onClose={() => {}} />
+          {step === 'first' ? (
+            <button type="button" onClick={() => setStep('second')}>다음 시트</button>
+          ) : null}
+          {step !== 'first' ? <MountedModal open={step === 'second'} onClose={() => setStep('done')} /> : null}
+        </>
+      );
+    }
+    render(<Flow />);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 시트' }));
+    // 앞 시트만 닫혔다 — 뒤 시트가 떠 있으니 아직 잠겨 있어야 한다
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('잠그기 전에 있던 인라인 값은 마지막 오버레이가 닫힐 때 그대로 돌아온다', () => {
+    document.body.style.overflow = 'clip';
+    const { rerender } = render(<TestModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<TestModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('clip');
+    document.body.style.overflow = '';
   });
 
   it('라디오 그룹이 있어도 Tab 이 다이얼로그 밖으로 새지 않는다', () => {

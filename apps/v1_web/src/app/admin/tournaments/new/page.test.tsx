@@ -188,7 +188,7 @@ function goToParticipationStep() {
 
 describe('AdminTournamentsNewPage four-step wizard', () => {
   // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
-  // 자동 제안된 마감(D-3/D-7)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // 자동 제안된 신청 마감(D-3)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
   // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
   // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
   // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
@@ -313,7 +313,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
   });
 
-  it('T2 proposes D-3 registration and D-7 roster deadlines without overwriting manual edits', () => {
+  it('T2 proposes a D-3 registration deadline without overwriting manual edits, and leaves the roster deadline empty', () => {
     renderPage();
     goToScheduleStep();
 
@@ -321,7 +321,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.change(start, { target: { value: '2026-08-15T09:00' } });
 
     expect(screen.getByLabelText(/신청 마감/)).toHaveValue('2026-08-12T23:59');
-    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('2026-08-08T23:59');
+    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('');
+    expect(screen.getByLabelText(/명단 제출 마감/)).not.toBeRequired();
 
     fireEvent.change(screen.getByLabelText(/신청 마감/), {
       target: { value: '2026-08-10T20:00' },
@@ -329,7 +330,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.change(start, { target: { value: '2026-08-22T09:00' } });
 
     expect(screen.getByLabelText(/신청 마감/)).toHaveValue('2026-08-10T20:00');
-    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('2026-08-15T23:59');
+    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('');
   });
 
   it('T3 preserves mixed gender quota values across step navigation', () => {
@@ -567,7 +568,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
 describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
   // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
-  // 자동 제안된 마감(D-3/D-7)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // 자동 제안된 신청 마감(D-3)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
   // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
   // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
   // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.

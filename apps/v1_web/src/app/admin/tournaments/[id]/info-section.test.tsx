@@ -5,15 +5,15 @@
  * '대회 정보 수정' + '기본 정보 수정', 상금은 읽기 2곳 + 편집 1곳). 아래는 그 통합이
  * 되돌아가지 않도록 "한 번만 나온다"를 고정하고, 함께 고친 권한 게이팅을 검증한다.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Tournament } from '@/types/api';
 import { TournamentInfoSection } from './info-section';
 import { TournamentAdminProvider } from './tournament-admin-context';
 
 const { hooks } = vi.hoisted(() => ({
-  hooks: { tournament: undefined as unknown, mutate: vi.fn() },
+  hooks: { tournament: undefined as unknown, mutate: vi.fn(), showToast: vi.fn() },
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -92,14 +92,14 @@ const tournament = {
   updatedAt: '2026-08-01T00:00:00.000Z',
 } as unknown as V1Tournament;
 
-function renderSection(canWrite: boolean) {
-  hooks.tournament = tournament;
+function renderSection(canWrite: boolean, overrides: Partial<V1Tournament> = {}) {
+  hooks.tournament = { ...tournament, ...overrides };
   // useV1AdminTournament/useV1UpdateTournament는 위에서 모킹되지만, CAS 충돌(409) 처리를
   // 위해 컴포넌트가 직접 부르는 useQueryClient()는 실제 QueryClientProvider가 있어야 한다.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast: vi.fn() }}>
+      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast: hooks.showToast }}>
         <TournamentInfoSection />
       </TournamentAdminProvider>
     </QueryClientProvider>,
@@ -155,5 +155,44 @@ describe('TournamentInfoSection', () => {
     // 상금 저장 버튼과 입력이 함께 잠긴다 — 예전에는 둘 다 그대로 노출됐다.
     expect(screen.queryByRole('button', { name: '상금 정보 저장' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('상품 및 상금')).toBeDisabled();
+  });
+});
+
+// 명단 마감이 신청 마감보다 앞서면 신청을 받는 중에 명단이 먼저 닫힌다. 서버도 같은 규칙으로 400 을 준다.
+describe('TournamentInfoSection — 명단 제출 마감은 신청 마감과 같거나 그 뒤', () => {
+  beforeEach(() => {
+    hooks.mutate.mockReset();
+    hooks.showToast.mockReset();
+  });
+
+  function submitEdit(edit: () => void) {
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    edit();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  }
+
+  it('신청 마감보다 앞선 명단 마감은 저장하지 않고 알린다', () => {
+    renderSection(true);
+    submitEdit(() => fireEvent.change(screen.getByLabelText('명단 제출 마감일'), { target: { value: '2026-08-20T09:00' } }));
+
+    expect(hooks.showToast).toHaveBeenCalledWith('명단 제출 마감은 신청 마감과 같거나 그 뒤여야 해요.', 'error');
+    expect(hooks.mutate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['신청 마감 뒤로', '2026-08-26T09:00'],
+    ['비우면', ''],
+  ])('대조군: 명단 마감을 %s 저장한다', (_label, value) => {
+    renderSection(true);
+    submitEdit(() => fireEvent.change(screen.getByLabelText('명단 제출 마감일'), { target: { value } }));
+
+    expect(hooks.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('순서가 어긋난 채 만들어진 대회라도 마감을 안 건드리는 수정은 막지 않는다', () => {
+    renderSection(true, { rosterDeadlineAt: '2026-08-20T00:00:00.000Z' });
+    submitEdit(() => fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } }));
+
+    expect(hooks.mutate).toHaveBeenCalledTimes(1);
   });
 });

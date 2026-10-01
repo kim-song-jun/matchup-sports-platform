@@ -15,6 +15,7 @@ import {
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
+import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import { GamesService } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
@@ -343,7 +344,7 @@ export class GameRosterService {
     });
     const rows = await tx.v1GameParticipant.findMany({
       where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
-      select: { lineupId: true, userId: true },
+      select: { id: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true },
     });
     // 팀 배정 직후처럼 빈 리비전이 먼저 있을 수 있어, 명단이 처음 채워진 리비전을 대진 시점 명단으로 본다.
     const snapshotLineup = lineups.find((lineup) => rows.some((row) => row.lineupId === lineup.id));
@@ -375,6 +376,9 @@ export class GameRosterService {
       fixtureSnapshotUserIds,
       legacyLineupPending,
       displayNameByUserId,
+      // 시작된 경기는 공식 결과와 같은 셀렉터로 고른 기록 명단을 보여 준다(동기화는 시작 뒤 멈춘다).
+      playedLineup:
+        context.gameState === V1GameState.SCHEDULED ? null : selectLineupParticipantsWithDraftFallback(rows, lineups),
     });
   }
 }

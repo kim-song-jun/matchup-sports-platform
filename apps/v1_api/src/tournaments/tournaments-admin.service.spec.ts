@@ -885,6 +885,92 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
+  // ─── 명단 제출 마감 ≥ 신청 마감 ─────────────────────────────────────────────
+  // 명단 마감이 신청 마감보다 앞서면 신청을 받는 중에 명단이 먼저 닫혀, 늦게 확정된 팀은
+  // 명단을 한 번도 못 낸다(alpha 실데이터: 생성 마법사 기본값 D-7 < D-3).
+  describe('roster deadline order', () => {
+    const REG = '2026-10-12T14:59:00.000Z';
+    const BEFORE_REG = '2026-10-08T14:59:00.000Z';
+    const AFTER_REG = '2026-10-13T14:59:00.000Z';
+    const createDto = (deadlines: { registrationDeadlineAt?: string; rosterDeadlineAt?: string }) => ({
+      sportId: 'sport-1',
+      title: '테스트 대회',
+      teamCount: 8,
+      ...deadlines,
+    });
+    function arrangeCreate() {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+      prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+    }
+    function arrangeUpdate(existing: Record<string, unknown>) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      const row = tournamentRow({ rosterDeadlineAt: null, ...existing });
+      prisma.v1Tournament.findFirst
+        .mockResolvedValueOnce(row)
+        .mockResolvedValueOnce({ ...row, _count: { registrations: 0 } });
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    it('create: 명단 마감이 신청 마감보다 앞서면 400 ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE', async () => {
+      arrangeCreate();
+      await expect(
+        service.create(ownerAuthUser, createDto({ registrationDeadlineAt: REG, rosterDeadlineAt: BEFORE_REG })),
+      ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE' } });
+      expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['같은 시각', REG],
+      ['뒤', AFTER_REG],
+    ])('create: 명단 마감이 신청 마감과 %s면 통과한다', async (_label, roster) => {
+      arrangeCreate();
+      await service.create(ownerAuthUser, createDto({ registrationDeadlineAt: REG, rosterDeadlineAt: roster }));
+      expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ rosterDeadlineAt: new Date(roster) }) }),
+      );
+    });
+
+    it('create: 명단 마감을 비우면 검사하지 않고 마감 없이 저장한다', async () => {
+      arrangeCreate();
+      await service.create(ownerAuthUser, createDto({ registrationDeadlineAt: REG }));
+      expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ rosterDeadlineAt: null }) }),
+      );
+    });
+
+    it('update: 기존 신청 마감보다 앞선 명단 마감으로 바꾸면 400', async () => {
+      arrangeUpdate({ registrationDeadlineAt: new Date(REG) });
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, rosterDeadlineAt: BEFORE_REG }),
+      ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('update: 신청 마감만 기존 명단 마감 뒤로 미뤄도 합친 값으로 막는다', async () => {
+      arrangeUpdate({ rosterDeadlineAt: new Date(BEFORE_REG) });
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, registrationDeadlineAt: REG }),
+      ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['같거나 뒤로 바꾸면', { rosterDeadlineAt: AFTER_REG }],
+      ['명단 마감을 비우면', { rosterDeadlineAt: null }],
+    ])('update: 명단 마감을 %s 통과한다', async (_label, patch) => {
+      arrangeUpdate({ registrationDeadlineAt: new Date(REG), rosterDeadlineAt: new Date(BEFORE_REG) });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, ...patch });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalled();
+    });
+
+    it('update: 순서가 어긋난 기존 대회라도 마감을 안 건드리는 수정은 막지 않는다', async () => {
+      arrangeUpdate({ registrationDeadlineAt: new Date(REG), rosterDeadlineAt: new Date(BEFORE_REG) });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '제목만 변경' });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalled();
+    });
+  });
+
   it('update: minPlayers > maxPlayers (merged with existing) → 400 TOURNAMENT_PLAYER_RANGE_INVALID', async () => {
     // Existing has minPlayers=6, maxPlayers=10. Sending minPlayers=11 should fail
     // the merged-range check (11 > 10).

@@ -8,6 +8,7 @@ import {
   buildAlphaTournamentCampaignContent,
   computeOfficialTopScorer,
   createCompetitionData,
+  createScenario,
   ensureAlphaQaRecordConsent,
   FEATURED_TEAMS,
 } from '../../prisma/seed-alpha-tournament-qa';
@@ -391,5 +392,66 @@ describe('alpha tournament QA campaign content', () => {
       new Date('2026-08-01T09:00:00.000Z'),
     ) as { faqSectionTitle: string };
     expect(content.faqSectionTitle).toBe('테스트 안내');
+  });
+});
+
+describe('alpha tournament QA seed — 재실행 시 캠페인 날짜 문구', () => {
+  const NOW = new Date('2026-10-01T03:00:00.000Z');
+  const openScenario = ALPHA_TOURNAMENT_SCENARIOS.find(
+    (scenario) => scenario.status === V1TournamentStatus.open && scenario.hasCampaign,
+  );
+  if (!openScenario) throw new Error('A campaign-enabled open scenario is required.');
+
+  async function runCreateScenario(existing: {
+    scheduledAt: Date;
+    scheduledEndAt: Date;
+    registrationDeadlineAt: Date;
+  } | null) {
+    const campaignCreate = jest.fn().mockResolvedValue({});
+    const tournamentUpsert = jest.fn().mockResolvedValue({});
+    const noop = jest.fn().mockResolvedValue({ count: 0 });
+    const tx = {
+      v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentAward: { deleteMany: noop },
+      v1TournamentReview: { deleteMany: noop },
+      v1TournamentSponsor: { deleteMany: noop },
+      v1TournamentAnnouncement: { deleteMany: noop, create: jest.fn().mockResolvedValue({}) },
+      v1TournamentCampaign: { deleteMany: noop, create: campaignCreate },
+      v1Tournament: {
+        findMany: jest.fn().mockResolvedValue(existing ? [existing] : []),
+        upsert: tournamentUpsert,
+      },
+    } as unknown as Prisma.TransactionClient;
+    await createScenario(tx, openScenario!, 'sport-1', [], null, NOW, 'config-version-1');
+    return {
+      content: campaignCreate.mock.calls[0][0].data.content as { hero: { summary: string } },
+      upsert: tournamentUpsert.mock.calls[0][0] as {
+        create: { scheduledAt: Date; promoHomeDateText: string };
+        update: { promoHomeDateText: string; promoListDateText: string };
+      },
+    };
+  }
+
+  it('기존 대회 일정이 보존되는 재실행에서는 보존된 일정 날짜를 문구에 쓴다', async () => {
+    // 실행일(10-01) + 21일 = 10-22 이지만 DB 에는 이전 실행이 남긴 10-06 이 보존된다.
+    const { content, upsert } = await runCreateScenario({
+      scheduledAt: new Date('2026-10-06T01:00:00.000Z'),
+      scheduledEndAt: new Date('2026-10-06T09:00:00.000Z'),
+      registrationDeadlineAt: new Date('2026-09-29T14:00:00.000Z'),
+    });
+
+    expect(content.hero.summary).toContain('2026-10-06');
+    expect(content.hero.summary).not.toContain('2026-10-22');
+    expect(upsert.update.promoHomeDateText).toBe('2026-10-06');
+    expect(upsert.update.promoListDateText).toBe('2026-10-06');
+  });
+
+  it('신규 생성이면 새로 계산한 일정이 DB 값이자 문구 값이다', async () => {
+    const { content, upsert } = await runCreateScenario(null);
+
+    const created = upsert.create.scheduledAt.toISOString().slice(0, 10);
+    expect(created).toBe('2026-10-22');
+    expect(content.hero.summary).toContain(created);
+    expect(upsert.create.promoHomeDateText).toBe(created);
   });
 });

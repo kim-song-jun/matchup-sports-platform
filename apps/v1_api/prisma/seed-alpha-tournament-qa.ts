@@ -287,6 +287,21 @@ function scenarioDate(now: Date, days: number, hour: number) {
   return value;
 }
 
+export type ScenarioSchedule = {
+  readonly scheduledAt: Date;
+  readonly scheduledEndAt: Date;
+  readonly registrationDeadlineAt: Date;
+};
+
+// 재실행 때 대회 행은 이 세 값을 update 에서 제외해 보존한다. 문구(캠페인·홍보 날짜)는 DB 에 실제로
+// 남는 값에서 만들어야 하므로, 기존 행이 있으면 그 값을, 신규 생성이면 새로 계산한 값을 쓴다.
+export function resolveScenarioSchedule(
+  computed: ScenarioSchedule,
+  existing: ScenarioSchedule | null,
+): ScenarioSchedule {
+  return existing ?? computed;
+}
+
 export function buildAlphaTournamentCampaignContent(
   scenario: TournamentScenario,
   scheduledAt: Date,
@@ -797,16 +812,35 @@ export async function createScenario(
   competitionConfigVersionId: string,
 ) {
   const marketing = scenario.marketing ?? FEATURED_QA_DEFAULT_MARKETING;
-  const scheduledAt = scenario.status === V1TournamentStatus.in_progress
+  const computedScheduledAt = scenario.status === V1TournamentStatus.in_progress
     ? new Date(now.getTime() - 60 * 60 * 1000)
     : scenarioDate(now, scenario.startsInDays, 1);
-  const scheduledEndAt = new Date(scheduledAt.getTime() + 8 * 60 * 60 * 1000);
-  const registrationDeadlineAt =
+  const computedScheduledEndAt = new Date(computedScheduledAt.getTime() + 8 * 60 * 60 * 1000);
+  const computedRegistrationDeadlineAt =
     scenario.status === V1TournamentStatus.closed ||
     scenario.status === V1TournamentStatus.in_progress ||
     scenario.status === V1TournamentStatus.completed
     ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
     : scenarioDate(now, scenario.startsInDays - 7, 14);
+  const [existingTournament] = await tx.v1Tournament.findMany({
+    where: { id: scenario.id },
+    select: { scheduledAt: true, scheduledEndAt: true, registrationDeadlineAt: true },
+    take: 1,
+  });
+  const { scheduledAt, scheduledEndAt, registrationDeadlineAt } = resolveScenarioSchedule(
+    {
+      scheduledAt: computedScheduledAt,
+      scheduledEndAt: computedScheduledEndAt,
+      registrationDeadlineAt: computedRegistrationDeadlineAt,
+    },
+    existingTournament?.scheduledAt && existingTournament.scheduledEndAt && existingTournament.registrationDeadlineAt
+      ? {
+          scheduledAt: existingTournament.scheduledAt,
+          scheduledEndAt: existingTournament.scheduledEndAt,
+          registrationDeadlineAt: existingTournament.registrationDeadlineAt,
+        }
+      : null,
+  );
   // 이 시나리오가 소유한 leaf 행(순위·시상·후기·스폰서·공지·캠페인)을
   // 먼저 정리한다. 대회·그룹·픽스처·V1Game 은 절대 지우지 않고 upsert/보존하므로 append-only
   // (operation_audit)·V1Game Restrict FK 가 걸릴 일이 없다 — leaf 는 그 append-only 참조 대상이

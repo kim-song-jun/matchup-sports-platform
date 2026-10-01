@@ -15,7 +15,7 @@
 - [x] 좁은 backend/frontend tests, typecheck, desktop/tablet/mobile before/after·console/network 증거를 남긴다.
 
 ## Owned / Forbidden
-- Owned: `profile/player-card.ts`, 관련 unit spec, web `types/api.ts`, 공통 `users/player-card.tsx`/spec, 필요한 카드 CSS, users API contract, changeset, 본 task.
+- Owned: `profile/player-card.ts`, 관련 unit spec, web `types/api.ts`, 공통 `users/player-card.tsx`/spec, 공유 OG 이미지, 필요한 카드 CSS, users API contract, changeset, 본 task.
 - Forbidden: 다른 세션 WIP, Prisma schema/migrations, 선수 기록·후기 데이터 변경, main 승격.
 
 ## User / Test Scenarios
@@ -33,7 +33,8 @@
 ## Progress Snapshot
 - [x] 최신 dev fetch 및 별도 작업트리 준비, 공통 카드 3개 진입점 확인.
 - [x] 구현/검증/시각 QA.
-- [ ] dev PR/리뷰/alpha 배포 후 실제 신규 API 재조회/최종 보고.
+- [ ] dev PR/리뷰/alpha 배포 후 실제 신규 API 재조회/최종 보고. PR #1490, 1차 CI Gates/API/Web 모두 통과.
+- [x] 자동 리뷰의 OG 점 단위 누락 및 PR 제목 형식 수정. OG 렌더/라우트 설정 8개 통과. 실제 OG 시각 판정은 alpha 배포 후 수행한다.
 
 ## Validation / Evidence
 - Host preflight: 24 cores, load 0.53~0.86, available memory 13~14GB, swap 0. 검증은 최소 worker로 실행했다.
@@ -55,3 +56,5 @@
 - 수동 diff review: 새로운 auth/쓰기 경로 없음. `records`는 공개 동의 + 공식 결과 존재 시에만 반환하며 기존 공식/신원/개별 숨김 로더 게이트를 재사용한다. 본인 조회 우회 없음. 점수 산식/버전 변경 없음.
 - API 문서의 stale 공개 필드 목록을 현재 v1 service 반환값에 맞춰 sync했다. 성향 추정 태그/100점 환산 설명을 실제 점수 계약으로 교체했다. 신규 TODO/FIXME/HACK/XXX 없음.
 - 각 headed 브라우저는 finally에서 종료했다. 크롬의 누락된 shared library는 `/tmp`에만 압축 해제해 사용했다. 로컬 Next/QA bridge와 임시 schema/tsconfig는 종료 시 제거한다.
+
+- OG local Next dev는 font URL 로딩 실패로 브랜드 이미지가 반환되어 실제 카드 시각 근거로 사용하지 않는다. 로컬 서버 종료; alpha 원본 OG와 배포 후 OG를 비교한다.

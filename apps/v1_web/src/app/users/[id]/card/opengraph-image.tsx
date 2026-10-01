@@ -192,7 +192,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                   color: s.value === null ? 'rgba(255,255,255,0.34)' : '#ffffff',
                 }}
               >
-                {String(s.value ?? '잠김')}
+                {s.value === null ? '잠김' : `${s.value}점`}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.52)', letterSpacing: 2 }}>

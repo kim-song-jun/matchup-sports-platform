@@ -1301,6 +1301,7 @@ function PresentationStep({
           </p>
         </div>
         <PromoCardFields
+          collapsible
           variant="home"
           value={state.promoHome}
           onChange={(value: TournamentPromoCardValue) =>
@@ -1325,6 +1326,7 @@ function PresentationStep({
           )}
         />
         <PromoCardFields
+          collapsible
           variant="list"
           value={state.promoList}
           onChange={(value: TournamentPromoCardValue) =>

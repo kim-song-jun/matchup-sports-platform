@@ -561,16 +561,30 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
-  it('rejects promo priorities outside the API integer range', () => {
+  it('rejects promo priorities outside the API integer range for enabled cards only', () => {
     const state = {
       ...INITIAL_TOURNAMENT_CREATE_STATE,
-      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, priority: '-1' },
-      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, priority: '2.5' },
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: true, priority: '-1' },
+      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, enabled: true, priority: '2.5' },
     };
 
     expect(validateTournamentCreateStep(state, 3)).toMatchObject({
       promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
       promoListPriority: '목록 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
+    });
+  });
+
+  it('꺼진 홍보 카드는 접혀 있어 고칠 수 없으므로 잘못된 우선순위도 검증·전송하지 않는다', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: false, priority: '-1' },
+      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, enabled: false, priority: '2.5' },
+    };
+
+    expect(validateTournamentCreateStep(state, 3)).toEqual({});
+    expect(buildTournamentCreatePayload(state)).toMatchObject({
+      promoHomePriority: 0,
+      promoListPriority: 0,
     });
   });
 });
@@ -924,6 +938,56 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         locationText: '서울월드컵보조경기장',
       });
       expect(reset.promoList.locationText).toBe('목록 전용 장소');
+    });
+  });
+
+  describe('홍보 카드 켠 것만 펼치기 (#1439)', () => {
+    it('꺼진 홍보 카드는 입력 없이 한 줄 요약과 켜는 버튼만 보인다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('노출 우선순위')).not.toBeInTheDocument();
+      for (const name of ['홈 오늘의 추천 홍보 켜기', '대회 목록 상단 홍보 켜기']) {
+        expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+      }
+    });
+
+    it('켜면 입력이 펼쳐지고, 껐다 켜도 입력한 값이 남으며, 꺼도 제출 payload 는 값을 그대로 보낸다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      fireEvent.click(screen.getByRole('button', { name: '홈 오늘의 추천 홍보 켜기' }));
+      fireEvent.change(screen.getByLabelText('카드 제목'), { target: { value: '이번 주 추천' } });
+      const off = screen.getByRole('button', { name: '홈 오늘의 추천 홍보 끄기' });
+      expect(off).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(off);
+
+      expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
+      expect(screen.getByText('꺼짐 · 입력한 항목 1개 보관 중')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '홈 오늘의 추천 홍보 켜기' }));
+      expect(screen.getByLabelText('카드 제목')).toHaveValue('이번 주 추천');
+
+      fireEvent.click(screen.getByRole('button', { name: '홈 오늘의 추천 홍보 끄기' }));
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+      expect(createMutate.mock.calls[0][0]).toMatchObject({
+        promoHomeEnabled: false,
+        promoHomeTitle: '이번 주 추천',
+        promoListEnabled: false,
+      });
+    });
+
+    it('켠 홍보의 우선순위 오류는 펼쳐진 입력으로 포커스를 보낸다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      fireEvent.click(screen.getByRole('button', { name: '대회 목록 상단 홍보 켜기' }));
+      fireEvent.change(screen.getByLabelText('노출 우선순위'), { target: { value: '-3' } });
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+      expect(createMutate).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('노출 우선순위')).toHaveFocus();
     });
   });
 

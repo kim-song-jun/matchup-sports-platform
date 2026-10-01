@@ -48,6 +48,11 @@ type PromoCardFieldsProps = {
    * 자리를 뺀 폴백 결과를 계산해 넘겨야 미리보기가 공개 화면과 어긋나지 않는다.
    */
   defaultImageUrl?: string | null;
+  /**
+   * 켠 것만 펼친다 — 꺼진 카드는 입력·미리보기를 렌더하지 않고 한 줄 요약만 둔다. 입력값은
+   * 상태에 그대로 남아 다시 켜면 돌아온다. 이미 저장된 대회를 고치는 화면은 항상 펼친다.
+   */
+  collapsible?: boolean;
 };
 
 const inputClass =
@@ -65,6 +70,7 @@ export function PromoCardFields({
   defaultImageUrl,
   onResetFacts,
   canResetFacts = true,
+  collapsible = false,
 }: PromoCardFieldsProps) {
   const generatedId = useId().replaceAll(':', '');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -80,6 +86,12 @@ export function PromoCardFields({
   const showResetHint = Boolean(onResetFacts) && !canResetFacts;
   const trimmedDefaultImageUrl = defaultImageUrl?.trim() ?? '';
   const usingDefaultImage = !value.imageUrl.trim() && Boolean(trimmedDefaultImageUrl);
+  const cardTitle = variant === 'home' ? '홈 오늘의 추천' : '대회 목록 상단';
+  const bodyId = `${prefix}-body`;
+  // 사실 문구(날짜·장소·상금)는 대회 정보로 자동 채워지므로 "입력한 항목"에서 뺀다.
+  const keptCount = [value.title, value.subtitle, value.badgeText, value.teamsText, value.imageUrl].filter(
+    (text) => text.trim(),
+  ).length;
   const previewFields = {
     title: value.title,
     subtitle: value.subtitle,
@@ -91,12 +103,35 @@ export function PromoCardFields({
     prizeText: value.prizeText,
   };
 
+  if (collapsible && !value.enabled) {
+    return (
+      <section className="tm-on-tint flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--grey50)] px-4 py-2">
+        <div className="min-w-0">
+          <h3 className="tm-text-label">{cardTitle}</h3>
+          <p className="tm-text-caption mt-0.5">
+            꺼짐{keptCount > 0 ? ` · 입력한 항목 ${keptCount}개 보관 중` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-expanded={false}
+          aria-label={`${cardTitle} 홍보 켜기`}
+          onClick={() => update('enabled', true)}
+          disabled={disabled}
+          className="inline-flex min-h-[44px] shrink-0 items-center rounded-xl bg-[var(--card-surface)] px-4 tm-text-label transition-colors disabled:opacity-50"
+        >
+          켜기
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="tm-on-tint rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-[var(--text-strong)]">
-            {variant === 'home' ? '홈 오늘의 추천' : '대회 목록 상단'}
+            {cardTitle}
           </h3>
           <p className="mt-0.5 text-xs text-[var(--text-caption)]">
             저장 전에 실제 카드 형태를 확인할 수 있어요.
@@ -119,16 +154,30 @@ export function PromoCardFields({
               <span className="sm:hidden">다시 채우기</span>
             </button>
           ) : null}
-          <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
-            <input
-              type="checkbox"
-              checked={value.enabled}
-              onChange={(event) => update('enabled', event.target.checked)}
+          {collapsible ? (
+            <button
+              type="button"
+              aria-expanded
+              aria-controls={bodyId}
+              aria-label={`${cardTitle} 홍보 끄기`}
+              onClick={() => update('enabled', false)}
               disabled={disabled}
-              className="h-4 w-4"
-            />
-            노출
-          </label>
+              className="inline-flex min-h-[44px] items-center rounded-xl bg-[var(--card-surface)] px-4 tm-text-label transition-colors disabled:opacity-50"
+            >
+              끄기
+            </button>
+          ) : (
+            <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
+              <input
+                type="checkbox"
+                checked={value.enabled}
+                onChange={(event) => update('enabled', event.target.checked)}
+                disabled={disabled}
+                className="h-4 w-4"
+              />
+              노출
+            </label>
+          )}
         </div>
       </div>
 
@@ -138,187 +187,189 @@ export function PromoCardFields({
         </p>
       ) : null}
 
-      <div className="mt-4">
-        {variant === 'home' ? (
-          <PromoHomePreview fields={previewFields} fallback={fallback} />
-        ) : (
-          <PromoListPreview fields={previewFields} fallback={fallback} />
-        )}
-      </div>
+      <div id={bodyId}>
+        <div className="mt-4">
+          {variant === 'home' ? (
+            <PromoHomePreview fields={previewFields} fallback={fallback} />
+          ) : (
+            <PromoListPreview fields={previewFields} fallback={fallback} />
+          )}
+        </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field id={`${prefix}-title`} label="카드 제목" hint="비우면 대회 이름이 그대로 나와요.">
-          <input
-            id={`${prefix}-title`}
-            value={value.title}
-            onChange={(event) => update('title', event.target.value)}
-            disabled={disabled}
-            maxLength={120}
-            aria-describedby={`${prefix}-title-hint`}
-            placeholder={fallback.title || '대회 이름'}
-            className={inputClass}
-          />
-        </Field>
-        <Field id={`${prefix}-badge`} label="배지" hint="카드 맨 위 작은 라벨. 비우면 '추천 대회'가 나와요.">
-          <input
-            id={`${prefix}-badge`}
-            value={value.badgeText}
-            onChange={(event) => update('badgeText', event.target.value)}
-            disabled={disabled}
-            maxLength={60}
-            aria-describedby={`${prefix}-badge-hint`}
-            placeholder="추천 대회"
-            className={inputClass}
-          />
-        </Field>
-        <div className="sm:col-span-2">
-          <Field
-            id={`${prefix}-subtitle`}
-            label="소개 문구"
-            hint="제목 아래 한 줄. 비우면 대회 장소가 대신 나와요."
-          >
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Field id={`${prefix}-title`} label="카드 제목" hint="비우면 대회 이름이 그대로 나와요.">
             <input
-              id={`${prefix}-subtitle`}
-              value={value.subtitle}
-              onChange={(event) => update('subtitle', event.target.value)}
+              id={`${prefix}-title`}
+              value={value.title}
+              onChange={(event) => update('title', event.target.value)}
               disabled={disabled}
-              maxLength={300}
-              aria-describedby={`${prefix}-subtitle-hint`}
+              maxLength={120}
+              aria-describedby={`${prefix}-title-hint`}
+              placeholder={fallback.title || '대회 이름'}
               className={inputClass}
             />
           </Field>
-        </div>
-        <Field id={`${prefix}-date`} label="날짜 문구" hint="대회 일정에서 자동으로 채워요.">
-          <input
-            id={`${prefix}-date`}
-            value={value.dateText}
-            onChange={(event) => update('dateText', event.target.value)}
-            disabled={disabled}
-            maxLength={120}
-            aria-describedby={`${prefix}-date-hint`}
-            className={inputClass}
-          />
-        </Field>
-        <Field
-          id={`${prefix}-teams`}
-          label="강조 문구"
-          hint="날짜와 장소 사이에 들어가는 자유 문구예요. 비워도 돼요."
-        >
-          <input
-            id={`${prefix}-teams`}
-            value={value.teamsText}
-            onChange={(event) => update('teamsText', event.target.value)}
-            disabled={disabled}
-            maxLength={120}
-            aria-describedby={`${prefix}-teams-hint`}
-            placeholder="예: 마감임박 · 16팀 참가"
-            className={inputClass}
-          />
-        </Field>
-        <Field id={`${prefix}-location`} label="장소 문구" hint="대회 장소에서 자동으로 채워요.">
-          <input
-            id={`${prefix}-location`}
-            value={value.locationText}
-            onChange={(event) => update('locationText', event.target.value)}
-            disabled={disabled}
-            maxLength={120}
-            aria-describedby={`${prefix}-location-hint`}
-            className={inputClass}
-          />
-        </Field>
-        <Field
-          id={`${prefix}-prize`}
-          label="상금 문구"
-          hint="상품 및 상금 요약에서 자동으로 채워요."
-        >
-          <input
-            id={`${prefix}-prize`}
-            value={value.prizeText}
-            onChange={(event) => update('prizeText', event.target.value)}
-            disabled={disabled}
-            maxLength={160}
-            aria-describedby={`${prefix}-prize-hint`}
-            className={inputClass}
-          />
-        </Field>
-        <Field
-          id={`${prefix}-priority`}
-          label="노출 우선순위"
-          hint="숫자가 클수록 위에 나와요."
-          error={priorityError}
-        >
-          <input
-            id={`${prefix}-priority`}
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={9999}
-            value={value.priority}
-            onChange={(event) => update('priority', event.target.value)}
-            disabled={disabled}
-            aria-describedby={`${prefix}-priority-hint`}
-            aria-invalid={Boolean(priorityError)}
-            className={inputClass}
-          />
-        </Field>
-        <div className="sm:col-span-2">
-          <Field id={`${prefix}-image`} label="홍보 이미지">
-            <div className="flex flex-wrap gap-2">
+          <Field id={`${prefix}-badge`} label="배지" hint="카드 맨 위 작은 라벨. 비우면 '추천 대회'가 나와요.">
+            <input
+              id={`${prefix}-badge`}
+              value={value.badgeText}
+              onChange={(event) => update('badgeText', event.target.value)}
+              disabled={disabled}
+              maxLength={60}
+              aria-describedby={`${prefix}-badge-hint`}
+              placeholder="추천 대회"
+              className={inputClass}
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field
+              id={`${prefix}-subtitle`}
+              label="소개 문구"
+              hint="제목 아래 한 줄. 비우면 대회 장소가 대신 나와요."
+            >
               <input
-                id={`${prefix}-image`}
-                value={value.imageUrl}
-                onChange={(event) => update('imageUrl', event.target.value)}
+                id={`${prefix}-subtitle`}
+                value={value.subtitle}
+                onChange={(event) => update('subtitle', event.target.value)}
                 disabled={disabled}
-                maxLength={1000}
-                placeholder={trimmedDefaultImageUrl ? '비우면 기본 이미지 사용' : '/uploads/...'}
-                className={`${inputClass} min-w-[220px] flex-1`}
+                maxLength={300}
+                aria-describedby={`${prefix}-subtitle-hint`}
+                className={inputClass}
               />
-              {onSelectImage ? (
-                <>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    disabled={disabled || uploading}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) onSelectImage(file);
-                      event.target.value = '';
-                    }}
-                  />
+            </Field>
+          </div>
+          <Field id={`${prefix}-date`} label="날짜 문구" hint="대회 일정에서 자동으로 채워요.">
+            <input
+              id={`${prefix}-date`}
+              value={value.dateText}
+              onChange={(event) => update('dateText', event.target.value)}
+              disabled={disabled}
+              maxLength={120}
+              aria-describedby={`${prefix}-date-hint`}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            id={`${prefix}-teams`}
+            label="강조 문구"
+            hint="날짜와 장소 사이에 들어가는 자유 문구예요. 비워도 돼요."
+          >
+            <input
+              id={`${prefix}-teams`}
+              value={value.teamsText}
+              onChange={(event) => update('teamsText', event.target.value)}
+              disabled={disabled}
+              maxLength={120}
+              aria-describedby={`${prefix}-teams-hint`}
+              placeholder="예: 마감임박 · 16팀 참가"
+              className={inputClass}
+            />
+          </Field>
+          <Field id={`${prefix}-location`} label="장소 문구" hint="대회 장소에서 자동으로 채워요.">
+            <input
+              id={`${prefix}-location`}
+              value={value.locationText}
+              onChange={(event) => update('locationText', event.target.value)}
+              disabled={disabled}
+              maxLength={120}
+              aria-describedby={`${prefix}-location-hint`}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            id={`${prefix}-prize`}
+            label="상금 문구"
+            hint="상품 및 상금 요약에서 자동으로 채워요."
+          >
+            <input
+              id={`${prefix}-prize`}
+              value={value.prizeText}
+              onChange={(event) => update('prizeText', event.target.value)}
+              disabled={disabled}
+              maxLength={160}
+              aria-describedby={`${prefix}-prize-hint`}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            id={`${prefix}-priority`}
+            label="노출 우선순위"
+            hint="숫자가 클수록 위에 나와요."
+            error={priorityError}
+          >
+            <input
+              id={`${prefix}-priority`}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={9999}
+              value={value.priority}
+              onChange={(event) => update('priority', event.target.value)}
+              disabled={disabled}
+              aria-describedby={`${prefix}-priority-hint`}
+              aria-invalid={Boolean(priorityError)}
+              className={inputClass}
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field id={`${prefix}-image`} label="홍보 이미지">
+              <div className="flex flex-wrap gap-2">
+                <input
+                  id={`${prefix}-image`}
+                  value={value.imageUrl}
+                  onChange={(event) => update('imageUrl', event.target.value)}
+                  disabled={disabled}
+                  maxLength={1000}
+                  placeholder={trimmedDefaultImageUrl ? '비우면 기본 이미지 사용' : '/uploads/...'}
+                  className={`${inputClass} min-w-[220px] flex-1`}
+                />
+                {onSelectImage ? (
+                  <>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      disabled={disabled || uploading}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) onSelectImage(file);
+                        event.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={disabled || uploading}
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] disabled:opacity-50"
+                    >
+                      <ImagePlus size={16} aria-hidden="true" />
+                      {uploading ? '업로드 중…' : '이미지 업로드'}
+                    </button>
+                  </>
+                ) : null}
+                {trimmedDefaultImageUrl && !usingDefaultImage ? (
                   <button
                     type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={disabled || uploading}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] disabled:opacity-50"
+                    onClick={() => update('imageUrl', '')}
+                    disabled={disabled}
+                    className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
                   >
-                    <ImagePlus size={16} aria-hidden="true" />
-                    {uploading ? '업로드 중…' : '이미지 업로드'}
+                    기본 이미지로
                   </button>
-                </>
-              ) : null}
-              {trimmedDefaultImageUrl && !usingDefaultImage ? (
-                <button
-                  type="button"
-                  onClick={() => update('imageUrl', '')}
-                  disabled={disabled}
-                  className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
-                >
-                  기본 이미지로
-                </button>
-              ) : null}
-            </div>
-            <p className="mt-2 text-xs text-[var(--text-caption)]">
-              {trimmedDefaultImageUrl
-                ? usingDefaultImage
-                  ? '기본 이미지를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
-                  : '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
-                : value.imageUrl.trim()
-                  ? '다른 자리에 이미지가 없어서, 이 이미지가 대표 이미지 자리에도 함께 쓰여요.'
-                  : '대표 이미지를 올리면 비워둔 이 자리에도 함께 쓰여요.'}
-            </p>
-          </Field>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-caption)]">
+                {trimmedDefaultImageUrl
+                  ? usingDefaultImage
+                    ? '기본 이미지를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
+                    : '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
+                  : value.imageUrl.trim()
+                    ? '다른 자리에 이미지가 없어서, 이 이미지가 대표 이미지 자리에도 함께 쓰여요.'
+                    : '대표 이미지를 올리면 비워둔 이 자리에도 함께 쓰여요.'}
+              </p>
+            </Field>
+          </div>
         </div>
       </div>
     </section>
@@ -351,7 +402,7 @@ function Field({
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-[var(--red500)]">
+        <p role="alert" data-error-focus={id} className="text-xs font-medium text-[var(--red500)]">
           {error}
         </p>
       ) : null}

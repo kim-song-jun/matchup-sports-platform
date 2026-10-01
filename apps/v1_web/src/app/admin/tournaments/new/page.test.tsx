@@ -989,6 +989,15 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       expect(screen.getByLabelText('남성 최소')).toHaveFocus();
     });
 
+    it('일정 단계에서 날짜를 비우고 넘기면 화면 순서상 첫 오류인 대회 시작 입력에 포커스한다', () => {
+      renderInScroller();
+      goToScheduleStep();
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByText('대회 시작 일시를 선택해 주세요.')).toBeInTheDocument();
+      expect(screen.getByLabelText(/대회 시작/)).toHaveFocus();
+    });
+
     it('종목만 채우고 넘기면 두 번째 오류 필드(대회명)로 포커스한다', () => {
       renderInScroller();
       fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });

@@ -354,6 +354,13 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     expect(listed.find((r: { roomId: string }) => r.roomId === room.id)).toMatchObject({ unreadCount: 1 });
     const items = (await get(member, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items;
     expect(items.map((m: { content: string }) => m.content)).toEqual(expect.arrayContaining(['토요일에 봬요', expect.stringContaining('들어왔어요')]));
+
+    // '들어왔어요'는 방을 연 때가 아니라 승인 순간 한 번 — 주최자에게도 보인다(방 생성 시각 = 승인 시각).
+    expect(room.createdAt).toEqual(approvedAt);
+    const joinedLines = await db.v1ChatMessage.findMany({ where: { chatRoomId: room.id, systemEventType: 'joined' } });
+    expect(joinedLines.map((line) => [line.senderUserId, line.sentAt])).toEqual([[member, approvedAt]]);
+    const hostItems = (await get(host, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items;
+    expect(hostItems.some((m: { systemEventType: string | null }) => m.systemEventType === 'joined')).toBe(true);
   });
 
   it('참가를 취소했다가 다시 승인되면 이번 승인 시각부터 보인다 — 취소돼 있던 동안의 대화는 안 보인다', async () => {
@@ -381,12 +388,18 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const { approvedAt } = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
     const room = await db.v1ChatRoom.findUniqueOrThrow({ where: { matchId: id } });
     await post(host, `/chat/rooms/${room.id}/messages`, { content: '승인 뒤 첫 안내' }).expect(201);
-    // 옛 경로 재현: 승인 때 채팅 참여자로 등록되지 않았던 참가자가 나중에 매치 상세에서 방을 연다.
+    // 옛 경로 재현: 승인 때 채팅 참여자로 등록되지도, '들어왔어요'가 남지도 않았던 참가자가 나중에 매치 상세에서 방을 연다.
     await db.v1ChatRoomParticipant.delete({ where: { chatRoomId_userId: { chatRoomId: room.id, userId: member } } });
+    await db.v1ChatMessage.deleteMany({ where: { chatRoomId: room.id, senderUserId: member, systemEventType: 'joined' } });
+    const { lastMessageAt } = await db.v1ChatRoom.findUniqueOrThrow({ where: { id: room.id } });
     await post(member, '/chat/rooms/resolve', { targetType: 'match', targetId: id }).expect(201);
     const items = (await get(member, `/chat/rooms/${room.id}/messages`).expect(200)).body.data.items;
     expect(items.map((m: { content: string }) => m.content)).toContain('승인 뒤 첫 안내');
     expect(await db.v1ChatRoomParticipant.findUnique({ where: { chatRoomId_userId: { chatRoomId: room.id, userId: member } } })).toMatchObject({ visibleFromAt: approvedAt });
+    // '들어왔어요'도 방을 연 지금이 아니라 승인 시각에 한 번 — 방 목록 정렬(lastMessageAt)은 뒤로 가지 않는다.
+    const joinedLines = await db.v1ChatMessage.findMany({ where: { chatRoomId: room.id, senderUserId: member, systemEventType: 'joined' } });
+    expect(joinedLines.map((line) => line.sentAt)).toEqual([approvedAt]);
+    expect((await db.v1ChatRoom.findUniqueOrThrow({ where: { id: room.id } })).lastMessageAt).toEqual(lastMessageAt);
 
     // 주최자도 입장 시각으로 늦게 잡혀 있었다면 방 생성 시각으로 당긴다 — 참가자가 먼저 보낸 메시지가 보인다.
     await post(member, `/chat/rooms/${room.id}/messages`, { content: '저도 갈게요' }).expect(201);

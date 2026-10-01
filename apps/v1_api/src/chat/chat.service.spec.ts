@@ -166,7 +166,7 @@ describe('ChatService', () => {
       v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
       v1Match: {
-        // 열람 시작(matchChatHistoryFrom) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
+        // 열람 시작(matchChatHistory) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
         findUnique: jest.fn().mockResolvedValue({ hostUserId: 'host-user', participants: [] }),
         findFirst: jest.fn().mockResolvedValue({
           hostUserId: 'host-user',

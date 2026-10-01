@@ -232,7 +232,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
           : undefined,
     draft,
     sending: send.isPending,
-    sendError: send.isError,
+    sendError: send.isError ? extractErrorMessage(send.error, '메시지를 전송하지 못했어요. 다시 시도해 주세요.') : undefined,
     onDraftChange: setDraft,
     onSend: () => {
       const content = draft.trim();

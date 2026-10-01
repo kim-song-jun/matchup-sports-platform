@@ -165,6 +165,7 @@ const deletionSql = [
   `DELETE FROM v1_team_memberships WHERE team_id IN (SELECT id FROM cleanup_seed_teams)`,
   `DELETE FROM v1_team_join_applications WHERE id::text LIKE '00000000-%' OR team_id IN (SELECT id FROM cleanup_seed_teams) OR applicant_user_id IN (SELECT id FROM cleanup_seed_users) OR reviewed_by_user_id IN (SELECT id FROM cleanup_seed_users)`,
   `DELETE FROM v1_team_invitations WHERE id::text LIKE '00000000-%' OR team_id IN (SELECT id FROM cleanup_seed_teams) OR invited_user_id IN (SELECT id FROM cleanup_seed_users) OR invited_by_user_id IN (SELECT id FROM cleanup_seed_users)`,
+  `DELETE FROM v1_team_invite_links WHERE team_id IN (SELECT id FROM cleanup_seed_teams) OR created_by_user_id IN (SELECT id FROM cleanup_seed_users)`,
   `DELETE FROM v1_team_memberships WHERE id::text LIKE '00000000-%' OR team_id IN (SELECT id FROM cleanup_seed_teams) OR user_id IN (SELECT id FROM cleanup_seed_users) OR removed_by_user_id IN (SELECT id FROM cleanup_seed_users)`,
   `DELETE FROM v1_teams WHERE id IN (SELECT id FROM cleanup_seed_teams)`,
   `DELETE FROM v1_admin_users WHERE id IN (SELECT id FROM cleanup_seed_admin_users)`,

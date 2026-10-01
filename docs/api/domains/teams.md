@@ -25,11 +25,17 @@
 | POST | `/team-join-applications/:applicationId/approve` | Yes(owner/manager) | 가입 신청 승인 |
 | POST | `/team-join-applications/:applicationId/reject` | Yes(owner/manager) | 가입 신청 거절 |
 | POST | `/teams/:teamId/invitations` | Yes(manager+) | 초대 발송 (body `{ invitedEmail, message? }`) |
+| POST | `/teams/:teamId/invitations/batch` | Yes(manager+) | 여러 명 초대 (body `{ recipients: string[1..20], message? }`, 항목별 결과) |
 | GET | `/teams/:teamId/invitations` | Yes(manager+) | 보낸 초대 목록 (pending) |
 | POST | `/teams/:teamId/invitations/:invitationId/cancel` | Yes(manager+) | 초대 취소 |
 | GET | `/me/invitations` | Yes | 받은 초대 목록 (pending) |
 | POST | `/team-invitations/:invitationId/accept` | Yes(피초대자 본인) | 초대 수락 |
 | POST | `/team-invitations/:invitationId/decline` | Yes(피초대자 본인) | 초대 거절 |
+| GET | `/teams/:teamId/invite-link` | Yes(manager+) | 지금 초대 링크(`status: active \| expired \| none`) |
+| POST | `/teams/:teamId/invite-link` | Yes(manager+) | 초대 링크 만들기 — 살아 있으면 그대로(`created: false`) |
+| POST | `/teams/:teamId/invite-link/reissue` | Yes(manager+) | 초대 링크 재발급 — 이전 링크 무효 |
+| GET | `/team-invite-links/:token` | Optional | 링크 미리보기(팀 이름·종목·지역·로고 + 로그인 시 내 가입 상태) |
+| POST | `/team-invite-links/:token/join-applications` | Yes | 링크로 가입 신청(승인 대기로 접수) |
 | GET | `/teams/:teamId/dissolution-preview` | Yes(owner) | 해체 사전 점검 — 막는 조건·함께 정리될 것 |
 | POST | `/teams/:teamId/dissolve` | Yes(owner) | 팀 해체(보관) — body `{ confirmTeamName }` |
 | POST | `/teams/:teamId/restore` | Yes(owner) | 해체 30일 안 복구 |
@@ -258,6 +264,32 @@ CAUTION:
 - 수락은 피초대자 본인만(`POST /team-invitations/:invitationId/accept`) — `teamMembership` upsert(active) + `memberCount` 증가(이미 active 멤버면 미증가, 가입 승인과 동일 로직 미러링)
 - 모든 mutation 멱등: `alreadyInvited` / `alreadyProcessed` / `alreadyCancelled` 플래그
 
+### POST /teams/:teamId/invitations/batch (Task 180 G12)
+
+- `recipients`: 1~20개. `@` 가 있으면 이메일(`normalizeEmail` 표준형), 없으면 닉네임 **정확히 일치**(부분 검색 없음 — 일반
+  사용자에게 사용자 검색을 열지 않는다). 탈퇴(`deletedAt`) 계정은 찾지 않는다.
+- 권한·정원은 단건 초대와 같다(팀장·매니저, 활성 팀, `TEAM_FULL` 이면 요청 전체 409). 초대 한 건의 처리(이미 멤버·대기 중
+  유지·끝난 초대 다시 열기·도착 알림)는 단건 초대와 같은 경로다.
+- 응답 `{ teamId, invitedCount, results: [{ recipient, status, invitationId }] }` — `status`:
+  `invited | already_invited | already_member | not_found | ambiguous(같은 닉네임이 여럿) | duplicate(같은 요청 안의 중복)`.
+
+## 초대 링크 (Task 180 G12)
+
+- 링크로 들어온 사람은 **가입 신청(`requested`)으로 접수**된다 — 멤버가 되지 않고, 승인은 그대로 팀장·매니저가 한다.
+  신청은 `POST /teams/:teamId/join-applications` 와 같은 경로라 가입 닫힘(`JOIN_CLOSED`)·정원(`TEAM_FULL`)·
+  이미 멤버(`ALREADY_MEMBER`)·대기 중(`ALREADY_REQUESTED`) 규칙이 같다.
+- 만든 때부터 **7일** 뒤 만료. 재발급하면 이전 링크는 즉시 무효. 팀당 살아 있는 링크는 하나.
+- 토큰은 32자 base64url. DB 에는 sha256 해시와 salt 만 저장하고(원문 없음), 조회는 해시로 한다.
+  `V1_SESSION_SECRET` 이 없으면 만들기·보여 주기가 503 `TEAM_INVITE_LINK_UNAVAILABLE`.
+- 가입을 닫아 둔 팀은 링크를 만들 수 없다(409 `JOIN_CLOSED`). 팀을 해체하면 살아 있는 링크도 닫힌다.
+- `GET /teams/:teamId/invite-link` 응답 `{ teamId, status, token, expiresAt, createdAt }` — 만들기·재발급은 여기에
+  `created` 가 붙는다. 웹은 `${origin}/invite/${token}` 으로 링크를 만든다.
+- 미리보기 응답 `{ team: { id, name, sportName, regionName, logoUrl }, expiresAt, viewer }` — `viewer` 는 비로그인이면
+  `null`, 로그인이면 `{ joinState, eligible, reasonCode, message }`(`join-eligibility` 와 같은 값).
+- 에러: 형식이 다르거나 없는 토큰 404 `TEAM_INVITE_LINK_NOT_FOUND` · 만료 410 `TEAM_INVITE_LINK_EXPIRED` ·
+  재발급으로 무효 410 `TEAM_INVITE_LINK_REVOKED` · 해체된 팀 410 `TEAM_NOT_ACTIVE`.
+- 레이트 리밋(프로덕션): 만들기·재발급·가입 신청 10회/분, 미리보기 30회/분, 여러 명 초대 10회/분.
+
 ## Frontend Mapping Notes
 
 - `/me/teams` 원응답은 membership 배열이며, `useMyTeams`가 `MyTeam`으로 평탄화한다.
@@ -276,6 +308,7 @@ CAUTION:
 - `apps/v1_api/src/teams/dto/*.ts`
 - `apps/v1_api/src/teams/teams.service.ts`
 - `apps/v1_api/src/teams/team-dissolution*.ts`
+- `apps/v1_api/src/teams/team-invite-link*.ts`
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`

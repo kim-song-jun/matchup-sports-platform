@@ -65,6 +65,7 @@ import {
   getViewerState,
   statusToCardStatus,
   sortTeamMatchesByAvailability,
+  summarizeTeamMatches,
   toTeamMatch,
 } from './team-matches.card-model';
 
@@ -193,7 +194,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
           selectedSportId,
         }),
         matches: visibleItems.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
-        summary: { ...base.summary, count: visibleItems.length, today: visibleItems.length },
+        summary: summarizeTeamMatches(visibleItems),
         hasNext,
         onLoadMore: handleLoadMore,
         loadMorePending: query.isFetching,

@@ -574,17 +574,14 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
-  it('꺼진 홍보 카드는 접혀 있어 고칠 수 없으므로 잘못된 우선순위도 검증·전송하지 않는다', () => {
+  it('꺼진 홍보 카드의 잘못된 우선순위도 서버 DTO 처럼 막고 값은 바꾸지 않는다', () => {
     const state = {
       ...INITIAL_TOURNAMENT_CREATE_STATE,
       promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: false, priority: '-1' },
-      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, enabled: false, priority: '2.5' },
     };
 
-    expect(validateTournamentCreateStep(state, 3)).toEqual({});
-    expect(buildTournamentCreatePayload(state)).toMatchObject({
-      promoHomePriority: 0,
-      promoListPriority: 0,
+    expect(validateTournamentCreateStep(state, 3)).toMatchObject({
+      promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
     });
   });
 });
@@ -978,16 +975,21 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       });
     });
 
-    it('켠 홍보의 우선순위 오류는 펼쳐진 입력으로 포커스를 보낸다', () => {
+    it('꺼진 카드에 잘못된 우선순위가 있으면 제출이 막히고 그 카드가 펼쳐져 입력에 포커스한다', () => {
       renderPage();
       goToPresentationStep();
 
       fireEvent.click(screen.getByRole('button', { name: '대회 목록 상단 홍보 켜기' }));
       fireEvent.change(screen.getByLabelText('노출 우선순위'), { target: { value: '-3' } });
+      fireEvent.click(screen.getByRole('button', { name: '대회 목록 상단 홍보 끄기' }));
+      expect(screen.queryByLabelText('노출 우선순위')).not.toBeInTheDocument();
+
       fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
 
       expect(createMutate).not.toHaveBeenCalled();
-      expect(screen.getByLabelText('노출 우선순위')).toHaveFocus();
+      const input = screen.getByLabelText('노출 우선순위');
+      expect(input).toHaveValue(-3);
+      expect(input).toHaveFocus();
     });
   });
 

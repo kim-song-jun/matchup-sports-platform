@@ -103,7 +103,9 @@ export function PromoCardFields({
     prizeText: value.prizeText,
   };
 
-  if (collapsible && !value.enabled) {
+  // 우선순위 오류가 있으면 접어 둔 채로 두지 않는다 — 오류 입력이 보여야 고칠 수 있다.
+  const folded = collapsible && !value.enabled && !priorityError;
+  if (folded) {
     return (
       <section className="tm-on-tint flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--grey50)] px-4 py-2">
         <div className="min-w-0">
@@ -157,14 +159,14 @@ export function PromoCardFields({
           {collapsible ? (
             <button
               type="button"
-              aria-expanded
+              aria-expanded={value.enabled || undefined}
               aria-controls={bodyId}
-              aria-label={`${cardTitle} 홍보 끄기`}
-              onClick={() => update('enabled', false)}
+              aria-label={`${cardTitle} 홍보 ${value.enabled ? '끄기' : '켜기'}`}
+              onClick={() => update('enabled', !value.enabled)}
               disabled={disabled}
               className="inline-flex min-h-[44px] items-center rounded-xl bg-[var(--card-surface)] px-4 tm-text-label transition-colors disabled:opacity-50"
             >
-              끄기
+              {value.enabled ? '끄기' : '켜기'}
             </button>
           ) : (
             <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">

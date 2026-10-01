@@ -490,7 +490,7 @@ export function buildTournamentPreviewItem(
     promoHomeTeamsText: state.promoHome.teamsText.trim() || null,
     promoHomeLocationText: state.promoHome.locationText.trim() || null,
     promoHomePrizeText: state.promoHome.prizeText.trim() || null,
-    promoHomePriority: parsePromoPriority(state.promoHome.priority) ?? 0,
+    promoHomePriority: Number(state.promoHome.priority) || 0,
     promoListEnabled: state.promoList.enabled,
     promoListTitle: state.promoList.title.trim() || null,
     promoListSubtitle: state.promoList.subtitle.trim() || null,
@@ -500,7 +500,7 @@ export function buildTournamentPreviewItem(
     promoListTeamsText: state.promoList.teamsText.trim() || null,
     promoListLocationText: state.promoList.locationText.trim() || null,
     promoListPrizeText: state.promoList.prizeText.trim() || null,
-    promoListPriority: parsePromoPriority(state.promoList.priority) ?? 0,
+    promoListPriority: Number(state.promoList.priority) || 0,
     campaignSlug: null,
     confirmedCount: 0,
     pendingPaymentCount: 0,
@@ -653,12 +653,11 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
-    // 꺼진 홍보 카드는 화면에서 접혀 있어 오류를 고칠 수 없다 — 켠 카드만 검증한다.
+    // 서버 DTO 는 꺼진 홍보의 priority 도 0~9999 정수로 검증한다 — 꺼진 카드도 막는다.
     for (const [field, card, label] of [
       ['promoHomePriority', state.promoHome, '홈 홍보 우선순위'],
       ['promoListPriority', state.promoList, '목록 홍보 우선순위'],
     ] as const) {
-      if (!card.enabled) continue;
       if (parsePromoPriority(card.priority) === null) {
         errors[field] = `${label}는 0~9999 사이의 정수여야 해요.`;
       }
@@ -746,8 +745,7 @@ function promoPayload(
   prefix: 'promoHome' | 'promoList',
   value: TournamentPromoCardValue,
 ): Partial<V1CreateTournamentPayload> {
-  // 접힌 채 꺼진 카드에 남은 잘못된 값은 검증을 건너뛰므로 서버로 보내지 않고 기본값으로 보낸다.
-  const priority = parsePromoPriority(value.priority) ?? 0;
+  const priority = numeric(value.priority) ?? 0;
   const fields = {
     enabled: value.enabled,
     title: value.title.trim(),

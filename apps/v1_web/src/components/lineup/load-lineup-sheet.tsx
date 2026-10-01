@@ -6,6 +6,7 @@ import type { LoadableEntry } from './lineup-source';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 /** 불러올 수 있는 라인업 한 건 — 과거 경기와 프리셋이 같은 모양으로 들어온다. */
 export type LoadableLineup = {
@@ -99,11 +100,8 @@ export function LoadLineupSheet({
   }, [open]);
 
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   if (!open) return null;

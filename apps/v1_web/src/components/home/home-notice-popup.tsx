@@ -8,6 +8,7 @@ import type { HomePopup } from './home.types';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const STORAGE_KEY_PREFIX = 'teameet:v1:home-popup:hidden-until:';
@@ -57,9 +58,8 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
   useEffect(() => {
     if (!open) return;
 
-    const previousOverflow = document.body.style.overflow;
     const previousFocus = document.activeElement as HTMLElement | null;
-    document.body.style.overflow = 'hidden';
+    const releaseScroll = lockBodyScroll();
     const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -83,7 +83,7 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
     return () => {
       window.clearTimeout(focusTimer);
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       previousFocus?.focus();
     };
   }, [open]);

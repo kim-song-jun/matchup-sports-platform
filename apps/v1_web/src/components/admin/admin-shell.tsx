@@ -29,6 +29,7 @@ import {
   Radio,
   Gauge,
 } from 'lucide-react';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── Nav items (reviews/notifications removed per task-97 IA) ───────────────
 interface NavItem {
@@ -339,14 +340,8 @@ function Drawer({
 
   // Prevent body scroll while drawer is open
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   return (

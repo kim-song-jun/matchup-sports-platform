@@ -9,6 +9,7 @@ import { useAdminToast, AdminToasts } from '@/components/admin';
 import type { V1AdminErrorLogDetail } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── Props ─────────────────────────────────────────────────────────────────
 interface ErrorLogDetailModalProps {
@@ -167,14 +168,8 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
 
   // body 스크롤 잠금
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   if (!open) return null;

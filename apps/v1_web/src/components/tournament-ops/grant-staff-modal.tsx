@@ -11,6 +11,7 @@ import type {
 } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 export interface GrantableRoleOption {
   value: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>;
@@ -159,10 +160,8 @@ export function GrantStaffModal({
   }, [open]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   // 이미 사람을 고른 뒤에는 검색을 멈춘다 — 선택 결과가 입력창에 남아 있는 상태에서

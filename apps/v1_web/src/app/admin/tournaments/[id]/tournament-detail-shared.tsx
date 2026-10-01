@@ -6,6 +6,7 @@ import { formatEntryFee } from '@/lib/date-utils';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -239,8 +240,8 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
   }, [open]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   if (!open) return null;

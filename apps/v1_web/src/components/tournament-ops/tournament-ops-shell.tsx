@@ -22,6 +22,7 @@ import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { overlayLinkClick } from '@/lib/overlay-history';
 import { displayInitials } from '@/lib/display-initials';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -281,10 +282,8 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
   }, [open]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   return (

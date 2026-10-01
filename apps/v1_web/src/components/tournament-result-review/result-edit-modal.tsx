@@ -14,6 +14,7 @@ import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/g
 import { periodLabel } from '@/components/tournament-live/operate/period-label';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 /**
  * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
@@ -389,11 +390,8 @@ export function ResultEditModal({
   }, [open, presentation]);
 
   useEffect(() => {
-    if (presentation === 'inline') return;
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (presentation === 'inline' || !open) return;
+    return lockBodyScroll();
   }, [open, presentation]);
 
   const participantNameMap = useMemo(() => buildParticipantNameMap(lineups), [lineups]);

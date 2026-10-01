@@ -71,7 +71,7 @@ export class LeagueCompletionProjectionService {
         game: {
           select: {
             // 감사 L-E finding 5 수정: 예전 계산은 "currentOfficialRevisionId == null"을
-            // "무효"의 신호로 삼았는데, voidTeamMatchResult(games.service.ts)는 포인터를
+            // "무효"의 신호로 삼았는데, voidResultRevision(tournament-result-review.service.ts)은 포인터를
             // null로 풀지 않고 VOID 리비전 자신으로 옮긴다 -- 그래서 hasOfficialResult와
             // isVoided가 서로 배타적인 이 계산식에서 isVoided는 프로덕션에서 절대 true가
             // 될 수 없었다(항상 hasOfficialResult=true로 잘못 잡혀 "이 대진은 결과가

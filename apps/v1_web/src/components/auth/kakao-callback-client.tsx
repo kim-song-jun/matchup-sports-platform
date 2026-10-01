@@ -11,6 +11,7 @@ import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
+import { extractErrorMessage } from '@/lib/error-message';
 
 function getKakaoRedirectUri() {
   return process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
@@ -106,7 +107,7 @@ export function KakaoCallbackClient() {
           }
         }
 
-        setError(nextError instanceof Error ? nextError.message : '카카오 로그인에 실패했어요.');
+        setError(extractErrorMessage(nextError, '카카오 로그인에 실패했어요.'));
       });
   }, [router, searchParams]);
 

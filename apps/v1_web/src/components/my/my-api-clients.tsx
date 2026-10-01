@@ -493,7 +493,7 @@ export function ProfileEditPageClient() {
       setCropSource(null);
       setFieldErrors((current) => ({
         ...current,
-        profileImage: err instanceof Error ? err.message : '이미지를 업로드하지 못했어요. 다시 선택해 주세요.',
+        profileImage: extractErrorMessage(err, '이미지를 업로드하지 못했어요. 다시 선택해 주세요.'),
       }));
     } finally {
       setUploadingProfileImage(false);
@@ -577,7 +577,7 @@ export function ProfileEditPageClient() {
         });
         return;
       }
-      setFieldErrors({ form: nextError instanceof Error ? nextError.message : '저장하지 못했어요. 다시 시도해 주세요.' });
+      setFieldErrors({ form: extractErrorMessage(nextError, '저장하지 못했어요. 다시 시도해 주세요.') });
     }
   };
 
@@ -952,7 +952,7 @@ export function SportsSettingsPageClient() {
       });
       router.replace('/my');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '운동 정보 저장에 실패했어요.');
+      setMessage(extractErrorMessage(error, '운동 정보 저장에 실패했어요.'));
     }
   };
 
@@ -1310,7 +1310,7 @@ export function LocationSettingsPageClient() {
         },
         onError: (error) => {
           setStatus('unmatched');
-          setMessage(error instanceof Error ? error.message : '활동 지역 저장에 실패했어요.');
+          setMessage(extractErrorMessage(error, '활동 지역 저장에 실패했어요.'));
         },
       },
     );

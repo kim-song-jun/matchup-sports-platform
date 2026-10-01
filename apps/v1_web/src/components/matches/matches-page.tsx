@@ -24,6 +24,7 @@ import type {
 } from './matches.types';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import type { V1MatchApiStatus } from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
 
 /**
  * 종목 한국어 레이블 → 인디케이터 dot CSS 색상.
@@ -1127,7 +1128,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
         const url = await onUpload(file);
         onChange?.(url);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : '이미지 업로드에 실패했어요. 다시 시도해 주세요.';
+        const msg = extractErrorMessage(err, '이미지 업로드에 실패했어요. 다시 시도해 주세요.');
         setUploadError(msg);
         setFileName('');
       } finally {

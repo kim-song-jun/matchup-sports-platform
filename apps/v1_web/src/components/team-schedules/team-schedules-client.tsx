@@ -34,6 +34,8 @@ import { extractErrorCode } from '@/lib/error-message';
 import { isHiddenFromViewerError } from '@/lib/access-denied-error';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { hydrateLineupEditorState } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
+import { teamGameDetailHref } from '@/lib/team-game-links';
 import type {
   V1CreateScheduleDto,
   V1GuestApplicationListItem,
@@ -73,10 +75,12 @@ import {
   matchScheduleDisplay,
   scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
+  scheduleLinkedMatchKind,
   scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
   scheduleTypeFilterOptions,
+  scheduleTournamentOpponentTeamName,
   scheduleTypeLabel,
   scheduleVisibilityLabel,
   scheduleVisibilityOptions,
@@ -185,12 +189,15 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const team = useV1TeamDetail(teamId);
   const detail = useV1TeamSchedule(teamId, scheduleId);
   // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 그 상대팀 이름·
-  // 장소가 없었다. 확정된 매치일 때만(그 전엔 approvedOpponentTeam이 비어 헛수고다)
-  // 매치 상세를 한 번 더 불러 요약을 보여준다 — 매치 상세(/team-matches/:id)가 이미
-  // 갖고 있는 approvedOpponentTeam/place를 재사용할 뿐, 새 백엔드 필드는 필요 없다.
-  const linkedTeamMatchId =
-    detail.data?.matchConfirmed === true ? (detail.data.linkedMatch?.teamMatchId ?? '') : '';
-  const opponentMatch = useV1TeamMatch(linkedTeamMatchId);
+  // 장소가 없었다. 확정된 매치일 때만(그 전엔 상대가 비어 헛수고다) 경기 상세를 한 번 더
+  // 불러 요약을 보여준다. 친선·리그는 팀 매치 상세, 대회 경기는 그 조회가 404 라 공개 경기
+  // 상세를 쓴다(대진표 공개 전이면 그것도 404 — 요약을 숨긴다).
+  const confirmedLinkedMatch = detail.data?.matchConfirmed === true ? (detail.data.linkedMatch ?? null) : null;
+  const linkedTeamMatchId = confirmedLinkedMatch?.teamMatchId ?? '';
+  const linkedMatchKind = confirmedLinkedMatch ? scheduleLinkedMatchKind(confirmedLinkedMatch) : null;
+  const linkedTournamentId = linkedMatchKind === 'TOURNAMENT' ? (confirmedLinkedMatch?.tournamentId ?? '') : '';
+  const opponentMatch = useV1TeamMatch(linkedTournamentId ? '' : linkedTeamMatchId);
+  const opponentTournamentMatch = usePublicMatch(linkedTournamentId, linkedTournamentId ? linkedTeamMatchId : '');
   const setAttendance = useV1SetMyScheduleAttendance(teamId, scheduleId);
   const cancelSchedule = useV1CancelTeamSchedule(teamId, scheduleId);
   const completeSchedule = useV1CompleteTeamSchedule(teamId, scheduleId);
@@ -418,13 +425,25 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
 
   const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
 
-  const opponentTeamName = scheduleOpponentTeamName(opponentMatch.data, teamId);
+  const opponentTeamName = linkedTournamentId
+    ? scheduleTournamentOpponentTeamName(opponentTournamentMatch.data, teamId)
+    : scheduleOpponentTeamName(opponentMatch.data, teamId);
+  const opponentHref = confirmedLinkedMatch && linkedMatchKind
+    ? teamGameDetailHref(
+        {
+          competitionKind: linkedMatchKind,
+          competitionId: confirmedLinkedMatch.leagueId ?? confirmedLinkedMatch.tournamentId,
+          teamMatchId: confirmedLinkedMatch.teamMatchId,
+        },
+        withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath),
+      )
+    : null;
   const opponent: ScheduleDetailViewModel['opponent'] =
-    linkedTeamMatchId && opponentTeamName
+    opponentHref && opponentTeamName
       ? {
           teamName: opponentTeamName,
-          placeName: opponentMatch.data?.place?.name ?? null,
-          teamMatchHref: withFromPath(`/team-matches/${linkedTeamMatchId}`, withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath)),
+          placeName: linkedTournamentId ? (opponentTournamentMatch.data?.venue ?? null) : (opponentMatch.data?.place?.name ?? null),
+          teamMatchHref: opponentHref,
         }
       : null;
 

@@ -197,7 +197,7 @@ Tournament announcement `audience` values are `public`, `all_registered`, `confi
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
-`cancel-request` stores the status that existed before `cancel_requested`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
+`cancel-request` stores the status that existed before `cancel_requested`. It is rejected with `409 TOURNAMENT_ENDED` (registration unchanged) when the tournament or league is `completed` or `cancelled` — terminal states have nothing left to cancel; this applies to `draft` registrations too. Other non-cancellable registration statuses keep returning `409 REGISTRATION_NOT_CANCELLABLE`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
 
 `cancel-request/withdraw` re-reads the tournament under a row lock before restoring the registration, so it can reject after the outer checks passed. **Three** conflicts are possible there:
 

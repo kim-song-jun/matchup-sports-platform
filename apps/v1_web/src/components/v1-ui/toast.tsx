@@ -35,7 +35,14 @@ export function useToast() {
     }, TOAST_DURATION_MS);
   }, []);
 
-  return { showToast, toast: <ToastViewport message={message} /> } as const;
+  /** 새 동작을 시작할 때 앞 동작의 안내를 거둔다 — 그 동작이 실패하면 지난 성공 문구만 남지 않게. */
+  const hideToast = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setMessage(null);
+  }, []);
+
+  return { showToast, hideToast, toast: <ToastViewport message={message} /> } as const;
 }
 
 /**

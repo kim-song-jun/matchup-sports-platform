@@ -8,6 +8,7 @@ import { GameStateBadge, PublicFixtureStateBadge, staffRoleLabel } from '@/compo
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { findMyTournamentGroup } from '@/hooks/use-v1-my-staff-assignments';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 import type { V1GameState, V1MyTournamentStaffAssignment, V1MyTournamentStaffFixture } from '@/types/api';
 
 const STAFF_GAME_STATE_BY_STATUS: Readonly<Record<string, V1GameState>> = {
@@ -168,7 +169,7 @@ function StaffFixtureRow({
   fixture: V1MyTournamentStaffFixture;
 }) {
   const when = formatTournamentDateTimeShort(fixture.scheduledAt);
-  const meta = [`${fixture.round} · ${fixture.fixtureNumber}번 경기`, when === '' ? '일정 미정' : when]
+  const meta = [`${tournamentRoundLabel(fixture.round)} · ${fixture.fixtureNumber}번 경기`, when === '' ? '일정 미정' : when]
     .filter(Boolean)
     .join(' · ');
   return (

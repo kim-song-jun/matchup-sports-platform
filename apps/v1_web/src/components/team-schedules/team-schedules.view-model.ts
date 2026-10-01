@@ -9,6 +9,7 @@ import type {
   V1TeamMatch,
   V1TeamScheduleSummary,
 } from '@/types/api';
+import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import type { ScheduleCalendarDayModel, ScheduleCalendarModel, ScheduleListItemModel } from './team-schedules.types';
 
 // ── 권한 판정 ──────────────────────────────────────────────────────────────────
@@ -213,6 +214,26 @@ export function scheduleOpponentTeamName(
   const hostTeamId = match.hostTeam?.teamId ?? match.hostTeamId ?? null;
   if (hostTeamId === scheduleTeamId) return guest.name;
   if (guest.teamId === scheduleTeamId) return match.hostTeam?.name ?? match.hostTeamName ?? null;
+  return null;
+}
+
+/** 이어진 경기의 종류. 리그 대진은 `tournamentId` 도 리그 id 로 채워져 있어 `leagueId` 를 먼저 본다. */
+export function scheduleLinkedMatchKind(linkedMatch: {
+  tournamentId: string | null;
+  leagueId: string | null;
+}): 'FRIENDLY' | 'LEAGUE' | 'TOURNAMENT' {
+  if (linkedMatch.leagueId !== null) return 'LEAGUE';
+  return linkedMatch.tournamentId !== null ? 'TOURNAMENT' : 'FRIENDLY';
+}
+
+/** 대회 경기 공개 상세의 home/away 에서 이 일정을 가진 팀 기준의 상대. 보는 팀이 어느 쪽도 아니면 null. */
+export function scheduleTournamentOpponentTeamName(
+  match: Pick<PublicMatchDetail, 'home' | 'away'> | undefined,
+  scheduleTeamId: string,
+): string | null {
+  if (!match) return null;
+  if (match.home?.teamId === scheduleTeamId) return match.away?.teamName ?? null;
+  if (match.away?.teamId === scheduleTeamId) return match.home?.teamName ?? null;
   return null;
 }
 

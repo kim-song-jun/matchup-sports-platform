@@ -1052,6 +1052,7 @@ describe('TournamentRegistrationsService', () => {
 
   it('cancel-request: draft → cancelled (self-service)', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'draft' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
     const result = await service.cancelRequest(manager, 'tournament-1', 'reg-1', {});
     expect(result).toMatchObject({ status: 'cancelled' });
@@ -1059,6 +1060,7 @@ describe('TournamentRegistrationsService', () => {
 
   it('cancel-request: confirmed → cancel_requested (admin handles)', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }));
     const result = await service.cancelRequest(manager, 'tournament-1', 'reg-1', { reason: '사정' });
     expect(result).toMatchObject({ status: 'cancel_requested' });
@@ -1071,8 +1073,33 @@ describe('TournamentRegistrationsService', () => {
 
   it('cancel-request: already cancelled → 409 NOT_CANCELLABLE', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     await expect(service.cancelRequest(manager, 'tournament-1', 'reg-1', {})).rejects.toMatchObject({
       response: { code: 'REGISTRATION_NOT_CANCELLABLE' },
+    });
+  });
+
+  // W8-V2 — 종료된 리그의 "내 신청"에 [참가 취소 요청]이 남아 있었고, 서버도 받아 cancel_requested 로 바꿨다.
+  it.each([
+    ['종료 대회', { status: 'completed' }, '대회가 종료되었거나'],
+    ['취소된 대회', { status: 'cancelled' }, '대회가 종료되었거나'],
+    ['종료 리그', { status: 'completed', kind: 'regular_league' }, '리그가 종료되었거나'],
+  ] as const)('cancel-request: %s → 409 TOURNAMENT_ENDED, 신청은 그대로', async (_label, tournament, message) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament(tournament));
+    await expect(service.cancelRequest(manager, 'tournament-1', 'reg-1', {})).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'TOURNAMENT_ENDED', message: expect.stringContaining(message) },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('cancel-request: 대조군 — 진행 중 리그는 그대로 cancel_requested 가 된다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ status: 'in_progress', kind: 'regular_league' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancel_requested' }));
+    await expect(service.cancelRequest(manager, 'tournament-1', 'reg-1', {})).resolves.toMatchObject({
+      status: 'cancel_requested',
     });
   });
 

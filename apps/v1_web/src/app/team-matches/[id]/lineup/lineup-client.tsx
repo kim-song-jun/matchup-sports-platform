@@ -785,6 +785,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             )
           ) : (
             <Card pad={0}>
+              <RosterColumnHeader editable={editable} />
               <ul style={{ listStyle: 'none', margin: 0, padding: '0 12px' }}>
                 {rosterRows.map((entry, index) => {
                   const away = entry.userId === null ? undefined : unavailableByUser.get(entry.userId);
@@ -1083,6 +1084,28 @@ function EmptyLineupStart({
         ) : null}
       </div>
     </Card>
+  );
+}
+
+/**
+ * 열 머리글(W4-V1) — 행의 두 "+"(번호·골키퍼)가 무엇인지 목록 위에서 한 번만 말한다. 미지정 행에 글자를 다시 넣지
+ * 않으려는 것이다(GK 토글 주석). 화면용이라 aria-hidden — 스크린리더는 각 버튼의 aria-label 로 같은 뜻을 듣는다.
+ */
+function RosterColumnHeader({ editable }: { editable: boolean }) {
+  const label = { color: 'var(--text-muted)', fontWeight: 600 } as const;
+  return (
+    <div aria-hidden="true" style={{ padding: '0 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0 8px', borderBottom: '1px solid var(--border)' }}>
+        {/* 번호 칸은 편집 땐 44px 버튼, 열람 땐 28px 글자다(GameRosterPlayerRow). */}
+        <span className="tm-text-micro" style={{ ...label, flex: '0 0 auto', width: editable ? 44 : 28, textAlign: 'center' }}>번호</span>
+        <span className="tm-text-micro" style={{ ...label, flex: '1 1 auto' }}>이름</span>
+        <span style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="tm-text-micro" style={{ ...label, width: 44, textAlign: 'center' }}>골키퍼</span>
+          {/* 행의 "빼기" 버튼과 같은 클래스로 폭만 잡는다 — 골키퍼 열이 토글 위에 정확히 선다. */}
+          {editable ? <span className="tm-btn tm-btn-sm" style={{ visibility: 'hidden', minHeight: 0, padding: '0 8px' }}>빼기</span> : null}
+        </span>
+      </div>
+    </div>
   );
 }
 

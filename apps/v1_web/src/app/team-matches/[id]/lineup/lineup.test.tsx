@@ -665,6 +665,31 @@ describe('TeamMatchLineupPageClient', () => {
     const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
     expect(notDesignated).toBeDisabled();
     expect(notDesignated.querySelector('svg')).toBeNull();
+    // 잠긴 명단에서도 머리글이 GK 열의 뜻을 말한다(W4-V1).
+    expect(screen.getByText('골키퍼')).toBeInTheDocument();
+  });
+
+  // W4-V1 — 행의 두 "+"(번호·골키퍼)는 모양이 같다. 무엇인지는 목록 맨 위 머리글 한 줄이 말한다.
+  it('참석명단 맨 위에 "번호 · 이름 · 골키퍼" 머리글이 있고, 화면용이라 스크린리더 트리에는 없다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        starters: [
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    const header = screen.getByText('골키퍼').closest('[aria-hidden="true"]');
+    expect(header).not.toBeNull();
+    expect(header).toHaveTextContent(/^번호이름골키퍼/);
+    // 스크린리더는 지금처럼 각 버튼 이름으로 듣는다 — 미지정 행에는 여전히 "GK" 글자가 없다(2026-09-08).
+    expect(screen.getByRole('button', { name: '홍길동 등번호 넣기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' })).not.toHaveTextContent('GK');
   });
 
   // H5 A-1 — 빈 목록에서 한 명씩 누르지 않게, 전원 넣기와 지난 경기 명단이 먼저 보인다.

@@ -419,7 +419,6 @@ function AddPlayerForm({
   onFooterNeededChange: (formId: string, needed: boolean) => void;
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
-  const [birthDateError, setBirthDateError] = useState<string | null>(null);
   const [memberQuery, setMemberQuery] = useState('');
 
   // ROSTER-004: cursor-paginated team member fetch so 50+ member teams work.
@@ -474,7 +473,6 @@ function AddPlayerForm({
       birthDate: normalizeBirthDateForInput(member?.birthDate),
       phone: normalizeProfileText(member?.phone),
     });
-    setBirthDateError(null);
   }
 
   const birthDateValid = isValidBirthDate(form.birthDate);
@@ -664,7 +662,6 @@ function AddPlayerForm({
           label="생년월일"
           required
           hint="팀원 선택 시 자동으로 조회돼요."
-          errorMessage={birthDateError ?? undefined}
         >
           <input
             id={birthDateFieldId}
@@ -674,8 +671,6 @@ function AddPlayerForm({
             placeholder="예: 1995-03-21"
             maxLength={10}
             className="tm-input"
-            aria-describedby={birthDateError ? `${birthDateFieldId}-error` : undefined}
-            aria-invalid={birthDateError ? true : undefined}
             style={{ fontFamily: 'var(--font-pretendard)' }}
             readOnly
           />
@@ -793,8 +788,8 @@ function AddPlayerForm({
       {isActive && footerSlot
         ? createPortal(
             <>
-              {/* 비활성 이유를 버튼 바로 위에서 알려 준다. 값은 채웠는데 못 보내는 경우(생년월일 형식·이미 등록 등)는
-                  해당 칸이 이유를 직접 말하므로 여기선 점검만 안내한다. */}
+              {/* 비활성 이유를 버튼 바로 위에서 알려 준다. 이미 등록·대기 중인 팀원은 선택지에서 막히고 출전 자격 미달은
+                  팀원 칸이 이유를 말한다. 그 밖의 경우(프로필 생년월일 형식 불일치 등)는 여기서 점검만 안내한다. */}
               <p className="tm-text-caption" style={{ margin: '0 0 8px', color: 'var(--text-muted)' }} aria-live="polite">
                 {remainingRequired.length > 0
                   ? `${multipleDrafts ? '선택한 칸 · ' : ''}필수 항목 ${remainingRequired.length}개가 남았어요 · ${remainingRequired.join(', ')}`

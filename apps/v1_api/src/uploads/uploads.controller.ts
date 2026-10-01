@@ -3,9 +3,10 @@ import {
   Post,
   UseGuards,
   UseInterceptors,
+  UploadedFile,
   UploadedFiles,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -18,7 +19,7 @@ import {
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import type { V1AuthUser } from '../auth/v1-auth-user';
-import { UploadsService } from './uploads.service';
+import { CHAT_FILE_MAX_BYTES, UploadsService } from './uploads.service';
 // Side-effect import: augments global Express.Multer namespace
 import './multer.types';
 
@@ -26,6 +27,8 @@ import './multer.types';
 // Files between 5MB and this cap still get the clear "5MB 초과" 400 from the
 // service; larger ones are rejected by multer before fully buffering to disk.
 export const UPLOAD_HARD_CAP_BYTES = 10 * 1024 * 1024; // 10MB
+// 채팅 파일(10MB) 위의 DoS 백스톱 — 10MB 를 조금 넘는 파일도 서비스의 한국어 400 을 받게 여유를 둔다.
+const CHAT_FILE_HARD_CAP_BYTES = CHAT_FILE_MAX_BYTES + 2 * 1024 * 1024;
 
 /**
  * ## 영상 업로드는 여기 없다 (의도된 것 — 다시 추가하지 말 것)
@@ -96,5 +99,30 @@ export class UploadsController {
     // this service (next.config rewrite), so images resolve in dev and prod
     // without depending on the request host.
     return this.uploadsService.storeFiles(files ?? [], user.id, '', 'image');
+  }
+
+  /**
+   * 채팅 파일 업로드(Task 181 ③) — 문서 한 개, 10MB. 공개 `/uploads` 가 아니라 비공개 폴더에 저장하고
+   * `fileId` 만 돌려준다. 받는 쪽은 채팅 메시지의 인증 다운로드 경로로만 받는다.
+   * `defParamCharset: 'utf8'` — 기본(latin1)이면 한글 파일 이름이 깨진다.
+   */
+  @Post('files')
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: '채팅 파일 업로드 (1개, 10MB, PDF·오피스·한글·텍스트·CSV·ZIP)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiUnauthorizedResponse({ description: '인증이 필요해요.' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      dest: UploadsService.UPLOAD_BASE,
+      limits: { fileSize: CHAT_FILE_HARD_CAP_BYTES, files: 1 },
+      defParamCharset: 'utf8',
+    }),
+  )
+  uploadChatFile(
+    @CurrentUser() user: V1AuthUser,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    return this.uploadsService.storeChatFile(file, user.id);
   }
 }

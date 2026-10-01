@@ -277,6 +277,8 @@ enum V1ChatMessageType {
   image
   /// 일정·매치 공유 카드 — `shareCard` 에 보낼 때의 스냅숏이 있다(Task 181 ②).
   share
+  /// 파일 메시지 — `attachmentAssetId` 가 보낸 사람의 `file` 업로드를 가리킨다(Task 181 ③).
+  file
 }
 
 enum V1ChatSystemEventType {
@@ -359,6 +361,8 @@ enum V1InquiryRelatedType {
 enum V1UploadKind {
   image
   video
+  /// 채팅 파일(문서) — 공개 `/uploads` 가 아니라 `.private/` 에 두고 방 참여자만 인증 경로로 받는다(Task 181 ③).
+  file
 }
 
 enum V1GameSourceType {
@@ -665,6 +669,8 @@ model V1UploadAsset {
   byteSize    BigInt       @map("byte_size")
   url         String       @unique
   storagePath String       @unique @map("storage_path")
+  /// 올린 사람이 붙인 파일 이름(정리된 값) — `file` 업로드의 다운로드 이름. 이미지·영상은 null.
+  originalName String?     @map("original_name")
   createdAt   DateTime     @default(now()) @map("created_at")
 
   ownerUser    V1User          @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)

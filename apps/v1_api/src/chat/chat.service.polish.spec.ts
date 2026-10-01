@@ -216,7 +216,7 @@ describe('ChatService room polish', () => {
     const result = await service.messages(userA, 'room-1', { limit: 30 });
 
     expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ include: expect.objectContaining({ attachmentAsset: { select: { url: true } } }) }),
+      expect.objectContaining({ include: expect.objectContaining({ attachmentAsset: { select: expect.objectContaining({ url: true }) } }) }),
     );
     expect(result.items).toEqual([
       expect.objectContaining({ messageId: 'photo-1', messageType: 'image', content: '사진', imageUrl: '/uploads/2026/10/photo-1.jpg', unreadCount: 1 }),

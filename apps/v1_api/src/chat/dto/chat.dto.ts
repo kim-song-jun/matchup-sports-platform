@@ -59,7 +59,7 @@ export class ChatShareTargetDto {
   targetId!: string;
 }
 
-/** 텍스트(`content`) · 사진(`imageUrl`) · 공유(`share`) 중 **하나**. 여러 개·하나도 없음은 서비스가 400 으로 막는다. */
+/** 텍스트(`content`) · 사진(`imageUrl`) · 공유(`share`) · 파일(`fileId`) 중 **하나**. 여러 개·하나도 없음은 서비스가 400 으로 막는다. */
 export class SendChatMessageDto {
   @IsOptional()
   @IsString()
@@ -76,6 +76,11 @@ export class SendChatMessageDto {
   @ValidateNested()
   @Type(() => ChatShareTargetDto)
   share?: ChatShareTargetDto;
+
+  /** 파일 메시지 — `POST /uploads/files` 가 돌려준 `fileId`. 보내는 사람이 올린 파일이어야 한다(Task 181 ③). */
+  @IsOptional()
+  @IsUUID()
+  fileId?: string;
 }
 
 export class UpdateMyChatRoomDto {

@@ -124,10 +124,18 @@ export class LineupTodoService {
     return this.collectWithLineupState([teamId], now);
   }
 
-  /** 여러 팀의 다가오는 경기를 시각순으로 한 번에 모은다(홈의 "다음 경기"). 팀이 없으면 빈 목록. */
-  async listUpcomingForTeams(teamIds: readonly string[], now: Date): Promise<TeamUpcomingGame[]> {
+  /**
+   * 여러 팀의 다가오는 경기를 시각순으로 한 번에 모은다(홈의 "다음 경기"). 팀이 없으면 빈 목록.
+   * `startedWithinMs` 를 주면 킥오프가 그만큼 안쪽으로 지난 경기도 남긴다 — 결과가 나가면
+   * 팀매치가 `completed` 가 되어 `status: matched` 조건에서 바로 빠진다.
+   */
+  async listUpcomingForTeams(
+    teamIds: readonly string[],
+    now: Date,
+    options: { startedWithinMs?: number } = {},
+  ): Promise<TeamUpcomingGame[]> {
     if (teamIds.length === 0) return [];
-    return this.collectWithLineupState([...teamIds], now);
+    return this.collectWithLineupState([...teamIds], now, options.startedWithinMs ?? 0);
   }
 
   /**
@@ -162,8 +170,9 @@ export class LineupTodoService {
   private async collectWithLineupState(
     teamIds: string[] | null,
     now: Date,
+    startedWithinMs = 0,
   ): Promise<TeamUpcomingGame[]> {
-    const candidates = await this.loadTeamMatches(teamIds, now);
+    const candidates = await this.loadTeamMatches(teamIds, now, startedWithinMs);
     if (candidates.length === 0) return [];
 
     const states = await this.loadLineupStates(candidates.map((candidate) => ({
@@ -191,12 +200,12 @@ export class LineupTodoService {
     return items;
   }
 
-  private async loadTeamMatches(teamIds: string[] | null, now: Date) {
+  private async loadTeamMatches(teamIds: string[] | null, now: Date, startedWithinMs: number) {
     const matches = await this.prisma.v1TeamMatch.findMany({
       where: {
         // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
         status: 'matched',
-        startAt: { gte: now },
+        startAt: { gte: new Date(now.getTime() - startedWithinMs) },
         hostTeamId: { not: null },
         approvedApplicantTeamId: { not: null },
         game: { isNot: null },

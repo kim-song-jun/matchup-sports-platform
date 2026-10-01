@@ -5,6 +5,12 @@ import { LineupTodoService, loadRosterSummaries } from './lineup-todo.service';
 import { assertTeamLineupMember } from './team-lineup-access';
 import { loadViewerParticipation } from './viewer-game-participation';
 
+/**
+ * 홈 "다음 경기" 는 킥오프 뒤에도 결과가 나갈 때까지 그 경기에 머문다. 결과가 늦어져도 이 시간이
+ * 지나면 다음 경기로 넘어간다(2026-10-01 사용자 결정 — 홈 카드만, 팀 화면·할 일·리마인더는 그대로).
+ */
+export const NEXT_GAME_STARTED_GRACE_MS = 3 * 60 * 60 * 1000;
+
 /** 홈 맨 위 "다음 경기" 카드가 그리는 경기 하나. 출전 여부는 서버가 판정해 내려 준다. */
 export interface NextTeamGame {
   gameId: string;
@@ -71,9 +77,9 @@ export class TeamUpcomingGamesService {
   }
 
   /**
-   * 내 팀들의 경기 중 **가장 가까운 앞으로의 경기** 하나. 팀원이 아니면 애초에 이 팀들에 들지 않으므로
+   * 내 팀들의 경기 중 **가장 가까운 경기** 하나. 팀원이 아니면 애초에 이 팀들에 들지 않으므로
    * 남의 팀 경기는 나오지 않는다 — `memberships` 는 호출자가 활성 멤버십으로 조회한 값이다.
-   * 킥오프 시각이 지나면 그 경기는 빠지고 다음 경기로 넘어간다(진행 중 경기를 붙잡아 두지 않는다).
+   * 킥오프가 지난 경기는 결과가 나가기 전(팀매치 `matched`)이고 `NEXT_GAME_STARTED_GRACE_MS` 안이면 남는다.
    */
   async nextForMemberships(
     userId: string,
@@ -83,6 +89,7 @@ export class TeamUpcomingGamesService {
     const games = await this.lineupTodos.listUpcomingForTeams(
       memberships.map((membership) => membership.teamId),
       now,
+      { startedWithinMs: NEXT_GAME_STARTED_GRACE_MS },
     );
     const next = games.find((game) => game.scheduledAt !== null);
     if (next === undefined || next.scheduledAt === null) return null;

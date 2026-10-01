@@ -200,6 +200,9 @@ CAUTION:
   `details.blockers`)·정리·알림을 지난다(팀장 본인도 알림 수신). 이렇게 보관한 팀은 팀장이 직접 복구할 수 없다.
   `archived` 에서 다른 상태로 바꾸면 기간 제한 없이 `deletedAt` 을 지우고 채팅방을 다시 연다. 같은 이름의 팀이 있으면
   셀프 복구와 같은 `409 TEAM_RESTORE_NAME_TAKEN` 이다(운영팀 보관은 이름을 바로 풀어 그 사이 생길 수 있다).
+  그때 운영팀은 어드민 `POST /admin/teams/:teamId/name` 으로 **보관 팀의 이름을 바꾼 뒤** 보관을 푼다(2026-10-01 결정 —
+  보관 팀만, 새 이름도 같은 이름 규칙). 이름 변경은 상태 기록을 남기지 않아 보관 주체가 그대로라, 팀장이 해체한 팀이면
+  이름을 바꾼 뒤 팀장이 기간 안에 다시 직접 복구할 수 있다.
 - 해체된 팀의 팀장은 회원 탈퇴 차단(`WITHDRAWAL_BLOCKED_TEAM_AUTHORITY`)에서 풀린다 — 그 판정이 `status=active` 팀만 본다.
 
 ## PATCH /teams/:teamId

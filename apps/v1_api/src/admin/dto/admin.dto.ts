@@ -419,6 +419,17 @@ export class ChangeTeamStatusDto {
   reason!: string;
 }
 
+/** 보관된 팀의 이름 변경(운영팀). 길이 상한은 팀 만들기·수정과 같다. */
+export class RenameArchivedTeamDto {
+  @IsString()
+  @MaxLength(50)
+  name!: string;
+
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
 export class ChangeTeamMatchStatusDto {
   @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
   status!: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';

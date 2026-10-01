@@ -15,7 +15,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TeamDissolutionOutcome, dissolveTeamInTx, restoreTeamInTx } from '../teams/team-dissolution-tx';
+import { TeamDissolutionOutcome, dissolveTeamInTx, renameArchivedTeamInTx, restoreTeamInTx } from '../teams/team-dissolution-tx';
 import { emitTeamDissolutionNotifications } from '../teams/team-dissolution.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
@@ -44,6 +44,7 @@ import {
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  RenameArchivedTeamDto,
   CreateAdminNoticeDto,
   CreateAdminPopupDto,
   DeleteAdminUserDto,
@@ -565,6 +566,26 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       emitTeamDissolutionNotifications(this.notifications, this.prisma, dissolution);
     }
     return response;
+  }
+
+  /** 보관된 팀의 이름 변경. 상태는 그대로라 상태 변경 기록은 남기지 않는다(보관 주체 판정이 그 기록을 읽는다). */
+  async renameArchivedTeam(user: V1AuthUser, teamId: string, dto: RenameArchivedTeamDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      const renamed = await renameArchivedTeamInTx(tx, { teamId, name: dto.name });
+      const actionLog = await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'team.rename',
+          targetType: 'team',
+          targetId: teamId,
+          reason: dto.reason,
+          beforeJson: { name: renamed.previousName },
+          afterJson: { name: renamed.name },
+        },
+      });
+      return { teamId, previousName: renamed.previousName, name: renamed.name, actionLogId: actionLog.id };
+    });
   }
 
   async changeTeamMatchStatus(user: V1AuthUser, teamMatchId: string, dto: ChangeTeamMatchStatusDto) {

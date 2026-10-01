@@ -5,7 +5,7 @@ describe('describeUpcomingGameTime', () => {
   it('같은 KST 날의 경기는 "오늘" 이고 한 시간 이내면 분 단위로 센다', () => {
     // 2026-09-30 00:10 KST 에 01:10 KST 경기.
     const result = describeUpcomingGameTime('2026-09-29T16:10:00.000Z', new Date('2026-09-29T15:10:00.000Z'));
-    expect(result).toEqual({ when: '오늘 01:10', countdown: '1시간 뒤' });
+    expect(result).toEqual({ when: '오늘 01:10', countdown: '1시간 뒤', started: false });
     expect(describeUpcomingGameTime('2026-09-29T16:10:00.000Z', new Date('2026-09-29T15:30:00.000Z'))?.countdown).toBe('40분 뒤');
   });
 
@@ -19,11 +19,15 @@ describe('describeUpcomingGameTime', () => {
 
   it('하루 넘게 남은 경기는 카운트다운 없이 날짜·시각만 준다', () => {
     const result = describeUpcomingGameTime('2026-10-03T10:00:00.000Z', new Date('2026-09-29T15:10:00.000Z'));
-    expect(result).toEqual({ when: '10/3 (토) 19:00', countdown: null });
+    expect(result).toEqual({ when: '10/3 (토) 19:00', countdown: null, started: false });
   });
 
-  it('시작 시각이 지났거나 시각이 잘못됐으면 카운트다운을 만들지 않는다', () => {
-    expect(describeUpcomingGameTime('2026-09-29T14:00:00.000Z', new Date('2026-09-29T15:10:00.000Z'))?.countdown).toBeNull();
+  it('시작 시각이 지났으면 카운트다운 대신 시작됨으로, 시각이 잘못됐으면 아무것도 만들지 않는다', () => {
+    expect(describeUpcomingGameTime('2026-09-29T14:00:00.000Z', new Date('2026-09-29T15:10:00.000Z'))).toMatchObject({
+      countdown: null,
+      started: true,
+    });
+    expect(describeUpcomingGameTime('2026-09-29T15:10:00.000Z', new Date('2026-09-29T15:10:00.000Z'))?.started).toBe(true);
     expect(describeUpcomingGameTime('not-a-date', new Date())).toBeNull();
   });
 });

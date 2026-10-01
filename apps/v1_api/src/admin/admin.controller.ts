@@ -36,6 +36,7 @@ import {
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  RenameArchivedTeamDto,
   CreateAdminNoticeDto,
   CreateAdminPopupDto,
   DeleteAdminUserDto,
@@ -110,6 +111,15 @@ export class AdminController {
     @Body() dto: ChangeTeamStatusDto,
   ) {
     return this.adminService.changeTeamStatus(user, teamId, dto);
+  }
+
+  @Post('teams/:teamId/name')
+  renameArchivedTeam(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: RenameArchivedTeamDto,
+  ) {
+    return this.adminService.renameArchivedTeam(user, teamId, dto);
   }
 
   @Post('team-matches/:teamMatchId/status')

@@ -1,8 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1ScheduleState, V1TeamStatus } from '@prisma/client';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { classifyTeamMatch, findDissolutionBlockers, loadTeamMatchCandidates } from './team-dissolution';
-import { assertRestoredTeamNameFree, lockTeamNameScope } from './team-name';
+import { assertRestoredTeamNameFree, assertTeamNameAvailable, lockTeamNameScope } from './team-name';
 
 type Tx = Prisma.TransactionClient;
 
@@ -212,6 +212,24 @@ export async function restoreTeamInTx(
   await tx.v1Team.update({ where: { id: team.id }, data: { status: input.toStatus, deletedAt: null } });
   await tx.v1ChatRoom.updateMany({ where: { teamId: team.id }, data: { status: 'active' } });
   return team;
+}
+
+/**
+ * 보관된 팀의 이름만 바꾼다 — 복구가 `TEAM_RESTORE_NAME_TAKEN` 으로 막혔을 때 운영팀의 출구다. 새 이름은
+ * 만들기·수정과 같은 규칙(정규화·같은 종목·지역 중복·팀장 해체 팀의 복구 기간 예약)을 지난다.
+ * 활동 중인 팀의 이름은 팀장·매니저가 팀 수정에서 바꾼다.
+ */
+export async function renameArchivedTeamInTx(tx: Tx, input: { teamId: string; name: string }) {
+  const team = await lockTeam(tx, input.teamId);
+  if (team.status !== 'archived') {
+    throw new ConflictException({ code: 'TEAM_RENAME_NOT_ARCHIVED', message: '보관된 팀만 여기서 이름을 바꿀 수 있어요.' });
+  }
+  const name = input.name.trim();
+  if (name === '') throw new BadRequestException({ code: 'TEAM_NAME_REQUIRED', message: '새 팀 이름을 입력해 주세요.' });
+  if (name === team.name) throw new BadRequestException({ code: 'TEAM_NAME_UNCHANGED', message: '지금 이름과 같아요. 다른 이름을 써 주세요.' });
+  await assertTeamNameAvailable(tx, { name, sportId: team.sportId, regionId: team.regionId, excludeTeamId: team.id });
+  await tx.v1Team.update({ where: { id: team.id }, data: { name } });
+  return { previousName: team.name, name };
 }
 
 export type DissolutionCleanupPreview = {

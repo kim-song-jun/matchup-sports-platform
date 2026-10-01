@@ -60,6 +60,22 @@ describe('NextGameCard', () => {
     expect(screen.getByText('마포 FC · 10명 출전 · 경기 시작 전까지 바꿀 수 있어요')).toBeInTheDocument();
   });
 
+  it('킥오프가 지난 경기(결과 전): 카운트다운 대신 "진행 중" 칩을 달고, 명단을 바꿀 수 있다는 안내는 거둔다', () => {
+    const started = new Date(new Date(KICKOFF).getTime() + 60_000);
+    render(<NextGameCard game={leagueGame({ viewerCanManage: true })} now={started} />);
+
+    expect(screen.getByText('진행 중')).toBeInTheDocument();
+    expect(screen.queryByText(/뒤$/)).not.toBeInTheDocument();
+    expect(screen.getByText('마포 FC · 10명 출전')).toBeInTheDocument();
+    expect(screen.queryByText(/바꿀 수 있어요/)).not.toBeInTheDocument();
+  });
+
+  it('킥오프 전에는 "진행 중" 칩이 없다', () => {
+    render(<NextGameCard game={leagueGame()} now={NOW} />);
+
+    expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
+  });
+
   it('친선: 팀원에게는 팀장 전용인 참석명단 링크를 내지 않고 경기 상세만 준다', () => {
     const friendly = leagueGame({
       competitionKind: 'FRIENDLY',

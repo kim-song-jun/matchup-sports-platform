@@ -64,6 +64,9 @@ function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
   return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
 }
 
+// 미리보기·생성(재생성) 버튼은 한 묶음 — 좁은 폭에선 한 줄을 나눠 쓰고, 넓은 폭에선 내용 폭으로 모인다.
+const ACTION_ROW_CLASS = 'col-span-full flex gap-2';
+
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
@@ -763,7 +766,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
 
       {series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid grid-cols-2 items-start gap-x-3 gap-y-3 md:max-w-3xl md:grid-cols-4">
             <LeagueWeeksPlanField
               inputId="weeks-count"
               inputClassName={inputClass}
@@ -779,7 +782,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 id="fixture-day-of-week"
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
-                className={`${inputClass} w-40`}
+                className={`${inputClass} w-full`}
               >
                 <option value="">시작일 그대로</option>
                 {WEEKDAY_OPTIONS.map((option) => (
@@ -799,16 +802,28 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 // 그러면 날짜는 있는데 시각을 넣을 방법이 없어 **영영 제출할 수 없다.**
                 disabled={dayOfWeek === '' && selectedDates.length === 0}
                 aria-describedby={dayOfWeek === '' && selectedDates.length === 0 ? timeHintId : undefined}
-                className={`${inputClass} w-36 disabled:opacity-50`}
+                className={`${inputClass} w-full disabled:opacity-50`}
               />
               {/* 잠긴 칸의 회색 시각이 자리표시처럼 보여 왜 못 바꾸는지 몰랐다(F41) — 여는 방법을 적는다. */}
               {dayOfWeek === '' && selectedDates.length === 0 ? (
-                <p id={timeHintId} className="mt-1 w-36 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                <p id={timeHintId} className="mt-1 min-h-[2.8em] text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                   요일이나 경기 날짜를 먼저 고르면 바꿀 수 있어요.
                 </p>
               ) : null}
             </div>
-            <div className="w-full">
+            <FixtureTimingFields
+              idPrefix="fixture"
+              dayOfWeekUnset={dayOfWeek === ''}
+              endTime={endTime}
+              onEndTimeChange={setEndTime}
+              gameDurationMinutes={gameDurationMinutes}
+              onGameDurationChange={setGameDurationMinutes}
+              breakMinutes={breakMinutes}
+              onBreakMinutesChange={setBreakMinutes}
+              gamesPerTeamPerDay={gamesPerTeamPerDay}
+              onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
+            />
+            <div className="col-span-full">
               <p className="mb-1 block text-sm font-medium text-[var(--text-strong)]">경기 날짜</p>
               {/* **날짜 목록이 서버로 나가는 값이다.** 위 요일·시각은 이 목록을 한 번에
                   채우는 편의이고, 채운 뒤에는 개별 날짜를 지우거나 더할 수 있다 —
@@ -841,19 +856,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 }
               />
             </div>
-            <FixtureTimingFields
-              idPrefix="fixture"
-              dayOfWeekUnset={dayOfWeek === ''}
-              endTime={endTime}
-              onEndTimeChange={setEndTime}
-              gameDurationMinutes={gameDurationMinutes}
-              onGameDurationChange={setGameDurationMinutes}
-              breakMinutes={breakMinutes}
-              onBreakMinutesChange={setBreakMinutes}
-              gamesPerTeamPerDay={gamesPerTeamPerDay}
-              onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
-            />
-            <div>
+            <div className="col-span-full">
               <label htmlFor="fixture-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
               <input
                 id="fixture-place-name"
@@ -861,28 +864,30 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 placeholder="장소 미정"
                 value={placeName}
                 onChange={(e) => setPlaceName(e.target.value)}
-                className={`${inputClass} w-48`}
+                className={`${inputClass} w-full`}
               />
             </div>
             {/* 그룹 B 감사 결함 3: 실제 생성 전에 어떤 대진이 만들어질지 먼저 보여준다.
                 DB를 바꾸지 않는다 — generateFixtures와 완전히 같은 검증을 통과해야 결과가
                 나오므로, 미리보기가 성공했는데 실제 생성이 실패하는 불일치가 없다. */}
-            <button
-              type="button"
-              onClick={onPreview}
-              disabled={previewFixtures.isPending || !hasLeagueStartsOn}
-              className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
-            >
-              미리보기
-            </button>
-            <button
-              type="button"
-              onClick={onGenerate}
-              disabled={generateFixtures.isPending || !hasLeagueStartsOn}
-              className="min-h-[44px] rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              라운드로빈 대진 생성
-            </button>
+            <div className={ACTION_ROW_CLASS}>
+              <button
+                type="button"
+                onClick={onPreview}
+                disabled={previewFixtures.isPending || !hasLeagueStartsOn}
+                className="min-h-[44px] flex-1 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50 md:flex-none"
+              >
+                미리보기
+              </button>
+              <button
+                type="button"
+                onClick={onGenerate}
+                disabled={generateFixtures.isPending || !hasLeagueStartsOn}
+                className="min-h-[44px] flex-[1.6] rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white disabled:opacity-50 md:flex-none"
+              >
+                라운드로빈 대진 생성
+              </button>
+            </div>
           </div>
           {!hasLeagueStartsOn && <MissingStartsOnNotice />}
           <TimingSuggestionRow
@@ -1127,7 +1132,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
                   취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
                 </p>
-                <div className="flex flex-wrap items-end gap-3">
+                <div className="grid grid-cols-2 items-start gap-x-3 gap-y-3 md:max-w-3xl md:grid-cols-4">
                   <LeagueWeeksPlanField
                     inputId="regen-weeks-count"
                     inputClassName={inputClass}
@@ -1143,7 +1148,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       id="regen-day-of-week"
                       value={dayOfWeek}
                       onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
-                      className={`${inputClass} w-40`}
+                      className={`${inputClass} w-full`}
                     >
                       <option value="">시작일 그대로</option>
                       {WEEKDAY_OPTIONS.map((option) => (
@@ -1160,10 +1165,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       onChange={(e) => setTime(e.target.value)}
                       disabled={dayOfWeek === ''}
                       aria-describedby={dayOfWeek === '' ? `${timeHintId}-regen` : undefined}
-                      className={`${inputClass} w-36 disabled:opacity-50`}
+                      className={`${inputClass} w-full disabled:opacity-50`}
                     />
                     {dayOfWeek === '' ? (
-                      <p id={`${timeHintId}-regen`} className="mt-1 w-36 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                      <p id={`${timeHintId}-regen`} className="mt-1 min-h-[2.8em] text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                         요일을 먼저 고르면 바꿀 수 있어요.
                       </p>
                     ) : null}
@@ -1180,7 +1185,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                     gamesPerTeamPerDay={gamesPerTeamPerDay}
                     onGamesPerTeamPerDayChange={setGamesPerTeamPerDay}
                   />
-                  <div>
+                  <div className="col-span-full">
                     <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
                     <input
                       id="regen-place-name"
@@ -1188,28 +1193,30 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                       placeholder="장소 미정"
                       value={placeName}
                       onChange={(e) => setPlaceName(e.target.value)}
-                      className={`${inputClass} w-48`}
+                      className={`${inputClass} w-full`}
                     />
                   </div>
                   {/* 그룹 B 감사 결함 3: 재생성도 같은 미리보기를 공유한다 — 새 로스터로
                       대진을 다시 계산했을 때 실제로 뭐가 만들어지는지 typedChallenge 확인
                       전에 먼저 보여준다. */}
-                  <button
-                    type="button"
-                    onClick={onPreview}
-                    disabled={previewFixtures.isPending || !hasLeagueStartsOn}
-                    className="min-h-[44px] rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
-                  >
-                    미리보기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRegenerateModalOpen(true)}
-                    disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0}
-                    className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
-                  >
-                    대진 재생성
-                  </button>
+                  <div className={ACTION_ROW_CLASS}>
+                    <button
+                      type="button"
+                      onClick={onPreview}
+                      disabled={previewFixtures.isPending || !hasLeagueStartsOn}
+                      className="min-h-[44px] flex-1 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50 md:flex-none"
+                    >
+                      미리보기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegenerateModalOpen(true)}
+                      disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0}
+                      className="min-h-[44px] flex-[1.6] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50 md:flex-none"
+                    >
+                      대진 재생성
+                    </button>
+                  </div>
                 </div>
                 {!hasLeagueStartsOn && <MissingStartsOnNotice />}
                 {inProgressFixtures.length > 0 ? (
@@ -1536,7 +1543,7 @@ function FixturePreviewPanel({
 }
 
 // 대진 timing 입력 4종(종료 시각 + 경기 시간·휴식·팀당 하루 경기). 생성·재생성 두 폼이 같은
-// 마크업을 공유한다 — 부모의 flex-wrap 행 안에서 fragment 자식들이 그대로 flex 아이템이 된다.
+// 마크업을 공유한다 — 부모 grid 안에서 fragment 자식들이 그대로 grid 아이템이 된다.
 function FixtureTimingFields({
   idPrefix,
   dayOfWeekUnset,
@@ -1571,10 +1578,10 @@ function FixtureTimingFields({
           onChange={(e) => onEndTimeChange(e.target.value)}
           disabled={dayOfWeekUnset}
           aria-describedby={dayOfWeekUnset ? `${idPrefix}-end-time-hint` : undefined}
-          className={`${inputClass} w-28 disabled:opacity-50`}
+          className={`${inputClass} w-full disabled:opacity-50`}
         />
         {dayOfWeekUnset ? (
-          <p id={`${idPrefix}-end-time-hint`} className="mt-1 w-28 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          <p id={`${idPrefix}-end-time-hint`} className="mt-1 min-h-[2.8em] text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
             요일을 먼저 고르면 바꿀 수 있어요.
           </p>
         ) : null}
@@ -1589,7 +1596,7 @@ function FixtureTimingFields({
           placeholder="예: 15"
           value={gameDurationMinutes}
           onChange={(e) => onGameDurationChange(e.target.value)}
-          className={`${inputClass} w-28`}
+          className={`${inputClass} w-full`}
         />
       </div>
       <div>
@@ -1602,7 +1609,7 @@ function FixtureTimingFields({
           placeholder="0"
           value={breakMinutes}
           onChange={(e) => onBreakMinutesChange(e.target.value)}
-          className={`${inputClass} w-24`}
+          className={`${inputClass} w-full`}
         />
       </div>
       <div>
@@ -1615,7 +1622,7 @@ function FixtureTimingFields({
           placeholder="1"
           value={gamesPerTeamPerDay}
           onChange={(e) => onGamesPerTeamPerDayChange(e.target.value)}
-          className={`${inputClass} w-28`}
+          className={`${inputClass} w-full`}
         />
       </div>
     </>

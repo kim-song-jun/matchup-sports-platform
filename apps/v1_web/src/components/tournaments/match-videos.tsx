@@ -60,55 +60,55 @@ export function MatchVideos({
             const title = displayTitle(v, i);
             if (kind === 'external') {
               return (
-                <a
-                  key={v.id}
-                  href={v.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="tm-video-strip-item"
-                  role="listitem"
-                  aria-label={`${title} 보기 (새 창)`}
-                >
-                  <span className="tm-video-strip-thumb is-file">
-                    <ExternalLink size={22} aria-hidden="true" />
-                  </span>
-                  <span className="tm-video-strip-title">{title}</span>
-                </a>
+                <div key={v.id} role="listitem" className="tm-video-strip-cell">
+                  <a
+                    href={v.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="tm-video-strip-item"
+                    aria-label={`${title} 보기 (새 창)`}
+                  >
+                    <span className="tm-video-strip-thumb is-file">
+                      <ExternalLink size={22} aria-hidden="true" />
+                    </span>
+                    <span className="tm-video-strip-title">{title}</span>
+                  </a>
+                </div>
               );
             }
             return (
-              <button
-                key={v.id}
-                type="button"
-                className="tm-video-strip-item"
-                role="listitem"
-                onClick={() => setOpenIndex(i)}
-                aria-label={`${title} 재생`}
-                aria-haspopup="dialog"
-              >
-                {kind === 'youtube' ? (
-                  <span className="tm-video-strip-thumb">
-                    <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" loading="lazy" />
-                    <span className="tm-video-strip-overlay" aria-hidden="true">
-                      <span className="tm-video-strip-play">
-                        <Play size={16} fill="currentColor" strokeWidth={0} />
+              <div key={v.id} role="listitem" className="tm-video-strip-cell">
+                <button
+                  type="button"
+                  className="tm-video-strip-item"
+                  onClick={() => setOpenIndex(i)}
+                  aria-label={`${title} 재생`}
+                  aria-haspopup="dialog"
+                >
+                  {kind === 'youtube' ? (
+                    <span className="tm-video-strip-thumb">
+                      <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" loading="lazy" />
+                      <span className="tm-video-strip-overlay" aria-hidden="true">
+                        <span className="tm-video-strip-play">
+                          <Play size={16} fill="currentColor" strokeWidth={0} />
+                        </span>
                       </span>
                     </span>
-                  </span>
-                ) : (
-                  <span className="tm-video-strip-thumb is-file">
-                    <Clapperboard size={22} aria-hidden="true" />
-                    {/* 첫 프레임을 썸네일로 — 로드 실패 시 뒤의 그라디언트+아이콘이 그대로 보인다 */}
-                    <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" />
-                    <span className="tm-video-strip-overlay" aria-hidden="true">
-                      <span className="tm-video-strip-play">
-                        <Play size={16} fill="currentColor" strokeWidth={0} />
+                  ) : (
+                    <span className="tm-video-strip-thumb is-file">
+                      <Clapperboard size={22} aria-hidden="true" />
+                      {/* 첫 프레임을 썸네일로 — 로드 실패 시 뒤의 그라디언트+아이콘이 그대로 보인다 */}
+                      <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" />
+                      <span className="tm-video-strip-overlay" aria-hidden="true">
+                        <span className="tm-video-strip-play">
+                          <Play size={16} fill="currentColor" strokeWidth={0} />
+                        </span>
                       </span>
                     </span>
-                  </span>
-                )}
-                <span className="tm-video-strip-title">{title}</span>
-              </button>
+                  )}
+                  <span className="tm-video-strip-title">{title}</span>
+                </button>
+              </div>
             );
           })}
         </div>

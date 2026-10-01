@@ -152,7 +152,12 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
       : pageItems;
   const orderedItems = items ? sortTeamMatchesByAvailability(items) : undefined;
   const visibleItems = filterTeamMatchesByLevels(orderedItems, selectedLevels);
-  const countItems = filterTeamMatchesByLevels((countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? items, selectedLevels);
+  const countPageItems = (countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? [];
+  const countPageIds = new Set(countPageItems.map((item) => item.teamMatchId ?? item.id));
+  const countItems = filterTeamMatchesByLevels(
+    [...countPageItems, ...(items ?? []).filter((item) => !countPageIds.has(item.teamMatchId ?? item.id))],
+    selectedLevels,
+  );
   const hasNext = query.data?.pageInfo?.hasNext ?? false;
   const handleLoadMore = () => {
     if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;

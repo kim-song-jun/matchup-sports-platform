@@ -123,6 +123,7 @@ vi.mock('./team-matches-page', () => ({
     <div>
       <span data-testid={'team-match-order'}>{model.matches.map((match) => match.title).join('|')}</span>
       <span data-testid="team-match-count">{model.matches.length}</span>
+      <span data-testid="team-match-sport-counts">{model.sports.map((sport) => `${sport.label}:${sport.count}`).join('|')}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
     </div>
   ),
@@ -1407,9 +1408,11 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
     render(<TeamMatchListPageClient />);
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('team-match-sport-counts')).toHaveTextContent('전체:1|풋살:1');
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('team-match-sport-counts')).toHaveTextContent('전체:2|풋살:2');
     expect(screen.getByTestId('team-match-order')).toHaveTextContent('팀매치 2|팀매치 1');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });

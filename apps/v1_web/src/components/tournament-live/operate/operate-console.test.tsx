@@ -2,7 +2,7 @@ import { act, render, screen, within, fireEvent, waitFor } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
-import { V1ApiError } from '@/lib/api-client';
+import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
 /**
  * "기록한 이벤트" 자리에 **로컬 전송 큐**를 그리고 있었다. 큐는 이번 세션에서 내가 올린 것만
@@ -1541,8 +1541,13 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
   });
 
   it('응답이 끊기면 같은 종료 요청을 같은 idempotency body로 재시도하고 다른 기록은 막는다', async () => {
+    // v1Api 가 fetch reject 를 바꿔 던지는 모양(api-client fetchOrNetworkError).
+    const networkError = new V1ApiError(
+      { status: 'error', timestamp: '', statusCode: 0, code: V1_NETWORK_ERROR_CODE, message: 'Failed to fetch' },
+      { displayableMessage: false },
+    );
     mocks.postV1GameCommand
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(networkError)
       .mockResolvedValueOnce({ gameId: 'game-1', state: 'ENDED', version: 3 });
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);

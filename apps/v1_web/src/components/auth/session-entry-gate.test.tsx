@@ -135,7 +135,7 @@ describe('SessionEntryGate', () => {
     expect(retry(1, apiError(503, 'SERVICE_UNAVAILABLE'))).toBe(true);
     // 무한히 재시도해 서버를 더 밀어붙이지는 않는다.
     expect(retry(2, apiError(503, 'SERVICE_UNAVAILABLE'))).toBe(false);
-    // 네트워크 단절은 응답이 없어 V1ApiError로 감싸이지 않는다 — 이 경로도 재시도 대상이다.
-    expect(retry(0, new TypeError('Failed to fetch'))).toBe(true);
+    // 네트워크 단절(응답 없음)은 v1Api 가 statusCode 0 · NETWORK_ERROR 로 감싼다 — 이 경로도 재시도 대상이다.
+    expect(retry(0, apiError(0, 'NETWORK_ERROR'))).toBe(true);
   });
 });

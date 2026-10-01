@@ -627,6 +627,30 @@ describe('LineupReminderService', () => {
       expect(rowsTitled(day.tx, '팀 매치 참석명단을 확인해 주세요')).toEqual([]);
     });
 
+    // W4-V11: 매칭 직후 09:30 스캔이 같은 경기로 일일 알림과 킥오프 안내를 함께 보냈다.
+    const DAILY = '팀 매치 참석명단을 확인해 주세요';
+    it('W4-V11: 이 스캔이 킥오프 안내를 내는 경기는 일일 알림을 따로 받지 않고, 먼 경기는 일일 알림을 받는다(대조군)', async () => {
+      const scan = scanAt('2026-10-01T00:30:00Z', [ // KST 09:30
+        fakeTodo({ gameId: 'soon', scheduledAt: new Date('2026-10-01T01:55:00Z') }), // KST 10:55 — 1시간 25분 뒤
+        fakeTodo({ gameId: 'later', scheduledAt: new Date('2026-10-03T01:55:00Z') }),
+      ]);
+      await scan.done;
+
+      expect(rowsTitled(scan.tx, FINAL).map((row) => row.businessKey)).toEqual(['lineup-final:soon:team-1:manager-1']);
+      expect(rowsTitled(scan.tx, DAILY).map((row) => row.businessKey)).toEqual(['lineup-daily:game:later:team-1:2026-10-01:manager-1']);
+    });
+
+    it('W4-V11: 킥오프 안내를 이미 받은 경기(키 중복)도, 밤 경기를 앞당겨 알리는 저녁 마지막 스캔도 일일 알림을 더하지 않는다', async () => {
+      const again = scanAt('2026-10-01T00:45:00Z', [fakeTodo({ gameId: 'soon', scheduledAt: new Date('2026-10-01T01:55:00Z') })]);
+      await again.done;
+      expect(rowsTitled(again.tx, DAILY)).toEqual([]);
+
+      const cutoff = scanAt('2026-08-27T11:50:00Z', [fakeTodo({ scheduledAt: NIGHT_KICKOFF })]); // KST 20:50
+      await cutoff.done;
+      expect(rowsTitled(cutoff.tx, FINAL)).toHaveLength(1);
+      expect(rowsTitled(cutoff.tx, DAILY)).toEqual([]);
+    });
+
     it('밤 킥오프의 미제출 안내는 알림함에만 남는다', async () => {
       const night = scanAt('2026-08-27T16:20:00Z', [fakeTodo({ scheduledAt: NIGHT_KICKOFF })]); // KST 01:20
       await night.done;

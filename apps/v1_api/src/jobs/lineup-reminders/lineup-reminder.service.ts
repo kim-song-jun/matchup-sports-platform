@@ -102,11 +102,11 @@ export class LineupReminderService {
 
     // 킥오프가 코앞인 미제출 안내는 밤에도 알림함에 남기고 푸시만 낮에 한다(L35). 2시간 전 시각이 밤에 걸리는 경기는
     // 밤이 시작되기 전 마지막 스캔이 앞당겨 푸시한다 — 이후 밤 스캔은 같은 키라 다시 만들지 않는다.
-    const urgent = [
+    const finals = [
       ...buildFinalMessages(upcoming, now),
       ...(isEveningCutoffScan(now) ? buildOvernightFinalMessages(upcoming, now) : []),
-      ...buildKickoffMissingMessages(started, now),
     ];
+    const urgent = [...finals, ...buildKickoffMissingMessages(started, now)];
     for (const message of urgent) {
       await this.deliver(tx, message, claim, !quiet);
     }
@@ -116,7 +116,10 @@ export class LineupReminderService {
 
     const rosterChecks = await this.todoService.listCompetitionRosterChecks(kstMidnight(now, 1), kstMidnight(now, 2));
     const { dateKey } = kstParts(now);
-    for (const message of [...buildDailyMessages(upcoming, dateKey), ...buildRosterCheckMessages(rosterChecks)]) {
+    // 이 스캔이 킥오프 안내를 내는(이미 냈으면 키 중복으로 건너뛰는) 경기는 일일 알림에서 뺀다 — 한 사건에 카드 한 장(W4-V11).
+    const finalKeys = new Set(finals.map((message) => message.keyPrefix));
+    const daily = buildDailyMessages(upcoming.filter((todo) => !finalKeys.has(finalReminderKeyPrefix(todo))), dateKey);
+    for (const message of [...daily, ...buildRosterCheckMessages(rosterChecks)]) {
       await this.deliver(tx, message, claim, true);
     }
     // 경기 알림은 "경기·대회" 수신 설정(teamMatchEnabled)을 따른다 — 위 팀 운영 알림(teamEnabled)과 축이 다르다.
@@ -333,9 +336,13 @@ export function buildFinalMessages(
           ? `${todo.title} 참석명단이 아직 비어 있어요.`
           : `${todo.title} 참석명단이 아직 제출 전이에요.`,
       deepLink: todo.deepLink,
-      // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
-      keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
+      keyPrefix: finalReminderKeyPrefix(todo),
     }));
+}
+
+/** 최종 확인(앞당긴 것 포함)의 키. 날짜를 넣지 않는다 — 이 알림은 그 경기·팀에 딱 한 번만 가야 한다. */
+function finalReminderKeyPrefix(todo: LineupTodo): string {
+  return `lineup-final:${todo.gameId}:${todo.teamId}`;
 }
 
 /**
@@ -358,7 +365,7 @@ export function buildOvernightFinalMessages(
       title: '곧 경기가 시작돼요 — 참석명단을 확인해 주세요',
       body: `${formatKstMonthDayTime(startAt)} ${todo.title} 참석명단이 ${todo.state === 'MISSING' ? '아직 비어 있어요' : '아직 제출 전이에요'}.`,
       deepLink: todo.deepLink,
-      keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
+      keyPrefix: finalReminderKeyPrefix(todo),
     }];
   });
 }

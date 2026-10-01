@@ -14,13 +14,17 @@ export class V1ApiError extends Error {
   readonly statusCode: number;
   readonly code: string;
   readonly details: unknown;
+  /** 사람에게 보여 줄 문장인가 — 아니면 `message` 는 로그용 자리표시(`Request failed`·statusText)라 화면은 해요체 fallback 을 쓴다. */
+  readonly displayableMessage: boolean;
 
-  constructor(body: ApiErrorBody) {
-    super(toErrorMessage(body.message));
+  constructor(body: ApiErrorBody, options: { displayableMessage?: boolean; cause?: unknown } = {}) {
+    const message = toErrorMessage(body.message);
+    super(message ?? 'Request failed', options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'V1ApiError';
     this.statusCode = body.statusCode;
     this.code = body.code;
     this.details = body.details;
+    this.displayableMessage = options.displayableMessage ?? message !== null;
   }
 }
 
@@ -30,6 +34,34 @@ export class V1ApiError extends Error {
 export function isUnauthenticatedError(error: unknown): boolean {
   return error instanceof V1ApiError
     && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
+}
+
+/** 응답을 하나도 받지 못한 실패(fetch reject). 서버가 처리했는지 알 수 없다 — 재시도·"저장 여부 불확실" 판정이 이 값을 본다. */
+export const V1_NETWORK_ERROR_CODE = 'NETWORK_ERROR';
+
+export function isV1NetworkError(error: unknown): boolean {
+  return error instanceof V1ApiError && error.code === V1_NETWORK_ERROR_CODE;
+}
+
+/** fetch 가 reject 하면 V1ApiError(statusCode 0)로 바꾼다. 요청 취소는 오류가 아니라서 그대로 다시 던진다. */
+async function fetchOrNetworkError(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    const aborted = init.signal?.aborted === true
+      || (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError');
+    if (aborted) throw error;
+    throw new V1ApiError(
+      {
+        status: 'error',
+        statusCode: 0,
+        code: V1_NETWORK_ERROR_CODE,
+        message: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      },
+      { displayableMessage: false, cause: error },
+    );
+  }
 }
 
 // React Query의 retry 옵션용. 서버가 잠시 밀린 경우(5xx·요청량 초과·네트워크 단절)만
@@ -49,18 +81,17 @@ function isExpectedGuestAuthProbe(path: string, init: RequestInit, error: V1ApiE
 
 export function retryTransientFailure(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) return false;
-  // 네트워크 단절은 응답 자체가 없어 V1ApiError로 감싸이지 않고 그대로 전파된다.
   if (!(error instanceof V1ApiError)) return true;
-  return error.statusCode >= 500 || error.statusCode === 429;
+  return isV1NetworkError(error) || error.statusCode >= 500 || error.statusCode === 429;
 }
 
-function toErrorMessage(message: unknown) {
-  if (typeof message === 'string') return message;
-  if (Array.isArray(message)) return message.join(', ');
+function toErrorMessage(message: unknown): string | null {
+  if (typeof message === 'string') return message || null;
+  if (Array.isArray(message)) return message.join(', ') || null;
   if (message && typeof message === 'object' && 'message' in message) {
     return toErrorMessage((message as { message: unknown }).message);
   }
-  return 'Request failed';
+  return null;
 }
 
 function getDefaultBaseUrl() {
@@ -90,7 +121,7 @@ export function getV1DevAuthHeaders(): HeadersInit {
 }
 
 export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${getV1ApiBaseUrl()}${path}`, {
+  const response = await fetchOrNetworkError(`${getV1ApiBaseUrl()}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
@@ -111,7 +142,8 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
         message: response.statusText || 'Request failed',
         timestamp: new Date().toISOString(),
       };
-    const error = new V1ApiError(errorBody);
+    // 본문이 없으면(배포 중 502 HTML 등) 메시지는 서버가 준 것이 아니다.
+    const error = new V1ApiError(errorBody, body ? {} : { displayableMessage: false });
     // 휴대폰 미인증 차단은 설계된 제품 상태이지 클라이언트 오류가 아니다. 리포터의 dedupe 는
     // 10초 창이라 미인증 사용자 수만큼 에러 로그가 실제로 쌓이고, 그러면 어드민 에러 뷰어에서
     // 진짜 장애가 이 잡음에 묻힌다 — 로그는 건너뛰고 안내 신호만 보낸다.
@@ -165,7 +197,7 @@ export function v1Delete<T>(path: string, body?: unknown, init?: RequestInit) {
  * 옮겼다 — 경기 영상 업로드도 같은 처리가 필요해 두 벌로 갈라두지 않는다.
  */
 export async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${getV1ApiBaseUrl()}${path}`, {
+  const response = await fetchOrNetworkError(`${getV1ApiBaseUrl()}${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -196,6 +228,7 @@ export async function v1MultipartPost<T>(path: string, formData: FormData): Prom
             message: response.statusText || '업로드에 실패했어요.',
             timestamp: new Date().toISOString(),
           },
+      isErrorEnvelope ? {} : { displayableMessage: false },
     );
   }
 

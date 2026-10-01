@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { RecordConsentSettingsPageClient } from './my-api-clients';
 
 // F2: 사용자 단위 공개 기록 동의 토글 — 켜면 과거 경기까지 소급 공개된다는 게 이 기능의
@@ -17,6 +18,7 @@ const hooks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => hooks.searchParams(),
+  usePathname: () => '/my/settings/record-consent',
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
@@ -40,7 +42,7 @@ describe('RecordConsentSettingsPageClient', () => {
     vi.clearAllMocks();
   });
 
-  it('꺼져 있으면 OFF로 보이고, 소급 공개를 미리 알린다', () => {
+  it('꺼져 있으면 비공개로 보이고, 소급 공개를 미리 알린다', () => {
     hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
     hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
 
@@ -48,9 +50,9 @@ describe('RecordConsentSettingsPageClient', () => {
 
     const toggle = screen.getByRole('switch', { name: '경기 기록 공개' });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText('OFF')).toBeInTheDocument();
+    expect(screen.getByText('지금은 비공개예요.')).toBeInTheDocument();
     // 켜기 전에도 소급 공개 사실을 알아야 한다 — 켜고 나서 놀라지 않게.
-    expect(screen.getByText(/켜면 지금까지 참가한 경기 기록도 함께 공개돼요/)).toBeInTheDocument();
+    expect(screen.getByText(/켜면 지금까지 참가한 경기 기록도 함께 공개되고/)).toBeInTheDocument();
   });
 
   it('토글을 누르면 granted:true + 고정 policyHash로 저장한다', async () => {
@@ -69,7 +71,7 @@ describe('RecordConsentSettingsPageClient', () => {
     );
   });
 
-  it('켜져 있으면 ON으로 보이고 언제부터 공개됐는지 알려준다', () => {
+  it('켜져 있으면 공개 중으로 보이고 언제부터 공개됐는지 알려준다', () => {
     hooks.consent.mockReturnValue({
       data: { granted: true, effectiveAt: '2026-08-01T00:00:00.000Z' },
       isLoading: false,
@@ -82,9 +84,11 @@ describe('RecordConsentSettingsPageClient', () => {
 
     const toggle = screen.getByRole('switch', { name: '경기 기록 공개' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('ON')).toBeInTheDocument();
-    expect(screen.getByText(/부터 공개하고 있어요/)).toBeInTheDocument();
-    // 서버는 끄는 즉시 연결된 모든 기록을 비공개로 돌린다(새 경기부터가 아니다) -- 문구가 그 동작을 말한다.
+    // 상태·시작 시점은 스위치 행 한 줄에만 나온다(ON 글자·날짜 줄을 따로 두지 않는다).
+    expect(screen.getByText(/^공개 중 · 2026년 8월 1일.*부터$/)).toBeInTheDocument();
+    expect(screen.queryByText('ON')).not.toBeInTheDocument();
+    expect(screen.queryByText(/부터 공개하고 있어요/)).not.toBeInTheDocument();
+    // 서버는 끄는 즉시 연결된 모든 기록을 비공개로 돌린다(새 경기부터가 아니다) -- 각주가 그 동작을 말한다.
     expect(screen.getByText(/끄면 바로 모두 비공개로 돌아가요/)).toBeInTheDocument();
     expect(screen.queryByText(/새 경기부터/)).not.toBeInTheDocument();
     // 활동 기록 KPI·득점 목록에는 도움도 나온다 -- 무엇이 공개되는지 말하는 각주가 빠뜨리면 안 된다.
@@ -121,7 +125,7 @@ describe('RecordConsentSettingsPageClient', () => {
     renderWithClient(<RecordConsentSettingsPageClient />);
 
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-    expect(screen.queryByText('OFF')).not.toBeInTheDocument();
+    expect(screen.queryByText('지금은 비공개예요.')).not.toBeInTheDocument();
   });
 
   it('데스크톱 뒤로가기는 ?from= 이 없으면 /my/settings 로 떨어진다', () => {
@@ -166,5 +170,20 @@ describe('RecordConsentSettingsPageClient', () => {
     expect(screen.queryByText('공개되는 정보')).not.toBeInTheDocument();
     expect(screen.getByText('공개')).toBeInTheDocument();
     expect(container.querySelectorAll('.tm-card').length).toBe(1);
+  });
+
+  // 성공 분기는 자기 헤더를 그리므로 셸 헤더가 겹치지 않게 꺼야 하고, 로딩·에러는 셸 헤더가 유일한 헤더다.
+  it.each([
+    ['성공', { data: { granted: false, effectiveAt: null }, isLoading: false, isError: false }, false],
+    ['로딩', { data: undefined, isLoading: true, isError: false }, undefined],
+    ['에러', { data: undefined, isLoading: false, isError: true }, undefined],
+  ])('데스크톱 셸 헤더 override: %s', (_name, state, expected) => {
+    hooks.consent.mockReturnValue({ ...state, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    renderWithClient(<RecordConsentSettingsPageClient />);
+
+    const { result } = renderHook(() => useShellOverrideForRoute('/my/settings/record-consent'));
+    expect(result.current.desktopHead).toBe(expected);
   });
 });

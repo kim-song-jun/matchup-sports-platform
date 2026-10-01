@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ResultEditModal } from './result-edit-modal';
 import type {
@@ -175,6 +175,24 @@ describe('ResultEditModal participant naming', () => {
     expect(screen.getAllByText('원정 · #7 강아라')).toHaveLength(2);
     expect(screen.queryByText(/참가자 dc52c8/)).not.toBeInTheDocument();
     expect(screen.queryByText(/참가자 701eb3/)).not.toBeInTheDocument();
+  });
+
+  it('선수별 칸 여섯 개를 선수 이름의 그룹으로 묶고, 각 칸은 숫자 키패드·16px 로 뜬다', () => {
+    const lineups: GameLineup[] = [
+      lineup(HOME_SIDE_ID, [{ id: HOME_PARTICIPANT_ID, name: '김골키', jersey: 1 }]),
+      lineup(AWAY_SIDE_ID, [{ id: AWAY_PARTICIPANT_ID, name: '강아라', jersey: 7 }]),
+    ];
+    render(<ResultEditModal {...baseProps()} lineups={lineups} />);
+
+    // 칸 이름이 "득점" 뿐이라 선수 12명이면 어느 선수 칸인지 알 수 없었다 — 그룹 이름이 선수다.
+    const group = screen.getByRole('group', { name: '홈 · #1 김골키' });
+    for (const label of ['득점', '어시스트', '파울', '출전(분)', '경고', '퇴장']) {
+      const input = within(group).getByLabelText(label);
+      expect(input).toHaveAttribute('inputmode', 'numeric');
+      expect(input).toHaveStyle({ fontSize: 'var(--font-size-input)' });
+    }
+    expect(within(group).getByRole('checkbox', { name: '골키퍼' })).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '원정 · #7 강아라' })).getAllByRole('spinbutton')).toHaveLength(6);
   });
 
   it('falls back to an explicit "라인업에 없음" label (not a blank) when no lineup data is available', () => {
@@ -449,7 +467,7 @@ describe('ResultEditModal — 참가자 어시스트·파울 보존/입력 (2-A)
         ],
       },
       ({ confirmLabel }) => {
-        const minutesInputs = screen.getAllByLabelText('출전 시간(분)');
+        const minutesInputs = screen.getAllByLabelText('출전(분)');
         expect(minutesInputs).toHaveLength(2);
         expect((minutesInputs[0] as HTMLInputElement).value).toBe('12');
         expect((minutesInputs[1] as HTMLInputElement).value).toBe('');

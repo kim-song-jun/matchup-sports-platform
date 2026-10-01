@@ -109,7 +109,7 @@ type AdminListSummary = {
   - v1에서는 `accountStatus=deleted`, `deletedAt` 기록, 이메일/전화번호/프로필 마스킹, auth identity unlink, provider key 마스킹, 감사 로그 기록으로 처리한다. 이미 연결된 실시간 소켓도 강제 종료한다.
   - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
   - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
-  - 팀 정보는 생성/소유 팀, 팀장/매니저/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다.
+  - 팀 정보는 소유 팀(`ownerUserId` 기준, 보관 팀 포함·최근 5건 목록과 전체 개수), 팀장/매니저/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다. 소유 팀은 소속 팀의 owner(팀장) 역할과 같은 개념이다.
 
 아래 "사용자·운영자 접근 불변식" 절은 같은 사용자 상태 변경/삭제 계약을 DTO 레벨(`ChangeUserStatusDto`/`DeleteAdminUserDto`)에서 상세히 다룬다.
 

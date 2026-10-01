@@ -198,7 +198,7 @@ export default function AdminUserDetailPage() {
                     <AdminStatusPill status={team.status} />
                   </>
                 }
-                tags={team.roleTags}
+                tags={team.roleLabel ? [team.roleLabel] : []}
               />
             ))}
           </ListSection>
@@ -230,7 +230,7 @@ export default function AdminUserDetailPage() {
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">활동 요약</h2>
             <dl className="mt-2">
               <DefinitionRow label="개설 매치" value={user.hostedMatchCount} />
-              <DefinitionRow label="생성/소유 팀" value={user.ownedTeamCount} />
+              <DefinitionRow label="소유 팀(보관 포함)" value={user.ownedTeamCount} />
               <DefinitionRow label="팀장 팀" value={teamRoles.owner} />
               <DefinitionRow label="매니저 팀" value={teamRoles.manager} />
               <DefinitionRow label="소속팀 전체" value={teamMemberships.length} />

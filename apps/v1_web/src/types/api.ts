@@ -2363,7 +2363,7 @@ export type V1HomeShortcut = {
   disabledReason: string | null;
 };
 
-/** 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 앞으로의 경기 중 가장 가까운 하나이고, 출전 여부는 서버가 판정한다. */
+/** 홈 맨 위 "다음 경기" 카드의 경기. 내 팀의 가장 가까운 경기 하나(킥오프 뒤에도 결과 전·3시간 안이면 남는다)이고, 출전 여부는 서버가 판정한다. */
 export type V1HomeNextGame = {
   gameId: string;
   teamMatchId: string | null;
@@ -3068,6 +3068,14 @@ export type V1AdminStatusChangeResult = {
   status: string;
   actionLogId: string;
   statusChangeLogId: string;
+};
+
+/** `POST /admin/teams/:teamId/name` — 보관된 팀만 이름을 바꾼다. */
+export type V1AdminTeamRenameResult = {
+  teamId: string;
+  previousName: string;
+  name: string;
+  actionLogId: string;
 };
 
 export type AdminListFilters = {

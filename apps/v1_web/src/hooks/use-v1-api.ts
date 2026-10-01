@@ -71,6 +71,7 @@ import type {
   V1AdminOverview,
   V1AdminStatusChangeLog,
   V1AdminStatusChangeResult,
+  V1AdminTeamRenameResult,
   V1AdminTeamDetail,
   V1AdminTeamMatchApprovalPayload,
   V1AdminTeamMatchApprovalResult,
@@ -3440,6 +3441,19 @@ export function useV1ChangeTeamStatus() {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeams() });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeam(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+/** 보관 팀 이름 변경(운영팀) — 같은 이름의 팀 때문에 보관을 못 풀 때의 출구. */
+export function useV1RenameArchivedTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name, reason }: { id: string; name: string; reason: string }) =>
+      v1Post<V1AdminTeamRenameResult>(`/admin/teams/${id}/name`, { name, reason }),
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeams() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeam(id) });
     },
   });
 }

@@ -73,9 +73,13 @@
 "계산하지 못했다"이므로 클라이언트는 그 영역을 그리지 않는다.
 
 - `hasTeam`: 활성 팀(활성 멤버십 + 활성·미삭제 팀)이 하나라도 있는지. `false` 면 그 자리가 "먼저 해 볼 일" 빈 상태다.
-- `nextGame`: 내 활성 팀들의 **앞으로의** 경기(`status=matched`, `startAt >= now`) 중 가장 가까운 하나 — 리그·대회·친선
+- `nextGame`: 내 활성 팀들의 경기(`status=matched`, `startAt >= now - 3시간`) 중 가장 가까운 하나 — 리그·대회·친선
   팀매치. 수집은 팀 상세 `GET /teams/:teamId/upcoming-games` 와 같은 경로(`LineupTodoService`)다. 권한 경계는
   서비스 계층의 멤버십 조회이며, 내 팀이 아닌 팀의 경기는 더 가까워도 나오지 않는다.
+  - **킥오프 뒤에도 남는다(2026-10-01 결정).** 결과가 나가 팀매치가 `completed` 가 되면(친선 결과 제출·대회·리그
+    콘솔 종료) 바로 다음 경기로, 결과가 늦어도 킥오프 + 3시간이 지나면 다음 경기로 넘어간다. `scheduledAt` 이
+    지났으면 웹은 "진행 중" 으로 그린다. 이 유예는 홈 카드만이다 — 팀 상세 다가오는 경기·할 일·리마인더는 여전히
+    `startAt >= now` 이다.
   `{ gameId, teamMatchId, competitionKind, competitionId(대회 id 또는 리그 id), title, opponentName, scheduledAt,
   placeName, teamId, teamName, viewerCanManage(owner·manager), viewerParticipating, participantCount }`.
   - `viewerParticipating` 은 서버 판정이다: 대회·리그는 계산된 경기 명단(참가 명단 − 조정 − 결장 − 출전정지)의

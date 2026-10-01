@@ -9,7 +9,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow, V1TeamDissolutionBlocker } from '@/types/api';
 import { formatAdminDate } from '@/lib/date-utils';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import {
   dissolutionBlockerItemSummary,
   dissolutionBlockerTitle,
@@ -47,6 +47,8 @@ const REASON_MODAL_STATUS_OPTIONS = [
 const PAGE_SIZE = 20;
 
 type ArchiveBlocked = { message: string; blockers: V1TeamDissolutionBlocker[] };
+type RestoreNameTaken = { message: string; teamId: string };
+type ModalNotice = ({ kind: 'archive_blocked' } & ArchiveBlocked) | ({ kind: 'restore_name_taken' } & RestoreNameTaken);
 
 /** 보관(archived)을 막는 항목 — 토스트로는 다 못 읽어 상태 변경 모달 안에 남긴다. */
 function ArchiveBlockedNotice({ message, blockers }: ArchiveBlocked) {
@@ -65,6 +67,22 @@ function ArchiveBlockedNotice({ message, blockers }: ArchiveBlocked) {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/** 보관 해제가 같은 이름의 팀 때문에 막혔을 때 — 이름을 바꾸는 곳(팀 상세)으로 잇는다. */
+function RestoreNameTakenNotice({ message, teamId }: RestoreNameTaken) {
+  return (
+    <>
+      <p className="font-semibold">{message}</p>
+      <p className="mt-1">보관 팀의 이름을 바꾼 뒤 다시 보관을 풀어 주세요.</p>
+      <Link
+        href={`/admin/teams/${encodeURIComponent(teamId)}`}
+        className="mt-1 inline-flex min-h-[44px] items-center font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      >
+        팀 상세에서 이름 바꾸기
+      </Link>
     </>
   );
 }
@@ -107,10 +125,10 @@ export default function AdminTeamsPage() {
 
   // ── Moderation modal ───────────────────────────────────────────────
   const [modalRow, setModalRow] = useState<V1AdminTeamRow | null>(null);
-  const [archiveBlocked, setArchiveBlocked] = useState<ArchiveBlocked | null>(null);
+  const [modalNotice, setModalNotice] = useState<ModalNotice | null>(null);
   const mutation = useV1ChangeTeamStatus();
   const setModalTarget = (row: V1AdminTeamRow | null) => {
-    setArchiveBlocked(null);
+    setModalNotice(null);
     setModalRow(row);
   };
 
@@ -119,9 +137,10 @@ export default function AdminTeamsPage() {
 
   const handleModalSubmit = (status: string, reason: string) => {
     if (!modalRow) return;
-    setArchiveBlocked(null);
+    const teamId = modalRow.teamId;
+    setModalNotice(null);
     mutation.mutate(
-      { id: modalRow.teamId, status, reason },
+      { id: teamId, status, reason },
       {
         onSuccess: () => {
           setModalTarget(null);
@@ -131,7 +150,11 @@ export default function AdminTeamsPage() {
         onError: (err) => {
           const blockers = dissolutionBlockersFromError(err);
           if (blockers) {
-            setArchiveBlocked({ message: extractErrorMessage(err, '보관을 막는 항목이 있어요. 먼저 정리해 주세요.'), blockers });
+            setModalNotice({ kind: 'archive_blocked', message: extractErrorMessage(err, '보관을 막는 항목이 있어요. 먼저 정리해 주세요.'), blockers });
+            return;
+          }
+          if (extractErrorCode(err) === 'TEAM_RESTORE_NAME_TAKEN') {
+            setModalNotice({ kind: 'restore_name_taken', message: extractErrorMessage(err, '같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.'), teamId });
             return;
           }
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -285,7 +308,13 @@ export default function AdminTeamsPage() {
         onSubmit={handleModalSubmit}
         onClose={() => setModalTarget(null)}
         pending={mutation.isPending}
-        error={archiveBlocked ? <ArchiveBlockedNotice {...archiveBlocked} /> : null}
+        error={
+          modalNotice?.kind === 'archive_blocked' ? (
+            <ArchiveBlockedNotice {...modalNotice} />
+          ) : modalNotice?.kind === 'restore_name_taken' ? (
+            <RestoreNameTakenNotice {...modalNotice} />
+          ) : null
+        }
       />
 
       {/* Toasts */}

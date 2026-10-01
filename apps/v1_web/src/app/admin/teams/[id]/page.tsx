@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, MapPin, Shield, Trophy, Users } from 'lucide-react';
@@ -10,8 +11,12 @@ import {
   AdminStatusPill,
   AdminSummaryItem,
   AdminTableSkeleton,
+  AdminTeamRenameModal,
+  AdminToasts,
+  useAdminToast,
 } from '@/components/admin';
-import { useV1AdminTeam } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useV1AdminTeam, useV1RenameArchivedTeam } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { teamRoleLabel } from '@/lib/v1-status-labels';
@@ -99,6 +104,11 @@ export default function AdminTeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = params.id;
   const { data: team, isPending, isError, error, refetch } = useV1AdminTeam(teamId);
+  const canWrite = useAdminCanWrite();
+  const rename = useV1RenameArchivedTeam();
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const { toasts, showToast } = useAdminToast();
 
   if (isPending) {
     return <AdminTableSkeleton rows={6} />;
@@ -126,6 +136,25 @@ export default function AdminTeamDetailPage() {
   }
 
   const trust = team.trustScore;
+  // 활동 중인 팀 이름은 팀장이 고친다 — 운영팀은 보관 팀만(복구가 같은 이름 때문에 막혔을 때의 출구).
+  const canRename = canWrite && team.status === 'archived';
+  const openRename = () => {
+    setRenameError(null);
+    setRenameOpen(true);
+  };
+  const handleRename = (name: string, reason: string) => {
+    setRenameError(null);
+    rename.mutate(
+      { id: team.teamId, name, reason },
+      {
+        onSuccess: () => {
+          setRenameOpen(false);
+          showToast('팀 이름을 바꿨어요. 이제 팀 목록의 상태 변경에서 보관을 풀 수 있어요.', 'success');
+        },
+        onError: (err) => setRenameError(extractErrorMessage(err, '이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
+    );
+  };
 
   return (
     <>
@@ -148,8 +177,25 @@ export default function AdminTeamDetailPage() {
                 <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{team.name}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{team.sportName}</p>
               </div>
-              <AdminStatusPill status={team.status} />
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminStatusPill status={team.status} />
+                {canRename ? (
+                  <button
+                    type="button"
+                    onClick={openRename}
+                    className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    이름 바꾸기
+                  </button>
+                ) : null}
+              </div>
             </div>
+
+            {canRename ? (
+              <p className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
+                보관된 팀이에요. 같은 종목·지역에 같은 이름의 팀이 있어 보관을 풀 수 없다면 이름을 바꾼 뒤 팀 목록의 상태 변경에서 풀어 주세요.
+              </p>
+            ) : null}
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <AdminDetailRow label="팀 ID" value={team.teamId} />
@@ -194,6 +240,16 @@ export default function AdminTeamDetailPage() {
           </section>
         </aside>
       </div>
+
+      <AdminTeamRenameModal
+        open={renameOpen}
+        currentName={team.name}
+        onSubmit={handleRename}
+        onClose={() => setRenameOpen(false)}
+        pending={rename.isPending}
+        error={renameError}
+      />
+      <AdminToasts toasts={toasts} />
     </>
   );
 }

@@ -1779,6 +1779,8 @@ export type V1TeamMatchLineup = {
     attending: boolean;
     /** 이 경기 팀 일정 응답(팀장 참고용, 읽기 전용). 연결된 일정이 없으면 null. */
     rsvpStatus?: V1TeamMatchRsvpStatus | null;
+    /** 상대 팀에도 활성 멤버인지(W4-V4, 안내용). 서버는 두 팀 명단에 모두 넣는 것을 막지 않는다. */
+    alsoOpponentMember?: boolean;
   }>;
 };
 

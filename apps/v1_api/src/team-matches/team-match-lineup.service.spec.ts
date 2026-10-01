@@ -72,6 +72,8 @@ function createFake(options: {
   scheduleAttendance?: Array<{ userId: string; status: string }>;
   /** V1GameVisibilityPolicy.lineupAt. undefined 면 정책 행이 없다. */
   publicLineupAt?: Date | null;
+  /** 팀장 소속이 아닌 팀의 멤버십(팀 id → 행). 우리 팀 목록은 아래 고정 3명이다. */
+  otherTeamMemberships?: Record<string, Array<{ userId: string; status: 'active' | 'left' | 'removed' }>>;
 } = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
@@ -168,12 +170,20 @@ function createFake(options: {
         if (!ROSTER_USER_IDS.has(userId)) return null;
         return { userId, user: { profile: { nickname: `${userId} 님`, displayName: null } } };
       },
-      findMany: async () =>
-        ['user-1', 'user-2', 'user-3'].map((userId, index) => ({
+      findMany: async (args: { where: { teamId: string; status?: string; userId?: { in: string[] } } }) => {
+        // 다른 팀 조회는 where(팀·상태·사용자)를 실제로 적용한다 — 서비스가 필터를 빠뜨리면 결과가 달라진다.
+        if (args.where.teamId !== managerMembership.teamId) {
+          return (options.otherTeamMemberships?.[args.where.teamId] ?? [])
+            .filter((row) => args.where.status === undefined || row.status === args.where.status)
+            .filter((row) => args.where.userId === undefined || args.where.userId.in.includes(row.userId))
+            .map((row) => ({ userId: row.userId }));
+        }
+        return ['user-1', 'user-2', 'user-3'].map((userId, index) => ({
           userId,
           jerseyNumber: index + 1,
           user: { profile: { nickname: `${userId} 님`, displayName: null } },
-        })),
+        }));
+      },
     },
     // 참석명단 자격은 활성 멤버십만 본다. RSVP 는 조회 화면의 읽기 전용 칩으로만 읽는다 —
     // 저장·추가 스펙은 scheduleReads 가 0 인지 본다.
@@ -1217,6 +1227,54 @@ describe('TeamMatchLineupService — 상대 참석명단 공개 (H5 결정 A)', 
     const view = await service.getOpponentLineup(manager, 'team-match-1');
     expect(view).toMatchObject({ teamName: '홈 FC' });
     expect(view.participants.map((row) => row.displayName)).toEqual(['홈 선수1', '홈 선수2']);
+  });
+});
+
+/**
+ * W4-V4 결정 B: 두 팀에 모두 속한 우리 팀원을 알린다(막지 않는다). 판정은 상대 **팀 멤버십**만 본다 —
+ * 상대 참석명단은 공개 전이라 읽지 않는다. 대조군을 양쪽에 둔다: 양 팀 소속 / 우리 팀만 / 상대 팀을 떠난 사람.
+ */
+describe('TeamMatchLineupService.getLineup — 상대 팀에도 소속된 팀원 (W4-V4)', () => {
+  it('상대 팀 활성 멤버인 우리 팀원만 true — 우리 팀만 소속이거나 상대 팀을 떠났으면 false', async () => {
+    const { prisma } = createFake({
+      otherTeamMemberships: {
+        'team-away': [
+          { userId: 'user-1', status: 'active' },
+          { userId: 'user-2', status: 'left' },
+          { userId: 'away-user-1', status: 'active' },
+        ],
+      },
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const lineup = await service.getLineup(manager, 'team-match-1');
+    expect(lineup.eligibleMembers.map((member) => [member.userId, member.alsoOpponentMember])).toEqual([
+      ['user-1', true],
+      ['user-2', false],
+      ['user-3', false],
+    ]);
+  });
+
+  it('원정 팀장이 보면 상대는 홈 팀이다 — 자기 팀 멤버십을 상대로 착각하지 않는다', async () => {
+    const { prisma } = createFake({
+      managerTeamId: 'team-away',
+      otherTeamMemberships: { 'team-home': [{ userId: 'user-3', status: 'active' }] },
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const lineup = await service.getLineup(manager, 'team-match-1');
+    expect(lineup.eligibleMembers.filter((member) => member.alsoOpponentMember).map((member) => member.userId)).toEqual(['user-3']);
+  });
+
+  it('상대가 아직 정해지지 않았으면 아무도 표시하지 않는다', async () => {
+    const { prisma } = createFake({
+      approvedApplicantTeamId: null,
+      otherTeamMemberships: { 'team-away': [{ userId: 'user-1', status: 'active' }] },
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const lineup = await service.getLineup(manager, 'team-match-1');
+    expect(lineup.eligibleMembers.every((member) => member.alsoOpponentMember === false)).toBe(true);
   });
 });
 

@@ -375,6 +375,10 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
     { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
   ],
   bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
+  eligibleMembers: [
+    { userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, attending: true, rsvpStatus: null, alsoOpponentMember: false },
+    { userId: 'user-2', displayName: '박서준', jerseyNumber: 1, attending: true, rsvpStatus: null, alsoOpponentMember: true },
+  ],
 };
 
 // ── Tournament operations mock state (Task 18/19 backend, Task 19 frontend) ─

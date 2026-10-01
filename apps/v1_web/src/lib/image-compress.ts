@@ -45,6 +45,15 @@ export type ImageEncoder = (
   quality: number,
 ) => Promise<Blob | null>;
 
+export type CompressOptions = {
+  /**
+   * 크기와 무관하게 **항상** 캔버스로 다시 그려 원본 메타데이터(EXIF — 촬영 위치 GPS·기기 정보)를 지운다.
+   * 채팅처럼 사람 사이에 사진이 오가는 곳에서 켠다(Task 181 — 2MB 이하 원본을 그대로 보내면 위치가 따라간다).
+   * 다시 그린 결과가 원본보다 커도 한도 안이면 채택한다. 디코드할 수 없는 파일은 원본을 보내 서버 검증에 맡긴다.
+   */
+  stripMetadata?: boolean;
+};
+
 /** 종횡비를 유지한 채 긴 변이 maxEdge 를 넘지 않도록 줄인 크기 (확대하지 않는다). */
 export function fitWithin(
   width: number,
@@ -81,12 +90,14 @@ function toEncodedFile(original: File, blob: Blob): File {
 export async function compressImageForUpload(
   file: File,
   encode: ImageEncoder = encodeWithCanvas,
+  options: CompressOptions = {},
 ): Promise<File> {
   const withinLimit = file.size <= UPLOAD_IMAGE_MAX_BYTES;
   const serverAccepted = SERVER_ACCEPTED_MIME_TYPES.includes(file.type);
+  const strip = options.stripMetadata === true;
 
   if (!file.type.startsWith('image/')) return file;
-  if (serverAccepted && file.size <= SKIP_RECOMPRESS_BELOW_BYTES) return file;
+  if (serverAccepted && file.size <= SKIP_RECOMPRESS_BELOW_BYTES && !strip) return file;
 
   for (const maxEdge of MAX_EDGE_STEPS) {
     for (const quality of QUALITY_STEPS) {
@@ -98,7 +109,8 @@ export async function compressImageForUpload(
       }
       // 서버가 받는 형식은 크기가 줄었을 때만 채택한다(작은 PNG 를 재인코딩하면 커질 수 있다).
       // 서버가 안 받는 형식(HEIC 등)은 원본이 어차피 거부되므로 한도 안이기만 하면 채택한다.
-      const adopt = serverAccepted
+      // 메타데이터 제거가 목적이면 커져도 채택한다 — 원본을 쓰면 지우려던 EXIF 가 그대로 간다.
+      const adopt = serverAccepted && !strip
         ? encoded.size <= UPLOAD_IMAGE_MAX_BYTES && encoded.size < file.size
         : encoded.size <= UPLOAD_IMAGE_MAX_BYTES;
       if (adopt) return toEncodedFile(file, encoded);
@@ -118,10 +130,11 @@ export async function compressImageForUpload(
 export async function compressImagesForUpload(
   files: File[],
   encode: ImageEncoder = encodeWithCanvas,
+  options: CompressOptions = {},
 ): Promise<File[]> {
   const prepared: File[] = [];
   for (const file of files) {
-    prepared.push(await compressImageForUpload(file, encode));
+    prepared.push(await compressImageForUpload(file, encode, options));
   }
   return prepared;
 }
@@ -136,7 +149,8 @@ async function encodeWithCanvas(
 
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file);
+    // EXIF 방향(세로로 찍은 사진)을 픽셀에 반영해 그린다 — 다시 그리면 방향 태그가 사라지므로 안 하면 사진이 눕는다.
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
     // 손상된 파일이거나 브라우저가 디코드하지 못하는 형식 — 원본 경로로 넘긴다.
     return null;
@@ -152,7 +166,14 @@ async function encodeWithCanvas(
     if (!context) return null;
     context.drawImage(bitmap, 0, 0, size.width, size.height);
 
-    return await encodeCanvasToBlob(canvas, quality);
+    // JPEG 로 넘어갈 때만(WebP 를 못 만드는 Safari) 그린 그림 **뒤에** 흰 바탕을 깐다 — 투명 PNG(스티커·캡처)의
+    // 투명 영역이 검게 나오지 않게. WebP 는 알파를 그대로 둔다(팀 로고 등 다른 업로드의 투명 배경 유지).
+    return await encodeCanvasToBlob(canvas, quality, () => {
+      context.globalCompositeOperation = 'destination-over';
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, size.width, size.height);
+      context.globalCompositeOperation = 'source-over';
+    });
   } finally {
     bitmap.close();
   }
@@ -172,13 +193,19 @@ export interface BlobEncodable {
  * 에러를 낸다(그 이상). 아이폰 사진은 3~8MB 라 후자가 잦다 — "사진을 올려도 저장이
  * 안 된다"의 실제 원인이다. 돌아온 blob 의 type 이 요청한 것과 다르면 JPEG 로 다시 간다.
  */
-export function encodeCanvasToBlob(canvas: BlobEncodable, quality: number): Promise<Blob | null> {
+export function encodeCanvasToBlob(
+  canvas: BlobEncodable,
+  quality: number,
+  /** JPEG 로 넘어가기 직전에 부른다 — JPEG 는 알파가 없어 투명 영역이 검게 나오므로 바탕을 채울 기회. */
+  beforeJpegFallback?: () => void,
+): Promise<Blob | null> {
   const encode = (type: string) =>
     new Promise<Blob | null>((resolve) => {
       canvas.toBlob((blob) => resolve(blob), type, quality);
     });
   return encode('image/webp').then((blob) => {
     if (blob && blob.type === 'image/webp') return blob;
+    beforeJpegFallback?.();
     return encode('image/jpeg');
   });
 }

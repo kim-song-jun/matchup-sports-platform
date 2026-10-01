@@ -22,6 +22,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
+import { displayInitials } from '@/lib/display-initials';
 import {
   clearSignupTermsDocumentIds,
   readSignupTermsDocumentIds,
@@ -590,7 +591,7 @@ export function SignupClient() {
                 <label className="tm-auth-profile-upload-main tm-pressable">
                   <span className="tm-auth-profile-preview-trigger">
                     <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-                      {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
+                      {profileImageUrl ? null : <span className="tm-text-caption">{displayInitials(realName || normalizedNickname, { fallback: 'T' })}</span>}
                     </span>
                     {profileImageUrl ? null : (
                       <span className="tm-auth-profile-preview-badge" aria-hidden="true">
@@ -735,8 +736,4 @@ function DuplicateHelper({ id, status, error, availableMessage }: {
     return <span id={id} className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">{availableMessage}</span>;
   }
   return null;
-}
-
-function initials(value: string) {
-  return value.trim().slice(0, 1) || 'T';
 }

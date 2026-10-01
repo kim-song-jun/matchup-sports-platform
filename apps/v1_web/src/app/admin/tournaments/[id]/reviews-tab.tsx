@@ -6,6 +6,7 @@ import { Search, Star } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { useV1AdminTournamentReviews, useV1HideReview, useV1UnhideReview } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentReview } from '@/types/api';
+import { displayInitials } from '@/lib/display-initials';
 import { extractErrorMessage } from '@/lib/error-message';
 import { AdminEmpty, AdminListSkeleton } from '@/components/admin';
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
@@ -259,7 +260,7 @@ function ReviewModerationCard({
   unhidePending: boolean;
 }) {
   const isHidden = !!review.hiddenAt;
-  const letter = (review.authorNickname || '?').charAt(0);
+  const letter = displayInitials(review.authorNickname, { fallback: '?' });
   const photoUrls = review.photoUrls ?? [];
 
   return (

@@ -30,6 +30,7 @@ import { PendingReviewsCard } from '@/components/tournaments/pending-review-card
 import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { isLeagueCompetition } from '@/lib/competition-kind';
+import { displayInitials } from '@/lib/display-initials';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 
 const REVIEW_PHOTO_MAX = 3;
@@ -394,7 +395,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
               {profileHref ? (
                 <ProfileAvatar
                   imageUrl={award.recipientProfileImageUrl}
-                  initials={Array.from(award.recipientName || '?')[0] ?? '?'}
+                  initials={displayInitials(award.recipientName, { fallback: '?' })}
                   size={36}
                 />
               ) : (
@@ -744,7 +745,7 @@ export function ReviewFormModal({
 
 /* ── 후기 카드 (임베드 목록 · 전체보기 페이지 공용) ── */
 export function ReviewCard({ review }: { review: V1TournamentReview }) {
-  const letter = (review.teamName ?? review.authorNickname ?? '?').charAt(0);
+  const letter = displayInitials(review.teamName ?? review.authorNickname, { fallback: '?' });
   const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
   const photoUrls = review.photoUrls ?? [];
 

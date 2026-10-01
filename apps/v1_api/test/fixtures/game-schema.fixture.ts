@@ -547,7 +547,9 @@ export const gameSchemaSourceManifest = {
   // 2026-09-29: task renumbered 178 -> 179 (dev took 178 as well); schema.prisma comments only.
   // 2026-09-30 Task 149: additive platform review source and nullable unique scope key.
   // Existing game models and bound historical migration remain unchanged.
-  schema: '012d273c8134f51226375dfc97aa2e60d28483d1d3076b8ae6486fdf1396d012',
+  // 2026-10-01 Task 181: additive chat image message (enum value + nullable attachment FK).
+  // Existing game models and bound historical migration remain unchanged.
+  schema: 'cd63ac41c85c862d5fb8903146e0183dee92ac19e4dacfe7b200d373b36e760d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

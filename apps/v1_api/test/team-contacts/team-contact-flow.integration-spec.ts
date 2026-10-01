@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { RealtimeGateway } from '../../src/realtime/realtime.gateway';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
@@ -23,6 +24,24 @@ const ids = {
   teamB: '68880000-0000-4000-8000-000000000021',
   teamC: '68880000-0000-4000-8000-000000000022',
 } as const;
+
+type EmitSpy = { mock: { calls: Array<[userId: string, event: string, payload: unknown]> } };
+
+/** 응답 시스템 줄은 응답이 끝난 뒤 비동기로 전달된다 — 받는 사람에게 도착할 때까지 잠시 기다린다. */
+async function chatMessagesTo(events: EmitSpy, recipientUserId: string) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const payloads = events.mock.calls
+      .filter(([userId, event]) => userId === recipientUserId && event === 'chat:message')
+      .map(([, , payload]) => payload);
+    if (payloads.length > 0) return payloads;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return [];
+}
+
+function chatMessageRecipients(events: EmitSpy) {
+  return events.mock.calls.filter(([, event]) => event === 'chat:message').map(([userId]) => userId);
+}
 
 describe('팀 컨택 전체 흐름', () => {
   let app: INestApplication;
@@ -161,6 +180,7 @@ describe('팀 컨택 전체 흐름', () => {
   });
 
   it('5) B owner 가 수락하면 시스템 메시지가 남고 A 운영진 알림이 채팅방으로 간다', async () => {
+    const events = jest.spyOn(app.get(RealtimeGateway), 'emitToUser');
     const res = await request(app.getHttpServer())
       .patch(`/api/v1/team-contacts/${contactId}/accept`)
       .set('x-v1-user-id', ids.ownerB)
@@ -172,6 +192,20 @@ describe('팀 컨택 전체 흐름', () => {
     const messages = await prisma.v1ChatMessage.findMany({ where: { chatRoomId: roomId }, orderBy: { sentAt: 'asc' } });
     expect(messages).toHaveLength(2);
     expect(messages[1]).toMatchObject({ messageType: 'system', body: '컨택을 수락했어요', senderUserId: ids.ownerB });
+
+    // 저장된 그 줄이 상대 운영진에게 chat:message 로 뜬다 — 응답한 본인에게는 가지 않는다.
+    expect(await chatMessagesTo(events, ids.ownerA)).toEqual([
+      expect.objectContaining({
+        messageId: messages[1].id,
+        roomId,
+        content: '컨택을 수락했어요',
+        senderUserId: ids.ownerB,
+        messageType: 'system',
+        systemEventType: null,
+      }),
+    ]);
+    expect(chatMessageRecipients(events)).toEqual([ids.ownerA]);
+    events.mockRestore();
 
     // 알림은 emitToManyDeferred 로 트랜잭션 밖에서 비동기 발송된다 — 잠시 기다린다.
     let notification = null;
@@ -232,12 +266,20 @@ describe('팀 컨택 전체 흐름', () => {
     const endedRoomId = created.body.data.chatRoomId as string;
     const endedContactId = created.body.data.id as string;
 
+    const events = jest.spyOn(app.get(RealtimeGateway), 'emitToUser');
     const declined = await request(app.getHttpServer())
       .patch(`/api/v1/team-contacts/${endedContactId}/decline`)
       .set('x-v1-user-id', ids.ownerA)
       .send({ reason: '이번 주는 어려워요' })
       .expect(200);
     expect(declined.body.data.chatRoomId).toBe(endedRoomId);
+
+    // 보관되는 방이어도 거절 줄은 보낸 팀 운영진에게 바로 뜬다 — 거절 사유는 싣지 않는다.
+    expect(await chatMessagesTo(events, ids.ownerB)).toEqual([
+      expect.objectContaining({ roomId: endedRoomId, content: '컨택을 거절했어요', senderUserId: ids.ownerA, systemEventType: null }),
+    ]);
+    expect(chatMessageRecipients(events)).toEqual([ids.ownerB]);
+    events.mockRestore();
 
     const room = await prisma.v1ChatRoom.findUniqueOrThrow({ where: { id: endedRoomId } });
     expect(room.status).toBe('archived');

@@ -82,6 +82,7 @@ import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinAp
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
+import { displayInitials } from '@/lib/display-initials';
 import { RecordConsentFirstAnswer } from './record-consent-first-answer';
 import { WithdrawalErrorCard } from './withdrawal-error-card';
 import { WITHDRAWAL_GRACE_NOTICE } from './withdrawal-guidance';
@@ -592,7 +593,7 @@ export function ProfileEditPageClient() {
         </div>
         <section className="tm-my-profile-head">
           <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-            {profileImageUrl ? null : <span className="tm-text-caption">{initials(normalizedNickname || nickname || realName)}</span>}
+            {profileImageUrl ? null : <span className="tm-text-caption">{displayInitials(normalizedNickname || nickname || realName, { fallback: 'T' })}</span>}
           </div>
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
@@ -2397,7 +2398,7 @@ function toMyHomeModel(
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
       genderLabel: formatGender(profile.profile.gender),
-      initials: initials(nickname),
+      initials: displayInitials(nickname, { fallback: 'T' }),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
       loginMethod: loginMethod ?? undefined,
       loginMethodProvider: profile.authProvider,
@@ -2429,7 +2430,6 @@ function toMyTeam(item: V1MyTeam): MyTeam {
   return {
     id: item.teamId,
     name: item.name,
-    logo: item.name.slice(0, 1),
     logoUrl: item.logoUrl ?? null,
     coverImageUrl: item.coverImageUrl ?? null,
     sport: item.sport.name,
@@ -2447,7 +2447,6 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
   return {
     id: team.teamId,
     name: team.name,
-    logo: team.name.slice(0, 1),
     logoUrl: team.profile.logoUrl ?? null,
     coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,
@@ -2595,8 +2594,4 @@ function isValidBirthDateDigits(value: string) {
   const date = new Date(Date.UTC(year, month - 1, day));
 
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
-function initials(value: string) {
-  return value.trim().slice(0, 1) || 'T';
 }

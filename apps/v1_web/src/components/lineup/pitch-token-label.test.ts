@@ -87,4 +87,9 @@ describe('tokenInitial — 번호가 없을 때 원 안 글자', () => {
     expect(tokenInitial('1004', 0)).toBe('?');
     expect(tokenInitial('', 0)).toBe('?');
   });
+
+  it('괄호·기호로 시작해도 글자를 쓴다 (F54 — "(" 가 원 안에 뜨지 않게)', () => {
+    expect(tokenInitial('(QA0929) 김민수', 0)).toBe('Q');
+    expect(tokenInitial('⚽ 7 박지성', 0)).toBe('박');
+  });
 });

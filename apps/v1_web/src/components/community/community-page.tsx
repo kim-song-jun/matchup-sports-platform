@@ -7,12 +7,14 @@ import { Check, MoreHorizontal, Pin, Send } from 'lucide-react';
 import { ActionSheet } from '@/components/v1-ui/action-sheet';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
+import { ChatImageViewer, ChatPlusPanel } from './chat-plus-panel';
 import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
@@ -112,8 +114,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
   const prevSendingRef = useRef(model.sending);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
+  const plusPanelId = useId();
   const [justSent, setJustSent] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // 카카오톡식 + 패널(Task 181 A안)과 사진 전체 화면 보기.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const composerDisabled = model.status !== 'ready' || Boolean(model.inputLockedMessage);
+  const plusDisabled = composerDisabled || !model.onPickImages;
   const lastMessageId = model.messages.at(-1)?.id;
 
   useLayoutEffect(() => {
@@ -142,6 +151,19 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
     // 숨겨진 채로 재면 0 이 나온다 — 그때 0px 로 박으면 다시 보일 때 입력칸이 사라진다.
     if (input.scrollHeight > 0) input.style.height = `${input.scrollHeight}px`;
   }, [model.draft]);
+
+  // 입력이 잠기면(컨택 종료 등) 열린 패널도 닫는다.
+  useEffect(() => {
+    if (plusDisabled) setPlusOpen(false);
+  }, [plusDisabled]);
+
+  useTopmostEscape({
+    open: plusOpen,
+    onEscape: () => {
+      setPlusOpen(false);
+      plusButtonRef.current?.focus();
+    },
+  });
 
   useEffect(() => {
     if (prevSendingRef.current && !model.sending && !model.sendError) {
@@ -262,8 +284,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                           {showTime ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
                         </div>
                       ) : null}
-                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}`}>
-                        <div className="tm-text-body">{message.body}</div>
+                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}${message.kind === 'image' && message.imageUrl ? ' tm-chat-bubble-image' : ''}`}>
+                        {message.kind === 'image' && message.imageUrl ? (
+                          <button type="button" className="tm-chat-image-button" aria-label="사진 크게 보기" onClick={() => setViewerUrl(message.imageUrl ?? null)}>
+                            {/* eslint-disable-next-line @next/next/no-img-element -- 사용자 업로드(/uploads)는 next/image 최적화 대상이 아니다. */}
+                            <img src={message.imageUrl} alt="" className="tm-chat-image" loading="lazy" />
+                          </button>
+                        ) : (
+                          <div className="tm-text-body">{message.body}</div>
+                        )}
                       </div>
                       {message.who === 'other' && showTime ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
                       {message.who === 'other' && model.onMessageSafety ? <button type="button" className="tm-btn tm-btn-icon tm-btn-ghost shrink-0" style={{ minWidth: 44, minHeight: 44 }} aria-label={`${message.label} 메시지 신고·차단`} onClick={() => model.onMessageSafety?.({ id: message.id, label: message.label })}>⋯</button> : null}
@@ -275,10 +304,23 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
           })}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
-        {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}
+        {model.sendingImages ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '4px 16px' }}>사진을 보내는 중이에요…</div> : null}
+        {model.imageNotice ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>{model.imageNotice}</div> : null}
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
-        <div className="tm-chat-inputbar">
-          <button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button>
+        <div className={`tm-chat-inputbar${plusOpen ? ' is-panel-open' : ''}`}>
+          {/* + ↔ × — 카카오톡처럼 입력창 아래 패널을 여닫는다. */}
+          <button
+            ref={plusButtonRef}
+            className={`tm-btn tm-btn-icon tm-btn-neutral tm-chat-plus-toggle${plusOpen ? ' is-open' : ''}`}
+            type="button"
+            aria-label={plusOpen ? '보내기 메뉴 닫기' : '보내기 메뉴 열기'}
+            aria-expanded={plusOpen}
+            aria-controls={plusPanelId}
+            disabled={plusDisabled}
+            onClick={() => setPlusOpen((open) => !open)}
+          >
+            <PlusIcon size={20} strokeWidth={2.2} />
+          </button>
           <textarea
             ref={inputRef}
             rows={1}
@@ -315,6 +357,17 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             )}
           </button>
         </div>
+        {plusOpen && model.onPickImages ? (
+          <ChatPlusPanel
+            id={plusPanelId}
+            disabled={Boolean(model.sendingImages)}
+            onPickImages={(files) => {
+              setPlusOpen(false);
+              model.onPickImages?.(files);
+            }}
+          />
+        ) : null}
+        <ChatImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />
       </div>
         </section>
       </div>

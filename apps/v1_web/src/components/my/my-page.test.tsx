@@ -268,7 +268,6 @@ describe('MyTeamsPageView — 팀 카드 출처', () => {
     return {
       id: 'team-1',
       name: '성수 FC',
-      logo: '',
       logoUrl: null,
       sport: '풋살',
       region: '성동구',

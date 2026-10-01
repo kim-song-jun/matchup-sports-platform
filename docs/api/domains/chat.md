@@ -11,7 +11,7 @@ V1 session authentication and current room entitlement are required. Development
 | POST | `/chat/rooms/resolve` | `{ targetType: match \| team \| team_match \| team_contact, targetId }`; checks domain membership |
 | GET | `/chat/rooms/:roomId` | room, linked target, current participant and context |
 | GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since the participant's visibility boundary |
-| POST | `/chat/rooms/:roomId/messages` | `{ content }`, nonblank, max 2,000; text only; active room, accepted team contact if applicable |
+| POST | `/chat/rooms/:roomId/messages` | exactly one of `{ content }` (nonblank, max 2,000) or `{ imageUrl }` (sender's own image upload from `POST /uploads`, else 400 `VALIDATION_FAILED` field `imageUrl`); both/neither → 400; active room, accepted team contact if applicable. Returns `{ messageId, roomId, messageType, content, imageUrl, status, sentAt, senderUserId }` |
 | PATCH | `/chat/rooms/:roomId/me` | optional `pinned`, `lastReadMessageId`, `mutedUntil` |
 | POST | `/chat/rooms/:roomId/leave` | optional `reason`, max 500 |
 | POST | `/chat/rooms/:roomId/messages/:messageId/report` | `{ reason, detail? }`; returns `{ inquiryId }` |
@@ -59,19 +59,31 @@ and therefore has no host participant row.
   `systemEventType = "joined"`); existing active-member repair does not duplicate it. Leaving or being
   removed from a team writes `systemEventType = "left"` (`○○님이 나갔어요` for both — the room does not
   reveal who removed the member).
-- Joined/left lines go through `ChatService` only: `recordSystemLine` persists them inside the membership
-  transaction, and after commit `deliverSystemLine` emits `chat:message` to the same recipients a text
-  message from that user would reach (payload = text payload + `messageType`, `systemEventType`). No
-  notification row or push is created, and a socket failure is logged, not surfaced.
-- Message rows include `messageType`, `systemEventType`, and `unreadCount`. `unreadCount` is
-  computed per text message from active participants whose visibility boundary includes that
+- Team-contact responses write one system line as the responder (`컨택을 수락했어요` / `컨택을 거절했어요` /
+  `컨택을 철회했어요`, `systemEventType = null`; a decline reason stays on the contact, not in the line).
+  Expiry and blocking write no line.
+- Every system line goes through `ChatService` only: `recordSystemLine` persists it inside the membership or
+  contact-response transaction, and after commit `deliverSystemLine` emits `chat:message` to the same
+  recipients a text message from that user would reach — the actor is excluded, and a declined/withdrawn
+  contact room still receives the line although it is archived (payload = text payload + `messageType`,
+  `systemEventType`). No notification row or push is created, and a socket failure is logged, not surfaced.
+- Message rows include `messageType` (`text | system | image`), `systemEventType`, `imageUrl`, and `unreadCount`.
+  `unreadCount` is computed per text/image message from active participants whose visibility boundary includes that
   message and whose `lastReadMessageId` is older or empty; system messages always return `0`.
+- Image messages (Task 181): `messageType = "image"`, `body`/`content = "사진"` (so previews, report snapshots and
+  body-only readers stay readable), `imageUrl` = the referenced `V1UploadAsset.url`. `imageUrl` is `null` when the
+  message is hidden/deleted (same rule as `content`) or the upload was deleted (FK `ON DELETE SET NULL`).
+  Notification/push body is "사진을 보냈어요". Room-list `unreadCount` counts every non-system message.
+- Image privacy: chat photos are served from the same **public, unguessable UUID path** (`/uploads/...`) as other
+  uploads — anyone holding the URL can open it (no room-membership check on the static file). The web client always
+  re-encodes chat photos before upload (`useV1UploadImages({ stripMetadata: true })`) so EXIF (GPS location, device)
+  does not travel with them. A participant-only download path is planned with file attachments (Task 181 ③).
 
 ## Reporting and blocking
 
 - Report reasons: `spam`, `harassment`, `impersonation`, `inappropriate`, `other`; detail max 500.
 - Both actions require current room entitlement, an active participant, an entered room, and a visible,
-  sent text message from another user. Cross-room/invisible messages return 404; self-targets 400;
+  sent non-system (text or image) message from another user. Image reports append the image path to the snapshot. Cross-room/invisible messages return 404; self-targets 400;
   nonparticipants 403; unauthenticated requests 401. Unknown DTO properties are rejected.
 - Reports persist the server-owned message snapshot and actor/target/reason in `V1Inquiry` (`category=report`,
   `relatedType=user`). The existing operator inbox and transactional outbox receive the report; no external

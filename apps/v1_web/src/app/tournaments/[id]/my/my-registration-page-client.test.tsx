@@ -373,6 +373,31 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
 
     expect(container.textContent).toContain('수정 가능');
   });
+
+  // 서버는 초안 정규 리그의 명단 수정을 허용한다. 이 카드가 판정에 `kind` 를 안 넘겨
+  // 초안 리그를 "마감 · 수정 불가" 로 보여 줬다(사용자 제보 "참가 확정 뒤 명단 수정이 안 된다").
+  it('초안 정규 리그는 "수정 가능" 이고 수정 링크가 열려 있다', () => {
+    arrange({ kind: 'regular_league', status: 'draft' });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.textContent).toContain('수정 가능');
+    expect(container.textContent).not.toContain('수정 불가');
+    expect(container.textContent).not.toContain('· 마감');
+    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['초안 대회', { kind: 'regular_tournament', status: 'draft' }],
+    ['종료 리그', { kind: 'regular_league', status: 'completed' }],
+  ] as const)('대조군: %s는 "수정 불가" 다', (_label, tournament) => {
+    arrange(tournament);
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.textContent).toContain('수정 불가');
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+  });
 });
 
 // 대회 상세·재신청으로 이동하는 CTA 들이 from 을 어떻게 잇는지.

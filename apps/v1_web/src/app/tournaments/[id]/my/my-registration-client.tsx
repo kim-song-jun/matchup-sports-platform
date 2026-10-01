@@ -35,6 +35,7 @@ import {
   type TournamentRegistrationBlockReason,
 } from '@/lib/tournament-registration-availability';
 import type {
+  V1CompetitionKind,
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
   V1TournamentPaymentMethod,
@@ -646,6 +647,8 @@ function RegistrationDetailView({
     venue: string | null;
     /** 명단 편집 가능 여부 판정에 쓴다 — 대회가 끝났으면 누구도 못 고친다. */
     status: string;
+    /** 같은 판정에 쓴다 — 정규 리그는 초안에서도 명단을 고칠 수 있다. */
+    kind: V1CompetitionKind | null;
     /** 같은 판정의 나머지 절반. 마감이 지나면 어드민 예외 없이는 못 고친다. */
     rosterDeadlineAt: string | null;
   };
@@ -1557,6 +1560,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           scheduledEndAt: tournament.scheduledEndAt,
           venue: tournament.venue,
           status: tournament.status,
+          kind: tournament.kind,
           rosterDeadlineAt: tournament.rosterDeadlineAt,
         }}
         registration={selectedRegistration}

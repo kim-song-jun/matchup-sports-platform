@@ -267,3 +267,19 @@ describe('summarizeTeamMatches — 목록 상단 요약', () => {
     expect(summarizeTeamMatches([])).toEqual({ count: 0, today: 0, urgent: 0 });
   });
 });
+
+describe('toTeamMatch — 성별 조건 표시', () => {
+  const modelFor = (genderRule: string | null) =>
+    toTeamMatch(
+      { id: 'tm-g', title: '성별 조건', status: 'recruiting', displayState: 'recruiting', hostTeam: null, genderRule } as unknown as V1TeamMatch,
+      base.matches[0],
+    );
+
+  it.each(['성별 무관', '남', '여'])('정본 값 %s 은 그대로 보인다', (value) => {
+    expect(modelFor(value).gender).toBe(value);
+  });
+
+  it.each(['any', '남녀 혼성', null])('정본이 아닌 값 %s 은 원문으로 노출하지 않는다', (value) => {
+    expect(modelFor(value).gender).toBe('');
+  });
+});

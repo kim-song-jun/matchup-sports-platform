@@ -265,6 +265,10 @@ export class TournamentsAdminService {
       dto.scheduledAt ? new Date(dto.scheduledAt) : null,
       dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
     );
+    this.assertRosterDeadlineOrder(
+      dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
+      dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
+    );
     this.assertPaidTournamentPaymentInstructions({
       entryFee: dto.entryFee ?? 0,
       bankName: dto.bankName,
@@ -471,6 +475,21 @@ export class TournamentsAdminService {
           : null
         : existing.scheduledEndAt;
     this.assertScheduleRange(nextScheduledAt, nextScheduledEndAt);
+    // 둘 중 하나를 바꿀 때만 본다 — 순서가 어긋난 채 만들어진 기존 대회의 다른 필드 수정까지 막지 않는다.
+    if (dto.registrationDeadlineAt !== undefined || dto.rosterDeadlineAt !== undefined) {
+      this.assertRosterDeadlineOrder(
+        dto.registrationDeadlineAt !== undefined
+          ? dto.registrationDeadlineAt
+            ? new Date(dto.registrationDeadlineAt)
+            : null
+          : existing.registrationDeadlineAt,
+        dto.rosterDeadlineAt !== undefined
+          ? dto.rosterDeadlineAt
+            ? new Date(dto.rosterDeadlineAt)
+            : null
+          : existing.rosterDeadlineAt,
+      );
+    }
     if (
       dto.entryFee !== undefined ||
       dto.bankName !== undefined ||
@@ -1145,6 +1164,20 @@ export class TournamentsAdminService {
     }
 
     return quota;
+  }
+
+  /**
+   * 명단 제출 마감은 신청 마감보다 앞설 수 없다 — 앞서면 신청을 받는 중에 명단이 먼저 닫혀
+   * 늦게 확정된 팀은 명단을 한 번도 못 낸다. 둘 중 하나가 비면 보지 않는다(명단 마감 없음 = 마감 없이 수정).
+   */
+  private assertRosterDeadlineOrder(registrationDeadline: Date | null, rosterDeadline: Date | null) {
+    if (!registrationDeadline || !rosterDeadline) return;
+    if (rosterDeadline.getTime() < registrationDeadline.getTime()) {
+      throw new BadRequestException({
+        code: 'ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE',
+        message: '명단 제출 마감은 신청 마감과 같거나 그 뒤여야 해요.',
+      });
+    }
   }
 
   private assertScheduleRange(start: Date | null, end: Date | null) {

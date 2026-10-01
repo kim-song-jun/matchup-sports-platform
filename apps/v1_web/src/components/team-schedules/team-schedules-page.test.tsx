@@ -175,6 +175,8 @@ describe('일정 상세 — 팀장 대리 참석 표시', () => {
     // 서버도 403 으로 막지만, 누를 수 없는 버튼을 보여주고 눌러서 실패하게 두지 않는다.
     renderAttendees({ canProxy: false });
     expect(screen.queryByRole('button', { name: /참석으로 대신 표시/ })).toBeNull();
+    // 누를 버튼이 없으면 그 버튼을 설명하는 줄도 없다(W4-V2).
+    expect(screen.queryByText(/\[대신 표시\]를 누르면/)).toBeNull();
   });
 
   it('대리 표시 중에는 버튼이 비활성화되고 진행 상태를 알린다', () => {
@@ -400,7 +402,9 @@ describe('일정 상세 — 친선 경기 응답 이름 (H5 A-3)', () => {
     expect(screen.getByText('올 수 있어요 7명')).toBeInTheDocument();
     expect(screen.getByText('응답 현황')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '올 수 있어요 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '선수03 올 수 있어요로 대신 표시' })).toBeInTheDocument();
+    // W4-V2 — 버튼 글자는 짧게(390 에서 한 줄), 무엇으로 남는지는 목록 위 한 줄과 버튼 이름이 말한다.
+    expect(screen.getByRole('button', { name: '선수03 올 수 있어요로 대신 표시' })).toHaveTextContent(/^대신 표시$/);
+    expect(screen.getByText("미응답 팀원은 [대신 표시]를 누르면 '올 수 있어요'로 남겨요.")).toBeInTheDocument();
     expect(screen.queryByText(/^참석/)).not.toBeInTheDocument();
   });
 
@@ -423,6 +427,8 @@ describe('일정 상세 — 친선 경기 응답 이름 (H5 A-3)', () => {
     expect(screen.getByRole('button', { name: '불참', pressed: false })).toBeInTheDocument();
     expect(screen.getByText('참석 현황')).toBeInTheDocument();
     expect(screen.queryByText(/올 수 있어요/)).not.toBeInTheDocument();
+    // 같은 버튼·같은 설명 틀 — 조사는 이름을 따른다('참석'으로).
+    expect(screen.getByText("미응답 팀원은 [대신 표시]를 누르면 '참석'으로 남겨요.")).toBeInTheDocument();
     expect(screen.queryByText(/출전을 정하지 않아요/)).not.toBeInTheDocument();
   });
 

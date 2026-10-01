@@ -544,6 +544,14 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
       : tab === 'no_response'
         ? model.items.filter((item) => item.status === 'NO_RESPONSE')
         : model.items;
+  /*
+    미응답 팀원만 대리 표시 대상이다 — 이미 응답한 사람의 의사를 팀장이
+    덮어쓰지 않는다. 정원이 찼으면 서버가 본인 응답과 똑같이 대기자로
+    내리므로(사용자 확정) 여기서 따로 막지 않는다.
+  */
+  const canProxyItem = (item: (typeof model.items)[number]) =>
+    model.canProxy && item.status === 'NO_RESPONSE' && model.viewerUserId !== null && item.userId !== model.viewerUserId;
+  const goingLabel = statusLabel('GOING');
 
   return (
     <div>
@@ -563,6 +571,12 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
         <div className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', marginBottom: 8 }}>
           {model.proxyError}
         </div>
+      ) : null}
+      {/* 행 버튼은 "대신 표시"만 말한다(390 에서 한 줄) — 무엇으로 남는지는 여기서 한 번(W4-V2). */}
+      {filtered.some(canProxyItem) ? (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.5 }}>
+          {`미응답 팀원은 [대신 표시]를 누르면 '${goingLabel}'${josa(goingLabel, ['으로', '로']).slice(goingLabel.length)} 남겨요.`}
+        </p>
       ) : null}
       {filtered.length === 0 ? (
         <div className="tm-text-caption">해당하는 팀원이 없어요.</div>
@@ -593,26 +607,18 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
               >
                 {displayInitials(item.nickname, { fallback: '?' })}
               </div>
-              {/* 이름이 버튼·배지에 밀려 "QA0929선수/10" 처럼 꺾이지 않게 최소 폭을 주고, 남는 폭 부족은 버튼 라벨이 줄바꿈으로 받는다. */}
+              {/* 이름이 버튼·배지에 밀려 "QA0929선수/10" 처럼 꺾이지 않게 최소 폭을 준다. */}
               <div className="tm-text-body" style={{ flex: '1 1 auto', minWidth: '7rem', wordBreak: 'keep-all' }}>{item.nickname}</div>
-              {/*
-                미응답 팀원만 대리 표시 대상이다 — 이미 응답한 사람의 의사를 팀장이
-                덮어쓰지 않는다. 정원이 찼으면 서버가 본인 응답과 똑같이 대기자로
-                내리므로(사용자 확정) 여기서 따로 막지 않는다.
-              */}
-              {model.canProxy &&
-              item.status === 'NO_RESPONSE' &&
-              model.viewerUserId !== null &&
-              item.userId !== model.viewerUserId ? (
+              {canProxyItem(item) ? (
                 <button
                   type="button"
                   className="tm-btn tm-btn-sm tm-btn-neutral"
-                  style={{ minHeight: 44 }}
+                  style={{ minHeight: 44, padding: '0 12px', whiteSpace: 'nowrap', flexShrink: 0 }}
                   disabled={model.proxyPendingUserId !== null}
-                  aria-label={`${item.nickname} ${josa(statusLabel('GOING'), ['으로', '로'])} 대신 표시`}
+                  aria-label={`${item.nickname} ${josa(goingLabel, ['으로', '로'])} 대신 표시`}
                   onClick={() => model.onProxyGoing(item.userId)}
                 >
-                  {model.proxyPendingUserId === item.userId ? '처리 중…' : `${statusLabel('GOING')} 대신 표시`}
+                  {model.proxyPendingUserId === item.userId ? '처리 중…' : '대신 표시'}
                 </button>
               ) : null}
               <span className={`tm-badge ${ATTENDEE_STATUS_BADGE_CLASS[item.status] ?? 'tm-badge-grey'}`}>

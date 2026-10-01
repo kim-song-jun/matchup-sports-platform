@@ -825,3 +825,25 @@ describe('icon button hit targets', () => {
     expect(dot).toMatch(/width:\s*5px/);
   });
 });
+
+describe('필터 시트의 [닫기][적용하기] 줄은 시트 바닥 고정 영역이다 (W5-V1)', () => {
+  // 시트는 max-height 안에서 스스로 스크롤한다. 버튼 줄이 스크롤 내용의 끝에 그냥 놓이면 옵션이 많은
+  // 시트(390×844 개인 매치 필터)에서 버튼 아래가 접힌다. 줄은 시트의 직계 자식으로 바닥에 붙는다.
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const ruleOf = (selector: string) =>
+    [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, sel]) => sel.trim() === selector)?.[2];
+
+  it('버튼 줄은 시트 바닥에 sticky 로 붙고, 시트 padding-bottom 만큼 바닥까지 덮는다', () => {
+    const sheet = ruleOf('.tm-filter-sheet');
+    const actions = ruleOf('.tm-filter-sheet > .tm-filter-actions');
+
+    expect(sheet).toMatch(/--tm-filter-sheet-pad-bottom:\s*calc\(20px \+ var\(--v1-shell-safe-bottom\)\)/);
+    expect(sheet).toMatch(/padding:\s*12px var\(--v1-shell-page-x\) var\(--tm-filter-sheet-pad-bottom\)/);
+    expect(actions).toMatch(/position:\s*sticky/);
+    // sticky 기준선은 스크롤 컨테이너의 padding 안쪽이다 — bottom:0 이면 줄 아래 padding 띠로 옵션이 비친다(alpha 실측).
+    expect(actions).toMatch(/bottom:\s*calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
+    expect(actions).toMatch(/margin:\s*8px 0 calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
+    expect(actions).toMatch(/padding:\s*12px 0 var\(--tm-filter-sheet-pad-bottom\)/);
+    expect(actions).toMatch(/background:\s*var\(--bg\)/);
+  });
+});

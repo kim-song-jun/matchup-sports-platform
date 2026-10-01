@@ -3625,7 +3625,8 @@ label.tm-btn:focus-within {
   right: 0;
   bottom: 0;
   width: 100%;
-  padding: 12px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  --tm-filter-sheet-pad-bottom: calc(20px + var(--v1-shell-safe-bottom));
+  padding: 12px var(--v1-shell-page-x) var(--tm-filter-sheet-pad-bottom);
   border-top: 1px solid var(--grey100);
   border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
@@ -3810,6 +3811,19 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   grid-template-columns: 96px 1fr;
   gap: 8px;
   margin-top: 20px;
+}
+
+/* 필터 시트의 [닫기][적용하기] 줄은 시트 바닥에 붙여 둔다 — 옵션이 시트 최대 높이를 넘으면 내용만
+   그 위에서 스크롤된다(W5-V1: 390×844 에서 버튼 아래 17px 가 접혔다). sticky 기준선은 스크롤
+   컨테이너의 padding 안쪽이라, 시트 padding-bottom 만큼 inset·margin 을 음수로 줘 바닥까지 덮고
+   같은 값을 padding 으로 되돌린다(내용이 다 들어갈 때 버튼 위치는 그대로다: 8 + 12 = 기존 20). */
+.tm-filter-sheet > .tm-filter-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--tm-filter-sheet-pad-bottom));
+  z-index: 1;
+  margin: 8px 0 calc(-1 * var(--tm-filter-sheet-pad-bottom));
+  padding: 12px 0 var(--tm-filter-sheet-pad-bottom);
+  background: var(--bg);
 }
 
 .tm-create-fieldset {

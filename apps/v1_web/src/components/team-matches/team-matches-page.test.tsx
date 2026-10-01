@@ -1529,6 +1529,18 @@ describe('팀매치 목록 필터 시트 — BottomSheet 배선(A안)', () => {
     expect(scrim).toHaveAttribute('href', '/team-matches?filterOpen=false');
   });
 
+  // W5-V1 — 바닥 고정 규칙(.tm-filter-sheet > .tm-filter-actions)은 버튼 줄이 스크롤하는 시트의 직계 자식일 때만 걸린다.
+  it('[닫기][적용하기] 줄은 스크롤하는 시트(dialog)의 직계 자식이다', () => {
+    renderPage(<TeamMatchListPageView model={buildFilterSheetModel()} />);
+
+    const dialog = screen.getByRole('dialog', { name: '팀매치 필터' });
+    const actions = within(dialog).getByRole('link', { name: '적용하기' }).parentElement;
+    expect(dialog).toHaveClass('tm-filter-sheet');
+    expect(actions).toHaveClass('tm-filter-actions');
+    expect(actions?.parentElement).toBe(dialog);
+    expect(within(actions!).getByRole('link', { name: '닫기' })).toBeInTheDocument();
+  });
+
   it('filterSheet.open이 false면 시트가 아예 마운트되지 않는다(로컬 open 상태를 새로 만들지 않는다)', () => {
     const model = buildFilterSheetModel();
     model.filterSheet!.open = false;

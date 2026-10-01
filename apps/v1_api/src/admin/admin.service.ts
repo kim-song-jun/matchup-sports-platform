@@ -2107,14 +2107,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           INQUIRY_CATEGORIES,
           categoryGroups.map((group) => ({ key: group.category, count: group._count._all })),
         ),
-        // reportReason 은 nullable 이라 groupBy 결과에 null 키가 섞인다 — 신고가 아닌 문의들이다.
-        // 필터 칩은 실제 사유만 보여주면 되므로 null 그룹은 버린다.
+        // reportReason 은 nullable 이라 groupBy 결과에 null 키(사유 미지정 신고·신고 아닌 문의)가 섞인다.
+        // 사유 칩에는 실제 사유만 싣고, '전체 사유' 건수(reportReasonTotal)는 null 까지 합친다.
         byReportReason: buildCountMap(
           INQUIRY_REPORT_REASONS,
           reportReasonGroups
             .filter((group) => group.reportReason !== null)
             .map((group) => ({ key: group.reportReason as string, count: group._count._all })),
         ),
+        reportReasonTotal: reportReasonGroups.reduce((sum, group) => sum + group._count._all, 0),
       },
     };
   }

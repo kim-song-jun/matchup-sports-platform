@@ -100,7 +100,7 @@ export default function AdminReportedTeamsPage() {
       <AdminPageHeader
         eyebrow="콘텐츠"
         title="신고 누적 팀"
-        description={`최근 ${windowDays}일 동안 반복 신고된 팀을 건수 순으로 보여줘요.`}
+        description={`전체 누적 신고 건수 순으로 신고된 팀을 보여줘요. 최근 ${windowDays}일 건수는 따로 표시해요.`}
       />
 
       <div className="tm-content-enter">

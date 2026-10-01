@@ -44,8 +44,12 @@ function looksLikeEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
-export function AccountRecoveryClient() {
-  const [mode, setMode] = useState<Mode>('find-id');
+export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/login/email' }: {
+  initialMode?: Mode;
+  backHref?: string;
+}) {
+  const returnToSettings = backHref === '/my/settings';
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [method, setMethod] = useState<Method>('phone');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [proofToken, setProofToken] = useState<string | null>(null);
@@ -143,7 +147,7 @@ export function AccountRecoveryClient() {
   };
 
   return (
-    <AuthFrame topTitle="계정 찾기" backHref="/login/email" stage={AUTH_NOTICE_STAGE}>
+    <AuthFrame topTitle={returnToSettings ? '비밀번호 변경' : '계정 찾기'} backHref={backHref} stage={AUTH_NOTICE_STAGE}>
       <div className="tm-auth-body">
         <div className="tm-auth-segmented" role="tablist" aria-label="찾기 방법">
           <button
@@ -347,9 +351,9 @@ export function AccountRecoveryClient() {
           {resetDone ? (
             <Card pad={16} className="tm-auth-soft-card">
               <div className="tm-text-body-lg">비밀번호를 바꿨어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>새 비밀번호로 로그인해 주세요.</div>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login/email" style={{ marginTop: 16 }}>
-                로그인하러 가기
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>{returnToSettings ? '새 비밀번호가 적용됐어요.' : '새 비밀번호로 로그인해 주세요.'}</div>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={returnToSettings ? backHref : '/login/email'} style={{ marginTop: 16 }}>
+                {returnToSettings ? '계정 설정으로 돌아가기' : '로그인하러 가기'}
               </Link>
             </Card>
           ) : null}

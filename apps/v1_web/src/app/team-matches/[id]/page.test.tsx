@@ -86,3 +86,23 @@ describe('TeamMatchDetailPage (server) — 첫 표시값 전달', () => {
     expect(findProps(element, 'data')).toEqual({ data: { '@type': 'SportsEvent' } });
   });
 });
+
+
+describe('리그 경기로 이동할 때 내 매치 목록 보존', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchPublicV1Mock.mockResolvedValue({ league: { leagueId: 'league-1' } } as never);
+  });
+  it.each([
+    ['/my/matches/joined?type=team', '?from=%2Fmy%2Fmatches%2Fjoined%3Ftype%3Dteam'],
+    ['/my/matches/created?type=team', '?from=%2Fmy%2Fmatches%2Fcreated%3Ftype%3Dteam'],
+    ['/\\evil.example', ''],
+    [['/my', '/home'], ''],
+    [undefined, ''],
+  ])('안전한 출발 경로만 전달한다 (%s)', async (from, suffix) => {
+    await expect(TeamMatchDetailPage({
+      params: Promise.resolve({ id: 'match-1' }), searchParams: Promise.resolve({ from }),
+    })).rejects.toThrow('NEXT_REDIRECT:');
+    expect(redirect).toHaveBeenCalledWith(`/league-matches/league-1/fixtures/match-1${suffix}`);
+  });
+});

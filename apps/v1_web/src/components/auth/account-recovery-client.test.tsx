@@ -66,6 +66,18 @@ describe('AccountRecoveryClient', () => {
     hooks.resetPasswordByEmailMutateAsync.mockResolvedValue({ ok: true });
   });
 
+  it('설정에서 비밀번호 재설정으로 진입하고 인증·저장 후 설정으로 복귀한다', async () => {
+    render(<AccountRecoveryClient initialMode="reset-password" backHref="/my/settings" />);
+    expect(screen.getByRole('tab', { name: '비밀번호 재설정' })).toHaveAttribute('aria-selected', 'true');
+    screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', '/my/settings'));
+    enterPhone();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+    await fillNewPassword();
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
+    expect(await screen.findByRole('link', { name: '계정 설정으로 돌아가기' })).toHaveAttribute('href', '/my/settings');
+    expect(hooks.resetPasswordMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ proofToken: 'RESET-TOKEN' }));
+  });
+
   // 가입용 증명으로 남의 비밀번호를 바꿀 수 없어야 하므로, 이 화면은 반드시 재설정 용도를 요청한다.
   it('본인인증을 password_reset 용도로 요청한다', () => {
     render(<AccountRecoveryClient />);

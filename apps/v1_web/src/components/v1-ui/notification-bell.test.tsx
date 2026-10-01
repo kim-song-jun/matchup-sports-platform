@@ -7,6 +7,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1NotificationUnreadSummary: vi.fn(),
 }));
 
+const navigation = vi.hoisted(() => ({ path: '/home', search: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => navigation.path,
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+
 const useV1NotificationUnreadSummaryMock = vi.mocked(useV1NotificationUnreadSummary);
 
 function mockUnreadCount(unreadCount: number) {
@@ -45,7 +51,19 @@ describe('buildAriaLabel', () => {
 describe('NotificationBellLink', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    navigation.path = '/home';
+    navigation.search = '';
     window.localStorage.clear();
+  });
+
+  it('알림 진입 때 출발 화면의 필터와 이전 출처를 보존한다', () => {
+    navigation.path = '/my/matches/joined';
+    navigation.search = 'type=team&from=%2Fmy';
+    mockUnreadCount(0);
+    render(<NotificationBellLink className="bell" />);
+    const href = screen.getByRole('link', { name: '알림' }).getAttribute('href')!;
+    expect(new URL(href, 'https://teameet.test').searchParams.get('from'))
+      .toBe('/my/matches/joined?type=team&from=%2Fmy');
   });
 
   it('does not request the protected unread summary without a stored session', () => {

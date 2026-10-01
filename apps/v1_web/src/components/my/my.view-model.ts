@@ -1,3 +1,4 @@
+import { withFromPath } from '@/lib/session-storage';
 import type {
   MyHomeViewModel,
   SettingsViewModel,
@@ -45,7 +46,7 @@ export const myHomeModel: MyHomeViewModel = {
         // icon 값: Lucide 컴포넌트 이름 — my-page.tsx MenuSection이 매핑해 렌더함
         // 채팅(=매치·팀·팀컨택 대화)으로 가는 상시 입구. 하단탭엔 채팅이 없어 홈 위젯과 여기서만 닿는다.
         // badge 는 my-api-clients 가 대기 중 받은 컨택 수로 채운다.
-        { label: '채팅', sub: '매치·팀·컨택 대화를 한곳에서 확인해요', href: '/chat', icon: 'MessageCircle' },
+        { label: '채팅', sub: '매치·팀·컨택 대화를 한곳에서 확인해요', href: withFromPath('/chat', '/my'), icon: 'MessageCircle' },
         { label: '받은 초대', sub: '팀에서 보낸 초대를 확인하고 수락해요', href: '/my/invitations', icon: 'Mail' },
         // 리뷰 항목은 my-api-clients.tsx의 toMyHomeModel에서 동적으로 여기에 끼워 넣는다.
         // 보낸 가입 신청은 내가 보낸 것이지만 **결과를 기다린다**는 점에서 같은 줄에 선다.

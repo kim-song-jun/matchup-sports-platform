@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamMatchDetailPageClient } from '@/components/team-matches/team-matches-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, matchDescriptionFallback, metadataDescription } from '@/lib/seo';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { buildTeamMatchEventLd } from '@/lib/structured-data';
 import type { V1TeamMatch } from '@/types/api';
 
@@ -22,7 +23,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
 }
 
-export default async function TeamMatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TeamMatchDetailPage({ params, searchParams }: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ from?: string | string[] }>;
+}) {
   const { id } = await params;
   const teamMatch = await fetchPublicV1<V1TeamMatch>(`/team-matches/${encodeURIComponent(id)}`);
   if (!teamMatch) notFound();
@@ -31,7 +35,11 @@ export default async function TeamMatchDetailPage({ params }: { params: Promise<
   // 2026-08-25 사용자 보고). 알림·목록 등 기존 /team-matches/:id 딥링크도 이 리다이렉트를
   // 지나므로 링크 전수 교체 없이 착지 화면만 바뀐다. 라인업·결과·수정 하위 라우트는
   // 별도 경로라 영향이 없다.
-  if (teamMatch.league) redirect(`/league-matches/${teamMatch.league.leagueId}/fixtures/${id}`);
+  if (teamMatch.league) {
+    const query = await searchParams;
+    const from = typeof query?.from === 'string' ? sanitizeRedirectPath(query.from) : null;
+    redirect(withFromPath(`/league-matches/${teamMatch.league.leagueId}/fixtures/${id}`, from));
+  }
   // matches/[id] 와 같은 이유 — 리다이렉트 판정을 위해 이미 받은 응답을 첫 표시값으로 넘긴다.
   const eventLd = buildTeamMatchEventLd(teamMatch, id);
   return (

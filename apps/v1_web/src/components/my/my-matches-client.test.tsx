@@ -60,7 +60,7 @@ describe('내 개인·팀 매치 이력', () => {
     mock.personalQuery.mockReturnValue({ ...emptyQuery(), data: { pages: [{ items: [item] }] } });
     render(<MyMatchesPageClient mode="created" />);
     expect(screen.getByRole('link', { name: '상세' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
-    expect(screen.getByRole('link', { name: '참가 관리' })).toHaveAttribute('href', '/matches/m1/applications');
+    expect(screen.getByRole('link', { name: '참가 관리' })).toHaveAttribute('href', '/matches/m1/applications?from=%2Fmy%2Fmatches%2Fcreated');
   });
 
   it('시작 후 개인매치는 모집 중이 아니라 진행중·종료 확인 상태로 보인다', () => {
@@ -76,7 +76,7 @@ describe('내 개인·팀 매치 이력', () => {
     expect(badge('모집 매치')).toBe('모집 중');
     expect(badge('진행 매치')).toBe('진행중');
     expect(badge('끝난 매치')).toBe('종료 확인 필요');
-    expect(screen.getByRole('link', { name: '참여 확인' })).toHaveAttribute('href', '/matches/m3/applications?tab=approved');
+    expect(screen.getByRole('link', { name: '참여 확인' })).toHaveAttribute('href', '/matches/m3/applications?tab=approved&from=%2Fmy%2Fmatches%2Fcreated');
   });
 
   it('참가자에게 종료 확인 대기 매치는 호스트 확인 중으로 보인다', () => {
@@ -150,7 +150,7 @@ describe('내 개인·팀 매치 이력', () => {
 
     expect(mock.personalQuery).toHaveBeenCalledWith('created', { enabled: false });
     expect(mock.teamQuery).toHaveBeenCalledWith('created', { enabled: true });
-    expect(screen.getByRole('link', { name: '팀매치 관리' })).toHaveAttribute('href', '/team-matches/tm-1');
+    expect(screen.getByRole('link', { name: '팀매치 관리' })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fmy%2Fmatches%2Fcreated%3Ftype%3Dteam');
     expect(screen.getByRole('link', { name: '상세' })).toHaveAttribute(
       'href',
       '/team-matches/tm-1?from=%2Fmy%2Fmatches%2Fcreated%3Ftype%3Dteam',

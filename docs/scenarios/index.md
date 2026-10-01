@@ -1,5 +1,7 @@
 # Teameet QA Scenario Index
 
+2026-10-01 마이페이지 수정: 생년월일 저장·출발 화면 복귀·비밀번호 재설정 진입 구현 및 회귀 123개 통과. dev 리뷰/배포·Alpha 재검증 대기. [MY 실행 기록](executions/my-flow-execution.md).
+
 ## 2026-09-30 — 플랫폼 팀매치 공동 운영
 
 [Task 149](../../.github/tasks/149-admin-assigned-team-match.md) · [검증 시나리오](./friendly-team-match-screen-flow.md): 기존 양 팀 협업을 유지하며 운영자 공동 기록·단방향 운영 리뷰 추가. 로컬 회귀/타입 검사 진행, 실제 DB CI 및 Alpha 시각 검증 대기. DEV만 배포하며 main은 변경하지 않는다.

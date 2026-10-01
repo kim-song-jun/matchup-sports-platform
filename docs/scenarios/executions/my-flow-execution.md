@@ -102,3 +102,11 @@ npx jest --testPathPatterns='profile.controller|reviews.controller|notifications
 원인 미확정(빌드 오류 / 환경변수 누락 / 콜드스타트 지연 가능성). API(:8121)는 정상.  
 E2E 커버 대상: MY-010~MY-014 (`settings.spec.ts`)는 해당 blocker 해소 후 재실행 필요.
 
+
+
+## 2026-10-01 마이페이지 오류 수정 후 dev 재검증 준비
+
+- Task: [.github/tasks/20260930-my-page-flow-audit.md](../../../.github/tasks/20260930-my-page-flow-audit.md).
+- 수정 계약: 구분자 생년월일 저장, 채팅·알림·카드·사진·리그 fixture·관리·약관 복귀, 본인인증 비밀번호 재설정 진입.
+- v1 프론트 회귀 10파일 123개 통과. tsc 오류 0, 패턴 검사 통과. API/DB 변경 없음.
+- Alpha 배포 및 실제 사용자 화면 검증은 아직 대기. 이전 검증의 PASS를 새 배포 PASS로 재사용하지 않는다.

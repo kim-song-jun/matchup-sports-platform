@@ -99,4 +99,21 @@ describe('SponsorLogoStrip', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  it('skips brackets in each word of the fallback initials (F54)', () => {
+    render(
+      <SponsorLogoStrip
+        sponsors={[
+          sponsor({ id: 'corp', name: '(주) 서울 스포츠랩', logoUrl: 'https://images.example.com/corp.png' }),
+          sponsor({ id: 'one', name: '(주)팀밋', logoUrl: 'https://images.example.com/one.png' }),
+        ]}
+      />,
+    );
+
+    fireEvent.error(screen.getByRole('img', { name: '(주) 서울 스포츠랩 로고' }));
+    fireEvent.error(screen.getByRole('img', { name: '(주)팀밋 로고' }));
+
+    expect(screen.getByRole('img', { name: '(주) 서울 스포츠랩 로고' })).toHaveTextContent(/^주서$/);
+    expect(screen.getByRole('img', { name: '(주)팀밋 로고' })).toHaveTextContent(/^주팀$/);
+  });
 });

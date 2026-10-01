@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { waitForOverlayHistory } from '@/lib/overlay-history';
 import { useModalA11y } from './use-modal-a11y';
 
@@ -166,15 +167,17 @@ export function ConfirmModal({
     if (open) setAcknowledged(false);
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
   const isDanger = tone === 'danger';
 
-  return (
+  // body 로 올린다 — 페이지는 template.tsx 의 view-transition-name 래퍼(스태킹 컨텍스트) 안이라,
+  // 거기서는 z-index 를 얼마로 줘도 셸 네비(데스크톱 nav·모바일 상단바) 아래에 깔린다.
+  return createPortal(
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)' }}
+      className="fixed inset-0 flex items-end justify-center sm:items-center p-4"
+      style={{ zIndex: 'var(--z-modal)', background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)' }}
       onClick={onBackdropClick}
     >
       {/* Panel */}
@@ -283,6 +286,7 @@ export function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -273,6 +273,8 @@ enum V1ChatMessageStatus {
 enum V1ChatMessageType {
   text
   system
+  /// 사진 메시지 — `attachmentAssetId` 가 보낸 사람의 이미지 업로드를 가리킨다(Task 181).
+  image
 }
 
 enum V1ChatSystemEventType {
@@ -664,7 +666,8 @@ model V1UploadAsset {
   storagePath String       @unique @map("storage_path")
   createdAt   DateTime     @default(now()) @map("created_at")
 
-  ownerUser V1User @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  ownerUser    V1User          @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  chatMessages V1ChatMessage[] @relation("V1ChatMessageAttachment")
 
   @@index([ownerUserId, createdAt])
   @@index([ownerUserId, kind, createdAt])
@@ -2096,6 +2099,8 @@ model V1ChatMessage {
   status          V1ChatMessageStatus    @default(sent)
   messageType     V1ChatMessageType      @default(text) @map("message_type")
   systemEventType V1ChatSystemEventType? @map("system_event_type")
+  /// 사진 메시지의 업로드. 업로드가 지워지면 null — 메시지는 남고 사진만 사라진다.
+  attachmentAssetId String?              @map("attachment_asset_id")
   sentAt          DateTime               @default(now()) @map("sent_at")
   hiddenAt        DateTime?              @map("hidden_at")
   deletedAt       DateTime?              @map("deleted_at")
@@ -2104,9 +2109,11 @@ model V1ChatMessage {
 
   chatRoom           V1ChatRoom              @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
   senderUser         V1User                  @relation("V1ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)
+  attachmentAsset    V1UploadAsset?          @relation("V1ChatMessageAttachment", fields: [attachmentAssetId], references: [id], onDelete: SetNull)
   readByParticipants V1ChatRoomParticipant[] @relation("V1LastReadMessage")
 
   @@index([chatRoomId, sentAt])
+  @@index([attachmentAssetId])
   @@index([senderUserId])
   @@index([status])
   @@map("v1_chat_messages")

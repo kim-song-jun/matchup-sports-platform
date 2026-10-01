@@ -20,6 +20,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
+import { displayInitials } from '@/lib/display-initials';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamMembersSection } from './team-members-section';
 import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
@@ -1684,7 +1685,7 @@ function JoinRequestSection({ model }: { model: TeamMembersViewModel }) {
 
 /** 사람 이름 첫 글자 동그라미 — 가입 신청·초대·멤버 행이 같은 모양을 쓴다. */
 function MemberInitial({ name }: { name: string }) {
-  return <span aria-hidden="true" className="tm-member-initial">{Array.from(name)[0] ?? '?'}</span>;
+  return <span aria-hidden="true" className="tm-member-initial">{displayInitials(name, { fallback: '?' })}</span>;
 }
 
 /** 목록 어디서 눌렀든 거절 이유가 화면 밖 위쪽에 묻히지 않게, 생길 때 끌어와 읽힌다. */

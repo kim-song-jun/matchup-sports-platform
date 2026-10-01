@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isAccessDeniedError } from '@/lib/access-denied-error';
+import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
 import { withFromPath } from '@/lib/session-storage';
@@ -17,6 +18,7 @@ import {
   useV1ReadAllNotifications,
   useV1ReadNotification,
   useV1SendChatMessage,
+  useV1UploadImages,
   useV1UpdateChatRoomMe,
   useV1UpdateMyChatRoom,
 } from '@/hooks/use-v1-api';
@@ -27,6 +29,7 @@ import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationM
 import { getChatRoomViewModel } from './community.view-model';
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
+import { MAX_CHAT_IMAGES } from './chat-plus-panel';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -148,8 +151,12 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const room = useV1ChatRoom(roomId);
   const messages = useV1ChatMessages(roomId, { limit: 50 });
   const send = useV1SendChatMessage(roomId);
+  // 채팅 사진은 크기와 무관하게 다시 그려 촬영 위치(EXIF GPS)·기기 정보를 지운다.
+  const uploadImages = useV1UploadImages({ stripMetadata: true });
   const updateMe = useV1UpdateMyChatRoom(roomId);
   const [draft, setDraft] = useState('');
+  const [sendingImages, setSendingImages] = useState(false);
+  const [imageNotice, setImageNotice] = useState<string | undefined>();
   const items = useMemo(() => [...(messages.data?.items ?? [])].reverse(), [messages.data]);
   const lastMessageId = items.at(-1)?.messageId ?? null;
 
@@ -226,6 +233,33 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         },
       );
     },
+    // 사진마다 "올리기 → 보내기"를 차례로 한다 — 말풍선이 사진별로 올라가고(카카오톡처럼), 중간에 실패해도
+    // 몇 장이 갔는지 정확히 알려 다시 고를 때 앞 사진이 중복되지 않으며, 올리기만 되고 안 보내진 사진이 쌓이지 않는다.
+    onPickImages: async (files) => {
+      if (sendingImages || files.length === 0) return;
+      const picked = files.slice(0, MAX_CHAT_IMAGES);
+      setImageNotice(undefined);
+      setSendingImages(true);
+      let sent = 0;
+      try {
+        for (const file of picked) {
+          const { urls } = await uploadImages.mutateAsync([file]);
+          if (!urls[0]) throw new Error('사진을 올리지 못했어요. 다시 시도해 주세요.');
+          await send.mutateAsync({ imageUrl: urls[0] });
+          sent += 1;
+        }
+        if (files.length > MAX_CHAT_IMAGES) {
+          setImageNotice(`사진은 한 번에 ${MAX_CHAT_IMAGES}장까지 보낼 수 있어요. 앞의 ${MAX_CHAT_IMAGES}장만 보냈어요.`);
+        }
+      } catch (err) {
+        const reason = extractErrorMessage(err, '사진을 보내지 못했어요. 다시 시도해 주세요.');
+        setImageNotice(sent > 0 ? `사진 ${picked.length}장 중 ${sent}장만 보냈어요. ${reason}` : reason);
+      } finally {
+        setSendingImages(false);
+      }
+    },
+    sendingImages,
+    imageNotice,
     errorBack: accessDenied ? { href: '/chat', label: '채팅 목록으로' } : undefined,
     onRetry: isError && !accessDenied
       ? () => {
@@ -344,6 +378,14 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
     label: message.mine ? '나' : message.sender.displayName,
     body: message.content ?? '삭제된 메시지예요.',
     sentAt: message.sentAt,
+    ...(message.messageType === 'image'
+      ? {
+          kind: 'image' as const,
+          imageUrl: message.imageUrl ?? null,
+          // 숨김·삭제면 content 가 null 이라 위 '삭제된 메시지예요.' 가 남고, 업로드만 지워졌으면 이 문구다.
+          ...(message.content !== null && !message.imageUrl ? { body: '사진을 볼 수 없어요' } : {}),
+        }
+      : {}),
   };
 }
 

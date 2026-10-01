@@ -255,3 +255,25 @@ describe('reviews view model — 작성 현황과 제출 대상', () => {
     expect(incompleteNote([])).toBeNull();
   });
 });
+
+describe('reviews view model — 대상 아바타 이니셜 (F54)', () => {
+  const target = (name: string): V1ReviewTarget => ({
+    targetType: 'team',
+    targetUserId: null,
+    targetTeamId: 'team-1',
+    reviewerTeam: null,
+    name,
+    imageUrl: null,
+    subtitle: '대회 상대 팀',
+    alreadySubmitted: false,
+    review: null,
+    locked: false,
+    lockReason: null,
+  });
+
+  it('앞의 괄호·공백을 건너뛴 두 글자, 글자가 없으면 "리뷰"', () => {
+    expect(toTargetViewModel(target('(QA0929) 마포 FC')).initials).toBe('QA');
+    expect(toTargetViewModel(target(' 마포 FC')).initials).toBe('마포');
+    expect(toTargetViewModel(target('()')).initials).toBe('리뷰');
+  });
+});

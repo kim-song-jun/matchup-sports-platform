@@ -23,6 +23,7 @@ import {
 } from '@/app/tournaments/[id]/tournament-detail-client';
 import { usePublicTournamentPlayerRecords, usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
+import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
 // ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
 // 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
 import {
@@ -334,6 +335,11 @@ function BracketEmpty({
   );
 }
 
+// 서버는 bare `/users/:id` 를 준다 — 프로필의 뒤로가기가 이 화면으로 돌아오도록 출처를 붙인다.
+function withProfileFrom(rows: readonly PublicTournamentPlayerRecordRow[] | undefined, from: string | null | undefined) {
+  return rows?.map((row) => ({ ...row, profileHref: withFromPath(row.profileHref, from) }));
+}
+
 /**
  * §B-6 — 이 화면에서 경기 일정도 볼 수 있게 한다. 탭으로 나눈 이유: "순위·대진표"와
  * "경기 일정"은 둘 다 화면 하나를 다 채울 만큼 정보량이 많아(특히 조별리그 대회는
@@ -416,8 +422,8 @@ export function BracketScheduleTab({
           집계 자체가 불가능하고, 빈 표는 "아직 기록이 없다"로 잘못 읽힌다. */}
       {isRegularLeague ? null : (
         <TournamentPlayerRecordsSections
-          goals={playerRecords.data?.goals}
-          assists={playerRecords.data?.assists}
+          goals={withProfileFrom(playerRecords.data?.goals, fromHref)}
+          assists={withProfileFrom(playerRecords.data?.assists, fromHref)}
           hiddenByEligibility={playerRecords.data?.hiddenByEligibility ?? false}
           isLoading={playerRecords.isLoading}
           isError={playerRecords.isError}

@@ -30,6 +30,8 @@ import { buildTeamMatchSummaryLabel } from './team-matches.card-model';
 import { teamMatchStepHref } from './team-matches.routes';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { josa } from '@/lib/korean';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -48,6 +50,10 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
   // 갖고 있다 — floatingSlot만 ReactNode라 테이블에 담을 수 없어 override로 밀어넣는다
   // (app-shell-promotion.md §1b, 6곳 중 하나).
   useShellOverride({ floatingSlot: <TeamMatchCreateFloatingButton /> });
+  // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
+  // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
+  const currentHref = useCurrentHref();
+  const listFromHref = currentHref?.includes('?') ? currentHref : null;
   return (
     <>
       {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}
@@ -75,7 +81,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         {model.isLoading
           ? <PageSkeleton />
           : model.matches.length
-            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} />)}</div>
+            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} fromHref={listFromHref} />)}</div>
             : (
               /* matches-page.tsx MatchListPageView 와 동일한 이유·조건 — 필터/종목이 걸려 있을
                  때만 "전체 팀매치 보기" CTA 를 준다(웨이브4, 2026-09-04). */
@@ -933,7 +939,7 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
   );
 }
 
-function TeamMatchCard({ match }: { match: TeamMatchModel }) {
+function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: string | null }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
   const league = match.league;
@@ -970,7 +976,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
   const openLabel = !relation && !isClosed && !isLeagueFixture && !match.live && !match.completionPending ? '상대 모집 중' : null;
   return (
-    <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
+    <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={withFromPath(`/team-matches/${match.id}`, fromHref)}>
       {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
           담을 값이 없다 — 목록 API 응답에 상대팀이 없고, 팀매치는 대부분 상대가 아직 정해지지
           않은 모집 글이라 그 자리를 상태 배지가 차지하고 있었다. 결과적으로 시각 무게가 가장 큰

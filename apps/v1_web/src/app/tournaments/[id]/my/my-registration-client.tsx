@@ -41,11 +41,8 @@ import type {
   V1TournamentPaymentMethod,
   V1MyTeam,
 } from '@/types/api';
-import {
-  ROSTER_BLOCK_BADGE_LABEL,
-  ROSTER_VIEW_ONLY_BADGE_LABEL,
-  registrationRosterBlockReason,
-} from '@/lib/roster-editability';
+import { registrationRosterBlockReason, rosterStateBadgeLabel } from '@/lib/roster-editability';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import {
   competitionKindLabel,
   teamRoleLabel,
@@ -670,12 +667,7 @@ function RegistrationDetailView({
   const rosterBlockReason = registrationRosterBlockReason(tournament, registration);
   const isRosterEditable = canManageRegistration && rosterBlockReason === null;
   // null 이면 고칠 수 있는 사람이 보고 있다 — 자리마다 "수정 가능" 배지나 수정 버튼을 그린다.
-  const rosterStateBadge =
-    rosterBlockReason !== null
-      ? ROSTER_BLOCK_BADGE_LABEL[rosterBlockReason]
-      : canManageRegistration
-        ? null
-        : ROSTER_VIEW_ONLY_BADGE_LABEL;
+  const rosterStateBadge = rosterStateBadgeLabel(rosterBlockReason, canManageRegistration);
   const detailLabel = `${competitionNoun(tournament.kind === 'regular_league')} 상세 보기`;
   const canCancelRequest =
     canManageRegistration &&
@@ -1516,7 +1508,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   }
 
   const selectedTeam = teams.find((team) => team.teamId === selectedRegistration.teamId);
-  const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
+  const canManageSelectedRegistration = isTeamOperatorRole(selectedTeam?.role);
 
   return (
           <RegistrationDetailView

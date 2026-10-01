@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { formatTournamentDateMedium } from '@/lib/date-utils';
 import { registrationRosterPath } from '@/lib/game-roster-routes';
-import { ROSTER_BLOCK_BADGE_LABEL } from '@/lib/roster-editability';
+import { rosterStateBadgeLabel } from '@/lib/roster-editability';
 import { withFromPath } from '@/lib/session-storage';
 import { tournamentRegistrationStatusConfig } from '@/lib/v1-status-labels';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
@@ -19,7 +19,7 @@ export type TeamCompetitionEntryRow = {
   statusLabel: string;
   statusColor: string;
   playerCount: number;
-  /** 명단을 지금 고칠 수 있는지 한 마디 — "수정 가능" · "10월 8일 (목)까지 수정" · "제출 마감" · "종료" */
+  /** 명단을 지금 고칠 수 있는지 한 마디 — "수정 가능" · "10월 8일 (목)까지 수정" · "제출 마감" · "종료" · 멤버는 "팀장에게 요청" */
   rosterNote: string;
   rosterHref: string;
   /** 보는 사람이 팀장·매니저이고 명단도 고칠 수 있을 때만 [명단 수정]. 아니면 [명단 보기]. */
@@ -49,11 +49,10 @@ export function toCompetitionEntryRows(
     const rosterNote =
       entry.rosterBlockedBy === 'closed' && ENDED.has(entry.status)
         ? getTournamentStatusConfig(entry.status).label
-        : entry.rosterBlockedBy !== null
-          ? ROSTER_BLOCK_BADGE_LABEL[entry.rosterBlockedBy]
-          : deadline !== null && new Date(deadline).getTime() > now
+        : (rosterStateBadgeLabel(entry.rosterBlockedBy, entries.viewerCanManageRoster) ??
+          (deadline !== null && new Date(deadline).getTime() > now
             ? `${formatTournamentDateMedium(deadline)}까지 수정`
-            : '수정 가능';
+            : '수정 가능'));
     return {
       key: entry.registrationId,
       kind: isLeague ? 'LEAGUE' : 'TOURNAMENT',

@@ -10,7 +10,7 @@ import { gameRosterScreenPath, registrationRosterPath } from '@/lib/game-roster-
 import {
   getRosterDeadlineState,
   registrationRosterBlockReason,
-  ROSTER_BLOCK_BADGE_LABEL,
+  rosterStateBadgeLabel,
   tournamentRosterClosedMessage,
   type RosterEditBlockReason,
 } from '@/lib/roster-editability';
@@ -98,6 +98,7 @@ function CompetitionEntryCard({
   const canManage = isTeamOperatorRole(team?.role);
   const blockReason = registrationRosterBlockReason(competition, registration);
   const editable = canManage && blockReason === null;
+  const stateBadge = rosterStateBadgeLabel(blockReason, canManage);
   // 참가 명단이 막혀도 이번 경기에서 빼는 건 경기 명단에서 된다 — 그 길을 같은 자리에 둔다.
   const offersGameRoster = canManage && (blockReason === 'deadline' || blockReason === 'locked');
   const upcoming = useV1TeamUpcomingGames(registration.teamId, { enabled: offersGameRoster });
@@ -129,9 +130,7 @@ function CompetitionEntryCard({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
         <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>참가 명단</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {blockReason === null ? null : (
-            <span className="tm-badge tm-badge-sm tm-badge-grey">{ROSTER_BLOCK_BADGE_LABEL[blockReason]}</span>
-          )}
+          {stateBadge === null ? null : <span className="tm-badge tm-badge-sm tm-badge-grey">{stateBadge}</span>}
           <span className="tm-text-label tab-num" style={{ fontWeight: 700 }}>
             선수 {registration.playerCount}명
           </span>

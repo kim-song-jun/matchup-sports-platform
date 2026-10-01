@@ -57,6 +57,19 @@ describe('toCompetitionEntryRows', () => {
     expect(rows.map((row) => row.rosterNote)).toEqual(['수정 가능', '10월 8일 (목)까지 수정', '제출 마감', '명단 마감', '종료']);
   });
 
+  // "내 신청"·대회 상세 카드와 한 기준(rosterStateBadgeLabel) — 멤버에게 "수정 가능"은 못 고치는 사람에게 고친다는 말이다.
+  it('멤버의 열린 명단은 "팀장에게 요청" — 대조군: 팀장은 그대로, 실제 마감은 멤버에게도 마감 사유', () => {
+    const items = [
+      { rosterDeadlineAt: null },
+      { rosterDeadlineAt: '2026-10-08T14:59:00.000Z' },
+      { rosterDeadlineAt: '2026-09-26T14:59:00.000Z', rosterEditable: false, rosterBlockedBy: 'deadline' as const },
+    ];
+    const notes = (canManage: boolean) =>
+      toCompetitionEntryRows(entries(items, canManage), SELF, NOW).map((row) => row.rosterNote);
+    expect(notes(false)).toEqual(['팀장에게 요청', '팀장에게 요청', '제출 마감']);
+    expect(notes(true)).toEqual(['수정 가능', '10월 8일 (목)까지 수정', '제출 마감']);
+  });
+
   it('[명단 수정]은 팀장·매니저이면서 명단을 고칠 수 있을 때만 — 둘 중 하나라도 아니면 [명단 보기]', () => {
     const items = [{ rosterEditable: true }, { rosterEditable: false, rosterBlockedBy: 'deadline' as const }];
     expect(toCompetitionEntryRows(entries(items, true), SELF, NOW).map((row) => row.canEdit)).toEqual([true, false]);

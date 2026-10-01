@@ -120,7 +120,7 @@ export class ChatService {
     const message = await this.prisma.v1ChatMessage.findFirst({
       // 사진 메시지도 신고·차단 대상이다 — 사람이 보낸 것 중 입장·퇴장 같은 system 만 뺀다.
       where: { id: messageId, chatRoomId: roomId, messageType: { not: 'system' }, status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
-      include: { attachmentAsset: { select: { url: true } } },
+      include: { attachmentAsset: { select: { url: true, originalName: true, kind: true } } },
     });
     if (!message) throw new NotFoundException({ code: 'NOT_FOUND', message: '신고할 메시지를 찾을 수 없어요.' });
     if (message.senderUserId === user.id) throw new BadRequestException({ code: 'INVALID_TARGET', message: '본인의 메시지는 신고하거나 차단할 수 없어요.' });
@@ -144,7 +144,7 @@ export class ChatService {
       const created = await tx.v1Inquiry.create({ data: {
         userId: user.id, category: 'report', title: '채팅 메시지 신고',
         // Keep the server-owned message snapshot so later edits cannot rewrite the evidence.
-        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}${message.attachmentAsset ? ` (${message.attachmentAsset.url})` : ''}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
+        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}${message.attachmentAsset ? ` (${message.attachmentAsset.kind === 'file' ? `파일 ${message.attachmentAsset.originalName ?? ''} · ${message.attachmentAsset.url}` : message.attachmentAsset.url})` : ''}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
         relatedType: 'user', relatedId: message.senderUserId, reportReason: dto.reason,
       } });
       await tx.v1OutboxEvent.create({ data: {
@@ -244,7 +244,7 @@ export class ChatService {
     const messages = await this.prisma.v1ChatMessage.findMany({
       where: { chatRoomId: roomId, sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
       include: {
-        attachmentAsset: { select: { url: true } },
+        attachmentAsset: { select: { url: true, originalName: true, byteSize: true, mimeType: true } },
         senderUser: {
           select: {
             id: true,
@@ -281,7 +281,17 @@ export class ChatService {
         systemEventType: message.systemEventType ?? null,
         content: message.status === 'sent' ? message.body : null,
         // 숨김·삭제 메시지는 본문처럼 사진도 내리지 않는다.
-        imageUrl: message.status === 'sent' ? message.attachmentAsset?.url ?? null : null,
+        // 사진 메시지만 공개 URL 을 싣는다 — 파일 업로드의 저장 경로는 응답에 내보내지 않는다.
+        imageUrl: message.status === 'sent' && message.messageType === 'image' ? message.attachmentAsset?.url ?? null : null,
+        // 파일은 이름·크기만. 받기는 GET /chat/rooms/:roomId/messages/:messageId/file(참여자 인증).
+        file:
+          message.status === 'sent' && message.messageType === 'file' && message.attachmentAsset
+            ? {
+                name: message.attachmentAsset.originalName ?? '파일',
+                size: Number(message.attachmentAsset.byteSize),
+                mimeType: message.attachmentAsset.mimeType,
+              }
+            : null,
         shareCard: message.status === 'sent' ? parseShareCard(message.shareCard) : null,
         status: message.status,
         sentAt: message.sentAt,
@@ -350,11 +360,29 @@ export class ChatService {
     };
   }
 
+  /**
+   * 파일 메시지의 저장 위치·이름을 돌려준다(Task 181 ③) — 메시지 목록과 **같은 열람 규칙**(입장한 활성 참여자 ·
+   * 보이기 시작한 뒤의 메시지 · 차단 관계 제외 · 숨김/삭제 아님)을 통과해야 한다. 못 보면 404.
+   */
+  async messageFile(user: V1AuthUser, roomId: string, messageId: string) {
+    const room = await this.ensureEntered(user.id, await this.getActiveParticipantRoom(user.id, roomId));
+    const visibleFromAt = room.participants[0].visibleFromAt ?? new Date(0);
+    const message = await this.prisma.v1ChatMessage.findFirst({
+      where: { id: messageId, chatRoomId: roomId, messageType: 'file', status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
+      select: { attachmentAsset: { select: { kind: true, storagePath: true, originalName: true, mimeType: true } } },
+    });
+    const asset = message?.attachmentAsset;
+    if (!asset || asset.kind !== 'file') throw new NotFoundException({ code: 'NOT_FOUND', message: '파일을 찾을 수 없어요.' });
+    return { storagePath: asset.storagePath, name: asset.originalName ?? 'file', mimeType: asset.mimeType };
+  }
+
   async sendMessage(user: V1AuthUser, roomId: string, dto: SendChatMessageDto) {
     const content = dto.content?.trim() ?? '';
     const imageUrl = dto.imageUrl?.trim() ?? '';
-    const sentKinds = [content, imageUrl, dto.share].filter(Boolean).length;
-    if (sentKinds > 1) throw validationError('send exactly one of content, imageUrl and share', dto.share ? 'share' : 'imageUrl');
+    const sentKinds = [content, imageUrl, dto.share, dto.fileId].filter(Boolean).length;
+    if (sentKinds > 1) {
+      throw validationError('send exactly one of content, imageUrl, share and fileId', dto.fileId ? 'fileId' : dto.share ? 'share' : 'imageUrl');
+    }
     if (sentKinds === 0) throw validationError('content is required', 'content');
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.teamContact) {
@@ -371,14 +399,25 @@ export class ChatService {
         })
       : null;
     if (imageUrl && !image) throw validationError('사진을 찾을 수 없어요. 다시 올려 주세요.', 'imageUrl');
+    // 파일은 **보내는 사람이 올린 file 업로드**만 — 남의 파일을 채팅에 붙이지 못하게.
+    const file = dto.fileId
+      ? await this.prisma.v1UploadAsset.findFirst({
+          where: { id: dto.fileId, ownerUserId: user.id, kind: 'file' },
+          select: { id: true, originalName: true, byteSize: true, mimeType: true },
+        })
+      : null;
+    if (dto.fileId && !file) throw validationError('파일을 찾을 수 없어요. 다시 올려 주세요.', 'fileId');
+    const fileName = file?.originalName ?? '파일';
     // 공유 카드는 보내는 사람이 볼 수 있는 일정·매치만 — 못 보는 걸 카드로 퍼 나르지 못하게. 보낼 때 스냅숏한다.
     const shareCard = dto.share ? await this.resolveShareCard(user.id, dto.share) : null;
     const shareLabel = shareCard ? CHAT_SHARE_LABEL[shareCard.kind] : null;
     // 사진·공유 메시지의 body 는 읽을 수 있는 대체 문구 — 목록 미리보기·신고 스냅샷·body 만 읽는 옛 경로가 그대로 읽힌다.
-    const body = image ? '사진' : shareCard ? `[${shareLabel}] ${shareCard.title}` : content;
+    const body = image ? '사진' : file ? `[파일] ${fileName}` : shareCard ? `[${shareLabel}] ${shareCard.title}` : content;
     const notificationText = image
       ? '사진을 보냈어요'
-      : shareCard
+      : file
+        ? `파일을 보냈어요 · ${fileName}`.slice(0, 120)
+        : shareCard
         ? `${shareLabel}${shareCard.kind === 'team_schedule' ? '을' : '를'} 공유했어요 · ${shareCard.title}`.slice(0, 120)
         : content.slice(0, 120);
 
@@ -386,7 +425,9 @@ export class ChatService {
       const created = await tx.v1ChatMessage.create({
         data: image
           ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'image', attachmentAssetId: image.id }
-          : shareCard
+          : file
+            ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'file', attachmentAssetId: file.id }
+            : shareCard
             ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'share', shareCard }
             : { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent' },
       });
@@ -404,6 +445,7 @@ export class ChatService {
       content: message.body,
       imageUrl: image?.url ?? null,
       shareCard,
+      file: file ? { name: fileName, size: Number(file.byteSize), mimeType: file.mimeType } : null,
       status: message.status,
       sentAt: message.sentAt,
       senderUserId: user.id,

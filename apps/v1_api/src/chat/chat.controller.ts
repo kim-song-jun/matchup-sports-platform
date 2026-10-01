@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -13,6 +14,7 @@ import {
   UpdateMyChatRoomDto,
 } from './dto/chat.dto';
 import { ChatService } from './chat.service';
+import { UploadsService } from '../uploads/uploads.service';
 
 @Controller('chat')
 @UseGuards(V1AuthGuard)
@@ -27,6 +29,31 @@ export class ChatController {
   @Delete('blocked-users/:userId')
   unblockUser(@CurrentUser() user: V1AuthUser, @Param('userId') userId: string) {
     return this.chatService.unblockUser(user, userId);
+  }
+
+  /**
+   * 파일 메시지 받기(Task 181 ③) — 방 참여자만. 파일은 공개 `/uploads` 밖(`.private/`)에 있어 이 경로가 유일한 입구다.
+   * 공통 응답 감싸기(TransformInterceptor)를 거치지 않게 응답을 직접 쓴다. 항상 내려받기(attachment)로 보내고
+   * MIME 추측을 막아(nosniff) 브라우저가 문서를 열어 실행하지 않게, 개인 대화 파일이라 캐시하지 않는다.
+   */
+  @Get('rooms/:roomId/messages/:messageId/file')
+  async downloadMessageFile(
+    @CurrentUser() user: V1AuthUser,
+    @Param('roomId') roomId: string,
+    @Param('messageId') messageId: string,
+    @Res() res: Response,
+  ) {
+    const file = await this.chatService.messageFile(user, roomId, messageId);
+    res.attachment(file.name);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+    await new Promise<void>((resolve, reject) => {
+      res.sendFile(
+        file.storagePath,
+        { root: UploadsService.UPLOAD_BASE, dotfiles: 'allow', headers: { 'Content-Type': file.mimeType } },
+        (err) => (err && !res.headersSent ? reject(new NotFoundException({ code: 'NOT_FOUND', message: '파일을 찾을 수 없어요.' })) : resolve()),
+      );
+    });
   }
 
   @Post('rooms/:roomId/messages/:messageId/block')

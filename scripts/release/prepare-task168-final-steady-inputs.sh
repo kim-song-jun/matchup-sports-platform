@@ -16,13 +16,14 @@ set -Eeuo pipefail
 # 2026-09-28 Task 179 adds v1_game_roster_adjustments and v1_team_member_unavailabilities.
 # 2026-10-01 Task 181: additive chat image message (enum value image + nullable v1_chat_messages.attachment_asset_id FK).
 # 2026-10-01 Task 181 ②: additive chat share card (enum value share + nullable v1_chat_messages.share_card JSONB).
+# 2026-10-01 Task 181 ③: additive chat file message (enum values file + nullable v1_upload_assets.original_name).
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
 [[ -f "$schema" && -f "$m11" ]] || { echo 'Task168 final-policy source inputs missing' >&2; exit 1; }
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == 41c6372ac1446a18c81c88035ad24702735fdc4f18a972f955a94756acaa44d7 \
+[[ "$schema_sha" == 7814e0de5f06aa5cef96bc515dff706767c39b2b01c545d164c5610456bd40cb \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

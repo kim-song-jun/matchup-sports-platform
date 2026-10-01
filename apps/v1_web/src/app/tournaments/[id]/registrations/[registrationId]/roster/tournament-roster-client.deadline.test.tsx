@@ -444,6 +444,48 @@ describe('등번호 수정', () => {
     // 고치던 입력값도 되돌아가지 않는다.
     expect(screen.getByLabelText('등번호')).toHaveValue('e');
   });
+
+  // W7-V3 — 등번호를 저장해도 상태 줄이 앞 동작 문구로 남았다(alpha: "선수를 추가했어요.").
+  it('등번호만 저장하면 상태 줄이 그 동작을 말하고, 앞 동작 문구는 남지 않는다', async () => {
+    renderRow(7);
+    // 앞 동작: 자격만 바꿔 저장 — 상태 줄에 문구 하나를 남긴다.
+    fireEvent.click(screen.getByRole('radio', { name: '선출' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('선수 정보를 수정했어요.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /수정/ }));
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '19' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('등번호를 저장했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('선수 정보를 수정했어요.')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 자격과 등번호를 함께 저장하면 문구는 저장 전체를 말하는 하나다', async () => {
+    renderRow(7);
+    fireEvent.click(screen.getByRole('radio', { name: '선출' }));
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '19' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(updateJersey).toHaveBeenCalledWith({ playerId: 'player-1', jerseyNumber: 19 }));
+    expect(screen.getByText('선수 정보를 수정했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('등번호를 저장했어요.')).not.toBeInTheDocument();
+  });
+
+  it('등번호 저장이 실패하면 앞 동작의 성공 문구를 지운 채 행에 오류를 보인다', async () => {
+    renderRow(7);
+    fireEvent.click(screen.getByRole('radio', { name: '선출' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('선수 정보를 수정했어요.')).toBeInTheDocument();
+
+    updateJersey.mockRejectedValueOnce(new Error('등번호 저장 실패'));
+    fireEvent.click(screen.getByRole('button', { name: /수정/ }));
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '19' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('등번호 저장 실패')).toBeInTheDocument();
+    expect(screen.queryByText('선수 정보를 수정했어요.')).not.toBeInTheDocument();
+  });
 });
 
 /**

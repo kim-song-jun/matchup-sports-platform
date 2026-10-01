@@ -841,9 +841,12 @@ function rosterPlayerName(player: Pick<V1TournamentRosterPlayer, 'realName' | 'n
   return player.realName ?? player.nickname ?? '(탈퇴한 선수)';
 }
 
+/** 행 저장 한 번에 바뀐 값만 담는다 — 자격과 등번호는 서버 경로가 다르다. */
+type PlayerRowChanges = { eligibilityStatus?: V1PlayerEligibilityStatus; jerseyNumber?: number | null };
+
 function PlayerRow({
   player,
-  onUpdate,
+  onSave,
   onRemove,
   isUpdating,
   isRemoving,
@@ -851,11 +854,10 @@ function PlayerRow({
   isEditing,
   onToggleEdit,
   isPrimary,
-  onUpdateJersey,
   showGameRosterName,
 }: {
   player: V1TournamentRosterPlayer;
-  onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
+  onSave: (playerId: string, changes: PlayerRowChanges) => Promise<void>;
   onRemove: (playerId: string) => void;
   isUpdating: boolean;
   isRemoving: boolean;
@@ -869,8 +871,6 @@ function PlayerRow({
    * 칸이 있거나 다른 행이 편집 중이면 이 행의 "저장"은 보조로 낮춘다. 부모가
    * `draftForms.length === 0 && editingPlayerId === player.id` 로 계산해 넘긴다. */
   isPrimary: boolean;
-  /** 등번호만 고치는 경로 — 자격과 서버 엔드포인트가 다르다. */
-  onUpdateJersey: (playerId: string, jerseyNumber: number | null) => Promise<unknown>;
   /**
    * 팀장·매니저 화면에서만 실명 옆에 경기 명단·기록에 나가는 이름(닉네임)을 함께 보인다 — 번호를 넣는 사람이
    * 경기 명단의 누구인지 대조하지 않도록. 일반 팀원은 서버가 남의 실명을 비워 이미 닉네임만 보므로 그대로 둔다.
@@ -929,13 +929,11 @@ function PlayerRow({
     try {
       // **바뀐 것만 보낸다.** 자격과 등번호는 축이 다르고 서버 경로도 다르다 —
       // 등번호만 고쳤는데 자격까지 보내면 어드민 판정을 덮어쓸 여지가 생긴다.
-      if (draftEligibility !== player.eligibilityStatus) {
-        await onUpdate(player.id, draftEligibility);
-      }
       const nextJersey = jersey.value ?? null;
-      if (nextJersey !== player.jerseyNumber) {
-        await onUpdateJersey(player.id, nextJersey);
-      }
+      await onSave(player.id, {
+        ...(draftEligibility !== player.eligibilityStatus ? { eligibilityStatus: draftEligibility } : {}),
+        ...(nextJersey !== player.jerseyNumber ? { jerseyNumber: nextJersey } : {}),
+      });
       onToggleEdit();
     } catch (err) {
       setEditError(extractErrorMessage(err, '선수 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요.'));
@@ -1388,19 +1386,20 @@ export function TournamentRosterPageClient({
     }
   }
 
-  async function handleUpdatePlayerJersey(playerId: string, jerseyNumber: number | null) {
-    return updatePlayerJersey.mutateAsync({ playerId, jerseyNumber });
-  }
-
-  async function handleUpdatePlayer(playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) {
+  /** 행 저장 하나에 상태 문구 하나 — 앞 동작의 문구("선수를 추가했어요." 등)를 지우고 시작한다. */
+  async function handleSavePlayer(playerId: string, changes: PlayerRowChanges) {
     if (!canEditRoster) return;
     setRemoveError(null);
     setAddSuccess(null);
-    await updatePlayer.mutateAsync({
-      playerId,
-      body: { eligibilityStatus },
-    });
-    setAddSuccess('선수 정보를 수정했어요.');
+    const { eligibilityStatus, jerseyNumber } = changes;
+    if (eligibilityStatus !== undefined) {
+      await updatePlayer.mutateAsync({ playerId, body: { eligibilityStatus } });
+      setAddSuccess('선수 정보를 수정했어요.');
+    }
+    if (jerseyNumber !== undefined) {
+      await updatePlayerJersey.mutateAsync({ playerId, jerseyNumber });
+      if (eligibilityStatus === undefined) setAddSuccess('등번호를 저장했어요.');
+    }
   }
 
   return (
@@ -1637,8 +1636,7 @@ export function TournamentRosterPageClient({
               <PlayerRow
                 key={player.id}
                 player={player}
-                onUpdate={handleUpdatePlayer}
-                onUpdateJersey={handleUpdatePlayerJersey}
+                onSave={handleSavePlayer}
                 onRemove={handleRemovePlayer}
                 // **두 mutation 을 함께 본다.** 저장 하나가 자격/등번호 두 경로로 갈리므로
                 // `updatePlayer` 만 보면 **등번호 요청이 도는 동안 저장 버튼이 열려 있어**

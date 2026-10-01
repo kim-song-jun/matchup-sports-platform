@@ -130,7 +130,7 @@ describe('ChatService', () => {
     v1Match: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock };
-    v1TeamMatch: { findFirst: jest.Mock };
+    v1TeamMatch: { findFirst: jest.Mock; findMany: jest.Mock };
     v1UploadAsset: { findFirst: jest.Mock };
     v1TeamSchedule: { findFirst: jest.Mock };
     v1Team: { findFirst: jest.Mock };
@@ -175,7 +175,7 @@ describe('ChatService', () => {
       },
       v1MatchParticipant: { findFirst: jest.fn() },
       v1TeamMembership: { findFirst: jest.fn() },
-      v1TeamMatch: { findFirst: jest.fn() },
+      v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn() },
       v1UploadAsset: { findFirst: jest.fn() },
       v1TeamSchedule: { findFirst: jest.fn() },
       v1Team: { findFirst: jest.fn() },
@@ -360,7 +360,7 @@ describe('ChatService', () => {
       prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-1', teamId: 'team-1', teamMatchId: 'tm-1', title: '토요일 친선', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
       prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
       prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
-      prisma.v1TeamMatch.findFirst.mockResolvedValue({ placeName: '잠실 풋살장' });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm-1', placeName: '잠실 풋살장', leagueId: null, tournamentId: null });
 
       const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-1' } });
 
@@ -369,6 +369,71 @@ describe('ChatService', () => {
       expect(result).toMatchObject({ messageType: 'share', content: '[일정] 토요일 친선', shareCard: card });
       expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: [expect.objectContaining({ body: '일정을 공유했어요 · 토요일 친선' })] }),
+      );
+    });
+
+    it('대회·리그 경기 일정은 팀 매치 화면(대회 경기면 404)이 아니라 공개 경기 상세로 연다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-c', teamId: 'team-1', teamMatchId: 'tm-c', title: '공식 경기', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+      // 리그 대진은 tournamentId 도 리그 id 로 채워져 있다(league-fixture-creation.ts).
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm-c', placeName: '잠실', leagueId: 'league-1', tournamentId: 'league-1' });
+      const league = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-c' } });
+      expect(league.shareCard).toMatchObject({ route: '/league-matches/league-1/fixtures/tm-c', place: '잠실' });
+
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm-c', placeName: '잠실', leagueId: null, tournamentId: 'cup-1' });
+      const tournament = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-c' } });
+      expect(tournament.shareCard).toMatchObject({ route: '/tournaments/cup-1/matches/tm-c' });
+      expect(prisma.v1ChatMessage.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ shareCard: expect.objectContaining({ route: '/tournaments/cup-1/matches/tm-c' }) }),
+      });
+    });
+
+    it('이미 /team-matches/:id 로 보낸 대회·리그 일정 카드는 읽을 때 경기 상세로 열린다 · 친선·다른 카드는 그대로', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom());
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([]);
+      const card = (id: string, kind: string, route: string) => ({
+        id,
+        chatRoomId: 'room-1',
+        senderUserId: userB.id,
+        senderUser: { id: userB.id, profile: { nickname: 'B', displayName: null, profileImageUrl: null } },
+        body: '[일정] 경기',
+        status: 'sent',
+        messageType: 'share',
+        systemEventType: null,
+        attachmentAsset: null,
+        sentAt: new Date('2026-10-01T10:00:00Z'),
+        shareCard: { kind, targetId: `sch-${id}`, title: '경기', startAt: null, place: null, sub: null, route },
+      });
+      prisma.v1ChatMessage.findMany.mockResolvedValue([
+        card('friendly', 'team_schedule', '/team-matches/tm-friendly'),
+        card('league', 'team_schedule', '/team-matches/tm-league'),
+        card('cup', 'team_schedule', '/team-matches/tm-cup'),
+        card('plain', 'team_schedule', '/teams/team-1/schedules/sch-plain'),
+        card('match', 'match', '/matches/m-1'),
+      ]);
+      const rows = [
+        { id: 'tm-friendly', leagueId: null, tournamentId: null },
+        { id: 'tm-league', leagueId: 'league-1', tournamentId: 'league-1' },
+        { id: 'tm-cup', leagueId: null, tournamentId: 'cup-1' },
+      ];
+      prisma.v1TeamMatch.findMany.mockImplementation(async ({ where }: { where: { id: { in: string[] } } }) =>
+        rows.filter((row) => where.id.in.includes(row.id)),
+      );
+
+      const result = await service.messages(userA, 'room-1', { limit: 30 });
+
+      expect(result.items.map((item) => item.shareCard?.route)).toEqual([
+        '/team-matches/tm-friendly',
+        '/league-matches/league-1/fixtures/tm-league',
+        '/tournaments/cup-1/matches/tm-cup',
+        '/teams/team-1/schedules/sch-plain',
+        '/matches/m-1',
+      ]);
+      expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: { in: ['tm-friendly', 'tm-league', 'tm-cup'] } }) }),
       );
     });
 

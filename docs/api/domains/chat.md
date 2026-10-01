@@ -95,8 +95,11 @@ and therefore has no host participant row.
   `{ kind, targetId, title, startAt, place, sub, route }` snapshotted at send time. Visibility is checked against the
   **sender** with the same rules as the target's own detail page: a team schedule needs an active, non-deleted team and
   either `visibility = PUBLIC` or an active membership; a match must not be deleted. A team-match schedule's card routes
-  to `/team-matches/:id` (the opposing team can open it), otherwise `/teams/:teamId/schedules/:id`; matches route to
-  `/matches/:id`. The target page enforces the recipient's own access. `shareCard` is `null` when hidden/deleted or when
+  to the match page the opposing team can open — a friendly to `/team-matches/:id`, a regular-league fixture to
+  `/league-matches/:leagueId/fixtures/:id`, a tournament match to `/tournaments/:tournamentId/matches/:id` — otherwise
+  `/teams/:teamId/schedules/:id`; matches route to `/matches/:id`. Cards stored earlier with `/team-matches/:id` for a
+  league/tournament match are returned with the competition route on read (the stored snapshot is unchanged). The
+  target page enforces the recipient's own access. `shareCard` is `null` when hidden/deleted or when
   the stored JSON is malformed (`route` must be a same-origin path). Notification body "일정을 공유했어요 · 제목" /
   "매치를 공유했어요 · 제목".
 - File messages (Task 181 ③): `messageType = "file"`, `content = "[파일] 이름"`, `file = { name, size, mimeType }` (never

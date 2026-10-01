@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
 import { TeamMatchClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
@@ -40,6 +41,9 @@ function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
   const subMatch = data.subMatches?.find((row) => row.id === goal.subMatchId);
   return `${subMatch ? `${subMatch.title} · ` : ''}${side?.name ?? '소속팀 미상'} · ${player?.name ?? '득점자 미상'}${goal.ownGoal ? ` (자책골 · ${creditedSide?.name ?? '상대팀'} 득점으로 반영)` : ''}${goal.minute === null ? '' : ` · ${goal.minute}분`}`;
 }
+
+// 확정된 결과에서 폼 없이 한 번에 실행되는 동작 뒤에 붙는 한 줄 — 서버가 정정 리비전을 만들고 전적·개인 기록을 다시 투영한다.
+const OFFICIAL_CHANGE_NOTE = '새 공식 결과가 생기고 양 팀 전적과 개인 기록이 바로 바뀌어요.';
 
 function subMatchScore(data: SharedRecord, subMatch: SharedSubMatch, sideKey: 'HOME' | 'AWAY') {
   const sideId = data.sides.find((side) => side.key === sideKey)?.id;
@@ -185,6 +189,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   const [endPrompt, setEndPrompt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const previousVersion = useRef<number | null>(null);
+  const { confirm, ConfirmModal: confirmModal } = useConfirm();
   const data = query.data;
   const router = useRouter();
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
@@ -213,6 +218,19 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       // useMutation exposes the actual error while local form state stays intact.
     }
   }
+  // 확정된 결과의 득점 삭제·변경 되돌리기는 누르는 즉시 공식 결과를 바꾼다 — 그 앞에만 확인 창을 둔다(H9 A).
+  // 진행 중 기록은 이력으로 되돌릴 수 있어 그대로 즉시 반영한다. 확인하는 동안 바뀐 기록은 열었던 버전으로 막는다.
+  async function commandAfterConfirm(input: Omit<RecordCommand, 'commandId' | 'expectedVersion'>, prompt: { title: string; message: string; confirmLabel: string }) {
+    if (!data) return;
+    const version = data.version;
+    if (data.phase === 'official' && !(await confirm({ ...prompt, tone: 'danger' }))) return;
+    await command(input, version);
+  }
+  const deleteGoal = (goal: SharedGoal) => void commandAfterConfirm({ action: 'delete', goalId: goal.id }, {
+    title: '득점을 삭제할까요?',
+    message: `${data ? goalLabel(data, goal) : ''} 득점을 지우면 ${OFFICIAL_CHANGE_NOTE}`,
+    confirmLabel: '득점 삭제',
+  });
 
   if (!data) {
     return query.isError
@@ -354,7 +372,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
                     onCancel={() => setEditing(null)}
                     onSave={(goal) => command({ action: editing.goal ? 'edit' : 'add', ...(editing.goal ? { goalId: editing.goal.id } : {}), ...goal }, editing.version)}
                   />}
-                  <GoalRows data={data} goals={subGoals} publicEvents={data.goalEvents?.filter((event) => event.subMatchId === subMatch.id)} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: subMatch.id }); }} onDelete={(goal) => void command({ action: 'delete', goalId: goal.id })} />
+                  <GoalRows data={data} goals={subGoals} publicEvents={data.goalEvents?.filter((event) => event.subMatchId === subMatch.id)} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: subMatch.id }); }} onDelete={deleteGoal} />
                 </article>;
               })}
             </div>}
@@ -373,7 +391,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
             onCancel={() => setEditing(null)}
             onSave={(goal) => command({ action: editing.goal ? 'edit' : 'add', ...(editing.goal ? { goalId: editing.goal.id } : {}), ...goal }, editing.version)}
           />}
-          <GoalRows data={data} goals={data.goals} publicEvents={data.goalEvents} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: null }); }} onDelete={(goal) => void command({ action: 'delete', goalId: goal.id })} />
+          <GoalRows data={data} goals={data.goals} publicEvents={data.goalEvents} disabled={disabled || controlsOpen} canEdit={data.canEdit} onEdit={(goal) => { mutation.reset(); setEditing({ goal, version: data.version, subMatchId: null }); }} onDelete={deleteGoal} />
         </section>}
       </div>
 
@@ -406,7 +424,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
               <time>{new Date(change.at).toLocaleString('ko-KR')}</time>
               {change.goalId && <p className={styles.muted}>{goalLabel(data, change.before as SharedGoal | null)} → {goalLabel(data, change.after as SharedGoal | null)}</p>}
               {change.subMatchId && !change.goalId && <p className={styles.muted}>{(change.before as SharedSubMatch | null)?.title ?? '없음'} → {(change.after as SharedSubMatch | null)?.title ?? '삭제'}</p>}
-              {data.canEdit && change.goalId && <Button variant="ghost" size="sm" disabled={disabled || controlsOpen} onClick={() => void command({ action: 'undo', changeId: change.id })}>이 변경 되돌리기</Button>}
+              {data.canEdit && change.goalId && <Button variant="ghost" size="sm" disabled={disabled || controlsOpen} onClick={() => void commandAfterConfirm({ action: 'undo', changeId: change.id }, { title: '이 변경을 되돌릴까요?', message: `이 변경을 되돌리면 ${OFFICIAL_CHANGE_NOTE}`, confirmLabel: '변경 되돌리기' })}>이 변경 되돌리기</Button>}
             </li>)}
           </ul>
           {!data.history.length && <p className={styles.muted}>첫 기록을 기다리고 있어요.</p>}
@@ -415,6 +433,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
     </div>
     {/* 이름만 올라간 게스트를 본인으로 연결하는 입구 — 리그 경기 상세와 같은 컴포넌트다. 경기 기록이 생긴 뒤에만 뜻이 있다. */}
     {!admin && (data.phase === 'live' || data.phase === 'official') ? <TeamMatchClaimEntry teamMatchId={teamMatchId} /> : null}
+    {confirmModal}
   </main>;
 }
 

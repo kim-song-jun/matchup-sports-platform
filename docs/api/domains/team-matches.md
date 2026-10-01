@@ -40,7 +40,15 @@
 - 득점 변경/복구/reopen은 기존 양 팀 확인을 초기화한다. 같은 팀의 중복 confirm은 409.
 - 두 팀의 서로 다른 라인업 참가자가 확인하면 같은 트랜잭션에서 Game 결과 DRAFT→SUBMITTED→OFFICIAL,
   result participants/goalEvents/decisions, TeamMatch 완료·팀 일정 cascade, `GAME_RESULT_OFFICIAL` outbox를 기록한다.
-- 확정 후 일반 편집은 409. 기존 관리자 정정으로 새로운 결과 revision이 생기면 기존 결과 화면을 사용한다.
+- 확정 후 참가자·팀장 편집은 409 `RECORD_NOT_EDITABLE`.
+- **확정 후 어드민 정정(2026-10-01 사용자 결정 "어드민은 언제든 수정")**: active 플랫폼 어드민(`owner`·`ops`)은
+  플랫폼 주관 여부와 무관하게 확정된 친선(`phase=official`)에서 같은 POST 로 add/edit/delete/undo·서브매치 조작을 할 수 있다
+  (GET 응답 `canEdit: true`, `operator: true`). 서버는 공동 기록을 갱신하고 **현재 공식 리비전을 덮어쓰지 않고**
+  `supersedesId` 로 잇는 새 리비전(DRAFT→OFFICIAL, CORRECTION flow, `reason="운영자 결과 정정"`)을 만들어 공식 포인터를 옮긴 뒤
+  `GAME_RESULT_OFFICIAL` outbox(`game:<id>:revision:<n>:correction_officialize`)로 전적·개인 기록·공개 캐시를 다시 투영한다.
+  양 팀 종료 확인·`officialAt` 은 그대로이고, 이력(`V1TeamMatchRecordChange`)과 `V1AdminActionLog`(`team_match.record_correction`,
+  전후 revisionId)가 남는다. 경기 완료 알림은 팀매치·수신자당 한 번이라 다시 나가지 않는다. confirm/reopen 은 여전히 403
+  `TEAM_CONFIRMATION_REQUIRED`, support·revoked 어드민은 403 이다. 대회·리그 경기는 `/games/:gameId/corrections` 레인을 쓴다.
 - 공동 기록이 생성된 경기에서 이전 host-only 결과/event/진행 command를 호출하면 `SHARED_RECORD_REQUIRED`.
 - 주요 오류: 403 RECORD_PARTICIPANT_REQUIRED; 404 TEAM_MATCH_NOT_FOUND;
   409 RECORD_NOT_EDITABLE/VERSION_CONFLICT/COMMAND_REUSED/ALREADY_CONFIRMED/GOAL_NOT_FOUND;

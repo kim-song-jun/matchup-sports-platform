@@ -258,8 +258,10 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
       {data.canEdit && subMatches.length === 0 && <Button block onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: null }); }} disabled={disabled || controlsOpen}>득점 추가</Button>}
       {data.teamAuthority && data.phase !== 'cancelled' && <p className={styles.muted}><span className="tm-badge tm-badge-sm tm-badge-blue">팀장 권한</span> 팀장·매니저는 명단에 없어도 기록하고 종료를 확인할 수 있어요.</p>}
-      {data.phase === 'official' && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
-      {data.operator && <p className={styles.muted}>Teameet 운영으로 양 팀과 함께 기록해요. 수정하면 기존 종료 확인이 초기화되며, 최종 확인은 양 팀이 직접 진행해요.</p>}
+      {data.phase === 'official' && !data.canEdit && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
+      {data.operator && (data.phase === 'official'
+        ? <p className={styles.muted}>확정된 결과를 Teameet 운영으로 고쳐요. 고칠 때마다 새 공식 결과로 남아 전적·개인 기록에 반영되고, 양 팀의 종료 확인과 이전 결과·변경 이력은 그대로예요.</p>
+        : <p className={styles.muted}>Teameet 운영으로 양 팀과 함께 기록해요. 수정하면 기존 종료 확인이 초기화되며, 최종 확인은 양 팀이 직접 진행해요.</p>)}
       {!data.participant && !data.operator && <p className={styles.muted}>기록 편집은 양 팀의 참석명단 참가자와 팀장·매니저, 플랫폼 주관 경기의 운영자에게 열려 있어요.</p>}
       {admin && (data.phase === 'legacy' || data.phase === 'managed') && <p className={styles.muted}>이 경기는 공동 기록 대상이 아니에요. 기존 경기 운영 화면을 이용해 주세요.</p>}
       {data.phase === 'scheduled' && <p className={styles.muted}>상대팀 확정 후 경기 시작 시간이 되면 기록할 수 있어요.</p>}

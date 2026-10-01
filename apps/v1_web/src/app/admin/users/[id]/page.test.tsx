@@ -2,7 +2,18 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import AdminUserDetailPage from './page';
 
-const state = vi.hoisted(() => ({ noMatches: false, withOwnedOnlyTeam: true }));
+const manyOwnedMemberships = vi.hoisted(() =>
+  Array.from({ length: 12 }, (_, i) => ({
+    membershipId: `mo-${i}`,
+    teamId: `many-${i}`,
+    name: `다수 팀 ${i}`,
+    status: 'active',
+    memberCount: 3,
+    role: 'owner' as const,
+    joinedAt: null,
+  })),
+);
+const state = vi.hoisted(() => ({ noMatches: false, withOwnedOnlyTeam: true, manyOwned: false }));
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'user-1' }),
@@ -46,6 +57,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
           : []),
       ],
       teamMemberships: [
+        ...(state.manyOwned ? manyOwnedMemberships : []),
         { membershipId: 'm-1', teamId: 'team-a', name: 'QA 팀A', status: 'active', memberCount: 12, role: 'owner', joinedAt: null },
         { membershipId: 'm-2', teamId: 'team-b', name: '매니저로 속한 팀', status: 'active', memberCount: 5, role: 'manager', joinedAt: null },
       ],
@@ -63,15 +75,14 @@ describe('AdminUserDetailPage — 팀 한 번만, 상세 링크, 한국어 상�
 
     expect(screen.getAllByText('QA 팀A')).toHaveLength(1);
     const teamA = screen.getByRole('link', { name: 'QA 팀A' }).closest('li') as HTMLElement;
-    expect(within(teamA).getByText('소유자')).toBeInTheDocument();
     expect(within(teamA).getByText('팀장')).toBeInTheDocument();
 
     const managed = screen.getByRole('link', { name: '매니저로 속한 팀' }).closest('li') as HTMLElement;
     expect(within(managed).getByText('매니저')).toBeInTheDocument();
-    expect(within(managed).queryByText('소유자')).not.toBeInTheDocument();
 
     const ownedOnly = screen.getByRole('link', { name: '소유만 한 팀' }).closest('li') as HTMLElement;
-    expect(within(ownedOnly).getByText('소유자')).toBeInTheDocument();
+    expect(within(ownedOnly).getByText('팀장')).toBeInTheDocument();
+    expect(screen.queryByText('소유자')).not.toBeInTheDocument();
     expect(screen.getByText('소속 팀 3개')).toBeInTheDocument();
   });
 
@@ -123,5 +134,18 @@ describe('AdminUserDetailPage — 팀 한 번만, 상세 링크, 한국어 상�
     render(<AdminUserDetailPage />);
     expect(summaryValue('소속팀 전체')).toBe(roleSum());
     state.withOwnedOnlyTeam = true;
+  });
+
+  it('팀장인 팀이 서버 소유 팀 한도(5건)보다 많아도 모든 팀이 같은 역할 라벨을 가진다', () => {
+    state.manyOwned = true;
+    render(<AdminUserDetailPage />);
+    state.manyOwned = false;
+
+    const manyRows = screen.getAllByRole('link', { name: /^다수 팀/ });
+    expect(manyRows).toHaveLength(12);
+    for (const link of manyRows) {
+      expect(within(link.closest('li') as HTMLElement).getByText('팀장')).toBeInTheDocument();
+    }
+    expect(screen.queryByText('소유자')).not.toBeInTheDocument();
   });
 });

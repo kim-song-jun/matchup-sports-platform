@@ -214,7 +214,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         <div className="tm-chat-context">
           {model.teamContact ? (
             <TeamContactStatusCard contact={model.teamContact} />
-          ) : (
+          ) : model.context.title ? (
             <Link className="tm-card tm-chat-context-card" href={model.context.href}>
               <div className="tm-chat-context-icon"><ChatIcon size={20} strokeWidth={2} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -223,7 +223,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
               </div>
               <ChevronRightIcon size={18} stroke="var(--text-caption)" />
             </Link>
-          )}
+          ) : null /* 방을 불러오기 전엔 연결 카드를 그리지 않는다 */}
         </div>
         <div
           ref={threadRef}

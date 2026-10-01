@@ -363,13 +363,18 @@ describe('ChatRoomPageClient', () => {
     expect(screen.getAllByRole('link').some((link) => link.getAttribute('href') === '/teams/team-1?from=%2Fchat%2Froom-1')).toBe(true);
   });
 
-  it('still shows the placeholder conversation while the room is loading (documented loading-only behavior)', () => {
+  it('불러오는 동안엔 예시 대화·제목·연결 카드 없이 스켈레톤만 보이고, 말풍선은 실제 메시지를 받은 뒤에만 그린다', () => {
     hooks.chatRoom.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
     hooks.chatMessages.mockReturnValue({ data: undefined, isPending: true, isError: false, refetch: vi.fn() });
 
-    renderWithClient(<ChatRoomPageClient roomId="room-real-from-notification" />);
+    const { container } = renderWithClient(<ChatRoomPageClient roomId="room-real-from-notification" />);
 
-    expect(screen.getAllByText('주말 풋살 매치').length).toBeGreaterThan(0);
+    expect(screen.queryByText('주말 풋살 매치')).not.toBeInTheDocument();
+    expect(screen.queryByText('오늘 14:00 경기 인원 확인해 주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('개인매치 상세')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-chat-context-card')).toBeNull();
+    expect(container.querySelector('.tm-chat-thread .tm-skeleton-page')).not.toBeNull();
+    expect(container.querySelector('.tm-chat-bubble, .tm-chat-system-message')).toBeNull();
   });
 });
 

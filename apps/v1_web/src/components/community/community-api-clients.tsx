@@ -31,7 +31,6 @@ import type { V1ChatMessage, V1ChatRoom, V1Notification } from '@/types/api';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
 import { formatChatListTimestamp } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCandidate, NotificationModel, NotificationsViewModel } from './community.types';
-import { getChatRoomViewModel } from './community.view-model';
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
 import { MAX_CHAT_IMAGES, formatFileSize } from './chat-plus-panel';
@@ -178,7 +177,6 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     updateMe.mutate({ lastReadMessageId: lastMessageId });
   }, [lastMessageId]);
 
-  const fallback = getChatRoomViewModel();
   const contact = room.data?.teamContact ?? null;
   // 컨택 방은 수락된 뒤에만 대화할 수 있다(서버 TEAM_CONTACT_NOT_ACCEPTED 게이트와 같은 규칙).
   const inputLockedMessage = contact
@@ -192,14 +190,14 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   // 팀에서 내보내진 뒤 옛 팀 채팅 주소로 들어온 경우 — 다시 불러와도 같으니 재시도 대신 나갈 길을 준다.
   const accessDenied = isAccessDeniedError(room.error) || isAccessDeniedError(messages.error);
   const isLoading = room.isPending || messages.isPending;
-  // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
-  // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
-  const messageItems = messages.data ? items.map((message) => toChatMessageModel(message, currentHref, roomId)) : isLoading ? fallback.messages : [];
+  // 말풍선은 실제 메시지를 받아온 뒤에만 그린다 — 불러오는 동안은 스켈레톤만 보인다(예시 대화를 깔면
+  // 다른 채팅방의 대화처럼 잠깐 보였다).
+  const messageItems = messages.data ? items.map((message) => toChatMessageModel(message, currentHref, roomId)) : [];
   const shareQueries = [mySchedules, joinedMatches, createdMatches];
   const model: ChatRoomViewModel = {
     onMessageSafety: setSafety,
     onManageBlocked: () => setSafety('manage'),
-    title: room.data?.title ?? (isLoading ? fallback.title : '채팅'),
+    title: room.data?.title ?? '채팅',
     context: room.data
       ? {
           title: room.data.linkedTarget.title,
@@ -207,9 +205,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
           // 연결된 화면에서 뒤로가면 이 채팅방으로 돌아온다.
           href: room.data.linkedTarget.route ? withFromPath(room.data.linkedTarget.route, currentHref) : '/chat',
         }
-      : isLoading
-        ? fallback.context
-        : { title: '', sub: '', href: '/chat' },
+      : { title: '', sub: '', href: '/chat' },
     teamContact: contact,
     // 더 오래된 메시지가 남아 있으면 여기가 대화의 맨 위가 아니다.
     historyNotice: room.data?.roomType === 'team' && messages.data?.pageInfo?.hasNext !== true ? '들어오기 전 대화는 보이지 않아요' : undefined,

@@ -122,12 +122,12 @@ CAUTION:
 - `skillLevelText`는 표시/레거시 설명용이고, 필터와 `levelLabel`은 `minSportLevelId`, `maxSportLevelId` FK를 기준으로 계산한다.
 - 생성 시 트랜잭션으로 owner 멤버십(`role=owner`, `status=active`)이 자동 생성된다.
 - 팀 생성은 프로필 `realName`, `phone`, `gender`가 있어야 하며 없으면 `422 PROFILE_COMPLETION_REQUIRED`다. 신청/관리 엔드포인트는 이 검사에서 제외된다.
-- **팀 이름 중복 금지**(Task 180 H2): 같은 `sportId`·같은 `regionId` 안에서 앞뒤 공백·대소문자를 무시하고 같은 이름을 차지한 팀이 있으면 `409 TEAM_NAME_TAKEN`. 이름을 차지하는 팀은 활동 중인 팀과, **팀장이 해체해 아직 직접 복구할 수 있는 팀**(`canRestore` 와 같은 판정 — 팀장 해체이고 해체 후 30일 경계 포함, 아래 "팀 해체(보관)·복구")이다. 복구 기간이 지났거나 운영팀이 보관한 팀의 이름은 풀린다. 규칙 전부터 있던 중복은 그대로 둔다. DB 유니크 제약은 없고 서비스가 이름 단위 advisory lock 안에서 검사한다(만들기·수정·셀프 복구·운영팀 보관 해제가 같은 잠금으로 줄 선다).
+- **팀 이름 중복 금지**(Task 180 H2): 같은 `sportId`·같은 `regionId` 안에서 같은 이름을 차지한 팀이 있으면 `409 TEAM_NAME_TAKEN`(message `같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.`). 같은 이름 판정은 NFKC 정규화(전각·반각, 조합형·완성형 한글) → 연속 공백을 한 칸으로 → 앞뒤 공백 제거 → 소문자로 비교한다(`team-name.ts` `normalizeTeamName`, advisory lock 키도 같은 값). 이름을 차지하는 팀은 활동 중인 팀과, **팀장이 해체해 아직 직접 복구할 수 있는 팀**(`canRestore` 와 같은 판정 — 팀장 해체이고 해체 후 30일 경계 포함, 아래 "팀 해체(보관)·복구")이다. 복구 기간이 지났거나 운영팀이 보관한 팀의 이름은 풀린다. 규칙 전부터 있던 중복은 그대로 둔다. DB 유니크 제약은 없고 서비스가 이름 단위 advisory lock 안에서 검사한다(만들기·수정·셀프 복구·운영팀 보관 해제가 같은 잠금으로 줄 선다).
 
 ## GET /teams/name-availability (TeamNameAvailabilityQueryDto)
 
 - 인증 필요. 쿼리 `name`(max 50, 빈 값 불가) · `sportId`(uuid) · `regionId` · `excludeTeamId?`(수정 중인 팀 자신을 빼고 센다).
-- 응답 `{ available: boolean }` — 겹치는 팀이 어디인지는 주지 않는다. 판정 규칙은 위 생성·수정의 `TEAM_NAME_TAKEN` 과 같다.
+- 응답 `{ available: boolean }` — 겹치는 팀이 어디인지는 주지 않는다. 판정 규칙은 위 생성·수정의 `TEAM_NAME_TAKEN` 과 같다: `excludeTeamId` 팀의 이름·종목·지역이 쿼리와 같으면(수정 저장이 이름 검사를 건너뛰는 경우) 규칙 전부터 있던 중복이어도 `available: true`. 웹은 "처음 그대로인지"를 따로 판정하지 않고 이 답만 쓴다.
 - 라우트는 `GET /teams/:teamId` 보다 먼저 등록돼 있어야 한다(아니면 `name-availability` 가 팀 id 로 잡힌다).
 
 ## GET /teams/:teamId — 컨택 관련 필드

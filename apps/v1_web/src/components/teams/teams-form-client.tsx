@@ -11,10 +11,9 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { isTeamOperatorRole } from '@/lib/team-role';
-import { withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { TEAM_NAME_TAKEN_MESSAGE, teamErrorMessage } from '@/lib/team-error-messages';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { formatProvinceWide, toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
@@ -204,10 +203,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   });
   const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
-  const nameError = useTeamNameError(
-    { name: draft.name, sportId, regionId },
-    query.data ? { teamId, name: query.data.name, sportId: query.data.sport.sportId, regionId: query.data.region?.regionId ?? '' } : undefined,
-  );
+  const nameError = useTeamNameError({ name: draft.name, sportId, regionId }, teamId);
   const updateTeamWithActivityCompatibility = async (
     payload: V1TeamMutationPayload & { version: string; membersVisibilityEnabled?: boolean },
     draft: TeamDraft,
@@ -334,22 +330,14 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
 const NAME_CHECK_DELAY_MS = 300;
 
 /**
- * 입력을 멈추면 같은 종목·지역에 같은 이름의 팀이 있는지 묻는다(H2). 수정 화면에서 이름·종목·지역이 처음 그대로면
- * 묻지 않는다 — 규칙 전부터 있던 중복 팀도 저장할 수 있어야 한다(서버도 같은 기준).
+ * 입력을 멈추면 같은 종목·지역에 같은 이름의 팀이 있는지 묻는다(H2). 같은 이름 판정과 "수정 중 처음 그대로면 통과"는
+ * 서버(excludeTeamId)가 저장과 같은 규칙으로 답한다 — 여기서 따로 비교하면 정규화가 어긋난다.
  */
-function useTeamNameError(
-  target: { name: string; sportId: string; regionId: string },
-  original?: { teamId: string; name: string; sportId: string; regionId: string },
-): string | undefined {
+function useTeamNameError(target: { name: string; sportId: string; regionId: string }, editingTeamId?: string): string | undefined {
   const name = target.name.trim();
-  const unchanged =
-    original !== undefined &&
-    name.toLowerCase() === original.name.trim().toLowerCase() &&
-    target.sportId === original.sportId &&
-    target.regionId === original.regionId;
   const params =
-    !unchanged && name && target.sportId && target.regionId
-      ? { name, sportId: target.sportId, regionId: target.regionId, excludeTeamId: original?.teamId }
+    name && target.sportId && target.regionId
+      ? { name, sportId: target.sportId, regionId: target.regionId, excludeTeamId: editingTeamId }
       : null;
   const key = params ? JSON.stringify(params) : null;
   const [settledKey, setSettledKey] = useState<string | null>(null);

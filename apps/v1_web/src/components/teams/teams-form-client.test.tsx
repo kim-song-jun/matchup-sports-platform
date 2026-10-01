@@ -463,21 +463,23 @@ describe('Team form client contracts', () => {
       expect(screen.queryByTestId('name-error')).toBeNull();
     });
 
-    it('수정: 이름·종목·지역이 처음 그대로면 묻지 않고, 바꾸면 자기 팀을 빼고 묻는다', async () => {
+    it('수정: 자기 팀을 알려 묻고 서버 답대로만 안내한다 — 처음 그대로인지는 서버가 저장과 같은 규칙으로 판정한다', async () => {
+      // 가짜 서버: '기존 풋살 팀' 은 규칙 전부터 다른 팀과 겹친다 — 그 팀 자신이 물을 때만 통과다.
+      useV1TeamNameAvailabilityMock.mockImplementation((params: { name: string; excludeTeamId?: string } | null) => ({
+        data: params ? { available: params.name !== '마포 FC' && !(params.name === '기존 풋살 팀' && params.excludeTeamId !== 'team-futsal') } : undefined,
+      }));
       render(<TeamEditPageClient teamId="team-futsal" />);
-      await waitFor(() => expect(screen.getByLabelText('팀 이름')).toHaveValue('기존 풋살 팀'));
-      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '기존 풋살 팀 ' } });
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      expect(useV1TeamNameAvailabilityMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: expect.any(String) }));
+      await waitFor(() => expect(useV1TeamNameAvailabilityMock).toHaveBeenLastCalledWith(expect.objectContaining({ name: '기존 풋살 팀', excludeTeamId: 'team-futsal' })));
+      expect(screen.queryByTestId('name-error')).toBeNull();
 
       fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '마포 FC' } });
       expect(await screen.findByTestId('name-error')).toBeInTheDocument();
       expect(useV1TeamNameAvailabilityMock).toHaveBeenLastCalledWith(expect.objectContaining({ name: '마포 FC', excludeTeamId: 'team-futsal' }));
     });
 
-    it('만들기 저장이 409 TEAM_NAME_TAKEN 이면 영어 서버 문구 대신 같은 안내를 보인다', async () => {
+    it('만들기 저장이 409 TEAM_NAME_TAKEN 이면 입력 중 확인과 같은 안내를 보인다', async () => {
       createTeamMutateAsync.mockRejectedValueOnce(
-        new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_NAME_TAKEN', message: 'Another team in the same sport and region already uses this name', timestamp: '2026-10-01T00:00:00.000Z' }),
+        new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_NAME_TAKEN', message: '같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.', timestamp: '2026-10-01T00:00:00.000Z' }),
       );
       render(<TeamCreatePageClient />);
       fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '동시에 만든 팀' } });

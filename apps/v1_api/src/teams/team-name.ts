@@ -5,8 +5,9 @@ import { isSelfRestorable, loadTeamArchivedBy } from './team-dissolution';
 /** 같은 종목·같은 지역 안에서 팀 이름이 겹치는지 본다(H2). */
 export type TeamNameTarget = { name: string; sportId: string; regionId: string; excludeTeamId?: string };
 
+/** 눈으로 같은 이름을 같게 본다 — 전각·반각, 조합형·완성형 한글(NFKC), 공백 개수, 대소문자. 잠금 키도 이 값이다. */
 export function normalizeTeamName(name: string) {
-  return name.trim().toLowerCase();
+  return name.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 export function isSameTeamName(team: { name: string; sportId: string; regionId: string }, target: TeamNameTarget) {
@@ -20,7 +21,7 @@ export async function lockTeamNameScope(tx: Prisma.TransactionClient, target: Te
 }
 
 /**
- * 앞뒤 공백·대소문자를 무시하고 같은 이름을 차지한 팀이 있나. 활동 중인 팀과, 팀장이 해체해 아직 직접
+ * normalizeTeamName 으로 같은 이름을 차지한 팀이 있나. 활동 중인 팀과, 팀장이 해체해 아직 직접
  * 복구할 수 있는 팀(H3)이 이름을 차지한다 — 복구 기간이 지났거나 운영팀이 보관한 팀은 이름을 풀어 준다.
  */
 export async function hasTeamWithSameName(db: Prisma.TransactionClient, target: TeamNameTarget, now: Date) {
@@ -44,7 +45,7 @@ export async function hasTeamWithSameName(db: Prisma.TransactionClient, target: 
 export async function assertTeamNameAvailable(tx: Prisma.TransactionClient, target: TeamNameTarget) {
   await lockTeamNameScope(tx, target);
   if (await hasTeamWithSameName(tx, target, new Date())) {
-    throw new ConflictException({ code: 'TEAM_NAME_TAKEN', message: 'Another team in the same sport and region already uses this name' });
+    throw new ConflictException({ code: 'TEAM_NAME_TAKEN', message: '같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.' });
   }
 }
 

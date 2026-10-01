@@ -450,9 +450,19 @@ export class TeamsService {
     };
   }
 
-  /** 입력 중 이름 확인 — 가능/불가만 알려 주고 겹치는 팀이 어디인지는 말하지 않는다. */
+  /**
+   * 입력 중 이름 확인 — 가능/불가만 알려 주고 겹치는 팀이 어디인지는 말하지 않는다. 답은 "저장하면 이름으로 막히나"와
+   * 같아야 해서, 수정 중인 팀의 이름·종목·지역이 그대로면 update 처럼 묻지 않고 통과시킨다(이미 있던 중복 팀).
+   */
   async nameAvailability(user: V1AuthUser, query: TeamNameAvailabilityQueryDto) {
     this.assertActiveAccount(user);
+    if (query.excludeTeamId) {
+      const current = await this.prisma.v1Team.findFirst({
+        where: { id: query.excludeTeamId, deletedAt: null },
+        select: { name: true, sportId: true, regionId: true },
+      });
+      if (current && isSameTeamName(current, query)) return { available: true };
+    }
     return { available: !(await hasTeamWithSameName(this.prisma, query, new Date())) };
   }
 

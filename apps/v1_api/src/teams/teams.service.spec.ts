@@ -420,6 +420,8 @@ describe('TeamsService', () => {
       { id: 'team-f', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 방금 해체', status: 'archived', deletedAt: daysAgo(29) },
       { id: 'team-g', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 오래 해체', status: 'archived', deletedAt: daysAgo(31) },
       { id: 'team-h', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC 운영 보관', status: 'archived', deletedAt: daysAgo(1) },
+      // 가운데 공백 두 칸.
+      { id: 'team-i', sportId: 'sport-1', regionId: 'region-mapo', name: 'FC  성수', status: 'active', deletedAt: null },
     ];
     const archivedByActor: Record<string, 'user' | 'admin'> = { 'team-f': 'user', 'team-g': 'user', 'team-h': 'admin' };
     type StatusClause = { status: string | { not: string }; deletedAt?: null };
@@ -455,9 +457,24 @@ describe('TeamsService', () => {
     const createAs = (sportId: string, regionId: string, name: string) =>
       service.create(owner, { sportId, regionId, name, joinPolicy: 'approval_required' });
 
-    it('같은 종목·지역에서 앞뒤 공백·대소문자만 다른 이름은 409 TEAM_NAME_TAKEN 이고 팀을 만들지 않는다', async () => {
-      await expect(createAs('sport-1', 'region-mapo', 'fc 서울  ')).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_NAME_TAKEN' } });
+    it('같은 종목·지역에서 앞뒤 공백·대소문자만 다른 이름은 409 TEAM_NAME_TAKEN(해요체 안내)이고 팀을 만들지 않는다', async () => {
+      await expect(createAs('sport-1', 'region-mapo', 'fc 서울  ')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'TEAM_NAME_TAKEN', message: '같은 종목·지역에 같은 이름의 팀이 있어요. 다른 이름을 써 주세요.' },
+      });
       expect(prisma.v1Team.create).not.toHaveBeenCalled();
+    });
+
+    it('공백 개수·전각 영문·조합형 한글만 다른 이름도 같은 이름으로 막고, 공백을 아예 뺀 이름은 다른 이름이다', async () => {
+      const decomposed = 'FC 성수'.normalize('NFD');
+      expect(decomposed).not.toBe('FC 성수');
+      for (const name of ['fc 성수', 'ＦＣ 성수', decomposed, 'FC\u3000성수']) {
+        await expect(createAs('sport-1', 'region-mapo', name)).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_NAME_TAKEN' } });
+      }
+      await expect(service.nameAvailability(owner, { name: 'ＦＣ 성수', sportId: 'sport-1', regionId: 'region-mapo' })).resolves.toEqual({ available: false });
+      expect(prisma.v1Team.create).not.toHaveBeenCalled();
+
+      await expect(createAs('sport-1', 'region-mapo', 'FC성수')).resolves.toMatchObject({ teamId: 'team-new' });
     });
 
     it('다른 지역·다른 종목의 같은 이름과, 복구 기간이 지났거나 운영팀이 보관한 팀의 이름은 막지 않는다', async () => {
@@ -502,6 +519,14 @@ describe('TeamsService', () => {
       await expect(updateAs('team-y', { name: 'FC 서울', regionId: 'region-gangnam' }, 'FC 서울')).rejects.toMatchObject({ response: { code: 'TEAM_NAME_TAKEN' } });
       // 대조군: 옮겨 간 지역에 그 이름이 없으면 된다.
       await expect(updateAs('team-b', { name: 'FC 강남', regionId: 'region-gangnam' }, 'FC 강남')).resolves.toMatchObject({ teamId: 'team-b' });
+    });
+
+    it('수정 중인 팀의 이름·종목·지역이 그대로면 이름 확인도 저장처럼 통과한다(이미 있던 중복 팀)', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({ name: 'fc 서울', sportId: 'sport-1', regionId: 'region-mapo' });
+      await expect(service.nameAvailability(owner, { name: 'FC  서울', sportId: 'sport-1', regionId: 'region-mapo', excludeTeamId: 'team-e' })).resolves.toEqual({ available: true });
+      // 대조군: 다른 팀이 그 이름을 가져가려 하면 여전히 불가다.
+      prisma.v1Team.findFirst.mockResolvedValueOnce({ name: 'FC 새 이름', sportId: 'sport-1', regionId: 'region-mapo' });
+      await expect(service.nameAvailability(owner, { name: 'FC 서울', sportId: 'sport-1', regionId: 'region-mapo', excludeTeamId: 'team-x' })).resolves.toEqual({ available: false });
     });
 
     it('이름 확인 조회는 가능/불가만 답하고, 수정 중인 팀 자신은 세지 않는다', async () => {

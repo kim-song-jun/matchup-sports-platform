@@ -989,21 +989,25 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     ];
     const HELD = { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 };
 
-    function secondHalf(state: 'LIVE' | 'PAUSED', overrides: Record<string, unknown> = {}) {
+    function secondHalf(
+      state: 'LIVE' | 'PAUSED',
+      overrides: Record<string, unknown> = {},
+      actorRole: string = 'tournament_director',
+    ) {
       gameWithPeriods('LIVE', SECOND_HALF);
-      mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), data: { ...mocks.useV1Game().data, state } });
+      mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), data: { ...mocks.useV1Game().data, state, actorRole } });
       mocks.useV1GameOperationsConsole.mockReturnValue(
         consoleState({ gameSnapshot: { version: 2, state }, takeover: HELD, ...overrides }),
       );
     }
 
     /** 일시 중지 상태에서 재개 확인 창을 연 뒤, 창이 떠 있는 동안 콘솔 상태를 바꾸고 확인을 누른다. */
-    async function confirmResumeAfter(change: Record<string, unknown>) {
-      secondHalf('PAUSED');
+    async function confirmResumeAfter(change: Record<string, unknown>, actorRole?: string) {
+      secondHalf('PAUSED', {}, actorRole);
       const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
       fireEvent.click(screen.getByRole('button', { name: '재개' }));
       const dialog = await screen.findByRole('dialog');
-      secondHalf('PAUSED', change);
+      secondHalf('PAUSED', change, actorRole);
       view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
       fireEvent.click(within(dialog).getByRole('button', { name: '재개' }));
     }
@@ -1056,6 +1060,46 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
       expect(mocks.postV1GameCommand.mock.calls[0][1]).toBe('resume');
       expect(mocks.postV1GameCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok-2' }));
+    });
+
+    // 2026-10-01 사용자 결정 — 어드민은 언제든 고칠 수 있어야 한다. 현장 스태프의 잠금(위)은 그대로다.
+    describe('플랫폼 운영자는 연결이 끊긴 동안에도', () => {
+      it('재개와 ⋯ 을 쓸 수 있고, 잠그지 않는다고 알린다', () => {
+        secondHalf('PAUSED', { connectionStatus: 'disconnected' }, 'platform_ops');
+        render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+        expect(screen.getByRole('button', { name: '재개' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: '더보기' })).toBeEnabled();
+        expect(screen.getByText(/진행 버튼은 그대로 쓸 수 있고, 보낸 명령은 서버 기준으로 반영돼요/)).toBeInTheDocument();
+        expect(screen.queryByText(/진행 버튼은 잠겨요/)).toBeNull();
+      });
+
+      it('확인 창이 떠 있는 사이 끊겨도 들고 있던 토큰으로 재개를 보낸다', async () => {
+        mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+        await confirmResumeAfter({ connectionStatus: 'disconnected' }, 'platform_ops');
+
+        await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+        expect(mocks.postV1GameCommand.mock.calls[0][1]).toBe('resume');
+        expect(mocks.postV1GameCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok' }));
+      });
+
+      // 토큰 갱신은 소켓으로만 된다 — 끊긴 채 만료되면 서버가 거절하므로 보내지 않고 이유를 보인다.
+      it('끊긴 사이 운영 권한이 만료되면 진행 버튼을 잠그고 그 이유를 알린다', () => {
+        secondHalf('PAUSED', { connectionStatus: 'disconnected', takeover: { status: 'expired' } }, 'platform_ops');
+        render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+        expect(screen.getByRole('button', { name: '재개' })).toBeDisabled();
+        expect(screen.getByText('연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.')).toBeInTheDocument();
+      });
+
+      it('확인 창이 떠 있는 사이 끊기고 권한까지 만료되면 보내지 않고 그 이유를 알린다', async () => {
+        await confirmResumeAfter({ connectionStatus: 'disconnected', takeover: { status: 'expired' } }, 'platform_ops');
+
+        expect(
+          await screen.findByText('연결이 끊긴 사이 운영 권한이 만료돼 ‘재개’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.'),
+        ).toBeInTheDocument();
+        expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      });
     });
 
     // 망이 먹통이면 fetch 가 끝나지 않아 버튼이 "처리 중"에 멈춘다 — 끊겨도 실패로 드러나야 다시 보낼 수 있다.

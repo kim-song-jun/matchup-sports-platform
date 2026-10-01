@@ -10,6 +10,7 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'user.delete': '회원 삭제',
   'match.status.update': '매치 상태 변경',
   'team.status.update': '팀 상태 변경',
+  'team.rename': '보관 팀 이름 변경',
   'team_match.status.update': '팀매치 상태 변경',
   // 관리자
   'admin.grant': '관리자 권한 부여',

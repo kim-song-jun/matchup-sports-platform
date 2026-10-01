@@ -21,6 +21,7 @@ export type { StatusOption } from './admin-filter-bar';
 // ── Modals ────────────────────────────────────────────────────────────────
 export { AdminReasonModal } from './admin-reason-modal';
 export type { ReasonStatusOption } from './admin-reason-modal';
+export { AdminTeamRenameModal } from './admin-team-rename-modal';
 
 // ── Ops tools ─────────────────────────────────────────────────────────────
 export { PushSendForm } from './push-send-form';

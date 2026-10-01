@@ -344,4 +344,38 @@ describe('팀 해체(보관)·복구 계약', () => {
     expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('archived');
     expect(await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } })).toBe(logsBefore);
   });
+
+  // 2026-10-01 결정 — 복구가 이름 중복으로 막히면 운영팀이 보관 팀의 이름을 바꿔 출구를 연다.
+  const renameByOps = (name: string, userId = opsUserId) =>
+    admin.renameArchivedTeam(asUser(userId), teamId, { name, reason: '이름 중복으로 복구 불가' });
+
+  it('운영팀이 보관 팀의 이름을 바꾸면 TEAM_RESTORE_NAME_TAKEN 으로 막혔던 보관 해제가 되고 감사 로그가 남는다', async () => {
+    await archiveByOps();
+    await prisma.v1Team.update({ where: { id: rivalTeamId }, data: { name: '해체 테스트팀' } });
+    const restoreByOps = () => admin.changeTeamStatus(asUser(opsUserId), teamId, { status: 'active', reason: '복구 요청' });
+    await expect(restoreByOps()).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_RESTORE_NAME_TAKEN' } });
+
+    await expect(renameByOps(' 해체 테스트팀 2기 ')).resolves.toMatchObject({ previousName: '해체 테스트팀', name: '해체 테스트팀 2기' });
+    await restoreByOps();
+    expect(await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).toMatchObject({ name: '해체 테스트팀 2기', status: 'active', deletedAt: null });
+    const log = await prisma.v1AdminActionLog.findFirstOrThrow({ where: { adminUserId: opsAdminId, action: 'team.rename', targetId: teamId } });
+    expect(log).toMatchObject({ beforeJson: { name: '해체 테스트팀' }, afterJson: { name: '해체 테스트팀 2기' } });
+  });
+
+  it('이름 변경은 보관 주체를 바꾸지 않는다 — 팀장이 해체한 팀은 이름을 바꾼 뒤에도 팀장이 직접 복구한다', async () => {
+    await dissolve();
+    await prisma.v1Team.update({ where: { id: rivalTeamId }, data: { name: '해체 테스트팀' } });
+    await renameByOps('해체 테스트팀 2기');
+    await dissolution.restore(asUser(ownerId), teamId);
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('active');
+  });
+
+  it('새 이름도 같은 종목·지역 중복이면 409 TEAM_NAME_TAKEN, 보관 팀이 아니거나 관리자가 아니면 거절한다', async () => {
+    await expect(renameByOps('상대 테스트팀')).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_RENAME_NOT_ARCHIVED' } });
+    await archiveByOps();
+    await expect(renameByOps(' 상대  테스트팀')).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_NAME_TAKEN' } });
+    await expect(renameByOps('새 이름 팀', rivalOwnerId)).rejects.toMatchObject({ status: 403 });
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).name).toBe('해체 테스트팀');
+    expect(await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId, action: 'team.rename' } })).toBe(0);
+  });
 });

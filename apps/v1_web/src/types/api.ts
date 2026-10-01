@@ -3066,6 +3066,14 @@ export type V1AdminStatusChangeResult = {
   statusChangeLogId: string;
 };
 
+/** `POST /admin/teams/:teamId/name` — 보관된 팀만 이름을 바꾼다. */
+export type V1AdminTeamRenameResult = {
+  teamId: string;
+  previousName: string;
+  name: string;
+  actionLogId: string;
+};
+
 export type AdminListFilters = {
   status?: string;
   q?: string;

@@ -47,6 +47,7 @@ The following pre-normalization v1 admin/audit contract is retained here so supe
 | `DELETE` | `/api/v1/admin/users/:userId` | mutation admin | `{ reason }` | deleted user status result |
 | `POST` | `/api/v1/admin/matches/:matchId/status` | active admin | `{ status, reason }` | updated match status |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | active admin | `{ status, reason }` | updated team status |
+| `POST` | `/api/v1/admin/teams/:teamId/name` | mutation admin | `{ name, reason }` | renamed archived team `{ teamId, previousName, name, actionLogId }` |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | active admin | `{ status, reason }` | updated team match status |
 | `GET` | `/api/v1/admin/action-logs` | active admin | `AdminLogsQueryDto` | cursor list |
 | `GET` | `/api/v1/admin/status-change-logs` | active admin | `AdminLogsQueryDto` | cursor list |

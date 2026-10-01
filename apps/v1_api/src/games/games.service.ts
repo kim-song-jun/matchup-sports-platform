@@ -1292,7 +1292,7 @@ export class GamesService {
           endingCancelledFixture = teamMatch.status === V1TeamMatchStatus.cancelled;
         }
         if (command === 'start') {
-          await this.assertTournamentStartTeamsAssigned(tx, game);
+          await this.assertTournamentMatchStartable(tx, game);
         }
         assertClockNotDrifted(dto.occurredAt);
         this.requireTakeover(game.id, game.sourceType, context);
@@ -4810,8 +4810,12 @@ export class GamesService {
     }
   }
 
-  /** Tournament-owned matches cannot be kicked off while either bracket side is TBD. */
-  private async assertTournamentStartTeamsAssigned(
+  /**
+   * Tournament-owned matches cannot be kicked off while either bracket side is TBD, nor once the
+   * fixture is cancelled — fixture cancellation leaves the game untouched, so a console left open
+   * could otherwise start a game nobody can end with a result (W4-V14).
+   */
+  private async assertTournamentMatchStartable(
     tx: Transaction,
     game: Pick<LockedGame, 'id' | 'sourceType' | 'teamMatchId'>,
   ): Promise<void> {
@@ -4820,6 +4824,9 @@ export class GamesService {
       if (game.teamMatchId === null) return;
       const competition = await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId);
       if (competition === null) return;
+      if (competition.status === V1TeamMatchStatus.cancelled) {
+        throw new ConflictException({ code: 'TOURNAMENT_MATCH_CANCELLED', message: '취소된 대진이라 경기를 시작할 수 없어요.' });
+      }
       const match = await tx.v1TeamMatch.findUniqueOrThrow({
         where: { id: game.teamMatchId },
         select: {

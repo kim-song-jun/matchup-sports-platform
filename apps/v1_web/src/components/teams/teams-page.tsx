@@ -21,6 +21,7 @@ import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { withFromPath } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamMembersSection } from './team-members-section';
 import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
@@ -1809,7 +1810,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
                 <MemberInitial name={item.displayName} />
                 <div className="tm-invitation-meta">
                   <span className="tm-invitation-meta-name">{item.displayName}</span>
-                  <span className="tm-invitation-meta-date">{formatInvitationDate(item.createdAt)} 초대</span>
+                  <span className="tm-invitation-meta-date">{formatTournamentDateTimeShort(item.createdAt) ?? '날짜 미정'} 초대</span>
                 </div>
                 {/* 비색상 지표: 텍스트 '초대 중' 병기 */}
                 <span className="tm-invitation-status tm-invitation-status-pending" aria-label="초대 상태: 초대 중">
@@ -1848,7 +1849,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
                   <MemberInitial name={item.displayName} />
                   <div className="tm-invitation-meta">
                     <span className="tm-invitation-meta-name">{item.displayName}</span>
-                    <span className="tm-invitation-meta-date">{formatInvitationDate(item.closedAt)}</span>
+                    <span className="tm-invitation-meta-date">{formatTournamentDateTimeShort(item.closedAt) ?? '날짜 미정'}</span>
                   </div>
                   <span className="tm-badge tm-badge-grey">{item.statusLabel}</span>
                 </div>
@@ -1955,12 +1956,6 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
       </BottomSheet>
     </>
   );
-}
-
-function formatInvitationDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '날짜 미정';
-  return new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit' }).format(date);
 }
 
 /** 고르는 화면의 카드라 한 줄씩만 쓴다(390 에서 5장). 팀장 이름은 비교 축이 아니라 팀 상세에서 본다. */

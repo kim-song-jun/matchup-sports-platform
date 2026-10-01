@@ -9,9 +9,11 @@ import {
   UserX,
   FileText,
   Loader2,
+  PauseCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { leagueStateLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
+import type { PreResultMatchPhase } from '@/lib/competition-status';
+import { leagueStateLabel, matchPhaseLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
 
 // ── Tone → classes ────────────────────────────────────────────────────────
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
@@ -209,6 +211,23 @@ export const STATUS_META: Record<string, StatusMeta> = {
     icon: <XCircle size={12} aria-hidden="true" />,
   },
 
+  // ── 리그 대진의 경기 단계(결과 전) — 말은 matchPhaseLabel, 톤·아이콘은 공개 화면 경기 칩과 같은 뜻 ──
+  match_scheduled: {
+    label: matchPhaseLabel('scheduled'),
+    tone: 'gray',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  match_live: {
+    label: matchPhaseLabel('live'),
+    tone: 'blue',
+    icon: <CircleDot size={12} aria-hidden="true" />,
+  },
+  match_paused: {
+    label: matchPhaseLabel('paused'),
+    tone: 'amber',
+    icon: <PauseCircle size={12} aria-hidden="true" />,
+  },
+
 };
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -249,4 +268,16 @@ const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
 
 export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {
   return <AdminStatusPill status={LEAGUE_STATE_PILL_KEY[state]} label={leagueStateLabel(state)} />;
+}
+
+const MATCH_PHASE_PILL_KEY: Record<PreResultMatchPhase, string> = {
+  scheduled: 'match_scheduled',
+  live: 'match_live',
+  paused: 'match_paused',
+  cancelled: 'cancelled',
+};
+
+/** 리그 대진의 결과 전 경기 단계 알약 — 단계는 `leagueFixtureResultCell` 이 정한다. */
+export function AdminMatchPhasePill({ phase }: { phase: PreResultMatchPhase }) {
+  return <AdminStatusPill status={MATCH_PHASE_PILL_KEY[phase]} label={matchPhaseLabel(phase)} />;
 }

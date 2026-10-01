@@ -94,6 +94,7 @@ import {
   resolveGameIdempotency,
   selectLineupParticipantsWithDraftFallback,
   serializeGameVisibility,
+  sidesWithSubmittedLineup,
   validateGameResultInvariants,
   validateSubstitution,
   type PublicParticipantProjection,
@@ -2825,8 +2826,11 @@ export class GamesService {
     const participants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
     // 후보가 0명일 때 화면이 "아직 명단이 없음"과 "모두 연결됨"을 가르는 값 — 공식 결과와 같은 셀렉터로 센다.
     const rosterCount = participants.length;
+    // 한 팀이라도 제출했으면 true. 초안만 있는 명단도 위 셀렉터로 후보·인원에 들지만(공식 결과와 같은 기준),
+    // 사용자 눈엔 "제출 전"이라 화면은 이 값이 false 이고 후보가 없으면 "모두 연결됨" 대신 "아직 제출된 명단이 없어요"다.
+    const rosterSubmitted = sidesWithSubmittedLineup(lineups).size > 0;
     if (rosterCount === 0) {
-      return { gameId, version: game.version, rosterCount, participants: [] };
+      return { gameId, version: game.version, rosterCount, rosterSubmitted, participants: [] };
     }
     // 이미 연결된 참가자는 뺀다 -- 남의 연결을 빼앗는 경로를 애초에 안 만든다.
     // (설령 목록에 넣어도 requestIdentityLink 가 409 로 막지만, 고를 수 있게 보여주는
@@ -2869,7 +2873,7 @@ export class GamesService {
     // Linked or pending participants are excluded before side validation. A stale
     // side on an ineligible row must not block a claimable teammate (51dedb/eb3d428).
     if (eligibleParticipants.length === 0) {
-      return { gameId, version: game.version, rosterCount, participants: [] };
+      return { gameId, version: game.version, rosterCount, rosterSubmitted, participants: [] };
     }
     const sides = await this.prisma.v1GameSide.findMany({
       where: {
@@ -2889,6 +2893,7 @@ export class GamesService {
       gameId,
       version: game.version,
       rosterCount,
+      rosterSubmitted,
       participants: eligibleParticipants
         .map((participant) => ({
           participantId: participant.id,

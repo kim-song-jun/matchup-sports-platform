@@ -8030,9 +8030,14 @@ textarea.tm-chat-input-placeholder::placeholder {
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
-.tm-video-strip-item {
+/* 목록 의미(role=listitem)를 wrapper 가 맡는다 — 스트립의 flex 자식 크기는 wrapper 가 정하고 안쪽 링크·버튼은 폭을 채운다 */
+.tm-video-strip-cell {
   flex: none;
   width: 168px;
+}
+.tm-video-strip-item {
+  display: block;
+  width: 100%;
   padding: 0;
   border: none;
   background: none;

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { MatchVideos } from './match-videos';
@@ -38,5 +38,40 @@ describe('MatchVideos — 유튜브 재생 모달', () => {
     await user.click(screen.getByRole('button', { name: '전반 기록 재생' }));
 
     expect(screen.queryByRole('link', { name: /유튜브에서 보기/ })).toBeNull();
+  });
+});
+
+/**
+ * 스트립의 목록 의미는 wrapper 가 맡아야 한다. 링크·버튼 요소에 role="listitem" 을
+ * 직접 붙이면 접근성 트리에서 링크/버튼 역할이 사라진다.
+ */
+describe('MatchVideos — strip 목록 의미', () => {
+  const videos = [
+    { id: 'v1', title: '결승 하이라이트', url: 'https://youtu.be/abcdefghijk' },
+    { id: 'v2', title: '전반 기록', url: '/uploads/2026/08/clip.mp4' },
+    { id: 'v3', title: '외부 중계', url: 'https://example.com/live' },
+  ];
+
+  it('항목마다 listitem 이 있고 안에서 링크·버튼 역할이 유지된다', () => {
+    render(<MatchVideos videos={videos} matchLabel="레드FC vs 블루FC" variant="strip" />);
+
+    const list = screen.getByRole('list', { name: '레드FC vs 블루FC 경기 영상 목록' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(3);
+
+    expect(within(items[0]).getByRole('button', { name: '결승 하이라이트 재생' })).toBeInTheDocument();
+    expect(within(items[1]).getByRole('button', { name: '전반 기록 재생' })).toBeInTheDocument();
+    const external = within(items[2]).getByRole('link', { name: '외부 중계 보기 (새 창)' });
+    expect(external).toHaveAttribute('href', 'https://example.com/live');
+    expect(external).toHaveAttribute('target', '_blank');
+    expect(external).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('링크·버튼 요소 자체에는 role 속성을 붙이지 않는다', () => {
+    render(<MatchVideos videos={videos} matchLabel="레드FC vs 블루FC" variant="strip" />);
+
+    for (const el of [...screen.getAllByRole('button'), ...screen.getAllByRole('link')]) {
+      expect(el).not.toHaveAttribute('role');
+    }
   });
 });

@@ -1,8 +1,8 @@
 /**
  * `matches.card-model.test.ts` 와 같은 계약 — 누르면 실제로 필터가 걸리는 링크만 만든다.
  */
-import { describe, expect, it } from 'vitest';
-import { buildSportChips, getStatus, sortTeamMatchesByAvailability, statusToCardStatus, toTeamMatch } from './team-matches.card-model';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildSportChips, getStatus, sortTeamMatchesByAvailability, statusToCardStatus, summarizeTeamMatches, toTeamMatch } from './team-matches.card-model';
 import { getTeamMatchListViewModel } from './team-matches.view-model';
 import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 
@@ -206,6 +206,65 @@ describe('friendly match live card', () => {
 
     expect(model.live).toBe(false);
     expect(model.completionPending).toBe(true);
+  });
+});
+
+describe('summarizeTeamMatches — 목록 상단 요약', () => {
+  // 2026-10-01 14:00 KST
+  const NOW = new Date('2026-10-01T05:00:00.000Z');
+  const item = (startsAt: string, status: V1TeamMatchApiStatus = 'recruiting') =>
+    ({ id: startsAt + status, startsAt, status, deadlineAt: null }) as unknown as V1TeamMatch;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('오늘은 KST 날짜가 같은 건만 센다 (과거·미래 제외)', () => {
+    const summary = summarizeTeamMatches([
+      item('2026-10-01T10:00:00.000Z'), // 10/1 19:00 KST
+      item('2026-10-01T01:00:00.000Z'), // 10/1 10:00 KST
+      item('2026-09-30T05:00:00.000Z'), // 어제
+      item('2026-10-06T05:00:00.000Z'), // 미래
+    ]);
+
+    expect(summary.count).toBe(4);
+    expect(summary.today).toBe(2);
+  });
+
+  it('KST 자정 경계 — 14:59:59Z(23:59:59 KST)는 오늘, 15:00:00Z(익일 00:00 KST)는 내일이다', () => {
+    const summary = summarizeTeamMatches([
+      item('2026-10-01T14:59:59.000Z'),
+      item('2026-10-01T15:00:00.000Z'),
+      item('2026-09-30T15:00:00.000Z'), // 10/1 00:00 KST — UTC 날짜로는 어제
+      item('2026-09-30T14:59:59.000Z'), // 9/30 23:59:59 KST
+    ]);
+
+    expect(summary.today).toBe(2);
+  });
+
+  it('모집 중은 실제로 신청을 받는 건만 센다 (마감·확정·취소·보류 제외)', () => {
+    const summary = summarizeTeamMatches([
+      item('2026-10-06T05:00:00.000Z', 'recruiting'),
+      item('2026-10-07T05:00:00.000Z', 'recruiting'),
+      item('2026-10-08T05:00:00.000Z', 'closed'),
+      item('2026-10-09T05:00:00.000Z', 'matched'),
+      item('2026-10-10T05:00:00.000Z', 'cancelled'),
+      item('2026-10-11T05:00:00.000Z', 'on_hold'),
+    ]);
+
+    expect(summary.urgent).toBe(2);
+  });
+
+  it('신청 마감이 지난 recruiting 은 모집 중이 아니다', () => {
+    const expired = { ...item('2026-10-06T05:00:00.000Z'), deadlineAt: '2026-09-30T00:00:00.000Z' } as V1TeamMatch;
+
+    expect(summarizeTeamMatches([expired]).urgent).toBe(0);
+  });
+
+  it('결과가 0건이면 전부 0이다', () => {
+    expect(summarizeTeamMatches([])).toEqual({ count: 0, today: 0, urgent: 0 });
   });
 });
 

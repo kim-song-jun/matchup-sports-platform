@@ -64,3 +64,10 @@ Root agent only. 기존 shared-tree WIP 보존. 2026-10-01 사용자 dev 배포 
 - Web 가입 대기 상태는 진행중보다 우선 유지하고 보류만 공통 우선. 관리 링크 fixture는 실제 manageHref를 명시. 관련 Web 98/98 PASS; 개인 API 67/67 PASS(팀 API 74/74 이전 PASS).
 
 - 두 번째 CI: Gates/Web 전체 PASS. API 참여 이력 한 건만 RED(철회 후 미완료 매치 후기의 SOURCE_NOT_COMPLETED 409 계약). 기존 403 기대를 실제 409 + code 검증으로 갱신. 나머지 참여/권한/삭제/일정변경 HTTP 시나리오 PASS.
+
+## 2026-10-01 latest dev merge preparation
+- PR #1388의 이전 CI는 통과했지만 최신 dev와 7개 파일에서 충돌했다. 별도 worktree에서 최신 dev의 팀매치 다음 행동 UI를 유지하고 보류 패널을 결합했다.
+- 리뷰 Major 3건: 진행 확정 후 마지막 참가자 이탈 시 보류 복귀, 내용만 수정할 때 closed/진행 확정 보존, 진행 중·종료 확인 중 취소 차단을 수정했다. 팀매치 내용 수정 시 closed 보존과 내 매치 진행 건수, 영문 409 안내도 반영했다.
+- 개인·팀 API 145/145, Web 관련 191/191 및 추가 영문 오류 테스트 5/5 통과. 양 앱 tsc --noEmit, v1 DB guardrails 통과. 최신 dev를 재병합했고 PR CI 재검증 대기.
+- release schema binding은 병합된 Prisma schema의 Git index LF SHA-256 `bb42ef9a40757b6877989b8cd883d461a714aebbcbd4591753acf0db757aba1a`로 고정했다. M11 기존 Git blob SHA-256 `08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323`는 그대로다. Windows checkout의 CRLF 때문에 작업 파일 직접 해시는 CI의 Git blob 해시와 다르다.
+- 실제 alpha 배포 후 인증 주최자 동작 및 전체 route 3폭 검증은 아직 미완료다.

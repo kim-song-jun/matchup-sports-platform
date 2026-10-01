@@ -51,7 +51,9 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
   // (app-shell-promotion.md §1b, 6곳 중 하나).
   useShellOverride({ floatingSlot: <TeamMatchCreateFloatingButton /> });
   // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
+  // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
   const currentHref = useCurrentHref();
+  const listFromHref = currentHref?.includes('?') ? currentHref : null;
   return (
     <>
       {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}
@@ -79,7 +81,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         {model.isLoading
           ? <PageSkeleton />
           : model.matches.length
-            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} fromHref={currentHref} />)}</div>
+            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} fromHref={listFromHref} />)}</div>
             : (
               /* matches-page.tsx MatchListPageView 와 동일한 이유·조건 — 필터/종목이 걸려 있을
                  때만 "전체 팀매치 보기" CTA 를 준다(웨이브4, 2026-09-04). */

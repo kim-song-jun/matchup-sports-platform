@@ -1933,14 +1933,11 @@ describe('TeamMatchListPageView — 상세로 가는 카드는 지금 목록(검
     expect(hrefs).toEqual([`/team-matches/tm-a?from=${from}`, `/team-matches/tm-b?from=${from}`]);
   });
 
-  it('대조군: 필터 없는 목록도 자기 경로를 싣는다(상세 뒤로가기가 항상 같은 목록으로 간다)', () => {
+  it('대조군: 쿼리 없는 목록은 from 을 싣지 않는다(fallback 이 같은 목록이고 공개 첫 HTML 링크가 깨끗해야 한다)', () => {
     navState.pathname = '/team-matches';
     const { container } = renderPage(<TeamMatchListPageView model={twoCards()} />);
     const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
 
-    expect(hrefs).toEqual([
-      `/team-matches/tm-a?from=${encodeURIComponent('/team-matches')}`,
-      `/team-matches/tm-b?from=${encodeURIComponent('/team-matches')}`,
-    ]);
+    expect(hrefs).toEqual(['/team-matches/tm-a', '/team-matches/tm-b']);
   });
 });

@@ -349,6 +349,7 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
     <TournamentPlayerRecordsSections
       goals={goals}
       assists={assists}
+      hiddenByEligibility={records.data?.hiddenByEligibility ?? false}
       isLoading={records.isLoading}
       isError={records.isError}
       errorMessage={extractErrorMessage(records.error, '기록을 불러오지 못했어요.')}

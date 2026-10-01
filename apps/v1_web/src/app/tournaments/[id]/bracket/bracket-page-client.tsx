@@ -424,6 +424,7 @@ export function BracketScheduleTab({
         <TournamentPlayerRecordsSections
           goals={withProfileFrom(playerRecords.data?.goals, fromHref)}
           assists={withProfileFrom(playerRecords.data?.assists, fromHref)}
+          hiddenByEligibility={playerRecords.data?.hiddenByEligibility ?? false}
           isLoading={playerRecords.isLoading}
           isError={playerRecords.isError}
           errorMessage={extractErrorMessage(playerRecords.error, '기록을 불러오지 못했어요.')}

@@ -24,7 +24,7 @@ import type {
   V1LeaguePlayerRecordRow,
   V1LeagueStandingRow,
 } from '@/types/league-match';
-import { leagueRecordEmptySub } from '../league-record-empty-copy';
+import { playerRecordEmptySub, playerRecordEmptyTitle } from '@/lib/player-record-empty-copy';
 
 /** 아직 종료되지 않은 리그로 딥링크했을 때 — 빈 화면 대신 안내 + 되돌아갈 동선. */
 function NotCompletedNotice({ parentHref, state }: { parentHref: string; state: 'draft' | 'active' }) {
@@ -170,12 +170,14 @@ function LeaderboardSection({
   title,
   rows,
   unit,
+  emptyTitle,
   emptySub,
 }: {
   parentHref: string;
   title: string;
   rows: V1LeaguePlayerRecordRow[];
   unit: (row: V1LeaguePlayerRecordRow) => number;
+  emptyTitle: string;
   emptySub: string;
 }) {
   const ranks = useMemo(() => competitionRanks(rows.map(unit)), [rows, unit]);
@@ -184,7 +186,7 @@ function LeaderboardSection({
       <section className="mb-5">
         <h2 className="tm-hub-section-title mb-2">{title}</h2>
         <EmptyState
-          title="아직 기록이 없어요"
+          title={emptyTitle}
           sub={emptySub}
           illustration={{ name: 'journey-done' }}
           cta="리그 순위표 보러가기"
@@ -302,21 +304,23 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
           {/*
             순위가 비는 이유가 두 가지이고 처방이 다르다 — 동의 게이팅으로 가려진 것인지,
             아직 확정 결과가 없는 것인지. 순위표 화면과 **같은 문구**를 쓰도록 단일 소스
-            (leagueRecordEmptySub)를 거친다.
+            (playerRecordEmptySub)를 거친다.
           */}
           <LeaderboardSection
             parentHref={parentHref}
             title="득점왕"
             rows={records.goals}
             unit={(row) => row.goals}
-            emptySub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
+            emptyTitle={playerRecordEmptyTitle(records.hiddenByEligibility)}
+            emptySub={playerRecordEmptySub('goals', records.hiddenByEligibility)}
           />
           <LeaderboardSection
             parentHref={parentHref}
             title="도움왕"
             rows={records.assists}
             unit={(row) => row.assists}
-            emptySub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
+            emptyTitle={playerRecordEmptyTitle(records.hiddenByEligibility)}
+            emptySub={playerRecordEmptySub('assists', records.hiddenByEligibility)}
           />
         </>
       )}

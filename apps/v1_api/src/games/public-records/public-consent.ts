@@ -67,6 +67,19 @@ export function isParticipantPubliclyEligible(row: ParticipantConsentEligibility
 }
 
 /**
+ * 공개 랭킹에서 "기록은 있는데 공개 자격 때문에 빠진 행"인가. 리그·대회 랭킹이 같은
+ * 값(`hiddenByEligibility`)을 응답에 싣는 단일 규칙이다 — eligibility 행 부재(연동
+ * 자체가 없음)도 포함하고, 득점·도움이 모두 0 인 행은 숨길 기록이 없으므로 세지 않는다.
+ */
+export function isRankedRecordHiddenByEligibility(
+  row: { goals: number; assists: number },
+  eligibility: ParticipantConsentEligibility | undefined,
+): boolean {
+  if (row.goals <= 0 && row.assists <= 0) return false;
+  return eligibility === undefined || !isParticipantPubliclyEligible(eligibility);
+}
+
+/**
  * 순수 판정: **본인 조회 기준**으로 이 participant 가 노출 대상인가.
  *
  * `isParticipantPubliclyEligible`과 딱 한 가지만 다르다 -- 사용자 단위 동의

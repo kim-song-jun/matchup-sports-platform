@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentRegistration } from '@/types/api';
@@ -712,5 +713,105 @@ describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () =
 
     expect(screen.getByText('이 리그에 신청할 수 있는 팀이 없어요')).toBeInTheDocument();
     expect(container.textContent).not.toContain('대회');
+  });
+});
+
+/** 팀 권한 조회(`/me/teams`)의 실패·로딩을 "권한 없음" 과 구분한다 (#1442). */
+describe('MyRegistrationPageClient — 팀 권한 조회 상태 구분', () => {
+  const refetchTeams = vi.fn();
+  const refetchRegistrations = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams('reg=registration-1');
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ rosterDeadlineAt: '2099-01-01T00:00:00.000Z' }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: refetchRegistrations,
+    });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+  });
+
+  it('팀 조회가 실패하면 권한 없음 대신 오류 안내와 다시 시도 버튼을 보여 준다', async () => {
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('network'),
+      refetch: refetchTeams,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('팀 정보를 불러오지 못했어요');
+    expect(screen.queryByText('권한 필요')).toBeNull();
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
+    expect(refetchTeams).toHaveBeenCalledTimes(1);
+  });
+
+  it('다시 시도가 성공하면 전체 새로고침 없이 수정 링크가 나타난다', () => {
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('network'),
+      refetch: refetchTeams,
+    });
+    const view = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).toBeNull();
+
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: { items: [makeTeam({ role: 'owner' })] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: refetchTeams,
+    });
+    view.rerender(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+  });
+
+  it('조회에 성공했지만 멤버 권한이면 오류가 아니라 수정 링크만 숨는다 (대조군)', () => {
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: { items: [makeTeam({ role: 'member', canManage: false })] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: refetchTeams,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).toBeNull();
+  });
+
+  it('조회 중에는 권한 판정 없이 로딩 상태만 보인다', () => {
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: refetchTeams,
+    });
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(container.textContent).not.toContain('권한');
   });
 });

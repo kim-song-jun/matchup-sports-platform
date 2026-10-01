@@ -1252,6 +1252,20 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.queryByRole('heading', { name: '득점·도움 순위' })).not.toBeInTheDocument();
   });
 
+  it('한쪽만 가려진 경우 빈 쪽 제목은 "기록이 없어요"가 아니라 공개 가능한 기록이 없다고 말한다', async () => {
+    mockLeague({
+      goals: [{ userId: 'u1', nickname: '선수 하나', goals: 2 }],
+      assists: [],
+      hiddenByEligibility: true,
+    });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const assistsSection = screen.getByRole('heading', { name: '도움 순위' }).closest('section');
+    expect(within(assistsSection as HTMLElement).getByText('아직 공개할 수 있는 기록이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('아직 기록이 없어요')).not.toBeInTheDocument();
+  });
+
   /* ── F8: 빈 상태에서 신원 연동으로 가는 길 ────────────────────────────────
    * 빈 상태는 "신원 연동과 기록 공개에 동의하면 순위가 공개돼요"라고 이유를 말하는데
    * 정작 이 화면에는 연동을 시작할 수단이 없었다(alpha 실측). 아래 테스트들은 그 길이

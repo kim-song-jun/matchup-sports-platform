@@ -27,7 +27,7 @@ import {
   type TournamentStaffResource,
 } from '../../tournaments/staff/tournament-staff-access.service';
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
-import { isParticipantPubliclyEligible, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
+import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
 import {
@@ -355,7 +355,7 @@ export class PublicTournamentRecordsService {
       throw new NotFoundException(NOT_FOUND);
     }
 
-    const empty = { tournamentId: tournament.id, goals: [], assists: [] };
+    const empty = { tournamentId: tournament.id, goals: [], assists: [], hiddenByEligibility: false };
     if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {
       return empty;
     }
@@ -408,11 +408,15 @@ export class PublicTournamentRecordsService {
     );
     const totalsByUserId = new Map<string, { goals: number; assists: number }>();
     const profileHrefByUserId = new Map<string, string>();
+    let hiddenByEligibility = false;
     for (const row of participantRows) {
       const eligibilityRow = eligibility.get(row.participantId);
-      if (eligibilityRow === undefined) continue;
       // officialAt null(공식 확정 안 됨)은 동의 판정과 무관한 별개 게이트 — 리그와 동일.
-      if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
+      if (row.resultRevision.officialAt === null) continue;
+      if (eligibilityRow === undefined || !isParticipantPubliclyEligible(eligibilityRow)) {
+        if (isRankedRecordHiddenByEligibility(row, eligibilityRow)) hiddenByEligibility = true;
+        continue;
+      }
       const userId = eligibilityRow.linkedUserId!;
       // href는 lane 단일 소스 헬퍼로 생성한다 — 여기서 문자열을 직접 만들면
       // 동의 게이팅·인코딩 규칙이 두 곳으로 갈라진다(리뷰 지적). 이 지점은
@@ -455,6 +459,7 @@ export class PublicTournamentRecordsService {
       tournamentId: tournament.id,
       goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
       assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
+      hiddenByEligibility,
     };
   }
 

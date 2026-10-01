@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { Check, MoreHorizontal, Pin, Send } from 'lucide-react';
+import { Check, Download, FileText, MoreHorizontal, Pin, Send } from 'lucide-react';
 import { ActionSheet } from '@/components/v1-ui/action-sheet';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -14,7 +14,7 @@ import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/compone
 import { cssUrl } from '@/lib/assets';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
-import { ChatImageViewer, ChatPlusPanel } from './chat-plus-panel';
+import { ChatImageViewer, ChatPlusPanel, ChatSharePicker } from './chat-plus-panel';
 import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel, notificationVisualType } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
@@ -284,8 +284,29 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                           {showTime ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
                         </div>
                       ) : null}
-                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}${message.kind === 'image' && message.imageUrl ? ' tm-chat-bubble-image' : ''}`}>
-                        {message.kind === 'image' && message.imageUrl ? (
+                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}${message.kind === 'image' && message.imageUrl ? ' tm-chat-bubble-image' : ''}${message.kind === 'share' && message.share ? ' tm-chat-bubble-share' : ''}${message.kind === 'file' && message.file ? ' tm-chat-bubble-share' : ''}`}>
+                        {message.kind === 'file' && message.file ? (
+                          // 참여자 인증 경로로 내려받는다(서버가 attachment 로 보낸다). 공개 URL 은 없다.
+                          <a className="tm-chat-file-card" href={message.file.href} download={message.file.name} aria-label={`${message.file.name} 파일 받기, ${message.file.sizeLabel}`}>
+                            <span className="tm-chat-file-card-icon" aria-hidden="true"><FileText size={20} strokeWidth={2} /></span>
+                            <span className="tm-chat-file-card-text">
+                              <span className="tm-text-body tm-chat-file-card-name">{message.file.name}</span>
+                              <span className="tm-text-caption">{message.file.sizeLabel}</span>
+                            </span>
+                            <Download size={18} strokeWidth={2.2} aria-hidden="true" className="tm-chat-file-card-download" />
+                          </a>
+                        ) : message.kind === 'share' && message.share ? (
+                          <Link className="tm-chat-share-card" href={message.share.href}>
+                            <span className="tm-text-micro tm-chat-share-card-kind">{message.share.label} 공유</span>
+                            <span className="tm-text-body tm-chat-share-card-title">{message.share.title}</span>
+                            {message.share.when ? <span className="tm-text-caption">{message.share.when}</span> : null}
+                            {message.share.place ? <span className="tm-text-caption">{message.share.place}</span> : null}
+                            {message.share.sub ? <span className="tm-text-caption">{message.share.sub}</span> : null}
+                            <span className="tm-text-caption tm-chat-share-card-cta">
+                              자세히 보기 <ChevronRightIcon size={14} strokeWidth={2.2} />
+                            </span>
+                          </Link>
+                        ) : message.kind === 'image' && message.imageUrl ? (
                           <button type="button" className="tm-chat-image-button" aria-label="사진 크게 보기" onClick={() => setViewerUrl(message.imageUrl ?? null)}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- 사용자 업로드(/uploads)는 next/image 최적화 대상이 아니다. */}
                             <img src={message.imageUrl} alt="" className="tm-chat-image" loading="lazy" />
@@ -305,6 +326,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         {model.sendingImages ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '4px 16px' }}>사진을 보내는 중이에요…</div> : null}
+        {model.sendingFile ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '4px 16px' }}>파일을 보내는 중이에요…</div> : null}
         {model.imageNotice ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>{model.imageNotice}</div> : null}
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
         <div className={`tm-chat-inputbar${plusOpen ? ' is-panel-open' : ''}`}>
@@ -360,13 +382,22 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         {plusOpen && model.onPickImages ? (
           <ChatPlusPanel
             id={plusPanelId}
-            disabled={Boolean(model.sendingImages)}
+            disabled={Boolean(model.sendingImages || model.sendingFile)}
             onPickImages={(files) => {
               setPlusOpen(false);
               model.onPickImages?.(files);
             }}
+            onOpenShare={model.share ? () => {
+              setPlusOpen(false);
+              model.share?.onOpen();
+            } : undefined}
+            onPickFile={model.onPickFile ? (file) => {
+              setPlusOpen(false);
+              model.onPickFile?.(file);
+            } : undefined}
           />
         ) : null}
+        {model.share ? <ChatSharePicker share={model.share} /> : null}
         <ChatImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />
       </div>
         </section>

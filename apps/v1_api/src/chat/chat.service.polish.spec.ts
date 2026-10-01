@@ -216,11 +216,35 @@ describe('ChatService room polish', () => {
     const result = await service.messages(userA, 'room-1', { limit: 30 });
 
     expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ include: expect.objectContaining({ attachmentAsset: { select: { url: true } } }) }),
+      expect.objectContaining({ include: expect.objectContaining({ attachmentAsset: { select: expect.objectContaining({ url: true }) } }) }),
     );
     expect(result.items).toEqual([
       expect.objectContaining({ messageId: 'photo-1', messageType: 'image', content: '사진', imageUrl: '/uploads/2026/10/photo-1.jpg', unreadCount: 1 }),
       expect.objectContaining({ messageId: 'photo-2', content: null, imageUrl: null }),
+    ]);
+  });
+
+  it('공유 메시지는 shareCard 를 싣는다 — 숨김 메시지는 카드도 내리지 않는다', async () => {
+    const visibleFromAt = new Date('2026-06-21T09:00:00Z');
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom(visibleFromAt));
+    const card = { kind: 'match', targetId: 'm-1', title: '토요일 풋살', startAt: '2026-06-27T10:00:00.000Z', place: '잠실', sub: null, route: '/matches/m-1' };
+    const shareMessage = (id: string, status: string) => ({
+      id, chatRoomId: 'room-1', senderUserId: userA.id, body: '[매치] 토요일 풋살', status, messageType: 'share',
+      systemEventType: null, sentAt, attachmentAsset: null, shareCard: card,
+      senderUser: { id: userA.id, profile: { nickname: 'Alice', displayName: null, profileImageUrl: null } },
+    });
+    prisma.v1ChatMessage.findMany.mockResolvedValue([shareMessage('share-1', 'sent'), shareMessage('share-2', 'hidden')]);
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([
+      { userId: userA.id, visibleFromAt, lastReadMessage: { sentAt } },
+      { userId: userB.id, visibleFromAt, lastReadMessage: null },
+    ]);
+
+    const result = await service.messages(userA, 'room-1', { limit: 30 });
+
+    expect(result.items).toEqual([
+      expect.objectContaining({ messageId: 'share-1', messageType: 'share', shareCard: card, unreadCount: 1 }),
+      expect.objectContaining({ messageId: 'share-2', content: null, shareCard: null }),
     ]);
   });
 

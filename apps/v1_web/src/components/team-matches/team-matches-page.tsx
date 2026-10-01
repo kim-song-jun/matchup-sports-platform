@@ -539,8 +539,6 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
         <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>
       </div>
 
-      {lifecyclePanel}
-
       {/* Desktop 2-column layout wrapper */}
       <div className="tm-team-match-detail-desktop tm-content-enter">
         {/* LEFT: VS hero + info */}
@@ -624,6 +622,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}
               {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
+            {lifecyclePanel}
             {/* 히어로(뒤로가기 포함) 다음, 본문 앞 — 내비게이션이 항상 먼저 보이게 유지한다. */}
             {recordEntry}
             <div className="tm-match-detail-body">

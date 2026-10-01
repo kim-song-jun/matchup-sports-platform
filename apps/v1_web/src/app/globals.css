@@ -200,6 +200,8 @@
   --font-size-body-sm: 14px;
   --font-size-body: 15px;
   --font-size-body-lg: 17px;
+  /* iOS 는 16px 미만 입력에 포커스하면 화면을 확대한다 — 모바일에서 쓰는 입력 칸 전용. */
+  --font-size-input: 16px;
   --font-size-subhead: 20px;
   --font-size-heading: 24px;
   /* [P1 Pretendard] 브랜드 폰트 스택 — Variable→정적 폴백→시스템 폰트 순서 */

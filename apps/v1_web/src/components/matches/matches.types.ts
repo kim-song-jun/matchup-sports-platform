@@ -12,6 +12,7 @@ export type MatchCardModel = {
   current: number;
   capacity: number;
   actionLabel: string;
+  lifecycleLabel?: '보류' | '진행 확정' | '진행 중';
   level: string;
   gender: string;
   host: string;

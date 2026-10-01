@@ -4,7 +4,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { completeTeamMatchAtResultBoundary } from '../games/team-match-result-boundary';
-import { canonicalGameCommandPayloadHash } from '../games/games.service';
+import { canonicalGameCommandPayloadHash, toGameHttpException } from '../games/games.service';
+import { GameContractError } from '../games/core/game-contract';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import {
@@ -18,7 +19,8 @@ import {
   type ParticipantConsentEligibility,
 } from '../games/public-records/public-consent';
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
-import { platformMatchOperator } from './platform-match-operator';
+import { friendlyResultCorrector, platformMatchOperator } from './platform-match-operator';
+import { assertRevisionSupersession, assertRevisionTransition } from '../games/core/revision-state-machine';
 
 type Tx = Prisma.TransactionClient;
 export type SharedSubMatch = { id: string; title: string; order: number };
@@ -128,6 +130,10 @@ export class TeamMatchRecordService {
 
   private async actor(tx: Tx, game: Loaded, user: V1AuthUser | null) {
     if (!user || user.accountStatus !== 'active') return null;
+    if (this.phase(game) === 'official') {
+      const corrector = await friendlyResultCorrector(tx, user, game.teamMatch!);
+      if (corrector) return { sideId: null, displayNameSnapshot: 'Teameet 운영', operator: true as const, teamAuthority: false, adminId: corrector.id };
+    }
     const roster = this.roster(game);
     const links = await tx.v1ParticipantIdentityLinkCurrent.findMany({
       where: { userId: user.id, participantId: { in: roster.filter((p) => !p.userId).map((p) => p.id) } },
@@ -226,7 +232,9 @@ export class TeamMatchRecordService {
     const match = game.teamMatch!;
     if (match.leagueId || match.tournamentId) return 'managed' as const;
     if (match.status === 'cancelled' || game.state === 'CANCELLED') return 'cancelled' as const;
-    if (game.sharedRecord?.officialAt && game.resultRevisions[0]?.revision === 1 && game.resultRevisions[0]?.state === 'OFFICIAL') return 'official' as const;
+    // 어드민 정정이 2번 이후 리비전을 공식으로 세우므로 번호가 아니라 "최신 리비전이 현재 공식" 으로 본다.
+    const latest = game.resultRevisions[0];
+    if (game.sharedRecord?.officialAt && latest?.state === 'OFFICIAL' && latest.id === game.currentOfficialRevisionId) return 'official' as const;
     if ((!game.sharedRecord && game.events.length) || game.resultRevisions.length || match.status === 'completed' || game.state === 'ENDED') return 'legacy' as const;
     if (match.status !== 'matched' || !match.approvedApplicantTeamId || !match.hostTeamId || !match.startAt || match.startAt.getTime() > Date.now()) return 'scheduled' as const;
     return 'live' as const;
@@ -250,7 +258,7 @@ export class TeamMatchRecordService {
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
-      canEdit: !!actor && phase === 'live' && readiness.lineupReady, participant: !!actor && !actor.operator, operator: actor?.operator ?? false, teamAuthority: actor?.teamAuthority ?? false, ownSideId,
+      canEdit: !!actor && ((phase === 'live' && readiness.lineupReady) || (phase === 'official' && actor.operator)), participant: !!actor && !actor.operator, operator: actor?.operator ?? false, teamAuthority: actor?.teamAuthority ?? false, ownSideId,
       ...readiness,
       sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
@@ -282,7 +290,9 @@ export class TeamMatchRecordService {
         if (replay.actorUserId !== user.id || replay.payloadHash !== payloadHash) throw conflict('COMMAND_REUSED', '다른 요청에 사용된 요청 번호예요. 새로고침해 주세요.');
         return this.view(tx, game, user);
       }
-      if (this.phase(game) !== 'live') throw conflict('RECORD_NOT_EDITABLE', '경기 시작 후에만 기록할 수 있으며, 확정된 결과는 수정할 수 없어요.');
+      // 확정 뒤에는 플랫폼 어드민만 고친다 — 양 팀 확인은 그대로 두고 새 공식 리비전으로 대체한다.
+      const correcting = this.phase(game) === 'official' && actor.operator;
+      if (this.phase(game) !== 'live' && !correcting) throw conflict('RECORD_NOT_EDITABLE', '경기 시작 후에만 기록할 수 있으며, 확정된 결과는 수정할 수 없어요.');
       const record = game.sharedRecord;
       if ((record?.version ?? 0) !== dto.expectedVersion) throw conflict('VERSION_CONFLICT', '다른 참가자가 기록을 바꿨어요. 최신 내용을 확인하고 다시 시도해 주세요.');
 
@@ -300,7 +310,7 @@ export class TeamMatchRecordService {
       } else if (dto.action === 'reopen') {
         confirmations = [];
       } else {
-        confirmations = [];
+        if (!correcting) confirmations = [];
         if (dto.action === 'submatch_add') {
           if (subMatches.length >= 20) throw conflict('SUBMATCH_LIMIT', '서브매치는 20개까지 만들 수 있어요.');
           const title = dto.title?.trim();
@@ -351,23 +361,26 @@ export class TeamMatchRecordService {
         }
       }
 
-      const official = confirmations.length === 2 && new Set(confirmations.map((c) => c.sideId)).size === 2;
+      const official = !correcting && confirmations.length === 2 && new Set(confirmations.map((c) => c.sideId)).size === 2;
       const version = (record?.version ?? 0) + 1;
+      const officialAt = correcting ? record!.officialAt : official ? new Date() : null;
       await tx.v1TeamMatchRecord.upsert({
         where: { gameId: game.id },
-        create: { gameId: game.id, version, goals: json(goals), subMatches: json(subMatches), confirmations: json(confirmations), officialAt: official ? new Date() : null },
-        update: { version, goals: json(goals), subMatches: json(subMatches), confirmations: json(confirmations), officialAt: official ? new Date() : null },
+        create: { gameId: game.id, version, goals: json(goals), subMatches: json(subMatches), confirmations: json(confirmations), officialAt },
+        update: { version, goals: json(goals), subMatches: json(subMatches), confirmations: json(confirmations), officialAt },
       });
       await tx.v1TeamMatchRecordChange.create({ data: {
         gameId: game.id, version, commandId: dto.commandId, payloadHash, actorUserId: user.id, actorName: actor.displayNameSnapshot,
         action: dto.action, goalId, subMatchId, before: before ? json(before) : Prisma.JsonNull, after: after ? json(after) : Prisma.JsonNull,
       } });
+      const correction = correcting ? await this.supersedeOfficialResult(tx, game, goals, subMatches, user.id) : null;
       if (actor.operator) await tx.v1AdminActionLog.create({ data: {
-        adminUserId: actor.adminId!, action: 'team_match.record', targetType: 'team_match', targetId: teamMatchId,
-        beforeJson: { version: version - 1 }, afterJson: { version, action: dto.action, commandId: dto.commandId },
+        adminUserId: actor.adminId!, action: correction ? 'team_match.record_correction' : 'team_match.record', targetType: 'team_match', targetId: teamMatchId,
+        beforeJson: { version: version - 1, ...(correction ? { revisionId: correction.supersedesId } : {}) },
+        afterJson: { version, action: dto.action, commandId: dto.commandId, ...(correction ? { revisionId: correction.revisionId } : {}) },
       } });
       if (official) await this.officialize(tx, game, goals, subMatches, confirmations, user.id);
-      else await tx.v1Game.update({ where: { id: game.id }, data: { state: 'LIVE', version: { increment: 1 } } });
+      else if (!correcting) await tx.v1Game.update({ where: { id: game.id }, data: { state: 'LIVE', version: { increment: 1 } } });
       return this.view(tx, await this.load(tx, teamMatchId), user);
     });
   }
@@ -381,23 +394,33 @@ export class TeamMatchRecordService {
     }
   }
 
-  private async officialize(tx: Tx, game: Loaded, goals: SharedGoal[], subMatches: SharedSubMatch[], confirmations: Confirmation[], userId: string) {
+  /** 공동 기록 득점에서 결과 리비전 내용(점수·득점 타임라인·출전자별 골)을 만든다. 첫 확정과 어드민 정정이 같은 규칙을 쓴다. */
+  private revisionContent(game: Loaded, goals: SharedGoal[], subMatches: SharedSubMatch[]) {
     for (const goal of goals) this.validateGoal(game, goal, subMatches);
     const home = game.sides.find((s) => s.sideKey === 'HOME');
     const away = game.sides.find((s) => s.sideKey === 'AWAY');
     if (!home || !away) throw conflict('SIDES_REQUIRED', '양 팀 정보가 필요해요.');
-    const score = {
-      home: goals.filter((g) => g.sideId === home.id).length,
-      away: goals.filter((g) => g.sideId === away.id).length,
-      ...(subMatches.length === 0 ? {} : { subMatches: subMatches.map((subMatch) => ({ id: subMatch.id, title: subMatch.title, home: goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === home.id).length, away: goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === away.id).length })) }),
+    const roster = this.roster(game);
+    return {
+      score: {
+        home: goals.filter((g) => g.sideId === home.id).length,
+        away: goals.filter((g) => g.sideId === away.id).length,
+        ...(subMatches.length === 0 ? {} : { subMatches: subMatches.map((subMatch) => ({ id: subMatch.id, title: subMatch.title, home: goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === home.id).length, away: goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === away.id).length })) }),
+      },
+      goalEvents: json(goals.map((g) => ({ ...g, period: null, playerNameSnapshot: roster.find((p) => p.id === g.participantId)?.displayNameSnapshot ?? null }))),
+      eventsHash: createHash('sha256').update(JSON.stringify({ subMatches, goals })).digest('hex'),
+      missingScorer: goals.some((g) => !g.participantId),
+      participants: (resultRevisionId: string) => roster.map((p) => ({ resultRevisionId, participantId: p.id, sideId: p.sideId, started: p.started, goals: goals.filter((g) => g.participantId === p.id && !g.ownGoal).length, cards: [], goalkeeper: p.position === 'GK' })),
     };
+  }
+
+  private async officialize(tx: Tx, game: Loaded, goals: SharedGoal[], subMatches: SharedSubMatch[], confirmations: Confirmation[], userId: string) {
+    const { participants, ...content } = this.revisionContent(game, goals, subMatches);
     const revision = await tx.v1GameResultRevision.create({ data: {
-      gameId: game.id, revision: 1, state: 'DRAFT', score,
-      goalEvents: json(goals.map((g) => ({ ...g, period: null, playerNameSnapshot: this.roster(game).find((p) => p.id === g.participantId)?.displayNameSnapshot ?? null }))),
-      eventsHash: createHash('sha256').update(JSON.stringify({ subMatches, goals })).digest('hex'), missingScorer: goals.some((g) => !g.participantId),
+      gameId: game.id, revision: 1, state: 'DRAFT', ...content,
       createdByActorType: 'USER', createdByUserId: userId, submittedAt: new Date(), officialAt: new Date(), reason: '양 팀 참가자 공동 기록 확인',
     } });
-    await tx.v1GameResultParticipant.createMany({ data: this.roster(game).map((p) => ({ resultRevisionId: revision.id, participantId: p.id, sideId: p.sideId, started: p.started, goals: goals.filter((g) => g.participantId === p.id && !g.ownGoal).length, cards: [], goalkeeper: p.position === 'GK' })) });
+    await tx.v1GameResultParticipant.createMany({ data: participants(revision.id) });
     await tx.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: 'SUBMITTED' } });
     await tx.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: 'OFFICIAL' } });
     await tx.v1GameResultDecision.createMany({ data: confirmations.map((c) => ({ revisionId: revision.id, decision: 'approve', actorType: 'USER', actorUserId: c.userId, reason: '공동 경기 기록 종료 확인' })) });
@@ -405,5 +428,33 @@ export class TeamMatchRecordService {
     await tx.v1GamePeriod.updateMany({ where: { gameId: game.id, state: { in: ['LIVE', 'HALFTIME'] } }, data: { state: 'ENDED', endedAt: new Date() } });
     await completeTeamMatchAtResultBoundary(tx, game.teamMatchId!, userId, 'shared_record_confirmed');
     await tx.v1OutboxEvent.create({ data: { businessKey: `game:${game.id}:revision:1:official`, aggregateType: 'GAME', aggregateId: game.id, revisionId: revision.id, type: 'GAME_RESULT_OFFICIAL', payload: { revisionId: revision.id } } });
+  }
+
+  /**
+   * 확정된 결과를 덮어쓰지 않고 CORRECTION 리비전으로 대체한다 — 이전 공식 리비전은 그대로 남고 포인터만 옮긴다.
+   * 같은 GAME_RESULT_OFFICIAL 투영이 전적·개인 기록·공개 캐시를 다시 맞추고, 완료 알림은 팀매치당 한 번이라 다시 나가지 않는다.
+   */
+  private async supersedeOfficialResult(tx: Tx, game: Loaded, goals: SharedGoal[], subMatches: SharedSubMatch[], userId: string) {
+    const base = game.resultRevisions[0];
+    try {
+      assertRevisionSupersession({
+        baseGameId: base.gameId, successorGameId: game.id, baseRevisionId: base.id, supersedesRevisionId: base.id,
+        baseState: base.state, successorState: 'DRAFT', purpose: 'CORRECTION',
+      });
+      assertRevisionTransition({ from: 'DRAFT', to: 'OFFICIAL', flow: 'CORRECTION' });
+    } catch (error) {
+      if (error instanceof GameContractError) throw toGameHttpException(error);
+      throw error;
+    }
+    const { participants, ...content } = this.revisionContent(game, goals, subMatches);
+    const revision = await tx.v1GameResultRevision.create({ data: {
+      gameId: game.id, revision: base.revision + 1, state: 'DRAFT', ...content,
+      createdByActorType: 'USER', createdByUserId: userId, supersedesId: base.id, reason: '운영자 결과 정정',
+    } });
+    await tx.v1GameResultParticipant.createMany({ data: participants(revision.id) });
+    await tx.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: 'OFFICIAL', submittedAt: new Date(), officialAt: new Date() } });
+    await tx.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id, version: { increment: 1 } } });
+    await tx.v1OutboxEvent.create({ data: { businessKey: `game:${game.id}:revision:${revision.revision}:correction_officialize`, aggregateType: 'GAME', aggregateId: game.id, revisionId: revision.id, type: 'GAME_RESULT_OFFICIAL', payload: { revisionId: revision.id } } });
+    return { revisionId: revision.id, supersedesId: base.id };
   }
 }

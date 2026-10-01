@@ -239,6 +239,21 @@ describe('AdminTeamMatchDetailPage', () => {
     expect(screen.getByRole('link', { name: '모집 수정' })).toHaveAttribute('href', '/admin/team-matches/tm-1/edit');
   });
 
+  // 2026-10-01 사용자 결정 — 확정된 친선은 플랫폼 주관이 아니어도 어드민이 고친다.
+  it('끝난 일반 친선에는 결과 정정 경로를 준다', () => {
+    renderWith({ ...OK, data: { ...DETAIL, league: null, status: 'completed' } });
+    expect(screen.getByRole('link', { name: '결과 정정' })).toHaveAttribute('href', '/admin/team-matches/tm-1/record');
+  });
+
+  it.each([
+    ['아직 안 끝난 친선', { league: null, status: 'matched' as const }],
+    ['리그 경기(결과 정정 레인이 따로 있다)', { status: 'completed' as const }],
+    ['경기 기록이 없는 친선', { league: null, status: 'completed' as const, hasGame: false }],
+  ])('%s 에는 결과 정정 경로가 없다', (_label, patch) => {
+    renderWith({ ...OK, data: { ...DETAIL, ...patch } });
+    expect(screen.queryByRole('link', { name: '결과 정정' })).not.toBeInTheDocument();
+  });
+
   it('불러오지 못하면 재시도 경로를 준다', () => {
     renderWith({ data: undefined, isPending: false, isError: true, error: new Error('boom'), refetch: vi.fn() });
     expect(screen.getByText('팀매치 정보를 불러오지 못했어요')).toBeInTheDocument();

@@ -243,3 +243,13 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - Actual persisted flow: `전반전 2:1` + `후반전 1:3` → aggregate `3:4`, then host submission and submitted-history readback.
 - Console errors `0`, failed API requests `0`, horizontal overflow `0`.
 - Screenshots and machine-readable report: [`docs/screenshots/team-match-shared-record-submatches/`](../screenshots/team-match-shared-record-submatches/).
+
+
+## Task 181 — 상대팀 미확정 보류
+
+- [ ] 확정 상대팀 없이 마감/시작 시각 경과하면 보류. 신청 대기팀이 있어도 동일.
+- [ ] 주최팀 관리자는 보류 일정 변경 후 재모집/취소 가능, 일반 팀원·비소속 사용자 mutation 불가.
+- [ ] 신청 이력 없을 때만 soft delete 및 연결 일정 취소. 신청 철회 이력도 보존.
+- [ ] matched/completed/cancelled 상태는 보류로 역전되지 않음.
+- [ ] 새로고침/내 팀매치/목록/상세 보류 표시 동일.
+- [ ] 390/768/1440 전체 route 및 console/network 확인.

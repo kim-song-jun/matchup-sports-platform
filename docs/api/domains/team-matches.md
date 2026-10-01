@@ -40,7 +40,15 @@
 - 득점 변경/복구/reopen은 기존 양 팀 확인을 초기화한다. 같은 팀의 중복 confirm은 409.
 - 두 팀의 서로 다른 라인업 참가자가 확인하면 같은 트랜잭션에서 Game 결과 DRAFT→SUBMITTED→OFFICIAL,
   result participants/goalEvents/decisions, TeamMatch 완료·팀 일정 cascade, `GAME_RESULT_OFFICIAL` outbox를 기록한다.
-- 확정 후 일반 편집은 409. 기존 관리자 정정으로 새로운 결과 revision이 생기면 기존 결과 화면을 사용한다.
+- 확정 후 참가자·팀장 편집은 409 `RECORD_NOT_EDITABLE`.
+- **확정 후 어드민 정정(2026-10-01 사용자 결정 "어드민은 언제든 수정")**: active 플랫폼 어드민(`owner`·`ops`)은
+  플랫폼 주관 여부와 무관하게 확정된 친선(`phase=official`)에서 같은 POST 로 add/edit/delete/undo·서브매치 조작을 할 수 있다
+  (GET 응답 `canEdit: true`, `operator: true`). 서버는 공동 기록을 갱신하고 **현재 공식 리비전을 덮어쓰지 않고**
+  `supersedesId` 로 잇는 새 리비전(DRAFT→OFFICIAL, CORRECTION flow, `reason="운영자 결과 정정"`)을 만들어 공식 포인터를 옮긴 뒤
+  `GAME_RESULT_OFFICIAL` outbox(`game:<id>:revision:<n>:correction_officialize`)로 전적·개인 기록·공개 캐시를 다시 투영한다.
+  양 팀 종료 확인·`officialAt` 은 그대로이고, 이력(`V1TeamMatchRecordChange`)과 `V1AdminActionLog`(`team_match.record_correction`,
+  전후 revisionId)가 남는다. 경기 완료 알림은 팀매치·수신자당 한 번이라 다시 나가지 않는다. confirm/reopen 은 여전히 403
+  `TEAM_CONFIRMATION_REQUIRED`, support·revoked 어드민은 403 이다. 대회·리그 경기는 `/games/:gameId/corrections` 레인을 쓴다.
 - 공동 기록이 생성된 경기에서 이전 host-only 결과/event/진행 command를 호출하면 `SHARED_RECORD_REQUIRED`.
 - 주요 오류: 403 RECORD_PARTICIPANT_REQUIRED; 404 TEAM_MATCH_NOT_FOUND;
   409 RECORD_NOT_EDITABLE/VERSION_CONFLICT/COMMAND_REUSED/ALREADY_CONFIRMED/GOAL_NOT_FOUND;
@@ -372,3 +380,18 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 - `add` / `edit`: 서브매치가 있으면 유효한 `subMatchId`가 필수다.
 
 서브매치 또는 득점 변경은 기존 종료 확인을 취소한다. 양 팀 라인업 참가자가 같은 버전을 확인하면 `score.home`, `score.away`, 선택적인 `score.subMatches[]`를 가진 공식 결과 revision 하나를 만든다. 팀 전적과 참가자 출전·득점은 팀매치 전체에서 한 번만 집계한다.
+
+
+## 2026-10-01 보류 및 주최팀 삭제 계약 (Task 181)
+
+- recruiting/closed에서 확정 상대팀이 없고 deadlineAt 또는 startAt이 지나면 status/displayState=`on_hold`. requested 신청은 확정 상대팀이 아니다. terminal/matched 상태는 이 계산으로 덮어쓰지 않는다.
+- 보류 중 관리자는 일정 변경 후 다시 모집 또는 취소 가능. 개인매치와 달리 상대팀 없는 팀매치를 그대로 진행하는 액션은 제공하지 않는다.
+- `GET /team-matches/:id`의 `lifecycle`은 `canEdit/canDelete/onHoldReason=NO_OPPONENT|null`을 제공한다. viewer.manageableHostTeam 및 서비스의 기존 owner/manager 권한 검증을 유지한다.
+- `PATCH /team-matches/:id`는 recruiting/closed + 상대팀 미확정에서 허용. 미래 일정 및 stale version 검증 후 recruiting으로 저장하고 연동 팀 일정을 동기화한다. 이미 matched인 매치는 계속 수정 제한.
+- `POST /team-matches/:id/cancel`은 보류에서도 허용. 신청 이력, 감사 로그, 확정 상대팀 알림 및 연결 팀 일정 취소를 유지한다.
+- 신규 `DELETE /team-matches/:id`: 인증 + 주최팀 기존 관리 권한. recruiting/closed/cancelled이고 확정 상대팀과 **모든 신청 이력**이 없을 때만 archived/deletedAt soft delete 및 감사 로그. 연결 팀 일정은 취소한다. 신청 이력이 있으면 409 STATE_CONFLICT로 취소를 안내한다.
+- 신청/승인/수정/취소/삭제는 team-match row lock 아래 상태를 재검사한다. 수정 stale version은 409 VERSION_CONFLICT.
+- `on_hold`는 표시 상태이며 목록 status query filter 추가는 없다. 기존 expired query 호환 계약은 유지. 별도 DB enum/backfill 불필요.
+
+- 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.
+- 취소·삭제 시 연결된 SCHEDULED Game도 CANCELLED로 전환하여 팀 일정/경기 상태가 어긋나지 않게 한다.

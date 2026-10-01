@@ -247,22 +247,31 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 진행 명령은 실시간 연결이 있을 때만 보낸다. 끊긴 동안엔 takeover 갱신이 서버에 닿지 않고
   // 다른 운영자의 기록도 받지 못한다 — 골·카드는 이 기기 큐에 모였다가 연결되면 나간다.
   const realtimeConnected = ops.connectionStatus === 'connected';
+  // 플랫폼 운영자(서버가 판정한 actorRole)는 끊긴 동안에도 진행 명령을 보낸다(2026-10-01 사용자 결정).
+  // 명령은 REST 라 소켓 없이 닿지만, 갱신 못 한 takeover 토큰이 만료되면 서버가 거절하므로 토큰은 여전히 필요하다.
+  const offlineCommandAllowed = gameDetail.data?.actorRole === 'platform_ops';
+  const commandPathOpen = realtimeConnected || offlineCommandAllowed;
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
   const commandBlocked = commandPending || pendingCommandRetry !== null;
-  const commandUnavailable = !canOperate || commandBlocked || !realtimeConnected;
+  const commandUnavailable = !canOperate || commandBlocked || !commandPathOpen;
   // 확인 창이 떠 있는 사이 연결이 끊기거나 takeover 가 다시 발급될 수 있다. 창을 연 렌더의 값은
   // 낡았으므로 명령은 보내는 순간의 연결·토큰으로 판단하고 그 토큰을 싣는다.
-  const commandGateRef = useRef<{ connected: boolean; token: string | null }>({ connected: false, token: null });
+  const commandGateRef = useRef<{ connected: boolean; pathOpen: boolean; token: string | null }>({
+    connected: false,
+    pathOpen: false,
+    token: null,
+  });
   useLayoutEffect(() => {
     commandGateRef.current = {
       connected: realtimeConnected,
+      pathOpen: commandPathOpen,
       token: takeoverEnabled && ops.takeover.status === 'held' ? ops.takeover.token : null,
     };
-  }, [realtimeConnected, takeoverEnabled, ops.takeover]);
+  }, [realtimeConnected, commandPathOpen, takeoverEnabled, ops.takeover]);
   // 몰수·중단 종료 다이얼로그. 사유 자유 텍스트를 받아야 해서 useConfirm(boolean)으로는 안 된다.
   const [abnormalEndOpen, setAbnormalEndOpen] = useState(false);
   // ⋯ 더보기 시트 — 조기 정상 종료·몰수/중단 종료가 여기 들어 있다.
@@ -787,12 +796,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       // 라벨이 뒤바뀐다.
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
       const gate = commandGateRef.current;
-      if (!gate.connected || gate.token === null) {
+      if (!gate.pathOpen || gate.token === null) {
         // 확인까지 누른 명령이 조용히 끝나면 운영자는 나간 줄 안다(G6-V6) — 보내지 않았다고 남긴다.
         setCommandError(
-          gate.connected
-            ? `운영 권한을 다시 확인하는 중이라 ‘${label}’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.`
-            : `실시간 연결이 끊겨 있어 ‘${label}’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.`,
+          !gate.pathOpen
+            ? `실시간 연결이 끊겨 있어 ‘${label}’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.`
+            : gate.connected
+              ? `운영 권한을 다시 확인하는 중이라 ‘${label}’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.`
+              : `연결이 끊긴 사이 운영 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`,
         );
         return false;
       }
@@ -834,7 +845,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             const refreshable =
               code === 'CLOCK_DRIFT' ||
               (code === 'TAKEOVER_TOKEN_EXPIRED' && current.token !== commandBody.takeoverToken);
-            if (replayBody === undefined || !refreshable || !current.connected || current.token === null || !ownsAttempt()) {
+            if (replayBody === undefined || !refreshable || !current.pathOpen || current.token === null || !ownsAttempt()) {
               throw error;
             }
             commandBody = {
@@ -1460,7 +1471,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         )}
         {takeoverEnabled && ops.connectionStatus === 'disconnected' && (
           <Banner tone="warning">
-            실시간 연결이 끊겨 다시 연결하는 중이에요. 연결될 때까지 재개·종료 같은 진행 버튼은 잠겨요.
+            {!offlineCommandAllowed
+              ? '실시간 연결이 끊겨 다시 연결하는 중이에요. 연결될 때까지 재개·종료 같은 진행 버튼은 잠겨요.'
+              : canOperate
+                ? '실시간 연결이 끊겨 다시 연결하는 중이에요. 진행 버튼은 그대로 쓸 수 있고, 보낸 명령은 서버 기준으로 반영돼요.'
+                : '연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'}
           </Banner>
         )}
         {/* [P1-d] 예전에는 "버튼이 비활성인 이유 + 제출하러 가는 링크"였다. 지금은 둘 다
@@ -1549,7 +1564,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {pendingCommandRetry && (
           <div className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-body-sm)] leading-relaxed text-[var(--red700)] sm:flex-row sm:items-center sm:gap-3">
             <span className="min-w-0 flex-1 break-keep">{pendingCommandRetry.label} 요청의 서버 응답을 받지 못했어요. 같은 요청을 다시 보낼 수 있어요.</span>
-            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" disabled={commandPending || !canOperate || !realtimeConnected} onClick={retryPendingCommand}>
+            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" disabled={commandPending || !canOperate || !commandPathOpen} onClick={retryPendingCommand}>
               같은 요청 재시도
             </Button>
           </div>

@@ -20,6 +20,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import { MatchLifecyclePanel } from './match-lifecycle-panel';
 import type { CursorListSeed } from '@/lib/public-list-seed';
 import { toDetailMode } from './matches.mode';
 import { MatchDetailPageSkeleton, MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
@@ -255,7 +256,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   // 둘 다 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const query = useV1Match(matchId, { seed });
-  const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
+  const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) && !query.isPlaceholderData && query.data?.viewer?.state !== 'guest' });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
   const applyMatch = useV1ApplyMatch(matchId);
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
@@ -314,7 +315,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       // API가 규칙을 안 주면 빈 배열 — 목업 규칙('풋살화 착용' 등)을 남의 매치에
       // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
       rules: query.data.rulesText ? [query.data.rulesText] : [],
-      editHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/edit`, selfHref) : undefined,
+      editHref: viewerState === 'host' && query.data.lifecycle?.canEdit !== false ? withFromPath(`/matches/${matchId}/edit`, selfHref) : undefined,
       applicationsHref: viewerState === 'host'
         ? withFromPath(`/matches/${matchId}/applications${query.data.canComplete ? '?tab=approved' : ''}`, selfHref)
         : undefined,
@@ -376,7 +377,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
 
   return (
     <>
-      <MatchDetailPageView model={model} />
+      <MatchDetailPageView model={model} lifecyclePanel={!seeding && query.data.lifecycle ? <MatchLifecyclePanel id={matchId} domain="matches" status={getStatus(query.data)} lifecycle={query.data.lifecycle} canManage={viewerState === 'host'} current={query.data.participantCount} capacity={query.data.capacity} /> : undefined} />
       <MatchApplyDialog
         open={applyDialogOpen}
         message={applyMessage}
@@ -572,6 +573,8 @@ function statusLabel(
   participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
   hostParticipates?: boolean,
 ) {
+  if (status === 'on_hold') return '보류';
+  if (status === 'scheduled') return '진행 확정';
   if (status === 'in_progress') return '진행중';
   if (status === 'completion_pending') return viewerState === 'host' ? '종료 확인 필요' : '종료 확인 중';
   if (status === 'completed' && participantStatus === 'no_show') return '불참 기록';

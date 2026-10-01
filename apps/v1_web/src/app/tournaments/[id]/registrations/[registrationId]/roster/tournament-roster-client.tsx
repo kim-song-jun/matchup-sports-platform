@@ -41,6 +41,8 @@ import type {
 import {
   getRosterDeadlineState,
   isTournamentRosterMutable,
+  ROSTER_BLOCK_BADGE_LABEL,
+  rosterEditBlockReason,
   tournamentRosterClosedMessage,
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
@@ -110,23 +112,7 @@ export function getRegistrationDeadlineState(
   return deadlineMs <= nowMs ? 'closed' : 'upcoming';
 }
 
-type RosterEditBlockReason = 'closed' | 'locked' | 'cancelled' | 'deadline' | null;
-
 const ROSTER_CANCELLED_MESSAGE = '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.';
-
-/** 명단 카드가 말하는 막힌 사유 하나 — 종료 > 잠금 > 취소 > 제출 마감. 안내 상자도 이 판정으로 중복을 가린다. */
-function rosterEditBlockReason(flags: {
-  isTournamentRosterClosed: boolean;
-  isRosterLocked: boolean;
-  isRosterEditBlockedByStatus: boolean;
-  isRosterDeadlineBlocked: boolean;
-}): RosterEditBlockReason {
-  if (flags.isTournamentRosterClosed) return 'closed';
-  if (flags.isRosterLocked) return 'locked';
-  if (flags.isRosterEditBlockedByStatus) return 'cancelled';
-  if (flags.isRosterDeadlineBlocked) return 'deadline';
-  return null;
-}
 
 export function TournamentRosterDeadlineCard({
   deadlineAt,
@@ -187,13 +173,9 @@ export function TournamentRosterDeadlineCard({
   const canEditRoster = canManageRoster && blockReason === null;
   const rosterEditBadge = !canManageRoster
     ? '팀장에게 요청'
-    : blockReason === 'closed' || blockReason === 'cancelled'
-      ? '수정 불가'
-      : blockReason === 'locked'
-        ? '명단 마감'
-        : blockReason === 'deadline'
-          ? '제출 마감'
-          : '수정 가능';
+    : blockReason === null
+      ? '수정 가능'
+      : ROSTER_BLOCK_BADGE_LABEL[blockReason];
   const rosterEditMessage = !canManageRoster
     ? '선수 명단은 확인할 수 있어요. 추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요.'
     : blockReason === 'closed'

@@ -77,3 +77,46 @@ export function getRosterDeadlineState(
   if (!isPast) return { blocked: false, overridden: false };
   return overrideAt ? { blocked: false, overridden: true } : { blocked: true, overridden: false };
 }
+
+/** 명단을 못 고치는 이유 하나. null 이면 막힌 데가 없다. */
+export type RosterEditBlockReason = 'closed' | 'locked' | 'cancelled' | 'deadline' | null;
+
+/** 막힌 사유 하나 — 종료 > 잠금 > 취소 > 제출 마감(서버 assertRosterMutable 과 같은 순서). */
+export function rosterEditBlockReason(flags: {
+  isTournamentRosterClosed: boolean;
+  isRosterLocked: boolean;
+  isRosterEditBlockedByStatus: boolean;
+  isRosterDeadlineBlocked: boolean;
+}): RosterEditBlockReason {
+  if (flags.isTournamentRosterClosed) return 'closed';
+  if (flags.isRosterLocked) return 'locked';
+  if (flags.isRosterEditBlockedByStatus) return 'cancelled';
+  if (flags.isRosterDeadlineBlocked) return 'deadline';
+  return null;
+}
+
+/** 명단 화면과 대회·리그 상세 "우리 팀 참가" 카드가 같은 배지를 단다. */
+export const ROSTER_BLOCK_BADGE_LABEL: Record<NonNullable<RosterEditBlockReason>, string> = {
+  closed: '수정 불가',
+  cancelled: '수정 불가',
+  locked: '명단 마감',
+  deadline: '제출 마감',
+};
+
+/**
+ * 신청 하나의 명단이 지금 막혔는지 — 명단 화면이 따로 세는 네 조건을 한 번에 본다.
+ * 팀장·매니저인지는 묻지 않는다(그건 보는 사람의 문제라 호출하는 화면이 따로 판정한다).
+ */
+export function registrationRosterBlockReason(
+  competition: NonNullable<Parameters<typeof isTournamentRosterMutable>[0]> & { rosterDeadlineAt: string | null },
+  registration: { status: string; rosterLockedAt: string | null; rosterDeadlineOverrideAt: string | null },
+  now: Date = new Date(),
+): RosterEditBlockReason {
+  return rosterEditBlockReason({
+    isTournamentRosterClosed: !isTournamentRosterMutable(competition),
+    isRosterLocked: Boolean(registration.rosterLockedAt),
+    isRosterEditBlockedByStatus: registration.status === 'cancel_requested' || registration.status === 'cancelled',
+    isRosterDeadlineBlocked: getRosterDeadlineState(competition.rosterDeadlineAt, registration.rosterDeadlineOverrideAt, now)
+      .blocked,
+  });
+}

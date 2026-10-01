@@ -41,7 +41,7 @@ import type {
   V1MyTeam,
 } from '@/types/api';
 import { getRosterDeadlineState, isTournamentRosterMutable } from '@/lib/roster-editability';
-import { teamRoleLabel } from '@/lib/v1-status-labels';
+import { teamRoleLabel, tournamentRegistrationStatusConfig as registrationStatusConfig } from '@/lib/v1-status-labels';
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
   if (!data) return [];
@@ -51,31 +51,6 @@ function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTe
 /* ── Status helpers ── */
 
 type StatusConfig = { badgeClass: string; label: string };
-
-function registrationStatusConfig(status: V1TournamentRegistrationStatus): StatusConfig {
-  switch (status) {
-    case 'draft':
-      return { badgeClass: 'tm-badge-grey', label: '임시저장' };
-    case 'submitted':
-      return { badgeClass: 'tm-badge-blue', label: '운영진 확인 중' };
-    case 'awaiting_payment':
-      return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
-    case 'payment_checking':
-      return { badgeClass: 'tm-badge-blue', label: '명단 확인 중' };
-    case 'paid':
-      return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
-    case 'confirmed':
-      return { badgeClass: 'tm-badge-green', label: '참가 확정' };
-    case 'waitlisted':
-      return { badgeClass: 'tm-badge-orange', label: '대기 중' };
-    case 'cancel_requested':
-      return { badgeClass: 'tm-badge-red', label: '취소 요청 중' };
-    case 'cancelled':
-      return { badgeClass: 'tm-badge-grey', label: '취소' };
-    default:
-      return { badgeClass: 'tm-badge-grey', label: status };
-  }
-}
 
 function paymentMethodLabel(method: V1TournamentPaymentMethod): string {
   return method === 'pg' ? '카드 · 간편결제' : '계좌이체';

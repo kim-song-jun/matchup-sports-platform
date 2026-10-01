@@ -35,6 +35,7 @@ import {
   matchPhaseChip,
 } from '@/lib/competition-status';
 import { StatusChip } from '@/components/v1-ui/status-chip';
+import { CompetitionEntrySection } from '@/components/tournaments/competition-entry-card';
 import type {
   V1LeagueChampionTeam,
   V1LeagueFixture,
@@ -534,8 +535,8 @@ function LeagueRegistrationCta({
   // **이미 신청한 사람에게 "참가 신청" 이라고 말하지 않는다.** 예전엔 조건 없이 `/apply`
   // 로 보냈는데, 신청이 있으면 그 화면이 `/my` 로 되돌린다 — 팀장은 "신청" 을 눌렀는데
   // 자기 신청 화면이 열려서 **눌린 건지 안 눌린 건지 알 수 없었다**(2026-09-05 alpha 실측).
-  // 대회 상세는 이미 같은 방식으로 갈라 두고 있어(`tournament-detail-client.tsx`) 그
-  // 판정 규칙을 그대로 쓴다 — 취소된 신청은 "없는 것" 으로 본다(다시 신청할 수 있다).
+  // 신청이 있으면 아래 "우리 팀 참가" 카드가 상태와 [신청 내역]을 말한다(R-1) — 여기선 비운다.
+  // 취소된 신청은 "없는 것" 으로 본다(다시 신청할 수 있다).
   // **비로그인에게 401 을 쏘지 않는다.** 이 순위표는 공개 화면이라 로그인하지 않은 사람도
   // 연다 — `registrationOpen` 만으로 켜면 그때마다 인증 요청이 나가 실패한다.
   // 대회 상세와 같은 방식으로, 저장된 세션 힌트를 `useEffect` 로 읽은 뒤에만 켠다
@@ -550,7 +551,7 @@ function LeagueRegistrationCta({
   const activeRegistration =
     (myRegistrations.data ?? []).find((registration) => registration.status !== 'cancelled') ?? null;
 
-  if (!registrationOpen) return null;
+  if (!registrationOpen || activeRegistration !== null) return null;
   const deadlineLabel = formatTournamentDateTimeShort(registrationDeadlineAt);
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -558,16 +559,8 @@ function LeagueRegistrationCta({
       {deadlineLabel !== null && (
         <span className="tm-text-caption text-[var(--text-muted)]">신청 마감 {deadlineLabel}</span>
       )}
-      <Link
-        href={
-          activeRegistration === null
-            ? `/tournaments/${leagueId}/apply`
-            : `/tournaments/${leagueId}/my?reg=${activeRegistration.id}`
-        }
-        className={`tm-btn tm-btn-sm ${activeRegistration === null ? 'tm-btn-primary' : 'tm-btn-outline'}`}
-        style={{ minHeight: 44 }}
-      >
-        {activeRegistration === null ? '참가 신청' : '내 신청'}
+      <Link href={`/tournaments/${leagueId}/apply`} className="tm-btn tm-btn-sm tm-btn-primary" style={{ minHeight: 44 }}>
+        참가 신청
       </Link>
     </div>
   );
@@ -771,6 +764,7 @@ export default function LeagueMatchStandingsClient({
             : `이번 시즌 승강 규칙 · 상위 ${standings.promotionForecast.promoteSlots}팀 승격 / 하위 ${standings.promotionForecast.relegateSlots}팀 강등 (지금 순위 기준 예상이에요)`}
         </p>
       )}
+      <CompetitionEntrySection competitionId={leagueId} style={{ marginTop: 16 }} />
 
       <section className="mt-6">
         <div className="mb-2 flex flex-wrap items-center gap-2">

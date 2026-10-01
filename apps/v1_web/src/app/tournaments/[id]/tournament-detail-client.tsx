@@ -37,6 +37,7 @@ import {
   TournamentVenuePrepSection,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { CompetitionEntrySection } from '@/components/tournaments/competition-entry-card';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
@@ -579,6 +580,9 @@ export function TournamentDetailPageClient({
         tournament={data}
         myRegistration={myRegistration}
         backHref="/tournaments"
+        entrySection={
+          <CompetitionEntrySection competitionId={tournamentId} competition={data} headingLevel={2} style={{ marginBottom: 16 }} />
+        }
       />
     </DetailChainFromContext.Provider>
   );
@@ -593,10 +597,13 @@ export function TournamentDetailView({
   tournament,
   myRegistration,
   backHref = '/tournaments',
+  entrySection = null,
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
   backHref?: string;
+  /** 제목 바로 아래 "우리 팀 참가" 카드 — 데이터 훅을 쓰므로 바깥(PageClient)에서 만들어 넘긴다. */
+  entrySection?: ReactNode;
 }) {
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
@@ -837,6 +844,7 @@ export function TournamentDetailView({
       {/* ── Section 1: Header ── */}
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
+        {entrySection}
 
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
@@ -981,6 +989,7 @@ export function TournamentDetailView({
     <>
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
+        {entrySection}
       </section>
 
       <CompletedResultHero tournament={tournament} />

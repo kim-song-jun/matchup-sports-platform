@@ -12,6 +12,7 @@ import {
   useV1MyTeams,
   useV1RecordConsent,
   useV1MyRegistrations,
+  useV1Tournament,
 } from '@/hooks/use-v1-api';
 import { clearStoredV1Session, saveStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { queryImageBySrc } from '@/test/next-image';
@@ -48,6 +49,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 두 카드 어느 쪽도 만나지 않는다.
   useV1MyTeams: vi.fn(() => ({ data: undefined })),
   useV1RecordConsent: vi.fn(() => ({ data: undefined })),
+  // "우리 팀 참가" 카드(R-1) — 신청이 있을 때만 리그의 대회 상세(명단 마감)를 받는다.
+  useV1Tournament: vi.fn(() => ({ data: undefined })),
+  useV1TeamUpcomingGames: vi.fn(() => ({ data: undefined })),
   // 이 화면은 **비로그인도 열리는 공개 순위표**라 여기서 호출하면 안 되는 무거운 조회.
   // 아래 "공개 화면에서 무거운 조회를 붙이지 않는다" 테스트가 이 mock 이 한 번도 불리지
   // 않는지 검사한다.
@@ -59,6 +63,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1MyRegistrationsMock = vi.mocked(useV1MyRegistrations);
+const useV1TournamentMock = vi.mocked(useV1Tournament, { partial: true });
 const useV1LeagueMatchMock = vi.mocked(useV1LeagueMatch, { partial: true });
 const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { partial: true });
 const useV1LeagueMatchPlayerRecordsMock = vi.mocked(useV1LeagueMatchPlayerRecords, { partial: true });
@@ -1725,13 +1730,23 @@ describe('리그 참가 신청 입구', () => {
     );
   });
 
-  it('이미 신청한 팀장에게는 "내 신청" 으로 보낸다 — 결함 #22-a', async () => {
+  it('이미 신청했으면 신청 버튼 대신 "우리 팀 참가" 카드가 명단으로 보낸다 — 결함 #22-a · R-1', async () => {
     saveStoredV1Session({ userId: 'captain' });
     // 예전엔 조건 없이 `/apply` 로 보냈다. 신청이 있으면 그 화면이 `/my` 로 되돌리므로,
     // 팀장은 "참가 신청" 을 눌렀는데 자기 신청 화면이 열려 **눌린 건지 안 눌린 건지
-    // 알 수 없었다**(2026-09-05 alpha 실측).
+    // 알 수 없었다**(2026-09-05 alpha 실측). 이제 신청 상태와 명단 입구는 카드가 말한다.
     useV1MyRegistrationsMock.mockReturnValue({
-      data: [{ id: 'reg-9', status: 'confirmed' }],
+      data: [{
+        id: 'reg-9', teamId: 'team-a', teamName: '마포 FC', status: 'confirmed',
+        rosterLockedAt: null, rosterDeadlineOverrideAt: null, playerCount: 10,
+      }],
+    } as never);
+    useV1MyTeamsMock.mockReturnValue({
+      data: { items: [{ teamId: 'team-a', role: 'owner', name: '마포 FC', logoUrl: null }] },
+      isPending: false,
+    } as never);
+    useV1TournamentMock.mockReturnValue({
+      data: { id: 'league-1', status: 'in_progress', kind: 'regular_league', rosterDeadlineAt: null, scheduledEndAt: null },
     } as never);
     mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
     const { container } = render(
@@ -1739,9 +1754,10 @@ describe('리그 참가 신청 입구', () => {
         <LeagueMatchStandingsClient leagueId="league-1" />
       </Providers>,
     );
-    await waitFor(() => expect(screen.getByText('내 신청')).toBeInTheDocument());
-    expect(container.querySelector('a[href="/tournaments/league-1/my?reg=reg-9"]')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('heading', { name: '우리 팀 참가' })).toBeInTheDocument());
+    expect(container.querySelector('a[href="/tournaments/league-1/registrations/reg-9/roster"]')).toBeInTheDocument();
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).not.toBeInTheDocument();
+    expect(screen.queryByText('모집 중')).not.toBeInTheDocument();
   });
 
   it('취소한 신청은 없는 것으로 본다 — 다시 신청할 수 있어야 한다', async () => {

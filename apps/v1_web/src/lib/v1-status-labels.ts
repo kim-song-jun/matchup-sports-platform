@@ -7,7 +7,7 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
-import type { V1InquiryReportReason } from '@/types/api';
+import type { V1InquiryReportReason, V1TournamentRegistrationStatus } from '@/types/api';
 
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
@@ -388,4 +388,34 @@ export const GENDER_RULE_OPTIONS = ['성별 무관', '남', '여'] as const;
 /** 정본이 아닌 값(옛 저장값·내부 코드)은 원문 대신 빈 문자열 — 호출부가 "미정"·배지 생략으로 처리한다. */
 export function genderRuleLabel(value: string | null | undefined): string {
   return (GENDER_RULE_OPTIONS as readonly string[]).includes(value ?? '') ? (value as string) : '';
+}
+
+/** 대회·리그 참가 신청 상태 배지 — 내 신청 화면과 대회·리그 상세 "우리 팀 참가" 카드가 같은 색·말을 쓴다. */
+export function tournamentRegistrationStatusConfig(status: V1TournamentRegistrationStatus): {
+  badgeClass: string;
+  label: string;
+} {
+  switch (status) {
+    case 'draft':
+      return { badgeClass: 'tm-badge-grey', label: '임시저장' };
+    case 'submitted':
+      return { badgeClass: 'tm-badge-blue', label: '운영진 확인 중' };
+    case 'awaiting_payment':
+      return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
+    case 'payment_checking':
+      return { badgeClass: 'tm-badge-blue', label: '명단 확인 중' };
+    case 'paid':
+      return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
+    case 'confirmed':
+      return { badgeClass: 'tm-badge-green', label: '참가 확정' };
+    case 'waitlisted':
+      return { badgeClass: 'tm-badge-orange', label: '대기 중' };
+    case 'cancel_requested':
+      return { badgeClass: 'tm-badge-red', label: '취소 요청 중' };
+    case 'cancelled':
+      return { badgeClass: 'tm-badge-grey', label: '취소' };
+    default:
+      // 모르는 값은 영문 코드 대신 한글로(이 모듈 머리 주석).
+      return { badgeClass: 'tm-badge-grey', label: '상태 확인 중' };
+  }
 }

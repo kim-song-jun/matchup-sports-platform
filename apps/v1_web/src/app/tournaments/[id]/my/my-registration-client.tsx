@@ -35,6 +35,7 @@ import {
   type TournamentRegistrationBlockReason,
 } from '@/lib/tournament-registration-availability';
 import type {
+  V1CompetitionKind,
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
   V1TournamentPaymentMethod,
@@ -237,7 +238,6 @@ function RegistrationPass({
    */
   rosterEditable,
   minPlayers,
-  isRosterLocked,
   belowMinimum,
 }: {
   tournamentId: string;
@@ -253,7 +253,6 @@ function RegistrationPass({
   rosterCount: number;
   rosterEditable: boolean;
   minPlayers: number;
-  isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
   // 명단에서 돌아올 때 이 화면(받은 출처 포함)으로 오도록 출처를 싣는다.
@@ -394,8 +393,8 @@ function RegistrationPass({
           {/*
             감사 finding #51: 잠기면 이 링크가 통째로 사라져, 팀장이 대회 당일 자기 팀 확정
             명단을 앱에서 확인할 방법이 없었다(명단 페이지 자체는 잠금 상태에서도 읽기 전용으로
-            잘 그린다 — tournament-roster-client.tsx 참조). 잠겼을 땐 라벨만 '명단 확인'으로
-            바꿔 읽기 전용으로라도 계속 연결한다.
+            잘 그린다 — tournament-roster-client.tsx 참조). 못 고칠 땐(잠금·마감·종료) 글자를
+            '명단 확인'으로 바꿔 읽기 전용으로라도 계속 연결한다.
           */}
           <Link
             href={rosterHref}
@@ -413,7 +412,7 @@ function RegistrationPass({
               minHeight: 44, paddingLeft: 8,
             }}
           >
-            {isRosterLocked ? '명단 확인' : belowMinimum ? '선수 등록' : '선수 수정'}
+            {!rosterEditable ? '명단 확인' : belowMinimum ? '선수 등록' : '선수 수정'}
             <ChevronRight size={16} />
           </Link>
         </div>
@@ -621,6 +620,8 @@ function RegistrationDetailView({
     venue: string | null;
     /** 명단 편집 가능 여부 판정에 쓴다 — 대회가 끝났으면 누구도 못 고친다. */
     status: string;
+    /** 같은 판정에 쓴다 — 정규 리그는 초안에서도 명단을 고칠 수 있다. */
+    kind: V1CompetitionKind | null;
     /** 같은 판정의 나머지 절반. 마감이 지나면 어드민 예외 없이는 못 고친다. */
     rosterDeadlineAt: string | null;
   };
@@ -894,7 +895,6 @@ function RegistrationDetailView({
               paymentSummary={paymentSummary}
               rosterCount={players.length}
               minPlayers={tournament.minPlayers}
-              isRosterLocked={isRosterLocked}
               belowMinimum={belowMinimum}
             />
 
@@ -1532,6 +1532,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           scheduledEndAt: tournament.scheduledEndAt,
           venue: tournament.venue,
           status: tournament.status,
+          kind: tournament.kind,
           rosterDeadlineAt: tournament.rosterDeadlineAt,
         }}
         registration={selectedRegistration}

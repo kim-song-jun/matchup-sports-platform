@@ -1,4 +1,5 @@
 import type { V1GameState } from '@prisma/client';
+import { compareRosterOrder } from '../../common/roster-order';
 import type { GameActorRole } from '../games.types';
 import type { GameRosterActorRole, GameRosterBaseEntry, GameRosterComputation } from './game-roster-computation';
 import type { GameRosterBaseSource } from './game-roster-loader';
@@ -94,6 +95,14 @@ export interface GameRosterView {
   readonly legacyLineupPending: boolean;
 }
 
+/** 경기 기록이 쓰는 명단 행(사이드의 제출본, 없으면 최신 리비전) — `selectLineupParticipantsWithDraftFallback` 결과. */
+export interface PlayedLineupRow {
+  readonly id: string;
+  readonly userId: string | null;
+  readonly displayNameSnapshot: string;
+  readonly jerseyNumber: number | null;
+}
+
 function person(entry: GameRosterBaseEntry): GameRosterPersonView {
   return {
     userId: entry.userId,
@@ -126,6 +135,42 @@ export interface GameRosterViewInput {
   readonly legacyLineupPending: boolean;
   readonly displayNameByUserId: ReadonlyMap<string, string>;
   readonly jerseyRegistrationId: string | null;
+  /**
+   * 시작된 경기의 실제 명단. null 이면(시작 전) 참가 명단에서 계산한 출전자를 보여 준다.
+   * 동기화는 시작 뒤 멈추므로, 시작 뒤 참가 명단을 다시 계산해 보여 주면 기록과 다른 사람이 "출전"으로 보인다.
+   */
+  readonly playedLineup: readonly PlayedLineupRow[] | null;
+}
+
+const byRosterOrder = (a: GameRosterPersonView, b: GameRosterPersonView) =>
+  compareRosterOrder(
+    { jerseyNumber: a.jerseyNumber, name: a.displayName, id: a.userId },
+    { jerseyNumber: b.jerseyNumber, name: b.displayName, id: b.userId },
+  );
+
+/**
+ * 기록 명단 행을 참가 명단과 잇는다. 계정 없이 들어간 리그 폴백 팀원은 이름으로 잇고, 참가 명단에서 사라진 사람
+ * (시작 뒤 탈퇴·삭제)은 경기 참가자 행 id 를 키로 남긴다 — 기록에 있는 사람을 화면에서 지우지 않는다.
+ */
+function playedPeople(rows: readonly PlayedLineupRow[], base: readonly GameRosterBaseEntry[]): GameRosterPersonView[] {
+  const remaining = [...base];
+  return rows
+    .map((row) => {
+      const index = remaining.findIndex((entry) =>
+        row.userId !== null
+          ? entry.accountLinked && entry.userId === row.userId
+          : !entry.accountLinked && entry.displayNameSnapshot === row.displayNameSnapshot,
+      );
+      const entry = index < 0 ? null : remaining.splice(index, 1)[0];
+      return {
+        userId: entry?.userId ?? row.userId ?? `game-participant:${row.id}`,
+        displayName: row.displayNameSnapshot,
+        jerseyNumber: row.jerseyNumber,
+        accountLinked: row.userId !== null,
+        participantId: entry === null ? null : person(entry).participantId,
+      };
+    })
+    .sort(byRosterOrder);
 }
 
 export function buildGameRosterView(input: GameRosterViewInput): GameRosterView {
@@ -135,10 +180,31 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     displayName: input.displayNameByUserId.get(userId) ?? '알 수 없음',
     role,
   });
+  const played = input.playedLineup === null ? null : playedPeople(input.playedLineup, input.base);
+  const playedIds = new Set(played?.map((row) => row.userId) ?? []);
+  // 시작된 경기에서 기록에 있는 사람은 그 뒤 생긴 결장·정지로 "빠짐"이 되지 않는다.
+  const notPlayed = <T extends { entry: GameRosterBaseEntry }>(rows: readonly T[]): readonly T[] =>
+    played === null ? rows : rows.filter((row) => !playedIds.has(row.entry.userId));
+  const excluded = notPlayed(computation.excluded);
+  const unavailable = notPlayed(computation.unavailable);
+  const suspended = notPlayed(computation.suspended);
   const statusByUser = new Map<string, GameRosterView['base'][number]['status']>();
-  for (const row of computation.suspended) statusByUser.set(row.entry.userId, 'SUSPENDED');
-  for (const row of computation.unavailable) statusByUser.set(row.entry.userId, 'UNAVAILABLE');
-  for (const row of computation.excluded) statusByUser.set(row.entry.userId, 'EXCLUDED');
+  for (const row of suspended) statusByUser.set(row.entry.userId, 'SUSPENDED');
+  for (const row of unavailable) statusByUser.set(row.entry.userId, 'UNAVAILABLE');
+  for (const row of excluded) statusByUser.set(row.entry.userId, 'EXCLUDED');
+
+  const participants = played ?? computation.participants.map(person);
+  // 시작 뒤 기준 명단 = 기록 명단 + 사유가 있어 빠진 사람. 시작 뒤 참가 명단에 들어온 사람은 이 경기와 무관하다.
+  const base: GameRosterView['base'] =
+    played === null
+      ? input.base.map((entry) => ({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING' }))
+      : [
+          ...played.map((row) => ({ ...row, status: 'PARTICIPATING' as const })),
+          ...input.base.flatMap((entry) => {
+            const status = statusByUser.get(entry.userId);
+            return status === undefined ? [] : [{ ...person(entry), status }];
+          }),
+        ].sort(byRosterOrder);
 
   const snapshot = input.fixtureSnapshotUserIds;
   return {
@@ -154,24 +220,24 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     viewerRole: input.access.viewerRole,
     baseSource: input.baseSource,
     jerseyRegistrationId: input.jerseyRegistrationId,
-    base: input.base.map((entry) => ({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING' })),
-    participants: computation.participants.map((entry) => ({
-      ...person(entry),
-      joinedAfterFixtureCreated: snapshot !== null && entry.accountLinked && !snapshot.has(entry.userId),
+    base,
+    participants: participants.map((row) => ({
+      ...row,
+      joinedAfterFixtureCreated: snapshot !== null && row.accountLinked && !snapshot.has(row.userId),
     })),
-    excluded: computation.excluded.map((row) => ({
+    excluded: excluded.map((row) => ({
       ...person(row.entry),
       adjustmentId: row.adjustmentId,
       reason: row.reason,
       excludedAt: row.createdAt,
       actor: actor(row.actorUserId, row.actorRole),
     })),
-    suspended: computation.suspended.map((row) => ({
+    suspended: suspended.map((row) => ({
       ...person(row.entry),
       reason: row.reason,
       remainingMatches: row.remainingMatches,
     })),
-    unavailable: computation.unavailable.map((row) => ({
+    unavailable: unavailable.map((row) => ({
       ...person(row.entry),
       unavailabilityId: row.unavailabilityId,
       reason: row.reason,
@@ -180,11 +246,11 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
       actor: actor(row.actorUserId, row.actorRole),
     })),
     counts: {
-      base: input.base.length,
-      participating: computation.participants.length,
-      excluded: computation.excluded.length,
-      unavailable: computation.unavailable.length,
-      suspended: computation.suspended.length,
+      base: base.length,
+      participating: participants.length,
+      excluded: excluded.length,
+      unavailable: unavailable.length,
+      suspended: suspended.length,
     },
     legacyLineupPending: input.legacyLineupPending,
   };

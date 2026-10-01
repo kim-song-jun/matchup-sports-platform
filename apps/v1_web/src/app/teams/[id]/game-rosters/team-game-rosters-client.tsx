@@ -78,7 +78,8 @@ export function TeamGameRostersClient({ teamId }: { teamId: string }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
-        padding: `16px var(--v1-shell-page-x) ${dirty || data.games.some((g) => g.editable) ? 112 : 16}px`,
+        // 아래 고정 저장 바(.tm-fixed-cta)는 안전영역만큼 커진다 — 여백도 같이 늘린다.
+        padding: `16px var(--v1-shell-page-x) ${dirty || data.games.some((g) => g.editable) ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
       }}
     >
       <p className="tm-text-caption" style={{ margin: 0 }}>

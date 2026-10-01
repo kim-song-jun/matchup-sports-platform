@@ -1,3 +1,5 @@
+import type { V1CompetitionKind } from '@/types/api';
+
 /**
  * 명단을 **지금 고칠 수 있는가** 를 판정하는 규칙.
  *
@@ -19,9 +21,12 @@
  */
 const ROSTER_MUTABLE_TOURNAMENT_STATUSES = new Set(['open', 'closed', 'in_progress']);
 
-/** 대회가 아직 로딩 중이면(undefined) 막지 않는다 — 기존 낙관적 렌더링과 동일. */
+/**
+ * 대회가 아직 로딩 중이면(undefined) 막지 않는다 — 기존 낙관적 렌더링과 동일.
+ * `kind` 는 값이 null 이어도 **키를 반드시 넘긴다** — 빠지면 초안 리그가 조용히 "수정 불가" 가 된다.
+ */
 export function isTournamentRosterMutable(
-  tournament: { status?: string | null; kind?: string | null } | null | undefined,
+  tournament: { status?: string | null; kind: V1CompetitionKind | null } | null | undefined,
 ): boolean {
   if (!tournament?.status) return true;
   if (ROSTER_MUTABLE_TOURNAMENT_STATUSES.has(tournament.status)) return true;

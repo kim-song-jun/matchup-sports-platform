@@ -220,6 +220,15 @@ export function TournamentInfoSection() {
       showToast('대회 종료가 시작보다 빠를 수 없어요.', 'error');
       return;
     }
+    // 서버(ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE)와 같은 규칙·같은 범위 — 두 마감 중 하나를
+    // 바꿀 때만 본다(순서가 어긋난 채 만들어진 대회의 다른 필드 수정은 막지 않는다).
+    const deadlineTouched =
+      editDeadlineAt !== isoToDatetimeLocalValue(tournament.registrationDeadlineAt) ||
+      editRosterDeadlineAt !== isoToDatetimeLocalValue(tournament.rosterDeadlineAt);
+    if (deadlineTouched && editDeadlineAt && editRosterDeadlineAt && editRosterDeadlineAt < editDeadlineAt) {
+      showToast('명단 제출 마감은 신청 마감과 같거나 그 뒤여야 해요.', 'error');
+      return;
+    }
     const teamCount = Number(editTeamCount);
     const minPlayers = Number(editMinPlayers);
     const maxPlayers = Number(editMaxPlayers);

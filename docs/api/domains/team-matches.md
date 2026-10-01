@@ -49,6 +49,8 @@
   양 팀 종료 확인·`officialAt` 은 그대로이고, 이력(`V1TeamMatchRecordChange`)과 `V1AdminActionLog`(`team_match.record_correction`,
   전후 revisionId)가 남는다. 경기 완료 알림은 팀매치·수신자당 한 번이라 다시 나가지 않는다. confirm/reopen 은 여전히 403
   `TEAM_CONFIRMATION_REQUIRED`, support·revoked 어드민은 403 이다. 대회·리그 경기는 `/games/:gameId/corrections` 레인을 쓴다.
+  GET/POST 응답의 `officialCorrected: boolean` 은 `phase=official` 이고 현재 공식 리비전이 정정 리비전(`supersedesId` 있음)일 때만
+  `true` 다(관전자 응답 포함). 화면은 이 값으로 점수판 머리말을 "운영팀이 정정한 최종 결과"로 바꾼다.
 - 공동 기록이 생성된 경기에서 이전 host-only 결과/event/진행 command를 호출하면 `SHARED_RECORD_REQUIRED`.
 - 주요 오류: 403 RECORD_PARTICIPANT_REQUIRED; 404 TEAM_MATCH_NOT_FOUND;
   409 RECORD_NOT_EDITABLE/VERSION_CONFLICT/COMMAND_REUSED/ALREADY_CONFIRMED/GOAL_NOT_FOUND;

@@ -171,8 +171,8 @@ export function ConfirmModal({
 
   const isDanger = tone === 'danger';
 
-  // body 로 올린다 — 페이지는 template.tsx 의 view-transition-name 래퍼(스태킹 컨텍스트) 안이라,
-  // 거기서는 z-index 를 얼마로 줘도 셸 네비(데스크톱 nav·모바일 상단바) 아래에 깔린다.
+  // body 로 올린다 — 페이지 전환이 도는 동안 template.tsx 래퍼는 view-transition-name 때문에
+  // 스태킹 컨텍스트가 되고, 그 안에서는 z-index 를 얼마로 줘도 셸 네비 아래에 깔린다.
   return createPortal(
     /* Backdrop */
     <div

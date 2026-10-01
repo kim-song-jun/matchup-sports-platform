@@ -268,6 +268,8 @@ export class TeamMatchRecordService {
       confirmations: privateView ? ((record?.confirmations ?? []) as Confirmation[]).map((c) => ({ sideId: c.sideId, name: c.name, at: c.at })) : [],
       history: changes.map((c) => ({ id: c.id, version: c.version, action: c.action, actorName: c.actorName, goalId: c.goalId, subMatchId: c.subMatchId, before: c.before, after: c.after, at: c.createdAt })),
       officialAt: record?.officialAt ?? null,
+      // 지금 공식 결과가 운영자 정정 리비전인지 — official 이면 최신 리비전이 곧 현재 공식이다(phase()).
+      officialCorrected: phase === 'official' && !!game.resultRevisions[0]?.supersedesId,
     };
   }
 

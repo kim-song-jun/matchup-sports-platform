@@ -224,6 +224,32 @@ describe('push/pop 콘텐츠 이중 페이드 억제(D2안 B, 그룹2/F2) — VT
   });
 });
 
+describe('페이지 전환 래퍼(.tm-page-transition-enter)는 상시 스태킹 컨텍스트를 만들지 않는다 (W5 오버레이 가림)', () => {
+  // 래퍼가 스태킹 컨텍스트면 그 안의 fixed 시트·모달은 z-index 와 무관하게 상단바·탭바·FAB·데스크톱
+  // 내비 아래에 깔린다. jsdom 은 스태킹을 못 재므로 원인이 되는 두 선언의 형태를 고정한다.
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const wrapperRules = [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(([, selector, body]) => ({ selector: selector.trim(), body }))
+    .filter((rule) => rule.selector.includes('.tm-page-transition-enter'));
+
+  it('view-transition-name 은 전환 중 표시(:root[data-page-transition="active"]) 아래에서만 붙는다', () => {
+    const naming = wrapperRules.filter((rule) => /view-transition-name\s*:/.test(rule.body));
+
+    expect(naming.length).toBeGreaterThan(0);
+    for (const rule of naming) {
+      expect(rule.selector).toMatch(/^:root\[data-page-transition=["']active["']\]\s+\.tm-page-transition-enter$/);
+      expect(rule.body).toMatch(/view-transition-name:\s*page-content/);
+    }
+  });
+
+  it('CSS 폴백 진입 애니메이션은 끝난 뒤 값을 붙잡지 않는다(fill both·forwards 금지)', () => {
+    const animated = wrapperRules.filter((rule) => /animation\s*:/.test(rule.body) && !/animation\s*:\s*none/.test(rule.body));
+
+    expect(animated.length).toBeGreaterThan(0);
+    for (const rule of animated) expect(rule.body).not.toMatch(/\b(both|forwards)\b/);
+  });
+});
+
 describe('선수 카드 무한 루프 가시성 게이트 (pcard-infinite-loop-no-visibility-gate)', () => {
   it('data-loop-paused="true" 규칙이 스윕·크레스트·프레임 발광·오로라 네 요소를 전부 잡는다', () => {
     // use-loop-pause.ts 가 세팅하는 속성을 globals.css 가 실제로 소비하는지 —
@@ -797,5 +823,27 @@ describe('icon button hit targets', () => {
 
     expect(dot).toBeDefined();
     expect(dot).toMatch(/width:\s*5px/);
+  });
+});
+
+describe('필터 시트의 [닫기][적용하기] 줄은 시트 바닥 고정 영역이다 (W5-V1)', () => {
+  // 시트는 max-height 안에서 스스로 스크롤한다. 버튼 줄이 스크롤 내용의 끝에 그냥 놓이면 옵션이 많은
+  // 시트(390×844 개인 매치 필터)에서 버튼 아래가 접힌다. 줄은 시트의 직계 자식으로 바닥에 붙는다.
+  const rulesOnly = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const ruleOf = (selector: string) =>
+    [...rulesOnly.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, sel]) => sel.trim() === selector)?.[2];
+
+  it('버튼 줄은 시트 바닥에 sticky 로 붙고, 시트 padding-bottom 만큼 바닥까지 덮는다', () => {
+    const sheet = ruleOf('.tm-filter-sheet');
+    const actions = ruleOf('.tm-filter-sheet > .tm-filter-actions');
+
+    expect(sheet).toMatch(/--tm-filter-sheet-pad-bottom:\s*calc\(20px \+ var\(--v1-shell-safe-bottom\)\)/);
+    expect(sheet).toMatch(/padding:\s*12px var\(--v1-shell-page-x\) var\(--tm-filter-sheet-pad-bottom\)/);
+    expect(actions).toMatch(/position:\s*sticky/);
+    // sticky 기준선은 스크롤 컨테이너의 padding 안쪽이다 — bottom:0 이면 줄 아래 padding 띠로 옵션이 비친다(alpha 실측).
+    expect(actions).toMatch(/bottom:\s*calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
+    expect(actions).toMatch(/margin:\s*8px 0 calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
+    expect(actions).toMatch(/padding:\s*12px 0 var\(--tm-filter-sheet-pad-bottom\)/);
+    expect(actions).toMatch(/background:\s*var\(--bg\)/);
   });
 });

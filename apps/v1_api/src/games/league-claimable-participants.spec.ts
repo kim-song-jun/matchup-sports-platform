@@ -150,6 +150,8 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       gameId: 'game-1',
       // requestIdentityLink 의 expectedVersion 으로 그대로 되돌아가는 값이다.
       version: 4,
+      // 연결된 p-2 도 명단 인원에는 든다 — 후보 0명일 때 "모두 연결됨"과 "명단 없음"을 가르는 값.
+      rosterCount: 2,
       participants: [
         { participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '김민준', jerseyNumber: 7 },
       ],
@@ -180,6 +182,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     ).resolves.toEqual({
       gameId: 'game-1',
       version: 6,
+      rosterCount: 1,
       // 폐기된 revision 1의 'p-stale'은 나오지 않는다 — 골랐다면 공식 결과가 절대
       // 매칭되지 않는 participantId였다.
       participants: [
@@ -246,15 +249,27 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       teamMatch: { game: { id: 'game-1', version: 9 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
       lineups: [{ id: 'lineup-1', sideId: 's-missing', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
-      participants: [{ id: 'p-linked', sideId: 's-missing-linked', lineupId: 'lineup-1', displayNameSnapshot: '연결됨', jerseyNumber: null }],
+      participants: [{ id: 'p-linked', sideId: 's-missing', lineupId: 'lineup-1', displayNameSnapshot: '연결됨', jerseyNumber: null }],
       linked: [{ participantId: 'p-linked' }],
       sides: [],
     });
 
     await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
-      gameId: 'game-1', version: 9, participants: [],
+      gameId: 'game-1', version: 9, rosterCount: 1, participants: [],
     });
     expect(prisma.v1GameSide.findMany).not.toHaveBeenCalled();
+  });
+
+  it('대조군 — 아직 어느 팀도 명단을 올리지 않았으면 rosterCount 0 으로 빈 목록을 돌려준다(W5-V3)', async () => {
+    const { service, prisma } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 2 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
+      gameId: 'game-1', version: 2, rosterCount: 0, participants: [],
+    });
+    expect(prisma.v1ParticipantIdentityLinkCurrent.findMany).not.toHaveBeenCalled();
   });
 
   it('참가자 side가 없으면 조용히 라벨을 추측하지 않고 무결성 충돌을 반환한다', async () => {

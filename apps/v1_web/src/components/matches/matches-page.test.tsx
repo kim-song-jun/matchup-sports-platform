@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MatchCreatePageView, MatchDetailPageView, MatchListPageView } from './matches-page';
 import { getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
@@ -764,5 +764,31 @@ describe('개인 매치 참여 기능', () => {
     expect(screen.queryByRole('link', { name: '매치 수정' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: '참여 여부 확인' })).toHaveLength(2);
     expect(screen.getAllByText('종료 확인이 필요해요')).toHaveLength(2);
+  });
+});
+
+// W5-V1 — 바닥 고정 규칙(.tm-filter-sheet > .tm-filter-actions)은 버튼 줄이 스크롤하는 시트의 직계 자식일 때만 걸린다.
+describe('MatchListPageView — 필터 시트 버튼 줄', () => {
+  it('[닫기][적용하기] 줄은 스크롤하는 시트(dialog)의 직계 자식이다', () => {
+    const option = (label: string, value: string) => ({ label, value, href: `/matches?x=${value}` });
+    const model = {
+      ...getMatchListViewModel(),
+      filterSheet: {
+        open: true, closeHref: '/matches', resetHref: '/matches?reset=1', applyHref: '/matches?apply=1',
+        sort: '' as const, view: 'card' as const, genderRule: '' as const, levels: [], regionId: '',
+        sortOptions: [{ ...option('추천순', 'recommended'), value: 'recommended' as const, active: true }],
+        genderOptions: [{ ...option('성별 무관', '성별 무관'), value: '성별 무관' as const }],
+        levelOptions: [{ ...option('초급', 'beginner'), value: 'beginner' as const }],
+        regionOptions: [option('전체', '')],
+      },
+    };
+    render(<MatchListPageView model={model} />);
+
+    const dialog = screen.getByRole('dialog', { name: '매치 필터' });
+    const actions = within(dialog).getByRole('link', { name: '적용하기' }).parentElement;
+    expect(dialog).toHaveClass('tm-filter-sheet');
+    expect(actions).toHaveClass('tm-filter-actions');
+    expect(actions?.parentElement).toBe(dialog);
+    expect(within(actions!).getByRole('link', { name: '닫기' })).toBeInTheDocument();
   });
 });

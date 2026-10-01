@@ -1938,6 +1938,8 @@ export function useV1SaveTeamMatchLineup(teamMatchId: string) {
 export type V1ClaimableParticipants = {
   gameId: string;
   version: number;
+  /** 명단(사이드별 제출본, 없으면 최신 초안) 인원 — 후보가 0명일 때 "명단 없음"과 "모두 연결됨"을 가른다. */
+  rosterCount: number;
   participants: {
     participantId: string;
     sideId: string;

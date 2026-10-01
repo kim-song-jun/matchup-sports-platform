@@ -47,7 +47,7 @@ beforeEach(() => {
       { id: 'h1', sideId: 'home', name: '김민수', jerseyNumber: 7, profileImageUrl: '/mock/players/minsu.jpg' },
       { id: 'a1', sideId: 'away', name: '박지훈', jerseyNumber: 10, profileImageUrl: null },
     ],
-    subMatches: [], goals: [], confirmations: [], history: [], officialAt: null,
+    subMatches: [], goals: [], confirmations: [], history: [], officialAt: null, officialCorrected: false,
   };
 });
 describe('shared record participant flow', () => {
@@ -352,6 +352,72 @@ describe('shared record participant flow', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '득점 팀' }), { target: { value: 'away' } });
     fireEvent.click(screen.getByRole('button', { name: '득점 등록' }));
     await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'add', sideId: 'away', expectedVersion: 3 })));
+  });
+  // W5-V5 — 운영자가 정정한 공식 결과를 "양 팀이 확인한" 결과라고 부르지 않는다(서버 officialCorrected).
+  it.each([
+    [true, '운영팀이 정정한 최종 결과', '양 팀이 확인한 최종 결과'],
+    [false, '양 팀이 확인한 최종 결과', '운영팀이 정정한 최종 결과'],
+  ])('확정 결과 머리말 — officialCorrected=%s 이면 "%s"', (officialCorrected, shown, hidden) => {
+    state.data = { ...state.data, phase: 'official', canEdit: false, officialAt: state.data.serverTime, officialCorrected };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    const board = screen.getByRole('region', { name: '공동 점수판' });
+    expect(within(board).getByText(shown)).toBeInTheDocument();
+    expect(within(board).queryByText(hidden)).toBeNull();
+  });
+  // W5-V4 — 확정된 결과의 [삭제]·[이 변경 되돌리기]는 한 번에 새 공식 결과를 만든다(H9 A: 그 앞에만 확인 창).
+  describe('확정 결과 정정 — 폼 없이 공식 결과를 바꾸는 버튼은 확인 창을 거친다', () => {
+    const officialAdmin = () => {
+      state.data = {
+        ...state.data, phase: 'official', canEdit: true, participant: false, operator: true, ownSideId: null,
+        officialAt: state.data.serverTime,
+        goals: [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 10, subMatchId: null }],
+        history: [{ id: 'c1', version: 3, action: 'add', actorName: 'Teameet 운영', goalId: 'g1', subMatchId: null, before: null, after: null, at: state.data.serverTime }],
+      };
+    };
+
+    it('득점 삭제는 무엇이 바뀌는지 알린 뒤 [득점 삭제]를 눌러야 보낸다', async () => {
+      officialAdmin();
+      render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+      fireEvent.click(screen.getByRole('button', { name: /김민수.*삭제$/ }));
+
+      const dialog = await screen.findByRole('dialog', { name: '득점을 삭제할까요?' });
+      expect(dialog).toHaveTextContent('김민수 · 10분 득점을 지우면 새 공식 결과가 생기고 양 팀 전적과 개인 기록이 바로 바뀌어요.');
+      expect(state.mutate).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: '득점 삭제' }));
+      await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'delete', goalId: 'g1', expectedVersion: 3 })));
+    });
+
+    it('[취소]하면 아무것도 보내지 않는다', async () => {
+      officialAdmin();
+      render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+      fireEvent.click(screen.getByRole('button', { name: /김민수.*삭제$/ }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(state.mutate).not.toHaveBeenCalled();
+    });
+
+    it('변경 되돌리기도 확인 뒤에만 보낸다', async () => {
+      officialAdmin();
+      render(<TeamMatchSharedRecord teamMatchId="match" admin />);
+      fireEvent.click(screen.getByRole('button', { name: '이 변경 되돌리기' }));
+
+      const dialog = await screen.findByRole('dialog', { name: '이 변경을 되돌릴까요?' });
+      expect(dialog).toHaveTextContent('새 공식 결과가 생기고 양 팀 전적과 개인 기록이 바로 바뀌어요.');
+      expect(state.mutate).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '변경 되돌리기' }));
+      await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'undo', changeId: 'c1', expectedVersion: 3 })));
+    });
+
+    it('대조군 — 진행 중인 공동 기록의 삭제는 확인 없이 바로 보낸다', async () => {
+      state.data.goals = [{ id: 'g1', sideId: 'home', participantId: 'h1', ownGoal: false, minute: 10, subMatchId: null }];
+      render(<TeamMatchSharedRecord teamMatchId="match" />);
+      fireEvent.click(screen.getByRole('button', { name: /김민수.*삭제$/ }));
+
+      await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'delete', goalId: 'g1' })));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
   });
   it('flags a potentially duplicate goal instead of blindly adding it', () => {
     state.data.goals = [{ id: 'g1', sideId: 'home', participantId: null, ownGoal: false, minute: null, subMatchId: null }];

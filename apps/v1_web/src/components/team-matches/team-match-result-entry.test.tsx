@@ -39,6 +39,7 @@ function record(overrides: Partial<SharedRecord>): SharedRecord {
     history: [],
     confirmations: [],
     officialAt: null,
+    officialCorrected: false,
     ...overrides,
   };
 }

@@ -27,6 +27,8 @@ export type SharedRecord = {
   /** `guest` — 계정 없는 출전자(개인 기록에 안 남는다). */
   participants: { id: string; sideId: string; name: string; jerseyNumber: number | null; profileImageUrl: string | null; guest?: boolean }[];
   goals: SharedGoal[]; goalEvents?: SharedPublicGoalEvent[]; history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
+  /** 지금 공식 결과가 운영자 정정 리비전이다(phase=official 일 때만 참). */
+  officialCorrected: boolean;
 };
 export type RecordCommand = {
   commandId: string;

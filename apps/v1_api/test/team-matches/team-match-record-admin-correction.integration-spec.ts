@@ -78,6 +78,7 @@ describe('friendly shared record admin correction after confirmation (real DB)',
       [[f.teams[0].id, 'LOST'], [f.teams[1].id, 'WON']].sort(),
     );
     expect((await records.read(user(f.userIds[1]), f.match.id)).sides.map((side) => side.score)).toEqual([0, 1]);
+    expect(await records.read(user(f.userIds[1]), f.match.id)).toMatchObject({ phase: 'official', officialCorrected: true });
   });
 
   it('replays the same correction command without another revision; a second correction supersedes the first one', async () => {
@@ -110,5 +111,6 @@ describe('friendly shared record admin correction after confirmation (real DB)',
     }
     expect(await prisma.v1GameResultRevision.count({ where: { gameId: f.game.id } })).toBe(1);
     expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: f.game.id } })).currentOfficialRevisionId).toBe(f.firstRevisionId);
+    expect(await records.read(user(f.userIds[1]), f.match.id)).toMatchObject({ phase: 'official', officialCorrected: false });
   });
 });

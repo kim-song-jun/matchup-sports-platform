@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { V1ApiError } from '@/lib/api-client';
-import { ClaimMyRecordSection, LeagueClaimMyRecordSection } from './claim-my-record';
+import { ClaimMyRecordSection, LeagueClaimMyRecordSection, TeamMatchClaimMyRecordSection } from './claim-my-record';
 
 /**
  * alpha 실화면(2026-08-24)에서 잡은 결함을 고정한다.
@@ -19,7 +19,10 @@ const requestMutateMock = vi.fn();
 const verifiedAuth = { data: { user: { id: 'u-1' } }, error: null, isError: false, isPending: false, isFetching: false };
 const authMeMock = vi.fn(() => verifiedAuth);
 const leagueRequestMutateMock = vi.fn();
+const teamMatchClaimableMock = vi.fn();
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TeamMatchClaimableParticipants: (...args: unknown[]) => teamMatchClaimableMock(...args),
+  useV1TeamMatchRequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
   useV1AuthMe: () => authMeMock(),
   useV1ClaimableParticipants: (...args: unknown[]) => claimableMock(...args),
   useV1RequestIdentityLink: () => ({ mutate: requestMutateMock, isPending: false }),
@@ -38,7 +41,7 @@ function openModal() {
 describe('ClaimMyRecordSection 빈 상태', () => {
   it('연결 가능한 참가자가 없으면 확정 버튼을 렌더하지 않는다', () => {
     claimableMock.mockReturnValue({
-      data: { gameId: 'g-1', version: 3, participants: [] },
+      data: { gameId: 'g-1', version: 3, rosterCount: 4, participants: [] },
       isLoading: false,
       isError: false,
       error: null,
@@ -65,6 +68,7 @@ describe('ClaimMyRecordSection 빈 상태', () => {
       data: {
         gameId: 'g-1',
         version: 3,
+        rosterCount: 2,
         participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,
@@ -95,6 +99,7 @@ describe('LeagueClaimMyRecordSection', () => {
       data: {
         gameId: 'g-1',
         version: 3,
+        rosterCount: 2,
         participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,
@@ -119,6 +124,7 @@ describe('LeagueClaimMyRecordSection', () => {
       data: {
         gameId: 'g-1',
         version: 3,
+        rosterCount: 2,
         participants: [
           { participantId: 'p-home', sideId: 's-home', sideKey: 'HOME', sideLabel: '블루팀', displayName: 'E2E 선수01', jerseyNumber: null },
           { participantId: 'p-away', sideId: 's-away', sideKey: 'AWAY', sideLabel: '레드팀', displayName: 'E2E 선수01', jerseyNumber: null },
@@ -147,13 +153,52 @@ describe('LeagueClaimMyRecordSection', () => {
 
 describe('LeagueClaimMyRecordSection — 명단 카드 아래 한 줄(G13 F61)', () => {
   it('link 는 카드 대신 한 줄 버튼이고, 누르면 같은 모달로 리그 목록을 부른다', () => {
-    leagueClaimableMock.mockReturnValue({ data: { gameId: 'g-1', version: 1, participants: [] }, isLoading: false, isError: false, error: null });
+    leagueClaimableMock.mockReturnValue({ data: { gameId: 'g-1', version: 1, rosterCount: 2, participants: [] }, isLoading: false, isError: false, error: null });
     render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" variant="link" />);
 
     expect(screen.queryByText('이 경기에 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '내 기록이 안 보이나요? 명단에서 나 찾기' }));
     expect(leagueClaimableMock).toHaveBeenLastCalledWith('lg-1', 'tm-1', { enabled: true });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+// W5-V3 — 후보 0명이 "명단이 아직 없음"인데 "명단은 모두 계정에 연결돼 있어요"라고 말하던 결함.
+describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount)', () => {
+  const emptyList = (rosterCount: number) => ({
+    data: { gameId: 'g-1', version: 1, rosterCount, participants: [] }, isLoading: false, isError: false, error: null,
+  });
+  const openTeamMatch = () => {
+    render(<TeamMatchClaimMyRecordSection teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+  };
+
+  it('친선에서 명단이 0명이면 "아직 제출된 참석명단이 없어요"라고 말하고, 모두 연결됐다고 하지 않는다', () => {
+    teamMatchClaimableMock.mockReturnValue(emptyList(0));
+    openTeamMatch();
+
+    expect(screen.getByRole('dialog', { name: '아직 제출된 참석명단이 없어요' })).toBeInTheDocument();
+    expect(screen.queryByText(/모두 계정에 연결돼 있어요/)).toBeNull();
+    expect(screen.queryByRole('link', { name: '기록 공개 설정' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '이 선수가 저예요' })).toBeNull();
+  });
+
+  it('대조군 — 명단은 있는데 모두 연결됐으면 기존 안내와 기록 공개 설정 링크를 보여 준다', () => {
+    teamMatchClaimableMock.mockReturnValue(emptyList(10));
+    openTeamMatch();
+
+    expect(screen.getByRole('dialog', { name: '연결할 참가자가 없어요' })).toBeInTheDocument();
+    expect(screen.getByText(/모두 계정에 연결돼 있어요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '기록 공개 설정' })).toBeInTheDocument();
+    expect(screen.queryByText('아직 제출된 참석명단이 없어요')).toBeNull();
+  });
+
+  it('리그·대회 경기는 같은 상태를 "경기 명단"으로 부른다', () => {
+    leagueClaimableMock.mockReturnValue(emptyList(0));
+    render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(screen.getByRole('dialog', { name: '아직 제출된 경기 명단이 없어요' })).toBeInTheDocument();
   });
 });
 

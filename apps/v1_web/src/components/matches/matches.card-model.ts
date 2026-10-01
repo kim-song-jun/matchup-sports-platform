@@ -151,14 +151,14 @@ export function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1View
   if (viewerState === 'host') return 'mine';
   if (viewerState === 'requested') return 'pending';
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full' || status === 'in_progress' || status === 'completion_pending') return 'full';
+  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full' || status === 'in_progress' || status === 'completion_pending' || status === 'on_hold' || status === 'scheduled') return 'full';
   return 'open';
 }
 
 function lifecycleRank(status: V1MatchApiStatus) {
   if (status === 'closed' || status === 'full') return 1;
   if (status === 'in_progress') return 2;
-  if (status === 'completion_pending') return 3;
+  if (status === 'completion_pending' || status === 'on_hold' || status === 'scheduled') return 3;
   if (status === 'completed') return 4;
   if (status === 'cancelled' || status === 'expired') return 5;
   return 0;

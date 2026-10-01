@@ -1211,6 +1211,7 @@ model V1Match {
   maxSportLevelId String?       @map("max_sport_level_id")
   genderRule      String?       @map("gender_rule")
   costNote        String?       @map("cost_note")
+  proceedConfirmedAt DateTime? @map("proceed_confirmed_at")
   status          V1MatchStatus @default(recruiting)
   cancelledAt     DateTime?     @map("cancelled_at")
   completedAt     DateTime?     @map("completed_at")

@@ -454,3 +454,8 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 이 표시는 자동 완료나 편집 잠금이 아니며, 점수·공동 기록 수정과 기존 종료 확인 동작을 유지한다.
 - 자책골은 선수 또는 익명 팀으로 자책한 쪽을 고르고 상대 팀 점수에 귀속한다.
 - 정본: [Task 172](../../.github/tasks/172-team-match-shared-record.md), [팀매치 시나리오](./05-team-match-flows.md), [경기 기록 시나리오](./19-game-operations-result-correction.md).
+
+
+### 2026-10-01 — Task 181 매치 보류 후속 조치
+
+개인·팀매치 보류와 주최자 후속 조치. [Task 181](../../.github/tasks/181-match-on-hold-lifecycle.md)에서 배포 및 검증 진행 상태를 관리한다.

@@ -61,7 +61,7 @@ export type MyHomeViewModel = {
   playerCardSlot?: { hidden: boolean; shape: 'rect' | 'shield' };
 };
 
-export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended';
+export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended' | 'on_hold' | 'scheduled' | 'in_progress';
 
 export type MyMatch = {
   id: string;

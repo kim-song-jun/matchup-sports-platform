@@ -549,7 +549,7 @@ export const gameSchemaSourceManifest = {
   // Existing game models and bound historical migration remain unchanged.
   // 2026-10-01 Task 181: additive chat image message (enum value + nullable attachment FK).
   // Existing game models and bound historical migration remain unchanged.
-  schema: 'cd63ac41c85c862d5fb8903146e0183dee92ac19e4dacfe7b200d373b36e760d',
+  schema: 'bb42ef9a40757b6877989b8cd883d461a714aebbcbd4591753acf0db757aba1a',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -21,7 +21,7 @@ m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_table
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == cd63ac41c85c862d5fb8903146e0183dee92ac19e4dacfe7b200d373b36e760d \
+[[ "$schema_sha" == bb42ef9a40757b6877989b8cd883d461a714aebbcbd4591753acf0db757aba1a \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

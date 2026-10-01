@@ -2,7 +2,7 @@ import { act, render, screen, within, fireEvent, waitFor } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
-import { V1ApiError } from '@/lib/api-client';
+import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
 /**
  * "기록한 이벤트" 자리에 **로컬 전송 큐**를 그리고 있었다. 큐는 이번 세션에서 내가 올린 것만
@@ -828,6 +828,21 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.queryByText('준비가 끝났어요. ‘경기 시작’을 눌러 주세요.')).toBeNull();
     });
 
+    // W4-V14 — 열어 둔 콘솔에서 취소된 대진을 시작하면 서버가 409 로 막는다. 그 이유가 해요체 그대로 보여야 한다.
+    it('취소된 대진이라 시작이 거절되면 서버의 해요체 사유를 오류 배너로 보여 준다', async () => {
+      scheduledWithRosters();
+      mocks.postV1GameCommand.mockRejectedValueOnce(
+        new V1ApiError({ status: 'error', timestamp: '', statusCode: 409, code: 'TOURNAMENT_MATCH_CANCELLED', message: '취소된 대진이라 경기를 시작할 수 없어요.' }),
+      );
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '경기 시작' }));
+
+      expect(await screen.findByText('취소된 대진이라 경기를 시작할 수 없어요.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
+    });
+
     it('미확인이 남아 있어도 경기 시작 버튼은 막히지 않는다 — 체크리스트는 조건이 아니라 안내다', () => {
       scheduledWithRosters();
       render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
@@ -1541,8 +1556,13 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
   });
 
   it('응답이 끊기면 같은 종료 요청을 같은 idempotency body로 재시도하고 다른 기록은 막는다', async () => {
+    // v1Api 가 fetch reject 를 바꿔 던지는 모양(api-client fetchOrNetworkError).
+    const networkError = new V1ApiError(
+      { status: 'error', timestamp: '', statusCode: 0, code: V1_NETWORK_ERROR_CODE, message: 'Failed to fetch' },
+      { displayableMessage: false },
+    );
     mocks.postV1GameCommand
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(networkError)
       .mockResolvedValueOnce({ gameId: 'game-1', state: 'ENDED', version: 3 });
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);

@@ -85,6 +85,7 @@
 - **상대 참석명단**: 공개 시각은 `V1GameVisibilityPolicy.lineupAt`, 없으면 킥오프 1시간 전. `GET .../lineup` 의 `opponent: { teamName, submitted, published, participantCount }` — 공개 전에는 제출 여부만, `participantCount` 는 공개 뒤에만 숫자. `GET .../lineup/opponent` 는 공개 뒤 `{ teamMatchId, teamName, publicLineupAt, participants: [{ jerseyNumber, displayName }] }`(번호순, 번호 없는 사람은 뒤)만 준다 — 공개 전 403 `OPPONENT_LINEUP_NOT_PUBLIC`(`details.publicLineupAt`), 미제출 404 `OPPONENT_LINEUP_NOT_SUBMITTED`, 대회·리그 409.
 - **응답 칩**: `eligibleMembers[].rsvpStatus` 는 이 경기 팀 일정(취소 제외)의 응답(`GOING`/`MAYBE`/`NOT_GOING`/`WAITLISTED`, 답이 없으면 `NO_RESPONSE`)이고 연결된 일정이 없으면 null. 읽기 전용 — 저장·추가 자격에 쓰지 않는다.
 - `GET .../lineup` 에 `ownTeamName` 도 싣는다.
+- **상대 팀에도 소속 (Task 180 W4-V4)**: `eligibleMembers[].alsoOpponentMember` 는 그 팀원이 **상대 팀의 활성 멤버**인지다(상대가 정해지지 않았으면 전원 false). 상대 참석명단은 읽지 않고 팀 멤버십만 본다 — 공개 전 명단 내용이 새지 않는다. 상대 팀이 멤버 목록을 비공개로 둬도 싣는다(우리 팀원 본인의 소속). 안내용이라 저장·제출·늦은 추가는 이 값으로 막지 않는다 — 화면은 칩을 달고 "모두 넣기"에서 기본으로 뺀다.
 
 
 
@@ -204,7 +205,7 @@ Query:
 |---|---|---|---|
 | `sportId` | uuid | No | `v1_master_sports.id` |
 | `query` | string | No | title/description/place/team 검색 |
-| `genderRule` | string | No | `성별 무관`, `남`, `여` |
+| `genderRule` | string | No | `성별 무관`, `남`, `여`, `무관`만 받는다(그 외 400, `무관`은 `성별 무관`과 같은 필터). 작성·수정 본문은 `무관` 없이 정본 세 값만 받는다. 응답은 옛 별칭(`any`·`무관`)을 `성별 무관`으로 접고, 정본이 아닌 저장값은 `null`이다. 목록 필터 `genderRule=성별 무관`(또는 `무관`)은 별칭으로 저장된 행도 포함한다 |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `regionId` | uuid | No | — |
 | `status` | recruiting/closed/matched/cancelled/completed/expired | No | 기본 recruiting |
@@ -334,7 +335,7 @@ Rules:
 - `GET /team-matches/:teamMatchId/lineup` reads the viewer's team lineup.
 - `PUT /team-matches/:teamMatchId/lineup` saves a draft through `TeamMatchLineupService`.
 - Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
-- Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement. The RSVP is echoed read-only as `eligibleMembers[].rsvpStatus` (Task 180 H5).
+- Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement. The RSVP is echoed read-only as `eligibleMembers[].rsvpStatus` (Task 180 H5). A member who is also an active member of the opponent team is flagged `eligibleMembers[].alsoOpponentMember` (Task 180 W4-V4) — informational only; saving that member on both sides is not rejected.
 - Opponent-side lineup access and change requests require an approved opponent team. The opponent's numbers and names are readable only after the public lineup time (`GET .../lineup/opponent`, see "첫 기록 뒤 추가만" above).
 - Scheduled games remain editable regardless of wall-clock kickoff. LIVE/PAUSED games remain editable only while either side's latest lineup is incomplete and no event/shared-record/result revision exists. The GET response's `editable`/`lockReason` is the client source of truth.
 - Goalkeeper is an independent per-participant designation: multiple participants or no participant may be marked as goalkeeper.

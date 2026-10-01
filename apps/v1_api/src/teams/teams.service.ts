@@ -1569,7 +1569,10 @@ export class TeamsService {
     return team;
   }
 
-  /** 한 사람에게 대기 중 초대를 하나 둔다. 이미 대기 중이면 그대로, 끝난 초대(거절·취소·수락)는 다시 연다. */
+  /**
+   * 한 사람에게 대기 중 초대를 하나 둔다. 이미 대기 중이면 그대로 두고, 아니면 새 행을 만든다 —
+   * 끝난 초대(수락·거절·취소)는 되살리지 않고 "지난 초대" 기록으로 남긴다(W4-V8).
+   */
   private async inviteUser(
     actorUserId: string,
     team: { id: string; name: string },
@@ -1584,24 +1587,25 @@ export class TeamsService {
       return { outcome: 'already_member', invitationId: null };
     }
 
-    const existing = await this.prisma.v1TeamInvitation.findUnique({
-      where: { teamId_invitedUserId: { teamId: team.id, invitedUserId } },
-      select: { id: true, status: true },
-    });
-    if (existing?.status === 'pending') {
-      return { outcome: 'already_invited', invitationId: existing.id };
+    const pendingWhere = { teamId: team.id, invitedUserId, status: 'pending' as const };
+    const pending = await this.prisma.v1TeamInvitation.findFirst({ where: pendingWhere, select: { id: true } });
+    if (pending) {
+      return { outcome: 'already_invited', invitationId: pending.id };
     }
 
-    const invitation = existing
-      ? await this.prisma.v1TeamInvitation.update({
-          where: { id: existing.id },
-          data: { status: 'pending', invitedByUserId: actorUserId, message, respondedAt: null },
-          select: { id: true },
-        })
-      : await this.prisma.v1TeamInvitation.create({
-          data: { teamId: team.id, invitedUserId, invitedByUserId: actorUserId, status: 'pending', message },
-          select: { id: true },
-        });
+    let invitation: { id: string };
+    try {
+      invitation = await this.prisma.v1TeamInvitation.create({
+        data: { teamId: team.id, invitedUserId, invitedByUserId: actorUserId, status: 'pending', message },
+        select: { id: true },
+      });
+    } catch (error) {
+      // 동시에 보낸 다른 초대가 먼저 들어갔다 — 대기 중 부분 unique(v1_team_invitations_pending_key)가 막은 것이다.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+      const winner = await this.prisma.v1TeamInvitation.findFirst({ where: pendingWhere, select: { id: true } });
+      if (!winner) throw error;
+      return { outcome: 'already_invited', invitationId: winner.id };
+    }
 
     // 알림: 초대받은 사용자에게 안내 (fire-and-forget)
     void this.notifications.emitNotification(
@@ -1692,7 +1696,7 @@ export class TeamsService {
       data: { status: 'cancelled' },
       select: { id: true, status: true },
     });
-    // 대기 중인 초대 행의 updatedAt 은 보낸(다시 보낸) 시각이다 — 그 뒤의 도착 알림만 이 초대의 것이다.
+    // 대기 중인 초대 행의 updatedAt 은 보낸 시각이다(초대마다 새 행) — 그 뒤의 도착 알림만 이 초대의 것이다.
     void this.notifications.markTeamInvitationCancelled(invitation.invitedUserId, teamId, invitation.team.name, invitation.updatedAt);
 
     return { invitationId: updated.id, status: updated.status, alreadyCancelled: false };

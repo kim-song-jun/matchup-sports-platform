@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getV1ApiBaseUrl, getV1DevAuthHeaders, v1Delete, v1Get } from './api-client';
+import { getV1ApiBaseUrl, getV1DevAuthHeaders, retryTransientFailure, v1Delete, v1Get } from './api-client';
 import { V1_USER_EMAIL_KEY, V1_USER_ID_KEY } from './session-storage';
 import * as clientErrorReporter from './client-error-reporter';
 
@@ -196,5 +196,31 @@ describe('v1Api error reporting', () => {
     expect(JSON.parse(sent.body as string)).toEqual({ reason: '이용약관 위반' });
     // 회귀 형태를 직접 배제한다 — 감싸졌다면 최상위 키가 body 하나뿐이었을 것이다.
     expect(Object.keys(JSON.parse(sent.body as string))).not.toContain('body');
+  });
+});
+
+// 응답이 아예 없는 실패는 V1ApiError(NETWORK_ERROR)로 바뀌었다 — 예전처럼 "서버가 밀린 일시 실패"로 재시도돼야 한다.
+describe('retryTransientFailure — 응답 없는 실패', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function failureOf(fetchMock: ReturnType<typeof vi.fn>) {
+    vi.stubGlobal('fetch', fetchMock);
+    return v1Get('/teams').then(() => { throw new Error('실패해야 한다'); }, (error: unknown) => error);
+  }
+
+  it('fetch 가 reject 하면 두 번까지 다시 시도한다', async () => {
+    const error = await failureOf(vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    expect(retryTransientFailure(0, error)).toBe(true);
+    expect(retryTransientFailure(2, error)).toBe(false);
+  });
+
+  it('대조군 — 서버가 답한 4xx 는 다시 시도하지 않는다', async () => {
+    vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    const error = await failureOf(vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ status: 'error', statusCode: 404, code: 'NOT_FOUND', message: '팀을 찾을 수 없어요.', timestamp: '' }),
+    }));
+    expect(retryTransientFailure(0, error)).toBe(false);
   });
 });

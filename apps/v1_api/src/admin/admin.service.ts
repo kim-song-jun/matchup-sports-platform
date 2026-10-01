@@ -1,3 +1,4 @@
+import { normalizeGenderRule } from '../common/gender-rule';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import {
   BadRequestException,
@@ -1205,7 +1206,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       matchFormat: row.matchFormat ?? null,
       formatNote: row.formatNote ?? null,
       matchStyle: row.matchStyle,
-      genderRule: row.genderRule ?? null,
+      genderRule: normalizeGenderRule(row.genderRule),
       uniformColor: row.uniformColor ?? null,
       costNote: row.costNote ?? null,
       version: row.updatedAt.toISOString(),

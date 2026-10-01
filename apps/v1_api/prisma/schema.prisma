@@ -1575,7 +1575,9 @@ model V1TeamInvitation {
   invitedUser   V1User @relation("V1TeamInvitee", fields: [invitedUserId], references: [id], onDelete: Cascade)
   invitedByUser V1User @relation("V1TeamInviter", fields: [invitedByUserId], references: [id], onDelete: Restrict)
 
-  @@unique([teamId, invitedUserId])
+  /// 초대 한 번 = 한 행이라 같은 (팀, 사람)에 끝난 초대가 여럿 남는다(Task 180 W4-V8). 대기 중(status = 'pending')
+  /// 행만 (팀, 사람)당 하나 — 부분 unique 인덱스라 마이그레이션 SQL 에만 있다(`v1_team_invitations_pending_key`).
+  @@index([teamId, invitedUserId])
   @@index([invitedUserId, status])
   @@index([teamId, status])
   @@map("v1_team_invitations")

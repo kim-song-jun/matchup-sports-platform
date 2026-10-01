@@ -16,10 +16,9 @@ export function dissolutionBlockerTitle(kind: V1TeamDissolutionBlocker['kind'], 
 
 /** 막는 항목 한 줄. 경기면 상대·일시·장소, 참가 신청이면 취소 요청 여부까지. */
 export function dissolutionBlockerItemSummary(item: V1TeamDissolutionBlocker['items'][number]) {
-  const when = [formatTournamentDateTimeShort(item.startAt), item.placeName].filter(Boolean).join(' ');
   const head = item.opponentName ? `${item.title} · vs ${item.opponentName}` : item.title;
   const status = item.registrationStatus === 'cancel_requested' ? '취소 요청 중' : null;
-  return [head, when || null, status].filter(Boolean).join(' · ');
+  return [head, formatTournamentDateTimeShort(item.startAt), item.placeName, status].filter(Boolean).join(' · ');
 }
 
 function isBlocker(value: unknown): value is V1TeamDissolutionBlocker {

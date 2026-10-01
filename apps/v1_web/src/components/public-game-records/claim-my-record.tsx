@@ -6,8 +6,11 @@ import { useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
 import {
+  useV1AuthMe,
   useV1ClaimableParticipants,
   useV1LeagueClaimableParticipants,
   useV1LeagueRequestIdentityLink,
@@ -46,11 +49,27 @@ export function ClaimMyRecordSection({
   fixtureId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { viewer, recheck } = useClaimViewer();
   // 목록 조회 자체가 인가(참가팀 멤버)를 태우므로, 모달을 열기 전에는 부르지 않는다 --
   // 관전자가 이 페이지를 열 때마다 403 을 만들 이유가 없다.
-  const claimable = useV1ClaimableParticipants(tournamentId, fixtureId, { enabled: open });
+  const claimable = useV1ClaimableParticipants(tournamentId, fixtureId, { enabled: open && viewer === 'verified' });
   const request = useV1RequestIdentityLink(tournamentId, fixtureId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} />;
+}
+
+type ClaimViewer = 'pending' | 'guest' | 'error' | 'verified';
+
+/**
+ * 후보 조회·신청은 로그인이 필요한 API 라, 판정이 끝나 `verified` 일 때만 호출한다.
+ * 대회 경기 상세는 비로그인 관전자에게도 열려 있어서 이 판정이 없으면 401 원문이 모달에 샌다.
+ */
+function useClaimViewer(): { viewer: ClaimViewer; recheck: () => void } {
+  const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
+  const recheck = () => void authMe.refetch();
+  if (isUnauthenticatedError(authMe.error)) return { viewer: 'guest', recheck };
+  if (authMe.isError) return { viewer: 'error', recheck };
+  if (authMe.data?.user?.id) return { viewer: 'verified', recheck };
+  return { viewer: 'pending', recheck };
 }
 
 /**
@@ -67,9 +86,10 @@ export function LeagueClaimMyRecordSection({
   variant?: ClaimEntryVariant;
 }) {
   const [open, setOpen] = useState(false);
-  const claimable = useV1LeagueClaimableParticipants(leagueId, teamMatchId, { enabled: open });
+  const { viewer, recheck } = useClaimViewer();
+  const claimable = useV1LeagueClaimableParticipants(leagueId, teamMatchId, { enabled: open && viewer === 'verified' });
   const request = useV1LeagueRequestIdentityLink(leagueId, teamMatchId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} variant={variant} />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} variant={variant} />;
 }
 
 type ClaimEntryVariant = 'card' | 'link';
@@ -77,14 +97,17 @@ type ClaimEntryVariant = 'card' | 'link';
 /** 팀매치 상세용 — 후보 목록 API만 팀매치 스코프로 바꾸고 화면·신청 계약은 공유한다. */
 export function TeamMatchClaimMyRecordSection({ teamMatchId }: { teamMatchId: string }) {
   const [open, setOpen] = useState(false);
-  const claimable = useV1TeamMatchClaimableParticipants(teamMatchId, { enabled: open });
+  const { viewer, recheck } = useClaimViewer();
+  const claimable = useV1TeamMatchClaimableParticipants(teamMatchId, { enabled: open && viewer === 'verified' });
   const request = useV1TeamMatchRequestIdentityLink(teamMatchId);
-  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} rosterLabel="참석명단" />;
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} rosterLabel="참석명단" />;
 }
 
 function ClaimMyRecordView({
   open,
   onOpenChange,
+  viewer,
+  onRecheckViewer,
   claimable,
   request,
   variant = 'card',
@@ -92,6 +115,8 @@ function ClaimMyRecordView({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  viewer: ClaimViewer;
+  onRecheckViewer: () => void;
   claimable: ReturnType<typeof useV1ClaimableParticipants>;
   request: ReturnType<typeof useV1RequestIdentityLink>;
   variant?: ClaimEntryVariant;
@@ -113,7 +138,7 @@ function ClaimMyRecordView({
   // 버튼이 그대로 남아 있었다. disabled 라도 회색 버튼이 보이면 "누를 수 있을 것 같은"
   // 신호를 주고, 사용자는 왜 안 눌리는지 찾게 된다. 아무것도 할 수 없는 상태에서는
   // 그 버튼을 아예 렌더하지 않고 닫기만 남긴다.
-  const loaded = claimable.data !== undefined;
+  const loaded = viewer === 'verified' && claimable.data !== undefined;
   const hasCandidates = (claimable.data?.participants.length ?? 0) > 0;
   // 후보 0명은 두 상태다 — 명단 자체가 아직 없거나, 명단의 모두가 이미 연결(신청 중)됐거나.
   const rosterEmpty = loaded && claimable.data?.rosterCount === 0;
@@ -189,7 +214,25 @@ function ClaimMyRecordView({
               그렇게 읽혔다. 0건은 정상 상태이므로 결론을 먼저 말하고, 그래도 기록이
               안 보이는 진짜 원인(공개 동의)으로 이어 준다.
             */}
-            {rosterEmpty ? (
+            {viewer === 'guest' ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  로그인이 필요해요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  로그인한 뒤 명단에서 본인을 찾아 내 기록으로 연결할 수 있어요.
+                </div>
+              </>
+            ) : viewer === 'error' ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  로그인 상태를 확인하지 못했어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  잠시 후 다시 확인해 주세요.
+                </div>
+              </>
+            ) : rosterEmpty ? (
               <>
                 <div id="claim-my-record-title" className="tm-text-heading">
                   아직 제출된 {rosterLabel}이 없어요
@@ -228,7 +271,7 @@ function ClaimMyRecordView({
             )}
 
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-              {claimable.isLoading ? (
+              {viewer === 'guest' || viewer === 'error' ? null : viewer === 'pending' || claimable.isLoading ? (
                 <div className="tm-text-caption">불러오는 중이에요…</div>
               ) : claimable.isError ? (
                 <div className="tm-text-caption" style={{ color: 'var(--red700)' }}>
@@ -285,9 +328,26 @@ function ClaimMyRecordView({
                 style={{ flex: 1, minHeight: 44, ...(loaded && !hasCandidates ? { background: 'var(--static-blue)' } : {}) }}
                 onClick={() => onOpenChange(false)}
               >
-                {loaded && !hasCandidates ? '닫기' : '취소'}
+                {viewer === 'error' || (loaded && !hasCandidates) ? '닫기' : '취소'}
               </button>
-              {loaded && !hasCandidates ? null : (
+              {viewer === 'guest' ? (
+                <Link
+                  href={getLoginPathForRedirect(getCurrentRedirectPath())}
+                  className="tm-btn tm-btn-md tm-btn-primary"
+                  style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
+                >
+                  로그인하기
+                </Link>
+              ) : viewer === 'error' ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-md tm-btn-primary"
+                  style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
+                  onClick={onRecheckViewer}
+                >
+                  다시 확인
+                </button>
+              ) : loaded && !hasCandidates ? null : (
               <button
                 type="button"
                 className="tm-btn tm-btn-md tm-btn-primary"

@@ -48,6 +48,7 @@ import {
   describeGoalkeeperNotice,
   describeLineupPhase,
   describeLineupSizeNotice,
+  describeOpponentSkipped,
   describePublicationCountdown,
   describePublicationNotice,
   describeRemaining,
@@ -91,6 +92,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     () => new Map((lineupQuery.data?.eligibleMembers ?? []).map((member) => [member.userId, member.rsvpStatus ?? null])),
     [lineupQuery.data],
   );
+  const alsoOpponentUserIds = useMemo(
+    () => new Set((lineupQuery.data?.eligibleMembers ?? []).filter((member) => member.alsoOpponentMember === true).map((member) => member.userId)),
+    [lineupQuery.data],
+  );
   const rosterPool: RosterOption[] = useMemo(
     () =>
       (rosterQuery.data?.items ?? [])
@@ -101,9 +106,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           jerseyNumber: member.jerseyNumber ?? null,
           membershipId: member.membershipId,
           rsvpStatus: rsvpByUserId.get(member.userId) ?? null,
+          alsoOpponentMember: alsoOpponentUserIds.has(member.userId),
         }))
         .sort(compareByJersey),
-    [rosterQuery.data, rsvpByUserId],
+    [rosterQuery.data, rsvpByUserId, alsoOpponentUserIds],
   );
   const changeTeamJersey = useV1ChangeMembershipJersey(ownTeamId);
 
@@ -406,9 +412,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const lineup = lineupQuery.data;
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
+  // 두 팀 소속은 "모두 넣기"에서 빠진다(W4-V4). 그들만 남은 빈 명단은 시작 카드에 넣을 사람이 없으니
+  // 후보 목록을 바로 보여 한 명씩 넣게 한다 — 안 그러면 넣을 길이 불러오기뿐이다.
+  const addAllCount = waitingMembers.filter((member) => member.alsoOpponentMember !== true).length;
   const unavailableByUser = new Map((unavailabilityQuery.data?.items ?? []).map((item) => [item.userId, item]));
   // 편집할 수 없을 때는 서버가 가진 명단 그대로 — 추가만 모드에서 늦게 온 선수가 붙으면 바로 보인다.
   const rosterRows = (editable ? state.participants : serverRosterEntries(lineup)).slice().sort(compareByJersey);
+  const showWaitingList = rosterRows.length > 0 || (addAllCount === 0 && waitingMembers.length > 0);
   const sizeNotice = editable ? describeLineupSizeNotice(state.participants.length, lineup.lineupConfig) : null;
   const goalkeeperNotice = editable ? describeGoalkeeperNotice(state.participants.filter((entry) => entry.goalkeeper).length) : null;
   const publicAt = resolvePublicLineupAt(lineup.publicLineupAt, kickoffAt);
@@ -498,11 +508,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     if (state === null) return;
     const result = addAllRosterMembersToLineup(state, rosterPool);
     setState(result.state);
-    setLoadNotice(
+    const notices = [
+      describeOpponentSkipped(result.skippedOpponent),
       result.clearedJersey.length === 0
         ? null
         : `${result.clearedJersey.join(', ')}님은 팀 등번호가 다른 선수와 겹쳐 비워 뒀어요. 등번호를 직접 넣어 주세요.`,
-    );
+    ].filter((notice): notice is string => notice !== null);
+    setLoadNotice(notices.length === 0 ? null : notices.join(' '));
   }
 
   const jerseyTarget = jerseyTargetKey === null ? null : state.participants.find((entry) => entry.key === jerseyTargetKey) ?? null;
@@ -722,7 +734,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         {/* 빈 명단은 아래 시작 카드가 같은 두 행동을 크게 보인다(A-1) — 여기 툴바는 명단이 있을 때만. */}
         {editable && ownTeamId !== null && state.participants.length > 0 ? (
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {waitingMembers.length > 0 ? (
+            {addAllCount > 0 ? (
               <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={handleAddAll} style={{ minHeight: 44 }}>
                 <PlusIcon size={16} aria-hidden="true" /> 팀원 전원 추가
               </button>
@@ -773,7 +785,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           {rosterRows.length === 0 ? (
             editable ? (
               <EmptyLineupStart
-                memberCount={waitingMembers.length}
+                memberCount={addAllCount}
                 canLoad={ownTeamId !== null}
                 onAddAll={handleAddAll}
                 onLoad={() => setLoadSheetOpen(true)}
@@ -785,6 +797,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             )
           ) : (
             <Card pad={0}>
+              <RosterColumnHeader editable={editable} />
               <ul style={{ listStyle: 'none', margin: 0, padding: '0 12px' }}>
                 {rosterRows.map((entry, index) => {
                   const away = entry.userId === null ? undefined : unavailableByUser.get(entry.userId);
@@ -796,6 +809,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         accountLinked={entry.userId !== null}
                         status={away === undefined ? undefined : 'UNAVAILABLE'}
                         reason={away?.reason}
+                        extraBadges={entry.userId !== null && alsoOpponentUserIds.has(entry.userId) ? <OpponentMemberChip /> : null}
                         onJerseyPress={
                           editable
                             ? () => {
@@ -832,14 +846,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </ul>
             </Card>
           )}
-          {editable && rosterRows.length === 0 && waitingMembers.length > 0 ? (
+          {editable && rosterRows.length === 0 && addAllCount > 0 ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '12px 0 0', lineHeight: 1.6 }}>
               팀에 없는 게스트는 목록이 채워진 뒤 이름만으로 추가할 수 있어요.
             </p>
           ) : null}
         </section>
 
-        {editable && rosterRows.length > 0 ? (
+        {editable && showWaitingList ? (
           <section aria-labelledby="lineup-roster-heading" style={{ marginBottom: 16 }}>
             <SectionTitle id="lineup-roster-heading" title={`추가할 팀원 (${waitingMembers.length})`} />
             {unavailabilityQuery.isError ? (
@@ -876,7 +890,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         accountLinked
                         status={away === undefined ? undefined : 'UNAVAILABLE'}
                         reason={away?.reason}
-                        extraBadges={member.rsvpStatus ? <RsvpChip status={member.rsvpStatus} /> : null}
+                        extraBadges={
+                          <>
+                            {member.rsvpStatus ? <RsvpChip status={member.rsvpStatus} /> : null}
+                            {member.alsoOpponentMember ? <OpponentMemberChip /> : null}
+                          </>
+                        }
                         trailing={
                           // 행마다 반복되는 버튼이라 outline — 목록이 파랗게 차면 주 행동(제출)이 묻힌다.
                           <button
@@ -1087,6 +1106,28 @@ function EmptyLineupStart({
 }
 
 /**
+ * 열 머리글(W4-V1) — 행의 두 "+"(번호·골키퍼)가 무엇인지 목록 위에서 한 번만 말한다. 미지정 행에 글자를 다시 넣지
+ * 않으려는 것이다(GK 토글 주석). 화면용이라 aria-hidden — 스크린리더는 각 버튼의 aria-label 로 같은 뜻을 듣는다.
+ */
+function RosterColumnHeader({ editable }: { editable: boolean }) {
+  const label = { color: 'var(--text-muted)', fontWeight: 600 } as const;
+  return (
+    <div aria-hidden="true" style={{ padding: '0 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0 8px', borderBottom: '1px solid var(--border)' }}>
+        {/* 번호 칸은 편집 땐 44px 버튼, 열람 땐 28px 글자다(GameRosterPlayerRow). */}
+        <span className="tm-text-micro" style={{ ...label, flex: '0 0 auto', width: editable ? 44 : 28, textAlign: 'center' }}>번호</span>
+        <span className="tm-text-micro" style={{ ...label, flex: '1 1 auto' }}>이름</span>
+        <span style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="tm-text-micro" style={{ ...label, width: 44, textAlign: 'center' }}>골키퍼</span>
+          {/* 행의 "빼기" 버튼과 같은 클래스로 폭만 잡는다 — 골키퍼 열이 토글 위에 정확히 선다. */}
+          {editable ? <span className="tm-btn tm-btn-sm" style={{ visibility: 'hidden', minHeight: 0, padding: '0 8px' }}>빼기</span> : null}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * GK 토글 — "GK" 글자는 지정된 행에만(항상 띄우면 값으로 읽혀 "전원 GK" 로 오독됐다, 2026-09-08 확정), 미지정
  * 행은 누를 수 있을 때만 "+"(2026-09-29 확정). 지정 = orange700 채움, 미지정 = 점선 테두리.
  */
@@ -1137,6 +1178,11 @@ function RsvpChip({ status }: { status: string }) {
       {friendlyRsvpLabel(status)}
     </span>
   );
+}
+
+/** 상대 팀에도 소속(W4-V4) — 응답 칩과 같은 자리·모양의 읽기 전용 칩. 색이 아니라 글자로 말한다. */
+function OpponentMemberChip() {
+  return <span className="tm-badge tm-badge-sm tm-badge-grey">상대 팀에도 소속</span>;
 }
 
 function GuestAddCard({ guestName, onChange, onAdd }: { guestName: string; onChange: (value: string) => void; onAdd: () => void }) {

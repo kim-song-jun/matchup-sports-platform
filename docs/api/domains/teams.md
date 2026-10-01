@@ -259,7 +259,10 @@ CAUTION:
 ## 초대
 
 - 이메일 기반: `invitedEmail`로 V1User 조회(미존재 시 `USER_NOT_FOUND`), 이미 active 멤버면 `ALREADY_MEMBER`
-- 중복 pending 초대 차단: `(teamId, invitedUserId)` unique upsert — declined/cancelled 후 재초대 시 pending으로 reset
+- 초대 한 번 = 한 행(Task 180 W4-V8): 대기 중 초대가 있으면 그대로 두고(`alreadyInvited: true`), 없으면 **새 행**을 만든다.
+  수락·거절·취소로 끝난 행은 되살리지 않아 `pastItems`(지난 초대)에 그대로 남고, 같은 사람이 여러 번 나올 수 있다. 다시 보낸
+  초대의 `createdAt` 은 그 행을 보낸 시각이다. 대기 중 중복은 부분 unique `v1_team_invitations_pending_key`
+  (`status = 'pending'` 인 `(team_id, invited_user_id)`)가 막고, 동시 재초대가 거기에 걸리면 `alreadyInvited: true` 로 돌려준다.
 - 상태: `pending | accepted | declined | cancelled` (만료 없음)
 - 수락은 피초대자 본인만(`POST /team-invitations/:invitationId/accept`) — `teamMembership` upsert(active) + `memberCount` 증가(이미 active 멤버면 미증가, 가입 승인과 동일 로직 미러링)
 - 모든 mutation 멱등: `alreadyInvited` / `alreadyProcessed` / `alreadyCancelled` 플래그
@@ -269,7 +272,7 @@ CAUTION:
 - `recipients`: 1~20개. `@` 가 있으면 이메일(`normalizeEmail` 표준형), 없으면 닉네임 **정확히 일치**(부분 검색 없음 — 일반
   사용자에게 사용자 검색을 열지 않는다). 탈퇴(`deletedAt`) 계정은 찾지 않는다.
 - 권한·정원은 단건 초대와 같다(팀장·매니저, 활성 팀, `TEAM_FULL` 이면 요청 전체 409). 초대 한 건의 처리(이미 멤버·대기 중
-  유지·끝난 초대 다시 열기·도착 알림)는 단건 초대와 같은 경로다.
+  유지·끝났으면 새 행·도착 알림)는 단건 초대와 같은 경로다.
 - 응답 `{ teamId, invitedCount, results: [{ recipient, status, invitationId }] }` — `status`:
   `invited | already_invited | already_member | not_found | ambiguous(같은 닉네임이 여럿) | duplicate(같은 요청 안의 중복)`.
 

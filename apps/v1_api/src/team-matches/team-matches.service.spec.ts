@@ -960,6 +960,37 @@ describe('TeamMatchesService', () => {
 
   // ─── getApiStatus: expired 분기 ───────────────────────────────────────────
 
+  it.each([
+    ['any', '성별 무관'],
+    ['무관', '성별 무관'],
+    ['남', '남'],
+    ['남녀 혼성', null],
+  ])('detail: 저장된 genderRule %s 은 응답에서 %s 로 정규화된다 (내부 코드 원문 비노출)', async (stored, expected) => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, genderRule: stored }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+    expect(result.genderRule).toBe(expected);
+  });
+
   it('detail: 상대팀 없이 startAt이 과거면 on_hold를 반환 (NOT_FOUND_OR_ARCHIVED 전이 없음)', async () => {
     // The recruiting + past startAt match should be visible as "expired", not 404.
     const teamMatch = {

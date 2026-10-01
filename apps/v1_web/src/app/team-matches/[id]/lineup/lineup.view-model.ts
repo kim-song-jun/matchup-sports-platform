@@ -36,6 +36,8 @@ export type RosterOption = {
   membershipId?: string;
   /** 이 경기 팀 일정 응답 — 팀장 참고용 읽기 전용 칩(H5). */
   rsvpStatus?: V1TeamMatchRsvpStatus | null;
+  /** 상대 팀에도 활성 멤버(W4-V4) — 칩으로 알리고 "모두 넣기"에서 기본으로 뺀다. 한 명씩 추가는 막지 않는다. */
+  alsoOpponentMember?: boolean;
 };
 
 /** 등번호순, 번호 없는 사람은 뒤, 같으면 이름순 — 명단과 후보가 같은 순서 규칙을 쓴다(H5). */
@@ -307,20 +309,33 @@ export function addRosterMemberToLineup(state: LineupEditorState, member: Roster
 /**
  * 아직 명단에 없는 팀원을 번호순으로 한 번에 넣는다("팀원 전원 추가", H5 A-1). 팀 번호가 이미 다른 행과
  * 겹치면 `addRosterMemberToLineup` 처럼 빈칸으로 둔다 — 겹친 사람 이름을 돌려줘 화면이 알린다.
+ * 상대 팀에도 소속된 팀원은 넣지 않고 이름만 돌려준다(W4-V4) — 두 팀 명단에 휩쓸려 들어가지 않게.
  */
 export function addAllRosterMembersToLineup(
   state: LineupEditorState,
   members: readonly RosterOption[],
-): { state: LineupEditorState; clearedJersey: string[] } {
+): { state: LineupEditorState; clearedJersey: string[]; skippedOpponent: string[] } {
   let next = state;
   const clearedJersey: string[] = [];
+  const skippedOpponent: string[] = [];
   for (const member of [...members].sort(compareByJersey)) {
     if (isPlaced(next, member)) continue;
+    if (member.alsoOpponentMember === true) {
+      skippedOpponent.push(member.displayName);
+      continue;
+    }
     const collides = member.jerseyNumber != null && findJerseyHolder(next, member.jerseyNumber) !== null;
     next = addRosterMemberToLineup(next, member);
     if (collides) clearedJersey.push(member.displayName);
   }
-  return { state: next, clearedJersey };
+  return { state: next, clearedJersey, skippedOpponent };
+}
+
+/** "모두 넣기"에서 뺀 두 팀 소속 팀원 안내(W4-V4). 뺀 사람이 없으면 null. */
+export function describeOpponentSkipped(names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+  const who = names.length === 1 ? `${names[0]}님은` : `${names[0]}님 외 ${names.length - 1}명은`;
+  return `상대 팀에도 소속된 ${who} 빼고 넣었어요. 이 경기에 우리 팀으로 뛰면 아래에서 한 명씩 추가해 주세요.`;
 }
 
 /** 이 등번호를 이미 쓰는 명단 행의 이름. 없으면 null. */

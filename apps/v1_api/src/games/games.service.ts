@@ -1268,13 +1268,14 @@ export class GamesService {
         // 하류는 이미 열려 있다: `end` 가 만드는 리비전은 `SUBMITTED` 이고(즉시 공식이
         // 아니다), 어드민 확정(`tournament-result-review.service.ts` 의 `withResultCommand`)
         // 은 Task 165 BE-1 이 `resolveGameSource` 로 바꿔 대회·리그를 함께 받는다.
+        let endingCancelledFixture = false;
         if (game.sourceType === V1GameSourceType.TEAM_MATCH && command === 'end') {
           const teamMatch =
             game.teamMatchId === null
               ? null
               : await tx.v1TeamMatch.findUnique({
                   where: { id: game.teamMatchId },
-                  select: { tournamentId: true, leagueId: true },
+                  select: { tournamentId: true, leagueId: true, status: true },
                 });
           // 팀매치 행을 못 찾는 경우도 막는 쪽으로 둔다 — 리그 대진임을 **확인했을 때만**
           // 연다(모르면 친선으로 취급하는 것이 안전한 기본값이다).
@@ -1288,12 +1289,18 @@ export class GamesService {
               message: 'Team matches end only through validated result submission',
             });
           }
+          endingCancelledFixture = teamMatch.status === V1TeamMatchStatus.cancelled;
         }
         if (command === 'start') {
-          await this.assertTournamentStartTeamsAssigned(tx, game);
+          await this.assertTournamentMatchStartable(tx, game);
         }
         assertClockNotDrifted(dto.occurredAt);
         this.requireTakeover(game.id, game.sourceType, context);
+        // 대진이 취소된 뒤 남은 게임(W4-V14)은 결과 없이 취소로 닫는다. 결과 경계를 타면
+        // 아래 C-1 주석의 사슬(취소 → completed → 자동 확정)이 다시 열린다.
+        if (endingCancelledFixture) {
+          return this.closeGameAsCancelled(tx, game, context);
+        }
 
         // 이슈 #375 — 구 `next-period`(fused 종료+시작, 배포 호환용으로만
         // 남겨둠 — GameCommandName.next_period의 @deprecated 문서 참고)와
@@ -1400,35 +1407,7 @@ export class GamesService {
           }
         }
         if (target === V1GameState.ENDED) {
-          // An operator can press "경기 종료" while the game is PAUSED (the
-          // console's PAUSED state offers exactly `resume`/`end`) — the period
-          // being closed here may still have an open pause segment. Fold it
-          // the same way `resume` would, so a period that ends mid-pause
-          // never leaves a dangling `pausedAt` and its final `pausedTotalMs`
-          // still excludes that last stoppage.
-          //
-          // 이슈 #375 — `state: LIVE`만 찾던 필터에 `HALFTIME`도 더한다.
-          // "경기 종료"는 game.state===LIVE인 동안 언제든 눌릴 수 있고,
-          // 하프타임도 이제 game.state===LIVE인 채 지속되는 실제 상태라
-          // 하프타임 도중 경기를 종료하는 경로가 새로 생겼다 — 다음
-          // 피리어드가 "시작도 안 했는데 ENDED도 아닌" HALFTIME으로 영원히
-          // 남는 대신 이 경로에서도 함께 ENDED로 닫는다. HALFTIME
-          // 피리어드는 애초에 pausedAt이 설정될 수 없으므로(pause는 LIVE
-          // 피리어드만 건드린다) resolveOpenPause는 안전하게 null을
-          // 돌려준다.
-          const livePeriods = await tx.v1GamePeriod.findMany({
-            where: {
-              gameId: game.id,
-              state: { in: [V1GamePeriodState.LIVE, V1GamePeriodState.HALFTIME] },
-            },
-          });
-          for (const period of livePeriods) {
-            const resolved = this.resolveOpenPause(period, now);
-            await tx.v1GamePeriod.update({
-              where: { id: period.id },
-              data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
-            });
-          }
+          await this.closeOpenPeriods(tx, game.id, now);
           // **리그 대진은 여기가 결과 경계다(결함 #29).** 콘솔의 `end` 가 곧 결과 보내기이므로
           // 친선의 결과 제출과 **같은 부수효과**를 태운다 — 안 그러면 `V1TeamMatch` 가
           // `matched` 로 남아 `reviews.service.ts` 의 `isCompleted` 가 409
@@ -1438,10 +1417,11 @@ export class GamesService {
           // canonical tournament matches also carry a TeamMatch; friendly matches
           // have no competition id and naturally skip this league completion path.
           if (updated.teamMatchId !== null) {
-            // **취소된 대진은 여기서 막는다(결함 #29 C-1).** 대진 취소 경로
-            // (`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 **게임을 건드리지 않아서**
-            // LIVE 이던 게임이 그대로 남고, 콘솔의 "경기 종료" 가 눌린다. 그대로 두면
-            // 완료 처리가 `cancelled` 를 `completed` 로 바꾸고, 24시간 뒤 자동 승인 잡의
+            // **취소된 대진은 결과 경계에 들어오면 안 된다(결함 #29 C-1).** 대진 취소 경로
+            // (`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 게임을 건드리지 않아 콘솔의
+            // "경기 종료" 가 눌린다 — 그 경우는 위 `endingCancelledFixture` 가 먼저 취소로 닫고,
+            // 이 가드는 그 밖의 비매칭 상태를 막는 마지막 줄이다. 들어오면 완료 처리가
+            // `cancelled` 를 `completed` 로 바꾸고, 24시간 뒤 자동 승인 잡의
             // `revision.teamMatchStatus === 'cancelled'` 가드가 **이미 바뀐 값을 읽어** 통과해
             // **취소된 경기가 공식 결과가 된다**(그 가드의 주석이 정확히 이 시나리오다).
             // 순위표의 `status === 'cancelled'` 필터도 같은 이유로 뚫린다.
@@ -1831,23 +1811,60 @@ export class GamesService {
       },
       async (tx, game, context) => {
         this.assertLifecycle(game.sourceType, 'CANCEL', game.state, V1GameState.CANCELLED);
-        const updated = await tx.v1Game.update({
-          where: { id: game.id },
-          data: { state: V1GameState.CANCELLED, version: { increment: 1 } },
-        });
-        await tx.v1GameVisibilityPolicy.update({
-          where: { gameId },
-          data: { mode: V1VisibilityMode.STATUS_ONLY, lineupAt: null, version: { increment: 1 } },
-        });
-        return {
-          gameId,
-          state: updated.state,
-          version: updated.version,
-          durableCommandId: context.durableCommandId,
-          replayed: false,
-        };
+        return this.markGameCancelled(tx, game.id, context);
       },
     );
+  }
+
+  /** 대진이 취소된 뒤 남은 게임을 콘솔 종료로 닫는다 — 결과 리비전도, 대진 완료 처리도 만들지 않는다. */
+  private async closeGameAsCancelled(
+    tx: Transaction,
+    game: Pick<LockedGame, 'id' | 'sourceType' | 'state'>,
+    context: GameCommandContext,
+  ): Promise<GameMutationResult> {
+    this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, V1GameState.CANCELLED);
+    await this.closeOpenPeriods(tx, game.id, new Date());
+    return this.markGameCancelled(tx, game.id, context);
+  }
+
+  private async markGameCancelled(
+    tx: Transaction,
+    gameId: string,
+    context: GameCommandContext,
+  ): Promise<GameMutationResult> {
+    const updated = await tx.v1Game.update({
+      where: { id: gameId },
+      data: { state: V1GameState.CANCELLED, version: { increment: 1 } },
+    });
+    await tx.v1GameVisibilityPolicy.update({
+      where: { gameId },
+      data: { mode: V1VisibilityMode.STATUS_ONLY, lineupAt: null, version: { increment: 1 } },
+    });
+    return {
+      gameId,
+      state: updated.state,
+      version: updated.version,
+      durableCommandId: context.durableCommandId,
+      replayed: false,
+    };
+  }
+
+  /**
+   * 게임을 닫을 때 열린 피리어드(LIVE·HALFTIME)를 함께 닫는다. 일시 중지 중이던 피리어드는
+   * `resume` 과 같은 방식으로 멈춘 구간을 접어 `pausedAt` 이 남지 않게 한다. HALFTIME 은
+   * `pausedAt` 이 설정될 수 없어(pause 는 LIVE 만 건드린다) `resolveOpenPause` 가 null 이다.
+   */
+  private async closeOpenPeriods(tx: Transaction, gameId: string, now: Date): Promise<void> {
+    const openPeriods = await tx.v1GamePeriod.findMany({
+      where: { gameId, state: { in: [V1GamePeriodState.LIVE, V1GamePeriodState.HALFTIME] } },
+    });
+    for (const period of openPeriods) {
+      const resolved = this.resolveOpenPause(period, now);
+      await tx.v1GamePeriod.update({
+        where: { id: period.id },
+        data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
+      });
+    }
   }
 
   async assertReadAccess(user: V1AuthUser, gameId: string): Promise<void> {
@@ -4796,8 +4813,12 @@ export class GamesService {
     }
   }
 
-  /** Tournament-owned matches cannot be kicked off while either bracket side is TBD. */
-  private async assertTournamentStartTeamsAssigned(
+  /**
+   * Tournament-owned matches cannot be kicked off while either bracket side is TBD, nor once the
+   * fixture is cancelled — fixture cancellation leaves the game untouched, so a console left open
+   * could otherwise start a game nobody can end with a result (W4-V14).
+   */
+  private async assertTournamentMatchStartable(
     tx: Transaction,
     game: Pick<LockedGame, 'id' | 'sourceType' | 'teamMatchId'>,
   ): Promise<void> {
@@ -4806,6 +4827,9 @@ export class GamesService {
       if (game.teamMatchId === null) return;
       const competition = await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId);
       if (competition === null) return;
+      if (competition.status === V1TeamMatchStatus.cancelled) {
+        throw new ConflictException({ code: 'TOURNAMENT_MATCH_CANCELLED', message: '취소된 대진이라 경기를 시작할 수 없어요.' });
+      }
       const match = await tx.v1TeamMatch.findUniqueOrThrow({
         where: { id: game.teamMatchId },
         select: {
@@ -6784,7 +6808,7 @@ export class GamesService {
     if (!reachedPlayableState) {
       throw new ConflictException({
         code: 'TEAM_MATCH_NOT_MATCHED',
-        message: 'Only a matched team match with an approved opponent can draft or submit a result',
+        message: '상대 팀이 확정된 경기만 결과를 입력하거나 보낼 수 있어요.',
       });
     }
   }

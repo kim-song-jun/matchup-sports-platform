@@ -15,13 +15,13 @@ import { randomUuid } from '@/lib/uuid';
 import { MultiPresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
+import { GENDER_RULE_OPTIONS } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const MATCH_STYLE_OPTIONS = ['친선', '매너 중시', '교환매치', '실력 중심', '초보 환영', '기타'] as const;
 const UNIFORM_COLOR_OPTIONS = ['흰색', '검정', '빨강', '파랑', '노랑', '초록', '주황', '남색'] as const;
-const GENDER_OPTIONS = ['성별 무관', '남', '여'] as const;
 
 function formatOptions(sport?: { code?: string; name: string }) {
   const value = (sport?.code ?? sport?.name ?? '').toLowerCase();
@@ -221,7 +221,7 @@ export default function AdminTeamMatchNewPage() {
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 성별 조건
                 <select aria-label="성별 조건" value={genderRule} onChange={(event) => setGenderRule(event.target.value)} className={"mt-1 " + inputClass}>
-                  {GENDER_OPTIONS.map((gender) => <option key={gender} value={gender}>{gender}</option>)}
+                  {GENDER_RULE_OPTIONS.map((gender) => <option key={gender} value={gender}>{gender}</option>)}
                 </select>
               </label>
             </div>

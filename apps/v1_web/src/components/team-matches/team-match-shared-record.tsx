@@ -22,7 +22,7 @@ import {
   type RecordCommand,
 } from '@/hooks/use-team-match-record';
 import { extractErrorMessage } from '@/lib/error-message';
-import { V1ApiError } from '@/lib/api-client';
+import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
@@ -207,7 +207,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
     if (data) previousVersion.current = data.version;
   }, [data]);
 
-  const uncertain = mutation.isError && (!(mutation.error instanceof V1ApiError) || mutation.error.statusCode >= 500);
+  const uncertain = mutation.isError && (!(mutation.error instanceof V1ApiError) || isV1NetworkError(mutation.error) || mutation.error.statusCode >= 500);
   async function command(input: Omit<RecordCommand, 'commandId' | 'expectedVersion'>, version = data?.version ?? 0) {
     try {
       await mutation.mutateAsync({ ...input, expectedVersion: version, commandId: randomUuid() });

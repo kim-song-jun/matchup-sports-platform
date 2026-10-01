@@ -127,6 +127,8 @@ describe('팀 해체 — 막는 조건이 남은 팀(A-3)', () => {
     expect(screen.getByText('아래 3가지를 먼저 정리해 주세요. 정리하고 나면 바로 해체할 수 있어요.')).toBeInTheDocument();
     const list = within(screen.getByRole('list', { name: '해체를 막는 조건' }));
     expect(list.getByText('상대가 정해진 팀매치 1건')).toBeInTheDocument();
+    // W4-V9: 일시와 장소도 앞 항목들처럼 " · "로 나눈다.
+    expect(list.getByText('QA0929 마포 FC 친선 · vs 합정 유나이티드 · 10/3 (토) 20:00 · 망원 유수지 풋살장')).toBeInTheDocument();
     expect(list.getByRole('link', { name: '경기 취소하러 가기' })).toHaveAttribute('href', '/team-matches/tm-1');
     expect(list.getByText('참가 중인 리그 1건')).toBeInTheDocument();
     expect(list.getByRole('link', { name: '참가 취소 요청하기' })).toHaveAttribute('href', '/tournaments/league-1/my');

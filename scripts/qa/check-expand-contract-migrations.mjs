@@ -43,6 +43,31 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20261001220000_v1_team_invitation_history/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_invitations_pending_key" ON "v1_team_invitations"("team_id", "invited_user_id") ' +
+      'WHERE "status" = \'pending\'',
+    reason:
+      'Task 180 W4-V8 (one row per invitation), reviewed 2026-10-01. The gate rejects CREATE UNIQUE INDEX on an existing table ' +
+      'because existing rows could collide; here they cannot. The full unique v1_team_invitations_team_id_invited_user_id_key is ' +
+      'still in place when this runs (it is dropped two statements later in the same file), so every (team_id, invited_user_id) ' +
+      'has at most one row and hence at most one pending row. The new index is strictly looser than that full unique. A hand ' +
+      're-run that met duplicate pending rows would fail and roll back with the old unique intact, which is intended: picking ' +
+      'which invitation to cancel is not a migration decision.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20261001220000_v1_team_invitation_history/migration.sql',
+    statement: 'DROP INDEX IF EXISTS "v1_team_invitations_team_id_invited_user_id_key"',
+    reason:
+      'Task 180 W4-V8, reviewed 2026-10-01. DROP only relaxes a constraint, and the pending-only partial unique created above ' +
+      'keeps "one pending invitation per (team, user)" enforced throughout. Old instances still mid-rollout (or an app-image ' +
+      'rollback) keep working: their findUnique on (teamId, invitedUserId) is a plain two-column WHERE served by the plain index ' +
+      'added just above, and their re-invite path revives a row in place, so they never add rows. Once the new app has added ' +
+      'closed history rows, an old instance may pick a closed row and try to revive it while a pending one exists; the partial ' +
+      'unique rejects that with P2002 (a 500 on that one request), so no duplicate pending row can appear. Already overwritten ' +
+      'history is not restored (user decision W4-V8-backfill).',
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20260927163000_v1_platform_recruitment_first_home/migration.sql",
     statement: "UPDATE \"v1_team_matches\" AS \"team_match\" SET \"host_team_id\" = \"approved\".\"applicant_team_id\", \"updated_at\" = CURRENT_TIMESTAMP FROM ( SELECT \"team_match_id\", \"applicant_team_id\" FROM ( SELECT \"team_match_id\", \"applicant_team_id\", COUNT(*) OVER (PARTITION BY \"team_match_id\") AS \"approved_count\" FROM \"v1_team_match_applications\" WHERE \"status\" = 'approved' ) AS \"approved_application\" WHERE \"approved_count\" = 1 ) AS \"approved\" WHERE \"team_match\".\"id\" = \"approved\".\"team_match_id\" AND \"team_match\".\"platform_managed\" = true AND \"team_match\".\"status\" = 'recruiting' AND \"team_match\".\"host_team_id\" IS NULL AND \"team_match\".\"approved_applicant_team_id\" IS NULL AND \"team_match\".\"league_id\" IS NULL AND \"team_match\".\"tournament_id\" IS NULL",
     reason: "Task 149 review 2026-09-27: backfills host_team_id only for standalone platform recruitments still recruiting with exactly one approved application, writing the same team the pre-change second approval assigns as HOME (its first approved applicant), so rollback to the previous API sees a state it would itself produce. Every previous-API host path (application approve/reject, manage, viewer host_team state, manage link) is gated on platformManaged, and applying with the approved team was already refused as ALREADY_APPROVED. The host_team_id IS NULL guard makes reruns a no-op; no row is deleted and no schema changes.",

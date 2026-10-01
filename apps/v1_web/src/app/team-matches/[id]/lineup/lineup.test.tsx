@@ -15,6 +15,7 @@ import {
   compareByJersey,
   describeGoalkeeperNotice,
   describeLineupSizeNotice,
+  describeOpponentSkipped,
   describePublicationCountdown,
   describePublicationNotice,
   findJerseyHolder,
@@ -665,6 +666,31 @@ describe('TeamMatchLineupPageClient', () => {
     const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
     expect(notDesignated).toBeDisabled();
     expect(notDesignated.querySelector('svg')).toBeNull();
+    // 잠긴 명단에서도 머리글이 GK 열의 뜻을 말한다(W4-V1).
+    expect(screen.getByText('골키퍼')).toBeInTheDocument();
+  });
+
+  // W4-V1 — 행의 두 "+"(번호·골키퍼)는 모양이 같다. 무엇인지는 목록 맨 위 머리글 한 줄이 말한다.
+  it('참석명단 맨 위에 "번호 · 이름 · 골키퍼" 머리글이 있고, 화면용이라 스크린리더 트리에는 없다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        starters: [
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    const header = screen.getByText('골키퍼').closest('[aria-hidden="true"]');
+    expect(header).not.toBeNull();
+    expect(header).toHaveTextContent(/^번호이름골키퍼/);
+    // 스크린리더는 지금처럼 각 버튼 이름으로 듣는다 — 미지정 행에는 여전히 "GK" 글자가 없다(2026-09-08).
+    expect(screen.getByRole('button', { name: '홍길동 등번호 넣기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' })).not.toHaveTextContent('GK');
   });
 
   // H5 A-1 — 빈 목록에서 한 명씩 누르지 않게, 전원 넣기와 지난 경기 명단이 먼저 보인다.
@@ -1584,6 +1610,49 @@ describe('TeamMatchLineupPageClient — H5 참석명단', () => {
     expect(screen.getByRole('button', { name: '홍길동 등번호 11번 바꾸기' })).toBeInTheDocument();
   });
 
+  // W4-V10 결정 C — 전술보드는 팀 번호만 읽는다(H7). 팀 번호가 없는 선수는 입구에서 "함께"가 기본이다.
+  it('W4-V10: 팀 번호가 없는 선수는 "팀 번호도 함께"가 기본이라 그대로 저장하면 팀 번호도 생긴다', () => {
+    hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onSuccess: () => void }) => options.onSuccess());
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [...members, { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: null }] },
+      isLoading: false,
+    });
+    renderLineup({ starters: [starter('user-3', '이영희', null)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '이영희 등번호 넣기' }));
+    const sheet = screen.getByRole('dialog', { name: '이영희 등번호' });
+    expect(within(sheet).getByLabelText('팀 번호도 함께 바꿔요')).toBeChecked();
+    expect(within(sheet).getByText(/지금 팀 번호가 없어서 함께 저장하는 게 기본이에요/)).toBeInTheDocument();
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '10' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '10번으로 저장' }));
+
+    expect(hoisted.changeJerseyMutate).toHaveBeenCalledWith({ membershipId: 'm-3', jerseyNumber: 10 }, expect.anything());
+  });
+
+  it('W4-V10: "이 경기만"으로 팀 번호와 달라지면 그 결과를 바로 알린다 — 팀 번호가 있는 선수는 지금처럼 "이 경기만"이 기본', () => {
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [...members, { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: null }] },
+      isLoading: false,
+    });
+    renderLineup({ starters: [starter('user-1', '홍길동', 7), starter('user-3', '이영희', null)] });
+
+    fireEvent.click(screen.getByRole('button', { name: '이영희 등번호 넣기' }));
+    const sheet = screen.getByRole('dialog', { name: '이영희 등번호' });
+    fireEvent.click(within(sheet).getByLabelText('이 경기만 바꿔요'));
+    fireEvent.change(within(sheet).getByLabelText('등번호'), { target: { value: '10' } });
+    expect(within(sheet).getByText('이 경기 참석명단에만 10번이 돼요. 전술보드와 다음 경기에는 팀 번호(없음)가 보여요.')).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: '10번으로 저장' }));
+    expect(hoisted.changeJerseyMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 등번호 7번 바꾸기' }));
+    const other = screen.getByRole('dialog', { name: '홍길동 등번호' });
+    expect(within(other).getByLabelText('이 경기만 바꿔요')).toBeChecked();
+    // 팀 번호와 같은 동안은 알릴 차이가 없다.
+    expect(within(other).queryByText(/이 경기 참석명단에만/)).not.toBeInTheDocument();
+    fireEvent.change(within(other).getByLabelText('등번호'), { target: { value: '11' } });
+    expect(within(other).getByText('이 경기 참석명단에만 11번이 돼요. 전술보드와 다음 경기에는 팀 번호(7번)가 보여요.')).toBeInTheDocument();
+  });
+
   it('D-5 번호 시트: 팀 번호 저장이 실패하면 초안도 그대로 두고 이유를 보인다', () => {
     hoisted.changeJerseyMutate.mockImplementation((_vars: unknown, options: { onError: (error: Error) => void }) =>
       options.onError(new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_JERSEY_NUMBER_TAKEN', message: '이미 같은 등번호를 쓰는 팀원이 있어요.', timestamp: '2026-09-30T00:00:00.000Z' })),
@@ -1697,5 +1766,100 @@ describe('TeamMatchLineupPageClient — H5 참석명단', () => {
     expect(within(sheet).getByText('9/23 (수) vs 합정 유나이티드 · 2명')).toBeInTheDocument();
     expect(within(sheet).queryByText(/상대팀/)).not.toBeInTheDocument();
     expect(within(sheet).queryByText(/선발/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * W4-V4 결정 B — 두 팀에 모두 속한 팀원은 알리고(칩) "모두 넣기"에서만 기본으로 뺀다. 한 명씩 추가는 막지 않는다.
+ * 대조군을 양쪽에 둔다: 양 팀 소속(홍길동) / 우리 팀만(김철수·이영희). 좁히는 변경이라 "여전히 들어간다"도 함께 잰다.
+ */
+describe('lineup.view-model — 상대 팀에도 소속된 팀원 (W4-V4)', () => {
+  it('전원 추가는 상대 팀에도 소속된 팀원만 빼고, 우리 팀만 소속인 사람은 그대로 넣는다', () => {
+    const { state, skippedOpponent } = addAllRosterMembersToLineup(createEmptyLineupEditorState(1), [
+      { userId: 'u-1', displayName: '가', role: 'member', jerseyNumber: 1, alsoOpponentMember: true },
+      { userId: 'u-2', displayName: '나', role: 'member', jerseyNumber: 2, alsoOpponentMember: false },
+      { userId: 'u-3', displayName: '다', role: 'member', jerseyNumber: 3 },
+    ]);
+    expect(state.participants.map((entry) => entry.displayName)).toEqual(['나', '다']);
+    expect(skippedOpponent).toEqual(['가']);
+  });
+
+  it('뺀 사람이 없으면 안내가 없고, 한 명이면 이름만, 여럿이면 "외 N명"이다', () => {
+    expect(describeOpponentSkipped([])).toBeNull();
+    expect(describeOpponentSkipped(['가'])).toBe(
+      '상대 팀에도 소속된 가님은 빼고 넣었어요. 이 경기에 우리 팀으로 뛰면 아래에서 한 명씩 추가해 주세요.',
+    );
+    expect(describeOpponentSkipped(['가', '나', '다', '라'])).toMatch(/^상대 팀에도 소속된 가님 외 3명은 빼고 넣었어요\./);
+  });
+});
+
+describe('TeamMatchLineupPageClient — 상대 팀에도 소속된 팀원 (W4-V4)', () => {
+  const members = [
+    { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active', jerseyNumber: 7 },
+    { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active', jerseyNumber: 9 },
+    { membershipId: 'm-3', userId: 'user-3', displayName: '이영희', role: 'member', status: 'active', jerseyNumber: null },
+  ];
+  const eligible = (userId: string, displayName: string, alsoOpponentMember: boolean) => ({
+    userId, displayName, jerseyNumber: null, attending: true, rsvpStatus: null, alsoOpponentMember,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: baseTeamMatch(), isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: members }, isLoading: false });
+    hoisted.useV1GameMock.mockReturnValue({ data: undefined, isLoading: false });
+    hoisted.useV1TeamLineupHistoryMock.mockReturnValue({ data: undefined, isLoading: false });
+  });
+
+  function renderWith(eligibleMembers: ReturnType<typeof eligible>[]) {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({ eligibleMembers }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+  }
+
+  it('"모두 넣기"는 두 팀 소속을 빼고 넣으며 알리고, 그 사람은 칩과 함께 한 명씩 추가할 수 있다', () => {
+    renderWith([eligible('user-1', '홍길동', true), eligible('user-2', '김철수', false), eligible('user-3', '이영희', false)]);
+
+    // 버튼이 말하는 인원 = 실제로 들어가는 인원.
+    fireEvent.click(screen.getByRole('button', { name: '팀원 2명 모두 넣기' }));
+
+    expect(screen.getByText('참석명단 (2)')).toBeInTheDocument();
+    expect(screen.getByText(/^상대 팀에도 소속된 홍길동님은 빼고 넣었어요\./)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '김철수 등번호 9번 바꾸기' })).toBeInTheDocument();
+    expect(screen.getByText('추가할 팀원 (1)')).toBeInTheDocument();
+    expect(screen.getAllByText('상대 팀에도 소속')).toHaveLength(1);
+
+    // 막지 않는다 — 우리 팀으로 뛰면 한 번 더 눌러 넣고, 명단 행에도 칩이 따라간다.
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에 추가' }));
+    expect(screen.getByText('참석명단 (3)')).toBeInTheDocument();
+    const row = screen.getByRole('button', { name: '홍길동 등번호 7번 바꾸기' }).closest('li');
+    expect(row).toHaveTextContent('상대 팀에도 소속');
+    expect(screen.getAllByText('상대 팀에도 소속')).toHaveLength(1);
+  });
+
+  it('대조군 — 두 팀 소속이 없으면 칩도 안내도 없이 전원이 들어간다', () => {
+    renderWith([eligible('user-1', '홍길동', false), eligible('user-2', '김철수', false), eligible('user-3', '이영희', false)]);
+
+    fireEvent.click(screen.getByRole('button', { name: '팀원 3명 모두 넣기' }));
+
+    expect(screen.getByText('참석명단 (3)')).toBeInTheDocument();
+    expect(screen.queryByText('상대 팀에도 소속')).not.toBeInTheDocument();
+    expect(screen.queryByText(/빼고 넣었어요/)).not.toBeInTheDocument();
+  });
+
+  it('남은 팀원이 모두 두 팀 소속이면 "모두 넣기" 대신 후보 목록에서 한 명씩 넣는다', () => {
+    renderWith([eligible('user-1', '홍길동', true), eligible('user-2', '김철수', true), eligible('user-3', '이영희', true)]);
+
+    expect(screen.queryByRole('button', { name: /모두 넣기/ })).not.toBeInTheDocument();
+    expect(screen.getByText('추가할 팀원 (3)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '이영희 참석명단에 추가' }));
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
   });
 });

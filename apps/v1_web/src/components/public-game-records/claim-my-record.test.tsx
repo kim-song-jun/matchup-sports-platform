@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { V1ApiError } from '@/lib/api-client';
 import { ClaimMyRecordSection, LeagueClaimMyRecordSection, TeamMatchClaimMyRecordSection } from './claim-my-record';
 
 /**
@@ -15,11 +16,14 @@ import { ClaimMyRecordSection, LeagueClaimMyRecordSection, TeamMatchClaimMyRecor
 const claimableMock = vi.fn();
 const leagueClaimableMock = vi.fn();
 const requestMutateMock = vi.fn();
+const verifiedAuth = { data: { user: { id: 'u-1' } }, error: null, isError: false, isPending: false, isFetching: false };
+const authMeMock = vi.fn(() => verifiedAuth);
 const leagueRequestMutateMock = vi.fn();
 const teamMatchClaimableMock = vi.fn();
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatchClaimableParticipants: (...args: unknown[]) => teamMatchClaimableMock(...args),
   useV1TeamMatchRequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1AuthMe: () => authMeMock(),
   useV1ClaimableParticipants: (...args: unknown[]) => claimableMock(...args),
   useV1RequestIdentityLink: () => ({ mutate: requestMutateMock, isPending: false }),
   useV1LeagueClaimableParticipants: (...args: unknown[]) => leagueClaimableMock(...args),
@@ -195,5 +199,89 @@ describe('명단에서 나 찾기 — 후보 0명의 두 상태(rosterCount)', (
     fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
 
     expect(screen.getByRole('dialog', { name: '아직 제출된 경기 명단이 없어요' })).toBeInTheDocument();
+  });
+});
+
+describe('비로그인(게스트) — 이슈 #1401', () => {
+  const guestAuth = {
+    data: undefined,
+    error: new V1ApiError({
+      status: 'error',
+      statusCode: 401,
+      code: 'UNAUTHENTICATED',
+      message: 'V1 authentication is required',
+      requestId: 'req-1',
+      timestamp: '2026-10-01T00:00:00.000Z',
+    }),
+    isError: true,
+    isPending: false,
+    isFetching: false,
+  };
+
+  it('보호된 후보 API 를 부르지 않고, 로그인 안내와 현재 경로로 돌아오는 로그인 링크를 보여준다', () => {
+    authMeMock.mockReturnValue(guestAuth as never);
+    claimableMock.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
+    window.history.pushState({}, '', '/tournaments/t-1/matches/f-1?tab=lineup');
+
+    render(<ClaimMyRecordSection tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(claimableMock).not.toHaveBeenCalledWith('t-1', 'f-1', { enabled: true });
+    expect(screen.getByText('로그인이 필요해요')).toBeInTheDocument();
+    expect(screen.queryByText(/authentication is required/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이 선수가 저예요' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '로그인하기' })).toHaveAttribute(
+      'href',
+      `/login?redirect=${encodeURIComponent('/tournaments/t-1/matches/f-1?tab=lineup')}`,
+    );
+  });
+
+  it('로그인 사용자는 기존 흐름대로 후보를 조회하고 신청한다', () => {
+    authMeMock.mockReturnValue(verifiedAuth);
+    requestMutateMock.mockClear();
+    claimableMock.mockReturnValue({
+      data: {
+        gameId: 'g-1',
+        version: 3,
+        participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<ClaimMyRecordSection tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(claimableMock).toHaveBeenLastCalledWith('t-1', 'f-1', { enabled: true });
+    expect(screen.queryByText('로그인이 필요해요')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /홍길동/ }));
+    fireEvent.click(screen.getByRole('button', { name: '이 선수가 저예요' }));
+    expect(requestMutateMock).toHaveBeenCalledWith(
+      { gameId: 'g-1', participantId: 'p-1', expectedVersion: 3 },
+      expect.anything(),
+    );
+  });
+
+  it('/auth/me 가 5xx 로 실패하면 신청 UI 대신 확인 실패 안내와 다시 확인·닫기만 보인다', () => {
+    authMeMock.mockReturnValue({
+      data: undefined,
+      error: new V1ApiError({ status: 'error', statusCode: 503, code: 'INTERNAL_ERROR', message: 'down', timestamp: '2026-10-01T00:00:00.000Z' }),
+      isError: true,
+      isPending: false,
+      isFetching: false,
+    } as never);
+    claimableMock.mockClear();
+    claimableMock.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
+
+    render(<ClaimMyRecordSection tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    expect(claimableMock).not.toHaveBeenCalledWith('t-1', 'f-1', { enabled: true });
+    expect(screen.getByText('로그인 상태를 확인하지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByText('명단에서 본인을 골라 주세요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이 선수가 저예요' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 확인' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '닫기' })).toBeInTheDocument();
   });
 });

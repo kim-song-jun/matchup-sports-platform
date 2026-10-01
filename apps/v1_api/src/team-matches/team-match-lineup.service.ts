@@ -981,6 +981,24 @@ export class TeamMatchLineupService {
       }),
     ]);
     const rsvpByUserId = new Map(schedule?.attendance.map((row) => [row.userId, row.status] as const) ?? []);
+    // W4-V4: 상대 팀에도 활성 멤버인 우리 팀원(안내 칩·"모두 넣기" 제외용). 상대 참석명단은 읽지 않는다 —
+    // 공개 전에 상대 명단 내용이 새지 않게(H5). 상대 팀이 멤버 목록을 비공개로 둬도 우리 팀원 본인의 소속이라 싣는다.
+    // 저장·추가 자격과는 무관하다(서버는 두 팀 명단에 모두 있는 것을 막지 않는다).
+    const alsoOpponentIds =
+      context.opponentTeamId === null || memberships.length === 0
+        ? new Set<string>()
+        : new Set(
+            (
+              await tx.v1TeamMembership.findMany({
+                where: {
+                  teamId: context.opponentTeamId,
+                  status: 'active',
+                  userId: { in: memberships.map((membership) => membership.userId) },
+                },
+                select: { userId: true },
+              })
+            ).map((row) => row.userId),
+          );
     return memberships.map((membership) => ({
       userId: membership.userId,
       displayName:
@@ -991,6 +1009,7 @@ export class TeamMatchLineupService {
         schedule === null
           ? null
           : ((rsvpByUserId.get(membership.userId) ?? 'NO_RESPONSE') satisfies TeamMatchLineupRsvpStatus),
+      alsoOpponentMember: alsoOpponentIds.has(membership.userId),
     }));
   }
 

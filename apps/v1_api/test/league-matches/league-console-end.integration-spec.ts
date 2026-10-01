@@ -356,9 +356,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     await run(friendlyGameId, 'start', 'console-end-friendly-start');
     friendlyEnd = await capture(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
 
-    // **C-1 재현: 진행 중에 대진이 취소된 상황.** 우천 중단·팀 이탈로 운영자가 대진을
-    // 취소하는 경로(`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 **게임을 건드리지
-    // 않는다** — LIVE 이던 게임은 LIVE 로 남는다. 그래서 콘솔의 "경기 종료" 가 그대로 눌린다.
+    // **C-1 재현: 진행 중에 대진이 취소된 상황.** 대진 취소 경로는 게임을 건드리지 않아 LIVE
+    // 이던 게임이 LIVE 로 남는다. `cancelFixture` 는 이제 진행 중 경기를 409 로 막지만
+    // `regenerateFixtures`/`removeTeam` 과 이미 그렇게 된 데이터에는 이 상태가 있다.
     await run(cancelledGameId, 'start', 'console-end-cancelled-start');
     await prisma.v1TeamMatch.update({
       where: { id: ids.cancelledMatch },
@@ -437,15 +437,21 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     ]);
   });
 
-  it('취소된 리그 대진은 콘솔로 끝낼 수 없다 — 되살아나면 24시간 뒤 자동 확정된다 (C-1)', () => {
-    // 이걸 열어 두면 **취소된 경기가 공식 결과가 된다.** 사슬이 이렇다:
-    //   대진 취소는 게임을 안 끝낸다(LIVE 유지) → 콘솔 `end` 통과 → 완료 처리가
-    //   `cancelled` 를 `completed` 로 바꾼다 → 24시간 뒤 자동 승인 잡의
-    //   `revision.teamMatchStatus === 'cancelled'` 가드가 **이미 바뀐 값을 읽어** 통과 →
-    //   OFFICIAL. 그 가드의 자기 주석이 정확히 이 시나리오를 적고 있다.
-    //   순위표의 `status === 'cancelled'` 필터도 같은 이유로 뚫린다.
-    // 즉 **가드를 지운 게 아니라 가드가 보는 값을 바꿔서** 같은 결과를 만든다.
-    expect(httpBody(cancelledEnd)).toEqual({ status: 409, code: 'TEAM_MATCH_NOT_MATCHED' });
+  it('취소된 리그 대진의 게임은 콘솔 종료로 결과 없이 취소로 닫힌다 (W4-V14)', async () => {
+    // 409 로 막아 두면 진행 중에 대진이 취소된 게임을 끝낼 길이 없어 공개 화면의 LIVE 시계가
+    // 영원히 돈다. 그렇다고 결과 경계를 태우면 C-1 사슬이 열린다: 완료 처리가 `cancelled` 를
+    // `completed` 로 바꾸고, 24시간 뒤 자동 승인 잡의 `teamMatchStatus === 'cancelled'` 가드가
+    // 바뀐 값을 읽어 통과해 취소된 경기가 공식 결과가 된다(아래 테스트가 그 쪽을 지킨다).
+    expect(cancelledEnd.ok && cancelledEnd.value.state).toBe(V1GameState.CANCELLED);
+    const game = await prisma.v1Game.findUniqueOrThrow({
+      where: { id: cancelledGameId },
+      select: { state: true, periods: { select: { state: true } }, visibilityPolicy: { select: { mode: true } } },
+    });
+    expect(game.state).toBe(V1GameState.CANCELLED);
+    // 열린 피리어드가 남으면 관전 화면 시계가 그 피리어드로 계속 흐른다. 개수부터 본다.
+    expect(game.periods.length).toBeGreaterThan(0);
+    expect(game.periods.some((period) => period.state === 'LIVE' || period.state === 'HALFTIME')).toBe(false);
+    expect(game.visibilityPolicy?.mode).toBe('STATUS_ONLY');
   });
 
   it('취소된 대진은 상태도 결과도 그대로다 — 되살아나지 않는다 (C-1)', async () => {

@@ -554,7 +554,9 @@ export const gameSchemaSourceManifest = {
   // 2026-10-01 Task 180 G12: additive V1TeamInviteLink table (+ V1Team/V1User back-relations) backed by
   // 20261001210000_v1_team_invite_links. No game model changed; bound historical migration unchanged.
   // 2026-10-01 merge: dev's Task 181 ②③ + this branch's Task 180 G12, re-pinned on the merged file.
-  schema: '3caf90ad046677aaa8f8d9f2d7738bd7ee20bfb106b61802fe63189ef7ddc813',
+  // 2026-10-01 Task 180 W4-V8: V1TeamInvitation @@unique([teamId, invitedUserId]) -> @@index (one row per invite);
+  // the pending-only partial unique lives in 20261001220000_v1_team_invitation_history SQL. No game model changed.
+  schema: 'eef298c3f325d99eb5940e5a466cf6e37404c3291167afcefaa1c572a5ee7930',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -3,11 +3,13 @@
  *
  * 우선순위:
  *   1. Axios 스타일 에러: err.response.data.message 또는 err.response.data.error
- *   2. 직접 message 프로퍼티: err.message
+ *   2. 직접 message 프로퍼티: err.message — 단 서버가 메시지를 주지 않은 V1ApiError 는 fallback
  *   3. fallback 문자열
  */
 export function extractErrorMessage(err: unknown, fallback: string): string {
   if (!err || typeof err !== 'object') return fallback;
+  // V1ApiError.displayableMessage — 서버가 메시지를 주지 않았으면 message 는 로그용 자리표시다.
+  if ((err as { displayableMessage?: unknown }).displayableMessage === false) return fallback;
 
   // Axios-style: err.response.data.message or err.response.data.error
   const maybeAxios = err as {

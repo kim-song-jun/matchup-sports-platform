@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post, retryTransientFailure } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
@@ -44,11 +45,23 @@ export type RecordCommand = {
 };
 const key = (id: string) => [...v1Keys.teamMatch(id), 'shared-record'];
 export function useTeamMatchRecord(id: string, enabled = true) {
-  return useQuery({
+  const client = useQueryClient();
+  const query = useQuery({
     queryKey: key(id), queryFn: () => v1Get<SharedRecord>(`/team-matches/${id}/record`), enabled: !!id && enabled,
     refetchInterval: (query) => query.state.data?.phase === 'live' ? 2000 : query.state.data?.phase === 'scheduled' ? 15000 : false,
     refetchOnWindowFocus: true, retry: retryTransientFailure,
   });
+  // 참석명단의 `lateAdditionAllowed`(늦게 온 선수 추가)는 첫 기록·결과 확정으로 서버에서 열리고 닫힌다 — 누가 기록했든
+  // (내 저장 응답이든 상대 기록의 폴링이든) 기록 버전이 바뀌면 다시 읽는다. 이 훅을 여러 곳이 써도 요청은 하나만 나간다.
+  const version = query.data?.version;
+  const seenVersion = useRef(version);
+  useEffect(() => {
+    if (version === undefined || seenVersion.current === version) return;
+    const firstLoad = seenVersion.current === undefined;
+    seenVersion.current = version;
+    if (!firstLoad) void client.invalidateQueries({ queryKey: v1Keys.teamMatchLineup(id), exact: true }, { cancelRefetch: false });
+  }, [client, id, version]);
+  return query;
 }
 export function useMutateTeamMatchRecord(id: string) {
   const client = useQueryClient();

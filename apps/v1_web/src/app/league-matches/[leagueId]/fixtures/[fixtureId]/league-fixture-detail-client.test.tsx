@@ -509,6 +509,18 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('vs')).toBeInTheDocument();
   });
 
+  // W4-V13 — 대진 목록은 폴링하지 않아 경기가 끝나도 LIVE 로 남는다. 10초마다 새로 읽는 기록이 끝났다고 하면 그쪽을 따른다.
+  it('대진 목록이 아직 LIVE 여도 기록이 끝났다고 하면 칩은 "진행 중"이 아니다', () => {
+    const staleLive = FIXTURES.map((fixture) => (fixture.teamMatchId === 'fx-1' ? { ...fixture, gameState: 'LIVE' } : fixture));
+    mockLeague({ fixtures: staleLive });
+    mockViewer('none');
+    mockRecord('present', { status: 'ended', resultState: null, scoreStatus: null, score: null });
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByText('경기 · 결과 대기')).toBeInTheDocument();
+    expect(screen.queryByText('경기 · 진행 중')).not.toBeInTheDocument();
+  });
+
   it('기록 API 가 404 면 자체 요약 카드로 폴백한다(게임 미공개 대진)', () => {
     mockLeague();
     mockViewer('none');

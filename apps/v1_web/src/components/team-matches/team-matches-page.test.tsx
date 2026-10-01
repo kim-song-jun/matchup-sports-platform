@@ -1712,6 +1712,26 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     }
   });
 
+  it('W4-V3: 신청 팀은 매칭 뒤에도 히어로 오른쪽 자기 팀을 우리 팀으로 보고, 호스트는 상대팀으로 본다(대조군)', () => {
+    function matchedModel(viewerOnApplicantSide: boolean) {
+      const model = getTeamMatchDetailViewModel('approved');
+      model.match.applicantTeams = [{ name: '합정 유나이티드', meta: '참가 확정', status: '승인 완료' }];
+      model.viewerOnApplicantSide = viewerOnApplicantSide;
+      return model;
+    }
+    const applicant = renderPage(<TeamMatchDetailPageView model={matchedModel(true)} />);
+    let hero = within(applicant.container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('우리 팀')).toBeInTheDocument();
+    expect(hero.queryByText('상대팀')).not.toBeInTheDocument();
+    expect(hero.getByText('합정 유나이티드')).toBeInTheDocument();
+    applicant.unmount();
+
+    const host = renderPage(<TeamMatchDetailPageView model={matchedModel(false)} />);
+    hero = within(host.container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('상대팀')).toBeInTheDocument();
+    expect(hero.queryByText('우리 팀')).not.toBeInTheDocument();
+  });
+
   it('제3자 — 할 일 카드도 관리 메뉴도 없다', () => {
     const model = getTeamMatchDetailViewModel('default');
     model.match.apiStatus = 'recruiting';

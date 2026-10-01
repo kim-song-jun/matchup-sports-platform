@@ -23,7 +23,7 @@ import {
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
 import { capacityLimitOf, isCapacityFull } from './registration-capacity';
-import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -518,6 +518,17 @@ export class TournamentRegistrationsService {
   ) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
+    const tournament = await findTournamentOnSurfaceOrThrow(this.prisma, ALL_COMPETITION_KINDS, {
+      where: { id: tournamentId, deletedAt: null },
+      select: { status: true, kind: true },
+    });
+    // 종료·취소는 종착 상태라 신청을 되돌릴 대상이 없다. 웹 `isRegistrationCancellable` 과 같은 규칙.
+    if (tournament.status === 'completed' || tournament.status === 'cancelled') {
+      throw new ConflictException({
+        code: 'TOURNAMENT_ENDED',
+        message: `${tournament.kind === 'regular_league' ? '리그' : '대회'}가 종료되었거나 취소돼 참가 취소를 요청할 수 없어요.`,
+      });
+    }
 
     // draft는 운영 반영 전이라 즉시 취소(self-service). 그 이후 상태는 어드민 처리 대기.
     if (registration.status === 'draft') {

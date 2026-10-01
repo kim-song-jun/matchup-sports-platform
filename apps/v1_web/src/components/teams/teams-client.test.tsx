@@ -1711,7 +1711,9 @@ describe('TeamMembersPageClient — 매니저 5명 한도', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('매니저는 최대 5명이에요');
     expect(screen.queryByText(/Manager count/)).not.toBeInTheDocument();
-    expect(alert.parentElement).toHaveFocus();
+    // 거절은 확인 창이 히스토리를 걷은 뒤(act 밖 promise)에 그려진다 — 안내가 DOM 에 붙은 순간과
+    // 포커스를 옮기는 effect 사이에 틈이 있어, 안내가 보였다고 포커스까지 옮겨졌다고 볼 수 없다.
+    await waitFor(() => expect(alert.parentElement).toHaveFocus());
   });
 });
 

@@ -8,6 +8,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel } from '@/lib/v1-status-labels';
 import { GameRosterQuickSheet } from './game-roster-quick-sheet';
+import { RegistrationRosterEntry } from './registration-roster-entry';
 import type { MyMatchRosterTeam } from './use-my-match-roster-team';
 
 /** 칩으로 이름을 보여 줄 인원 — 나머지는 "+N". */
@@ -134,6 +135,7 @@ function ResolvedRosterCard({
           setSheetOpen(true);
         }}
       />
+      <RegistrationRosterEntry view={data} variant="inline" />
       {footer?.({ view: data, viewerRow: data.base.find((row) => row.userId === viewerUserId) })}
       {/* 시트는 늘 마운트해 둔다 — 저장 중 마감(409)으로 editable 이 꺼져도 시트가 그 안내를 보여 줘야 한다. */}
       <GameRosterQuickSheet

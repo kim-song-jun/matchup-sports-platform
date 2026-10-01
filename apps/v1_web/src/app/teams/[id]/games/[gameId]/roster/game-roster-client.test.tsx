@@ -291,3 +291,34 @@ describe('권한별 — 팀·경기 명단 한 번의 조회로 연다', () => {
     expect(getPaths()).toEqual([`/api/v1/teams/team-2/games/${G1.gameId}/roster`]);
   });
 });
+
+describe('참가 명단으로 가는 한 줄(Task 180 R-1 C)', () => {
+  const FROM = encodeURIComponent('/teams/team-1/games/roster-game-1/roster');
+
+  it('팀장에게 출전 목록 끝에서 그 신청의 참가 명단 화면으로 바로 가는 길을 준다', async () => {
+    renderScreen();
+    await screen.findByRole('heading', { name: '출전 3명' });
+    const outing = section(/출전 3명/);
+    const link = within(outing).getByRole('link', { name: '참가 명단에서 선수 추가·빼기' });
+    expect(link).toHaveAttribute(
+      'href',
+      `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${FROM}`,
+    );
+    expect(within(outing).getByText(/대회 참가 명단에서 바꿔요\. 바꾸면 시작 전 경기에 모두 반영돼요\./)).toBeInTheDocument();
+  });
+
+  it('참가 명단이 없는 팀(팀원 전체 기준)은 내 신청 화면에서 명단을 내러 간다', async () => {
+    mock.useTeamMembersFallback();
+    renderScreen();
+    const link = await screen.findByRole('link', { name: '참가 명단 내러 가기' });
+    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/my?from=${FROM}`);
+    expect(screen.queryByRole('link', { name: '참가 명단에서 선수 추가·빼기' })).toBeNull();
+  });
+
+  it.each(['TEAM_MEMBER', 'ADMIN'] as const)('%s 에게는 보이지 않는다 — 참가 명단은 팀장·매니저가 고친다', async (role) => {
+    mock.setViewerRole(role);
+    renderScreen();
+    await screen.findByRole('heading', { name: '출전 3명' });
+    expect(screen.queryByRole('link', { name: /참가 명단/ })).toBeNull();
+  });
+});

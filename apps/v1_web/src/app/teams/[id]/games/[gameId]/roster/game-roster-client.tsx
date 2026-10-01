@@ -16,6 +16,7 @@ import {
 import { GameRosterHistoryList } from '@/components/game-roster/game-roster-history';
 import { GameRosterJerseySheet, nextPlayerWithoutJersey } from '@/components/game-roster/game-roster-jersey-sheet';
 import { GameRosterReasonChips } from '@/components/game-roster/game-roster-reason-chips';
+import { RegistrationRosterEntry } from '@/components/game-roster/registration-roster-entry';
 import { TEAM_UPCOMING_GAMES_ANCHOR } from '@/components/teams/team-upcoming-games-card';
 import {
   useV1ApplyGameRosterBatch,
@@ -291,6 +292,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
+        <RegistrationRosterEntry view={data} variant="block" />
       </RosterSection>
 
       {data.excluded.length > 0 ? (

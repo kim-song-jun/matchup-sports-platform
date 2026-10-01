@@ -499,6 +499,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     myApplicationTeam: viewerState === 'requested' && selectedEligibility?.applicationId
       ? { teamId: selectedEligibility.teamId, name: selectedEligibility.name }
       : null,
+    // 진행 체크리스트와 같은 편 판정 — 호스트 팀도 관리하면 호스트 편이다.
+    viewerOnApplicantSide: !canManageHostTeam && (canManageOpponentTeam || viewerState === 'approved'),
     applyTeamPicker,
     resultAction,
     reviewAction,

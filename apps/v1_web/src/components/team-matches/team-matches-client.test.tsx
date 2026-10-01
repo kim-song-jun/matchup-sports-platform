@@ -97,6 +97,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-manage-menu">{JSON.stringify(model.manageMenu ?? null)}</span>
       <span data-testid="team-match-progress">{JSON.stringify(model.progress ?? null)}</span>
       <span data-testid="team-match-my-application-team">{model.myApplicationTeam?.name}</span>
+      <span data-testid="team-match-viewer-applicant-side">{String(model.viewerOnApplicantSide === true)}</span>
       {model.applicationsError ? <button onClick={model.applicationsError.retry}>신청 목록 다시 불러오기</button> : null}
       <span data-testid="team-match-applicants">{JSON.stringify(model.match.applicantTeams.map(({ name, applicationStatus, appliedByName, message }) => ({ name, applicationStatus, appliedByName, message })))}</span>
       {model.applyTeamPicker ? (
@@ -413,6 +414,53 @@ describe('TeamMatchDetailPageClient — 참가팀 멤버가 자기 팀 경기를
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('내 팀으로 신청');
     expect(screen.getByRole('button', { name: '상대팀 신청' })).toBeInTheDocument();
+  });
+});
+
+// W4-V3: 신청 팀은 승인 대기 때 히어로 오른쪽을 "우리 팀"으로 보다가, 매칭되자 자기 팀을 "상대팀"으로 봤다.
+describe('TeamMatchDetailPageClient — 매칭 뒤 신청 팀 편 판정 (W4-V3)', () => {
+  function mockMatch(viewer: { state: V1TeamMatchViewerState; manageableHostTeam: boolean; manageableOpponentTeam: boolean }, matched = true) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        startsAt: '2026-10-01T10:00:00.000Z',
+        status: matched ? 'matched' : 'recruiting',
+        displayState: matched ? 'matched' : 'recruiting',
+        viewer,
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: matched ? { teamId: 'team-away', name: '합정 유나이티드' } : null,
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it.each([
+    ['신청서를 낸 신청 팀 팀장', { state: 'approved' as const, manageableHostTeam: false, manageableOpponentTeam: true }],
+    ['신청서를 내지 않은 신청 팀 매니저(리그 대진 포함)', { state: 'none' as const, manageableHostTeam: false, manageableOpponentTeam: true }],
+  ])('%s — 신청 팀 편이다', (_who, viewer) => {
+    mockMatch(viewer);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.getByTestId('team-match-viewer-applicant-side')).toHaveTextContent('true');
+  });
+
+  it.each([
+    ['호스트 팀장', { state: 'host_team' as const, manageableHostTeam: true, manageableOpponentTeam: false }, true],
+    ['두 팀을 다 관리하는 사람', { state: 'none' as const, manageableHostTeam: true, manageableOpponentTeam: true }, true],
+    ['무관한 사람', { state: 'none' as const, manageableHostTeam: false, manageableOpponentTeam: false }, true],
+    ['승인을 기다리는 신청 팀 팀장', { state: 'requested' as const, manageableHostTeam: false, manageableOpponentTeam: false }, false],
+  ])('대조군 — %s — 신청 팀 편이 아니다', (_who, viewer, matched) => {
+    mockMatch(viewer, matched);
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+    expect(screen.getByTestId('team-match-viewer-applicant-side')).toHaveTextContent('false');
   });
 });
 

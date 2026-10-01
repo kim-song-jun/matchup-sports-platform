@@ -611,7 +611,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                     </div>
                     <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
                     <div style={{ textAlign: 'right' }}>
-                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{mode === 'pending' && model.myApplicationTeam ? '우리 팀' : '상대팀'}</div>
+                      <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{(mode === 'pending' && model.myApplicationTeam) || model.viewerOnApplicantSide ? '우리 팀' : '상대팀'}</div>
                       <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}</div>
                       {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentSub}</div> : null}
                     </div>

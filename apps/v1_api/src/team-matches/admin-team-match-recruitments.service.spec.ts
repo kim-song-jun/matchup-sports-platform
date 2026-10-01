@@ -23,7 +23,7 @@ const createDto = {
   costNote: '총 90,000원 · 상대팀 30,000원',
   minLevelCode: 'intermediate',
   maxLevelCode: 'intermediate',
-  genderRule: '성별 무관',
+  genderRule: '성별 무관' as const,
   matchFormat: '5:5',
   matchStyle: ['친선', '매너 중시'],
   uniformColor: '파랑',

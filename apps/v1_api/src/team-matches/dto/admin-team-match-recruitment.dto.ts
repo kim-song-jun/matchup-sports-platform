@@ -1,4 +1,5 @@
-import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { GENDER_RULES } from '../../common/gender-rule';
+import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
 import {
   MATCH_FORMAT_MAX_LENGTH,
   MATCH_STYLE_ITEM_MAX_LENGTH,
@@ -73,9 +74,8 @@ export class CreateAdminTeamMatchRecruitmentDto {
   maxLevelCode?: string | null;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  genderRule?: string | null;
+  @IsIn(GENDER_RULES)
+  genderRule?: (typeof GENDER_RULES)[number] | null;
 
   @IsOptional()
   @IsString()

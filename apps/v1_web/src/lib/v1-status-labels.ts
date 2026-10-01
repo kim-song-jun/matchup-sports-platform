@@ -367,3 +367,11 @@ export function leagueSeasonStageLabel(stage: LeagueSeasonStage): string {
 /** 운영 콘솔 도착 확인(검인)을 한 경기에서, 아직 도착 확인이 안 된 선수. */
 export const ARRIVAL_PENDING_LABEL = '도착 전';
 export const ARRIVAL_CONFIRMED_LABEL = '도착 확인';
+
+/** 성별 조건 정본 값(서버 GENDER_RULES 와 같다). 값이 곧 화면 라벨이다. */
+export const GENDER_RULE_OPTIONS = ['성별 무관', '남', '여'] as const;
+
+/** 정본이 아닌 값(옛 저장값·내부 코드)은 원문 대신 빈 문자열 — 호출부가 "미정"·배지 생략으로 처리한다. */
+export function genderRuleLabel(value: string | null | undefined): string {
+  return (GENDER_RULE_OPTIONS as readonly string[]).includes(value ?? '') ? (value as string) : '';
+}

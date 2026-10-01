@@ -1,3 +1,4 @@
+import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
 import {
   BadRequestException,
@@ -183,7 +184,7 @@ export class TeamMatchesService {
           : query.kind === 'competition'
             ? { leagueId: { not: null } }
             : {}),
-        ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
+        ...(query.genderRule ? { genderRule: genderRuleColumnFilter(query.genderRule) } : {}),
         ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
         // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
         // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
@@ -273,7 +274,7 @@ export class TeamMatchesService {
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
       rulesText: this.formatMatchConditionsRulesText(teamMatch),
-      genderRule: teamMatch.genderRule,
+      genderRule: normalizeGenderRule(teamMatch.genderRule),
       matchFormat: teamMatch.matchFormat,
       matchStyle: teamMatch.matchStyle,
       uniformColor: teamMatch.uniformColor,
@@ -706,7 +707,7 @@ export class TeamMatchesService {
         rulesText: teamMatch.formatNote,
         minLevelCode: teamMatch.minSportLevel?.code ?? null,
         maxLevelCode: teamMatch.maxSportLevel?.code ?? null,
-        genderRule: teamMatch.genderRule,
+        genderRule: normalizeGenderRule(teamMatch.genderRule),
         matchFormat: teamMatch.matchFormat,
         matchStyle: teamMatch.matchStyle,
         uniformColor: teamMatch.uniformColor,
@@ -1653,7 +1654,7 @@ export class TeamMatchesService {
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
       rulesText: this.formatMatchConditionsRulesText(teamMatch),
-      genderRule: teamMatch.genderRule,
+      genderRule: normalizeGenderRule(teamMatch.genderRule),
       matchFormat: teamMatch.matchFormat,
       matchStyle: teamMatch.matchStyle,
       uniformColor: teamMatch.uniformColor,
@@ -2093,7 +2094,7 @@ export class TeamMatchesService {
     const conditionText = hasStructuredConditions
       ? [teamMatch.matchFormat, teamMatch.matchStyle.join(' · ') || null, teamMatch.uniformColor].filter(Boolean).join(' · ') || null
       : teamMatch.formatNote;
-    return [levelLabel, conditionText, teamMatch.genderRule].filter(Boolean).join(' · ') || null;
+    return [levelLabel, conditionText, normalizeGenderRule(teamMatch.genderRule)].filter(Boolean).join(' · ') || null;
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {
@@ -2180,12 +2181,6 @@ function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
 function getOrderBy(sort: TeamMatchesQueryDto['sort']): Prisma.V1TeamMatchOrderByWithRelationInput[] {
   if (!sort || sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
   return [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }];
-}
-
-function getGenderRuleWhere(genderRule: NonNullable<TeamMatchesQueryDto['genderRule']>) {
-  return genderRule === '무관' || genderRule === '성별 무관'
-    ? { in: ['성별 무관', '무관'] }
-    : genderRule;
 }
 
 type TeamMatchApplicationLedgerRow = Pick<

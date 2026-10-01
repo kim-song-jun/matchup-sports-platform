@@ -16,6 +16,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
+import { GENDER_RULE_OPTIONS, genderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 
@@ -42,7 +43,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const [maxLevelCode, setMaxLevelCode] = useState(teamMatch.maxLevelCode ?? '');
   const [matchFormat, setMatchFormat] = useState(teamMatch.matchFormat ?? '');
   const [matchStyle, setMatchStyle] = useState(teamMatch.matchStyle.join(', '));
-  const [genderRule, setGenderRule] = useState(teamMatch.genderRule ?? '');
+  const [genderRule, setGenderRule] = useState(genderRuleLabel(teamMatch.genderRule));
   const [uniformColor, setUniformColor] = useState(teamMatch.uniformColor ?? '');
   const [costNote, setCostNote] = useState(teamMatch.costNote ?? '');
   const [rulesText, setRulesText] = useState(teamMatch.formatNote ?? '');
@@ -138,7 +139,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
               <label className="text-[length:var(--font-size-body-sm)] font-medium">최대 등급<select aria-label="최대 등급" value={maxLevelCode} onChange={(event) => setMaxLevelCode(event.target.value)} className={inputClass}><option value="">미지정</option>{V1_LEVELS.map((level) => <option key={level.code} value={level.code}>{level.label}</option>)}</select></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 형식<input aria-label="경기 형식" value={matchFormat} onChange={(event) => setMatchFormat(event.target.value)} maxLength={20} className={inputClass} /></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">유니폼 색<input aria-label="유니폼 색" value={uniformColor} onChange={(event) => setUniformColor(event.target.value)} maxLength={20} className={inputClass} /></label>
-              <label className="text-[length:var(--font-size-body-sm)] font-medium">성별 조건<input aria-label="성별 조건" value={genderRule} onChange={(event) => setGenderRule(event.target.value)} maxLength={20} className={inputClass} /></label>
+              <label className="text-[length:var(--font-size-body-sm)] font-medium">성별 조건<select aria-label="성별 조건" value={genderRule} onChange={(event) => setGenderRule(event.target.value)} className={inputClass}><option value="">미지정</option>{GENDER_RULE_OPTIONS.map((gender) => <option key={gender} value={gender}>{gender}</option>)}</select></label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium">경기 성격<input aria-label="경기 성격" value={matchStyle} onChange={(event) => setMatchStyle(event.target.value)} placeholder="쉼표로 최대 3개" className={inputClass} /></label>
             </div>
             <label className="block text-[length:var(--font-size-body-sm)] font-medium">비용 안내<input aria-label="비용 안내" value={costNote} onChange={(event) => setCostNote(event.target.value)} maxLength={500} className={inputClass} /></label>

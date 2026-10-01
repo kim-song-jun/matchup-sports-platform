@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 리그 대진 제목 라운드 키 백필(backfill-league-round-titles.sql)을 SSM 으로 alpha 에만 보낸다.
-#   scripts/qa/backfill-league-round-titles-alpha.sh           # 읽기 전용 dry-run
-#   scripts/qa/backfill-league-round-titles-alpha.sh --apply   # 한 트랜잭션으로 적용
+# 대회·리그 대진 제목 라운드 키 백필(backfill-round-key-titles.sql)을 SSM 으로 alpha 에만 보낸다.
+#   scripts/qa/backfill-round-key-titles-alpha.sh           # 읽기 전용 dry-run
+#   scripts/qa/backfill-round-key-titles-alpha.sh --apply   # 한 트랜잭션으로 적용
 # alpha 와 prod EC2 가 한 계정에 있다. 인스턴스는 태그로 고르고 1대·alpha 임을 단언한다.
 # prod 는 이 스크립트로 실행할 수 없다 — docs/ops/prod-task168-transition-runbook.md 9절을 따른다.
 set -Eeuo pipefail
@@ -14,7 +14,7 @@ case "$#:${1:-}" in
   *) usage ;;
 esac
 
-sql_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backfill-league-round-titles.sql"
+sql_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backfill-round-key-titles.sql"
 [[ -f "${sql_file}" ]] || { echo "SQL 파일이 없다: ${sql_file}" >&2; exit 1; }
 
 readonly alpha_name='teameet-alpha-dev'
@@ -48,7 +48,7 @@ REMOTE
 
 params="$(jq -nc --arg c "${remote_script}" '{commands:[$c]}')"
 command_id="$(aws ssm send-command --instance-ids "${instance}" --document-name AWS-RunShellScript \
-  --comment "Teameet alpha league round title backfill apply=${apply}" \
+  --comment "Teameet alpha round key title backfill apply=${apply}" \
   --parameters "${params}" --query 'Command.CommandId' --output text)"
 aws ssm wait command-executed --command-id "${command_id}" --instance-id "${instance}" || true
 invocation="$(aws ssm get-command-invocation --command-id "${command_id}" --instance-id "${instance}" --output json)"

@@ -37,6 +37,7 @@ import {
   TournamentVenuePrepSection,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { CompetitionEntrySection } from '@/components/tournaments/competition-entry-card';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { fixtureStatusLabel } from '@/components/public-game-records/format';
@@ -336,16 +337,15 @@ function CollapsiblePolicyText({
 
 /* ── Apply CTA ── */
 
-/**
- * Renders the CTA button pair, aware of the viewer's existing registration.
- * Tournament registrations are team-scoped, so an existing registration must not
- * hide the apply entry; the viewer may manage another team that can still apply.
- */
 /** 차단 사유별 버튼 라벨 — '모집 마감'(정원)과 '신청 마감'(기한)을 구분해 보여준다. */
 function getApplyBlockButtonLabel(reason: TournamentRegistrationBlockReason): string {
   return reason === 'deadline_passed' ? '신청 마감' : '모집 마감';
 }
 
+/**
+ * 신청 CTA(참가 신청·다시 신청·마감). 활성 신청이 있으면 호출부가 그리지 않는다 — 제목 아래 "우리 팀 참가"
+ * 카드가 그 팀 신청으로 가고, 다른 팀 신청은 거기서 돌아간 내 신청 화면(`/my`)에서 한다.
+ */
 function ApplyCTAButtons({
   tournament,
   blockReason,
@@ -362,21 +362,6 @@ function ApplyCTAButtons({
       ? ' [--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]'
       : ''
   }`;
-  const hasActiveRegistration =
-    myRegistration !== null && myRegistration.status !== 'cancelled';
-
-  if (hasActiveRegistration) {
-    return (
-      <Link
-        href={childHref(`/tournaments/${tournament.id}/my`)}
-        className={primaryButtonClass}
-        style={{ fontSize: 'var(--font-size-body-lg)' }}
-        aria-label="내 신청 내역 보기"
-      >
-        내 신청 보기
-      </Link>
-    );
-  }
 
   const applyLabel = myRegistration?.status === 'cancelled' ? '다시 신청하기' : '참가 신청하기';
   const applyAriaLabel = myRegistration?.status === 'cancelled' ? '대회 다시 신청하기' : '참가 신청하기';
@@ -409,7 +394,7 @@ function ApplyCTAButtons({
   );
 }
 
-function ApplyCTA({
+export function ApplyCTA({
   tournament,
   myRegistration,
 }: {
@@ -420,7 +405,8 @@ function ApplyCTA({
     ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
     : tournament.status === 'open';
 
-  if (!isOpen) return null;
+  // 신청이 있으면 제목 아래 "우리 팀 참가" 카드가 신청 내역·명단으로 보낸다(R-1) — 같은 입구를 한 화면에 두지 않는다.
+  if (!isOpen || (myRegistration !== null && myRegistration.status !== 'cancelled')) return null;
 
   const blockReason = resolveTournamentRegistrationBlock(tournament);
 
@@ -579,6 +565,9 @@ export function TournamentDetailPageClient({
         tournament={data}
         myRegistration={myRegistration}
         backHref="/tournaments"
+        entrySection={
+          <CompetitionEntrySection competitionId={tournamentId} competition={data} headingLevel={2} style={{ marginBottom: 16 }} />
+        }
       />
     </DetailChainFromContext.Provider>
   );
@@ -593,10 +582,13 @@ export function TournamentDetailView({
   tournament,
   myRegistration,
   backHref = '/tournaments',
+  entrySection = null,
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
   backHref?: string;
+  /** 제목 바로 아래 "우리 팀 참가" 카드 — 데이터 훅을 쓰므로 바깥(PageClient)에서 만들어 넘긴다. */
+  entrySection?: ReactNode;
 }) {
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
@@ -657,9 +649,11 @@ export function TournamentDetailView({
   const hasPrize = prizeText.length > 0;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
+  /** 하단 고정 신청 CTA 가 뜨는가 — 신청한 팀은 "우리 팀 참가" 카드가 그 자리를 맡아 뜨지 않는다(ApplyCTA 와 같은 조건). */
+  const showsApplyCta = isOpen && !hasActiveRegistration;
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
-  const detailArticleClassName = `tm-tournament-detail-article${isOpen ? ' tm-tournament-detail-article--fixed-cta' : ''}`;
+  const detailArticleClassName = `tm-tournament-detail-article${showsApplyCta ? ' tm-tournament-detail-article--fixed-cta' : ''}`;
 
   /* ── 신청자 본인 대상 targeted 공지(confirmed_only/waitlist/all_registered) ──
      공개 상세 프로젝션(`tournament.announcements`)은 audience='public'만 담는다(의도된
@@ -837,6 +831,7 @@ export function TournamentDetailView({
       {/* ── Section 1: Header ── */}
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
+        {entrySection}
 
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
@@ -981,6 +976,7 @@ export function TournamentDetailView({
     <>
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
+        {entrySection}
       </section>
 
       <CompletedResultHero tournament={tournament} />
@@ -1166,6 +1162,7 @@ export function TournamentDetailView({
   /* ── Desktop right-rail CTA card ── */
   const railCTA = isOpen ? (
     isLeagueMirror ? (
+      hasActiveRegistration ? null : (
       <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
           {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
@@ -1177,6 +1174,7 @@ export function TournamentDetailView({
         ) : null}
         <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
       </aside>
+      )
     ) : (
 
     <aside
@@ -1187,7 +1185,7 @@ export function TournamentDetailView({
       {/* Registration status / CTA */}
       <div style={{ marginBottom: 12 }}>
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
-          {hasActiveRegistration ? '내 신청' : '참가 신청'}
+          {hasActiveRegistration ? '참가 현황' : '참가 신청'}
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
           {tournament.confirmedCount}/{tournament.teamCount}팀 확정
@@ -1202,9 +1200,11 @@ export function TournamentDetailView({
           height={6}
           isFreeEntry={tournament.entryFee === 0}
         />
-        <div style={{ marginTop: 20 }}>
-          <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
-        </div>
+        {hasActiveRegistration ? null : (
+          <div style={{ marginTop: 20 }}>
+            <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
+          </div>
+        )}
       </div>
 
       {/* Key facts: schedule, capacity, entry fee (the canonical desktop facts panel —
@@ -1387,12 +1387,12 @@ export function TournamentDetailView({
           .tm-scroll-area 바깥) 바로 아래에 붙고 겹치지 않는다. 데스크탑(≥1024px)은
           .tm-scroll-area가 static이 되며 이 CTA도 .tm-hide-desktop으로 숨겨지고, 항상
           보이는 railCTA(우측 sticky 레일)가 같은 역할을 대신한다.
-          isOpen(모집 중)은 ApplyCTA가 스크롤 내내 화면 하단에 고정(.tm-fixed-cta)돼
+          showsApplyCta(모집 중·미신청)면 ApplyCTA가 스크롤 내내 화면 하단에 고정(.tm-fixed-cta)돼
           있어 이 스티키 CTA를 숨길 스크롤 위치가 존재하지 않는다 — 데스크탑 rail도
           isOpen일 땐 ApplyCTAButtons만 두고 대진표 링크를 넣지 않으므로(railCTA 위,
           §isOpen 분기), 동일하게 여기서도 렌더 자체를 건너뛰어 "참가 신청하기" 하나만
           1차 CTA로 남긴다(토스 루브릭: 카드당 주요 CTA 1개). */}
-      {bracketCtaLabel && !isOpen ? (
+      {bracketCtaLabel && !showsApplyCta ? (
         <div
           className="tm-hide-desktop"
           style={{

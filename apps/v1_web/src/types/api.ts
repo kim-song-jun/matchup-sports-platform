@@ -739,6 +739,31 @@ export type V1TeamDissolutionInfo = {
   canRestore: boolean;
 };
 
+/** `GET /teams/:teamId/competition-entries` 항목 — 이 팀의 대회·리그 신청 하나(활성 팀원만 받는다). */
+export type V1TeamCompetitionEntry = {
+  competitionId: string;
+  competitionKind: V1CompetitionKind | null;
+  title: string;
+  status: V1TournamentStatus;
+  scheduledAt: string | null;
+  scheduledEndAt: string | null;
+  registrationId: string;
+  registrationStatus: V1TournamentRegistrationStatus;
+  playerCount: number;
+  rosterDeadlineAt: string | null;
+  /** 참가 명단 수정 API 와 같은 판정(팀장·매니저 기준). */
+  rosterEditable: boolean;
+  rosterBlockedBy: 'closed' | 'locked' | 'cancelled' | 'deadline' | null;
+};
+
+export type V1TeamCompetitionEntries = {
+  teamId: string;
+  /** 보는 사람이 팀장·매니저인지 — 참가 명단은 그들만 고친다. */
+  viewerCanManageRoster: boolean;
+  /** 진행 중·예정이 먼저, 종료·취소된 대회는 맨 아래. 취소된 신청은 없다. */
+  items: V1TeamCompetitionEntry[];
+};
+
 export type V1TeamDissolutionBlockerKind = 'live_game' | 'matched_team_match' | 'league_entry' | 'tournament_entry';
 
 export type V1TeamDissolutionBlocker = {

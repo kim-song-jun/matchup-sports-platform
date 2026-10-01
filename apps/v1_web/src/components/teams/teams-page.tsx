@@ -23,6 +23,7 @@ import { withFromPath } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
+import { TeamCompetitionEntriesSection } from './team-competition-entries-section';
 import { TeamMembersSection } from './team-members-section';
 import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
 import type {
@@ -667,7 +668,11 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
           <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
-          <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
+          {model.competitionEntries ? (
+            <TeamCompetitionEntriesSection model={model.competitionEntries} />
+          ) : (
+            <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
+          )}
           <TeamRecordLinkCard
             href={withFromPath(`/teams/${team.id}/records`, model.subPageFrom)}
             title="팀 전적"
@@ -809,7 +814,11 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} canManageRosters={model.canManageGameRosters === true} /> : null}
         <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
-        <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
+        {model.competitionEntries ? (
+            <TeamCompetitionEntriesSection model={model.competitionEntries} />
+          ) : (
+            <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
+          )}
 
         {/* 기록으로 가는 링크 묶음. 예전에는 "팀 전적" 링크 하나가 위 매치 섹션과 **간격 0px
             로 맞붙어**(alpha 390 실측) 그 섹션의 일부처럼 보였다 — 별개 항목이므로 자기

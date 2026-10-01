@@ -63,6 +63,7 @@ import {
   v1SettingsFixture,
   v1SportsFixture,
   v1TeamMatchesFixture,
+  v1TeamCompetitionEntriesFixture,
   v1TeamsFixture,
   v1UserFixture,
   getReportedTeamIdForInquiry,
@@ -536,6 +537,8 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/teams/name-availability`, () => ok({ available: true })),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
+  http.get(`${api}/teams/:teamId/competition-entries`, ({ params }) =>
+    ok({ ...v1TeamCompetitionEntriesFixture, teamId: String(params.teamId) })),
   http.get(`${api}/teams/:teamId/members`, () => ok({
     items: [
       {

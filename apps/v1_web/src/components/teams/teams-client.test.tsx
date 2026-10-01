@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1AuthMe } from '@/types/api';
+import { v1TeamCompetitionEntriesFixture } from '@/test/msw/fixtures';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TeamDetailPageClient, TeamMembersPageClient } from './teams-client';
 
@@ -25,6 +26,7 @@ const teamApiMocks = vi.hoisted(() => ({
   // 반환 타입을 vi.fn()의 첫 구현으로 좁히지 않는다 — 좁히면 아래 테스트가 items를 담은
   // 값을 돌려줄 때 tsc가 undefined 할당으로 잡는다(다른 훅 목들과 같은 형태로 맞춘다).
   useV1LeagueMatches: vi.fn(),
+  useV1TeamCompetitionEntries: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })),
   useV1TeamMembers: vi.fn(),
   useV1MyTeams: vi.fn(() => ({ data: undefined })),
   useV1TeamContactSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
@@ -938,7 +940,48 @@ describe('TeamDetailPageClient — 내 리그', () => {
 
     expect(teamApiMocks.useV1LeagueMatches).toHaveBeenCalledWith(
       expect.objectContaining({ teamId: 'team-1' }),
+      { enabled: true },
     );
+  });
+
+  // R-1 B — 신청 상태·신청 id 는 팀 내부 정보라 팀원에게만 "참가 중인 대회·리그"를 보이고, 비회원은 공개 리그 목록 그대로.
+  it('팀원(팀장)에게는 "참가 중인 대회·리그"를 보이고 공개 리그 목록은 부르지 않는다', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({ data: undefined, isLoading: false });
+    teamApiMocks.useV1TeamCompetitionEntries.mockReturnValue({ data: v1TeamCompetitionEntriesFixture, isLoading: false, isError: false, refetch: vi.fn() } as never);
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamCompetitionEntries).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(teamApiMocks.useV1LeagueMatches).toHaveBeenLastCalledWith(expect.objectContaining({ teamId: 'team-1' }), { enabled: false });
+    // 데스크톱·모바일 레이아웃당 1개씩.
+    expect(screen.getAllByText('참가 중인 대회·리그')).toHaveLength(2);
+    screen.getAllByRole('link', { name: '가을 정규 리그 참가 명단 수정' }).forEach((link) =>
+      expect(link).toHaveAttribute('href', '/tournaments/league-1/registrations/registration-league-1/roster?from=%2Fteams%2Fteam-1'),
+    );
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+
+  it('비회원에게는 참가 내역을 조회하지 않고 공개 리그 목록("내 리그")을 그대로 보인다', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'outsider', email: null, onboardingStatus: 'complete' }, profile: { displayName: '방문자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({
+      data: { items: [{ leagueId: 'lg-1', title: '가을 리그', state: 'draft' }], pageInfo: { nextCursor: null, hasNext: false } },
+      isLoading: false,
+    });
+    teamApiMocks.useV1TeamCompetitionEntries.mockReturnValue({ data: v1TeamCompetitionEntriesFixture, isLoading: false, isError: false, refetch: vi.fn() } as never);
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamCompetitionEntries).not.toHaveBeenCalledWith('team-1', { enabled: true });
+    expect(screen.queryByText('참가 중인 대회·리그')).not.toBeInTheDocument();
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
   });
 });
 

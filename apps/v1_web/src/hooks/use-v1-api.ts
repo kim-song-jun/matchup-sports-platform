@@ -146,6 +146,7 @@ import type {
   V1Settings,
   V1Sport,
   V1Team,
+  V1TeamCompetitionEntries,
   V1TeamDetail,
   V1TeamDissolutionPreview,
   V1DissolveTeamResult,
@@ -2341,6 +2342,16 @@ export function useV1TeamUpcomingGames(teamId: string | null, options?: { enable
   });
 }
 
+/** 팀 상세 "참가 중인 대회·리그"(Task 180 R-1 B). 활성 팀원만 받는다(비회원 403) — 호출부가 enabled 로 막는다. */
+export function useV1TeamCompetitionEntries(teamId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamCompetitionEntries(teamId),
+    queryFn: () => v1Get<V1TeamCompetitionEntries>(`/teams/${teamId}/competition-entries`),
+    enabled: (options?.enabled ?? true) && Boolean(teamId),
+    retry: false,
+  });
+}
+
 /** 전술보드 한 판. 아직 저장한 적 없으면 `version: 0` 인 빈 판이 온다(404 가 아니다). */
 export type V1TacticsBoardEntry = {
   userId: string | null;
@@ -4346,6 +4357,10 @@ export function invalidateRosterViews(
 ) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentRoster(registrationId) }),
+    // 팀 상세 "참가 중인 대회·리그"의 선수 수도 이 명단이다 — 팀 id 를 모르는 자리라 키 모양으로 찾는다.
+    queryClient.invalidateQueries({
+      predicate: (query) => query.queryKey[1] === 'teams' && query.queryKey[3] === 'competition-entries',
+    }),
     queryClient.invalidateQueries({
       queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
     }),

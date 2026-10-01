@@ -13,7 +13,7 @@ import {
   V1TournamentRegistration,
   V1TournamentStatus,
 } from '@prisma/client';
-import { isRosterMutableTournament } from './roster-cleanup';
+import { isRosterMutableTournament, rosterBlockReason } from './roster-cleanup';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -189,35 +189,30 @@ export class TournamentPlayersService {
     // 완료·취소된 대회의 명단은 누구도 못 바꾼다. 수상 내역·리뷰·기록이 이 명단을 참조하므로
     // 지난 대회의 선수를 넣고 빼면 과거 기록이 가리키는 대상이 달라진다 — 탈퇴 정리가 완료
     // 대회를 건너뛰는 것과 같은 불변식이다(roster-cleanup.ts 주석 참조).
-    if (!isRosterMutableTournament(tournament)) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_ROSTER_NOT_MUTABLE',
-        message:
-          tournament.status === 'completed' || tournament.status === 'cancelled'
-            ? '종료되었거나 취소된 대회는 선수 명단을 수정할 수 없어요.'
-            : '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.',
-      });
-    }
-    if (!options.allowLockedAndExpired && registration.rosterLockedAt) {
-      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
-    }
-    if (registration.status === 'cancel_requested' || registration.status === 'cancelled') {
-      throw new ConflictException({
-        code: 'REGISTRATION_ROSTER_NOT_MUTABLE',
-        message: '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.',
-      });
-    }
-    // 명단 제출 마감 하드 차단 — 어드민이 해당 팀에 개별 예외(rosterDeadlineOverrideAt)를 부여한 경우만 예외.
-    if (
-      !options.allowLockedAndExpired &&
-      tournament.rosterDeadlineAt &&
-      new Date() > tournament.rosterDeadlineAt &&
-      !registration.rosterDeadlineOverrideAt
-    ) {
-      throw new ConflictException({
-        code: 'ROSTER_DEADLINE_PASSED',
-        message: '명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.',
-      });
+    switch (rosterBlockReason(registration, tournament, options)) {
+      case 'closed':
+        throw new ConflictException({
+          code: 'TOURNAMENT_ROSTER_NOT_MUTABLE',
+          message:
+            tournament.status === 'completed' || tournament.status === 'cancelled'
+              ? '종료되었거나 취소된 대회는 선수 명단을 수정할 수 없어요.'
+              : '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.',
+        });
+      case 'locked':
+        throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
+      case 'cancelled':
+        throw new ConflictException({
+          code: 'REGISTRATION_ROSTER_NOT_MUTABLE',
+          message: '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.',
+        });
+      // 명단 제출 마감 하드 차단 — 어드민이 해당 팀에 개별 예외(rosterDeadlineOverrideAt)를 부여한 경우만 예외.
+      case 'deadline':
+        throw new ConflictException({
+          code: 'ROSTER_DEADLINE_PASSED',
+          message: '명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.',
+        });
+      case null:
+        return;
     }
   }
 

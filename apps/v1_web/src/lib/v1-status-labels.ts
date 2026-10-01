@@ -7,7 +7,7 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
-import type { V1InquiryReportReason } from '@/types/api';
+import type { V1InquiryReportReason, V1TournamentRegistrationStatus } from '@/types/api';
 
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
@@ -388,4 +388,39 @@ export const GENDER_RULE_OPTIONS = ['성별 무관', '남', '여'] as const;
 /** 정본이 아닌 값(옛 저장값·내부 코드)은 원문 대신 빈 문자열 — 호출부가 "미정"·배지 생략으로 처리한다. */
 export function genderRuleLabel(value: string | null | undefined): string {
   return (GENDER_RULE_OPTIONS as readonly string[]).includes(value ?? '') ? (value as string) : '';
+}
+
+type RegistrationTone = 'grey' | 'blue' | 'orange' | 'green' | 'red';
+
+const REGISTRATION_TONE: Record<RegistrationTone, { badgeClass: string; textColor: string }> = {
+  grey: { badgeClass: 'tm-badge-grey', textColor: 'var(--text-muted)' },
+  blue: { badgeClass: 'tm-badge-blue', textColor: 'var(--blue700)' },
+  orange: { badgeClass: 'tm-badge-orange', textColor: 'var(--orange700)' },
+  green: { badgeClass: 'tm-badge-green', textColor: 'var(--green700)' },
+  red: { badgeClass: 'tm-badge-red', textColor: 'var(--red700)' },
+};
+
+const REGISTRATION_STATUS: Record<V1TournamentRegistrationStatus, { tone: RegistrationTone; label: string }> = {
+  draft: { tone: 'grey', label: '임시저장' },
+  submitted: { tone: 'blue', label: '운영진 확인 중' },
+  awaiting_payment: { tone: 'orange', label: '입금 대기' },
+  payment_checking: { tone: 'blue', label: '명단 확인 중' },
+  paid: { tone: 'blue', label: '결제 완료' },
+  confirmed: { tone: 'green', label: '참가 확정' },
+  waitlisted: { tone: 'orange', label: '대기 중' },
+  cancel_requested: { tone: 'red', label: '취소 요청 중' },
+  cancelled: { tone: 'grey', label: '취소' },
+};
+
+/**
+ * 대회·리그 참가 신청 상태 — 내 신청 화면·대회/리그 상세 "우리 팀 참가" 카드·팀 상세 "참가 중인 대회·리그"가
+ * 같은 색·말을 쓴다. 배지는 `badgeClass`, 줄 안의 글자는 `textColor`. 모르는 값은 영문 코드 대신 한글로.
+ */
+export function tournamentRegistrationStatusConfig(status: V1TournamentRegistrationStatus): {
+  badgeClass: string;
+  textColor: string;
+  label: string;
+} {
+  const entry: { tone: RegistrationTone; label: string } = REGISTRATION_STATUS[status] ?? { tone: 'grey', label: '상태 확인 중' };
+  return { ...REGISTRATION_TONE[entry.tone], label: entry.label };
 }

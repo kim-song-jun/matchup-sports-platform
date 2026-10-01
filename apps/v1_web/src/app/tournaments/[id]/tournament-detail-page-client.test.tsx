@@ -21,6 +21,7 @@ const tournamentApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
   useV1MyRegistrations: vi.fn(),
   useV1Reviews: vi.fn(),
+  useV1MyTeams: vi.fn(() => ({ data: undefined, isPending: true })),
 }));
 
 // 기본값은 빈 파라미터라 기존 테스트 동작은 그대로다 — `?from=` 테스트만 갈아끼운다.
@@ -315,5 +316,43 @@ describe('TournamentDetailPageClient — 뒤로가기 출처(?from=)', () => {
       .filter((href) => /^\/tournaments\/tournament-1\/(bracket|results|my)/.test(href));
     expect(childLinks.length).toBeGreaterThan(0);
     childLinks.forEach((href) => expect(href).not.toContain('from='));
+  });
+});
+
+describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsRef.current = new URLSearchParams();
+    window.localStorage.setItem('teameet.v1.userId', 'captain');
+    tournamentApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(), isPending: false, isError: false, error: null, refetch: vi.fn() });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({ data: undefined, isError: false, isPending: false, isFetching: false, refetch: vi.fn() });
+    tournamentApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [{ teamId: 'team-a', role: 'owner', name: '마포 FC', logoUrl: null }] }, isPending: false } as never);
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('신청이 있으면 제목 아래에서 참가 명단 화면으로 바로 보낸다', async () => {
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [{ id: 'reg-1', teamId: 'team-a', teamName: '마포 FC', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null, playerCount: 7 }],
+    });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    const title = await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const heading = await screen.findByRole('heading', { level: 2, name: '우리 팀 참가' });
+    expect(title.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toHaveAttribute(
+      'href',
+      `/tournaments/tournament-1/registrations/reg-1/roster?from=${encodeURIComponent('/tournaments/tournament-1')}`,
+    );
+  });
+
+  it('신청이 없으면 카드가 없다', async () => {
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.queryByRole('heading', { name: '우리 팀 참가' })).not.toBeInTheDocument();
   });
 });

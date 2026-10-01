@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen } from '@testing-library/react';
+import { render as rtlRender, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TournamentDetailView, getBracketEntryCtaLabel } from './tournament-detail-client';
-import type { V1TournamentDetail, V1TournamentGroup, V1TournamentStatus } from '@/types/api';
+import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel } from './tournament-detail-client';
+import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V1TournamentStatus } from '@/types/api';
 
 /**
  * 대회 상세 §A-1~5 회귀 방지:
@@ -283,5 +283,47 @@ describe('TournamentDetailView — 조별 순위 섹션이 상세에서 제거�
     expect(screen.queryByText('성수 FC')).not.toBeInTheDocument();
     // 대신 /bracket으로 안내하는 문구가 그 자리를 채운다(§A-1 시각적 무게 재조정).
     expect(screen.getByText('실시간 순위표는 대진표에서 확인하세요')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Task 180 R-1 — 신청한 팀에게는 제목 아래 "우리 팀 참가" 카드가 신청 내역·명단 입구다.
+ * 하단 고정 [내 신청 보기]·레일 버튼까지 두면 같은 곳으로 가는 입구가 한 화면에 둘이 된다.
+ */
+describe('대회 상세 — 신청한 팀의 입구는 카드 하나', () => {
+  const registration = (status: V1TournamentRegistration['status']) =>
+    ({ id: 'reg-1', teamId: 'team-a', status }) as V1TournamentRegistration;
+  const myLinks = (container: HTMLElement) => container.querySelectorAll('a[href^="/tournaments/t-r1/my"]');
+
+  it('신청이 있으면 하단 고정·레일의 신청 버튼이 없고, 하단 대신 대진 입구가 상단에 남는다', () => {
+    const tournament = makeTournament({ id: 't-r1', status: 'open', format: 'knockout' });
+    const fixed = render(<ApplyCTA tournament={tournament} myRegistration={registration('confirmed')} />);
+    expect(fixed.container).toBeEmptyDOMElement();
+    fixed.unmount();
+
+    const { container } = render(
+      <TournamentDetailView tournament={tournament} myRegistration={registration('confirmed')} entrySection={<p>우리 팀 참가 카드</p>} />,
+    );
+    expect(screen.getByText('우리 팀 참가 카드')).toBeInTheDocument();
+    expect(myLinks(container)).toHaveLength(0);
+    expect(screen.queryByText('참가 신청하기')).not.toBeInTheDocument();
+    const bracketLabel = getBracketEntryCtaLabel('open', false);
+    expect(container.querySelectorAll(`a[aria-label="${bracketLabel}"]`)).toHaveLength(1);
+  });
+
+  it('대조군: 신청하지 않은 팀에게는 하단 고정·레일의 [참가 신청하기]가 그대로다', () => {
+    const tournament = makeTournament({ id: 't-r1', status: 'open', format: 'knockout' });
+    const fixed = render(<ApplyCTA tournament={tournament} myRegistration={null} />);
+    expect(within(fixed.container).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute('href', '/tournaments/t-r1/my');
+    fixed.unmount();
+
+    const { container } = render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
+    expect(myLinks(container).length).toBeGreaterThan(0);
+  });
+
+  it('대조군: 취소한 신청만 있으면 [다시 신청하기]가 남는다', () => {
+    const tournament = makeTournament({ id: 't-r1', status: 'open', format: 'knockout' });
+    render(<ApplyCTA tournament={tournament} myRegistration={registration('cancelled')} />);
+    expect(screen.getByRole('link', { name: '대회 다시 신청하기' })).toBeInTheDocument();
   });
 });

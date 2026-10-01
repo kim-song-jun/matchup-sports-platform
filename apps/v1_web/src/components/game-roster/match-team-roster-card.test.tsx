@@ -230,3 +230,24 @@ describe('GameRosterQuickSheet (빠른 선택)', () => {
     expect(await screen.findByText('경기가 시작돼 명단을 바꿀 수 없어요.')).toBeInTheDocument();
   });
 });
+
+describe('MatchTeamRosterCard — 참가 명단 한 줄(Task 180 R-1 C)', () => {
+  it('팀장에게 [명단 조정](이번 경기)과 따로 참가 명단(선수·등번호)으로 가는 한 줄을 준다', async () => {
+    renderCard();
+    const link = await screen.findByRole('link', { name: '참가 명단' });
+    const matchDetail = `/tournaments/tournament-1/matches/${TEAM_MATCH_ID}`;
+    expect(link).toHaveAttribute(
+      'href',
+      `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${encodeURIComponent(matchDetail)}`,
+    );
+    expect(screen.getByText('선수 추가·빼기와 등번호는 대회 참가 명단에서 바꿔요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '명단 조정' })).toBeInTheDocument();
+  });
+
+  it('팀원에게는 보이지 않는다', async () => {
+    mock.setViewerRole('TEAM_MEMBER');
+    renderCard();
+    expect(await screen.findByRole('heading', { name: '우리 팀 출전' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 명단' })).not.toBeInTheDocument();
+  });
+});

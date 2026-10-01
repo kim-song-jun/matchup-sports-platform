@@ -140,8 +140,10 @@ function ClaimMyRecordView({
   // 그 버튼을 아예 렌더하지 않고 닫기만 남긴다.
   const loaded = viewer === 'verified' && claimable.data !== undefined;
   const hasCandidates = (claimable.data?.participants.length ?? 0) > 0;
-  // 후보 0명은 두 상태다 — 명단 자체가 아직 없거나, 명단의 모두가 이미 연결(신청 중)됐거나.
-  const rosterEmpty = loaded && claimable.data?.rosterCount === 0;
+  // 후보 0명은 두 상태다 — 제출된 명단이 아직 없거나, 명단의 모두가 이미 연결(신청 중)됐거나.
+  // 초안만 있는 명단은 서버가 인원·후보로 세지만(공식 결과와 같은 기준) 화면 위쪽은 "제출 전"이라 앞쪽으로 읽는다.
+  const noSubmittedRoster =
+    loaded && !hasCandidates && (claimable.data?.rosterCount === 0 || claimable.data?.rosterSubmitted === false);
 
   // 신청이 끝나면 배너를 접는다. 같은 경기에 두 번 신청할 이유가 없고, 남겨 두면
   // "아직 안 됐나?" 하고 다시 누르게 된다.
@@ -232,7 +234,7 @@ function ClaimMyRecordView({
                   잠시 후 다시 확인해 주세요.
                 </div>
               </>
-            ) : rosterEmpty ? (
+            ) : noSubmittedRoster ? (
               <>
                 <div id="claim-my-record-title" className="tm-text-heading">
                   아직 제출된 {rosterLabel}이 없어요

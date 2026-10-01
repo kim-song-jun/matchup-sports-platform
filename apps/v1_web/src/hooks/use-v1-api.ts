@@ -1940,6 +1940,8 @@ export type V1ClaimableParticipants = {
   version: number;
   /** 명단(사이드별 제출본, 없으면 최신 초안) 인원 — 후보가 0명일 때 "명단 없음"과 "모두 연결됨"을 가른다. */
   rosterCount: number;
+  /** 한 팀이라도 명단을 제출했는가. 초안만 있으면 false — 인원·후보에는 들어도 사용자 눈엔 "제출 전"이다. */
+  rosterSubmitted: boolean;
   participants: {
     participantId: string;
     sideId: string;

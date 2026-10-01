@@ -152,6 +152,8 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       version: 4,
       // 연결된 p-2 도 명단 인원에는 든다 — 후보 0명일 때 "모두 연결됨"과 "명단 없음"을 가르는 값.
       rosterCount: 2,
+      // 리그·대회 경기 명단은 참가 명단에서 계산된 제출본이다.
+      rosterSubmitted: true,
       participants: [
         { participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '김민준', jerseyNumber: 7 },
       ],
@@ -183,6 +185,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       gameId: 'game-1',
       version: 6,
       rosterCount: 1,
+      rosterSubmitted: true,
       // 폐기된 revision 1의 'p-stale'은 나오지 않는다 — 골랐다면 공식 결과가 절대
       // 매칭되지 않는 participantId였다.
       participants: [
@@ -255,7 +258,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     });
 
     await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
-      gameId: 'game-1', version: 9, rosterCount: 1, participants: [],
+      gameId: 'game-1', version: 9, rosterCount: 1, rosterSubmitted: true, participants: [],
     });
     expect(prisma.v1GameSide.findMany).not.toHaveBeenCalled();
   });
@@ -267,9 +270,62 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     });
 
     await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
-      gameId: 'game-1', version: 2, rosterCount: 0, participants: [],
+      gameId: 'game-1', version: 2, rosterCount: 0, rosterSubmitted: false, participants: [],
     });
     expect(prisma.v1ParticipantIdentityLinkCurrent.findMany).not.toHaveBeenCalled();
+  });
+
+  describe('친선 — rosterSubmitted(W6-V3)', () => {
+    const sides = [
+      { id: 's-home', sideKey: 'HOME', displayNameSnapshot: '마포 FC' },
+      { id: 's-away', sideKey: 'AWAY', displayNameSnapshot: '합정 유나이티드' },
+    ];
+    const participants = [
+      { id: 'p-home', sideId: 's-home', lineupId: 'l-home', displayNameSnapshot: '김민준', jerseyNumber: 7 },
+      { id: 'p-away', sideId: 's-away', lineupId: 'l-away', displayNameSnapshot: '이서준', jerseyNumber: 9 },
+      { id: 'p-guest', sideId: 's-away', lineupId: 'l-away', displayNameSnapshot: '용병 박지성', jerseyNumber: null },
+    ];
+
+    function friendly(homeState: string, awayState: string) {
+      const made = makeService({
+        teamMatch: { game: { id: 'game-f', version: 3 } },
+        memberships: [{ teamId: 'team-host', role: 'member' }],
+        lineups: [
+          { id: 'l-home', sideId: 's-home', revision: 1, state: homeState, invalidatedAt: null },
+          { id: 'l-away', sideId: 's-away', revision: 1, state: awayState, invalidatedAt: null },
+        ],
+        participants,
+        // 계정 있는 팀원은 저장 때 연결된다 — 연결 안 된 건 게스트뿐이다.
+        linked: [{ participantId: 'p-home' }, { participantId: 'p-away' }],
+        sides,
+      });
+      made.prisma.v1Game.findUnique.mockResolvedValue({
+        sourceType: 'TEAM_MATCH',
+        teamMatch: {
+          id: 'tm-1', deletedAt: null, hostTeamId: 'team-host', approvedApplicantTeamId: 'team-away',
+          tournamentId: null, leagueId: null, fieldId: null, tournament: null, league: null, tournamentDetails: null,
+        },
+      });
+      return made.service.listTeamMatchClaimableParticipants(user, 'tm-1');
+    }
+
+    it('양 팀 모두 초안만 저장했으면 제출 전(false)이지만 명단·후보는 공식 결과와 같은 초안 기준 그대로다', async () => {
+      await expect(friendly('DRAFT', 'DRAFT')).resolves.toEqual({
+        gameId: 'game-f',
+        version: 3,
+        rosterCount: 3,
+        rosterSubmitted: false,
+        participants: [expect.objectContaining({ participantId: 'p-guest', sideKey: 'AWAY' })],
+      });
+    });
+
+    it('한 팀만 제출했어도 제출됨(true) — "아직 제출된 참석명단이 없어요"는 거짓이 된다', async () => {
+      await expect(friendly('SUBMITTED', 'DRAFT')).resolves.toMatchObject({ rosterCount: 3, rosterSubmitted: true });
+    });
+
+    it('양 팀 모두 제출했으면 제출됨(true)', async () => {
+      await expect(friendly('SUBMITTED', 'LOCKED')).resolves.toMatchObject({ rosterCount: 3, rosterSubmitted: true });
+    });
   });
 
   it('참가자 side가 없으면 조용히 라벨을 추측하지 않고 무결성 충돌을 반환한다', async () => {

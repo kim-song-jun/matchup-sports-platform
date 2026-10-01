@@ -117,7 +117,6 @@ export type MyTeamRole = 'owner' | 'manager' | 'admin' | 'member';
 export type MyTeam = {
   id: string;
   name: string;
-  logo: string;
   logoUrl?: string | null;
   coverImageUrl?: string | null;
   sport: string;

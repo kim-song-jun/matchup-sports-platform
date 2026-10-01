@@ -45,6 +45,7 @@ import {
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
 import { teamRoleLabel } from '@/lib/v1-status-labels';
+import { displayInitials } from '@/lib/display-initials';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
@@ -984,7 +985,7 @@ function PlayerRow({
             fontWeight: 700,
           }}
         >
-          {playerName.charAt(0)}
+          {displayInitials(playerName, { fallback: '?' })}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

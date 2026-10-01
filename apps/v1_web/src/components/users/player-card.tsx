@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, UserRound, Zap } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
+import { displayInitials } from '@/lib/display-initials';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
 import { useLoopPause } from './use-loop-pause';
@@ -294,7 +295,7 @@ export function PlayerCard({
    */
   readonly belowCardSlot?: ReactNode;
 }) {
-  const initial = displayName.trim().charAt(0) || '?';
+  const initial = displayInitials(displayName, { fallback: '?' });
   const needsConsent = card.nextUnlock?.reason.type === 'consent';
   const { left, right } = splitStats(card.stats);
   const [flipped, setFlipped] = useState(false);

@@ -6,6 +6,7 @@ import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primit
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
 import { cssUrl } from '@/lib/assets';
+import { displayInitials } from '@/lib/display-initials';
 import { useKeepTappedItemInPlace } from './review-scroll-anchor';
 import { REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewMetricDraft, ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
@@ -821,7 +822,7 @@ function ReceivedReviewRow({ review }: { review: V1ReceivedReviewDetail }) {
   return (
     <div className="tm-review-received-row">
       {/* 작성자를 공개한다(2026-08-18). 팀 대상 후기는 보낸 팀 이름이 더 유용해서 팀명을 우선한다. */}
-      <Avatar imageUrl={review.reviewerUser?.imageUrl} initials={(review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '리뷰').slice(0, 2)} size={34} />
+      <Avatar imageUrl={review.reviewerUser?.imageUrl} initials={displayInitials(review.reviewerTeam?.name ?? review.reviewerUser?.name, { fallback: '리뷰', count: 2 })} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-label">{review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '작성자 미상'}</div>
         <div className="tm-text-caption" style={{ marginTop: 2 }}>{review.rating}점 · {firstTag}</div>

@@ -6,7 +6,8 @@ import { createPortal } from 'react-dom';
 import { Star, ImagePlus, X, Trophy, Medal, ChevronRight } from 'lucide-react';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { nextStarValue, STAR_VALUES } from '@/lib/star-rating-keys';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
@@ -471,15 +472,29 @@ export function RatingStar({ filled, size = 18 }: { filled: boolean; size?: numb
 }
 
 /* ── 별점 컴포넌트 ── */
-function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  // 방향키는 점수와 포커스를 함께 옮긴다. 선택된 별만 탭 정지점(roving tabindex)이다.
+  const onStarKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: number) => {
+    const next = nextStarValue(event.key, current);
+    if (next === null) return;
+    event.preventDefault();
+    onChange(next);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next - 1]?.focus();
+  };
+
   return (
-    <div style={{ display: 'flex', gap: 4 }} role="group" aria-label="별점 선택">
-      {[1, 2, 3, 4, 5].map((n) => (
+    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} role="radiogroup" aria-label="별점 선택">
+      {STAR_VALUES.map((n) => (
         <button
           key={n} type="button"
-          style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', padding: 0, cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
-          onClick={() => onChange?.(n)}
+          role="radio"
+          className="tm-pressable"
+          aria-checked={n === value}
           aria-label={`${n}점`}
+          tabIndex={n === value ? 0 : -1}
+          style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 1 }}
+          onClick={() => onChange(n)}
+          onKeyDown={(e) => onStarKeyDown(e, n)}
         >
           <RatingStar filled={n <= value} size={26} />
         </button>
@@ -510,6 +525,7 @@ function parseTeamSelectionOptions(error: unknown): { teamId: string; teamName: 
 export function ReviewFormModal({
   tournamentId, onClose,
 }: { tournamentId: string; onClose: () => void }) {
+  const commentId = useId();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
@@ -663,7 +679,9 @@ export function ReviewFormModal({
           </div>
         )}
 
+        <label htmlFor={commentId} className="sr-only">후기 내용</label>
         <textarea
+          id={commentId}
           value={comment} onChange={(e) => setComment(e.target.value)}
           placeholder="대회 운영, 경기장, 대진표 등 솔직한 후기를 남겨주세요. (선택)"
           maxLength={500}

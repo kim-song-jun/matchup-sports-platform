@@ -613,6 +613,7 @@ model V1User {
   reviewedTeamJoins              V1TeamJoinApplication[]       @relation("V1TeamJoinReviewer")
   teamInvitesReceived            V1TeamInvitation[]            @relation("V1TeamInvitee")
   teamInvitesSent                V1TeamInvitation[]            @relation("V1TeamInviter")
+  teamInviteLinksCreated         V1TeamInviteLink[]            @relation("V1TeamInviteLinkCreator")
   createdTeamMatches             V1TeamMatch[]                 @relation("V1TeamMatchCreator")
   teamMatchApplications          V1TeamMatchApplication[]      @relation("V1TeamMatchApplicantUser")
   reviewedTeamMatches            V1TeamMatchApplication[]      @relation("V1TeamMatchReviewer")
@@ -1304,6 +1305,7 @@ model V1Team {
   memberships                  V1TeamMembership[]
   joinApplications             V1TeamJoinApplication[]
   invitations                  V1TeamInvitation[]
+  inviteLinks                  V1TeamInviteLink[]
   trustScore                   V1TeamTrustScore?
   hostedTeamMatches            V1TeamMatch[]              @relation("V1HostTeamMatches")
   approvedTeamMatches          V1TeamMatch[]              @relation("V1ApprovedApplicantTeam")
@@ -1565,6 +1567,28 @@ model V1TeamInvitation {
   @@index([invitedUserId, status])
   @@index([teamId, status])
   @@map("v1_team_invitations")
+}
+
+/// 팀 초대 링크(Task 180 G12). 링크로 온 사람은 가입 신청으로 접수된다 — 승인 권한은 그대로 팀장·매니저.
+/// 토큰 원문은 저장하지 않는다: 보여 줄 때는 tokenSalt + 서버 시크릿으로 다시 만들고, 조회는 tokenHash(sha256)로 한다.
+/// 팀당 살아 있는(revoked_at IS NULL) 행은 하나 — 부분 unique 인덱스라 마이그레이션 SQL 에만 있다
+/// (`v1_team_invite_links_active_team_key`). 재발급·만료 뒤 새로 만들 때 이전 행에 revokedAt 을 찍는다.
+model V1TeamInviteLink {
+  id              String    @id @default(uuid())
+  teamId          String    @map("team_id")
+  createdByUserId String    @map("created_by_user_id")
+  tokenSalt       String    @map("token_salt")
+  tokenHash       String    @unique(map: "v1_team_invite_links_token_hash_key") @map("token_hash")
+  expiresAt       DateTime  @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+  revokedByUserId String?   @map("revoked_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  team          V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade, map: "v1_team_invite_links_team_fk")
+  createdByUser V1User @relation("V1TeamInviteLinkCreator", fields: [createdByUserId], references: [id], onDelete: Restrict, map: "v1_team_invite_links_created_by_fk")
+
+  @@index([teamId, createdAt], map: "v1_team_invite_links_team_id_created_at_idx")
+  @@map("v1_team_invite_links")
 }
 
 model V1TeamContact {

@@ -108,7 +108,8 @@ validate_alpha_final_release_manifest() {
        .database.task168.schemaSha256 == "46e4129e4e03b1d74a07bcd7411427b5826114fa2c97ee232db0d9fd8ee207a9" or
        .database.task168.schemaSha256 == "a253cc251952aa69690f275ce2ef6bdf72d7c6cdede9b5ce631f181735599dab" or
        .database.task168.schemaSha256 == "1594b60981b035faee0a079522e7ac1632950ebc166c7a8084c432049f433c97" or
-       .database.task168.schemaSha256 == "012d273c8134f51226375dfc97aa2e60d28483d1d3076b8ae6486fdf1396d012") and
+       .database.task168.schemaSha256 == "012d273c8134f51226375dfc97aa2e60d28483d1d3076b8ae6486fdf1396d012" or
+       .database.task168.schemaSha256 == "1624c88fa73071dafe130cb34f6fd0443d63112d7514a7e8628f5e062129606e") and
       .database.task168.runtimeClientSchemaSha256 == .database.task168.schemaSha256 and
       .database.task168.m11Sha256 == "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323" and
       .images.api.repository == ($registry + "/teameet-alpha-v1-api") and

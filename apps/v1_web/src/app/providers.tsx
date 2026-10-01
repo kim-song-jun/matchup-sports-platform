@@ -14,9 +14,9 @@ import { KeyboardViewportBridge } from '@/components/providers/keyboard-viewport
 import { AppShellFrame } from '@/components/v1-ui/app-shell-frame';
 import {
   createV1Persister,
-  shouldPersistQuery,
   PERSIST_BUSTER,
   PERSIST_MAX_AGE_MS,
+  V1_PERSIST_DEHYDRATE_OPTIONS,
 } from '@/lib/query-persist';
 import { createV1QueryClient } from '@/lib/query-client';
 import { NativeAppSurface } from '@/components/providers/native-app-surface';
@@ -32,15 +32,12 @@ export function Providers({ children }: { children: ReactNode }) {
         persister,
         buster: PERSIST_BUSTER,
         maxAge: PERSIST_MAX_AGE_MS,
-        dehydrateOptions: {
-          // persist 패키지 2종(@tanstack/react-query-persist-client ·
-          // query-sync-storage-persister)은 peer 로 @tanstack/react-query ^5.102.8 을
-          // 요구한다. package.json 의 범위를 거기에 맞춰 정렬해 두었으므로 query-core 는
-          // 한 벌만 설치되고, 이 콜백은 타입 우회 없이 그대로 연결된다 — 범위를 다시
-          // 낮추면 query-core 가 두 벌이 되면서 여기서 TS2345 가 난다.
-          shouldDehydrateQuery: (query) =>
-            query.state.status === 'success' && shouldPersistQuery(query),
-        },
+        // persist 패키지 2종(@tanstack/react-query-persist-client ·
+        // query-sync-storage-persister)은 peer 로 @tanstack/react-query ^5.102.8 을
+        // 요구한다. package.json 의 범위를 거기에 맞춰 정렬해 두었으므로 query-core 는
+        // 한 벌만 설치되고, 이 옵션은 타입 우회 없이 그대로 연결된다 — 범위를 다시
+        // 낮추면 query-core 가 두 벌이 되면서 여기서 TS2345 가 난다.
+        dehydrateOptions: V1_PERSIST_DEHYDRATE_OPTIONS,
       }}
     >
       <ThemeProvider>

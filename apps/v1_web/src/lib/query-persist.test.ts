@@ -1,6 +1,6 @@
-import type { Query } from '@tanstack/react-query';
-import { describe, expect, it } from 'vitest';
-import { shouldPersistQuery } from './query-persist';
+import { QueryClient, dehydrate, onlineManager, type Query } from '@tanstack/react-query';
+import { afterEach, describe, expect, it } from 'vitest';
+import { V1_PERSIST_DEHYDRATE_OPTIONS, shouldPersistQuery } from './query-persist';
 
 /**
  * shouldPersistQuery 는 순수 함수지만 계약이 깨지면 실제로 개인정보가 localStorage 에
@@ -38,5 +38,24 @@ describe('shouldPersistQuery', () => {
   it('status가 success가 아니면 거부한다', () => {
     expect(shouldPersistQuery(fakeQuery(['v1', 'master', 'sports'], 'pending'))).toBe(false);
     expect(shouldPersistQuery(fakeQuery(['v1', 'master', 'sports'], 'error'))).toBe(false);
+  });
+});
+
+describe('V1_PERSIST_DEHYDRATE_OPTIONS', () => {
+  afterEach(() => onlineManager.setOnline(true));
+
+  it('멈춘 쓰기(mutation)는 저장하지 않는다 — 복원돼도 보낼 함수가 없어 조용히 사라진다. 허용된 조회는 그대로 저장한다', () => {
+    const client = new QueryClient();
+    client.setQueryData(['v1', 'master', 'sports'], { items: [] });
+    client.setQueryData(['v1', 'matches', 'm1'], { id: 'm1' });
+    onlineManager.setOnline(false);
+    void client.getMutationCache().build(client, { mutationFn: async () => 'sent' }).execute(undefined);
+
+    // 대조군 — 기본 옵션이면 이 멈춘 쓰기가 저장 대상이다(빈 캐시를 보고 통과하지 않게).
+    expect(dehydrate(client).mutations).toHaveLength(1);
+
+    const persisted = dehydrate(client, V1_PERSIST_DEHYDRATE_OPTIONS);
+    expect(persisted.mutations).toHaveLength(0);
+    expect(persisted.queries.map((query) => query.queryKey)).toEqual([['v1', 'master', 'sports']]);
   });
 });

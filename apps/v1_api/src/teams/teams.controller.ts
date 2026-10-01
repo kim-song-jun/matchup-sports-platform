@@ -1,10 +1,11 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
-import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
+import { CreateTeamInvitationDto, CreateTeamInvitationsBatchDto } from './dto/create-team-invitation.dto';
 import {
   ChangeTeamMembershipJerseyDto,
   ChangeTeamMembershipRoleDto,
@@ -191,6 +192,17 @@ export class TeamsController {
     @Body() dto: CreateTeamInvitationDto,
   ) {
     return this.teamsService.createInvitation(user, teamId, dto);
+  }
+
+  @Post('teams/:teamId/invitations/batch')
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  createInvitationsBatch(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: CreateTeamInvitationsBatchDto,
+  ) {
+    return this.teamsService.createInvitationsBatch(user, teamId, dto);
   }
 
   @Get('teams/:teamId/invitations')

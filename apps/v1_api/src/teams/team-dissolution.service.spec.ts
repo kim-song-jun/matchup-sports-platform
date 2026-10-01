@@ -76,6 +76,7 @@ function setup(state: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       count: jest.fn().mockResolvedValue(1),
     },
+    v1TeamInviteLink: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     v1TeamSchedule: {
       findMany: jest.fn(({ where }) => Promise.resolve(where.teamId ? [{ id: 'sch-1', title: '연습', startAt: FUTURE, teamMatchId: null }] : [])),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -173,6 +174,10 @@ describe('TeamDissolutionService.dissolve — 자동 정리와 알림', () => {
       expect.objectContaining({ data: expect.objectContaining({ status: 'expired' }) }),
     );
     expect(prisma.v1TeamInvitation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'cancelled' } }));
+    expect(prisma.v1TeamInviteLink.updateMany).toHaveBeenCalledWith({
+      where: { teamId: TEAM, revokedAt: null },
+      data: { revokedAt: expect.any(Date), revokedByUserId: OWNER },
+    });
     expect(prisma.v1TeamSchedule.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: ['sch-1'] }, state: 'SCHEDULED' }, data: expect.objectContaining({ state: 'CANCELLED' }) }),
     );

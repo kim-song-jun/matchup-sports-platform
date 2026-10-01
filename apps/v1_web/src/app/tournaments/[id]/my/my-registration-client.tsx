@@ -263,7 +263,6 @@ function RegistrationPass({
    */
   rosterEditable,
   minPlayers,
-  isRosterLocked,
   belowMinimum,
 }: {
   tournamentId: string;
@@ -279,7 +278,6 @@ function RegistrationPass({
   rosterCount: number;
   rosterEditable: boolean;
   minPlayers: number;
-  isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
   // 명단에서 돌아올 때 이 화면(받은 출처 포함)으로 오도록 출처를 싣는다.
@@ -420,8 +418,8 @@ function RegistrationPass({
           {/*
             감사 finding #51: 잠기면 이 링크가 통째로 사라져, 팀장이 대회 당일 자기 팀 확정
             명단을 앱에서 확인할 방법이 없었다(명단 페이지 자체는 잠금 상태에서도 읽기 전용으로
-            잘 그린다 — tournament-roster-client.tsx 참조). 잠겼을 땐 라벨만 '명단 확인'으로
-            바꿔 읽기 전용으로라도 계속 연결한다.
+            잘 그린다 — tournament-roster-client.tsx 참조). 못 고칠 땐(잠금·마감·종료) 글자를
+            '명단 확인'으로 바꿔 읽기 전용으로라도 계속 연결한다.
           */}
           <Link
             href={rosterHref}
@@ -439,7 +437,7 @@ function RegistrationPass({
               minHeight: 44, paddingLeft: 8,
             }}
           >
-            {isRosterLocked ? '명단 확인' : belowMinimum ? '선수 등록' : '선수 수정'}
+            {!rosterEditable ? '명단 확인' : belowMinimum ? '선수 등록' : '선수 수정'}
             <ChevronRight size={16} />
           </Link>
         </div>
@@ -922,7 +920,6 @@ function RegistrationDetailView({
               paymentSummary={paymentSummary}
               rosterCount={players.length}
               minPlayers={tournament.minPlayers}
-              isRosterLocked={isRosterLocked}
               belowMinimum={belowMinimum}
             />
 

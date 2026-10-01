@@ -398,6 +398,30 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
     expect(container.textContent).toContain('수정 불가');
     expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
   });
+
+  // 링크 글자가 잠금만 봐서, 마감이 지났거나 대회가 끝나 못 고치는데도 "선수 수정" 이라고 썼다.
+  it.each([
+    ['명단 제출 마감 경과', { rosterDeadlineAt: '2020-01-01T00:00:00.000Z' }],
+    ['종료 리그', { kind: 'regular_league', status: 'completed' }],
+  ] as const)('못 고치는 명단(%s)의 링크는 읽기 전용 글자를 쓴다', (_label, tournament) => {
+    arrange(tournament);
+
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const link = screen.getByRole('link', { name: '선수 명단 확인하기' });
+    expect(link).toHaveTextContent('명단 확인');
+    expect(container.textContent).not.toContain('선수 수정');
+  });
+
+  it('대조군: 고칠 수 있는 명단의 링크는 그대로 "선수 수정" 이다', () => {
+    arrange({ kind: 'regular_league', status: 'draft' });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    for (const link of screen.getAllByRole('link', { name: '선수 명단 수정하기' })) {
+      expect(link).toHaveTextContent('선수 수정');
+    }
+  });
 });
 
 // 대회 상세·재신청으로 이동하는 CTA 들이 from 을 어떻게 잇는지.

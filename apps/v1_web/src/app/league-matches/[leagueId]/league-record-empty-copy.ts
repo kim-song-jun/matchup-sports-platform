@@ -18,3 +18,8 @@ export function leagueRecordEmptySub(kind: 'goals' | 'assists', hiddenByEligibil
     ? `${label} 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.`
     : `확정된 경기 결과가 쌓이면 ${label} 순위가 나타나요.`;
 }
+
+/** 제목도 사유를 따른다 — 기록이 가려진 것을 "기록이 없어요"로 말하면 방금 입력한 기록이 사라진 것처럼 읽힌다. */
+export function leagueRecordEmptyTitle(hiddenByEligibility: boolean): string {
+  return hiddenByEligibility ? '아직 공개할 수 있는 기록이 없어요' : '아직 기록이 없어요';
+}

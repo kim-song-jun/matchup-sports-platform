@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leagueRecordEmptySub } from './league-record-empty-copy';
+import { leagueRecordEmptySub, leagueRecordEmptyTitle } from './league-record-empty-copy';
 
 describe('leagueRecordEmptySub', () => {
   // 순위가 비는 이유 두 가지는 **처방이 다르다** — 동의 게이팅은 할 일이 있고,
@@ -35,5 +35,12 @@ describe('leagueRecordEmptySub', () => {
       leagueRecordEmptySub('assists', false),
     ];
     expect(new Set(all).size).toBe(4);
+  });
+});
+
+describe('leagueRecordEmptyTitle', () => {
+  it('가려진 기록과 실제 0건을 서로 다른 제목으로 말한다', () => {
+    expect(leagueRecordEmptyTitle(true)).toBe('아직 공개할 수 있는 기록이 없어요');
+    expect(leagueRecordEmptyTitle(false)).toBe('아직 기록이 없어요');
   });
 });

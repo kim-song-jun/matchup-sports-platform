@@ -24,7 +24,7 @@ import type {
   V1LeaguePlayerRecordRow,
   V1LeagueStandingRow,
 } from '@/types/league-match';
-import { leagueRecordEmptySub } from '../league-record-empty-copy';
+import { leagueRecordEmptySub, leagueRecordEmptyTitle } from '../league-record-empty-copy';
 
 /** 아직 종료되지 않은 리그로 딥링크했을 때 — 빈 화면 대신 안내 + 되돌아갈 동선. */
 function NotCompletedNotice({ parentHref, state }: { parentHref: string; state: 'draft' | 'active' }) {
@@ -170,12 +170,14 @@ function LeaderboardSection({
   title,
   rows,
   unit,
+  emptyTitle,
   emptySub,
 }: {
   parentHref: string;
   title: string;
   rows: V1LeaguePlayerRecordRow[];
   unit: (row: V1LeaguePlayerRecordRow) => number;
+  emptyTitle: string;
   emptySub: string;
 }) {
   const ranks = useMemo(() => competitionRanks(rows.map(unit)), [rows, unit]);
@@ -184,7 +186,7 @@ function LeaderboardSection({
       <section className="mb-5">
         <h2 className="tm-hub-section-title mb-2">{title}</h2>
         <EmptyState
-          title="아직 기록이 없어요"
+          title={emptyTitle}
           sub={emptySub}
           illustration={{ name: 'journey-done' }}
           cta="리그 순위표 보러가기"
@@ -309,6 +311,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
             title="득점왕"
             rows={records.goals}
             unit={(row) => row.goals}
+            emptyTitle={leagueRecordEmptyTitle(records.hiddenByEligibility)}
             emptySub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
           />
           <LeaderboardSection
@@ -316,6 +319,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
             title="도움왕"
             rows={records.assists}
             unit={(row) => row.assists}
+            emptyTitle={leagueRecordEmptyTitle(records.hiddenByEligibility)}
             emptySub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
           />
         </>

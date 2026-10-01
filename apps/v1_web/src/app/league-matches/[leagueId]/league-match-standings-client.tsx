@@ -42,7 +42,7 @@ import type {
   V1LeagueStandingsResponse,
   V1PublicLeagueDetail,
 } from '@/types/league-match';
-import { leagueRecordEmptySub } from './league-record-empty-copy';
+import { leagueRecordEmptySub, leagueRecordEmptyTitle } from './league-record-empty-copy';
 
 /**
  * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
@@ -1066,7 +1066,7 @@ export default function LeagueMatchStandingsClient({
               <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
             ) : records.goals.length === 0 ? (
               <EmptyState
-                title="아직 기록이 없어요"
+                title={leagueRecordEmptyTitle(records.hiddenByEligibility)}
                 sub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
                 illustration={{ name: 'journey-done' }}
                 cta="경기 일정 보기"
@@ -1095,7 +1095,7 @@ export default function LeagueMatchStandingsClient({
               <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
             ) : records.assists.length === 0 ? (
               <EmptyState
-                title="아직 기록이 없어요"
+                title={leagueRecordEmptyTitle(records.hiddenByEligibility)}
                 sub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
                 illustration={{ name: 'journey-done' }}
                 cta="경기 일정 보기"

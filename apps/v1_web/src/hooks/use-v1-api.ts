@@ -1008,7 +1008,15 @@ export function useV1CreateTeam() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1TeamMutationPayload) => v1Post<V1TeamMutationResult>('/teams', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teams() }),
+    // 새 팀이 바로 보여야 하는 곳 — 팀 목록, 내 팀 목록(팀매치 만들기), 팀매치 신청 가능 팀 목록
+    // (팀매치에서 "팀 만들고 신청하기"로 왔다가 돌아가면 새 팀을 곧바로 고를 수 있어야 한다).
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() }),
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] }),
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[1] === 'team-matches' && query.queryKey[3] === 'application-eligibility',
+      }),
+    ]),
   });
 }
 

@@ -1212,6 +1212,43 @@ describe('TeamMatchDetailPageClient — 신청 마감된 매치는 로그인/팀
   });
 });
 
+// 팀이 없는 사람이 모집 중인 팀매치에서 "팀 만들고 신청하기"를 누르면 이 팀매치 주소와 종목을 들고 팀 만들기로
+// 간다 — 만든 뒤 새 팀 상세가 아니라 이 팀매치로 돌아와 새 팀으로 바로 신청한다.
+describe('TeamMatchDetailPageClient — 팀 만들고 신청하기', () => {
+  afterEach(() => window.history.replaceState({}, '', '/'));
+
+  it('팀 만들기로 이 팀매치 주소(from)와 경기 종목(sportId)을 넘긴다', async () => {
+    vi.clearAllMocks();
+    window.history.replaceState({}, '', '/team-matches/tm-open?from=%2Fteam-matches');
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'tm-open',
+        teamMatchId: 'tm-open',
+        title: '모집 중인 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '경기장',
+        startsAt: '2099-08-01T10:00:00.000Z',
+        status: 'recruiting',
+        displayState: 'recruiting',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '알파팀' },
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: { teamMatchId: 'tm-open', requiresApproval: true, requiresPayment: false, teams: [] }, isSuccess: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="tm-open" />);
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('팀 만들고 신청하기');
+    fireEvent.click(screen.getByRole('button', { name: '상대팀 신청' }));
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith(
+      `/teams/new?sportId=sport-futsal&from=${encodeURIComponent('/team-matches/tm-open?from=%2Fteam-matches')}`,
+    ));
+  });
+});
+
 // 그룹 A(alpha 실측) — 서버는 리그 대진(leagueId 有)의 팀 단독 취소를 항상 409
 // LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN으로 거부한다(team-matches.service.ts cancel()).
 // 눌러서 실패 문구를 봐야만 알 수 있게 두지 않고, 애초에 버튼을 노출하지 않는다.

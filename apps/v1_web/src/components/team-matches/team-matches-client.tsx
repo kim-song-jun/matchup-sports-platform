@@ -550,6 +550,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       apply: (teamId) => submitApplication(teamId, null),
       withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
       reasonCode: selectedEligibility?.reasonCode,
+      sportId: query.data.sport?.sportId,
       redirectTo: (href) => router.push(href),
     }),
   };
@@ -1011,6 +1012,7 @@ function getApplyAction({
   apply,
   withdraw,
   reasonCode,
+  sportId,
   redirectTo,
 }: {
   viewerState: V1TeamMatchViewerState;
@@ -1024,6 +1026,7 @@ function getApplyAction({
   apply: (teamId: string) => Promise<unknown>;
   withdraw: () => Promise<unknown>;
   reasonCode?: string;
+  sportId?: string;
   redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
   // 취소된 매치에는 신청도 철회도 없다 — 신청서가 살아 있어도 아래 철회 분기로 흘리지 않는다.
@@ -1045,8 +1048,12 @@ function getApplyAction({
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
   // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
   if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };
-  // 팀 없음: 팀 만들기 페이지로 이동 (#13)
-  if (hasNoTeam) return async () => { redirectTo('/teams/new'); };
+  // 팀 없음: 팀 만들기로 보내되 이 팀매치 주소를 넘긴다(#13) — 만든 뒤 돌아와 새 팀으로 바로 신청한다.
+  // 종목도 이 경기 종목으로 채운다: 다른 종목 팀은 SPORT_MISMATCH 라 돌아와도 고를 수 없다.
+  if (hasNoTeam) {
+    const createPath = sportId ? `/teams/new?sportId=${encodeURIComponent(sportId)}` : '/teams/new';
+    return async () => { redirectTo(withFromPath(createPath, getCurrentRedirectPath())); };
+  }
   return undefined;
 }
 

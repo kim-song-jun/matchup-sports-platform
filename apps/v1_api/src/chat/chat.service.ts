@@ -24,7 +24,7 @@ import {
   UpdateMyChatRoomDto,
 } from './dto/chat.dto';
 
-/** 입장·퇴장 시스템 줄의 chat:message 페이로드 — 텍스트 메시지 페이로드에 종류 두 칸을 더한다. */
+/** 시스템 줄의 chat:message 페이로드 — 텍스트 메시지 페이로드에 종류 두 칸을 더한다. */
 export type ChatSystemLine = {
   messageId: string;
   roomId: string;
@@ -33,8 +33,14 @@ export type ChatSystemLine = {
   sentAt: Date;
   senderUserId: string;
   messageType: 'system';
-  systemEventType: V1ChatSystemEventType;
+  systemEventType: V1ChatSystemEventType | null;
 };
+
+/** 입장·퇴장 줄은 event 로 본문을 만들고, 그 밖의 줄(컨택 응답 등)은 enum 을 늘리지 않고 event=null + 호출자 본문을 쓴다. */
+export type ChatSystemLineInput = { chatRoomId: string; userId: string; at: Date } & (
+  | { event: V1ChatSystemEventType; displayName?: string }
+  | { event: null; body: string }
+);
 
 type ChatRecipientRoom = Parameters<typeof currentChatRecipientEntitlementWhere>[0] & { id: string };
 
@@ -365,7 +371,7 @@ export class ChatService {
     return chatMessagePayload;
   }
 
-  /** 보낸 사람의 메시지를 실시간으로 받을 참여자 — 텍스트 메시지와 입장·퇴장 줄이 같은 규칙을 쓴다. */
+  /** 보낸 사람의 메시지를 실시간으로 받을 참여자 — 텍스트 메시지와 시스템 줄이 같은 규칙을 쓴다. */
   private async messageRecipientIds(db: Prisma.TransactionClient, room: ChatRecipientRoom, senderUserId: string): Promise<string[]> {
     const recipients = await db.v1ChatRoomParticipant.findMany({
       where: {
@@ -382,20 +388,23 @@ export class ChatService {
   }
 
   /**
-   * 입장·퇴장 줄을 호출자 트랜잭션 안에서 저장한다 — 멤버십·참여 상태 변경과 함께 커밋되거나 함께 롤백된다.
+   * 시스템 줄을 호출자 트랜잭션 안에서 저장한다 — 멤버십·컨택 상태 변경과 함께 커밋되거나 함께 롤백된다.
    * 커밋 뒤 반환값을 deliverSystemLine 에 넘겨야 방에 실시간으로 뜬다. 내보내기도 'left'(나갔어요)로 쓴다:
    * 팀 채팅은 팀원 모두가 보므로 누가 내보냈는지를 드러내지 않는다(Task 180 H1-left).
    */
-  async recordSystemLine(
-    tx: Prisma.TransactionClient,
-    input: { chatRoomId: string; userId: string; event: V1ChatSystemEventType; at: Date; displayName?: string },
-  ): Promise<ChatSystemLine> {
-    const displayName = input.displayName ?? (await systemLineDisplayName(tx, input.userId));
+  async recordSystemLine(tx: Prisma.TransactionClient, input: ChatSystemLineInput): Promise<ChatSystemLine> {
+    let body: string;
+    if (input.event === null) {
+      body = input.body;
+    } else {
+      const displayName = input.displayName ?? (await systemLineDisplayName(tx, input.userId));
+      body = input.event === 'joined' ? `${displayName}님이 들어왔어요` : `${displayName}님이 나갔어요`;
+    }
     const message = await tx.v1ChatMessage.create({
       data: {
         chatRoomId: input.chatRoomId,
         senderUserId: input.userId,
-        body: input.event === 'joined' ? `${displayName}님이 들어왔어요` : `${displayName}님이 나갔어요`,
+        body,
         status: 'sent',
         messageType: 'system',
         systemEventType: input.event,
@@ -416,7 +425,7 @@ export class ChatService {
     };
   }
 
-  /** 커밋된 입장·퇴장 줄을 방 참여자에게 chat:message 로 알린다. 알림함·푸시는 없고, 실패해도 던지지 않는다. */
+  /** 커밋된 시스템 줄을 방 참여자에게 chat:message 로 알린다. 알림함·푸시는 없고, 실패해도 던지지 않는다. */
   async deliverSystemLine(line: ChatSystemLine): Promise<void> {
     try {
       const room = await this.prisma.v1ChatRoom.findUnique({ where: { id: line.roomId }, select: RECIPIENT_ROOM_SELECT });
@@ -425,7 +434,7 @@ export class ChatService {
         this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', line);
       }
     } catch (err) {
-      this.logger.warn({ roomId: line.roomId, messageId: line.messageId, err }, '채팅 입장·퇴장 줄 실시간 전달 실패');
+      this.logger.warn({ roomId: line.roomId, messageId: line.messageId, err }, '채팅 시스템 줄 실시간 전달 실패');
     }
   }
 

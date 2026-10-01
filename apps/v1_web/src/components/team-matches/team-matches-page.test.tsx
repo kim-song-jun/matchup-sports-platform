@@ -27,6 +27,17 @@ function renderPage(ui: ReactElement) {
 }
 
 describe('team match images', () => {
+  it('places the lifecycle notice after the match hero and its mobile back action', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} lifecyclePanel={<div data-testid="lifecycle-notice">보류 안내</div>} />);
+    const hero = container.querySelector<HTMLElement>('.tm-team-vs-hero');
+    const notice = screen.getByTestId('lifecycle-notice');
+
+    expect(hero).not.toBeNull();
+    expect(within(hero!).getByRole('link', { name: '뒤로가기' })).toBeInTheDocument();
+    expect(hero!.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('renders the API image with a local fallback on list cards', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], imageUrl: 'https://cdn.example.com/team-match.webp' }];

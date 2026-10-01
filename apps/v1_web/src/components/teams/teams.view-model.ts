@@ -11,7 +11,6 @@ const teams = [
   {
     id: 'team-1',
     name: '성수 러너스 FC',
-    logo: '성',
     sport: '풋살',
     sports: ['풋살', '축구'],
     region: '서울 성동',
@@ -27,7 +26,6 @@ const teams = [
   {
     id: 'team-2',
     name: '강동 애슬레틱 풋살',
-    logo: '강',
     sport: '풋살',
     sports: ['풋살'],
     region: '서울 강동',
@@ -43,7 +41,6 @@ const teams = [
   {
     id: 'team-3',
     name: '마포 원데이 FC',
-    logo: '마',
     sport: '축구',
     sports: ['축구', '풋살'],
     region: '서울 마포',
@@ -59,7 +56,6 @@ const teams = [
   {
     id: 'team-4',
     name: '내 팀 다이나믹 FS',
-    logo: '다',
     sport: '풋살',
     sports: ['풋살', '러닝'],
     region: '서울 구로',

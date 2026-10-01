@@ -133,7 +133,6 @@ describe('TeamListPageView', () => {
         {
           id: 'team-live-1',
           name: '라이브 팀',
-          logo: '라',
           sport: '풋살',
           sports: ['풋살'],
           region: '서울 성동구',
@@ -208,7 +207,6 @@ describe('TeamDetailPageView', () => {
       team: {
         id: 'team-live-1',
         name: '라이브 팀',
-        logo: '라',
         logoUrl: null,
         coverImageUrl: null,
         sport: '풋살',
@@ -259,7 +257,6 @@ describe('TeamDetailPageView', () => {
       team: {
         id: 'team-live-1',
         name: '라이브 팀',
-        logo: '라',
         logoUrl: null,
         coverImageUrl: null,
         sport: '풋살',

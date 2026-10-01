@@ -8,6 +8,7 @@ import { Check } from 'lucide-react';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { josa } from '@/lib/korean';
 import { friendlyRsvpLabel } from '@/lib/v1-status-labels';
+import { displayInitials } from '@/lib/display-initials';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { scheduleTypeLabel, weekdayHeaders } from './team-schedules.view-model';
@@ -590,7 +591,7 @@ function ScheduleAttendeeSection({ model, friendlyMatch }: { model: ScheduleDeta
                   flexShrink: 0,
                 }}
               >
-                {item.nickname.slice(0, 1)}
+                {displayInitials(item.nickname, { fallback: '?' })}
               </div>
               {/* 이름이 버튼·배지에 밀려 "QA0929선수/10" 처럼 꺾이지 않게 최소 폭을 주고, 남는 폭 부족은 버튼 라벨이 줄바꿈으로 받는다. */}
               <div className="tm-text-body" style={{ flex: '1 1 auto', minWidth: '7rem', wordBreak: 'keep-all' }}>{item.nickname}</div>

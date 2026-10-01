@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Card } from '@/components/v1-ui/primitives';
+import { displayInitials } from '@/lib/display-initials';
 import { Handshake } from 'lucide-react';
 import type { V1TournamentSponsor } from '@/types/api';
 import styles from './tournament-sponsor-section.module.css';
@@ -172,7 +173,7 @@ function SponsorLogo({ name, logoUrl }: { name: string; logoUrl: string | null }
           onError={() => setErrored(true)}
         />
       ) : (
-        <span className="tm-text-label">{name.slice(0, 2)}</span>
+        <span className="tm-text-label">{displayInitials(name, { fallback: '후원', count: 2 })}</span>
       )}
     </div>
   );

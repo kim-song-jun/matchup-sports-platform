@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
+import { displayInitials } from '@/lib/display-initials';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -74,7 +75,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
 
   const data = profile.data;
   const { reputation, activitySummary } = data;
-  const initials = Array.from(data.displayName || data.nickname || '?')[0] ?? '?';
+  const initials = displayInitials(data.displayName || data.nickname, { fallback: '?' });
   const trust = trustConfig(reputation.trustState);
   const mannerDisplay = reputation.mannerScore !== null
     ? reputation.mannerScore.toFixed(1)

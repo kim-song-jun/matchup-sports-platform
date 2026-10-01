@@ -19,6 +19,7 @@ import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { extractErrorMessage } from '@/lib/error-message';
 import { cssUrl } from '@/lib/assets';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { displayInitials } from '@/lib/display-initials';
 import type { V1MatchApplication } from '@/types/api';
 
 type Attendance = Record<string, 'completed' | 'no_show'>;
@@ -399,7 +400,7 @@ function ApplicationRow({
             }}
           >
             {!application.profileImageUrl
-              ? (application.displayName.slice(0, 1) || '?')
+              ? displayInitials(application.displayName, { fallback: '?' })
               : null}
           </div>
 

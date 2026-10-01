@@ -47,10 +47,18 @@ export class ChatMessagesQueryDto {
   direction?: 'before' | 'after';
 }
 
+/** 텍스트(`content`) 또는 사진(`imageUrl`) 중 **하나**. 둘 다·둘 다 없음은 서비스가 400 으로 막는다. */
 export class SendChatMessageDto {
+  @IsOptional()
   @IsString()
   @MaxLength(2000)
-  content!: string;
+  content?: string;
+
+  /** 사진 메시지 — `POST /uploads` 가 돌려준 루트 상대 URL(`/uploads/...`). 보내는 사람이 올린 이미지여야 한다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  imageUrl?: string;
 }
 
 export class UpdateMyChatRoomDto {

@@ -25,6 +25,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
+import { displayInitials } from '@/lib/display-initials';
 import {
   eventPresentation,
   presentGameEventParticipantName,
@@ -43,10 +44,6 @@ function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
 function subMatchScore(data: SharedRecord, subMatch: SharedSubMatch, sideKey: 'HOME' | 'AWAY') {
   const sideId = data.sides.find((side) => side.key === sideKey)?.id;
   return subMatch.scores.find((score) => score.sideId === sideId)?.score ?? null;
-}
-
-function playerInitials(name: string) {
-  return Array.from(name.trim()).slice(0, 2).join('') || '?';
 }
 
 const RESULT_AXIS_COLUMNS = 'minmax(0, 1fr) 64px minmax(0, 1fr)';
@@ -475,7 +472,7 @@ function GoalRows({ data, goals, publicEvents, disabled, canEdit, onEdit, onDele
     const creditedSideName = data.sides.find((side) => side.id === goal.sideId)?.name ?? '상대팀';
     return <div className={styles.goalRow} key={goal.id} role="group" aria-label={`${participantName} 득점 기록`}>
     <div className={styles.goalPlayer}>
-      <ProfileAvatar imageUrl={participant?.profileImageUrl} initials={playerInitials(participantName)} size={40} />
+      <ProfileAvatar imageUrl={participant?.profileImageUrl} initials={displayInitials(participantName, { fallback: '?', count: 2 })} size={40} />
       <div className={styles.goalPlayerText}>
         <div className={styles.goalTitleRow}>
           <strong>{participantName}</strong>
@@ -535,7 +532,7 @@ function GoalForm({ data, goal, subMatchId, disabled, stale, onCancel, onRefresh
         </label>
         {candidates.map((participant) => <label className={styles.playerChoice} data-selected={participantId === participant.id} key={participant.id}>
           <input type="radio" name="scorer" value={participant.id} checked={participantId === participant.id} onChange={(event) => setParticipantId(event.target.value)} />
-          <ProfileAvatar imageUrl={participant.profileImageUrl} initials={playerInitials(participant.name)} size={40} />
+          <ProfileAvatar imageUrl={participant.profileImageUrl} initials={displayInitials(participant.name, { fallback: '?', count: 2 })} size={40} />
           <span><strong>{participant.jerseyNumber !== null ? `#${participant.jerseyNumber} ` : ''}{participant.name}</strong><small>{data.sides.find((side) => side.id === participant.sideId)?.name}</small></span>
         </label>)}
       </div>

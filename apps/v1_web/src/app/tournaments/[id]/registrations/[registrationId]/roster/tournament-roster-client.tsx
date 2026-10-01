@@ -154,11 +154,13 @@ export function TournamentRosterDeadlineCard({
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
-  // 마감일이 남았어도 대회가 모집(open) 단계가 아니면 "신청 접수 중" 이라 말할 수 없다.
-  // 상태를 아직 모르면(로딩 중) 기존처럼 마감일만 본다.
+  // 종료·취소는 마감 경과와 무관하게 상태가 우선이다(하단 안내도 같은 축). 그 외 non-open 상태는
+  // 마감 전일 때만 상태를 보여 준다 — 마감 후엔 "신청 마감" 이 여전히 사실이다.
+  // 상태를 아직 모르면(로딩 중) 마감일만 본다.
+  const isTerminalStatus = tournamentStatus === 'completed' || tournamentStatus === 'cancelled';
   const statusOverride = season
     ? season.status
-    : deadlineState === 'upcoming' && tournamentStatus && tournamentStatus !== 'open'
+    : tournamentStatus && (isTerminalStatus || (deadlineState === 'upcoming' && tournamentStatus !== 'open'))
       ? tournamentStatus
       : null;
   const seasonStatus = statusOverride ? getTournamentStatusConfig(statusOverride) : null;

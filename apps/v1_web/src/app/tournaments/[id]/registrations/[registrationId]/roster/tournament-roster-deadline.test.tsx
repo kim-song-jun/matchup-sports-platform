@@ -124,6 +124,39 @@ describe('TournamentRosterDeadlineCard', () => {
       expect(screen.getByText(label)).toBeInTheDocument();
     });
 
+    it.each<[V1TournamentStatus, string]>([
+      ['completed', '종료'],
+      ['cancelled', '취소'],
+    ])('%s 대회는 마감이 지나도 "신청 마감" 대신 "%s" 를 보여 준다', (status, label) => {
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={'2026-07-20T18:30:00+09:00'}
+          isTournamentRosterClosed
+          tournamentStatus={status}
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+          nowMs={new Date('2026-07-20T19:00:00+09:00').getTime()}
+        />,
+      );
+      expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+      expect(screen.getByText(label)).toBeInTheDocument();
+    });
+
+    it('대조군: 진행 중 대회는 마감이 지나면 기존대로 "신청 마감" 이다', () => {
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={'2026-07-20T18:30:00+09:00'}
+          tournamentStatus="in_progress"
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+          nowMs={new Date('2026-07-20T19:00:00+09:00').getTime()}
+        />,
+      );
+      expect(screen.getByText('신청 마감')).toBeInTheDocument();
+    });
+
     it('대조군: 모집 중(open) 대회는 마감 전이면 기존대로 "신청 접수 중" 이다', () => {
       renderCard('open');
       expect(screen.getByText('신청 접수 중')).toBeInTheDocument();

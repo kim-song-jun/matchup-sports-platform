@@ -524,6 +524,8 @@ type InfoRowProps = {
   sub?: string;
   /** Optional inline badge node rendered after the value. (#2: 희소성 배지) */
   badge?: React.ReactNode;
+  /** 라벨 위·값 아래로 쌓고 값을 왼쪽 정렬한다. 좁은 폭에서 긴 값이 라벨 옆에서 꺾이는 것을 막는다. */
+  stacked?: boolean;
 };
 
 /**
@@ -547,24 +549,27 @@ type InfoRowProps = {
  * 손조립 행도 쓴다(예: 매치 상세의 `인원` — 배지·서브텍스트를 직접 붙인다). 클래스로
  * 세면 이 컴포넌트의 영향권보다 큰 수가 나온다.
  */
-export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRowProps) {
+export function InfoRow({ label, value, valueColor, isLast, sub, badge, stacked }: InfoRowProps) {
   // 판정한 값과 그리는 값을 **같게** 둔다 — `trim()` 으로 판정하고 원본을 그리면
   // 서버가 `"  값  "` 을 줬을 때 화면에 공백이 그대로 남는다.
   const trimmed = value.trim();
   return (
     <div
       className="tm-info-row"
-      style={{ ...(isLast ? { borderBottom: 'none' } : {}) }}
+      style={{
+        ...(isLast ? { borderBottom: 'none' } : {}),
+        ...(stacked ? { flexDirection: 'column', alignItems: 'flex-start', gap: 4, padding: '12px 0' } : {}),
+      }}
     >
       {/* #1: 라벨은 caption/muted로 recede */}
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
         {label}
       </div>
       {/* #1: 값 슬롯 — body(15px)+weight600+strong으로 라벨 대비 명확한 위계 */}
-      <div style={{ textAlign: 'right', minWidth: 0 }}>
+      <div style={{ textAlign: stacked ? 'left' : 'right', minWidth: 0 }}>
         <div
           className="tm-text-body"
-          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
+          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: stacked ? 'flex-start' : 'flex-end', gap: 8 }}
         >
           {trimmed.length > 0 ? trimmed : '미정'}
           {/* #2: 희소성/마감 인라인 배지 */}

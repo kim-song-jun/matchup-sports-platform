@@ -430,6 +430,31 @@ describe('TournamentApplyPageClient GA events', () => {
     });
   });
 
+  describe('신청 요약 rail (#1443)', () => {
+    it('rail 은 요약 표면 하나만 그리고 안에 또 하나의 요약 카드를 넣지 않는다', async () => {
+      await openAgreementsStep();
+      const rail = screen.getByRole('complementary', { name: '신청 요약' });
+      expect(rail.querySelector('.tm-card')).toBeNull();
+      expect(rail).toHaveTextContent('대회명');
+      expect(rail).toHaveTextContent('참가 팀');
+    });
+
+    it('rail 의 대회명은 라벨 위·값 아래로 쌓고 참가 팀 같은 짧은 값은 한 줄 행으로 둔다', async () => {
+      await openAgreementsStep();
+      const rail = screen.getByRole('complementary', { name: '신청 요약' });
+      const rows = Array.from(rail.querySelectorAll<HTMLElement>('.tm-info-row'));
+      const byLabel = (label: string) => rows.find((row) => row.textContent?.startsWith(label));
+      expect(byLabel('대회명')?.style.flexDirection).toBe('column');
+      expect(byLabel('참가 팀')?.style.flexDirection).toBe('');
+    });
+
+    it('왼쪽 본문의 recap 은 모바일 전용이라 데스크톱에서 숨는다', async () => {
+      await openAgreementsStep();
+      const recapTitle = screen.getByText('신청 내용을 확인해 주세요');
+      expect(recapTitle.closest('.tm-hide-desktop')).not.toBeNull();
+    });
+  });
+
   it('참가비가 없는 대회는 입금자명 없이도 제출할 수 있다', async () => {
     // 입금자명이 `canSubmit` 의 필수 조건이라 무료 대회에서도 버튼이 잠겨 있었다.
     tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({

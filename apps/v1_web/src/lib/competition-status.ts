@@ -105,6 +105,30 @@ export function leagueFixturePhase(fixture: LeagueFixturePhaseInput, nowMs: numb
   return 'scheduled';
 }
 
+/** 결과가 들어오기 전의 경기 단계 — 어드민 대진 표 '결과' 열이 결과 단계 대신 그린다. */
+export type PreResultMatchPhase = Extract<MatchPhase, 'scheduled' | 'live' | 'paused' | 'cancelled'>;
+
+export type LeagueFixtureResultCell =
+  | { readonly kind: 'phase'; readonly phase: PreResultMatchPhase }
+  | { readonly kind: 'result'; readonly stage: NonNullable<V1LeagueFixture['resultStage']> };
+
+/**
+ * 어드민 대진 표 '결과' 열. 결과가 아직 없는(not_entered) 경기는 `leagueFixturePhase` 의 단계를 그려
+ * 진행 중·예정 경기가 '결과 미입력'으로 읽히지 않게 한다(W6-V4). 취소는 결과 단계보다 먼저다.
+ */
+export function leagueFixtureResultCell(
+  fixture: LeagueFixturePhaseInput & Pick<V1LeagueFixture, 'resultStage'>,
+  nowMs: number = Date.now(),
+): LeagueFixtureResultCell {
+  const phase = leagueFixturePhase(fixture, nowMs);
+  const stage = fixture.resultStage ?? 'not_entered';
+  if (phase === 'cancelled') return { kind: 'phase', phase };
+  if (stage === 'not_entered' && (phase === 'scheduled' || phase === 'live' || phase === 'paused')) {
+    return { kind: 'phase', phase };
+  }
+  return { kind: 'result', stage };
+}
+
 const PUBLIC_STATUS_GAME_STATE: Record<string, NonNullable<LeagueFixturePhaseInput['gameState']>> = {
   scheduled: 'SCHEDULED',
   live: 'LIVE',

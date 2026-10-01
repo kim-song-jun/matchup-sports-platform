@@ -260,6 +260,58 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', '/admin/league-matches');
   });
 
+  // W6-V4: 결과가 아직 없는 대진은 경기 단계로 그린다. 진행 중 경기가 '결과 미입력'으로 읽히면 같은 화면의
+  // "지금 할 일"("경기가 진행 중이에요")과 말이 엇갈린다. 끝났는데 결과가 없는 경기만 '결과 미입력'이다.
+  it('결과 열은 진행 중·예정 경기에 경기 단계를, 끝났지만 결과가 없는 경기에만 결과 미입력을 그린다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        startsOn: '2026-09-01T00:00:00.000Z',
+        recentVenues: [],
+        fixtures: [
+          {
+            teamMatchId: 'tm-ended', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+            resultStage: 'not_entered', gameState: 'ENDED', homeScore: null, awayScore: null,
+          },
+          {
+            // 예정 시각보다 일찍 시작한 경기 — 킥오프 시각만 보면 아직 '예정'이다.
+            teamMatchId: 'tm-live', title: '가을 풋살 리그 2주차', homeTeamId: 't2', awayTeamId: 't1',
+            startAt: '2099-09-08T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+            resultStage: 'not_entered', gameState: 'LIVE', homeScore: null, awayScore: null,
+          },
+          {
+            teamMatchId: 'tm-scheduled', title: '가을 풋살 리그 3주차', homeTeamId: 't1', awayTeamId: 't2',
+            startAt: '2099-09-15T20:00:00.000Z', placeName: '장소 미정', status: 'matched',
+            resultStage: 'not_entered', gameState: 'SCHEDULED', homeScore: null, awayScore: null,
+          },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    const table = screen.getByRole('table');
+    const resultCellOf = (fixtureTitle: string) => {
+      const row = within(table).getByText(`${fixtureTitle} · `, { exact: false }).closest('tr') as HTMLElement;
+      return within(row).getAllByRole('cell')[1];
+    };
+    expect(resultCellOf('가을 풋살 리그 1주차')).toHaveTextContent(/^결과 미입력$/);
+    expect(resultCellOf('가을 풋살 리그 2주차')).toHaveTextContent(/^진행 중$/);
+    expect(resultCellOf('가을 풋살 리그 3주차')).toHaveTextContent(/^예정$/);
+  });
+
   it('일정 수정 모달의 일시 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({

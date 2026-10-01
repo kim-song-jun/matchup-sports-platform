@@ -411,6 +411,25 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
     expect(onCancelB).toHaveBeenCalledTimes(1);
     expect(onCancelA).not.toHaveBeenCalled();
   });
+
+  // W6-V2: 같은 날 다시 보낸 초대와 앞서 끝난 초대가 날짜만으로는 구분되지 않았다. 시각은 KST 로 읽는다.
+  it('보낸 초대는 보낸 시각을, 지난 초대는 끝난 시각을 날짜와 함께 보여 같은 날 두 초대가 구분된다', () => {
+    const model = baseModel({
+      items: [
+        { invitationId: 'inv-new', displayName: '선수18', createdAt: '2026-10-01T06:24:58.000Z', message: null, cancelPending: false, onCancel: vi.fn() },
+      ],
+      pastItems: [
+        { invitationId: 'inv-old', displayName: '선수18', statusLabel: '수락', closedAt: '2026-10-01T06:16:02.000Z' },
+      ],
+    });
+
+    render(<TeamMembersPageView model={model} />);
+
+    const pendingCard = screen.getByRole('button', { name: '선수18님 초대 취소' }).closest('.tm-invitation-card') as HTMLElement;
+    expect(within(pendingCard).getByText('10/1 (목) 15:24 초대')).toBeInTheDocument();
+    const past = screen.getByRole('list', { name: '지난 초대' });
+    expect(within(past).getByText('10/1 (목) 15:16')).toBeInTheDocument();
+  });
 });
 
 describe('TeamFormPageView', () => {

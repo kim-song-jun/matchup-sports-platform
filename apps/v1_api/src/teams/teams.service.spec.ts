@@ -2213,8 +2213,8 @@ describe('TeamsService', () => {
       prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
       // v1TeamMembership.findUnique (기존 멤버 여부)
       prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
-      // v1TeamInvitation.findUnique (기존 초대 여부)
-      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(null);
+      // v1TeamInvitation.findFirst (대기 중 초대 여부)
+      prisma.v1TeamInvitation.findFirst.mockResolvedValueOnce(null);
     }
 
     it('비멤버 이메일 초대 성공 → invitationId 반환 + alreadyInvited=false', async () => {
@@ -2339,40 +2339,6 @@ describe('TeamsService', () => {
       expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
     });
 
-    it('declined 였던 초대 재초대 시 pending 으로 reset (upsert 경로)', async () => {
-      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
-      prisma.v1Team.findFirst.mockResolvedValueOnce({
-        id: 'team-1', name: '팀', status: 'active',
-      });
-      prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
-      // 기존 멤버 없음
-      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
-      // 기존 초대: declined 상태
-      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
-        id: 'inv-old',
-        status: 'declined',
-      });
-      // update(reset) 경로
-      prisma.v1TeamInvitation.update.mockResolvedValueOnce({
-        id: 'inv-old',
-        status: 'pending',
-      });
-
-      const result = await service.createInvitation(
-        owner,
-        'team-1',
-        { invitedEmail: invitee.email },
-      );
-
-      // create 가 아니라 update 경로로 reset 됐어야 함
-      expect(prisma.v1TeamInvitation.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'pending' }) }),
-      );
-      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
-      expect(result.status).toBe('pending');
-      expect(result.alreadyInvited).toBe(false);
-    });
-
     it('이미 pending 인 초대 재시도 → alreadyInvited=true (트랜잭션·생성 skip)', async () => {
       prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
       prisma.v1Team.findFirst.mockResolvedValueOnce({
@@ -2380,11 +2346,8 @@ describe('TeamsService', () => {
       });
       prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
       prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
-      // 기존 초대: pending 상태
-      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
-        id: 'inv-existing',
-        status: 'pending',
-      });
+      // 대기 중 초대가 이미 있다
+      prisma.v1TeamInvitation.findFirst.mockResolvedValueOnce({ id: 'inv-existing' });
 
       const result = await service.createInvitation(
         owner,

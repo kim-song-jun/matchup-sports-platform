@@ -59,17 +59,12 @@ function setup(options: { memberCount?: number; memberGoalCount?: number | null 
       ),
     },
     v1TeamInvitation: {
-      findUnique: jest.fn(async ({ where }: { where: { teamId_invitedUserId: { teamId: string; invitedUserId: string } } }) =>
-        invitations.find((row) => row.teamId === where.teamId_invitedUserId.teamId && row.invitedUserId === where.teamId_invitedUserId.invitedUserId) ?? null,
+      findFirst: jest.fn(async ({ where }: { where: { teamId: string; invitedUserId: string; status: string } }) =>
+        invitations.find((row) => row.teamId === where.teamId && row.invitedUserId === where.invitedUserId && row.status === where.status) ?? null,
       ),
       create: jest.fn(async ({ data }: { data: Omit<Invitation, 'id'> }) => {
         const row = { id: `inv-new-${invitations.length + 1}`, ...data };
         invitations.push(row);
-        return row;
-      }),
-      update: jest.fn(async ({ where, data }: { where: { id: string }; data: Partial<Invitation> }) => {
-        const row = invitations.find((invitation) => invitation.id === where.id)!;
-        Object.assign(row, data);
         return row;
       }),
     },
@@ -89,15 +84,16 @@ describe('TeamsService.createInvitationsBatch', () => {
 
     expect(result.results).toEqual([
       { recipient: 'Kim@Example.com', status: 'invited', invitationId: 'inv-new-3' },
-      { recipient: '이선수', status: 'invited', invitationId: 'inv-lee' },
+      { recipient: '이선수', status: 'invited', invitationId: 'inv-new-4' },
       { recipient: '박선수', status: 'already_invited', invitationId: 'inv-park' },
       { recipient: '기존멤버', status: 'already_member', invitationId: null },
       { recipient: 'ghost@example.com', status: 'not_found', invitationId: null },
       { recipient: '쌍둥이', status: 'ambiguous', invitationId: null },
     ]);
     expect(result.invitedCount).toBe(2);
-    // 거절했던 초대는 다시 열리고 보낸 사람이 지금 매니저로 바뀐다.
-    expect(ctx.invitations.find((row) => row.id === 'inv-lee')).toMatchObject({ status: 'pending', invitedByUserId: 'manager', message: '같이 뛰어요' });
+    // 거절했던 초대는 기록으로 남고, 다시 보낸 초대는 지금 매니저가 보낸 새 행이다(W4-V8).
+    expect(ctx.invitations.find((row) => row.id === 'inv-lee')).toMatchObject({ status: 'declined', invitedByUserId: 'owner' });
+    expect(ctx.invitations.find((row) => row.id === 'inv-new-4')).toMatchObject({ invitedUserId: 'u-lee', status: 'pending', invitedByUserId: 'manager', message: '같이 뛰어요' });
     expect(ctx.invitations.filter((row) => row.status === 'pending').map((row) => row.invitedUserId).sort()).toEqual(['u-kim', 'u-lee', 'u-park']);
     expect(ctx.notifications.emitNotification.mock.calls.map((call) => call[0]).sort()).toEqual(['u-kim', 'u-lee']);
   });

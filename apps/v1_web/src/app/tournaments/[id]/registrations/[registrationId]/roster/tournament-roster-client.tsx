@@ -137,7 +137,7 @@ export function TournamentRosterDeadlineCard({
   /** 대회 상태 때문에 누구도 명단을 못 고치는 상태 — 잠금·마감보다 우선한다(서버 assertRosterMutable과 동일 순서). */
   isTournamentRosterClosed?: boolean;
   /** 막힌 이유 문구를 고르는 데 쓴다(종료·취소 ≠ 아직 공개 전). */
-  tournamentStatus?: string | null;
+  tournamentStatus?: V1TournamentStatus | null;
   isRosterLocked: boolean;
   isRosterEditBlockedByStatus: boolean;
   isRosterDeadlineBlocked: boolean;
@@ -159,7 +159,7 @@ export function TournamentRosterDeadlineCard({
   const statusOverride = season
     ? season.status
     : deadlineState === 'upcoming' && tournamentStatus && tournamentStatus !== 'open'
-      ? (tournamentStatus as V1TournamentStatus)
+      ? tournamentStatus
       : null;
   const seasonStatus = statusOverride ? getTournamentStatusConfig(statusOverride) : null;
   const deadlineBadge = seasonStatus

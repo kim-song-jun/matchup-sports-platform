@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { V1TournamentStatus } from '@/types/api';
 import { describe, expect, it } from 'vitest';
 import { TournamentRosterDeadlineCard } from './tournament-roster-client';
 
@@ -98,7 +99,7 @@ describe('TournamentRosterDeadlineCard', () => {
 
   // #1451: 마감 전이어도 대회가 끝났거나 취소됐으면 "신청 접수 중" 이 아니라 대회 상태를 보여 줘야 한다.
   describe('마감 전 대회의 상태 배지', () => {
-    const renderCard = (tournamentStatus: string) =>
+    const renderCard = (tournamentStatus: V1TournamentStatus) =>
       render(
         <TournamentRosterDeadlineCard
           deadlineAt={'2026-07-20T18:30:00+09:00'}
@@ -111,7 +112,9 @@ describe('TournamentRosterDeadlineCard', () => {
         />,
       );
 
-    it.each([
+    it.each<[V1TournamentStatus, string]>([
+      ['draft', '준비 중'],
+      ['closed', '마감'],
       ['completed', '종료'],
       ['cancelled', '취소'],
       ['in_progress', '진행 중'],

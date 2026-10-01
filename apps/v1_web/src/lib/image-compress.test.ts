@@ -221,4 +221,22 @@ describe('encodeCanvasToBlob', () => {
     expect(blob?.type).toBe('image/jpeg');
     expect(calls).toEqual(['image/webp', 'image/jpeg']);
   });
+
+  it('JPEG 로 넘어갈 때만 바탕을 채울 기회를 준다 — 투명 영역이 검게 나오지 않게, WebP 는 알파 유지', async () => {
+    const order: string[] = [];
+    const flatten = vi.fn(() => order.push('flatten'));
+    const safari = fakeCanvas(new Set(['image/jpeg']));
+    const toBlob = safari.canvas.toBlob;
+    safari.canvas.toBlob = (callback, type) => {
+      order.push(type ?? '');
+      toBlob(callback, type);
+    };
+    await encodeCanvasToBlob(safari.canvas, 0.8, flatten);
+    expect(order).toEqual(['image/webp', 'flatten', 'image/jpeg']);
+
+    const chrome = fakeCanvas(new Set(['image/webp', 'image/jpeg']));
+    const keepAlpha = vi.fn();
+    await encodeCanvasToBlob(chrome.canvas, 0.8, keepAlpha);
+    expect(keepAlpha).not.toHaveBeenCalled();
+  });
 });

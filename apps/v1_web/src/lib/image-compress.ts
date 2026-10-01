@@ -166,7 +166,14 @@ async function encodeWithCanvas(
     if (!context) return null;
     context.drawImage(bitmap, 0, 0, size.width, size.height);
 
-    return await encodeCanvasToBlob(canvas, quality);
+    // JPEG 로 넘어갈 때만(WebP 를 못 만드는 Safari) 그린 그림 **뒤에** 흰 바탕을 깐다 — 투명 PNG(스티커·캡처)의
+    // 투명 영역이 검게 나오지 않게. WebP 는 알파를 그대로 둔다(팀 로고 등 다른 업로드의 투명 배경 유지).
+    return await encodeCanvasToBlob(canvas, quality, () => {
+      context.globalCompositeOperation = 'destination-over';
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, size.width, size.height);
+      context.globalCompositeOperation = 'source-over';
+    });
   } finally {
     bitmap.close();
   }
@@ -186,13 +193,19 @@ export interface BlobEncodable {
  * 에러를 낸다(그 이상). 아이폰 사진은 3~8MB 라 후자가 잦다 — "사진을 올려도 저장이
  * 안 된다"의 실제 원인이다. 돌아온 blob 의 type 이 요청한 것과 다르면 JPEG 로 다시 간다.
  */
-export function encodeCanvasToBlob(canvas: BlobEncodable, quality: number): Promise<Blob | null> {
+export function encodeCanvasToBlob(
+  canvas: BlobEncodable,
+  quality: number,
+  /** JPEG 로 넘어가기 직전에 부른다 — JPEG 는 알파가 없어 투명 영역이 검게 나오므로 바탕을 채울 기회. */
+  beforeJpegFallback?: () => void,
+): Promise<Blob | null> {
   const encode = (type: string) =>
     new Promise<Blob | null>((resolve) => {
       canvas.toBlob((blob) => resolve(blob), type, quality);
     });
   return encode('image/webp').then((blob) => {
     if (blob && blob.type === 'image/webp') return blob;
+    beforeJpegFallback?.();
     return encode('image/jpeg');
   });
 }

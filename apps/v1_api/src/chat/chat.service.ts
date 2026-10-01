@@ -268,9 +268,12 @@ export class ChatService {
         } },
       },
     });
+    const shareCards = await this.withCompetitionMatchRoutes(
+      pageItems.map((message) => (message.status === 'sent' ? parseShareCard(message.shareCard) : null)),
+    );
 
     return {
-      items: pageItems.map((message) => ({
+      items: pageItems.map((message, index) => ({
         messageId: message.id,
         sender: {
           userId: message.senderUser.id,
@@ -292,7 +295,7 @@ export class ChatService {
                 mimeType: message.attachmentAsset.mimeType,
               }
             : null,
-        shareCard: message.status === 'sent' ? parseShareCard(message.shareCard) : null,
+        shareCard: shareCards[index],
         status: message.status,
         sentAt: message.sentAt,
         mine: message.senderUserId === user.id,
@@ -303,9 +306,28 @@ export class ChatService {
   }
 
   /**
+   * 대회·리그 경기 일정을 `/team-matches/:id` 로 담아 보낸 카드(대회 경기면 그 화면이 404)를 읽을 때 경기 상세 경로로
+   * 바꿔 내보낸다. 저장된 스냅숏은 건드리지 않는다.
+   */
+  private async withCompetitionMatchRoutes(cards: (ChatShareCard | null)[]): Promise<(ChatShareCard | null)[]> {
+    const teamMatchIds = new Set(cards.map(legacyTeamMatchId).filter((id): id is string => id !== null));
+    if (teamMatchIds.size === 0) return cards;
+    const competitionMatches = await this.prisma.v1TeamMatch.findMany({
+      where: { id: { in: [...teamMatchIds] }, OR: [{ leagueId: { not: null } }, { tournamentId: { not: null } }] },
+      select: { id: true, leagueId: true, tournamentId: true },
+    });
+    const routeById = new Map(competitionMatches.map((match) => [match.id, teamMatchShareRoute(match)]));
+    return cards.map((card) => {
+      const id = legacyTeamMatchId(card);
+      const route = id === null ? undefined : routeById.get(id);
+      return card && route ? { ...card, route } : card;
+    });
+  }
+
+  /**
    * 공유 대상을 보내는 사람 기준으로 열람 확인하고 카드 스냅숏을 만든다. 못 보면 400(존재를 드러내지 않는다).
    * - 팀 일정: 팀이 살아 있고, 공개 일정이거나 보내는 사람이 활성 팀원(팀 일정 상세의 규칙과 같다).
-   *   팀 매치 일정이면 카드는 상대 팀도 열 수 있는 팀 매치 화면으로 연다.
+   *   팀 매치 일정이면 카드는 상대 팀도 열 수 있는 경기 화면(친선은 팀 매치, 대회·리그는 공개 경기 상세)으로 연다.
    * - 매치: 지워지지 않은 매치(매치 상세의 규칙과 같다).
    */
   private async resolveShareCard(userId: string, target: ChatShareTargetDto): Promise<ChatShareCard> {
@@ -326,7 +348,10 @@ export class ChatService {
       // 카드는 보낼 때의 스냅숏이라 취소·끝난 일정을 보내면 받는 사람이 진행되는 줄 안다.
       if (schedule.state !== 'SCHEDULED') throw validationError('취소됐거나 끝난 일정은 공유할 수 없어요.', 'share');
       const teamMatch = schedule.teamMatchId
-        ? await this.prisma.v1TeamMatch.findFirst({ where: { id: schedule.teamMatchId, deletedAt: null }, select: { placeName: true } })
+        ? await this.prisma.v1TeamMatch.findFirst({
+            where: { id: schedule.teamMatchId, deletedAt: null },
+            select: { id: true, placeName: true, leagueId: true, tournamentId: true },
+          })
         : null;
       return {
         kind: 'team_schedule',
@@ -335,7 +360,7 @@ export class ChatService {
         startAt: schedule.startAt.toISOString(),
         place: teamMatch?.placeName ?? null,
         sub: team.name,
-        route: teamMatch && schedule.teamMatchId ? `/team-matches/${schedule.teamMatchId}` : `/teams/${schedule.teamId}/schedules/${schedule.id}`,
+        route: teamMatch ? teamMatchShareRoute(teamMatch) : `/teams/${schedule.teamId}/schedules/${schedule.id}`,
       };
     }
     // 종류를 명시적으로 가른다 — 검증을 빠져나온 이상한 값이 매치 분기로 떨어져 `id: undefined` 조회(= 아무 매치)가
@@ -1202,6 +1227,22 @@ export function parseShareCard(value: Prisma.JsonValue | null): ChatShareCard | 
   const route = text('route');
   if (!kind || !(CHAT_SHARE_KINDS as readonly string[]).includes(kind) || !targetId || !title || !route?.startsWith('/')) return null;
   return { kind: kind as ChatShareKind, targetId, title, startAt: text('startAt'), place: text('place'), sub: text('sub'), route };
+}
+
+/**
+ * 팀 매치 일정 카드가 여는 경기 화면. `/team-matches/:id` 는 대회 경기를 404 로 낸다.
+ * 리그 대진은 `tournamentId` 도 리그 id 로 채워져 있어 `leagueId` 를 먼저 본다.
+ */
+function teamMatchShareRoute(match: { id: string; leagueId: string | null; tournamentId: string | null }): string {
+  if (match.leagueId !== null) return `/league-matches/${match.leagueId}/fixtures/${match.id}`;
+  if (match.tournamentId !== null) return `/tournaments/${match.tournamentId}/matches/${match.id}`;
+  return `/team-matches/${match.id}`;
+}
+
+const TEAM_MATCH_ROUTE = /^\/team-matches\/([^/?#]+)$/;
+
+function legacyTeamMatchId(card: ChatShareCard | null): string | null {
+  return card ? (TEAM_MATCH_ROUTE.exec(card.route)?.[1] ?? null) : null;
 }
 
 function validationError(message: string, field: string) {

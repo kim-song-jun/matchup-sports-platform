@@ -104,6 +104,8 @@ export class UploadsService {
    * 새 볼륨을 만들면 배포 설정까지 바꿔야 해서 같은 볼륨 안에 둔다.
    */
   static readonly PRIVATE_DIR = '.private';
+  /** `/uploads` 공개 정적 서빙 옵션 — 점으로 시작하는 경로(`.private/`)를 403 으로 거부한다. main.ts 와 테스트가 같은 값을 쓴다. */
+  static readonly STATIC_OPTIONS = { dotfiles: 'deny' } as const;
 
   async storeFiles(
     files: UploadedFile[],

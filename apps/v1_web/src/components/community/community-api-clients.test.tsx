@@ -25,6 +25,7 @@ const hooks = vi.hoisted(() => ({
   chatMessages: vi.fn(),
   sendChatMessage: vi.fn(),
   uploadImages: vi.fn(),
+  uploadChatFile: vi.fn(),
   // 공유 시트는 열 때만 부른다 — 기본은 "아직 안 부름".
   mySchedule: vi.fn(() => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() })),
   myMatches: vi.fn(() => ({ data: undefined, isPending: true, isError: false, refetch: vi.fn() })),
@@ -76,6 +77,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
     useV1ChatMessages: hooks.chatMessages,
     useV1SendChatMessage: hooks.sendChatMessage,
     useV1UploadImages: hooks.uploadImages,
+    useV1UploadChatFile: hooks.uploadChatFile,
     useV1MySchedule: hooks.mySchedule,
     useV1MyMatches: hooks.myMatches,
     useV1UpdateMyChatRoom: hooks.updateMyChatRoom,
@@ -582,6 +584,71 @@ describe('ChatRoomPageClient — 팀컨택 방', () => {
       fireEvent.change(screen.getByTestId('chat-album-input'), { target: { files: photos(1) } });
 
       expect(await screen.findByText('사진을 보내지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+    });
+  });
+
+  describe('파일 보내기 (Task 181 ③)', () => {
+    function arrangeFile(upload: ReturnType<typeof vi.fn>) {
+      const sendMutateAsync = vi.fn().mockResolvedValue({});
+      hooks.sendChatMessage.mockReturnValue({ isPending: false, isError: false, mutate: vi.fn(), mutateAsync: sendMutateAsync });
+      hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn() });
+      hooks.uploadChatFile.mockReturnValue({ mutateAsync: upload });
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+      fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+      return { sendMutateAsync };
+    }
+
+    it('올린 뒤 fileId 로 보낸다', async () => {
+      const upload = vi.fn().mockResolvedValue({ fileId: 'file-1', name: 'a.pdf', size: 10, mimeType: 'application/pdf' });
+      const { sendMutateAsync } = arrangeFile(upload);
+      const doc = new File(['%PDF-'], 'a.pdf', { type: 'application/pdf' });
+
+      fireEvent.change(screen.getByTestId('chat-file-input'), { target: { files: [doc] } });
+
+      await waitFor(() => expect(sendMutateAsync).toHaveBeenCalledWith({ fileId: 'file-1' }));
+      expect(upload).toHaveBeenCalledWith(doc);
+    });
+
+    it('10MB 를 넘으면 올리지 않고 알려 준다', async () => {
+      const upload = vi.fn();
+      arrangeFile(upload);
+      const big = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.pdf', { type: 'application/pdf' });
+
+      fireEvent.change(screen.getByTestId('chat-file-input'), { target: { files: [big] } });
+
+      expect(await screen.findByText('파일은 10MB까지 보낼 수 있어요.')).toBeInTheDocument();
+      expect(upload).not.toHaveBeenCalled();
+    });
+
+    it('서버가 형식을 거절하면 그 이유를 보여 주고 보내지 않는다', async () => {
+      const upload = vi.fn().mockRejectedValue(new V1ApiError({
+        status: 'error', statusCode: 400, code: 'UPLOAD_FILE_TYPE_INVALID',
+        message: '보낼 수 없는 파일 형식이에요. PDF·워드·엑셀·파워포인트·한글·텍스트·CSV·ZIP 파일만 보낼 수 있어요.',
+        timestamp: '2026-10-01T00:00:00.000Z',
+      } as ConstructorParameters<typeof V1ApiError>[0]));
+      const { sendMutateAsync } = arrangeFile(upload);
+
+      fireEvent.change(screen.getByTestId('chat-file-input'), { target: { files: [new File(['x'], 'a.pdf')] } });
+
+      expect(await screen.findByText(/보낼 수 없는 파일 형식이에요/)).toBeInTheDocument();
+      expect(sendMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('받은 파일 메시지는 참여자 인증 받기 경로로 내려받는다', () => {
+      hooks.chatRoom.mockReturnValue({ data: contactRoomDetail('accepted', 'from'), isPending: false, isError: false, refetch: vi.fn() });
+      hooks.chatMessages.mockReturnValue({
+        data: { items: [{
+          messageId: 'file-msg-1', messageType: 'file', content: '[파일] 경기 일정표.pdf', status: 'sent', sentAt: '2026-10-01T01:00:00.000Z', mine: false,
+          sender: { userId: 'u-2', displayName: '서연', profileImageUrl: null },
+          file: { name: '경기 일정표.pdf', size: 1258291, mimeType: 'application/pdf' },
+        }] },
+        isPending: false, isError: false, refetch: vi.fn(),
+      });
+      renderWithClient(<ChatRoomPageClient roomId="room-contact" />);
+
+      const link = screen.getByRole('link', { name: '경기 일정표.pdf 파일 받기, 1.2MB' });
+      expect(link.getAttribute('href')).toMatch(/\/chat\/rooms\/room-contact\/messages\/file-msg-1\/file$/);
     });
   });
 

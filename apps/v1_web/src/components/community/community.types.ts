@@ -93,10 +93,12 @@ export type ChatRoomViewModel = {
     sentAt: string;
     unreadCount?: number;
     /** 사진 메시지. `imageUrl` 이 null 이면 볼 수 없는 사진(숨김·삭제·업로드 삭제). */
-    kind?: 'image' | 'share';
+    kind?: 'image' | 'share' | 'file';
     imageUrl?: string | null;
     /** 일정·매치 공유 카드. 없으면(숨김·삭제) body 대체 문구만 보인다. */
     share?: ChatShareCardModel | null;
+    /** 파일 메시지 — 이름·크기·받기 경로(참여자 인증). 없으면(숨김·삭제) body 대체 문구만 보인다. */
+    file?: { name: string; sizeLabel: string; href: string } | null;
   }>;
   status?: 'loading' | 'error' | 'ready';
   emptyTitle?: string;
@@ -110,6 +112,10 @@ export type ChatRoomViewModel = {
   onPickImages?: (files: File[]) => void;
   /** 사진 업로드·전송 중. */
   sendingImages?: boolean;
+  /** + 패널의 "파일"에서 고른 문서(Task 181 ③). 없으면 칸이 안 보인다. */
+  onPickFile?: (file: File) => void;
+  /** 파일 업로드·전송 중. */
+  sendingFile?: boolean;
   /** 사진·공유 전송 실패·안내 문구. */
   imageNotice?: string;
   /** + 패널의 "일정·매치" — 없으면 칸이 안 보인다. */

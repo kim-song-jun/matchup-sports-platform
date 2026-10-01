@@ -42,7 +42,7 @@ async function bootstrap() {
   app.useStaticAssets(path.resolve(UploadsService.UPLOAD_BASE), {
     prefix: UploadsService.SERVE_PREFIX,
     // 채팅 파일은 같은 볼륨의 `.private/` 에 있다 — 점 경로를 공개 서빙에서 명시적으로 막는다(Task 181 ③).
-    dotfiles: 'deny',
+    ...UploadsService.STATIC_OPTIONS,
   });
   app.setGlobalPrefix('api/v1');
   app.enableCors({

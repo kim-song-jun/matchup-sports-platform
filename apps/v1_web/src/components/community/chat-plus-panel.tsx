@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
-import { CalendarDays, Camera, Image as ImageIcon, X } from 'lucide-react';
+import { CalendarDays, Camera, FileText, Image as ImageIcon, X } from 'lucide-react';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
@@ -13,6 +13,15 @@ export const MAX_CHAT_IMAGES = 5;
 
 // iOS 는 accept 에 HEIC 가 없으면 고를 때 JPEG 로 바꿔 준다 — 서버가 받는 세 형식만 연다.
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+// 서버 채팅 파일 표(CHAT_FILE_TYPES)와 같은 확장자 — 선택 창에서 먼저 거른다(내용 검사는 서버가 한다).
+const FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.txt,.csv,.zip';
+
+/** 파일 크기 표시 — "820B" · "12KB" · "3.4MB". */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')}MB`;
+}
 
 /**
  * 카메라 칸은 터치 기기에서만 보인다. PC 는 카메라가 없어 `capture` 가 그냥 파일 선택이 되고,
@@ -36,15 +45,19 @@ export function ChatPlusPanel({
   disabled,
   onPickImages,
   onOpenShare,
+  onPickFile,
 }: {
   id: string;
   disabled: boolean;
   onPickImages: (files: File[]) => void;
   /** 일정·매치 공유 시트를 연다(Task 181 ②). 없으면 칸이 안 보인다. */
   onOpenShare?: () => void;
+  /** 문서 하나를 보낸다(Task 181 ③). 없으면 칸이 안 보인다. */
+  onPickFile?: (file: File) => void;
 }) {
   const albumRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const canUseCamera = useCanUseCamera();
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -69,8 +82,27 @@ export function ChatPlusPanel({
           <CalendarDays size={22} strokeWidth={2} />
         </PlusTile>
       ) : null}
+      {onPickFile ? (
+        <PlusTile label="파일" disabled={disabled} onClick={() => fileRef.current?.click()}>
+          <FileText size={22} strokeWidth={2} />
+        </PlusTile>
+      ) : null}
       <input ref={albumRef} type="file" accept={IMAGE_ACCEPT} multiple hidden onChange={handleChange} data-testid="chat-album-input" />
       <input ref={cameraRef} type="file" accept={IMAGE_ACCEPT} capture="environment" hidden onChange={handleChange} data-testid="chat-camera-input" />
+      {onPickFile ? (
+        <input
+          ref={fileRef}
+          type="file"
+          accept={FILE_ACCEPT}
+          hidden
+          data-testid="chat-file-input"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) onPickFile(file);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -21,7 +21,9 @@ import {
   useV1MyMatches,
   useV1MySchedule,
   useV1SendChatMessage,
+  useV1UploadChatFile,
   useV1UploadImages,
+  chatMessageFileUrl,
   useV1UpdateChatRoomMe,
   useV1UpdateMyChatRoom,
 } from '@/hooks/use-v1-api';
@@ -32,7 +34,7 @@ import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, ChatShareCand
 import { getChatRoomViewModel } from './community.view-model';
 import { chatRoomContextSub, chatRoomTypeLabel } from '@/lib/chat-route';
 import { displayInitials } from '@/lib/display-initials';
-import { MAX_CHAT_IMAGES } from './chat-plus-panel';
+import { MAX_CHAT_IMAGES, formatFileSize } from './chat-plus-panel';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -159,6 +161,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const updateMe = useV1UpdateMyChatRoom(roomId);
   const [draft, setDraft] = useState('');
   const [sendingImages, setSendingImages] = useState(false);
+  const uploadFile = useV1UploadChatFile();
+  const [sendingFile, setSendingFile] = useState(false);
   const [imageNotice, setImageNotice] = useState<string | undefined>();
   // 일정·매치 공유 시트 — 열 때만 내 팀 일정·내 매치를 불러온다(채팅방을 열 때마다 부르지 않게).
   const [shareOpen, setShareOpen] = useState(false);
@@ -190,7 +194,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const isLoading = room.isPending || messages.isPending;
   // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
   // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
-  const messageItems = messages.data ? items.map((message) => toChatMessageModel(message, currentHref)) : isLoading ? fallback.messages : [];
+  const messageItems = messages.data ? items.map((message) => toChatMessageModel(message, currentHref, roomId)) : isLoading ? fallback.messages : [];
   const shareQueries = [mySchedules, joinedMatches, createdMatches];
   const model: ChatRoomViewModel = {
     onMessageSafety: setSafety,
@@ -269,6 +273,25 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       }
     },
     sendingImages,
+    // 파일(Task 181 ③): 올리기 → 보내기. 10MB 넘는 파일은 올리기 전에 막는다(서버도 막지만 기다리지 않게).
+    onPickFile: async (file: File) => {
+      if (sendingFile) return;
+      setImageNotice(undefined);
+      if (file.size > CHAT_FILE_MAX_BYTES) {
+        setImageNotice('파일은 10MB까지 보낼 수 있어요.');
+        return;
+      }
+      setSendingFile(true);
+      try {
+        const uploaded = await uploadFile.mutateAsync(file);
+        await send.mutateAsync({ fileId: uploaded.fileId });
+      } catch (err) {
+        setImageNotice(extractErrorMessage(err, '파일을 보내지 못했어요. 다시 시도해 주세요.'));
+      } finally {
+        setSendingFile(false);
+      }
+    },
+    sendingFile,
     imageNotice,
     share: {
       open: shareOpen,
@@ -407,8 +430,10 @@ function upcomingMatches(matches: Array<{ id: string; title: string; startsAt: s
 }
 
 const SHARE_LABEL = { team_schedule: '일정', match: '매치' } as const;
+/** 서버 채팅 파일 한도(CHAT_FILE_MAX_BYTES)와 같게. */
+const CHAT_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
-function toChatMessageModel(message: V1ChatMessage, currentHref: string | null): ChatRoomViewModel['messages'][number] {
+function toChatMessageModel(message: V1ChatMessage, currentHref: string | null, roomId: string): ChatRoomViewModel['messages'][number] {
   if (message.messageType === 'system') {
     return {
       id: message.messageId,
@@ -435,6 +460,13 @@ function toChatMessageModel(message: V1ChatMessage, currentHref: string | null):
           // 숨김·삭제면 content 가 null 이라 위 '삭제된 메시지예요.' 가 남고, 업로드만 지워졌으면 이 문구다.
           ...(message.content !== null && !message.imageUrl ? { body: '사진을 볼 수 없어요' } : {}),
         }
+      : message.messageType === 'file'
+        ? {
+            kind: 'file' as const,
+            file: message.file
+              ? { name: message.file.name, sizeLabel: formatFileSize(message.file.size), href: chatMessageFileUrl(roomId, message.messageId) }
+              : null,
+          }
       : message.messageType === 'share'
         ? {
             kind: 'share' as const,

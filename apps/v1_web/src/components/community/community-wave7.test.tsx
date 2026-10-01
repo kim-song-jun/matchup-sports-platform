@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
+import { formatFileSize } from './chat-plus-panel';
 import type { ChatListViewModel, ChatRoomViewModel, NotificationsViewModel } from './community.types';
 
 vi.mock('next/navigation', () => ({
@@ -282,6 +283,50 @@ describe('채팅방 일정·매치 공유 (Task 181 ②)', () => {
     expect(card).toHaveAttribute('href', '/matches/m-1?from=%2Fchat%2Froom-1');
     expect(within(card).getByText('수요일 저녁 풋살')).toBeInTheDocument();
     expect(within(card).getByText('성수 풋살파크')).toBeInTheDocument();
+  });
+});
+
+describe('채팅방 파일 보내기 (Task 181 ③)', () => {
+  it('+ 패널의 "파일" 칸에서 고른 문서를 넘기고 패널을 닫는다', () => {
+    const onPickFile = vi.fn();
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), onPickFile }} roomId="room-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+    expect(screen.getByRole('button', { name: '파일' })).toBeInTheDocument();
+    expect(screen.getByTestId('chat-file-input')).toHaveAttribute('accept', expect.stringContaining('.hwp'));
+    const doc = new File(['%PDF-'], '경기 일정표.pdf', { type: 'application/pdf' });
+
+    fireEvent.change(screen.getByTestId('chat-file-input'), { target: { files: [doc] } });
+
+    expect(onPickFile).toHaveBeenCalledWith(doc);
+    expect(screen.queryByRole('group', { name: '보내기 메뉴' })).not.toBeInTheDocument();
+  });
+
+  it('파일 말풍선은 이름·크기를 보여 주고 참여자 인증 경로로 내려받는다', () => {
+    const messages: ChatRoomViewModel['messages'] = [{
+      id: 'f1', who: 'other', senderId: 'u2', label: '서연', body: '[파일] 경기 일정표.pdf', sentAt: '2026-10-01T01:00:00Z', kind: 'file',
+      file: { name: '경기 일정표.pdf', sizeLabel: '1.2MB', href: '/api/v1/chat/rooms/room-1/messages/f1/file' },
+    }];
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, messages }} roomId="room-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 일정표.pdf 파일 받기, 1.2MB' });
+    expect(link).toHaveAttribute('href', '/api/v1/chat/rooms/room-1/messages/f1/file');
+    expect(link).toHaveAttribute('download', '경기 일정표.pdf');
+  });
+
+  it('보내는 중이면 알리고 + 패널 칸을 잠근다', () => {
+    renderWithClient(<ChatRoomPageView listModel={emptyChatList} model={{ ...emptyRoom, onPickImages: vi.fn(), onPickFile: vi.fn(), sendingFile: true }} roomId="room-1" />);
+    expect(screen.getByRole('status')).toHaveTextContent('파일을 보내는 중이에요…');
+    fireEvent.click(screen.getByRole('button', { name: '보내기 메뉴 열기' }));
+    expect(screen.getByRole('button', { name: '파일' })).toBeDisabled();
+  });
+});
+
+describe('formatFileSize', () => {
+  it('B · KB · MB 로 줄여 쓴다', () => {
+    expect(formatFileSize(820)).toBe('820B');
+    expect(formatFileSize(12 * 1024 + 300)).toBe('12KB');
+    expect(formatFileSize(3.4 * 1024 * 1024)).toBe('3.4MB');
+    expect(formatFileSize(2 * 1024 * 1024)).toBe('2MB');
   });
 });
 

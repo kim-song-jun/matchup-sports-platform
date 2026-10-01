@@ -154,8 +154,9 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const visibleItems = filterTeamMatchesByLevels(orderedItems, selectedLevels);
   const countPageItems = (countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? [];
   const countPageIds = new Set(countPageItems.map((item) => item.teamMatchId ?? item.id));
+  const loadedMoreItems = selectedSportId ? [] : (items ?? []).filter((item) => !countPageIds.has(item.teamMatchId ?? item.id));
   const countItems = filterTeamMatchesByLevels(
-    [...countPageItems, ...(items ?? []).filter((item) => !countPageIds.has(item.teamMatchId ?? item.id))],
+    [...countPageItems, ...loadedMoreItems],
     selectedLevels,
   );
   const hasNext = query.data?.pageInfo?.hasNext ?? false;

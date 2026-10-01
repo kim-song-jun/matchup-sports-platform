@@ -282,7 +282,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           <div className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{model.dateTimeLabel}</div>
           {model.capacityLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{model.capacityLabel}</div> : null}
           {/* M-M 감사: 배지가 "상대팀 확정"이라 말하면서 상대팀·장소가 화면 어디에도
-              없었다 — 매치 상세(/team-matches/:id)가 이미 갖고 있는 값을 요약해 보여준다. */}
+              없었다 — 이어진 경기 상세(친선·리그는 팀 매치, 대회는 공개 경기)의 값을 요약해 보여준다. */}
           {model.opponent ? (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--grey100)', display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div className="tm-text-body" style={{ fontWeight: 700 }}>{model.opponent.teamName}</div>

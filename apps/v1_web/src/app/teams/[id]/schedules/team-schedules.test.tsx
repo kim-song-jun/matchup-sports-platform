@@ -35,6 +35,13 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...scheduleApiMocks,
 }));
 
+const publicRecordMocks = vi.hoisted(() => ({ usePublicMatch: vi.fn() }));
+
+vi.mock('@/components/public-game-records/use-public-game-records', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/public-game-records/use-public-game-records')>()),
+  ...publicRecordMocks,
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/schedules',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -150,6 +157,7 @@ beforeEach(() => {
   });
   scheduleApiMocks.useV1TeamMatch.mockReturnValue({ data: undefined, isLoading: false, isError: false });
   scheduleApiMocks.useV1TeamMatchLineup.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+  publicRecordMocks.usePublicMatch.mockReturnValue({ data: undefined, isLoading: false, isError: false });
   scheduleApiMocks.useV1AuthMe.mockReturnValue({ data: undefined });
   scheduleApiMocks.useV1SetMyScheduleAttendance.mockReturnValue(idleMutation());
   scheduleApiMocks.useV1CancelTeamSchedule.mockReturnValue(idleMutation());
@@ -349,6 +357,72 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     expect(screen.getByText('E2E 알파 B팀')).toBeInTheDocument();
     expect(screen.getByText('(테스트) 알파 구장')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1');
+  });
+
+  describe('대회·리그 경기의 상대팀 요약', () => {
+    const fromQuery = '?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1';
+    function confirmedCompetitionSchedule(linkedMatch: { tournamentId: string | null; leagueId: string | null }) {
+      scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+      scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+        data: scheduleDetail({ type: 'MATCH', teamMatchId: 'tm-1', linkedMatch: { teamMatchId: 'tm-1', ...linkedMatch }, matchConfirmed: true }),
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+    }
+    async function renderDetail() {
+      const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+      render(page);
+    }
+
+    it('리그 경기는 팀 매치 상세로 상대팀을 보여주고 리그 경기 상세로 연결한다', async () => {
+      // 리그 대진은 tournamentId 도 리그 id 다.
+      confirmedCompetitionSchedule({ tournamentId: 'league-1', leagueId: 'league-1' });
+      scheduleApiMocks.useV1TeamMatch.mockReturnValue({
+        data: { hostTeamId: 'team-2', hostTeam: { teamId: 'team-2', name: '망원 FC' }, approvedOpponentTeam: { teamId: 'team-1', name: '성수 풋살 크루' }, place: { name: '망원 구장' } },
+        isLoading: false,
+        isError: false,
+      });
+
+      await renderDetail();
+
+      expect(scheduleApiMocks.useV1TeamMatch).toHaveBeenCalledWith('tm-1');
+      expect(screen.getByText('망원 FC')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', `/league-matches/league-1/fixtures/tm-1${fromQuery}`);
+    });
+
+    it('대회 경기는 팀 매치 조회(404) 대신 공개 경기 상세로 상대팀을 보여주고 대회 경기 상세로 연결한다', async () => {
+      confirmedCompetitionSchedule({ tournamentId: 'cup-1', leagueId: null });
+      publicRecordMocks.usePublicMatch.mockReturnValue({
+        data: { home: { registrationId: 'r-2', teamId: 'team-2', teamName: '천둥 FC' }, away: { registrationId: 'r-1', teamId: 'team-1', teamName: '성수 풋살 크루' }, venue: '알파 구장' },
+        isLoading: false,
+        isError: false,
+      });
+
+      await renderDetail();
+
+      expect(scheduleApiMocks.useV1TeamMatch).toHaveBeenCalledWith('');
+      expect(publicRecordMocks.usePublicMatch).toHaveBeenCalledWith('cup-1', 'tm-1');
+      expect(screen.getByText('천둥 FC')).toBeInTheDocument();
+      expect(screen.getByText('알파 구장')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', `/tournaments/cup-1/matches/tm-1${fromQuery}`);
+    });
+
+    it('대진표 공개 전(공개 상세 404)인 대회 경기는 요약을 숨기고 오류도 띄우지 않는다', async () => {
+      confirmedCompetitionSchedule({ tournamentId: 'cup-1', leagueId: null });
+      publicRecordMocks.usePublicMatch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new V1ApiError({ status: 'error', statusCode: 404, code: 'NOT_FOUND', message: 'Not found', timestamp: new Date().toISOString() }),
+      });
+
+      await renderDetail();
+
+      expect(screen.getAllByText(scheduleDetail().title).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('link', { name: /경기 상세 보기/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 
   // H5 결정 6 — 친선 경기 일정만 응답 이름을 나눈다. 리그·대회 경기로 이어진 일정은 그대로다.

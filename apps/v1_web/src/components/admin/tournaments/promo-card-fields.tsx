@@ -153,16 +153,8 @@ export function PromoCardFields({
             >
               <span
                 aria-hidden="true"
-                className={`relative h-7 w-11 rounded-full transition-colors ${
-                  value.enabled ? 'bg-[var(--blue500)]' : 'bg-[var(--grey300)]'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-[var(--card-surface)] transition-transform ${
-                    value.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                  }`}
-                />
-              </span>
+                className={`tm-toggle ${value.enabled ? 'tm-toggle-on' : ''}`}
+              />
             </button>
           ) : (
             <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">

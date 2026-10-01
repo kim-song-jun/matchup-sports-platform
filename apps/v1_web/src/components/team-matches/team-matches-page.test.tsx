@@ -10,13 +10,17 @@ import type { TeamMatchModel } from './team-matches.types';
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
 const { routerPush, routerReplace } = vi.hoisted(() => ({ routerPush: vi.fn(), routerReplace: vi.fn() }));
 
+const navState = vi.hoisted(() => ({ pathname: '/team-matches/team-match-1/edit', search: '' }));
+
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/team-matches/team-match-1/edit',
+  usePathname: () => navState.pathname,
   useRouter: () => ({ push: routerPush, replace: routerReplace, back: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navState.search),
 }));
 
 beforeEach(() => {
+  navState.pathname = '/team-matches/team-match-1/edit';
+  navState.search = '';
   routerPush.mockClear();
   routerReplace.mockClear();
 });
@@ -784,7 +788,7 @@ describe('리그전 배지', () => {
 
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
 
-    const card = container.querySelector('a[href="/team-matches/team-match-1"]');
+    const card = container.querySelector('a[href^="/team-matches/team-match-1"]');
     expect(card).not.toBeNull();
     expect(card!.querySelectorAll('a, button')).toHaveLength(0);
     expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
@@ -1910,5 +1914,33 @@ describe('TeamMatchDetailPageView — 히어로의 매치 상태 자리 (W2-V8)'
 
     expect(container.querySelector('.tm-team-vs-hero .tm-badge')).toBeNull();
     expect(opponentColumn(container).getByText('승인 대기')).toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchListPageView — 상세로 가는 카드는 지금 목록(검색어·필터)을 출처로 싣는다', () => {
+  function twoCards() {
+    const base = getTeamMatchListViewModel();
+    return { ...base, matches: [{ ...base.matches[0], id: 'tm-a' }, { ...base.matches[0], id: 'tm-b' }] };
+  }
+
+  it('q·kind 가 걸린 목록의 모든 카드 href 에 그 URL 이 from 으로 들어간다', () => {
+    navState.pathname = '/team-matches';
+    navState.search = 'q=QA179&kind=friendly';
+    const { container } = renderPage(<TeamMatchListPageView model={twoCards()} />);
+    const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
+
+    const from = encodeURIComponent('/team-matches?q=QA179&kind=friendly');
+    expect(hrefs).toEqual([`/team-matches/tm-a?from=${from}`, `/team-matches/tm-b?from=${from}`]);
+  });
+
+  it('대조군: 필터 없는 목록도 자기 경로를 싣는다(상세 뒤로가기가 항상 같은 목록으로 간다)', () => {
+    navState.pathname = '/team-matches';
+    const { container } = renderPage(<TeamMatchListPageView model={twoCards()} />);
+    const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
+
+    expect(hrefs).toEqual([
+      `/team-matches/tm-a?from=${encodeURIComponent('/team-matches')}`,
+      `/team-matches/tm-b?from=${encodeURIComponent('/team-matches')}`,
+    ]);
   });
 });

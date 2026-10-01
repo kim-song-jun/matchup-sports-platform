@@ -31,10 +31,11 @@ describe('chat file messages with PostgreSQL', () => {
     for (const asset of assets) {
       const filePath = path.join(UploadsService.UPLOAD_BASE, asset.storagePath);
       await fs.rm(filePath, { force: true });
-      // 비게 된 폴더(.private/YYYY/MM)도 거슬러 올라가며 지운다 — 비어 있지 않으면 rmdir 이 실패하고 거기서 멈춘다
-      // (다른 파일은 건드리지 않는다). 남겨 두면 uploads/ 가 비어 있다고 가정하는 다른 스펙이 깨진다.
+      // 비게 된 YYYY/MM 폴더도 거슬러 올라가며 지운다 — 비어 있지 않으면 rmdir 이 실패하고 거기서 멈춘다
+      // (다른 파일은 건드리지 않는다). `.private/` 자체는 multer 임시 폴더라 앱이 만들어 두므로 남긴다.
+      const privateRoot = path.join(UploadsService.UPLOAD_BASE, UploadsService.PRIVATE_DIR);
       let dir = path.dirname(filePath);
-      while (dir.startsWith(path.join(UploadsService.UPLOAD_BASE, UploadsService.PRIVATE_DIR))) {
+      while (dir.startsWith(`${privateRoot}${path.sep}`)) {
         try {
           await fs.rmdir(dir);
         } catch {

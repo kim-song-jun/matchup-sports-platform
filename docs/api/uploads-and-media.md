@@ -52,6 +52,8 @@ served.
 - Files are stored under `uploads/.private/YYYY/MM/<uuid>.<ext>` — the same persistent volume as public uploads, but
   `main.ts` serves `/uploads` with `dotfiles: 'deny'` so `.private/` is never served publicly (404). The only way to
   read a chat file is `GET /api/v1/chat/rooms/:roomId/messages/:messageId/file` (participants only, see chat contract).
+  Multer's temp file for this route is also written under `uploads/.private/` (not the public root), so a crash mid-upload
+  never leaves a served file behind.
 - `V1UploadAsset.url` is still filled (`/uploads/.private/...`) only to satisfy its unique column; it is not returned by
   any API.
 

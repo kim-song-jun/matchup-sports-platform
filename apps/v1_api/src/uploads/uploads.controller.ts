@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
+import * as path from 'path';
 import {
   ApiTags,
   ApiOperation,
@@ -114,7 +115,9 @@ export class UploadsController {
   @ApiUnauthorizedResponse({ description: '인증이 필요해요.' })
   @UseInterceptors(
     FileInterceptor('file', {
-      dest: UploadsService.UPLOAD_BASE,
+      // 임시 파일도 공개 서빙 밖(`.private/`)에 — 업로드 도중 서버가 죽어 남아도 `/uploads/<hex>` 로 열리지 않는다.
+      // 같은 볼륨이라 storeChatFile 의 rename 은 그대로. multer 가 앱 시작 때 이 폴더를 만든다.
+      dest: path.join(UploadsService.UPLOAD_BASE, UploadsService.PRIVATE_DIR),
       limits: { fileSize: CHAT_FILE_HARD_CAP_BYTES, files: 1 },
       defParamCharset: 'utf8',
     }),

@@ -13,6 +13,7 @@ import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile'
 import { isTeamOperatorRole } from '@/lib/team-role';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
+import { rememberApplyTeamId } from '@/components/team-matches/team-match-next-step';
 import { TEAM_NAME_TAKEN_MESSAGE, teamErrorMessage } from '@/lib/team-error-messages';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { formatProvinceWide, toTeamRegionOptions } from '@/lib/v1-regions';
@@ -53,6 +54,11 @@ const EMPTY_TEAM_DRAFT: TeamDraft = {
 
 export function TeamCreatePageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 팀매치의 "팀 만들고 신청하기"로 왔으면 만든 뒤(이전을 눌러도) 그 팀매치로 돌아간다 — 새 팀 상세가 아니라.
+  const fromPath = sanitizeRedirectPath(searchParams.get('from'));
+  const teamMatchReturn = fromPath?.startsWith('/team-matches/') ? fromPath : null;
+  const requestedSportId = searchParams.get('sportId');
   const { confirm, ConfirmModal } = useConfirm();
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
@@ -74,7 +80,9 @@ export function TeamCreatePageClient() {
   const [error, setError] = useState<string | null>(null);
   const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
-  const selectedSportId = sportId || sports.data?.[0]?.id || '';
+  // 넘겨받은 종목(팀매치 종목)이 목록에 있으면 그걸 먼저 고른다.
+  const defaultSportId = sports.data?.find((sport) => sport.id === requestedSportId)?.id ?? sports.data?.[0]?.id;
+  const selectedSportId = sportId || defaultSportId || '';
   const [touched, setTouched] = useState(false);
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(touched);
   const profile = useV1Profile();
@@ -137,6 +145,12 @@ export function TeamCreatePageClient() {
         .then((result) => {
           const sportType = sports.data?.find((sport) => sport.id === selectedSportId)?.code ?? selectedSportId;
           trackEvent('team_create_complete', { sportType });
+          if (teamMatchReturn) {
+            // 돌아간 팀매치의 신청 팀 기본값을 새 팀으로 — 팀이 여럿이어도 새 팀이 골라진 채로 열린다.
+            rememberApplyTeamId(result.teamId);
+            router.push(teamMatchReturn);
+            return;
+          }
           router.push(withCreatedFlag(result.detailRoute || `/teams/${result.teamId}`));
         })
         .catch((err) => {
@@ -149,7 +163,9 @@ export function TeamCreatePageClient() {
               confirmLabel: '프로필 수정',
             }).then(async (ok) => {
               // Leaving the form for the profile — the unsaved-changes guard still asks.
-              if (ok && (await confirmLeave())) router.push(profileEditHref('/teams/new'));
+              // 팀매치 출처·종목을 그대로 실어 돌아와야 만든 뒤에도 팀매치로 간다.
+              const query = searchParams.toString();
+              if (ok && (await confirmLeave())) router.push(profileEditHref(query ? `/teams/new?${query}` : '/teams/new'));
             });
             return;
           }
@@ -163,7 +179,7 @@ export function TeamCreatePageClient() {
 
   return (
     <>
-      <TeamFormPageView model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model} />
+      <TeamFormPageView model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model} cancelHref={teamMatchReturn ?? undefined} />
       {ConfirmModal}
       {UnsavedChangesModal}
     </>

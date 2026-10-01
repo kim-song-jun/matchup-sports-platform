@@ -1,4 +1,4 @@
-import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel } from './community.types';
+import type { ChatListViewModel, ChatRoomModel } from './community.types';
 
 const CHAT_AVATARS = {
   개인매치: '/mock/profile/profile-01.svg',
@@ -32,22 +32,5 @@ export function getChatListViewModel(): ChatListViewModel {
     ],
     pinnedRooms: rooms.filter((room) => room.pinned),
     rooms: rooms.filter((room) => !room.pinned),
-  };
-}
-
-export function getChatRoomViewModel(): ChatRoomViewModel {
-  return {
-    title: '주말 풋살 매치',
-    context: {
-      title: '개인매치 상세',
-      sub: '이 채팅방과 연결된 개인매치예요',
-      href: '/matches',
-    },
-    messages: [
-      { id: 'm1', who: 'other', senderId: 'user-opponent', label: '상대', body: '오늘 14:00 경기 인원 확인해 주세요', sentAt: '2026-05-17T04:55:00.000Z' },
-      { id: 'm2', who: 'me', senderId: 'user-me', label: '나', body: '네. 20분 전에 도착하겠습니다.', sentAt: '2026-05-17T05:00:00.000Z', unreadCount: 1 },
-      { id: 'm3', who: 'other', senderId: 'user-opponent', label: '상대', body: '참가가 승인됐어요. 현장 준비 내용도 확인해 주세요.', sentAt: '2026-05-18T03:00:00.000Z' },
-      { id: 'm4', who: 'system', senderId: 'system', label: '시스템', body: '수아님이 참가 승인됐어요', sentAt: '2026-05-18T03:01:00.000Z' },
-    ],
   };
 }

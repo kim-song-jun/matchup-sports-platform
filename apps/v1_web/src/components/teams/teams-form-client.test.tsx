@@ -190,6 +190,33 @@ describe('Team form client contracts', () => {
     });
   });
 
+  it('팀매치에서 "팀 만들고 신청하기"로 왔으면 그 종목을 고르고, 만든 뒤 새 팀 상세가 아니라 그 팀매치로 돌아가 새 팀을 신청 팀으로 둔다', async () => {
+    navigation.searchParams = new URLSearchParams({ sportId: 'sport-futsal', from: '/team-matches/tm-1?from=%2Fteam-matches' });
+    window.localStorage.clear();
+    render(<TeamCreatePageClient />);
+
+    expect(screen.getByRole('button', { name: '풋살' })).toHaveAttribute('aria-pressed', 'true');
+    // 이전도 원래 팀매치로 간다.
+    expect(screen.getByRole('link', { name: '취소' })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fteam-matches');
+    fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '새 풋살 팀' } });
+    fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/team-matches/tm-1?from=%2Fteam-matches'));
+    expect(createTeamMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ sportId: 'sport-futsal' }));
+    expect(window.localStorage.getItem('teameet.v1.lastTeamMatchApplyTeamId')).toBe('team-futsal');
+  });
+
+  it('팀매치가 아닌 출처나 목록에 없는 종목은 무시하고 예전처럼 새 팀 상세로 간다', async () => {
+    navigation.searchParams = new URLSearchParams({ sportId: 'sport-unknown', from: '/teams' });
+    render(<TeamCreatePageClient />);
+
+    expect(screen.getByRole('button', { name: '축구' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '새 축구 팀' } });
+    fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/teams/team-futsal?created=1'));
+  });
+
   it('tracks team_create_complete with the sport code on successful creation', async () => {
     render(<TeamCreatePageClient />);
 
@@ -430,6 +457,14 @@ describe('Team form client contracts', () => {
     it('나가기 then goes to the profile edit page', async () => {
       await submitDirtyWithoutProfile([true, true]);
       await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/my/profile/edit?returnTo=%2Fteams%2Fnew'));
+    });
+
+    it('팀매치에서 왔으면 프로필을 채우고 돌아올 주소에 팀매치 출처·종목을 그대로 싣는다', async () => {
+      navigation.searchParams = new URLSearchParams({ sportId: 'sport-futsal', from: '/team-matches/tm-1' });
+      await submitDirtyWithoutProfile([true, true]);
+      await waitFor(() => expect(routerPush).toHaveBeenCalledWith(
+        `/my/profile/edit?returnTo=${encodeURIComponent('/teams/new?sportId=sport-futsal&from=%2Fteam-matches%2Ftm-1')}`,
+      ));
     });
   });
 

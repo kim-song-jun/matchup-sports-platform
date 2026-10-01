@@ -810,6 +810,7 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     const tournament = makeTournament({
       id: 't1',
       status: 'open',
+      entryFee: 20000,
       format: 'league',
       groups: [],
       fixtures: [],
@@ -823,6 +824,24 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.getByText('선수단 확정')).toBeInTheDocument();
     expect(screen.getByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).toBeInTheDocument();
     expect(screen.queryByText('운영진 검토')).not.toBeInTheDocument();
+  });
+
+  it('무료(0원) 대회의 신청 안내는 입금 대신 운영진 확인으로 확정된다고 설명한다', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'open',
+      entryFee: 0,
+      format: 'league',
+      groups: [],
+      fixtures: [],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('입금 절차는 없어요.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('운영진 확인 후 참가가 확정돼요.', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText('입금 확인 후 대회 참가가 확정돼요.', { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByText('2시간 내 입금 확인')).not.toBeInTheDocument();
   });
 
   it('hides the application guide once applications close, but keeps the flow explainer', () => {

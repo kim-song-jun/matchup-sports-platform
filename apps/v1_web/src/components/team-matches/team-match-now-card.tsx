@@ -267,14 +267,14 @@ export function MatchProgressCard({ model }: { model: TeamMatchDetailViewModel }
         ? '경기 전에 경기 명단을 확인하고, 채팅으로 준비 사항을 맞춰요.'
         : '경기 날짜와 장소를 다시 확인해요.';
 
+  // 두 팀은 히어로가 이미 말한다 — 여기서는 단계 행만 평평하게 둔다(상자 속 상자 없음).
   return (
-    <NowCard
-      tone={completed ? 'grey' : 'green'}
-      badge={completed ? '경기 종료' : matchPhase ? model.statusLabel ?? '진행 중' : '상대팀 확정'}
-      title={completed ? `${opponent} 경기했어요` : `${opponent} 경기해요`}
-      caption={caption}
-    >
-      <ol style={{ ...INNER_BOX, listStyle: 'none', padding: '4px 12px' }}>
+    <section aria-label={completed ? `${opponent} 경기했어요` : `${opponent} 경기해요`} style={{ marginTop: 12 }}>
+      <span className={`tm-badge ${completed ? 'tm-badge-grey' : 'tm-badge-green'}`}>
+        {completed ? '경기 종료' : matchPhase ? model.statusLabel ?? '진행 중' : '상대팀 확정'}
+      </span>
+      <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{caption}</p>
+      <ol style={{ listStyle: 'none', padding: 0, marginTop: 4 }}>
         {steps.map((step, index) => (
           <li key={step.key} style={index > 0 ? { borderTop: '1px solid var(--border)' } : undefined}>
             {step.href ? (
@@ -295,7 +295,7 @@ export function MatchProgressCard({ model }: { model: TeamMatchDetailViewModel }
           <p className="tm-text-caption">{progress.lockNote}</p>
         </div>
       ) : null}
-    </NowCard>
+    </section>
   );
 }
 

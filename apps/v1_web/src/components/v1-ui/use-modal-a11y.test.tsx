@@ -4,7 +4,7 @@
  * 고정돼 있지 않던) 동작을 여기서 고정한다.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useModalA11y } from './use-modal-a11y';
 
@@ -242,5 +242,73 @@ describe('useModalA11y', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe.each([['일반', undefined], ['StrictMode', StrictMode]] as const)('%s 렌더', (_label, wrapper) => {
+  it('시트 안 입력이 autoFocus 여도 Escape 로 닫으면 트리거 버튼으로 돌아온다', async () => {
+    // autoFocus 는 마운트 커밋에서 이미 적용된다 — 그 뒤에 이전 포커스를 읽으면 입력이 잡힌다.
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            등번호
+          </button>
+          {open ? <AutoFocusSheet onClose={() => setOpen(false)} /> : null}
+        </>
+      );
+    }
+    function AutoFocusSheet({ onClose }: { onClose: () => void }) {
+      const { dialogRef, mounted } = useModalA11y<HTMLElement, HTMLElement>({ open: true, onClose });
+      if (!mounted) return null;
+      return (
+        <section ref={dialogRef} role="dialog" aria-modal="true">
+          <input aria-label="번호" autoFocus />
+        </section>
+      );
+    }
+    render(<Host />, { wrapper });
+    const trigger = screen.getByRole('button', { name: '등번호' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(document.activeElement).toBe(screen.getByLabelText('번호'));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('open 토글형 모달도 autoFocus 입력이 아니라 트리거로 복원하고, 다른 트리거로 다시 열면 그쪽으로 복원한다', async () => {
+    function Host() {
+      const [open, setOpen] = useState(false);
+      const { dialogRef, mounted } = useModalA11y<HTMLElement, HTMLElement>({ open, onClose: () => setOpen(false) });
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            첫째
+          </button>
+          <button type="button" onClick={() => setOpen(true)}>
+            둘째
+          </button>
+          {mounted ? (
+            <section ref={dialogRef} role="dialog" aria-modal="true">
+              <input aria-label="번호" autoFocus />
+            </section>
+          ) : null}
+        </>
+      );
+    }
+    render(<Host />, { wrapper });
+    for (const name of ['첫째', '둘째']) {
+      const trigger = screen.getByRole('button', { name });
+      trigger.focus();
+      fireEvent.click(trigger);
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(document.activeElement).toBe(screen.getByLabelText('번호'));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(document.activeElement).toBe(trigger);
+    }
+  });
   });
 });

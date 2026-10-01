@@ -876,8 +876,7 @@ describe('AdminService — list/detail endpoints', () => {
           tournament_hosting: 0,
           partnership: 0,
         },
-        // null 그룹(신고 아닌 문의 11건)은 버려야 한다 — 사유 칩에 넣을 자리가 없고,
-        // 넣으면 "사유 미상 11건" 처럼 보여 실제 신고 건수를 오해하게 만든다.
+        // null 그룹(신고 아닌 문의 11건)은 사유 칩에 넣지 않는다 — "사유 미상 11건" 칩이 생기면 오해를 부른다.
         byReportReason: {
           spam: 2,
           harassment: 0,
@@ -885,6 +884,8 @@ describe('AdminService — list/detail endpoints', () => {
           inappropriate: 0,
           other: 0,
         },
+        // '전체 사유' 건수는 null 그룹까지 합친 같은 필터의 총 건수다.
+        reportReasonTotal: 13,
       });
     });
 
@@ -919,6 +920,27 @@ describe('AdminService — list/detail endpoints', () => {
       expect(reportReasonGroupByArgs.where).not.toHaveProperty('reportReason');
       // 그래서 고르지 않은 사유의 건수도 그대로 보인다.
       expect(result.summary.byReportReason).toMatchObject({ spam: 2, harassment: 5 });
+    });
+  });
+
+  describe('listInquiries 전체 사유 건수', () => {
+    it('사유 미지정 신고(null)도 reportReasonTotal 에 포함되고 사유 칩은 지정된 사유만 센다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findMany.mockResolvedValue([makeInquiryRow()]);
+      prisma.v1Inquiry.groupBy
+        .mockResolvedValueOnce([{ status: 'received', _count: { _all: 4 } }])
+        .mockResolvedValueOnce([{ category: 'report', _count: { _all: 4 } }])
+        .mockResolvedValueOnce([
+          { reportReason: null, _count: { _all: 1 } },
+          { reportReason: 'spam', _count: { _all: 2 } },
+          { reportReason: 'harassment', _count: { _all: 1 } },
+        ]);
+
+      const result = await service.listInquiries(adminAuthUser, { category: 'report' });
+
+      expect(result.summary.total).toBe(4);
+      expect(result.summary.reportReasonTotal).toBe(4);
+      expect(result.summary.byReportReason).toMatchObject({ spam: 2, harassment: 1 });
     });
   });
 

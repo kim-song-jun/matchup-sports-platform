@@ -1759,6 +1759,22 @@ export function useV1CancelTeamMatch(teamMatchId: string) {
   });
 }
 
+/** 지원 이력이 없는 팀매치 삭제. 화면 이동(onDeleted) 뒤에 상세 캐시를 지운다 — 먼저 지우면 아직 열린 상세가 404 를 다시 조회한다. */
+export function useV1DeleteTeamMatch(teamMatchId: string, onDeleted: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Delete<{ deleted: boolean }>(`/team-matches/${teamMatchId}`),
+    onSuccess: async () => {
+      onDeleted();
+      await queryClient.invalidateQueries({
+        queryKey: v1Keys.all,
+        predicate: (query) => !(query.queryKey[1] === 'team-matches' && query.queryKey[2] === teamMatchId),
+      });
+      queryClient.removeQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+    },
+  });
+}
+
 export function useV1CloseTeamMatch(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({

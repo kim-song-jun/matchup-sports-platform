@@ -10,7 +10,7 @@ import {
 
 /**
  * 대진 만들기·재생성 폼의 "주차 수" — 팀 수로 계산한 제안 칩(단일/홈앤어웨이)과 계획 요약 한 줄(F40).
- * 부모의 flex-wrap 행 안에서 fragment 자식이 그대로 flex 아이템이 된다(요약은 w-full 로 한 줄을 차지).
+ * 부모 grid 안에서 fragment 자식이 그대로 grid 아이템이 된다(요약은 col-span-full 로 한 줄을 차지).
  */
 export function LeagueWeeksPlanField({
   inputId,
@@ -41,7 +41,7 @@ export function LeagueWeeksPlanField({
 
   return (
     <>
-      <div className="w-full">
+      <div className="col-span-full">
         <p className="tm-on-tint rounded-lg bg-[var(--surface-soft)] p-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">
           <span className="font-semibold">
             {teamCount}팀 · {weeksPlanLabel(plan)}
@@ -90,7 +90,7 @@ export function LeagueWeeksPlanField({
               weeks === singleWeeks ? { kind: 'single' } : weeks === doubleWeeks ? { kind: 'double' } : { kind: 'custom', weeks },
             );
           }}
-          className={`${inputClassName} w-24`}
+          className={`${inputClassName} w-full`}
         />
       </div>
     </>

@@ -197,9 +197,7 @@ function AdminInquiriesPageContent() {
     count: option.value ? categoryCounts?.[option.value] : categoryTotal,
   }));
   const reportReasonCounts = firstPage?.summary.byReportReason;
-  const reportReasonTotal = reportReasonCounts
-    ? Object.values(reportReasonCounts).reduce((sum, count) => sum + count, 0)
-    : undefined;
+  const reportReasonTotal = firstPage?.summary.reportReasonTotal;
   const reportReasonOptions = REPORT_REASON_OPTIONS.map((option) => ({
     ...option,
     count: option.value ? reportReasonCounts?.[option.value] : reportReasonTotal,

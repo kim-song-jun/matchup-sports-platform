@@ -498,6 +498,36 @@ describe('LeagueMatchFixturesClient', () => {
     expect(screen.queryByText('요일이나 경기 날짜를 먼저 고르면 바꿀 수 있어요.')).toBeNull();
   });
 
+  it('1434: 생성 폼 입력칸은 같은 grid 열 폭을 채우고, 장소는 한 행 전체를 쓰며, 미리보기·생성 버튼은 한 묶음이다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 풋살 리그', startsOn: '2026-09-01T00:00:00.000Z', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    const grid = screen.getByLabelText('시작 시각').parentElement!.parentElement!;
+    expect(grid.className).toContain('grid-cols-2');
+    for (const label of ['주차 수', '요일', '시작 시각', '종료 시각', '경기 시간(분)', '휴식(분)', '팀당 하루 경기']) {
+      const input = screen.getByLabelText(label);
+      expect(input.className).toContain('w-full');
+      expect(input.parentElement!.parentElement).toBe(grid);
+    }
+    const place = screen.getByLabelText('기본 장소');
+    expect(place.className).toContain('w-full');
+    expect(place.parentElement!.className).toContain('col-span-full');
+    expect(screen.getByRole('button', { name: '미리보기' }).parentElement).toBe(
+      screen.getByRole('button', { name: '라운드로빈 대진 생성' }).parentElement,
+    );
+  });
+
   it('리그 시작일이 응답에 없으면 대진 생성·미리보기를 잠그고 이유를 알린다 — 조용히 틀린 날짜로 만들지 않는다', async () => {
     // 화면은 요일을 **리그 시작일 기준**으로 날짜 목록으로 펼쳐 보낸다. 시작일이 없다고
     // 오늘 기준으로 떨어뜨리면 다음 달에 시작하는 리그가 이번 주부터 경기를 갖게 되고,

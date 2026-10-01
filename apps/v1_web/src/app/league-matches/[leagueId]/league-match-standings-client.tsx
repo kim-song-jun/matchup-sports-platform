@@ -42,7 +42,7 @@ import type {
   V1LeagueStandingsResponse,
   V1PublicLeagueDetail,
 } from '@/types/league-match';
-import { leagueRecordEmptySub } from './league-record-empty-copy';
+import { playerRecordEmptySub, playerRecordEmptyTitle, playerRecordsCombinedEmptySub } from '@/lib/player-record-empty-copy';
 
 /**
  * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
@@ -1040,9 +1040,7 @@ export default function LeagueMatchStandingsClient({
         <section className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
           <h2 className="tm-text-body-lg">득점·도움 순위</h2>
           <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
-            {records.hiddenByEligibility
-              ? '기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'
-              : '확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.'}
+            {playerRecordsCombinedEmptySub(records.hiddenByEligibility)}
           </p>
           {/* 해시 앵커는 도장 없는 히스토리 항목을 만든다 — 히스토리를 건드리지 않고 스크롤만 한다. */}
           <button
@@ -1066,8 +1064,8 @@ export default function LeagueMatchStandingsClient({
               <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
             ) : records.goals.length === 0 ? (
               <EmptyState
-                title="아직 기록이 없어요"
-                sub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
+                title={playerRecordEmptyTitle(records.hiddenByEligibility)}
+                sub={playerRecordEmptySub('goals', records.hiddenByEligibility)}
                 illustration={{ name: 'journey-done' }}
                 cta="경기 일정 보기"
                 ctaHref="#league-schedule"
@@ -1095,8 +1093,8 @@ export default function LeagueMatchStandingsClient({
               <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
             ) : records.assists.length === 0 ? (
               <EmptyState
-                title="아직 기록이 없어요"
-                sub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
+                title={playerRecordEmptyTitle(records.hiddenByEligibility)}
+                sub={playerRecordEmptySub('assists', records.hiddenByEligibility)}
                 illustration={{ name: 'journey-done' }}
                 cta="경기 일정 보기"
                 ctaHref="#league-schedule"

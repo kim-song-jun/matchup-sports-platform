@@ -18,8 +18,10 @@ import {
   SHOWCASE_SQUAD_PERSONAS,
 } from '../../prisma/seed-alpha-league-qa';
 import { assertShowcaseResultSeedAllowed } from '../../prisma/seed-alpha-showcase-results';
+import { SEED_TOURNAMENT_PHASE_LABEL, seedTournamentRoundLabel } from '../../prisma/seed-tournament-round-label';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
+import { TOURNAMENT_PHASE_LABEL, tournamentRoundLabel } from './tournament-round-label';
 
 describe('alpha tournament QA campaign content', () => {
   it('10개 번들 팀 로고를 재현 가능한 셔플 순서로 배정한다', () => {
@@ -131,6 +133,16 @@ describe('alpha tournament QA campaign content', () => {
     expect(ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID).toBe(FUTSAL_COMPETITION_CONFIG_ID);
   });
 
+  it('시드의 라운드 이름 규칙이 서버 tournamentRoundLabel 과 같다', () => {
+    // 시드 쪽은 이미지 안에서 src/ 를 못 읽어 복제본이다. 단계 키를 하나 더하고 한쪽만 고치면 여기서 깨진다.
+    expect(SEED_TOURNAMENT_PHASE_LABEL).toEqual(TOURNAMENT_PHASE_LABEL);
+    const rounds = [
+      'league_r1', 'league_r01', 'league_r12', ' league_r3 ', 'league_round_2',
+      ...Object.keys(TOURNAMENT_PHASE_LABEL), 'Final', ' SEMI ', '결승', 'round_of_16', '',
+    ];
+    expect(rounds.map(seedTournamentRoundLabel)).toEqual(rounds.map(tournamentRoundLabel));
+  });
+
   it('배포 이미지 안에서 실행되는 prisma 스크립트는 src/ 를 import 하지 않는다', () => {
     // alpha 배포는 `ts-node prisma/seed-alpha-tournament-qa.ts` 를 API 프로덕션 이미지
     // 안에서 실행하는데, 그 이미지에는 `src/` 가 없다(dist/·prisma/·node_modules 만 COPY).
@@ -138,7 +150,7 @@ describe('alpha tournament QA campaign content', () => {
     // CI 는 src/ 가 존재하는 레포에서 돌아 잡지 못했다. 그래서 소스 텍스트로 고정한다.
     // 리그 QA 시드도 같은 자리에서 같은 방식으로 실행되므로 같은 가드를 받는다 --
     // 시드가 늘어날 때마다 가드가 한 파일에만 남으면 다음 시드가 그대로 사고를 반복한다.
-    const seedScripts = ['seed-alpha-tournament-qa.ts', 'seed-alpha-league-qa.ts'];
+    const seedScripts = ['seed-alpha-tournament-qa.ts', 'seed-alpha-league-qa.ts', 'seed-tournament-round-label.ts'];
     const srcImportsByScript = seedScripts.map((script) => {
       const seedSource = readFileSync(resolve(__dirname, '../../prisma/', script), 'utf8');
       const srcImports = seedSource

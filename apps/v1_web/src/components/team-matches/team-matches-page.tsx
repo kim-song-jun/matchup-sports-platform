@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -30,6 +30,8 @@ import { buildTeamMatchSummaryLabel } from './team-matches.card-model';
 import { teamMatchStepHref } from './team-matches.routes';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { josa } from '@/lib/korean';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -48,6 +50,10 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
   // 갖고 있다 — floatingSlot만 ReactNode라 테이블에 담을 수 없어 override로 밀어넣는다
   // (app-shell-promotion.md §1b, 6곳 중 하나).
   useShellOverride({ floatingSlot: <TeamMatchCreateFloatingButton /> });
+  // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
+  // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
+  const currentHref = useCurrentHref();
+  const listFromHref = currentHref?.includes('?') ? currentHref : null;
   return (
     <>
       {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}
@@ -75,7 +81,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         {model.isLoading
           ? <PageSkeleton />
           : model.matches.length
-            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} />)}</div>
+            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} fromHref={listFromHref} />)}</div>
             : (
               /* matches-page.tsx MatchListPageView 와 동일한 이유·조건 — 필터/종목이 걸려 있을
                  때만 "전체 팀매치 보기" CTA 를 준다(웨이브4, 2026-09-04). */
@@ -248,12 +254,42 @@ const LINEUP_ACTION_COPY = {
   'match-roster': { title: '경기 명단', description: '참가 명단 선수가 출전해요. 이번 경기에 빠지는 선수만 빼 주세요.', cta: '명단 조정' },
 } as const;
 
+/** 히어로의 팀 칸 — href 가 있으면 칸 전체가 팀 화면으로 가는 링크(44px 이상)다. */
+function HeroTeamLink({ href, name, align, children }: { href?: string; name: string; align: 'left' | 'right'; children: React.ReactNode }) {
+  if (!href) return <div style={{ textAlign: align }}>{children}</div>;
+  return (
+    <Link className="tm-pressable" href={href} aria-label={`${name} 팀 보기`} style={{ display: 'block', minHeight: 44, textAlign: align }}>
+      {children}
+    </Link>
+  );
+}
+
+/** 팀 카드의 신뢰 배지와 같은 낱말·같은 배지 — 알 수 없는 값은 숨긴다. */
+function HeroTrustBadge({ trustState, align }: { trustState?: string | null; align: 'left' | 'right' }) {
+  const label = trustState ? trustStateLabel(trustState) : null;
+  if (!label) return null;
+  return (
+    <div style={{ marginTop: 4, textAlign: align }}>
+      <span className="tm-badge tm-badge-sm tm-badge-blue">{label}</span>
+    </div>
+  );
+}
+
+function HeroTeamChevron() {
+  return <ChevronRightIcon size={14} aria-hidden="true" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 2, color: 'var(--overlay-white-72)' }} />;
+}
+
 export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode; lifecyclePanel?: React.ReactNode }) {
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
   const shouldShowHostTeamCard = !match.platformManaged || hasAssignedHostTeam;
   const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
+  // 두 팀이 모두 정해지면 히어로가 두 팀을 요약하고 팀 이름이 팀 화면으로 가는 입구다 — 아래 팀 카드는 같은 정보를 반복하므로 그리지 않는다.
+  // 플랫폼 주관 매치는 제외한다: 운영 주체와 팀 로고·신뢰 배지를 카드로 따로 보여 주는 화면이라 그대로 둔다.
+  const confirmedOpponent = !match.platformManaged && hasAssignedHostTeam
+    ? match.applicantTeams.find((team) => team.status === '승인 완료' && team.href)
+    : undefined;
   const locked = mode === 'pending' || mode === 'approved' || mode === 'cancelled';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 수정' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   // 호스트의 "지금 할 일" — 대기 중인 신청. 라벨(status)이 아니라 서버 상태 원문으로 고른다.
@@ -429,7 +465,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
     && teams.findIndex((candidate) => candidate.href === team.href) === index
   ));
   const hasTeamViewCards = Boolean(hostTeamCard) || applicantTeamViewCards.length > 0;
-  const teamViewCards = hasTeamViewCards ? (
+  const teamViewCards = hasTeamViewCards && !confirmedOpponent ? (
     <div className="tm-team-match-team-cards" style={{ display: 'grid', gap: 12 }} aria-label="팀 보기">
       {hostTeamCard}
       {applicantTeamViewCards.map((team) => (
@@ -472,6 +508,13 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
       <span className="tm-badge" style={{ background: 'var(--static-white)', color: 'var(--static-ink)' }}>{heroStatus}</span>
     </div>
   ) : null;
+  // 팀 카드를 그리지 않을 때(confirmedOpponent) 카드가 말하던 수준 라벨·신뢰 배지를 히어로가 이어받는다.
+  const hostHeroSub = [
+    match.hostTeamRatingScore == null ? null : `팀 평점 ${match.hostTeamRatingScore.toFixed(1)}`,
+    match.hostTeamWins == null ? null : `${match.hostTeamWins}승`,
+    confirmedOpponent ? match.hostTeamLevelLabel : null,
+  ].filter(Boolean).join(' · ');
+  const opponentHeroSub = confirmedOpponent ? [confirmedOpponent.meta, confirmedOpponent.levelLabel].filter(Boolean).join(' · ') : '';
   const opponentSub = teamMatchOpponentSub(mode, match, Boolean(model.applicationsError));
   // 취소·모집 마감·수정은 화면 본문이 아니라 히어로 ⋯ 메뉴에 둔다(H6 manage-menu A).
   const manageMenuButton = mode === 'mine' && model.manageMenu ? (
@@ -596,24 +639,20 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 <div>
                   {heroStatusBadge}
                   <div className="tm-team-vs-row">
-                    <div>
+                    <HeroTeamLink href={confirmedOpponent ? match.hostTeamHref ?? `/teams/${match.hostTeamId}` : undefined} name={match.hostTeam} align="left">
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
-                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
-                      {match.hostTeamRatingScore != null || match.hostTeamWins != null ? (
-                        <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>
-                          {[
-                            match.hostTeamRatingScore == null ? null : `팀 평점 ${match.hostTeamRatingScore.toFixed(1)}`,
-                            match.hostTeamWins == null ? null : `${match.hostTeamWins}승`,
-                          ].filter(Boolean).join(' · ')}
-                        </div>
-                      ) : null}
-                    </div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
+                      {hostHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{hostHeroSub}</div> : null}
+                      {confirmedOpponent ? <HeroTrustBadge trustState={match.hostTeamTrustState} align="left" /> : null}
+                    </HeroTeamLink>
                     <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
-                    <div style={{ textAlign: 'right' }}>
+                    <HeroTeamLink href={confirmedOpponent?.href} name={confirmedOpponent?.name ?? ''} align="right">
                       <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{(mode === 'pending' && model.myApplicationTeam) || model.viewerOnApplicantSide ? '우리 팀' : '상대팀'}</div>
-                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}</div>
+                      <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match, model.myApplicationTeam?.name)}{confirmedOpponent ? <HeroTeamChevron /> : null}</div>
+                      {opponentHeroSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentHeroSub}</div> : null}
+                      {confirmedOpponent ? <HeroTrustBadge trustState={confirmedOpponent.trustState} align="right" /> : null}
                       {opponentSub ? <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{opponentSub}</div> : null}
-                    </div>
+                    </HeroTeamLink>
                   </div>
                   {match.platformManaged ? (
                     <div className="tm-text-caption" style={{ color: 'var(--overlay-white-86)', textAlign: 'center', marginTop: 20 }}>플랫폼 주관</div>
@@ -627,6 +666,12 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
             {/* 히어로(뒤로가기 포함) 다음, 본문 앞 — 내비게이션이 항상 먼저 보이게 유지한다. */}
             {recordEntry}
             <div className="tm-match-detail-body">
+              {/* 지금 할 일 — 데스크톱은 우측 CTA 카드가 맡고, 모바일은 하단 바 대신 본문 맨 위에도 둔다. */}
+              {model.progress && nextAction?.href && nextAction.tone === 'primary' ? (
+                <div className="tm-hide-desktop" style={{ marginTop: 12 }}>
+                  <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={nextAction.href}>{nextAction.label}</Link>
+                </div>
+              ) : null}
               {nowCard}
               {/* ── 그룹 1: 일정 · 장소 ── */}
               <div className="tm-info-group">
@@ -933,7 +978,7 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
   );
 }
 
-function TeamMatchCard({ match }: { match: TeamMatchModel }) {
+function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: string | null }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
   const league = match.league;
@@ -970,7 +1015,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
   const openLabel = !relation && !isClosed && !isLeagueFixture && !match.live && !match.completionPending ? '상대 모집 중' : null;
   return (
-    <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
+    <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={withFromPath(`/team-matches/${match.id}`, fromHref)}>
       {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
           담을 값이 없다 — 목록 API 응답에 상대팀이 없고, 팀매치는 대부분 상대가 아직 정해지지
           않은 모집 글이라 그 자리를 상태 배지가 차지하고 있었다. 결과적으로 시각 무게가 가장 큰

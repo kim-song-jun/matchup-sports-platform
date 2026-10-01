@@ -97,6 +97,32 @@ describe('AdminPopupsPage', () => {
     expect(deleteMutate).toHaveBeenCalledWith('popup-1', expect.any(Object));
   });
 
+  // 모바일 가로 넘침(#1463): 단일 열 grid 의 암묵 트랙은 min-content 라 편집기의 datetime-local·select 고유 폭이
+  // 트랙을 키운다. 트랙이 minmax(0,1fr) 로 고정돼야 aside 가 viewport 안에 머문다.
+  it('pins every single-column grid track in the editor to minmax(0,1fr) so intrinsic input widths cannot widen the page', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+    await user.click(screen.getByRole('button', { name: '새 팝업' }));
+
+    const aside = screen.getByLabelText('팝업 생성');
+    const grids = [aside.parentElement, screen.getByLabelText('노출 시작').closest('div.grid'), screen.getByLabelText('이동 링크 (선택)').closest('div.grid'), screen.getByRole('checkbox', { name: /홈/ }).closest('div.grid')];
+    expect(grids).toHaveLength(4);
+    for (const grid of grids) {
+      expect(grid).toHaveClass('grid-cols-[minmax(0,1fr)]');
+    }
+  });
+
+  // 모바일 가로 넘침(#1463): fieldset 은 기본 min-inline-size: min-content 라 flex-col 자식일 때 안쪽 입력 고유 폭만큼 늘어난다.
+  it('lets the editor fieldsets shrink below their content width with min-w-0', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+    await user.click(screen.getByRole('button', { name: '새 팝업' }));
+
+    const fieldsets = screen.getByLabelText('팝업 생성').querySelectorAll('fieldset');
+    expect(fieldsets).toHaveLength(2);
+    fieldsets.forEach((fieldset) => expect(fieldset).toHaveClass('min-w-0'));
+  });
+
   // 대회별 팝업 화면을 없애고 이 화면 하나로 합쳤다 — 대회 어드민의 '팝업' 항목이 넘겨주는
   // `?targetPath=/tournaments/<id>` 가 곧 "이 대회의 팝업"이라는 유일한 연결고리다.
   it('opens the create form prefilled from a targetPath deep link', async () => {

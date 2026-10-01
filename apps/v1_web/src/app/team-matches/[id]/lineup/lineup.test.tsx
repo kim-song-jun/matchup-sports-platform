@@ -761,6 +761,51 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
   });
 
+  it('미저장 변경이 있으면 화면 안 링크 이동이 확인창으로 막히고, 변경이 없으면 그대로 이동한다', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    render(
+      <>
+        <a href="/teams">팀 목록</a>
+        <TeamMatchLineupPageClient teamMatchId="tm-1" />
+      </>,
+    );
+    const leaveTitle = '작성 중인 내용이 사라져요. 나갈까요?';
+    // 가드는 window capture 에서 preventDefault + stopPropagation 으로 막는다 — 막히면 아래 버블 리스너에 닿지 않는다.
+    // 막히지 않은 클릭의 jsdom 실제 이동은 여기서 취소한다.
+    const reachedBubble: boolean[] = [];
+    const observe = (event: MouseEvent) => {
+      if (!(event.target instanceof HTMLAnchorElement)) return;
+      reachedBubble.push(!event.defaultPrevented);
+      event.preventDefault();
+    };
+    document.addEventListener('click', observe);
+    try {
+      // 변경 없음 — 이동을 가로채지 않는다(버블까지 닿는다).
+      fireEvent.click(screen.getByRole('link', { name: '팀 목록' }));
+      expect(reachedBubble).toEqual([true]);
+      expect(screen.queryByRole('dialog', { name: leaveTitle })).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: '팀원 1명 모두 넣기' }));
+      fireEvent.click(screen.getByRole('link', { name: '팀 목록' }));
+      expect(reachedBubble).toEqual([true]);
+      expect(await screen.findByRole('dialog', { name: leaveTitle })).toBeInTheDocument();
+
+      // 계속 작성 — 편집 중인 명단이 그대로 남는다.
+      fireEvent.click(screen.getByRole('button', { name: '계속 작성' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: leaveTitle })).toBeNull());
+      expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    } finally {
+      document.removeEventListener('click', observe);
+    }
+  });
+
   it('멤버 관리에서 지정한 팀 등번호가 "추가" 때 번호 칩에 채워진다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({ starters: [GUEST_STARTER] }),

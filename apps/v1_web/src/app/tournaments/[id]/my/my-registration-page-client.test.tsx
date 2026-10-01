@@ -815,3 +815,43 @@ describe('MyRegistrationPageClient — 팀 권한 조회 상태 구분', () => {
     expect(container.textContent).not.toContain('권한');
   });
 });
+
+describe('MyRegistrationPageClient — payment_checking 안내는 참가비 유무를 따른다 (#1428)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+  });
+
+  function renderPaymentChecking(entryFee: number) {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament({ entryFee }), isLoading: false });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({
+        status: 'payment_checking',
+        payment: { method: 'bank_transfer', status: 'paid', amount: entryFee, paidAt: '2026-09-04T00:00:00.000Z' },
+      })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    return render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+  }
+
+  it('무료 대회는 입금이 있었다고 말하지 않고 신청 접수 후 운영진 확인 대기를 말한다', () => {
+    const { container } = renderPaymentChecking(0);
+    const text = container.textContent ?? '';
+    expect(text).not.toContain('입금이 확인됐어요');
+    expect(text).toContain('신청이 접수됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.');
+  });
+
+  it('대조군: 유료 대회는 기존대로 입금이 확인됐다고 말한다', () => {
+    const { container } = renderPaymentChecking(20000);
+    const text = container.textContent ?? '';
+    expect(text).toContain('입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.');
+    expect(text).not.toContain('신청이 접수됐어요. 운영자가');
+  });
+});

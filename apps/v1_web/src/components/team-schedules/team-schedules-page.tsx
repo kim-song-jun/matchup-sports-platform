@@ -289,7 +289,11 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
               {model.opponent.placeName ? (
                 <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{model.opponent.placeName}</div>
               ) : null}
-              <Link href={model.opponent.teamMatchHref} className="tm-text-caption" style={{ color: 'var(--blue700)', fontWeight: 700 }}>
+              <Link
+                href={model.opponent.teamMatchHref}
+                className="tm-text-caption"
+                style={{ color: 'var(--blue700)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', minHeight: 44 }}
+              >
                 경기 상세 보기 ›
               </Link>
             </div>

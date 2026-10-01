@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import {
   useV1AddPlayer,
   useV1Registration,
@@ -148,7 +148,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
     expect(
       screen.queryByText('명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '선수 추가하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '선수 추가' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
   });
 
@@ -161,7 +161,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
     expect(
       screen.getByText('명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.'),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
   });
 
@@ -563,7 +563,7 @@ describe('등번호 입력 종류', () => {
           <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
         </QueryClientProvider>,
       );
-      fireEvent.click(screen.getByRole('button', { name: '선수 추가하기' }));
+      fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
 
       const jersey = container.querySelector('input[id$="-jersey"]');
       expect(jersey).not.toBeNull();
@@ -639,7 +639,7 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
 
     expect(screen.getByText('팀장에게 요청')).toBeInTheDocument();
     expect(screen.getByText(/추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '길동이 수정' })).not.toBeInTheDocument();
     // 명단 자체(읽기)는 그대로 보인다 — 막는 건 쓰기뿐이다.
     expect(screen.getByText('길동이')).toBeInTheDocument();
@@ -651,7 +651,7 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
     render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
 
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '선수 추가하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '선수 추가' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
   });
 
@@ -662,7 +662,7 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
 
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
     expect(screen.queryByText('수정 가능')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
   });
 
   it('팀 조회가 실패하면 재시도 배너를 보여주고 쓰기 버튼은 숨긴다', () => {
@@ -672,7 +672,7 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
 
     expect(screen.getByText(/팀 정보를 불러오지 못해 수정 권한을 확인할 수 없어요/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
     // Copilot 리뷰: 실패는 "멤버라 확정됨"이 아니라 "확인 못 함"이다 — '팀장에게 요청'을
     // 단정적으로 보여주면 재시도 배너와 서로 다른 말을 하는 모순이 생긴다.
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
@@ -1051,5 +1051,175 @@ describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받
       'href',
       '/tournaments/tournament-1/my?reg=reg-1',
     );
+  });
+});
+
+// #1430: 긴 추가 폼에서 하단 '추가' 버튼이 입력칸을 덮고 상단 버튼과 이름이 같았다 — 제출은 스크롤
+// 영역 밖 전용 하단 영역(.tm-fixed-cta)의 "선수 등록", 상단은 "선수 추가"로 갈린다.
+describe('TournamentRosterPageClient — 선수 등록 하단 영역(#1430)', () => {
+  const addMutate = vi.fn();
+  let fetchSpy: MockInstance<typeof fetch>;
+  let memberItems: ReturnType<typeof memberItem>[];
+
+  function memberItem(userId: string, name: string, phone = '01012345678') {
+    return {
+      membershipId: `m-${userId}`,
+      userId,
+      displayName: name,
+      realName: name,
+      phone,
+      birthDate: '1995-03-21',
+      gender: 'male',
+      profileImageUrl: null,
+      role: 'member',
+      status: 'active',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: false,
+      canRemove: false,
+    };
+  }
+
+  beforeEach(() => {
+    memberItems = [memberItem('u-1', '김하나'), memberItem('u-2', '이둘'), memberItem('u-3', '박셋', '')];
+    addMutate.mockReset().mockResolvedValue({});
+    useV1TournamentMock.mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'owner' } },
+      isPending: false,
+      isPlaceholderData: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [], belowMinimum: true },
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: addMutate, isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+    const page = {
+      items: memberItems,
+      summary: { ownerCount: 0, managerCount: 0, memberCount: 2 },
+      viewerRole: 'owner',
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ status: 'success', data: page, timestamp: new Date().toISOString() }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    vi.clearAllMocks();
+  });
+
+  function renderRoster() {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <TournamentRosterPageClient tournamentId="t1" registrationId="reg-1" />
+      </QueryClientProvider>,
+    );
+    return { ...view, queryClient };
+  }
+
+  it('폼을 열면 제출 "선수 등록"은 전용 하단 영역에, 상단은 "선수 추가"로 갈린다', async () => {
+    const { container, unmount, queryClient } = renderRoster();
+    expect(container.querySelector('.tm-fixed-cta')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+
+    const footer = await screen.findByRole('group', { name: '선수 등록' });
+    expect(footer).toHaveClass('tm-fixed-cta');
+    expect(within(footer).getByRole('button', { name: '선수 등록' })).toBeInTheDocument();
+    // 폼 카드 안에는 제출 버튼이 없다 — 스크롤 영역 밖이라 입력칸을 덮지 않는다.
+    expect(footer.contains(screen.getByRole('button', { name: '선수 추가' }))).toBe(false);
+    expect(screen.getAllByRole('button', { name: '선수 등록' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument();
+    unmount();
+    queryClient.clear();
+  });
+
+  it('남은 필수 항목 수가 실제 미입력 수와 같고, 채울수록 줄어 제출이 켜진다', async () => {
+    const { unmount, queryClient } = renderRoster();
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+    const footer = await screen.findByRole('group', { name: '선수 등록' });
+    const submit = within(footer).getByRole('button', { name: '선수 등록' });
+
+    expect(footer).toHaveTextContent('필수 항목 4개가 남았어요 · 팀원 선택, 실명, 생년월일, 휴대폰 번호');
+    expect(submit).toBeDisabled();
+
+    // 팀원을 고르면 프로필이 실명·생년월일·휴대폰을 채운다.
+    const select = await screen.findByLabelText(/팀원 선택/);
+    await waitFor(() => expect(within(select).getByRole('option', { name: /김하나/ })).toBeInTheDocument());
+    fireEvent.change(select, { target: { value: 'u-1' } });
+    expect(footer).not.toHaveTextContent('필수 항목');
+    expect(submit).toBeEnabled();
+
+    // 휴대폰이 없는 팀원을 고르면 정확히 그 한 항목만 남는다.
+    await waitFor(() => expect(within(select).getByRole('option', { name: /박셋/ })).toBeInTheDocument());
+    fireEvent.change(select, { target: { value: 'u-3' } });
+    expect(footer).toHaveTextContent('필수 항목 1개가 남았어요 · 휴대폰 번호');
+    expect(submit).toBeDisabled();
+    unmount();
+    queryClient.clear();
+  });
+
+  it('"선수 등록"을 누르면 입력한 선수로 추가 요청을 보낸다', async () => {
+    const { unmount, queryClient } = renderRoster();
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+    const footer = await screen.findByRole('group', { name: '선수 등록' });
+    const select = await screen.findByLabelText(/팀원 선택/);
+    await waitFor(() => expect(within(select).getByRole('option', { name: /김하나/ })).toBeInTheDocument());
+    fireEvent.change(select, { target: { value: 'u-1' } });
+
+    fireEvent.click(within(footer).getByRole('button', { name: '선수 등록' }));
+
+    await waitFor(() => expect(addMutate).toHaveBeenCalledTimes(1));
+    expect(addMutate.mock.calls[0][0]).toMatchObject({ userId: 'u-1', realName: '김하나', birthDate: '1995-03-21' });
+    unmount();
+    queryClient.clear();
+  });
+
+  it('팀원이 0명이면 안내만 보이고 빈 하단 영역·하단 여백을 만들지 않는다', async () => {
+    memberItems.length = 0; // fetch 목이 같은 배열을 본다
+    const { container, unmount, queryClient } = renderRoster();
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+
+    expect(await screen.findByText('팀원이 없어요')).toBeInTheDocument();
+    expect(container.querySelector('.tm-fixed-cta')).toBeNull();
+    expect(container.querySelector('.tm-tournament-roster-body')).toHaveStyle({ paddingBottom: '48px' });
+    unmount();
+    queryClient.clear();
+  });
+
+  it('추가 칸이 둘이면 하단 영역은 하나이고 포커스한 칸을 제출한다', async () => {
+    const { unmount, queryClient } = renderRoster();
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
+    await screen.findByRole('group', { name: '선수 등록' });
+    expect(screen.getAllByRole('group', { name: '선수 등록' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '선수 등록' })).toHaveLength(1);
+
+    const selects = await screen.findAllByLabelText(/팀원 선택/);
+    expect(selects).toHaveLength(2);
+    await waitFor(() => expect(within(selects[0]).getByRole('option', { name: /김하나/ })).toBeInTheDocument());
+    // 첫 칸에 값을 넣고 포커스를 두면 하단 영역이 그 칸을 따라 켜진다(둘째 칸은 비어 있음).
+    fireEvent.focus(selects[0]);
+    fireEvent.change(selects[0], { target: { value: 'u-1' } });
+    expect(screen.getByRole('button', { name: '선수 등록' })).toBeEnabled();
+    fireEvent.focus(selects[1]);
+    expect(screen.getByRole('button', { name: '선수 등록' })).toBeDisabled();
+    unmount();
+    queryClient.clear();
   });
 });

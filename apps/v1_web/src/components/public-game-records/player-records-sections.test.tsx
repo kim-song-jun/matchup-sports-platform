@@ -11,6 +11,7 @@ function row(overrides: Partial<PublicTournamentPlayerRecordRow>): PublicTournam
 }
 
 const base = {
+  hiddenByEligibility: false,
   isLoading: false,
   isError: false,
   errorMessage: '기록을 불러오지 못했어요.',
@@ -92,6 +93,22 @@ describe('TournamentPlayerRecordsSections', () => {
       <TournamentPlayerRecordsSections {...base} goals={[]} assists={[]} emptyBehavior="empty-state" />,
     );
     expect(screen.getByText('아직 기록이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('아직 공개할 수 있는 기록이 없어요')).not.toBeInTheDocument();
+  });
+
+  it('기록은 있지만 공개 자격 때문에 가려졌으면 "공개할 수 있는 기록이 없어요"라고 말한다', () => {
+    render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        hiddenByEligibility
+        goals={[]}
+        assists={[]}
+        emptyBehavior="empty-state"
+      />,
+    );
+    expect(screen.getByText('아직 공개할 수 있는 기록이 없어요')).toBeInTheDocument();
+    expect(screen.getByText(/동의하면 득점·도움 순위가 공개돼요/)).toBeInTheDocument();
+    expect(screen.queryByText('아직 기록이 없어요')).not.toBeInTheDocument();
   });
 
   it('에러면 재시도 가능한 ErrorState를 보여준다', () => {

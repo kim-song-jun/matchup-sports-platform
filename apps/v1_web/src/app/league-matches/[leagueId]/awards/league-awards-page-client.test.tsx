@@ -226,4 +226,30 @@ describe('LeagueAwardsPageClient', () => {
     );
     useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
   });
+
+  // 득점·도움이 비는 이유가 둘이라 제목도 갈라야 한다 — 가려진 기록을 "기록이 없어요"로 말하면 방금 입력한 기록이 사라진 것처럼 읽힌다.
+  it.each([
+    { hidden: true, title: '아직 공개할 수 있는 기록이 없어요', other: '아직 기록이 없어요' },
+    { hidden: false, title: '아직 기록이 없어요', other: '아직 공개할 수 있는 기록이 없어요' },
+  ])('득점왕·도움왕이 비면 hiddenByEligibility=$hidden 에 맞는 제목을 보여준다', async ({ hidden, title, other }) => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [], champions: [], promotionDecided: true },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({
+      data: { leagueId: 'league-1', goals: [], assists: [], hiddenByEligibility: hidden },
+    } as never);
+
+    renderAwards();
+
+    expect(await screen.findAllByText(title)).toHaveLength(2);
+    expect(screen.queryByText(other)).not.toBeInTheDocument();
+  });
 });

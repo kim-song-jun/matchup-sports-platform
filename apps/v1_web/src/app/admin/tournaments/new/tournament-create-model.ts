@@ -653,17 +653,12 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
   }
 
   if (step === 3) {
-    for (const [field, value, label] of [
-      ['promoHomePriority', state.promoHome.priority, '홈 홍보 우선순위'],
-      ['promoListPriority', state.promoList.priority, '목록 홍보 우선순위'],
+    // 서버 DTO 는 꺼진 홍보의 priority 도 0~9999 정수로 검증한다 — 꺼진 카드도 막는다.
+    for (const [field, card, label] of [
+      ['promoHomePriority', state.promoHome, '홈 홍보 우선순위'],
+      ['promoListPriority', state.promoList, '목록 홍보 우선순위'],
     ] as const) {
-      const priority = numeric(value);
-      if (
-        priority === null ||
-        !Number.isInteger(priority) ||
-        priority < 0 ||
-        priority > 9999
-      ) {
+      if (parsePromoPriority(card.priority) === null) {
         errors[field] = `${label}는 0~9999 사이의 정수여야 해요.`;
       }
     }
@@ -737,6 +732,13 @@ export function buildTournamentCreatePayload(
   }
 
   return payload;
+}
+
+function parsePromoPriority(value: string): number | null {
+  const priority = numeric(value);
+  return priority !== null && Number.isInteger(priority) && priority >= 0 && priority <= 9999
+    ? priority
+    : null;
 }
 
 function promoPayload(

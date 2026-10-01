@@ -625,7 +625,8 @@ export class TournamentPlayersService {
       });
     });
 
-    return this.serializePlayer(updated);
+    const jerseyByPlayerId = await readJerseyNumbers(this.prisma, registrationId);
+    return this.serializePlayer(updated, jerseyByPlayerId.get(updated.id) ?? null);
   }
 
   // ─── 어드민: 명단 조회/CSV 다운로드 ───────────────────────────────────────────
@@ -653,9 +654,11 @@ export class TournamentPlayersService {
       orderBy: { addedAt: 'asc' },
     });
 
+    const jerseyByPlayerId = await readJerseyNumbers(this.prisma, registrationId);
+
     const serializedPlayers = players
       .map(({ user: playerUser, ...player }) => ({
-        ...this.serializePlayer(player),
+        ...this.serializePlayer(player, jerseyByPlayerId.get(player.id) ?? null),
         phone: playerUser.phone?.trim() || null,
         isTeamCaptain: player.userId === registration.team.ownerUserId,
       }))
@@ -861,7 +864,7 @@ export class TournamentPlayersService {
       // 경로라서 더욱 그렇다. 명단 변경과 같은 트랜잭션에 기록해 둘이 어긋나지 않게 한다.
       auditAs: { admin, action: 'player.add' },
     });
-    return this.serializePlayer(player);
+    return this.serializePlayer(player, dto.jerseyNumber ?? null);
   }
 
   /**
@@ -1095,7 +1098,8 @@ export class TournamentPlayersService {
       return p;
     });
 
-    return this.serializePlayer(updated);
+    const jerseyByPlayerId = await readJerseyNumbers(this.prisma, updated.registrationId);
+    return this.serializePlayer(updated, jerseyByPlayerId.get(updated.id) ?? null);
   }
 
   // ─── 직렬화 ───────────────────────────────────────────────────────────────────

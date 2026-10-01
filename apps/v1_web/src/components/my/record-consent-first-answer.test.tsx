@@ -9,6 +9,7 @@ import { RecordConsentSettingsPageClient } from './my-api-clients';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/my/settings/record-consent',
 }));
 
 vi.mock('@/lib/api-client', async () => {

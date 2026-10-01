@@ -1651,6 +1651,10 @@ export function RecordConsentSettingsPageClient() {
   const update = useV1UpdateRecordConsent();
   const [toggleError, setToggleError] = useState(false);
 
+  // 성공 분기만 자기 `.tm-desktop-page-head` 를 그리므로 셸의 데스크톱 헤더를 끈다(알림 설정과 같은 R3 패턴).
+  // 로딩·에러는 테이블 기본값(desktopHead:true)의 셸 헤더를 그대로 쓴다.
+  useShellOverride({ desktopHead: consent.isError || consent.isLoading || !consent.data ? undefined : false });
+
   if (consent.isError) {
     return (
       <div className="tm-my-shell">
@@ -1727,37 +1731,22 @@ export function RecordConsentSettingsPageClient() {
                         {update.isPending
                           ? '저장하는 중이에요…'
                           : granted
-                            ? '지금 공개돼 있어요. 끄면 바로 모두 비공개로 돌아가요.'
+                            ? `공개 중${consent.data?.effectiveAt ? ` · ${formatTournamentDateTimeLong(consent.data.effectiveAt)}부터` : ''}`
                             : '지금은 비공개예요.'}
                       </div>
                     </div>
-                    <span
-                      className="tm-text-caption"
-                      style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
-                      aria-hidden="true"
-                    >
-                      {granted ? 'ON' : 'OFF'}
-                    </span>
                     <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
                   </button>
                 </div>
-                {/* 이 각주는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
-                    맥락 배너가, "지금 켜져 있는지"는 위 토글 서브텍스트가 각각 맡는다 --
-                    셋이 같은 말을 반복하면(실측: 알림에서 들어온 화면에 "켜면 공개돼요"가
-                    세 번 나왔다) 정작 무엇이 공개되는지는 아무도 말해주지 않는다. */}
+                {/* 각주는 **무엇이** 공개되는지와 켜기·끄기의 영향을 말한다. 현재 상태는 스위치 행이,
+                    "왜 지금 이 화면인지"는 대회 맥락 배너가 맡는다 — 같은 말을 반복하지 않는다. */}
                 <div className="tm-text-caption tm-my-settings-footnote">
                   내 프로필의 활동 기록에 출전 경기, 득점, 도움, 경고·퇴장, MVP 가 표시돼요.
                   팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
-                  {/* 소급 공개는 켜기 전에 반드시 알아야 하는 조건(사용자 명시 결정)이라
-                      여기 둔다 -- 토글 서브텍스트는 현재 상태만 말한다. */}
-                  {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
+                  {/* 소급 공개는 켜기 전에 반드시 알아야 하는 조건(사용자 명시 결정)이다. */}
+                  {' '}켜면 지금까지 참가한 경기 기록도 함께 공개되고, 끄면 바로 모두 비공개로 돌아가요.
                 </div>
               </section>
-              {granted && consent.data?.effectiveAt ? (
-                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
-                  {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
-                </div>
-              ) : null}
             </>
           )}
         </div>

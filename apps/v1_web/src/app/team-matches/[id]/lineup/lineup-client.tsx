@@ -11,6 +11,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { GameRosterPlayerRow } from '@/components/game-roster/game-roster-player-row';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { LineupJerseySheet, type LineupJerseyScope } from '@/components/lineup/lineup-jersey-sheet';
 import { LateLineupAdditionSheet } from '@/components/team-matches/late-lineup-addition-sheet';
 import { useV1TeamUnavailability } from '@/hooks/use-v1-game-roster';
@@ -310,20 +311,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     );
   }
 
-  // 미저장 변경이 있는 채로 탭을 닫거나 새로고침하면 브라우저 기본 경고를 띄운다 —
-  // 자동저장을 없앤 대가로 "저장 안 하고 나가면 잃는다"는 위험이 생겼으므로, 그 위험을
-  // 사용자가 모르고 지나치지 않게 막는 것까지가 이 변경의 범위다.
-  useEffect(() => {
-    if (!state?.dirty || !editable) return;
-    function warnBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault();
-      // 최신 브라우저는 문구를 무시하고 기본 경고만 보여주지만, returnValue 설정은 여전히
-      // "경고를 띄우겠다"는 신호로 요구된다.
-      event.returnValue = '';
-    }
-    window.addEventListener('beforeunload', warnBeforeUnload);
-    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
-  }, [state?.dirty, editable]);
+  // 저장은 버튼을 눌러야 나가므로, 미저장 변경이 있으면 이탈(뒤로가기·링크·탭 닫기)을 확인창으로 막는다.
+  const { UnsavedChangesModal } = useUnsavedChangesGuard(Boolean(state?.dirty) && editable);
 
   function handleConflictReload() {
     lineupQuery.refetch().then((result) => {
@@ -989,6 +978,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>{submitButtons}</div>
         </div>
       ) : null}
+
+      {UnsavedChangesModal}
 
       {jerseyTarget !== null ? (
         <LineupJerseySheet

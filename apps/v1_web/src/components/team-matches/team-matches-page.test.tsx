@@ -10,13 +10,17 @@ import type { TeamMatchModel } from './team-matches.types';
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
 const { routerPush, routerReplace } = vi.hoisted(() => ({ routerPush: vi.fn(), routerReplace: vi.fn() }));
 
+const navState = vi.hoisted(() => ({ pathname: '/team-matches/team-match-1/edit', search: '' }));
+
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/team-matches/team-match-1/edit',
+  usePathname: () => navState.pathname,
   useRouter: () => ({ push: routerPush, replace: routerReplace, back: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navState.search),
 }));
 
 beforeEach(() => {
+  navState.pathname = '/team-matches/team-match-1/edit';
+  navState.search = '';
   routerPush.mockClear();
   routerReplace.mockClear();
 });
@@ -784,7 +788,7 @@ describe('리그전 배지', () => {
 
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
 
-    const card = container.querySelector('a[href="/team-matches/team-match-1"]');
+    const card = container.querySelector('a[href^="/team-matches/team-match-1"]');
     expect(card).not.toBeNull();
     expect(card!.querySelectorAll('a, button')).toHaveLength(0);
     expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
@@ -1246,6 +1250,83 @@ describe('TeamMatchDetailPageView — 진행 체크리스트의 명단 행 (Task
     // 경기 전에는 결과 행이 열리지 않는다 — 링크가 아니라 안내다.
     expect(screen.queryByRole('link', { name: /경기 결과 기록/ })).not.toBeInTheDocument();
     expect(screen.getByText('경기 후에 열려요')).toBeInTheDocument();
+  });
+});
+
+// #1422 A안 — 두 팀이 정해진 친선 상세는 히어로가 두 팀을 요약하고, 같은 정보를 담은 팀 카드를 따로 그리지 않는다.
+describe('TeamMatchDetailPageView — 히어로가 두 팀을 요약한다 (#1422)', () => {
+  const opponent = { teamId: 'team-away', name: '한강 로버스', meta: '팀 평점 4.0 · 9승', status: '승인 완료', href: '/teams/team-away', applicationId: 'application-away' };
+
+  function confirmedModel(overrides: Partial<ReturnType<typeof getTeamMatchDetailViewModel>['match']> = {}) {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match = { ...model.match, hostTeam: '마포 레인저스', hostTeamId: 'team-home', hostTeamHref: '/teams/team-home', applicantTeams: [opponent], ...overrides };
+    return model;
+  }
+
+  it('두 팀 이름이 히어로 링크이고, 팀은 화면에 한 번만 나온다(모바일·데스크톱 팀 카드 없음)', () => {
+    const { container } = renderPage(<TeamMatchDetailPageView model={confirmedModel()} />);
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+
+    expect(hero.getByRole('link', { name: '마포 레인저스 팀 보기' })).toHaveAttribute('href', '/teams/team-home');
+    expect(hero.getByRole('link', { name: '한강 로버스 팀 보기' })).toHaveAttribute('href', '/teams/team-away');
+    expect(hero.getByText('팀 평점 4.0 · 9승')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '한강 로버스 팀 보기' })).toHaveLength(1);
+    expect(container.querySelector('.tm-team-match-team-cards')).toBeNull();
+  });
+
+  it('카드가 말하던 수준 라벨과 신뢰 배지를 히어로 팀 칸이 이어받는다', () => {
+    const model = confirmedModel({ hostTeamLevelLabel: '중급', hostTeamTrustState: 'verified', applicantTeams: [{ ...opponent, levelLabel: '상급', trustState: 'estimated' }] });
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+
+    expect(hero.getByText('팀 평점 4.0 · 9승 · 상급')).toBeInTheDocument();
+    expect(hero.getByText('중급')).toBeInTheDocument();
+    expect(hero.getByText('인증팀')).toBeInTheDocument();
+    expect(hero.getByText('누적 중')).toBeInTheDocument();
+  });
+
+  it('대조군 — 표시하지 않는 신뢰 상태(sample)는 배지가 없다', () => {
+    const model = confirmedModel({ hostTeamTrustState: 'sample', applicantTeams: [{ ...opponent, trustState: 'sample' }] });
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(container.querySelector('.tm-team-vs-row .tm-badge')).toBeNull();
+  });
+
+  it('대조군 — 상대가 아직 없으면 팀 카드가 그대로 남고 히어로 팀 칸은 링크가 아니다', () => {
+    const { container } = renderPage(<TeamMatchDetailPageView model={confirmedModel({ applicantTeams: [] })} />);
+
+    expect(container.querySelector('.tm-team-match-team-cards')).not.toBeNull();
+    expect(within(container.querySelector<HTMLElement>('.tm-team-vs-row')!).queryByRole('link')).toBeNull();
+  });
+
+  it('대조군 — 플랫폼 주관 매치는 팀 카드를 그대로 둔다', () => {
+    const { container } = renderPage(<TeamMatchDetailPageView model={confirmedModel({ platformManaged: true })} />);
+
+    expect(container.querySelector('.tm-team-match-team-cards')).not.toBeNull();
+  });
+
+  it('진행 체크리스트가 있으면 다음 할 일(참석명단)이 모바일 본문 맨 위 링크로도 나온다', () => {
+    const model = confirmedModel();
+    model.progress = { opponentName: '한강 로버스', confirmedAtLabel: '10/1 확정', lineupSubmitted: false, lockNote: null };
+    model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
+    model.nextAction = { label: '참석명단 관리', tone: 'primary', href: '/team-matches/team-match-1/lineup' };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const body = container.querySelector<HTMLElement>('.tm-match-detail-body')!;
+    const cta = within(body).getByRole('link', { name: '참석명단 관리' });
+
+    expect(cta).toHaveAttribute('href', '/team-matches/team-match-1/lineup');
+    // 본문의 첫 요소이므로 체크리스트(진행 섹션)보다 앞선다.
+    expect(cta.compareDocumentPosition(within(body).getByRole('region', { name: /경기해요/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('대조군 — 진행 체크리스트가 없으면(모집 중 호스트) 본문 상단 CTA 를 두지 않는다', () => {
+    const model = confirmedModel({ applicantTeams: [] });
+    model.nextAction = { label: '매치 수정', tone: 'neutral', href: '/team-matches/team-match-1/edit' };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(within(container.querySelector<HTMLElement>('.tm-match-detail-body')!).queryByRole('link', { name: '매치 수정' })).toBeNull();
   });
 });
 
@@ -1910,5 +1991,30 @@ describe('TeamMatchDetailPageView — 히어로의 매치 상태 자리 (W2-V8)'
 
     expect(container.querySelector('.tm-team-vs-hero .tm-badge')).toBeNull();
     expect(opponentColumn(container).getByText('승인 대기')).toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchListPageView — 상세로 가는 카드는 지금 목록(검색어·필터)을 출처로 싣는다', () => {
+  function twoCards() {
+    const base = getTeamMatchListViewModel();
+    return { ...base, matches: [{ ...base.matches[0], id: 'tm-a' }, { ...base.matches[0], id: 'tm-b' }] };
+  }
+
+  it('q·kind 가 걸린 목록의 모든 카드 href 에 그 URL 이 from 으로 들어간다', () => {
+    navState.pathname = '/team-matches';
+    navState.search = 'q=QA179&kind=friendly';
+    const { container } = renderPage(<TeamMatchListPageView model={twoCards()} />);
+    const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
+
+    const from = encodeURIComponent('/team-matches?q=QA179&kind=friendly');
+    expect(hrefs).toEqual([`/team-matches/tm-a?from=${from}`, `/team-matches/tm-b?from=${from}`]);
+  });
+
+  it('대조군: 쿼리 없는 목록은 from 을 싣지 않는다(fallback 이 같은 목록이고 공개 첫 HTML 링크가 깨끗해야 한다)', () => {
+    navState.pathname = '/team-matches';
+    const { container } = renderPage(<TeamMatchListPageView model={twoCards()} />);
+    const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>('a.tm-match-row')).map((a) => a.getAttribute('href'));
+
+    expect(hrefs).toEqual(['/team-matches/tm-a', '/team-matches/tm-b']);
   });
 });

@@ -46,6 +46,8 @@ export type AdminListSummary = {
   byAudience?: Record<string, number>;
   /** 문의 목록 전용 — 신고(`category: 'report'`) 사유별 건수. 5개 키 전부 존재, 없으면 0. */
   byReportReason?: Record<string, number>;
+  /** 문의 목록 전용 — 사유 필터만 뺀 같은 조건의 총 건수('전체 사유'). 사유 미지정(null) 신고 포함. */
+  reportReasonTotal?: number;
 };
 
 export type AdminCursorPage<T> = CursorPage<T> & {

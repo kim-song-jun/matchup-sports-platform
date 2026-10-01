@@ -61,6 +61,7 @@ export function TournamentDatetimeField({
         <p
           id={`${id}-error`}
           role="alert"
+          data-error-focus={id}
           className="text-[length:var(--font-size-caption)] text-[var(--red700)]"
         >
           {error}

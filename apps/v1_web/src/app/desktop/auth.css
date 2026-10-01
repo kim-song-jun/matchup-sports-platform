@@ -322,6 +322,11 @@
     text-wrap: balance;
   }
 
+  /* eyebrow 가 없는 스테이지는 브랜드 줄이 그 자리를 채우므로 브랜드 아래 간격을 한 단 키운다. */
+  .tm-auth-stage-brand + .tm-auth-stage-slogan {
+    margin-top: 12px;
+  }
+
   .tm-auth-stage-sub {
     margin: 12px 0 0;
     color: var(--text-muted);

@@ -225,7 +225,7 @@ function toStatValue(rawValue: string): number {
 /**
  * 참가자별 기록 숫자 입력 한 칸. 다섯 칸(득점·어시스트·파울·경고·퇴장)이 같은 마크업을
  * 쓰도록 한 곳에 모았다 -- 새 칸을 붙일 때 라벨 연결이나 터치 타겟을 빠뜨릴 여지를
- * 없앤다. `<label htmlFor>` + `<input id>` 명시 연결(프로젝트 폼 규칙)이고, 터치 타겟은
+ * 없앤다. 라벨은 칸 위에 둬서 라벨 길이가 칸 위치를 밀지 않게 한다(선수 카드는 3열 격자). `<label htmlFor>` + `<input id>` 명시 연결(프로젝트 폼 규칙)이고, 터치 타겟은
  * 44px 다(기존에 이 칸들이 40px 로 규칙에 미달해 있었다 -- 같은 마크업을 건드리는
  * 이번 변경에서 함께 맞춘다).
  */
@@ -241,8 +241,8 @@ function StatNumberField({
   onValueChange: (next: number) => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <label htmlFor={id} className="tm-text-caption">
+    <div>
+      <label htmlFor={id} className="tm-text-caption" style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>
         {label}
       </label>
       <input
@@ -251,7 +251,8 @@ function StatNumberField({
         min={0}
         inputMode="numeric"
         className="tm-input"
-        style={{ width: 72, minWidth: 72, minHeight: 44 }}
+        // 클래스가 아니라 인라인이다: `.tm-input` 의 font-size(15px)가 비계층 CSS 라 유틸리티 클래스를 이긴다.
+        style={{ fontSize: 'var(--font-size-input)', minHeight: 44, padding: '0 8px', textAlign: 'center' }}
         value={value ?? ''}
         onChange={(event) => onValueChange(toStatValue(event.target.value))}
       />
@@ -825,11 +826,11 @@ export function ResultEditModal({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             {participants.map((participant, index) => (
-              <div key={participant.participantId} className="tm-card" style={{ padding: 12 }}>
-                <p className="tm-text-caption" style={{ fontWeight: 600, marginBottom: 8 }}>
+              <fieldset key={participant.participantId} className="tm-card" style={{ padding: 12, margin: 0, minWidth: 0 }}>
+                <legend className="tm-text-caption" style={{ fontWeight: 600, padding: '0 4px' }}>
                   {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                </legend>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px 8px' }}>
                   <StatNumberField
                     id={`${idPrefix}-p${index}-goals`}
                     label="득점"
@@ -853,7 +854,7 @@ export function ResultEditModal({
                   />
                   <StatNumberField
                     id={`${idPrefix}-p${index}-minutes`}
-                    label="출전 시간(분)"
+                    label="출전(분)"
                     value={participant.minutesPlayed}
                     onValueChange={(minutesPlayed) => updateParticipant(index, { minutesPlayed })}
                   />
@@ -871,16 +872,16 @@ export function ResultEditModal({
                     value={participant.cards.red}
                     onValueChange={(red) => updateParticipant(index, { cards: { ...participant.cards, red } })}
                   />
-                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 44 }}>
-                    <input
-                      type="checkbox"
-                      checked={participant.goalkeeper}
-                      onChange={(event) => updateParticipant(index, { goalkeeper: event.target.checked })}
-                    />
-                    골키퍼
-                  </label>
                 </div>
-              </div>
+                <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 44 }}>
+                  <input
+                    type="checkbox"
+                    checked={participant.goalkeeper}
+                    onChange={(event) => updateParticipant(index, { goalkeeper: event.target.checked })}
+                  />
+                  골키퍼
+                </label>
+              </fieldset>
             ))}
           </div>
 

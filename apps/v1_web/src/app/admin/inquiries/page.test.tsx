@@ -72,6 +72,30 @@ describe('AdminInquiriesPage — 신고 사유 필터', () => {
     mockInquiriesData();
   });
 
+  it('전체 사유 건수는 사유 미지정 신고까지 포함한 서버의 reportReasonTotal 을 쓴다', async () => {
+    inquiriesMock.mockReturnValue({
+      data: {
+        items: [reportRow],
+        pageInfo: { nextCursor: null, hasNext: false },
+        summary: {
+          total: 4,
+          byStatus: { received: 4, reviewing: 0, answered: 0, closed: 0 },
+          byCategory: { account: 0, match: 0, team: 0, tournament: 0, payment_refund: 0, report: 4, other: 0 },
+          byReportReason: { spam: 2, harassment: 1, impersonation: 0, inappropriate: 0, other: 0 },
+          reportReasonTotal: 4,
+        },
+      },
+      isPending: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    searchParamsValue = new URLSearchParams('category=report');
+    render(<AdminInquiriesPage />);
+    expect(screen.getByRole('option', { name: '전체 사유 4' })).toBeInTheDocument();
+  });
+
   it('분류가 신고일 때만 사유 필터가 보인다', async () => {
     const user = userEvent.setup();
     render(<AdminInquiriesPage />);

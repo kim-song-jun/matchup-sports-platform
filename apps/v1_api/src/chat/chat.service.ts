@@ -115,7 +115,9 @@ export class ChatService {
     const visibleFromAt = room.participants[0]?.visibleFromAt;
     if (!visibleFromAt) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '먼저 채팅방에 입장해 주세요.' });
     const message = await this.prisma.v1ChatMessage.findFirst({
-      where: { id: messageId, chatRoomId: roomId, messageType: 'text', status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
+      // 사진 메시지도 신고·차단 대상이다 — 사람이 보낸 것 중 입장·퇴장 같은 system 만 뺀다.
+      where: { id: messageId, chatRoomId: roomId, messageType: { not: 'system' }, status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
+      include: { attachmentAsset: { select: { url: true } } },
     });
     if (!message) throw new NotFoundException({ code: 'NOT_FOUND', message: '신고할 메시지를 찾을 수 없어요.' });
     if (message.senderUserId === user.id) throw new BadRequestException({ code: 'INVALID_TARGET', message: '본인의 메시지는 신고하거나 차단할 수 없어요.' });
@@ -139,7 +141,7 @@ export class ChatService {
       const created = await tx.v1Inquiry.create({ data: {
         userId: user.id, category: 'report', title: '채팅 메시지 신고',
         // Keep the server-owned message snapshot so later edits cannot rewrite the evidence.
-        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
+        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}${message.attachmentAsset ? ` (${message.attachmentAsset.url})` : ''}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
         relatedType: 'user', relatedId: message.senderUserId, reportReason: dto.reason,
       } });
       await tx.v1OutboxEvent.create({ data: {
@@ -239,6 +241,7 @@ export class ChatService {
     const messages = await this.prisma.v1ChatMessage.findMany({
       where: { chatRoomId: roomId, sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
       include: {
+        attachmentAsset: { select: { url: true } },
         senderUser: {
           select: {
             id: true,
@@ -274,6 +277,8 @@ export class ChatService {
         messageType: message.messageType,
         systemEventType: message.systemEventType ?? null,
         content: message.status === 'sent' ? message.body : null,
+        // 숨김·삭제 메시지는 본문처럼 사진도 내리지 않는다.
+        imageUrl: message.status === 'sent' ? message.attachmentAsset?.url ?? null : null,
         status: message.status,
         sentAt: message.sentAt,
         mine: message.senderUserId === user.id,
@@ -284,8 +289,10 @@ export class ChatService {
   }
 
   async sendMessage(user: V1AuthUser, roomId: string, dto: SendChatMessageDto) {
-    const content = dto.content.trim();
-    if (!content) throw validationError('content is required', 'content');
+    const content = dto.content?.trim() ?? '';
+    const imageUrl = dto.imageUrl?.trim() ?? '';
+    if (content && imageUrl) throw validationError('content and imageUrl cannot be sent together', 'imageUrl');
+    if (!content && !imageUrl) throw validationError('content is required', 'content');
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.teamContact) {
       const status = contactDisplayStatus(room.teamContact.status, room.teamContact.expiresAt);
@@ -293,9 +300,23 @@ export class ChatService {
     }
     if (room.status !== 'active') throw stateConflict('Chat room is not active');
 
+    // 사진은 **보내는 사람이 올린 이미지 업로드**만 싣는다 — 남의 업로드나 임의 URL 을 채팅에 붙이지 못하게.
+    const image = imageUrl
+      ? await this.prisma.v1UploadAsset.findFirst({
+          where: { url: imageUrl, ownerUserId: user.id, kind: 'image' },
+          select: { id: true, url: true },
+        })
+      : null;
+    if (imageUrl && !image) throw validationError('사진을 찾을 수 없어요. 다시 올려 주세요.', 'imageUrl');
+    // 사진 메시지의 body 는 '사진' — 목록 미리보기·신고 스냅샷·body 만 읽는 옛 경로가 그대로 읽힌다.
+    const body = image ? '사진' : content;
+    const notificationText = image ? '사진을 보냈어요' : content.slice(0, 120);
+
     const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1ChatMessage.create({
-        data: { chatRoomId: room.id, senderUserId: user.id, body: content, status: 'sent' },
+        data: image
+          ? { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent', messageType: 'image', attachmentAssetId: image.id }
+          : { chatRoomId: room.id, senderUserId: user.id, body, status: 'sent' },
       });
       await tx.v1ChatRoom.update({
         where: { id: room.id },
@@ -307,7 +328,9 @@ export class ChatService {
     const chatMessagePayload = {
       messageId: message.id,
       roomId: room.id,
+      messageType: message.messageType,
       content: message.body,
+      imageUrl: image?.url ?? null,
       status: message.status,
       sentAt: message.sentAt,
       senderUserId: user.id,
@@ -333,7 +356,7 @@ export class ChatService {
             targetType: 'chat',
             targetId: room.id,
             title: roomTitle,
-            body: content.slice(0, 120),
+            body: notificationText,
             deepLink: `/chat/${room.id}`,
           })),
         });
@@ -360,7 +383,7 @@ export class ChatService {
       void this.webPushService
         .sendToUser(recipientUserId, {
           title: roomTitle,
-          body: content.slice(0, 120),
+          body: notificationText,
           url: `/chat/${room.id}`,
         })
         .catch((err) => {
@@ -769,7 +792,8 @@ export class ChatService {
       };
     }>,
   ) {
-    if (message.messageType !== 'text') return 0;
+    // 입장·퇴장 같은 system 만 뺀다 — 사진도 읽어야 할 메시지다.
+    if (message.messageType === 'system') return 0;
     return participants.filter((participant) => {
       if (participant.userId === message.senderUserId) return false;
       if (participant.user?.chatBlocksMade.some((block) => block.blockedUserId === message.senderUserId)
@@ -829,7 +853,7 @@ export class ChatService {
       where: {
         chatRoomId: room.id,
         status: 'sent',
-        messageType: 'text',
+        messageType: { not: 'system' },
         senderUserId: { not: userId },
         senderUser: chatVisibleUserWhere(userId),
         ...(visibleFromAt ? { sentAt: { gte: visibleFromAt, ...(lastReadMessage ? { gt: lastReadMessage.sentAt } : {}) } } : { id: '__never__' }),

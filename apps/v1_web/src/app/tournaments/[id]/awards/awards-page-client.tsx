@@ -487,6 +487,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
         <button
           key={n} type="button"
           role="radio"
+          className="tm-pressable"
           aria-checked={n === value}
           aria-label={`${n}점`}
           tabIndex={n === value ? 0 : -1}

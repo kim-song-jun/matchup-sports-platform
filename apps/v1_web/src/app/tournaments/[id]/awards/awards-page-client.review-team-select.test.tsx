@@ -198,6 +198,9 @@ describe('AwardsPageClient — 다중 팀 겸임 사용자의 리뷰 팀 선택'
     expect(screen.getByRole('radio', { name: '5점' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: '4점' })).toHaveAttribute('aria-checked', 'false');
 
+    // 표준 키보드 포커스 링(.tm-pressable:focus-visible)을 받는 클래스
+    expect(screen.getByRole('radio', { name: '4점' })).toHaveClass('tm-pressable');
+
     fireEvent.click(screen.getByRole('radio', { name: '4점' }));
     expect(screen.getByRole('radio', { name: '4점' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: '5점' })).toHaveAttribute('aria-checked', 'false');

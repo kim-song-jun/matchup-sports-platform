@@ -63,6 +63,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CloseTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ReopenTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1DeleteTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: resolveChatRoomMutateMock, isPending: false }),
   useV1WithdrawTeamMatchApplication: useV1WithdrawTeamMatchApplicationMock,
   useV1TeamMatches: useV1TeamMatchesMock,
@@ -73,8 +74,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 vi.mock('./team-matches-page', () => ({
   TeamMatchDetailPageSkeleton: () => <div data-testid="team-match-detail-skeleton" />,
-  TeamMatchDetailPageView: ({ model }: { model: TeamMatchDetailViewModel }) => (
+  TeamMatchDetailPageView: ({ model, lifecyclePanel }: { model: TeamMatchDetailViewModel; lifecyclePanel?: React.ReactNode }) => (
     <div>
+      <span data-testid="team-match-lifecycle-panel">{String(Boolean(lifecyclePanel))}</span>
       <span data-testid="team-match-image">{model.match.imageUrl}</span>
       <span data-testid="team-match-mode">{model.mode}</span>
       <span data-testid="team-match-detail-back-href">{model.detailBackHref}</span>
@@ -1649,6 +1651,31 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 재개,팀매치 취소');
     expect(screen.getByTestId('team-match-next-action')).toHaveTextContent('모집 재개');
     expect(json('team-match-manage-menu').edit.lockedReason).toContain('모집을 다시 열면');
+  });
+
+  // 취소·수정은 ⋯ 메뉴가 맡고, 보류 결정 패널(MatchLifecyclePanel)은 보류 매치에만 남는다 — 메뉴에 없던 "삭제"는 메뉴로 옮겼다.
+  it('지원 이력이 없는 모집 중 매치는 ⋯ 메뉴에 삭제가 있고, 상세에는 관리 패널이 없다', () => {
+    mockHost({ lifecycle: { canEdit: true, canDelete: true, onHoldReason: null } });
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('모집 마감,팀매치 취소,팀매치 삭제');
+    expect(json('team-match-host-action-details')[2]).toMatchObject({ label: '팀매치 삭제', confirm: { confirmLabel: '팀매치 삭제' } });
+    expect(screen.getByTestId('team-match-lifecycle-panel')).toHaveTextContent('false');
+  });
+
+  it('대조군 — 삭제할 수 없는 매치(canDelete=false)의 메뉴에는 삭제가 없다', () => {
+    mockHost({ lifecycle: { canEdit: true, canDelete: false, onHoldReason: null } });
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent(/^모집 마감,팀매치 취소$/);
+  });
+
+  it('보류 매치는 취소·삭제를 보류 결정 패널이 맡고 ⋯ 메뉴에는 두지 않는다', () => {
+    mockHost({ status: 'on_hold', lifecycle: { canEdit: true, canDelete: true, onHoldReason: 'NO_OPPONENT' } });
+    render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
+
+    expect(screen.getByTestId('team-match-lifecycle-panel')).toHaveTextContent('true');
+    expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
   });
 
   it('상대 확정 뒤 — 진행 체크리스트(확정 시각·명단 제출·잠금 안내)와 하단 바 참석명단 관리', () => {

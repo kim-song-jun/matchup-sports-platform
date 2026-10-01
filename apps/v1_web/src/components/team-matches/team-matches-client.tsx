@@ -8,6 +8,7 @@ import {
   useV1ApplyTeamMatch,
   useV1ApproveTeamMatchApplication,
   useV1CancelTeamMatch,
+  useV1DeleteTeamMatch,
   useV1CloseTeamMatch,
   useV1MasterSports,
   useV1MyTeams,
@@ -297,6 +298,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const closeTeamMatch = useV1CloseTeamMatch(teamMatchId);
   const reopenTeamMatch = useV1ReopenTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
+  const deleteTeamMatch = useV1DeleteTeamMatch(teamMatchId, () => router.replace('/team-matches'));
   const [actionError, setActionError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
@@ -473,7 +475,11 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
           reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
           cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
-          pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
+          // 보류 매치의 취소·삭제는 상세의 보류 결정 패널이 맡는다 — 메뉴에 같은 동작을 두 번 두지 않는다.
+          deleteTeamMatch: query.data.lifecycle?.canDelete && apiStatus !== 'on_hold'
+            ? () => deleteTeamMatch.mutateAsync()
+            : undefined,
+          pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending || deleteTeamMatch.isPending,
         })
       : undefined,
     // manageHref 는 모집을 운영하는 호스트에게만 있다(canManageMatchListing).
@@ -555,7 +561,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     }),
   };
 
-  return <TeamMatchDetailPageView model={model} lifecyclePanel={!seeding && query.data.lifecycle && !query.data.league ? <MatchLifecyclePanel id={teamMatchId} domain="team-matches" status={getStatus(query.data)} lifecycle={query.data.lifecycle} canManage={Boolean(query.data.viewer?.manageableHostTeam && query.data.viewer?.manageRoute)} /> : undefined} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
+  return <TeamMatchDetailPageView model={model} lifecyclePanel={!seeding && query.data.lifecycle && !query.data.league && apiStatus === 'on_hold' ? <MatchLifecyclePanel id={teamMatchId} domain="team-matches" status={getStatus(query.data)} lifecycle={query.data.lifecycle} canManage={Boolean(query.data.viewer?.manageableHostTeam && query.data.viewer?.manageRoute)} /> : undefined} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
 }
 
 
@@ -834,6 +840,7 @@ function buildHostActions({
   closeTeamMatch,
   reopenTeamMatch,
   cancelTeamMatch,
+  deleteTeamMatch,
   pending,
 }: {
   /** 서버 api status — close()/reopen() 이 보는 값과 같아야 눌러서 409 를 보지 않는다. */
@@ -844,6 +851,8 @@ function buildHostActions({
   closeTeamMatch: () => Promise<unknown>;
   reopenTeamMatch: () => Promise<unknown>;
   cancelTeamMatch: () => Promise<unknown>;
+  /** 지원 이력이 없어 삭제할 수 있을 때만 넘긴다. */
+  deleteTeamMatch?: () => Promise<unknown>;
   pending: boolean;
 }): TeamMatchDetailViewModel['hostActions'] {
   // 리그 대진의 팀 단독 취소는 서버가 항상 409로 거부한다(team-matches.service.ts cancel(),
@@ -856,6 +865,17 @@ function buildHostActions({
     confirm: TEAM_MATCH_CANCEL_CONFIRM,
     onClick: cancelTeamMatch,
   };
+  const deleteAction: NonNullable<TeamMatchDetailViewModel['hostActions']>[number] | null = deleteTeamMatch
+    ? {
+        label: '팀매치 삭제',
+        description: '지원 이력이 없는 팀매치라 목록에서 지워져요.',
+        tone: 'danger',
+        pending,
+        confirm: { title: '팀매치를 삭제할까요?', message: '삭제하면 되돌릴 수 없어요.', confirmLabel: '팀매치 삭제', cancelLabel: '닫기' },
+        onClick: deleteTeamMatch,
+      }
+    : null;
+  const withDelete = (actions: NonNullable<TeamMatchDetailViewModel['hostActions']>) => (deleteAction ? [...actions, deleteAction] : actions);
   if (status === 'recruiting') {
     // 마감하면 서버가 대기 신청을 전부 expired 로 끝낸다(close()) — 끝나는 팀이 있을 때만 확인한다.
     const closeConfirm = requestedCount > 0
@@ -867,7 +887,7 @@ function buildHostActions({
           tone: 'default' as const,
         }
       : undefined;
-    return [
+    return withDelete([
       {
         label: '모집 마감',
         description: requestedCount > 0 ? `대기 중인 신청 ${requestedCount}팀이 종료돼요.` : '더 이상 신청을 받지 않아요.',
@@ -877,14 +897,14 @@ function buildHostActions({
         onClick: closeTeamMatch,
       },
       ...(isLeagueFixture ? [] : [cancelAction]),
-    ];
+    ]);
   }
   if (status === 'on_hold') return [];
   if (status === 'closed') {
-    return [
+    return withDelete([
       { label: '모집 재개', description: '다시 신청을 받아요.', tone: 'primary', pending, onClick: reopenTeamMatch },
       ...(isLeagueFixture ? [] : [cancelAction]),
-    ];
+    ]);
   }
   if (status === 'matched') {
     // Task 16 removed the standalone "complete" mutation — completion is now an
@@ -893,7 +913,8 @@ function buildHostActions({
     // only remaining direct mutation here.
     return isLeagueFixture ? [] : [cancelAction];
   }
-  return [];
+  // cancelled·expired — 취소된 매치를 지우는 것이 남은 유일한 관리 동작이다.
+  return withDelete([]);
 }
 
 function buildLineupAction(

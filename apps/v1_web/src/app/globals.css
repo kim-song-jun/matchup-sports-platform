@@ -6562,7 +6562,7 @@ textarea.tm-chat-input-placeholder::placeholder {
    .tm-segment-row의 기본 --grey100 트랙이면 .tm-review-tab[data-active]의 --surface
    pill이 원래도 잘 보였다(패치를 덧대는 대신 원인이 된 오버라이드 자체를 제거). */
 .tm-match-type-segment {
-  margin: 0 var(--v1-shell-page-x) 12px;
+  margin: 12px var(--v1-shell-page-x) 12px;
 }
 
 /* 통합 대회 목록의 유형 세그먼트 — 칸이 셋이라 기본 2칸 grid 를 덮는다. */
@@ -6587,6 +6587,7 @@ textarea.tm-chat-input-placeholder::placeholder {
   /* 데스크탑에서는 리스트·검색바의 모바일 패딩이 0으로 리셋되고 스크롤 영역이 열 여백을 담당하므로
      세그먼트도 열 가장자리에 맞춰야 제목·검색바와 정렬된다. */
   .tm-match-type-segment {
+    margin-top: 0;
     margin-inline: 0;
   }
 }

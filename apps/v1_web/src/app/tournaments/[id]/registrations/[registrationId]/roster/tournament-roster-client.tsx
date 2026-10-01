@@ -137,7 +137,7 @@ export function TournamentRosterDeadlineCard({
   /** 대회 상태 때문에 누구도 명단을 못 고치는 상태 — 잠금·마감보다 우선한다(서버 assertRosterMutable과 동일 순서). */
   isTournamentRosterClosed?: boolean;
   /** 막힌 이유 문구를 고르는 데 쓴다(종료·취소 ≠ 아직 공개 전). */
-  tournamentStatus?: string | null;
+  tournamentStatus?: V1TournamentStatus | null;
   isRosterLocked: boolean;
   isRosterEditBlockedByStatus: boolean;
   isRosterDeadlineBlocked: boolean;
@@ -154,9 +154,18 @@ export function TournamentRosterDeadlineCard({
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
-  const seasonStatus = season ? getTournamentStatusConfig(season.status) : null;
-  const deadlineBadge = seasonStatus
-    ? { label: seasonStatus.label, className: seasonStatus.badgeClass }
+  // 종료·취소는 마감 경과와 무관하게 상태가 우선이다(하단 안내도 같은 축). 그 외 non-open 상태는
+  // 마감 전일 때만 상태를 보여 준다 — 마감 후엔 "신청 마감" 이 여전히 사실이다.
+  // 상태를 아직 모르면(로딩 중) 마감일만 본다.
+  const isTerminalStatus = tournamentStatus === 'completed' || tournamentStatus === 'cancelled';
+  const statusOverride = season
+    ? season.status
+    : tournamentStatus && (isTerminalStatus || (deadlineState === 'upcoming' && tournamentStatus !== 'open'))
+      ? tournamentStatus
+      : null;
+  const statusBadge = statusOverride ? getTournamentStatusConfig(statusOverride) : null;
+  const deadlineBadge = statusBadge
+    ? { label: statusBadge.label, className: statusBadge.badgeClass }
     : deadlineState === 'upcoming'
       ? { label: '신청 접수 중', className: 'tm-badge-green' }
       : deadlineState === 'closed'

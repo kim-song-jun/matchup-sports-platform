@@ -245,7 +245,7 @@ function StatNumberField({
       <label htmlFor={id} className="tm-text-caption" style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>
         {label}
       </label>
-            <input
+      <input
         id={id}
         type="number"
         min={0}

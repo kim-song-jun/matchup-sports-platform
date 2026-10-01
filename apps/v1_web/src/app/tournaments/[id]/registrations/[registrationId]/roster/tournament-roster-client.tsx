@@ -154,7 +154,14 @@ export function TournamentRosterDeadlineCard({
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
-  const seasonStatus = season ? getTournamentStatusConfig(season.status) : null;
+  // 마감일이 남았어도 대회가 모집(open) 단계가 아니면 "신청 접수 중" 이라 말할 수 없다.
+  // 상태를 아직 모르면(로딩 중) 기존처럼 마감일만 본다.
+  const statusOverride = season
+    ? season.status
+    : deadlineState === 'upcoming' && tournamentStatus && tournamentStatus !== 'open'
+      ? (tournamentStatus as V1TournamentStatus)
+      : null;
+  const seasonStatus = statusOverride ? getTournamentStatusConfig(statusOverride) : null;
   const deadlineBadge = seasonStatus
     ? { label: seasonStatus.label, className: seasonStatus.badgeClass }
     : deadlineState === 'upcoming'

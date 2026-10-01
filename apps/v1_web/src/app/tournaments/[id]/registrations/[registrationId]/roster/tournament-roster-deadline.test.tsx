@@ -96,6 +96,37 @@ describe('TournamentRosterDeadlineCard', () => {
     expect(screen.getByText('대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.')).toBeInTheDocument();
   });
 
+  // #1451: 마감 전이어도 대회가 끝났거나 취소됐으면 "신청 접수 중" 이 아니라 대회 상태를 보여 줘야 한다.
+  describe('마감 전 대회의 상태 배지', () => {
+    const renderCard = (tournamentStatus: string) =>
+      render(
+        <TournamentRosterDeadlineCard
+          deadlineAt={'2026-07-20T18:30:00+09:00'}
+          isTournamentRosterClosed={tournamentStatus !== 'open' && tournamentStatus !== 'in_progress'}
+          tournamentStatus={tournamentStatus}
+          isRosterLocked={false}
+          isRosterEditBlockedByStatus={false}
+          isRosterDeadlineBlocked={false}
+          nowMs={new Date('2026-07-20T17:00:00+09:00').getTime()}
+        />,
+      );
+
+    it.each([
+      ['completed', '종료'],
+      ['cancelled', '취소'],
+      ['in_progress', '진행 중'],
+    ])('%s 대회는 신청 접수 중 대신 "%s" 를 보여 준다', (status, label) => {
+      renderCard(status);
+      expect(screen.queryByText('신청 접수 중')).not.toBeInTheDocument();
+      expect(screen.getByText(label)).toBeInTheDocument();
+    });
+
+    it('대조군: 모집 중(open) 대회는 마감 전이면 기존대로 "신청 접수 중" 이다', () => {
+      renderCard('open');
+      expect(screen.getByText('신청 접수 중')).toBeInTheDocument();
+    });
+  });
+
   // F98: 정규 리그에는 신청 마감이 없다. 예전엔 그 자리가 항상 "일정 미정 · 일정 미정" 이었다.
   describe('정규 리그(season)', () => {
     const season = (status: 'in_progress' | 'completed' | 'cancelled') => ({

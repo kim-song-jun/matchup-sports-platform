@@ -957,6 +957,7 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       fireEvent.click(screen.getByRole('switch', { name: '홈 오늘의 추천 노출' }));
       const on = screen.getByRole('switch', { name: '홈 오늘의 추천 노출' });
       expect(on).toHaveAttribute('aria-checked', 'true');
+      expect(on.querySelector('.tm-toggle')).toHaveClass('tm-toggle-on');
       on.focus();
       fireEvent.change(screen.getByLabelText('카드 제목'), { target: { value: '이번 주 추천' } });
       fireEvent.click(on);
@@ -966,6 +967,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       expect(off).toHaveFocus();
       expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
       expect(screen.getByText('꺼짐 · 입력한 항목 1개 보관 중')).toBeInTheDocument();
+      // 노브 위치는 저장소 공용 스위치(.tm-toggle)가 정한다 — 손으로 만든 트랙을 쓰면 노브가 트랙을 벗어난다.
+      expect(off.querySelector('.tm-toggle')).not.toHaveClass('tm-toggle-on');
 
       fireEvent.click(off);
       expect(screen.getByLabelText('카드 제목')).toHaveValue('이번 주 추천');

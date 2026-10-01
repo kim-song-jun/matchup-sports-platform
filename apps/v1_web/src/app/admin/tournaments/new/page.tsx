@@ -629,7 +629,7 @@ function BasicStep({
         </Field>
       </div>
 
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="text-sm font-semibold text-[var(--text-body)]">대회 형식</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {([
@@ -665,7 +665,7 @@ function BasicStep({
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="text-sm font-semibold text-[var(--text-body)]">성별 카테고리</legend>
         <p className="mt-1 text-xs text-[var(--text-caption)]">
           혼성 대회는 3단계에서 남녀 최소·최대 인원을 설정할 수 있어요.

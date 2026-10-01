@@ -151,15 +151,16 @@ export function LineupGrid({
               aria-selected={activeMobileSideId === side.id}
               onClick={() => setSelectedMobileSideId(side.id)}
               className={[
-                'min-h-[44px] flex-1 rounded-md px-2 text-sm font-semibold transition-colors',
+                'flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-md px-2 text-sm font-semibold transition-colors',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                 activeMobileSideId === side.id
                   ? 'bg-[var(--grey300)] text-[var(--text-strong)] shadow-sm'
                   : 'text-[var(--text-muted)]',
               ].join(' ')}
             >
-              {side.displayNameSnapshot}
-              <span className="ml-1 text-xs font-normal opacity-70">
+              {/* 한글 기본 줄바꿈은 글자 사이에서 끊어 좁은 탭에서 팀 이름이 쪼개진다 — 단어 단위로 두 줄까지, 넘치면 말줄임. */}
+              <span className="line-clamp-2 min-w-0 break-keep text-center">{side.displayNameSnapshot}</span>
+              <span className="ml-1 shrink-0 whitespace-nowrap text-xs font-normal opacity-70">
                 {side.sideKey === 'HOME' ? '홈' : '원정'}
               </span>
             </button>
@@ -203,10 +204,10 @@ export function LineupGrid({
             >
               <h3
                 id={`lineup-side-${side.id}-heading`}
-                className="mb-2 text-sm font-semibold text-[var(--text-strong)]"
+                className="mb-2 break-keep text-sm font-semibold text-[var(--text-strong)]"
               >
                 {side.displayNameSnapshot}
-                <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                <span className="ml-2 whitespace-nowrap text-xs font-normal text-[var(--text-muted)]">
                   {side.sideKey === 'HOME' ? '홈' : '원정'}
                 </span>
               </h3>

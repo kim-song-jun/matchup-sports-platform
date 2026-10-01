@@ -92,15 +92,33 @@ type LeagueFixturePhaseInput = Pick<
  * 리그 대진 한 경기의 단계. 리그 대진은 status='matched' 로 만들어져 결과가 제출돼야 바뀌므로
  * 킥오프가 지났는데 결과가 없으면 '결과 대기'다(status 만 보면 '예정'으로 잘못 읽힌다).
  * 점수가 가려진 대진(`scoreHidden`)은 결과가 확정돼 있어 '종료'다.
+ * 게임 상태가 있으면 킥오프 시각보다 먼저 본다 — 예정보다 일찍 시작·종료한 경기가 '예정'으로 남지 않게(W4-V13).
  */
 export function leagueFixturePhase(fixture: LeagueFixturePhaseInput, nowMs: number = Date.now()): MatchPhase {
-  if (fixture.status === 'cancelled') return 'cancelled';
+  if (fixture.status === 'cancelled' || fixture.gameState === 'CANCELLED') return 'cancelled';
   if (fixture.scoreHidden === true) return 'ended';
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') return 'ended';
   if (fixture.gameState === 'LIVE') return 'live';
   if (fixture.gameState === 'PAUSED') return 'paused';
+  if (fixture.gameState === 'ENDED') return 'awaiting_result';
   if (fixture.status === 'completed' || new Date(fixture.startAt).getTime() <= nowMs) return 'awaiting_result';
   return 'scheduled';
+}
+
+const PUBLIC_STATUS_GAME_STATE: Record<string, NonNullable<LeagueFixturePhaseInput['gameState']>> = {
+  scheduled: 'SCHEDULED',
+  live: 'LIVE',
+  ended: 'ENDED',
+  cancelled: 'CANCELLED',
+};
+
+/**
+ * 공개 경기 기록(`/fixtures/:id/record`)의 `status` 를 대진에 덧씌운다. 기록은 진행 중일 때 10초마다
+ * 새로 읽혀 대진 목록 응답보다 최신이라, 경기 상세는 이 값으로 단계를 정한다('live' 는 LIVE·PAUSED 둘 다).
+ */
+export function withPublicRecordGameState<T extends LeagueFixturePhaseInput>(fixture: T, recordStatus: string | undefined): T {
+  const gameState = recordStatus === undefined ? undefined : PUBLIC_STATUS_GAME_STATE[recordStatus];
+  return gameState === undefined ? fixture : { ...fixture, gameState };
 }
 
 export interface LeagueFixturePhaseCounts {

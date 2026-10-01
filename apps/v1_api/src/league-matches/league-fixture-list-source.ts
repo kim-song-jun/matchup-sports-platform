@@ -1,4 +1,4 @@
-import type { V1VisibilityMode } from '@prisma/client';
+import type { V1GameState, V1VisibilityMode } from '@prisma/client';
 import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { resolveIsForfeit } from './league-forfeit-result';
 
@@ -35,6 +35,7 @@ export type LeagueFixtureListRow = {
   status: string;
   game: {
     id: string;
+    state: V1GameState;
     currentOfficialRevisionId: string | null;
     visibilityPolicy: { mode: V1VisibilityMode } | null;
   } | null;
@@ -73,6 +74,11 @@ export type LeagueFixtureListItem = {
    * 구분되지 않아 화면이 '결과 대기' 라고 거짓말한다 — 결과는 확정돼 있고 공개만 안 될 뿐이다.
    */
   scoreHidden: boolean;
+  /**
+   * 경기(Game)의 진행 상태. 예정 시각보다 일찍 시작한 경기를 화면이 '예정'으로 읽지 않게 한다
+   * (W4-V13). 경기 상세가 404 인 `hidden` 정책에서는 진행 여부도 싣지 않는다(null).
+   */
+  gameState: V1GameState | null;
 };
 
 /**
@@ -97,8 +103,8 @@ export function toLeagueFixtureList(
     const fact = game === null ? undefined : factByGameId.get(game.id);
     // 확정된 사실이 있을 때만 "가렸다" 고 말한다 — 결과가 아직 없는 경기까지 `scoreHidden`
     // 으로 표시하면 화면이 "예정" 을 "점수 비공개" 로 바꿔 읽는다.
-    const scoreHidden =
-      fact !== undefined && hidesScore(game?.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+    const mode = effectivePublicVisibilityMode(game?.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+    const scoreHidden = fact !== undefined && hidesScore(mode);
     return {
       teamMatchId: fixture.id,
       title: fixture.title,
@@ -115,6 +121,7 @@ export function toLeagueFixtureList(
       // 가린 적이 없는 것과 같다.
       isForfeit: scoreHidden || fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
       scoreHidden,
+      gameState: game === null || mode === 'hidden' ? null : game.state,
     };
   });
 }
@@ -128,8 +135,7 @@ export function toLeagueFixtureList(
  * 주차 라벨과 '다음 경기' 강조가 이 배열의 길이·순서에서 파생되므로, 행을 빼면 같은 경기의
  * 주차가 보는 사람마다 달라진다.
  */
-function hidesScore(policyMode: V1VisibilityMode, publicLiveEnabled: boolean): boolean {
-  const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
+function hidesScore(mode: ReturnType<typeof effectivePublicVisibilityMode>): boolean {
   return mode === 'status_only' || mode === 'hidden';
 }
 
@@ -183,7 +189,7 @@ export const LEAGUE_FIXTURE_LIST_SELECT = {
   placeName: true,
   status: true,
   // `visibilityPolicy` 를 빼면 매퍼가 모드를 **볼 수 없어** 가려야 할 점수를 그대로 싣는다.
-  game: { select: { id: true, currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } } },
+  game: { select: { id: true, state: true, currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } } },
 } as const;
 
 /**

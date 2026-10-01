@@ -55,6 +55,14 @@ function consoleHref(leagueId: string, teamMatchId: string): string {
   return `/admin/live/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/operate`;
 }
 
+/**
+ * 서버가 대진 취소·팀 제외·재생성을 409 LEAGUE_FIXTURE_GAME_IN_PROGRESS 로 막는 조건과 같다 —
+ * 아직 취소되지 않은 대진의 경기가 뛰는 중이다. 화면은 같은 조건에서 버튼을 미리 막고 이유를 적는다.
+ */
+function isFixtureGameInProgress(fixture: V1LeagueFixture): boolean {
+  return fixture.status !== 'cancelled' && (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED');
+}
+
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
@@ -246,6 +254,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const fixtureNameOf = (fixture: V1LeagueFixture) =>
     `${matchupLabelOf(fixture)} ${formatKstDateShort(fixture.startAt)} ${formatKstTime(fixture.startAt)}`;
   const nextAction = pickLeagueNextAction(series.fixtures);
+  const inProgressFixtures = series.fixtures.filter(isFixtureGameInProgress);
+  const teamIdsWithGameInProgress = new Set(inProgressFixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]));
 
   /**
    * 행의 ⋯ 시트 항목. 일정 수정·몰수패·취소는 표에서 물러나 여기 모였다. 결과 항목은 **결과가 있는
@@ -289,11 +299,14 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         },
       });
     }
+    const gameInProgress = isFixtureGameInProgress(row);
     actions.push({
       key: 'cancel',
       label: '대진 취소',
       description: '이 경기를 순위 집계에서 빼요. 되돌릴 수 없어요',
       destructive: true,
+      disabled: gameInProgress,
+      disabledReason: gameInProgress ? '경기가 진행 중이에요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요' : null,
       onSelect: () => {
         setMenuFixture(null);
         setCancelTarget(row);
@@ -1046,8 +1059,16 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   <button
                     type="button"
                     aria-label={`${team.name} 제외`}
-                    disabled={removeTeam.isPending || (teamsData?.teams.length ?? 0) <= 2}
-                    title={(teamsData?.teams.length ?? 0) <= 2 ? '리그는 팀이 2개 이상이어야 해요' : undefined}
+                    disabled={
+                      removeTeam.isPending || (teamsData?.teams.length ?? 0) <= 2 || teamIdsWithGameInProgress.has(team.teamId)
+                    }
+                    title={
+                      (teamsData?.teams.length ?? 0) <= 2
+                        ? '리그는 팀이 2개 이상이어야 해요'
+                        : teamIdsWithGameInProgress.has(team.teamId)
+                          ? '이 팀의 경기가 진행 중이에요'
+                          : undefined
+                    }
                     onClick={() => setRemoveTarget({ teamId: team.teamId, teamName: team.name })}
                     className="flex min-h-[44px] min-w-[44px] items-center justify-center disabled:opacity-40"
                   >
@@ -1056,6 +1077,11 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 </li>
               ))}
             </ul>
+            {inProgressFixtures.length > 0 ? (
+              <p className="mb-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                경기가 진행 중인 팀은 콘솔의 ‘몰수·중단으로 종료’로 경기를 먼저 끝낸 뒤 제외할 수 있어요.
+              </p>
+            ) : null}
             <label htmlFor="league-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
               팀 추가
             </label>
@@ -1178,13 +1204,18 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   <button
                     type="button"
                     onClick={() => setRegenerateModalOpen(true)}
-                    disabled={!hasLeagueStartsOn}
+                    disabled={!hasLeagueStartsOn || inProgressFixtures.length > 0}
                     className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors disabled:opacity-50"
                   >
                     대진 재생성
                   </button>
                 </div>
                 {!hasLeagueStartsOn && <MissingStartsOnNotice />}
+                {inProgressFixtures.length > 0 ? (
+                  <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
+                    진행 중인 경기가 있어 대진을 다시 만들 수 없어요. 콘솔의 ‘몰수·중단으로 종료’로 먼저 끝내 주세요.
+                  </p>
+                ) : null}
                 <div className="mt-3 flex flex-col gap-3">
                   <TimingSuggestionRow
                     suggestion={timingSuggestion}

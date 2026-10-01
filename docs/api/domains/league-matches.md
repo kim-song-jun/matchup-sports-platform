@@ -40,7 +40,11 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (which is where `PUBLIC_LIVE=off` lands a `live` policy) keeps the
   confirmed score. `scoreHidden` is `true` only when an official result
   exists and is being withheld; a fixture that has not been played yet
-  reports `false`. Standings keep counting the official facts.
+  reports `false`. Standings keep counting the official facts. Each fixture
+  also carries `gameState` (`SCHEDULED|LIVE|PAUSED|ENDED|CANCELLED`) — `null`
+  when there is no game or the effective visibility is `hidden` — so a match
+  that kicked off before its scheduled time reads as live, not upcoming
+  (Task 180 W4-V13).
 - `GET /api/v1/league-matches/:leagueId/standings` returns standings and
   fixtures.
 - `GET /api/v1/admin/league-matches/:leagueId` 의 각 `fixtures[]` 는 결과 진행 단계 `resultStage` 와 별개로 경기(Game)의
@@ -49,3 +53,20 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual` creates one
   fixture with `homeTeamId`, `awayTeamId`, `startsAt`, and optional
   `durationMinutes`, `placeName`, and `title`.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel`
+  (`{ reason }`) cancels one fixture; an already-cancelled fixture returns
+  `alreadyProcessed: true`. A fixture whose game is in progress (`LIVE` or
+  `PAUSED`) returns `409 LEAGUE_FIXTURE_GAME_IN_PROGRESS` — the game would
+  otherwise stay running with no way to end it. End it from the live console
+  (forfeit/abandon end) first. Scheduled and ended games stay cancellable
+  (ended ones for result corrections). The admin fixture table disables the
+  cancel action on the same condition.
+- The two other paths that cancel fixtures apply the same rule to every
+  not-yet-cancelled fixture they would cancel, with the same
+  `409 LEAGUE_FIXTURE_GAME_IN_PROGRESS` and nothing changed:
+  `DELETE /api/v1/admin/league-matches/:leagueId/teams/:teamId` (team removal —
+  that team's fixtures) and
+  `POST /api/v1/admin/league-matches/:leagueId/fixtures/regenerate` (all
+  fixtures). Already-cancelled fixtures are skipped, so an orphaned live game
+  on a cancelled fixture does not block them. The admin screen disables the
+  team's remove button and the regenerate button on the same condition.

@@ -749,6 +749,12 @@ export class LeagueMatchAdminService {
         });
       }
 
+      await this.assertFixtureGamesNotInProgress(
+        tx,
+        freshTeamFixtures.filter((fixture) => fixture.status !== 'cancelled').map((fixture) => fixture.id),
+        "이 팀의 경기가 진행 중이에요. 운영 콘솔의 '몰수·중단으로 종료'로 먼저 끝낸 뒤 제외해 주세요.",
+      );
+
       let cancelled = 0;
       // 그룹 B 감사 결함 4: 취소되는 대진마다 상대 팀(들)에게 알려야 하므로, 취소 후처리
       // (cascadeCancelFixtureInTx)와 별개로 알림 발송에 필요한 최소 필드를 tx 밖으로
@@ -885,6 +891,7 @@ export class LeagueMatchAdminService {
   // C-4/R8 배경: 공식 결과가 확정된 대진도 취소할 수 있어야 오심·오입력 정정이 가능하므로
   // status와 무관하게 허용한다 — league-match-public.service.ts의 standings()가 status==
   // 'cancelled'를 결과 존재 여부와 무관하게 전부 제외하도록 이미 뒤집혀 있다(Wave 1).
+  // 예외는 경기가 진행 중일 때 하나다(assertFixtureGamesNotInProgress).
   async cancelFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: CancelLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId } });
@@ -903,6 +910,11 @@ export class LeagueMatchAdminService {
     }
 
     const { cancelledApplications, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
+      await this.assertFixtureGamesNotInProgress(
+        tx,
+        [teamMatchId],
+        "경기가 진행 중이에요. 운영 콘솔의 '몰수·중단으로 종료'로 먼저 끝낸 뒤 취소해 주세요.",
+      );
       await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: { status: 'cancelled', cancelledAt: new Date() },
@@ -1005,6 +1017,12 @@ export class LeagueMatchAdminService {
           message: '공식 결과가 확정된 대진이 있어 대진을 다시 만들 수 없어요.',
         });
       }
+
+      await this.assertFixtureGamesNotInProgress(
+        tx,
+        existingFixtures.filter((fixture) => fixture.status !== 'cancelled').map((fixture) => fixture.id),
+        "진행 중인 경기가 있어요. 운영 콘솔의 '몰수·중단으로 종료'로 먼저 끝낸 뒤 대진을 다시 만들어 주세요.",
+      );
 
       let cancelledCount = 0;
       // 그룹 B 감사 결함 4: 재생성으로 취소되는 옛 대진도 알림 대상이다 — 아래 notifyFixturesScheduled는
@@ -1736,6 +1754,25 @@ export class LeagueMatchAdminService {
       ),
     );
     return { ids, placeName };
+  }
+
+  /**
+   * 진행 중(LIVE·PAUSED)인 경기의 대진은 취소하지 않는다 — 단건 취소·팀 제외·재생성 셋 다. 대진 취소는
+   * 게임을 건드리지 않아 뛰던 경기가 진행 중으로 남는다(W4-V14). 진행 중 경기는 콘솔의 몰수·중단 종료로
+   * 먼저 끝낸다. 끝난 경기는 정정용 취소(C-4/R8)를 위해 그대로 열어 둔다. 콘솔 명령과 같은 게임 행 락을
+   * 잡아, 먼저 들어온 시작이 커밋되기 전에 취소가 "시작 전" 으로 읽고 지나가지 않게 한다.
+   */
+  private async assertFixtureGamesNotInProgress(
+    tx: Prisma.TransactionClient,
+    teamMatchIds: readonly string[],
+    message: string,
+  ): Promise<void> {
+    if (teamMatchIds.length === 0) return;
+    const games = await tx.$queryRaw<Array<{ state: string }>>`
+      SELECT state::text AS state FROM v1_games WHERE team_match_id = ANY(${teamMatchIds}::text[]) FOR UPDATE`;
+    if (games.some((game) => game.state === 'LIVE' || game.state === 'PAUSED')) {
+      throw new ConflictException({ code: 'LEAGUE_FIXTURE_GAME_IN_PROGRESS', message });
+    }
   }
 
   // cancelFixture()·regenerateFixtures() 공용 취소 후처리. team-matches.service.ts의

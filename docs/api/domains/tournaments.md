@@ -20,6 +20,8 @@ Public detail applies the D-06 visibility matrix (see `docs/api/domains/public-r
 
 `scoreHidden` means "confirmed but withheld", so it is `true` only when an official result exists. A fixture that has not been played yet reports `scoreHidden: false` -- it is not hidden, it simply has no result.
 
+Each `leagueFixtures[]` row also carries `gameState` (`SCHEDULED|LIVE|PAUSED|ENDED|CANCELLED`): `null` when the fixture has no game or its effective visibility is `hidden` (the match detail is a 404 there), otherwise the game's state even under `status_only`. Screens read it before the kickoff time so a match that started early is not shown as upcoming (Task 180 W4-V13).
+
 `PUBLIC_LIVE=off` demotes a `live` policy to `official_only`, which is not a gated state -- confirmed results stay visible while the kill-switch is off. Staff bypass is unchanged. Standings and overall aggregates are not gated.
 
 After bracket publication, each public `groups[].standings[]` row includes nullable `teamLogoUrl` from the registered team's current profile. Tournament detail and bracket clients render it through the shared team-avatar fallback contract, so a missing or failed image remains distinguishable without replacing valid saved logos.

@@ -790,3 +790,47 @@ describe('GamesService.confirmSideArrival', () => {
     expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
   });
 });
+
+// W4-V14 — 대진 취소는 게임을 건드리지 않는다. 열어 둔 콘솔이 취소된 대진의 경기를 시작하면 결과 없이
+// 진행 중으로 남으므로 시작에서 막는다.
+describe('GamesService start — 취소된 대진의 경기', () => {
+  function makeTx(teamMatchStatus: string) {
+    return {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tm-1',
+          tournamentId: 'league-1',
+          leagueId: 'league-1',
+          status: teamMatchStatus,
+          tournament: { kind: 'regular_league' },
+          league: { kind: 'regular_league' },
+          tournamentDetails: null,
+        }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-a' }),
+      },
+      v1GameSide: {
+        findMany: jest.fn().mockResolvedValue([
+          { sideKey: 'HOME', teamId: 'team-h' },
+          { sideKey: 'AWAY', teamId: 'team-a' },
+        ]),
+      },
+    };
+  }
+
+  function assertStartable(tx: ReturnType<typeof makeTx>) {
+    const service = new GamesService({} as never, {} as never, {} as never) as unknown as {
+      assertTournamentMatchStartable(tx: unknown, game: { id: string; sourceType: string; teamMatchId: string }): Promise<void>;
+    };
+    return service.assertTournamentMatchStartable(tx, { id: 'game-1', sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' });
+  }
+
+  it('취소된 대진이면 409 로 막는다', async () => {
+    await expect(assertStartable(makeTx('cancelled'))).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_CANCELLED' }),
+    });
+  });
+
+  it('양 팀이 확정된 매칭 대진은 그대로 시작할 수 있다', async () => {
+    await expect(assertStartable(makeTx('matched'))).resolves.toBeUndefined();
+  });
+});

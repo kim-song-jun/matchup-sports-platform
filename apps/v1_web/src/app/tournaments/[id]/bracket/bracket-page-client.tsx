@@ -335,6 +335,11 @@ function BracketEmpty({
   );
 }
 
+// 서버는 bare `/users/:id` 를 준다 — 프로필의 뒤로가기가 이 화면으로 돌아오도록 출처를 붙인다.
+function withProfileFrom(rows: readonly PublicTournamentPlayerRecordRow[] | undefined, from: string | null | undefined) {
+  return rows?.map((row) => ({ ...row, profileHref: withFromPath(row.profileHref, from) }));
+}
+
 /**
  * §B-6 — 이 화면에서 경기 일정도 볼 수 있게 한다. 탭으로 나눈 이유: "순위·대진표"와
  * "경기 일정"은 둘 다 화면 하나를 다 채울 만큼 정보량이 많아(특히 조별리그 대회는
@@ -346,11 +351,6 @@ function BracketEmpty({
  * 목적은 "다음 경기가 언제/어디서"이고, 순위·대진표는 결과가 쌓인 뒤에 보는
  * 정보라 첫 화면을 일정에 내줬다. 세그먼트 탭 나열 순서도 기본 탭과 같게 둔다.
  */
-// 서버는 bare `/users/:id` 를 준다 — 프로필의 뒤로가기가 이 화면으로 돌아오도록 출처를 붙인다.
-function withProfileFrom(rows: readonly PublicTournamentPlayerRecordRow[] | undefined, from: string | null | undefined) {
-  return rows?.map((row) => ({ ...row, profileHref: withFromPath(row.profileHref, from) }));
-}
-
 export function BracketScheduleTab({
   tournamentId,
   isRegularLeague = false,

@@ -31,7 +31,7 @@ export function TournamentApplicationGuideSection() {
   const steps = [
     {
       title: '팀 준비',
-      body: '팀밋 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장과 운영진이 진행할 수 있어요.',
+      body: '팀밋 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장·매니저가 진행할 수 있어요.',
     },
     {
       title: '팀 선택',
@@ -61,7 +61,7 @@ export function TournamentApplicationGuideSection() {
           이 대회는 팀 단위로 신청해요
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
-          팀장 또는 운영진이 팀을 선택해 신청하고, 입금 확인 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
+          팀장·매니저가 팀을 선택해 신청하고, 입금 확인 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
         </div>
         <ol style={{ display: 'grid', gap: 12, listStyle: 'none', margin: '16px 0 0', padding: 0 }}>
           {steps.map((step, index) => (

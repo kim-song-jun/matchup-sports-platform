@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { useV1TeamGameRoster, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
@@ -23,7 +23,14 @@ function isExpectedAbsence(error: unknown): boolean {
  * 출전 인원·빠진 사람 요약은 우리 팀 팀원 모두, "명단 조정"(빠른 선택 시트 ③)은 서버가 편집 가능하다고 한
  * 사람(팀장·매니저·운영자)에게만. 상대팀 명단은 여기서 다루지 않는다 — 공개 기록 본문의 라인업이 그 몫이다.
  */
-export function MatchTeamRosterCard({ team }: { team: MyMatchRosterTeam }) {
+export function MatchTeamRosterCard({
+  team,
+  footer,
+}: {
+  team: MyMatchRosterTeam;
+  /** 카드 맨 아래 한 줄 — 화면이 명단과 내 행을 보고 정한다(리그 경기 상세의 "내 기록 연결"). */
+  footer?: (context: { view: V1GameRosterView; viewerRow: V1GameRosterView['base'][number] | undefined }) => ReactNode;
+}) {
   if (team.status === 'none' || team.status === 'loading') return null;
   if (team.status === 'error') {
     if (isExpectedAbsence(team.error)) return null;
@@ -38,10 +45,20 @@ export function MatchTeamRosterCard({ team }: { team: MyMatchRosterTeam }) {
       </Card>
     );
   }
-  return <ResolvedRosterCard teamId={team.teamId} gameId={team.gameId} />;
+  return <ResolvedRosterCard teamId={team.teamId} gameId={team.gameId} viewerUserId={team.viewerUserId} footer={footer} />;
 }
 
-function ResolvedRosterCard({ teamId, gameId }: { teamId: string; gameId: string }) {
+function ResolvedRosterCard({
+  teamId,
+  gameId,
+  viewerUserId,
+  footer,
+}: {
+  teamId: string;
+  gameId: string;
+  viewerUserId: string;
+  footer?: Parameters<typeof MatchTeamRosterCard>[0]['footer'];
+}) {
   const roster = useV1TeamGameRoster(teamId, gameId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -117,6 +134,7 @@ function ResolvedRosterCard({ teamId, gameId }: { teamId: string; gameId: string
           setSheetOpen(true);
         }}
       />
+      {footer?.({ view: data, viewerRow: data.base.find((row) => row.userId === viewerUserId) })}
       {/* 시트는 늘 마운트해 둔다 — 저장 중 마감(409)으로 editable 이 꺼져도 시트가 그 안내를 보여 줘야 한다. */}
       <GameRosterQuickSheet
         open={sheetOpen}

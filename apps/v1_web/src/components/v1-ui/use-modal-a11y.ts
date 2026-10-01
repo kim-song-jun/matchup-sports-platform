@@ -188,6 +188,14 @@ export function useModalA11y<
     };
   }, [mounted]);
 
+  const focusFirstControl = () => {
+    const target =
+      initialFocusRef.current ??
+      dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
+      null;
+    target?.focus();
+  };
+
   // 열리면 첫 컨트롤로 포커스 이동 (미지정 시 패널 안 첫 focusable).
   // 60ms 는 마운트 트랜지션 뒤로 미루기 위한 것 — 그 사이 사용자가 패널 안 다른 필드를
   // 먼저 클릭해 타이핑을 시작했다면 되채가지 않는다(GateConfirmModal 에서 온 가드 —
@@ -196,14 +204,23 @@ export function useModalA11y<
     if (!open) return;
     const id = setTimeout(() => {
       if (dialogRef.current?.contains(document.activeElement)) return;
-      const target =
-        initialFocusRef.current ??
-        dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
-        null;
-      target?.focus();
+      focusFirstControl();
     }, 60);
     return () => clearTimeout(id);
   }, [open]);
+
+  // pending 동안 소비처가 컨트롤을 disabled 로 잠그면 브라우저가 포커스를 body 로 옮기고
+  // (focus fixup), 요청이 실패해 잠금이 풀려도 돌아오지 않는다 — body 에서는 트랩의
+  // first/last 비교가 안 걸려 Tab 이 창 밖으로 샌다. 포커스가 body 에 떨어져 있을 때만
+  // 되돌린다: 창 안이나 다른 오버레이에 있는 포커스는 건드리지 않는다.
+  const wasPendingRef = useRef(pending);
+  useEffect(() => {
+    const released = wasPendingRef.current && !pending;
+    wasPendingRef.current = pending;
+    if (!released || !open) return;
+    const active = document.activeElement;
+    if (active === null || active === document.body) focusFirstControl();
+  }, [pending]);
 
   // ESC·focus trap·스크롤 잠금은 모달이 **화면에 있는 동안**(mounted) 유지한다.
   // 닫히는 중에 풀리면 그 사이 키 입력이 뒤 화면으로 새고 배경이 스크롤된다.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
   useV1RemoveTeamContactBlock,
@@ -14,14 +15,26 @@ import { formatMonthDay } from '@/lib/date-utils';
 
 // 각 옵션에 한 줄 설명을 붙인다. 특히 recruiting_only 는 이름만으로는 "왜 컨택이 안 오지?" 를
 // 유발하기 쉬워서, 무엇을 기준으로 열리고 닫히는지 풀어 쓴다.
-const POLICY_OPTIONS: Array<{ value: V1ContactPolicy; label: string; description: string }> = [
-  { value: 'open', label: '항상 받기', description: '어느 팀이든 컨택을 보낼 수 있어요.' },
+// savedResult 는 즉시 저장 뒤 카드에 남기는 결과 한 줄이다.
+const POLICY_OPTIONS: Array<{ value: V1ContactPolicy; label: string; description: string; savedResult: string }> = [
+  {
+    value: 'open',
+    label: '항상 받기',
+    description: '어느 팀이든 컨택을 보낼 수 있어요.',
+    savedResult: '이제 어느 팀이든 컨택을 보낼 수 있어요.',
+  },
   {
     value: 'recruiting_only',
     label: '모집 중일 때만 받기',
     description: '경기 상대를 구하는 중일 때만 받아요.',
+    savedResult: '이제 경기 상대를 구하는 중일 때만 컨택을 받아요.',
   },
-  { value: 'closed', label: '받지 않기', description: '지금은 아무도 컨택을 보낼 수 없어요.' },
+  {
+    value: 'closed',
+    label: '받지 않기',
+    description: '지금은 아무도 컨택을 보낼 수 없어요.',
+    savedResult: '이제 다른 팀은 컨택을 보낼 수 없어요.',
+  },
 ];
 
 export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
@@ -30,6 +43,8 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
   const updatePolicy = useV1UpdateContactPolicy(teamId);
   const removeBlock = useV1RemoveTeamContactBlock(teamId);
   const [error, setError] = useState<string | null>(null);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [savedPolicy, setSavedPolicy] = useState<V1ContactPolicy | null>(null);
   const idPrefix = useId();
 
   // 정책의 진실은 팀 상세다 — PATCH 응답은 { id, contactPolicy } 만 돌려주므로 화면 상태를
@@ -37,15 +52,22 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
   const currentPolicy: V1ContactPolicy = teamQuery.data?.contactPolicy ?? 'open';
   const blocks = blocksQuery.data?.items ?? [];
   const blocksErrorCode = blocksQuery.isError ? extractErrorCode(blocksQuery.error) : null;
+  // 팀 상세가 새 값으로 다시 읽힌 뒤에만 알린다 — 라디오와 안내가 서로 다른 값을 말하지 않게.
+  const savedOption =
+    savedPolicy !== null && savedPolicy === currentPolicy
+      ? POLICY_OPTIONS.find((option) => option.value === savedPolicy)
+      : undefined;
 
   function handlePolicyChange(value: V1ContactPolicy) {
     if (value === currentPolicy) return;
-    setError(null);
+    setPolicyError(null);
+    setSavedPolicy(null);
     updatePolicy.mutate(
       { contactPolicy: value },
       {
+        onSuccess: () => setSavedPolicy(value),
         onError: (err) =>
-          setError(extractErrorMessage(err, '수신 설정을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')),
+          setPolicyError(extractErrorMessage(err, '수신 설정을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')),
       },
     );
   }
@@ -59,7 +81,16 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
   }
 
   return (
-      <div style={{ display: 'grid', gap: 12, padding: '12px 0 24px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gap: 12,
+          paddingTop: 12,
+          paddingBottom: 24,
+          paddingLeft: 'var(--v1-shell-page-x)',
+          paddingRight: 'var(--v1-shell-page-x)',
+        }}
+      >
         <Card>
           <div className="tm-text-heading">컨택 수신 설정</div>
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
@@ -86,7 +117,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
                     alignItems: 'center',
                     gap: 12,
                     padding: '12px 12px',
-                    borderRadius: 10,
+                    borderRadius: 'var(--radius-control)',
                     cursor: updatePolicy.isPending ? 'default' : 'pointer',
                     border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border)'}`,
                     background: selected ? 'var(--blue50)' : 'var(--surface)',
@@ -111,6 +142,25 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
               );
             })}
           </fieldset>
+          <div
+            role="status"
+            aria-live="polite"
+            style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 12, minHeight: 24, color: 'var(--green700)' }}
+          >
+            {savedOption ? (
+              <>
+                <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                <span className="tm-text-caption" style={{ color: 'var(--green700)', fontWeight: 600 }}>
+                  저장했어요. {savedOption.savedResult}
+                </span>
+              </>
+            ) : null}
+          </div>
+          {policyError ? (
+            <div role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
+              {policyError}
+            </div>
+          ) : null}
         </Card>
 
         <Card>
@@ -127,7 +177,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
             // 403 을 빈 목록으로 위장하면 안 된다 — 운영진이 아닌 사람에게 "차단한 팀이 없어요" 를
             // 보여주면 권한 문제를 데이터 없음으로 오해하고, 실제 차단이 있는데도 없는 줄 안다.
             blocksErrorCode === 'PERMISSION_DENIED' ? (
-              <EmptyState title="차단 목록을 볼 권한이 없어요" sub="팀장과 운영진만 볼 수 있어요." />
+              <EmptyState title="차단 목록을 볼 권한이 없어요" sub="팀장·매니저만 볼 수 있어요." />
             ) : (
               <EmptyState
                 title="차단 목록을 불러오지 못했어요"
@@ -189,7 +239,7 @@ export function TeamContactSettingsPageClient({ teamId }: { teamId: string }) {
         </Card>
 
         {error ? (
-          <div role="status" className="tm-text-caption" style={{ color: 'var(--red700)', padding: '0 4px' }}>
+          <div role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', padding: '0 4px' }}>
             {error}
           </div>
         ) : null}

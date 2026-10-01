@@ -13,6 +13,8 @@ interface ActionSheetActionBase {
   readonly description?: string;
   /** 되돌릴 수 없는 동작은 라벨을 빨강으로 낮춰 다른 행동과 구분한다. */
   readonly destructive?: boolean;
+  /** 묶음 이름 — 앞 항목과 다르면 이 항목 위에 소제목을 둔다(예: 되돌리기 어려운 동작을 따로 떼기). */
+  readonly groupLabel?: string;
 }
 
 export type ActionSheetAction =
@@ -35,6 +37,8 @@ export interface ActionSheetProps {
   readonly open: boolean;
   /** 시트 제목 겸 dialog 접근 이름. */
   readonly title: string;
+  /** 제목 아래 한 줄 — 누구·무엇에 대한 시트인지(역할·등번호 등). */
+  readonly subtitle?: string;
   readonly actions: readonly ActionSheetAction[];
   readonly onClose: () => void;
 }
@@ -50,7 +54,7 @@ const ROW_CLASS =
  * 아니라 다른 상태 기반 시트들처럼 `useModalA11y` 를 쓴다). 동작을 고르면 부모가 시트를 먼저
  * 닫아야 뒤이어 뜨는 확인 창과 겹치지 않는다 — 링크 항목은 `overlayLinkClick` 으로 이동하며 시트가 닫힌다.
  */
-export function ActionSheet({ open, title, actions, onClose }: ActionSheetProps) {
+export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionSheetProps) {
   const titleId = useId();
   const pathname = usePathname();
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open, onClose });
@@ -69,7 +73,7 @@ export function ActionSheet({ open, title, actions, onClose }: ActionSheetProps)
         aria-labelledby={titleId}
         className="flex max-h-[85vh] w-full max-w-[440px] flex-col rounded-t-2xl bg-[var(--card-surface)] p-5 sm:rounded-2xl"
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className={`flex items-center justify-between gap-2 ${subtitle ? '' : 'mb-3'}`}>
           <h2
             id={titleId}
             className="min-w-0 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]"
@@ -85,9 +89,15 @@ export function ActionSheet({ open, title, actions, onClose }: ActionSheetProps)
             <X size={18} aria-hidden="true" />
           </button>
         </div>
+        {subtitle ? (
+          <p className="mb-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{subtitle}</p>
+        ) : null}
         <ul className="flex flex-col gap-2 overflow-y-auto">
-          {actions.map((action) => (
+          {actions.map((action, index) => (
             <li key={action.key}>
+              {action.groupLabel && action.groupLabel !== actions[index - 1]?.groupLabel ? (
+                <p className="mb-2 mt-2 text-[length:var(--font-size-caption)] font-bold text-[var(--text-muted)]">{action.groupLabel}</p>
+              ) : null}
               {action.href !== undefined ? (
                 // 오버레이 안 링크는 일반 push 가 아니라 이 경로로 이동한다 — 시트의 뒤로가기 표식 항목이 새
                 // 페이지 앞에 남아 다음 뒤로가기가 죽은 정류장에 서는 것을 막는다.

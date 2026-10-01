@@ -85,13 +85,13 @@ describe('취소된 팀매치 상세 (L31)', () => {
     expect(screen.queryByRole('button', { name: /채팅/ })).not.toBeInTheDocument();
   });
 
-  it('대조군 — 취소가 아닌 호스트 화면은 "매치 관리" 링크와 채팅을 그대로 가진다', () => {
+  it('대조군 — 취소가 아닌 호스트 화면은 "매치 수정" 링크와 채팅을 그대로 가진다', () => {
     const model = getTeamMatchDetailViewModel('mine');
-    model.applyLabel = '매치 관리';
+    model.nextAction = { label: '매치 수정', href: '/team-matches/team-match-1/edit', tone: 'neutral' };
     model.onChat = vi.fn();
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    expect(screen.getAllByRole('link', { name: '매치 관리' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: '매치 수정' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /채팅/ }).length).toBeGreaterThan(0);
     expect(screen.queryByText('이 팀매치는 취소되어 진행되지 않아요.')).not.toBeInTheDocument();
   });
@@ -1075,7 +1075,7 @@ describe('상세 CTA 상태줄 — 신청한 적 없는 뷰어의 닫힌 매치�
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    // 히어로 sub(상대팀 없음 → '모집 마감' 라벨 + statusLabel sub)는 그대로 보여야 한다.
+    // 히어로(상대팀 없음 → '모집 마감' 라벨 + 매치 상태 배지)는 그대로 보여야 한다.
     expect(screen.getByText('모집 마감')).toBeInTheDocument();
     // 하단 바 캡션("신청 상태")은 사라지고, statusLabel 값도 딱 한 번만(히어로에서만) 보인다.
     expect(screen.queryByText('신청 상태')).not.toBeInTheDocument();
@@ -1179,31 +1179,60 @@ describe('상세 홈팀 카드·히어로 — 표기 결함 회귀(2026-08-25)',
   });
 });
 
-describe('TeamMatchDetailPageView — 매치 관리 명단 행 (Task 179)', () => {
-  it('친선은 참석명단 관리가 첫 할 일(primary)이다', () => {
+// H6 A-3: 예전 "매치 관리" 카드는 상대 확정 뒤 진행 체크리스트로 합쳐졌다 — 명단·결과 입구가 행 링크다.
+describe('TeamMatchDetailPageView — 진행 체크리스트의 명단 행 (Task 179 · H6 A-3)', () => {
+  const progress = { opponentName: '한강 로버스', confirmedAtLabel: '오늘 19:05', lineupSubmitted: false, lockNote: null };
+
+  it('친선은 참석명단 행이 제출 여부를 말하고 명단 화면으로 간다', () => {
     const model = getTeamMatchDetailViewModel('mine');
+    model.progress = progress;
     model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    const link = screen.getByRole('link', { name: '참석명단 관리' });
-    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/lineup');
-    expect(link).toHaveClass('tm-btn-primary');
+    const row = screen.getByRole('link', { name: /참석명단 제출/ });
+    expect(row).toHaveAttribute('href', '/team-matches/team-match-1/lineup');
+    expect(row).toHaveTextContent('제출 전');
+    expect(screen.queryByText('매치 관리')).not.toBeInTheDocument();
   });
 
-  it('리그 경기 명단은 제출 문구 없이 조정 입구만 두고, 결과 행에 primary 를 양보한다', () => {
+  // H5 D-1 의 "참석명단" 카드는 이 칸 안으로 들어왔다 — 우리 제출은 칸 한 줄, 상대 명단은 그 아래 한 줄.
+  it('참석명단 칸이 우리 인원과 상대 명단 상태를 함께 말하고, 공개된 상대 명단만 [보기]로 연다', () => {
     const model = getTeamMatchDetailViewModel('mine');
+    const opponent = { name: '합정 유나이티드', badge: { tone: 'blue' as const, label: '공개됨 · 6명' }, note: '오후 8:00에 공개됐어요', viewHref: '/team-matches/team-match-1/lineup/opponent' };
+    model.progress = { ...progress, lineupSubmitted: true, attendance: { ownCount: 7, opponent } };
+    model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
+
+    const { unmount } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByRole('link', { name: /참석명단 제출/ })).toHaveTextContent('제출 완료 · 7명');
+    expect(screen.getByText('공개됨 · 6명')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '상대 참석명단 보기' })).toHaveAttribute('href', '/team-matches/team-match-1/lineup/opponent');
+    // 우리 제출 상태는 칸 한 곳에서만 말한다.
+    expect(screen.getAllByText(/제출 완료/)).toHaveLength(1);
+
+    model.progress = { ...model.progress, attendance: { ownCount: 7, opponent: { ...opponent, badge: { tone: 'green', label: '제출 완료' }, note: '명단은 오후 8:00에 서로 공개돼요 · 지금은 제출 여부만 보여요', viewHref: null } } };
+    unmount();
+    renderPage(<TeamMatchDetailPageView model={model} />);
+    expect(screen.getByText('명단은 오후 8:00에 서로 공개돼요 · 지금은 제출 여부만 보여요')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '상대 참석명단 보기' })).not.toBeInTheDocument();
+  });
+
+  it('리그 경기 명단은 제출 문구 없이 참가 명단 기준으로 두고, 조정 화면으로만 간다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.progress = { ...progress, lineupSubmitted: null };
     model.lineupAction = { kind: 'match-roster', href: '/teams/team-host/games/game-1/roster' };
     model.resultAction = { label: '경기 결과 보기', href: '/team-matches/team-match-1/result' };
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    const link = screen.getByRole('link', { name: '명단 조정' });
-    expect(link).toHaveAttribute('href', '/teams/team-host/games/game-1/roster');
-    expect(link).toHaveClass('tm-btn-outline');
-    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveClass('tm-btn-primary');
-    expect(screen.queryByText(/제출하세요/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '참석명단 관리' })).not.toBeInTheDocument();
+    const row = screen.getByRole('link', { name: /경기 명단/ });
+    expect(row).toHaveAttribute('href', '/teams/team-host/games/game-1/roster');
+    expect(row).toHaveTextContent('참가 명단 기준');
+    expect(screen.queryByText(/제출/)).not.toBeInTheDocument();
+    // 경기 전에는 결과 행이 열리지 않는다 — 링크가 아니라 안내다.
+    expect(screen.queryByRole('link', { name: /경기 결과 기록/ })).not.toBeInTheDocument();
+    expect(screen.getByText('경기 후에 열려요')).toBeInTheDocument();
   });
 });
 
@@ -1252,10 +1281,22 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
   it('신청팀이 없으면 빈 카드 대신 현재 상태를 설명한다', () => {
     const model = getTeamMatchDetailViewModel('mine');
     model.match.applicantTeams = [];
+    model.match.apiStatus = 'recruiting';
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '아직 신청한 팀이 없어요' })).toBeInTheDocument();
+  });
+
+  it('신청 목록을 받는 중이면 "신청 없음"을 먼저 말하지 않는다 — 알림으로 들어온 호스트가 잘못 읽는다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.applicantTeams = [];
+    model.match.apiStatus = 'recruiting';
+    model.applicationsPending = true;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('아직 신청한 팀이 없어요')).not.toBeInTheDocument();
   });
 
   // MD-QA #16: 생성팀 계정에서 상대팀 승인 완료 후에도 상세 상단이 실제 팀명 대신
@@ -1276,9 +1317,10 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
     expect(screen.queryByText('승인 후 확정')).not.toBeInTheDocument();
   });
 
-  it('상세의 팀매치 취소는 확인 전에는 실행하지 않는다', async () => {
+  it('⋯ 메뉴의 팀매치 취소는 확인 전에는 실행하지 않는다', async () => {
     const onCancel = vi.fn();
     const model = getTeamMatchDetailViewModel('mine');
+    model.manageMenu = { edit: { href: '/team-matches/team-match-1/edit' }, history: [] };
     model.hostActions = [{
       label: '팀매치 취소',
       tone: 'danger',
@@ -1291,12 +1333,17 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
     }];
 
     renderPage(<TeamMatchDetailPageView model={model} />);
-    fireEvent.click(screen.getByRole('button', { name: '팀매치 취소' }));
+    // 본문에는 취소 버튼이 없다(빨강 채움 제거) — ⋯ 메뉴 안에만 있다.
+    expect(screen.queryByRole('button', { name: /팀매치 취소/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: /팀매치 취소/ }));
 
     expect(onCancel).not.toHaveBeenCalled();
     const dialog = await screen.findByRole('dialog', { name: '팀매치를 취소할까요?' });
     fireEvent.click(within(dialog).getByRole('button', { name: '팀매치 취소' }));
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+    // 확정하면 메뉴 시트도 닫힌다.
+    expect(screen.queryByRole('dialog', { name: '매치 관리' })).not.toBeInTheDocument();
   });
 });
 
@@ -1307,7 +1354,7 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
 describe('팀매치 상세 히어로 CTA — 안내와 실제 동작', () => {
   it('신청 중인데 실행할 액션이 없으면 CTA가 눌리지 않는다', () => {
     const model = getTeamMatchDetailViewModel('pending');
-    const label = '팀 운영진만 취소할 수 있어요';
+    const label = '팀장·매니저만 취소할 수 있어요';
     model.applyLabel = label;
     model.onApply = undefined;
 
@@ -1506,5 +1553,317 @@ describe('TeamMatchListPageView completed card', () => {
     expect(screen.getByText('경기 종료')).toBeInTheDocument();
     expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
+  });
+});
+
+// H6 A안 — 상세 맨 위 "지금 할 일" 카드. 호스트는 그 자리에서 승인·거절하고(확인 창 N-2), 신청 팀은
+// 히어로 "우리 팀" 과 승인 대기 카드를, 상대 확정 뒤에는 양쪽이 진행 체크리스트를 본다.
+describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
+  type Applicant = ReturnType<typeof getTeamMatchDetailViewModel>['match']['applicantTeams'][number];
+  const applicant = (name: string, extra: Partial<Applicant> = {}): Applicant => ({
+    name,
+    meta: '팀 평점 4.5 · 3승',
+    status: '승인 대기',
+    applicationStatus: 'requested',
+    applicationId: `app-${name}`,
+    href: `/teams/${name}`,
+    appliedByName: `${name} 팀장`,
+    appliedAtLabel: '오늘 18:41',
+    onApprove: vi.fn(),
+    onReject: vi.fn(),
+    ...extra,
+  });
+  function hostModel(teams: Applicant[]) {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.apiStatus = 'recruiting';
+    model.match.applicantTeams = teams;
+    return model;
+  }
+
+  it('호스트 — 신청 수가 히어로와 카드 맨 위에 보이고, 승인은 주 버튼·거절은 글자 버튼이다', () => {
+    const model = hostModel([applicant('합정', { message: '저녁 경기 좋아요.' }), applicant('성수'), applicant('처리됨', { applicationStatus: 'rejected', status: '거절', onApprove: undefined, onReject: undefined })]);
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(within(container.querySelector<HTMLElement>('.tm-team-vs-row')!).getByText('신청 2팀 대기')).toBeInTheDocument();
+    const card = screen.getByRole('region', { name: '신청 2팀이 승인을 기다려요' });
+    expect(within(card).getByText('지금 할 일')).toBeInTheDocument();
+    expect(within(card).getByText('“저녁 경기 좋아요.”')).toBeInTheDocument();
+    expect(within(card).getByText('합정 팀장 · 오늘 18:41 신청')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '합정 신청 승인' })).toHaveClass('tm-btn-primary');
+    expect(within(card).getByRole('button', { name: '합정 신청 거절' })).toHaveClass('tm-btn-ghost');
+    // 처리된 신청은 할 일이 아니다.
+    expect(within(card).queryByText('처리됨')).not.toBeInTheDocument();
+  });
+
+  it('승인은 확인 창을 거치고, 나머지 신청 팀이 자동 종료된다고 이름까지 알린다', async () => {
+    const hapjeong = applicant('합정');
+    renderPage(<TeamMatchDetailPageView model={hostModel([hapjeong, applicant('성수')])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '합정 신청 승인' }));
+    expect(hapjeong.onApprove).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: '합정을 상대팀으로 확정할까요?' });
+    expect(dialog).toHaveTextContent('확정하면 되돌릴 수 없어요. 나머지 신청 1팀(성수)은 자동으로 종료되고 알림이 가요.');
+    fireEvent.click(within(dialog).getByRole('button', { name: '승인하기' }));
+    await waitFor(() => expect(hapjeong.onApprove).toHaveBeenCalledTimes(1));
+  });
+
+  it('신청이 1팀이면 확인 창에 자동 종료 문장이 없다', async () => {
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('합정')])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '합정 신청 승인' }));
+    const dialog = await screen.findByRole('dialog', { name: '합정을 상대팀으로 확정할까요?' });
+    expect(dialog).toHaveTextContent('확정하면 되돌릴 수 없어요.');
+    expect(dialog).not.toHaveTextContent('나머지');
+  });
+
+  it('거절도 확인 창을 거치고 닫기를 누르면 아무 일도 없다', async () => {
+    const seongsu = applicant('성수');
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('합정'), seongsu])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '성수 신청 거절' }));
+    const dialog = await screen.findByRole('dialog', { name: '성수 신청을 거절할까요?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '성수 신청을 거절할까요?' })).not.toBeInTheDocument());
+    expect(seongsu.onReject).not.toHaveBeenCalled();
+  });
+
+  it('시작 시각이 지나 승인할 수 없는 신청만 남으면 승인을 약속하지 않고, 거절만 열어 둔다', () => {
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('합정', { onApprove: undefined }), applicant('성수', { onApprove: undefined })])} />);
+
+    const card = screen.getByRole('region', { name: '신청 2팀이 대기 중이에요' });
+    expect(card).toHaveTextContent('경기 시작 시각이 지나서 승인할 수 없어요. 거절하면 신청 팀에 알림이 가요.');
+    expect(card).not.toHaveTextContent(/승인을 기다려요|승인하면/);
+    expect(within(card).queryByRole('button', { name: '합정 신청 승인' })).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '합정 신청 거절' })).toBeInTheDocument();
+  });
+
+  it('신청 목록 조회가 실패하면 "신청 없음"이 아니라 실패를 말하고, 히어로도 신청 수를 지어내지 않는다', () => {
+    const retry = vi.fn();
+    const model = hostModel([]);
+    model.applicationsError = { retry };
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('아직 신청한 팀이 없어요')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-team-vs-row')).not.toHaveTextContent('신청 후 승인');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('신청 목록을 불러오지 못했어요');
+    expect(alert).toHaveTextContent('대기 중인 신청이 있을 수 있어요.');
+    fireEvent.click(within(alert).getByRole('button', { name: '다시 불러오기' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('대조군 — 조회에 성공했고 대기 신청이 0건이면 "아직 신청한 팀이 없어요"', () => {
+    const { container } = renderPage(<TeamMatchDetailPageView model={hostModel([])} />);
+
+    expect(screen.getByRole('region', { name: '아직 신청한 팀이 없어요' })).toBeInTheDocument();
+    expect(within(container.querySelector<HTMLElement>('.tm-team-vs-row')!).getByText('신청 후 승인')).toBeInTheDocument();
+    expect(screen.queryByText('신청 목록을 불러오지 못했어요')).not.toBeInTheDocument();
+  });
+
+  it('신청이 3팀 이상이면 2팀만 펼치고 나머지는 더 보기로 연다', () => {
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('A'), applicant('B'), applicant('C')])} />);
+
+    expect(screen.queryByRole('button', { name: 'C 신청 승인' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '신청 1팀 더 보기' }));
+    expect(screen.getByRole('button', { name: 'C 신청 승인' })).toBeInTheDocument();
+  });
+
+  it('신청 팀 — 히어로 상대팀 자리에 우리 팀과 승인 대기가 보이고, 신청 취소는 중립 톤이다', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    model.myApplicationTeam = { teamId: 'team-hapjeong', name: '합정 유나이티드' };
+    model.applyLabel = '합정 유나이티드 신청 취소';
+    model.onApply = vi.fn();
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('우리 팀')).toBeInTheDocument();
+    expect(hero.getByText('합정 유나이티드')).toBeInTheDocument();
+    expect(hero.getByText('승인 대기')).toBeInTheDocument();
+    const card = screen.getByRole('region', { name: '신청을 접수했어요' });
+    expect(card).toHaveTextContent('홈팀이 승인하면 채팅과 참석명단이 열려요.');
+    for (const button of screen.getAllByRole('button', { name: '합정 유나이티드 신청 취소' })) {
+      expect(button).toHaveClass('tm-btn-neutral');
+      expect(button).not.toHaveClass('tm-btn-warning');
+    }
+  });
+
+  it('제3자 — 할 일 카드도 관리 메뉴도 없다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.apiStatus = 'recruiting';
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('지금 할 일')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '매치 관리 메뉴' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageView — 매칭 뒤 진행 카드와 ⋯ 메뉴 (H6 A-3·manage-menu)', () => {
+  function matchedHostModel() {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.apiStatus = 'matched';
+    model.match.applicantTeams = [{ name: '합정 유나이티드', meta: '', status: '승인 완료', applicationStatus: 'approved', href: '/teams/hapjeong' }];
+    model.onChat = vi.fn();
+    model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
+    model.progress = { opponentName: '합정 유나이티드', confirmedAtLabel: '오늘 19:05', lineupSubmitted: false, lockNote: '시간·장소는 상대팀이 정해진 뒤에는 바꿀 수 없어요. 바꿔야 하면 채팅으로 상의해요.' };
+    model.nextAction = { label: '참석명단 관리', href: '/team-matches/team-match-1/lineup', tone: 'primary' };
+    model.statusCaption = '경기 준비';
+    model.statusLabel = '참석명단 제출 전';
+    model.manageMenu = {
+      edit: { lockedReason: '상대팀이 정해져서 바꿀 수 없어요. 바꿔야 하면 채팅으로 상의해요.' },
+      history: [
+        { key: 'a', name: '합정 유나이티드', statusLabel: '승인 완료', timeLabel: '오늘 19:05' },
+        { key: 'b', name: '성수 FC', statusLabel: '자동 종료', timeLabel: '오늘 19:05' },
+      ],
+    };
+    model.hostActions = [{ label: '팀매치 취소', description: '취소하면 합정 유나이티드에 알림이 가요.', tone: 'danger', onClick: vi.fn() }];
+    return model;
+  }
+
+  it('호스트는 상대·진행 단계·수정 잠금 이유를 한 카드에서 보고, 하단 바는 참석명단 관리가 된다', () => {
+    renderPage(<TeamMatchDetailPageView model={matchedHostModel()} />);
+
+    const card = screen.getByRole('region', { name: '합정 유나이티드와 경기해요' });
+    expect(within(card).getByText('상대팀 확정', { selector: '.tm-badge' })).toBeInTheDocument();
+    expect(within(card).getByText('오늘 19:05')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: /참석명단 제출/ })).toHaveTextContent('제출 전');
+    expect(card).toHaveTextContent('시간·장소는 상대팀이 정해진 뒤에는 바꿀 수 없어요.');
+    const barLinks = screen.getAllByRole('link', { name: '참석명단 관리' });
+    expect(barLinks.length).toBeGreaterThan(0);
+    for (const link of barLinks) expect(link).toHaveClass('tm-btn-primary');
+    expect(screen.getAllByText('경기 준비').length).toBeGreaterThan(0);
+  });
+
+  it('⋯ 메뉴 — 매칭 뒤엔 수정 대신 잠긴 이유, 신청 기록 요약과 펼침, 취소 결과 안내를 보여 준다', async () => {
+    renderPage(<TeamMatchDetailPageView model={matchedHostModel()} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    const menu = await screen.findByRole('dialog', { name: '매치 관리' });
+    expect(within(menu).queryByRole('link', { name: /정보 수정/ })).not.toBeInTheDocument();
+    expect(menu).toHaveTextContent('상대팀이 정해져서 바꿀 수 없어요.');
+    const history = within(menu).getByRole('button', { name: /신청 기록/ });
+    expect(history).toHaveTextContent('승인 완료 1팀 · 자동 종료 1팀');
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(history);
+    expect(within(menu).getByText('성수 FC')).toBeInTheDocument();
+    expect(within(menu).getByRole('button', { name: /팀매치 취소/ })).toHaveTextContent('취소하면 합정 유나이티드에 알림이 가요.');
+  });
+
+  it('⋯ 메뉴 — 모집 중이면 정보 수정이 링크이고, 신청 기록이 없으면 그 행이 없다', async () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.apiStatus = 'recruiting';
+    model.manageMenu = { edit: { href: '/team-matches/team-match-1/edit' }, history: [] };
+    model.hostActions = [{ label: '모집 마감', description: '대기 중인 신청 2팀이 종료돼요.', tone: 'neutral', onClick: vi.fn() }];
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '매치 관리 메뉴' })[0]);
+    const menu = await screen.findByRole('dialog', { name: '매치 관리' });
+    expect(within(menu).getByRole('link', { name: /정보 수정/ })).toHaveAttribute('href', '/team-matches/team-match-1/edit');
+    expect(within(menu).queryByRole('button', { name: /신청 기록/ })).not.toBeInTheDocument();
+    expect(within(menu).getByRole('button', { name: /모집 마감/ })).toHaveTextContent('대기 중인 신청 2팀이 종료돼요.');
+  });
+
+  it('상대가 확정된 참가팀(신청 팀 쪽)도 같은 자리에서 진행 상황을 본다 — 호스트용 잠금 안내는 없다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.progress = { opponentName: '마포 FC', confirmedAtLabel: null, lineupSubmitted: true, lockNote: null };
+    model.lineupAction = { kind: 'attendance', href: '/team-matches/team-match-1/lineup' };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const card = screen.getByRole('region', { name: '마포 FC와 경기해요' });
+    expect(within(card).getByRole('link', { name: /참석명단 제출/ })).toHaveTextContent('제출 완료');
+    expect(card).not.toHaveTextContent('바꿀 수 없어요');
+    expect(screen.queryByRole('button', { name: '매치 관리 메뉴' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시트 (H6 N-1)', () => {
+  it('신청 버튼이 팀 선택 시트를 열고, 고른 팀과 한마디로 신청한다', async () => {
+    const submit = vi.fn(async () => ({ status: 'requested' }));
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.applyTeamPicker = {
+      teams: [
+        { teamId: 'a', name: '합정 유나이티드', roleLabel: '팀장', eligible: true, reason: null },
+        { teamId: 'b', name: '성수 FC', roleLabel: '매니저', eligible: true, reason: null },
+        { teamId: 'c', name: '망원 축구단', roleLabel: '팀장', eligible: false, reason: '이 팀매치와 종목이 다른 팀이에요' },
+      ],
+      defaultTeamId: 'b',
+      submit,
+    };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    const sheet = await screen.findByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+    expect(within(sheet).getByRole('radio', { name: /성수 FC/ })).toBeChecked();
+    expect(within(sheet).getByRole('radio', { name: /망원 축구단/ })).toBeDisabled();
+    expect(sheet).toHaveTextContent('이 팀매치와 종목이 다른 팀이에요');
+
+    fireEvent.click(within(sheet).getByRole('radio', { name: /합정 유나이티드/ }));
+    fireEvent.change(within(sheet).getByLabelText(/홈팀에 한마디/), { target: { value: '  저녁 경기 좋아요.  ' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: '합정 유나이티드로 신청하기' }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledWith('a', '저녁 경기 좋아요.'));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '어느 팀으로 신청할까요?' })).not.toBeInTheDocument());
+  });
+
+  it('신청이 실패하면 시트를 닫지 않고 이유를 보여 준다', async () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.applyLabel = '신청하기';
+    model.applyTeamPicker = {
+      teams: [
+        { teamId: 'a', name: 'A팀', roleLabel: '팀장', eligible: true, reason: null },
+        { teamId: 'b', name: 'B팀', roleLabel: '팀장', eligible: true, reason: null },
+      ],
+      defaultTeamId: 'a',
+      submit: vi.fn(async () => { throw new Error('이미 다른 팀으로 신청했어요.'); }),
+    };
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청하기' })[0]);
+    const sheet = await screen.findByRole('dialog', { name: '어느 팀으로 신청할까요?' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'A팀으로 신청하기' }));
+
+    expect(await within(sheet).findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '어느 팀으로 신청할까요?' })).toBeInTheDocument();
+  });
+});
+
+// W2-V8(alpha 확인) — 취소된 팀매치의 "취소됨"이 상대팀 이름 아래 캡션 자리에 있어 매치가 아니라
+// 상대 팀의 상태처럼 읽혔다. 매치 상태는 히어로 맨 위 배지, 상대팀 캡션은 팀 상태만.
+describe('TeamMatchDetailPageView — 히어로의 매치 상태 자리 (W2-V8)', () => {
+  const opponentColumn = (container: HTMLElement) => within(container.querySelector<HTMLElement>('.tm-team-vs-row > div:last-child')!);
+
+  it('취소된 팀매치는 "취소됨"을 상대팀 캡션이 아니라 히어로 배지로 말한다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.mode = 'cancelled';
+    model.statusLabel = '취소됨';
+    model.match.applicantTeams = [{ name: '합정 유나이티드', meta: '', status: '승인 완료', applicationStatus: 'approved' }];
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = container.querySelector<HTMLElement>('.tm-team-vs-hero')!;
+    expect(within(hero).getByText('취소됨', { selector: '.tm-badge' })).toBeInTheDocument();
+    expect(opponentColumn(container).getByText('합정 유나이티드')).toBeInTheDocument();
+    expect(opponentColumn(container).queryByText('취소됨')).not.toBeInTheDocument();
+    expect(opponentColumn(container).queryByText('참가 확정')).not.toBeInTheDocument();
+  });
+
+  it('신청한 적 없는 뷰어가 끝난 매치를 보면 경기 상태는 배지, 상대팀 캡션은 참가 확정이다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.status = 'closed';
+    model.statusLabel = '경기 종료';
+    model.match.applicantTeams = [{ name: '합정 유나이티드', meta: '', status: '승인 완료' }];
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(within(container.querySelector<HTMLElement>('.tm-team-vs-hero')!).getByText('경기 종료', { selector: '.tm-badge' })).toBeInTheDocument();
+    expect(opponentColumn(container).getByText('참가 확정')).toBeInTheDocument();
+    expect(opponentColumn(container).queryByText('경기 종료')).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 승인 대기 중인 신청 팀은 배지 없이 캡션이 팀 상태(승인 대기)다', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    model.myApplicationTeam = { teamId: 't', name: '합정 유나이티드' };
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(container.querySelector('.tm-team-vs-hero .tm-badge')).toBeNull();
+    expect(opponentColumn(container).getByText('승인 대기')).toBeInTheDocument();
   });
 });

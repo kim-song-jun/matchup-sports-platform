@@ -7,14 +7,16 @@
  */
 import type { TeamListViewModel, TeamModel } from './teams.types';
 import type { V1Team } from '@/types/api';
+import { formatProvinceWide } from '@/lib/v1-regions';
+import { teamRecruitmentLabel } from '@/lib/v1-status-labels';
 
-export function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
+export function toTeam(team: V1Team): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
   const regionName = formatTeamRegion(team.region, team.regionName);
   const levelTag = formatTeamLevelTag(team);
   const genderRule = team.genderRule ?? '';
-  const full = isTeamAtCapacity(team.memberCount, team.memberGoalCount);
+  const recruitment = teamRecruitmentLabel(team);
 
   return {
     id,
@@ -27,12 +29,10 @@ export function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     region: regionName,
     members: team.memberCount,
     capacity: team.memberGoalCount ?? 0,
-    status: team.joinPolicy === 'closed' || full ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
+    status: recruitment === '가입 가능' ? 'open' : 'closed',
+    statusLabel: recruitment,
     tags: [levelTag, genderRule].filter(Boolean),
     genderRule,
-    ownerName: team.owner?.displayName,
-    managerName: team.manager?.displayName ?? null,
     // 소개가 없으면 **빈 값으로 둔다.** 예전엔 `{지역}에서 활동하는 {종목} 팀이에요.` 를
     // 만들어 넣었는데, 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)과 같은 말이라 정보가 되지
     // 않으면서 카드에서 ~35px 를 먹었다 — alpha 실측(2026-09-07) 50팀 중 **25팀**이 그
@@ -53,7 +53,7 @@ export function formatTeamLevelTag(team: V1Team) {
 
 export function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
   if (region?.parentName) return `${region.parentName} ${region.name}`;
-  return region?.name ? `${region.name} 전체` : fallback ?? '지역 미정';
+  return region?.name ? formatProvinceWide(region.name) : fallback ?? '지역 미정';
 }
 
 export function splitTeamRegion(region?: { name: string; parentName?: string | null } | null) {
@@ -63,10 +63,6 @@ export function splitTeamRegion(region?: { name: string; parentName?: string | n
   const [city, ...countyParts] = trimmed.split(/\s+/);
   if (countyParts.length === 0) return { city, county: '전체' };
   return { city, county: countyParts.join(' ') };
-}
-
-export function isTeamAtCapacity(memberCount: number, memberGoalCount?: number | null) {
-  return memberGoalCount != null && memberCount >= memberGoalCount;
 }
 
 /**

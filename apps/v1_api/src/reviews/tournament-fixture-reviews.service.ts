@@ -197,7 +197,7 @@ export class TournamentFixtureReviewsService {
     context: ReviewContext,
   ) {
     if (!canReviewOpponentTeam(context.reviewerTeam.role)) {
-      throw forbidden('TEAM_REVIEW_ROLE_REQUIRED', '상대팀 후기는 팀장·운영진만 작성할 수 있어요.');
+      throw forbidden('TEAM_REVIEW_ROLE_REQUIRED', '상대팀 후기는 팀장·매니저만 작성할 수 있어요.');
     }
     if (!dto.targetTeamId) throw badRequest('TARGET_TEAM_REQUIRED', 'targetTeamId is required');
     const targetTeamId = dto.targetTeamId;

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
@@ -23,9 +24,25 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 // 우리 팀 판별·카드 내부는 match-team-roster-card.test.tsx 가 실제 훅으로 검증한다 — 여기서는
 // 이 화면이 어떤 인자로 판별을 부르고, 그 결과로 카드·경기 명단 링크를 어디에 두는지만 본다.
+// 카드는 명단이 풀렸을 때만 footer(내 기록 연결 한 줄)를 명단 상태·내 행으로 부른다(실제 카드와 같다).
+const rosterView = vi.hoisted(() => ({
+  gameState: 'ENDED' as string,
+  viewerRow: undefined as { accountLinked: boolean } | undefined,
+}));
 vi.mock('@/components/game-roster/use-my-match-roster-team', () => ({ useMyMatchRosterTeam: vi.fn() }));
 vi.mock('@/components/game-roster/match-team-roster-card', () => ({
-  MatchTeamRosterCard: ({ team }: { team: MyMatchRosterTeam }) => <div data-testid="roster-card">{team.status}</div>,
+  MatchTeamRosterCard: ({
+    team,
+    footer,
+  }: {
+    team: MyMatchRosterTeam;
+    footer?: (context: { view: { gameState: string }; viewerRow: { accountLinked: boolean } | undefined }) => ReactNode;
+  }) => (
+    <div data-testid="roster-card">
+      {team.status}
+      {team.status === 'resolved' ? footer?.({ view: { gameState: rosterView.gameState }, viewerRow: rosterView.viewerRow }) : null}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
@@ -35,8 +52,8 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
 // claim 배너 내부(훅·모달)는 claim-my-record.test.tsx 가 검증한다 — 여기서는
 // "기록 본문이 뜰 때만 리그 인자로 배치되는지"만 본다.
 vi.mock('@/components/public-game-records/claim-my-record', () => ({
-  LeagueClaimMyRecordSection: ({ leagueId, teamMatchId }: { leagueId: string; teamMatchId: string }) => (
-    <div data-testid="league-claim-section">{`${leagueId}/${teamMatchId}`}</div>
+  LeagueClaimMyRecordSection: ({ leagueId, teamMatchId, variant }: { leagueId: string; teamMatchId: string; variant?: string }) => (
+    <div data-testid="league-claim-section">{`${leagueId}/${teamMatchId}/${variant ?? 'card'}`}</div>
   ),
 }));
 
@@ -55,7 +72,7 @@ const useV1ResolveChatRoomMock = vi.mocked(useV1ResolveChatRoom, { partial: true
 const usePublicLeagueFixtureRecordMock = vi.mocked(usePublicLeagueFixtureRecord, { partial: true });
 const useMyMatchRosterTeamMock = vi.mocked(useMyMatchRosterTeam);
 useMyMatchRosterTeamMock.mockReturnValue({ status: 'none' });
-const RESOLVED_TEAM: MyMatchRosterTeam = { status: 'resolved', teamId: 't2', gameId: 'game-1' };
+const RESOLVED_TEAM: MyMatchRosterTeam = { status: 'resolved', teamId: 't2', gameId: 'game-1', viewerUserId: 'me' };
 
 /** 게임 프로젝션(대회와 동일한 본문) 픽스처 — MatchDetailContent 가 소비하는 필드 전부. */
 function makeRecord(overrides: Record<string, unknown> = {}) {
@@ -159,6 +176,8 @@ function mockViewer(state: 'none' | 'approved' | 'host_team', extra: Record<stri
 describe('LeagueFixtureDetailClient', () => {
   afterEach(() => {
     useMyMatchRosterTeamMock.mockReturnValue({ status: 'none' });
+    rosterView.gameState = 'ENDED';
+    rosterView.viewerRow = undefined;
   });
 
   // 픽스처가 **고정 날짜**다 — fx-1 은 2026-09-08T10:00Z 이고 "예정"으로 보여야 한다.
@@ -176,7 +195,7 @@ describe('LeagueFixtureDetailClient', () => {
     vi.useRealTimers();
   });
 
-  it('예정 경기: 양팀 실명·순위·전적과 "예정"을 보여주고, 리그명은 리그 상세로 링크한다', () => {
+  it('예정 경기: 양팀 실명·순위·전적과 경기 칩 "예정"을 보여주고, 리그명은 리그 상세로 링크한다', () => {
     mockLeague();
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
@@ -184,7 +203,10 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByRole('link', { name: /성수 FC 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t1?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1');
     expect(screen.getByRole('link', { name: /왕십리 유나이티드 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t2?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1');
     expect(screen.getByText('1위 · 1승 1무 0패')).toBeInTheDocument();
-    expect(screen.getByText('예정')).toBeInTheDocument();
+    // F59 — 리그 상태와 경기 상태를 대상이 적힌 칩 둘로 가른다. 대상 없는 "진행 중"은 남지 않는다.
+    expect(screen.getByText('리그 · 진행 중')).toBeInTheDocument();
+    expect(screen.getByText('경기 · 예정')).toBeInTheDocument();
+    expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '가을 리그' })).toHaveAttribute('href', '/league-matches/lg-1');
     // 대진 날짜가 9/1(1주차)·9/8(2주차) 두 날이고 이 경기는 9/8 — 2주차.
     expect(screen.getByText('2주차')).toBeInTheDocument();
@@ -345,6 +367,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockLeague();
     mockViewer('none', { participantMember: true });
     mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     // MatchDetailContent 헤더의 주차(칩의 주차 표기는 이때 숨는다 — 중복 방지).
@@ -354,10 +377,12 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('기록된 이벤트가 없어요')).toBeInTheDocument();
     // 리그 고유 문맥 — 순위·전적 카드는 기록 본문과 함께 유지된다.
     expect(screen.getByText('리그 순위·전적')).toBeInTheDocument();
-    // 폴백 요약 카드는 렌더되지 않는다(같은 정보 중복 방지) — 폴백에만 있는 상태 배지로 판정.
-    expect(screen.queryByText('매칭됨')).not.toBeInTheDocument();
-    // "내 기록 연결" 배너(claim 의 리그 판)가 리그 인자 그대로 기록 본문 아래에 실린다.
-    expect(screen.getByTestId('league-claim-section')).toHaveTextContent('lg-1/fx-1');
+    // 폴백 요약 카드는 렌더되지 않는다(같은 정보 중복 방지) — 폴백에만 있는 팀 링크로 판정.
+    expect(screen.queryByRole('link', { name: '성수 FC 팀 상세로 이동' })).not.toBeInTheDocument();
+    // 경기 상태는 위 칩이 말한다 — 기록 헤더 일시 줄에 " · 종료"를 겹쳐 싣지 않는다.
+    expect(screen.queryByText(/ · 종료/)).not.toBeInTheDocument();
+    // "내 기록 연결"은 우리 팀 출전 카드 아래 한 줄(link)로 리그 인자 그대로 실린다(F61).
+    expect(screen.getByTestId('league-claim-section')).toHaveTextContent('lg-1/fx-1/link');
     // 기록 연결 승인함도 기록의 gameId 로 함께 실린다.
     expect(screen.getByTestId('attest-section')).toHaveTextContent('game-1');
   });
@@ -366,6 +391,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockLeague();
     mockViewer('none');
     mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     expect(screen.getByText('득점·카드')).toBeInTheDocument();
@@ -376,6 +402,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockLeague();
     mockViewer(state);
     mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     // 공개 기록은 유지하지만, 서버가 403으로 거부할 claim affordance는 숨긴다.
@@ -387,6 +414,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockLeague();
     mockViewer('none', { manageableOpponentTeam: true });
     mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     expect(screen.getByTestId('league-claim-section')).toBeInTheDocument();
@@ -396,6 +424,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockLeague();
     mockRecord('present');
     let viewer = { participantMember: true };
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     useV1TeamMatchMock.mockImplementation(() => ({ data: { id: 'fx-1', viewer } }) as never);
     useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 
@@ -410,6 +439,7 @@ describe('LeagueFixtureDetailClient', () => {
   it('참가자 범위를 확인할 수 없을 때는 내 기록 연결 진입점을 보류한다', () => {
     mockLeague();
     mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
     useV1TeamMatchMock.mockReturnValue({ data: undefined, isPending: true, isError: false } as never);
     useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     const view = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
@@ -418,6 +448,34 @@ describe('LeagueFixtureDetailClient', () => {
     useV1TeamMatchMock.mockReturnValue({ data: undefined, isPending: false, isError: true } as never);
     view.rerender(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
     expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+  });
+
+  it('F61: 경기 시작 전에는 참가자에게도 내 기록 연결 입구가 없다', () => {
+    mockLeague();
+    mockViewer('none', { participantMember: true });
+    mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
+    rosterView.gameState = 'SCHEDULED';
+    const view = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+
+    rosterView.gameState = 'LIVE';
+    view.rerender(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getByTestId('league-claim-section')).toBeInTheDocument();
+  });
+
+  it('F61: 명단에 계정이 연결된 선수에겐 없고, 계정 없이 기록되는 선수에게만 뜬다', () => {
+    mockLeague();
+    mockViewer('none', { participantMember: true });
+    mockRecord('present');
+    useMyMatchRosterTeamMock.mockReturnValue(RESOLVED_TEAM);
+    rosterView.viewerRow = { accountLinked: true };
+    const view = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+
+    rosterView.viewerRow = { accountLinked: false };
+    view.rerender(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getByTestId('league-claim-section')).toBeInTheDocument();
   });
 
   it('기록에 경기 영상이 있으면 대회와 동일한 경기 영상 섹션이 뜬다', () => {
@@ -430,14 +488,37 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('전반 하이라이트')).toBeInTheDocument();
   });
 
+  it('킥오프 지난 미제출 대진: 진행 중이면 "결과 대기"가 어디에도 없고, 기록이 없으면 칩만 "결과 대기"를 말한다', () => {
+    // 2주차 대진을 킥오프(9/4) 뒤 · 결과 미제출로 둔다 — 공개 대진만 보면 '결과 대기' 단계다.
+    const kickedOff = FIXTURES.map((fixture) =>
+      fixture.teamMatchId === 'fx-1' ? { ...fixture, startAt: '2026-09-04T10:00:00.000Z' } : fixture,
+    );
+    mockLeague({ fixtures: kickedOff });
+    mockViewer('none');
+    mockRecord('present', { status: 'live', resultState: null, scoreStatus: null, score: { home: 1, away: 0, penalties: null } });
+    const live = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getByText('경기 · 진행 중')).toBeInTheDocument();
+    expect(live.container.textContent).not.toContain('결과 대기');
+    live.unmount();
+
+    // 대조군: 기록 404 폴백 — 단계는 칩 하나가 말하고 가운데 칸은 'vs'.
+    mockRecord('absent');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getAllByText(/결과 대기/)).toHaveLength(1);
+    expect(screen.getByText('경기 · 결과 대기')).toBeInTheDocument();
+    expect(screen.getByText('vs')).toBeInTheDocument();
+  });
+
   it('기록 API 가 404 면 자체 요약 카드로 폴백한다(게임 미공개 대진)', () => {
     mockLeague();
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    // 폴백 카드의 상태 배지 + 일시·장소가 그대로 살아 있다.
-    expect(screen.getByText('매칭됨')).toBeInTheDocument();
-    expect(screen.getByText('예정')).toBeInTheDocument();
+    // 폴백 카드는 팀·일시·장소를 싣고, 단계는 위 경기 칩 하나가 말한다 — "매칭됨" 같은 기본 상태 배지는 없다(F47).
+    expect(screen.getByRole('link', { name: '성수 FC 팀 상세로 이동' })).toBeInTheDocument();
+    expect(screen.getByText('경기 · 예정')).toBeInTheDocument();
+    expect(screen.getByText('vs')).toBeInTheDocument();
+    expect(screen.queryByText('매칭됨')).not.toBeInTheDocument();
     // 게임 미공개 대진에는 연결할 기록이 화면에 없다 — claim 배너도 싣지 않는다.
     expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
   });
@@ -451,7 +532,7 @@ describe('LeagueFixtureDetailClient', () => {
     // extractErrorMessage 는 서버가 준 메시지를 그대로 노출한다.
     expect(screen.getByText('서버 오류')).toBeInTheDocument();
     // 폴백 요약 카드는 함께 뜨지 않는다 — 장애를 정상 화면처럼 보이게 하지 않는다.
-    expect(screen.queryByText('매칭됨')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '성수 FC 팀 상세로 이동' })).not.toBeInTheDocument();
   });
 
   it('리그에 없는 경기 id 는 오류 안내와 리그로 돌아가는 링크를 보여준다', () => {

@@ -82,6 +82,8 @@ export type ChatRoomViewModel = {
   onRetry?: () => void;
   /** 다시 불러와도 소용없는 막힘(권한 없음)일 때 재시도 대신 돌아갈 곳. */
   errorBack?: { href: string; label: string };
+  /** 대화 맨 위 안내 한 줄 — 팀 채팅은 입장한 뒤의 대화만 보인다(H2, 서버 visibleFromAt). */
+  historyNotice?: string;
 };
 
 export type NotificationModel = {

@@ -19,6 +19,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // 팀 소개도 메타 설명에 반영되지 않았다(alpha 실측).
   const team = await fetchPublicV1<V1TeamDetail>(`/teams/${encodeURIComponent(id)}`);
   if (!team) return buildNoIndexMetadata('팀을 찾을 수 없어요');
+  // 해체된 팀은 지난 경기 링크를 위해 읽기 전용으로 남을 뿐이다 — 검색에는 내보내지 않는다.
+  if (team.dissolution) return buildNoIndexMetadata(`${team.name} (해체된 팀)`);
 
   const sportName = team.sport?.name ?? team.sportName;
   // 구조화 데이터와 같은 규칙으로 표시용 지역명을 만든다 — 둘이 갈리면 화면·메타·LD 가 어긋난다.
@@ -42,6 +44,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   // 읽어야 하므로 상세 타입으로 받는다.
   const team = await fetchPublicV1<V1TeamDetail>(`/teams/${encodeURIComponent(id)}`);
   if (!team) notFound();
+  if (team.dissolution) return <TeamDetailPageClient teamId={id} seed={team} />;
 
   return (
     <>

@@ -17,10 +17,6 @@ export type TeamModel = {
   statusLabel: string;
   tags: string[];
   genderRule: string;
-  /** 팀장 표시명 — 목록 카드용, V1Team.owner가 아직 없는 폴백/시드 데이터에는 없을 수 있어 optional */
-  ownerName?: string;
-  /** 감독 표시명 — 감독이 없는 팀은 null */
-  managerName?: string | null;
   intro: string;
   next: string;
 };
@@ -122,6 +118,10 @@ export type TeamDetailViewModel = {
    */
   joinRequest?: { requestedAtLabel?: string };
   operations?: Array<{ label: string; sub: string; href: string; badge?: number; badgeLabel?: string }>;
+  /** 팀을 막 만든 팀장에게만 — 성공 안내와 다음 할 일(G12 F25). */
+  justCreated?: boolean;
+  /** 팀장·매니저 바로가기 — 운영 메뉴 맨 아래에 묻혀 있던 두 가지를 히어로 바로 아래로(G12 F26). */
+  manageShortcuts?: { membersHref: string; editHref: string; inviteHref: string };
   /** 팀장·매니저 — 다가오는 경기의 명단·참석명단 버튼(Task 179 팀 A). */
   canManageGameRosters?: boolean;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
@@ -147,6 +147,8 @@ export type TeamFormMode = 'create' | 'edit';
 
 export type TeamFormViewModel = {
   mode: TeamFormMode;
+  /** 수정 화면 맨 아래 "팀 관리" — 팀장에게만 채운다(Task 180 H3). */
+  dissolveHref?: string;
   team: {
     name: string;
     logoUrl: string | null;
@@ -175,6 +177,10 @@ export type TeamFormViewModel = {
     membersVisibilityEnabled?: boolean;
     /** 수정 화면에서 정원이 내려갈 수 있는 하한 — 지금 팀원 수. */
     minCapacity?: number;
+    /** 만들기 화면에서 활동 지역을 내 프로필 지역으로 채웠고 아직 바꾸지 않았다. */
+    regionPrefilled?: boolean;
+    /** 같은 종목·지역에 같은 이름의 팀이 있으면 이름 칸 아래 안내(H2). */
+    nameError?: string;
     onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
     onSportChange: (sportId: string) => void;
     onRegionChange: (regionId: string) => void;
@@ -185,6 +191,35 @@ export type TeamFormViewModel = {
     submitting?: boolean;
     error?: string | null;
   };
+};
+
+/** 멤버 행의 ⋯ 시트 항목(H2 A-2). risky 는 '되돌리기 어려운 동작' 소제목 아래로 떨어진다. */
+export type TeamMemberAction = {
+  key: string;
+  label: string;
+  description?: string;
+  risky?: boolean;
+  destructive?: boolean;
+  /** 있으면 항목을 비활성으로 두고 설명 자리에 이 이유를 보여 준다. */
+  disabledReason?: string;
+  onSelect: () => void;
+};
+
+export type TeamMemberRowModel = {
+  /** membershipId — 행 키이자 방금 바뀐 행을 강조할 때 쓴다. */
+  id: string;
+  name: string;
+  /** '팀장' | '매니저' | '멤버' — teamRoleLabel 에서 온다. */
+  role: string;
+  /** 배지는 팀장·매니저만. 멤버는 기본 상태라 배지 없이 둔다. */
+  roleTone?: 'owner' | 'manager';
+  meta: string;
+  jerseyNumber?: number | null;
+  profileHref?: string;
+  actions: TeamMemberAction[];
+  actionPending?: boolean;
+  /** 확인 창 뒤 방금 바뀐 행 — 토스트와 함께 잠깐 강조한다(H2 A-3). */
+  highlighted?: boolean;
 };
 
 export type TeamMembersViewModel = {
@@ -198,33 +233,26 @@ export type TeamMembersViewModel = {
   selfNotice?: ReactNode;
   /** 역할 변경·내보내기가 서버에서 거절됐을 때의 이유. 목록 위에 뜨고 화면으로 끌어온다. */
   actionError?: string | null;
-  members: Array<{
-    name: string;
-    role: string;
-    meta: string;
-    profileHref?: string;
-    manageLabel?: string;
-    locked?: boolean;
-    /** disabledReason 이 있으면 버튼을 비활성으로 두고 그 이유를 버튼 아래에 보여준다. */
-    actions: Array<{ label: string; tone?: 'danger'; disabledReason?: string; onSelect: () => void }>;
-    actionPending?: boolean;
-    /** 본인 행에만 노출되는 "팀 나가기" 버튼. owner는 소유권 이전 전까지 disabled + 툴팁. */
-    selfLeave?: {
-      disabled: boolean;
-      disabledReason?: string;
-      pending?: boolean;
-      error?: string | null;
-      onSelect: () => void;
-    };
-  }>;
+  /** 팀장 혼자 남은 팀에서만(Task 180 H3 A-1) — 멤버 초대·팀 해체 입구. */
+  soloOwner?: { onInvite: () => void; dissolveHref: string };
+  members: TeamMemberRowModel[];
+  membersLoading?: boolean;
   requests: Array<{
+    id: string;
     name: string;
     meta: string;
-    status: string;
     profileHref?: string;
-    actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
-    actionPending?: boolean;
+    /** 이 화면에서 방금 승인했다 — 목록 조회에서 빠져도 "승인 완료"로 제자리에 남는다. */
+    approved?: boolean;
+    pending?: boolean;
+    /** 개별 승인은 확인 창 없이 바로 반영된다(G12 F37). */
+    onApprove: () => void;
+    /** 거절은 확인 창을 거친다. */
+    onReject: () => void;
   }>;
+  requestsLoading?: boolean;
+  /** 대기 중인 신청이 둘 이상일 때만 — 확인 창 한 번으로 전부 승인한다. */
+  approveAll?: { count: number; pending: boolean; onSelect: () => void };
   /** owner/manager 전용 — 보낸 초대 목록 + 초대 폼 */
   invitations?: {
     /** 이메일 입력 폼 */
@@ -247,6 +275,8 @@ export type TeamMembersViewModel = {
       cancelPending: boolean;
       onCancel: () => void;
     }>;
+    /** 최근 30일에 끝난 초대 — 수락·거절·취소(초대가 목록에서 사라진 이유) */
+    pastItems: Array<{ invitationId: string; displayName: string; statusLabel: string; closedAt: string }>;
     listLoading: boolean;
     /** 목록 조회 실패 여부 — true면 EmptyState 대신 에러+재시도 UI로 분기 */
     listError: boolean;

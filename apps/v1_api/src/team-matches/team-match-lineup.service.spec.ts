@@ -37,7 +37,7 @@ const manager: V1AuthUser = {
 const ROSTER_USER_IDS = new Set(['user-1', 'user-2', 'user-3', 'away-user-1', 'away-user-3']);
 
 interface FakeState {
-  participants: Array<{ id: string; lineupId: string; sideId: string | null; userId: string | null; displayNameSnapshot: string; position: string | null }>;
+  participants: Array<{ id: string; lineupId: string; sideId: string | null; userId: string | null; displayNameSnapshot: string; position: string | null; jerseyNumber?: number | null }>;
   linkEvents: Array<{ participantId: string; linkId: string; eventVersion: number; action: string; userId: string; actorType: string; actorUserId: string | null; systemActor?: string | null; effectiveAt: Date }>;
   links: Array<{ participantId: string; linkId: string; userId: string }>;
   lineups: Array<{ id: string; gameId: string; sideId: string; revision: number; state: V1GameLineupState; version: number; formation: string | null; supersedesId: string | null }>;
@@ -46,6 +46,13 @@ interface FakeState {
   consentSnapshots: Array<{ participantId: string; linkId: string; consentVersion: number; state: V1ConsentState; policyHash: string; actorUserId: string }>;
   /** 사용자 단위 기록 공개 동의 (V1UserRecordConsent). */
   userConsents: Array<{ userId: string; state: V1ConsentState }>;
+  /** 공동 기록(V1TeamMatchRecord) — hasSharedRecord 일 때만 있다. */
+  record: { gameId: string; version: number; officialAt: Date | null; confirmations: unknown[] } | null;
+  recordChanges: Array<{ version: number; commandId: string; action: string; actorName: string; after: unknown }>;
+  /** 팀 일정 RSVP 를 읽은 횟수 — 저장·추가 경로는 읽지 않아야 한다(명단 자격과 무관). */
+  scheduleReads: number;
+  /** V1OutboxEvent — businessKey 가 유니크라 skipDuplicates 면 같은 키는 한 행만 남는다. */
+  outbox: Array<{ businessKey: string; type: string; aggregateId: string; payload: unknown }>;
 }
 
 function createFake(options: {
@@ -58,6 +65,13 @@ function createFake(options: {
   startAt?: Date;
   leagueId?: string | null;
   tournamentId?: string | null;
+  status?: string;
+  /** 권한 조회(role 필터)가 멤버십을 못 찾게 한다 — 팀장·매니저가 아닌 사용자. */
+  viewerNotManager?: boolean;
+  /** 이 경기 팀 일정의 응답. undefined 면 연결된 일정이 없다. */
+  scheduleAttendance?: Array<{ userId: string; status: string }>;
+  /** V1GameVisibilityPolicy.lineupAt. undefined 면 정책 행이 없다. */
+  publicLineupAt?: Date | null;
 } = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
@@ -71,6 +85,10 @@ function createFake(options: {
     idempotency: [],
     consentSnapshots: [],
     userConsents: [],
+    record: options.hasSharedRecord ? { gameId: 'game-1', version: 3, officialAt: null, confirmations: [{ sideId: 'side-away' }] } : null,
+    recordChanges: [],
+    scheduleReads: 0,
+    outbox: [],
   };
   let participantSeq = 0;
   let lineupSeq = 0;
@@ -83,7 +101,7 @@ function createFake(options: {
         hostTeamId: 'team-home',
         approvedApplicantTeamId:
           options.approvedApplicantTeamId === undefined ? 'team-away' : options.approvedApplicantTeamId,
-        status: 'matched',
+        status: options.status ?? 'matched',
         // 마감(startAt) 이전이어야 저장이 허용된다.
         startAt: options.startAt ?? new Date(Date.now() + 60 * 60 * 1000),
         leagueId: options.leagueId ?? null,
@@ -100,30 +118,69 @@ function createFake(options: {
       findFirst: async () => options.hasResultRevision ? { id: 'result-1' } : null,
     },
     v1TeamMatchRecord: {
-      findUnique: async () => options.hasSharedRecord ? { gameId: 'game-1' } : null,
+      findUnique: async () => state.record,
+      update: async (args: { data: { version: number; confirmations: unknown[] } }) => {
+        if (state.record === null) throw new Error('record not found');
+        state.record = { ...state.record, ...args.data };
+        return state.record;
+      },
+    },
+    v1TeamMatchRecordChange: {
+      create: async (args: { data: { version: number; commandId: string; action: string; actorName: string; after: unknown } }) => {
+        state.recordChanges.push(args.data);
+        return args.data;
+      },
+    },
+    v1UserProfile: {
+      findUnique: async () => ({ nickname: '팀장 님', displayName: null }),
+    },
+    v1OutboxEvent: {
+      createMany: async (args: { data: FakeState['outbox']; skipDuplicates?: boolean }) => {
+        let count = 0;
+        for (const row of args.data) {
+          if (state.outbox.some((existing) => existing.businessKey === row.businessKey)) {
+            if (args.skipDuplicates === true) continue;
+            throw new Error('unique constraint: v1_outbox_events_business_key_key');
+          }
+          state.outbox.push({ businessKey: row.businessKey, type: row.type, aggregateId: row.aggregateId, payload: row.payload });
+          count += 1;
+        }
+        return { count };
+      },
+    },
+    v1GameVisibilityPolicy: {
+      findUnique: async () => (options.publicLineupAt === undefined ? null : { lineupAt: options.publicLineupAt }),
     },
     v1GameSide: {
       findMany: async () => [
-        { id: 'side-home', sideKey: 'HOME', teamId: 'team-home' },
-        { id: 'side-away', sideKey: 'AWAY', teamId: 'team-away' },
+        { id: 'side-home', sideKey: 'HOME', teamId: 'team-home', displayNameSnapshot: '홈 FC' },
+        { id: 'side-away', sideKey: 'AWAY', teamId: 'team-away', displayNameSnapshot: '원정 FC' },
       ],
     },
     v1TeamMembership: {
       findFirst: async (args: { where: Record<string, unknown> }) => {
         // loadContext 의 권한 조회(role 필터가 있는 쪽)와 resolveEntry 의 자격 조회를 구분한다.
         if (args.where.role !== undefined) {
+          if (options.viewerNotManager) return null;
           return { id: 'membership-manager', teamId: managerMembership.teamId, userId: manager.id, role: 'owner', status: 'active' };
         }
         const userId = args.where.userId as string;
         if (!ROSTER_USER_IDS.has(userId)) return null;
         return { userId, user: { profile: { nickname: `${userId} 님`, displayName: null } } };
       },
+      findMany: async () =>
+        ['user-1', 'user-2', 'user-3'].map((userId, index) => ({
+          userId,
+          jerseyNumber: index + 1,
+          user: { profile: { nickname: `${userId} 님`, displayName: null } },
+        })),
     },
-    // 참석명단 자격은 활성 멤버십만 본다. 일정/RSVP를 다시 조회하면 모든 저장 스펙이
-    // 즉시 실패해 회귀를 드러낸다.
+    // 참석명단 자격은 활성 멤버십만 본다. RSVP 는 조회 화면의 읽기 전용 칩으로만 읽는다 —
+    // 저장·추가 스펙은 scheduleReads 가 0 인지 본다.
     v1TeamSchedule: {
       findFirst: async () => {
-        throw new Error('참석명단 저장은 팀 일정 RSVP를 조회하면 안 됩니다.');
+        state.scheduleReads += 1;
+        return options.scheduleAttendance === undefined ? null : { attendance: options.scheduleAttendance };
       },
     },
     v1ScheduleAttendance: {
@@ -180,7 +237,9 @@ function createFake(options: {
     v1GameParticipant: {
       findMany: async (args: { where: { lineupId: string } }) =>
         state.participants.filter((row) => row.lineupId === args.where.lineupId),
-      create: async (args: { data: { lineupId: string; sideId?: string; userId: string | null; displayNameSnapshot: string; position: string | null } }) => {
+      count: async (args: { where: { lineupId: string } }) =>
+        state.participants.filter((row) => row.lineupId === args.where.lineupId).length,
+      create: async (args: { data: { lineupId: string; sideId?: string; userId: string | null; displayNameSnapshot: string; position: string | null; jerseyNumber?: number | null } }) => {
         participantSeq += 1;
         const row = {
           id: `participant-${participantSeq}`,
@@ -189,6 +248,7 @@ function createFake(options: {
           userId: args.data.userId,
           displayNameSnapshot: args.data.displayNameSnapshot,
           position: args.data.position,
+          jerseyNumber: args.data.jerseyNumber ?? null,
         };
         state.participants.push(row);
         return row;
@@ -836,7 +896,7 @@ describe('TeamMatchLineupService.saveLineup host-only recruitment', () => {
   });
 
   it('allows active team members without an attendance invitation or RSVP', async () => {
-    const { prisma } = createFake();
+    const { prisma, state } = createFake({ scheduleAttendance: [{ userId: 'user-1', status: 'NOT_GOING' }] });
     const service = new TeamMatchLineupService(prisma, audit);
 
     await expect(
@@ -845,6 +905,8 @@ describe('TeamMatchLineupService.saveLineup host-only recruitment', () => {
       sideId: 'side-home',
       revision: 1,
     });
+    // '못 가요' 라고 답한 팀원도 저장된다 — 저장 경로는 응답을 읽지조차 않는다.
+    expect(state.scheduleReads).toBe(0);
   });
 });
 
@@ -884,5 +946,315 @@ describe('TeamMatchLineupService — 대회·리그 경기는 전체 명단을 �
 
     await expect(service.saveLineup(manager, 'team-match-1', 'friendly-live', lineupDto(0))).resolves.toMatchObject({ revision: 1 });
     expect(state.lineups).toHaveLength(1);
+  });
+});
+
+/** 양 팀이 제출한 명단 — 홈은 user-1(#1)·user-2(#2), 원정은 번호 섞인 세 명. */
+function seedSubmittedLineups(state: FakeState) {
+  for (const sideId of ['side-home', 'side-away']) {
+    state.lineups.push({
+      id: `${sideId}-lineup`,
+      gameId: 'game-1',
+      sideId,
+      revision: 2,
+      state: V1GameLineupState.SUBMITTED,
+      version: 1,
+      formation: null,
+      supersedesId: null,
+    });
+  }
+  state.participants.push(
+    { id: 'home-p1', lineupId: 'side-home-lineup', sideId: 'side-home', userId: 'user-1', displayNameSnapshot: '홈 선수1', position: null, jerseyNumber: 1 },
+    { id: 'home-p2', lineupId: 'side-home-lineup', sideId: 'side-home', userId: 'user-2', displayNameSnapshot: '홈 선수2', position: null, jerseyNumber: 2 },
+    { id: 'away-p9', lineupId: 'side-away-lineup', sideId: 'side-away', userId: 'away-user-1', displayNameSnapshot: '원정 나', position: null, jerseyNumber: 9 },
+    { id: 'away-pn', lineupId: 'side-away-lineup', sideId: 'side-away', userId: null, displayNameSnapshot: '원정 가', position: null, jerseyNumber: null },
+    { id: 'away-p3', lineupId: 'side-away-lineup', sideId: 'side-away', userId: 'away-user-3', displayNameSnapshot: '원정 다', position: null, jerseyNumber: 3 },
+  );
+}
+
+function auditSpy() {
+  const calls: Array<{ action: string; occurredAt: Date; after: unknown }> = [];
+  const writer = {
+    create: async (_tx: unknown, input: { action: string; occurredAt: Date; after: unknown }) => {
+      calls.push(input);
+      return { id: `audit-${calls.length}` };
+    },
+  } as unknown as OperationAuditWriterService;
+  return { calls, writer };
+}
+
+describe('TeamMatchLineupService.addLateParticipant — 첫 기록 뒤에는 추가만 (H5 결정 A)', () => {
+  it('공동 기록이 시작된 뒤 늦게 온 팀원을 현재 제출본에 붙이고, 변경 이력·감사에 추가 시각을 남긴다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const { calls, writer } = auditSpy();
+    const service = new TeamMatchLineupService(prisma, writer);
+
+    const result = await service.addLateParticipant(manager, 'team-match-1', 'late-1', { userId: 'user-3', jerseyNumber: 5 });
+
+    // 새 리비전 없이 같은 제출본에 붙는다 — 기존 행 id(득점이 매달린 곳)는 그대로다.
+    expect(state.lineups.filter((row) => row.sideId === 'side-home')).toHaveLength(1);
+    expect(result).toMatchObject({ lineupId: 'side-home-lineup', sideId: 'side-home' });
+    const homeRows = state.participants.filter((row) => row.lineupId === 'side-home-lineup');
+    expect(homeRows.map((row) => row.id)).toEqual(['home-p1', 'home-p2', result.participantId]);
+    expect(state.links.map((link) => link.participantId)).toEqual([result.participantId]);
+    // 변경 이력 한 줄 + 버전 증가 + 양 팀 종료 확인 초기화.
+    expect(state.record).toMatchObject({ version: 4, confirmations: [] });
+    expect(state.recordChanges).toEqual([
+      expect.objectContaining({ version: 4, action: 'participant_add', actorName: '팀장 님', after: expect.objectContaining({ participantId: result.participantId, jerseyNumber: 5 }) }),
+    ]);
+    expect(calls).toEqual([expect.objectContaining({ action: 'LINEUP_LATE_ADDITION', occurredAt: expect.any(Date) })]);
+    expect(state.scheduleReads).toBe(0);
+  });
+
+  it('게스트도 이름만으로 추가되고 신원 연결은 만들지 않는다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await service.addLateParticipant(manager, 'team-match-1', 'late-guest', { displayName: '용병 김' });
+
+    expect(state.participants.at(-1)).toMatchObject({ lineupId: 'side-home-lineup', userId: null, displayNameSnapshot: '용병 김' });
+    expect(state.links).toHaveLength(0);
+    // 게스트는 받을 사람이 없어 참석명단 포함 알림도 넣지 않는다.
+    expect(state.outbox).toEqual([]);
+  });
+
+  it('[H1 연결] 늦게 추가된 팀원 한 명에게만 "참석명단에 올랐어요" outbox 를 같은 트랜잭션에 넣는다 — 재시도·중복 추가는 한 건', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await service.addLateParticipant(manager, 'team-match-1', 'late-notice', { userId: 'user-3', jerseyNumber: 5 });
+    // 같은 요청 재시도(멱등 키 재사용)와 같은 선수 다시 추가(422)는 outbox 를 늘리지 않는다.
+    await service.addLateParticipant(manager, 'team-match-1', 'late-notice', { userId: 'user-3', jerseyNumber: 5 });
+    await expect(service.addLateParticipant(manager, 'team-match-1', 'late-notice-again', { userId: 'user-3', jerseyNumber: 6 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_DUPLICATE_PARTICIPANT' }),
+    });
+
+    // 제출 때의 키(`…:{lineupId}`)와 달라야 이미 처리된 제출 행에 막혀 버려지지 않는다. payload 의 userId 로 워커가 이 사람만 본다.
+    expect(state.outbox).toEqual([
+      {
+        businessKey: 'team-match-lineup-included:side-home-lineup:user-3',
+        type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION',
+        aggregateId: 'side-home-lineup',
+        payload: { lineupId: 'side-home-lineup', userId: 'user-3' },
+      },
+    ]);
+  });
+
+  it('[H1 연결] 제출 때의 outbox 행이 이미 있어도 늦은 추가의 알림은 따로 들어간다(대조군)', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    state.outbox.push({
+      businessKey: 'team-match-lineup-included:side-home-lineup',
+      type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION',
+      aggregateId: 'side-home-lineup',
+      payload: { lineupId: 'side-home-lineup' },
+    });
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await service.addLateParticipant(manager, 'team-match-1', 'late-after-submit', { userId: 'user-3' });
+
+    expect(state.outbox.map((row) => row.businessKey)).toEqual([
+      'team-match-lineup-included:side-home-lineup',
+      'team-match-lineup-included:side-home-lineup:user-3',
+    ]);
+  });
+
+  it('같은 잠금 상태에서 빼기·번호 변경(전체 저장)은 409 이고 제출본이 그대로다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await expect(
+      service.saveLineup(manager, 'team-match-1', 'remove-one', {
+        expectedVersion: 2,
+        participants: [{ userId: 'user-1', jerseyNumber: 10 }],
+      }),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT' }) });
+    expect(state.participants.filter((row) => row.lineupId === 'side-home-lineup').map((row) => [row.id, row.jerseyNumber])).toEqual([
+      ['home-p1', 1],
+      ['home-p2', 2],
+    ]);
+  });
+
+  it('첫 기록 전에는 추가 경로를 열지 않는다 — 참석명단에서 바로 고친다(대조군)', async () => {
+    const { state, prisma } = createFake();
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await expect(service.addLateParticipant(manager, 'team-match-1', 'too-early', { userId: 'user-3' })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_NOT_LOCKED' }),
+    });
+    expect(state.participants).toHaveLength(5);
+  });
+
+  it.each([
+    ['결과 revision 이 생긴 뒤(확정)', { hasSharedRecord: true, hasResultRevision: true }, 'LINEUP_LATE_ADDITION_CLOSED'],
+    ['경기가 끝난 뒤', { hasSharedRecord: true, status: 'completed' }, 'LINEUP_MATCH_TERMINAL'],
+  ] as const)('%s에는 추가도 거절한다', async (_label, options, code) => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, ...options });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await expect(service.addLateParticipant(manager, 'team-match-1', `closed-${code}`, { userId: 'user-3' })).rejects.toMatchObject({
+      response: expect.objectContaining({ code }),
+    });
+    expect(state.participants).toHaveLength(5);
+  });
+
+  it('이미 명단에 있는 선수와 이미 쓰는 번호는 422 로 막는다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await expect(service.addLateParticipant(manager, 'team-match-1', 'dup-user', { userId: 'user-1' })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_DUPLICATE_PARTICIPANT' }),
+    });
+    await expect(service.addLateParticipant(manager, 'team-match-1', 'dup-jersey', { userId: 'user-3', jerseyNumber: 2 })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_DUPLICATE_JERSEY_NUMBER' }),
+    });
+    expect(state.participants).toHaveLength(5);
+  });
+
+  it('상대 팀장이 부르면 자기 팀 명단에만 붙는다 — 우리 제출본은 그대로다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, managerTeamId: 'team-away' });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    const result = await service.addLateParticipant(manager, 'team-match-1', 'away-late', { userId: 'user-3' });
+
+    expect(result).toMatchObject({ sideId: 'side-away', lineupId: 'side-away-lineup' });
+    expect(state.participants.filter((row) => row.lineupId === 'side-home-lineup')).toHaveLength(2);
+  });
+
+  it('팀장·매니저가 아니면 추가 경로도 403 이다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, viewerNotManager: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, auditSpy().writer);
+
+    await expect(service.addLateParticipant(manager, 'team-match-1', 'member-late', { userId: 'user-3' })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+    });
+  });
+});
+
+describe('TeamMatchLineupService — 상대 참석명단 공개 (H5 결정 A)', () => {
+  const HOUR = 60 * 60 * 1000;
+
+  it('상대가 아직 내지 않았으면 제출 여부만 false 이고 명단 조회는 404 다', async () => {
+    const { prisma } = createFake({ publicLineupAt: new Date(Date.now() - HOUR) });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.getLineup(manager, 'team-match-1')).resolves.toMatchObject({
+      opponent: { teamName: '원정 FC', submitted: false, published: false, participantCount: null },
+    });
+    await expect(service.getOpponentLineup(manager, 'team-match-1')).rejects.toMatchObject({
+      status: 404,
+      response: expect.objectContaining({ code: 'OPPONENT_LINEUP_NOT_SUBMITTED' }),
+    });
+  });
+
+  it('공개 시각 전에는 제출 여부만 보이고 명단은 403 이다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: new Date(Date.now() + HOUR) });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.getLineup(manager, 'team-match-1')).resolves.toMatchObject({
+      opponent: { submitted: true, published: false, participantCount: null },
+    });
+    await expect(service.getOpponentLineup(manager, 'team-match-1')).rejects.toMatchObject({
+      status: 403,
+      response: expect.objectContaining({ code: 'OPPONENT_LINEUP_NOT_PUBLIC' }),
+    });
+  });
+
+  it('공개 시각이 지나면 번호·이름만 번호순으로 준다(번호 없는 사람은 뒤)', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: new Date(Date.now() - 1000) });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.getLineup(manager, 'team-match-1')).resolves.toMatchObject({
+      opponent: { submitted: true, published: true, participantCount: 3 },
+    });
+    const view = await service.getOpponentLineup(manager, 'team-match-1');
+    expect(view.participants).toEqual([
+      { jerseyNumber: 3, displayName: '원정 다' },
+      { jerseyNumber: 9, displayName: '원정 나' },
+      { jerseyNumber: null, displayName: '원정 가' },
+    ]);
+    expect(view.teamName).toBe('원정 FC');
+  });
+
+  it.each([
+    ['킥오프 50분 전(기본 공개 시각 지남)', 50 * 60 * 1000, 'published'],
+    ['킥오프 70분 전(기본 공개 시각 전)', 70 * 60 * 1000, 'hidden'],
+  ] as const)('정책에 공개 시각이 없으면 킥오프 1시간 전을 쓴다 — %s', async (_label, startsInMs, expected) => {
+    const { state, prisma } = createFake({ startAt: new Date(Date.now() + startsInMs) });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const lineup = await service.getLineup(manager, 'team-match-1');
+    expect(lineup.opponent.published).toBe(expected === 'published');
+  });
+
+  it('팀장·매니저가 아니면 상대 명단도 403 이다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: new Date(Date.now() - HOUR), viewerNotManager: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.getOpponentLineup(manager, 'team-match-1')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+    });
+  });
+
+  it('상대 팀이 보는 쪽에서는 우리 명단이 상대 명단이다', async () => {
+    const { state, prisma } = createFake({ publicLineupAt: new Date(Date.now() - HOUR), managerTeamId: 'team-away' });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const view = await service.getOpponentLineup(manager, 'team-match-1');
+    expect(view).toMatchObject({ teamName: '홈 FC' });
+    expect(view.participants.map((row) => row.displayName)).toEqual(['홈 선수1', '홈 선수2']);
+  });
+});
+
+describe('TeamMatchLineupService.getLineup — 팀 일정 응답은 읽기 전용 칩 (H5 결정 A)', () => {
+  it('연결된 일정이 있으면 응답을, 답하지 않은 팀원은 NO_RESPONSE 를 싣는다', async () => {
+    const { prisma } = createFake({
+      scheduleAttendance: [
+        { userId: 'user-1', status: 'GOING' },
+        { userId: 'user-2', status: 'MAYBE' },
+      ],
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const lineup = await service.getLineup(manager, 'team-match-1');
+    expect(lineup.eligibleMembers.map((member) => [member.userId, member.rsvpStatus])).toEqual([
+      ['user-1', 'GOING'],
+      ['user-2', 'MAYBE'],
+      ['user-3', 'NO_RESPONSE'],
+    ]);
+  });
+
+  it('연결된 일정이 없으면 응답 칩을 만들지 않는다(null)', async () => {
+    const { prisma } = createFake();
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    const lineup = await service.getLineup(manager, 'team-match-1');
+    expect(lineup.eligibleMembers.every((member) => member.rsvpStatus === null)).toBe(true);
+  });
+
+  it('기록이 시작됐고 우리 명단이 제출돼 있으면 추가만 열린다고 알린다', async () => {
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true });
+    seedSubmittedLineups(state);
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.getLineup(manager, 'team-match-1')).resolves.toMatchObject({
+      editable: false,
+      lockReason: 'records_exist',
+      lateAdditionAllowed: true,
+    });
   });
 });

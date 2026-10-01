@@ -1088,7 +1088,7 @@ export class ReviewsService {
         (reviewerTeam) => opponentOf(reviewerTeam.teamId).id === targetTeamId && !canReviewOpponentTeam(reviewerTeam.role),
       );
       if (blockedByRole) {
-        throw forbidden('TEAM_REVIEW_ROLE_REQUIRED', '상대팀 후기는 팀장·운영진만 작성할 수 있어요.');
+        throw forbidden('TEAM_REVIEW_ROLE_REQUIRED', '상대팀 후기는 팀장·매니저만 작성할 수 있어요.');
       }
       throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
     }

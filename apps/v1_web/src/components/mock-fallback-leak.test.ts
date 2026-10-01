@@ -104,7 +104,6 @@ describe('목업(view-model)이 실제 개체의 폴백으로 새지 않는다',
     expect(model.genderRule).toBe('');
     // 소개는 목업이 아니라 이 팀의 실제 지역·종목으로 만든 문장이다.
     expect(model.intro).toContain('농구');
-    expect(model.ownerName).toBe('팀장');
   });
 
   it('팀 매치: 호스트팀 이름·경기장·비용에 목업이 붙지 않는다', () => {

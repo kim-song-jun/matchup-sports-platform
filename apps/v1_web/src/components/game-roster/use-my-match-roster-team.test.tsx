@@ -54,7 +54,7 @@ describe('useMyMatchRosterTeam', () => {
     ];
     api.rosters = { 'team-a': [ME] };
     const { result } = render([null, null]);
-    await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1' }));
+    await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1', viewerUserId: ME }));
   });
 
   it('두 팀에 다 속하면 /me/teams 순서가 아니라 기준 명단에 내가 있는 팀을 고른다', async () => {
@@ -64,7 +64,7 @@ describe('useMyMatchRosterTeam', () => {
     ];
     api.rosters = { 'team-b': ['someone-else'], 'team-a': [ME] };
     const { result } = render(['team-b', 'team-a']);
-    await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1' }));
+    await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1', viewerUserId: ME }));
   });
 
   it('기준 명단에 없는 팀장도 자기 팀을 받는다 — 공개된 두 팀 밖의 내 팀은 조회하지 않는다', async () => {
@@ -74,7 +74,7 @@ describe('useMyMatchRosterTeam', () => {
     ];
     api.rosters = { 'team-a': ['p1', 'p2'] };
     const { result } = render(['team-h', 'team-a']);
-    await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1' }));
+    await waitFor(() => expect(result.current).toEqual({ status: 'resolved', teamId: 'team-a', gameId: 'g1', viewerUserId: ME }));
     expect(api.calls).not.toContain('/teams/team-other/games/g1/roster');
   });
 

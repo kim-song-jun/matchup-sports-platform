@@ -68,6 +68,11 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
+  const showStarter = !dash && model.teamActivity?.hasTeam === false;
+  const invitationBanner =
+    model.bannerDecision.nudge === 'teamInvitation' && model.teamActivity?.pendingInvitations ? (
+      <TeamRequestBanner kind="teamInvitation" invitations={model.teamActivity.pendingInvitations} />
+    ) : null;
 
   // 셸 승격(U25): title/activeTab/showSearch는 route-chrome/fragments/home.ts의 정적 테이블로
   // 옮겼다. hasNewNotification·floatingSlot은 model(런타임 상태) 의존이라 여기서 override로
@@ -99,15 +104,15 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             {/* 다음 경기는 유도 배너 예산 밖이다 -- 배너가 아니라 오늘의 정보라 조건이 맞으면 항상 맨 위에
                 온다. 팀이 없는 새 가입자에게는 같은 자리가 "먼저 해 볼 일"이 된다. */}
             {model.teamActivity?.nextGame ? <NextGameCard game={model.teamActivity.nextGame} /> : null}
-            {!dash && model.teamActivity?.hasTeam === false ? <HomeStarterCard /> : null}
+            {/* 팀이 없는데 초대가 와 있으면 새 팀을 만들기보다 초대에 답하는 게 먼저다(W3-V7). */}
+            {showStarter ? invitationBanner : null}
+            {showStarter ? <HomeStarterCard /> : null}
             {/* Task 154 P2-1: 조건이 맞아도 이번 방문에 선택된 유도 배너 하나만 렌더한다.
                 차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
                 밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.
                 판정은 model.bannerDecision(lib/home-banner-policy.ts) 하나로 모았다. */}
             {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
-            {model.bannerDecision.nudge === 'teamInvitation' && model.teamActivity?.pendingInvitations ? (
-              <TeamRequestBanner kind="teamInvitation" invitations={model.teamActivity.pendingInvitations} />
-            ) : null}
+            {showStarter ? null : invitationBanner}
             {model.bannerDecision.nudge === 'joinRequests' && model.teamActivity?.pendingJoinRequests ? (
               <TeamRequestBanner kind="joinRequests" joinRequests={model.teamActivity.pendingJoinRequests} />
             ) : null}

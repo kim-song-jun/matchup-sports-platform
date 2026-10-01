@@ -269,7 +269,7 @@ export class TournamentReviewsService {
     if (eligibleTeams.length === 0) {
       throw new ForbiddenException({
         code: 'NOT_PARTICIPANT',
-        message: '대회에 참가한 팀의 팀장·운영진만 리뷰를 작성할 수 있어요.',
+        message: '대회에 참가한 팀의 팀장·매니저만 리뷰를 작성할 수 있어요.',
       });
     }
 
@@ -294,7 +294,7 @@ export class TournamentReviewsService {
       if (!match) {
         throw new ForbiddenException({
           code: 'NOT_PARTICIPANT',
-          message: '대회에 참가한 팀의 팀장·운영진만 리뷰를 작성할 수 있어요.',
+          message: '대회에 참가한 팀의 팀장·매니저만 리뷰를 작성할 수 있어요.',
         });
       }
       targetTeam = match;

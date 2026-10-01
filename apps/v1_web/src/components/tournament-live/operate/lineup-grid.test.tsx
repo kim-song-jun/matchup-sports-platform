@@ -223,3 +223,55 @@ describe('[P1-c 후속] 표시용 폴백과 제출본 전용 판정은 의도적
     expect(latestOperableLineup(submittedThenDraft, 'side-home')?.id).toBe('l-submitted');
   });
 });
+
+// F71 — 도착 확인(검인)을 한 경기에서 아직 확인되지 않은 선수는 흐리게 + "도착 전" 칩으로 가르되,
+// 득점·카드 기록 대상으로는 여전히 고를 수 있다(검인을 놓친 선수의 기록을 막지 않는다).
+describe('LineupGrid — 도착 전 선수 (F71)', () => {
+  const arrived = (p: GameLineupParticipant): GameLineupParticipant => ({ ...p, arrivedAt: '2026-08-23T09:50:00.000Z' });
+
+  it('검인한 경기에서 도착 전 선수는 흐리게 + "도착 전" 칩이고 선택할 수 있다 — 도착한 선수엔 칩이 없다', () => {
+    const onSelectPlayer = vi.fn();
+    render(
+      <LineupGrid
+        sides={SIDES}
+        lineups={[lineup([arrived(SQUAD[0]), SQUAD[1]])]}
+        onSelectPlayer={onSelectPlayer}
+      />,
+    );
+
+    const pending = screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 도착 전' });
+    expect(pending).toHaveTextContent('도착 전');
+    expect(screen.getByText('김철수')).toHaveClass('text-[var(--text-muted)]');
+    expect(pending).toBeEnabled();
+    fireEvent.click(pending);
+    expect(onSelectPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({ participant: expect.objectContaining({ id: 'p-2' }) }),
+    );
+
+    const done = screen.getByRole('button', { name: '홍길동 선수 이벤트 기록' });
+    expect(done).not.toHaveTextContent('도착 전');
+    expect(screen.getByText('홍길동')).toHaveClass('text-[var(--text-strong)]');
+  });
+
+  it('아무도 검인하지 않은 경기에서는 칩을 달지 않는다 — 전원이 "도착 전"이면 정보가 아니라 잡음이다', () => {
+    render(<LineupGrid sides={SIDES} lineups={[lineup(SQUAD)]} onSelectPlayer={vi.fn()} />);
+
+    expect(screen.queryByText('도착 전')).toBeNull();
+    expect(screen.getByRole('button', { name: '김철수 선수 이벤트 기록' })).toBeEnabled();
+  });
+
+  it('다른 팀만 검인했어도 경기 전체로 판단한다 — 보이는 팀만 보고 칩을 빼지 않는다', () => {
+    const away = side('side-away', '원정팀', 'AWAY');
+    const awayLineup = { ...lineup([arrived({ ...participant('a-1', '박원정', 7), sideId: 'side-away' })]), id: 'lineup-away', sideId: 'side-away' };
+    render(
+      <LineupGrid
+        sides={[SIDES[0], away]}
+        lineups={[lineup([SQUAD[1]]), awayLineup]}
+        onSelectPlayer={vi.fn()}
+        restrictSideId="side-home"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '김철수 선수 이벤트 기록, 도착 전' })).toBeEnabled();
+  });
+});

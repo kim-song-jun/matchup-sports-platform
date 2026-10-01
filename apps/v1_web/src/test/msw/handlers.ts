@@ -70,6 +70,7 @@ import {
   toAdminInquiryRow,
 } from './fixtures';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
+import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 
 const api = '*/api/v1';
 
@@ -201,6 +202,7 @@ function teamDetail(teamId: string) {
       disabledReason: null,
       manageRoute: null,
     },
+    dissolution: null,
   };
 }
 
@@ -362,6 +364,9 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   state: 'DRAFT',
   editable: true,
   lockReason: null,
+  lateAdditionAllowed: false,
+  ownTeamName: '홈 FC',
+  opponent: { teamName: '원정 FC', submitted: false, published: false, participantCount: null },
   version: 1,
   formation: '2-2',
   publicLineupAt: null,
@@ -420,6 +425,7 @@ const v1TournamentFields = [
 
 export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
+  ...v1TeamDissolutionMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {
@@ -522,6 +528,7 @@ export const v1MswHandlers = [
       : teamsBySport;
     return ok(page(teams));
   }),
+  http.get(`${api}/teams/name-availability`, () => ok({ available: true })),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
   http.get(`${api}/teams/:teamId/members`, () => ok({
     items: [
@@ -1267,6 +1274,15 @@ export const v1MswHandlers = [
     });
   }),
   http.get(`${api}/team-matches/:teamMatchId/lineup`, () => ok(v1TeamMatchLineupFixture)),
+  // 기본 픽스처의 상대는 아직 미제출이다(opponent.submitted=false) — 서버와 같은 404 를 준다.
+  // 공개 뒤 화면을 보는 테스트는 이 핸들러를 덮어쓴다.
+  http.get(`${api}/team-matches/:teamMatchId/lineup/opponent`, () => HttpResponse.json({
+    code: 'OPPONENT_LINEUP_NOT_SUBMITTED', message: '상대 팀이 아직 참석명단을 내지 않았어요.',
+  }, { status: 404 })),
+  // 기본 픽스처는 초안이라 추가만 창이 닫혀 있다(lateAdditionAllowed=false) — 서버처럼 409.
+  http.post(`${api}/team-matches/:teamMatchId/lineup/late-additions`, () => HttpResponse.json({
+    code: 'LINEUP_NOT_LOCKED', message: '아직 경기 기록 전이라 참석명단에서 바로 넣을 수 있어요.',
+  }, { status: 409 })),
   http.put(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
     const body = await request.json() as V1TeamMatchLineupSavePayload;
     v1TeamMatchLineupFixture = {

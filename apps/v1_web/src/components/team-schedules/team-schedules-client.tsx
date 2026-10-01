@@ -15,6 +15,7 @@ import {
   useV1SetScheduleAttendanceOnBehalf,
   useV1TeamDetail,
   useV1TeamMatch,
+  useV1TeamMatchLineup,
   useV1TeamSchedule,
   useV1TeamSchedules,
   useV1TriggerScheduleReminder,
@@ -32,6 +33,7 @@ import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { extractErrorCode } from '@/lib/error-message';
 import { isHiddenFromViewerError } from '@/lib/access-denied-error';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { hydrateLineupEditorState } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import type {
   V1CreateScheduleDto,
   V1GuestApplicationListItem,
@@ -69,7 +71,9 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
+  scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
   scheduleTypeFilterOptions,
@@ -166,7 +170,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     emptyTitle: '아직 등록된 일정이 없어요',
     emptySub: canManage
       ? '팀원과 함께할 첫 일정을 만들어 보세요.'
-      : '팀 운영진이 일정을 등록하면 여기서 확인할 수 있어요.',
+      : '팀장·매니저가 일정을 등록하면 여기서 확인할 수 있어요.',
   };
 
   return <ScheduleListPageView model={model} />;
@@ -224,6 +228,12 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const viewerRole = team.data?.viewer.role;
   const canManage = isScheduleManagerRole(viewerRole);
   const canRsvp = isScheduleMemberRole(viewerRole);
+  const friendlyTeamMatchId =
+    linkedTeamMatchId && schedule?.linkedMatch?.tournamentId === null && schedule.linkedMatch.leagueId === null
+      ? linkedTeamMatchId
+      : '';
+  // 명단 조회(GET /team-matches/:id/lineup)는 팀장·매니저만 된다 — 멤버는 부르지 않는다(403).
+  const friendlyLineup = useV1TeamMatchLineup(friendlyTeamMatchId, { enabled: canManage });
 
   // 신청자 목록 + 승인/거절 — Task 12(guest-recruitment)에 없던 lane. 전용 훅이 아직
   // hooks/use-v1-api.ts에 없어(이 배치의 ownedFiles 밖) 같은 저수준 클라이언트를 여기서
@@ -408,13 +418,29 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
 
   const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
 
-  const opponentTeamName = opponentMatch.data?.approvedOpponentTeam?.name ?? null;
+  const opponentTeamName = scheduleOpponentTeamName(opponentMatch.data, teamId);
   const opponent: ScheduleDetailViewModel['opponent'] =
     linkedTeamMatchId && opponentTeamName
       ? {
           teamName: opponentTeamName,
           placeName: opponentMatch.data?.place?.name ?? null,
           teamMatchHref: withFromPath(`/team-matches/${linkedTeamMatchId}`, withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath)),
+        }
+      : null;
+
+  const rosterEntries = friendlyLineup.data ? hydrateLineupEditorState(friendlyLineup.data).participants : null;
+  const rosterViewerId = me?.user.id ?? null;
+  const roster: ScheduleDetailViewModel['roster'] =
+    friendlyTeamMatchId && schedule?.state !== 'CANCELLED'
+      ? {
+          count: rosterEntries ? rosterEntries.length : null,
+          viewerIncluded:
+            rosterEntries && rosterEntries.length > 0 && rosterViewerId
+              ? rosterEntries.some((entry) => entry.userId === rosterViewerId)
+              : null,
+          href: canManage
+            ? withFromPath(`/team-matches/${friendlyTeamMatchId}/lineup`, withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath))
+            : null,
         }
       : null;
 
@@ -431,6 +457,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     visibilityLabel: schedule ? scheduleVisibilityLabel(schedule.visibility) : '',
     capacityLabel: schedule?.capacity != null ? `정원 ${schedule.goingCount}/${schedule.capacity}명` : null,
     opponent,
+    roster,
     version: schedule?.version ?? 0,
     conflictBanner,
     onDismissConflict: () => setConflictBanner(null),
@@ -447,6 +474,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       pending: setAttendance.isPending,
       error: attendanceError,
       onSetStatus,
+      friendlyMatch: Boolean(schedule?.linkedMatch) && schedule?.linkedMatch?.tournamentId === null && schedule.linkedMatch.leagueId === null,
     },
     attendees: {
       visible: Boolean(schedule?.attendees),
@@ -490,7 +518,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
             onEdit: onOpenRecruitmentEdit,
             pending: createRecruitment.isPending || updateRecruitment.isPending,
             exists: Boolean(recruitment),
-            canCreate: schedule?.state === 'SCHEDULED',
+            scheduleActive: schedule?.state === 'SCHEDULED',
             editPanel: recruitmentEditOpen
               ? {
                   open: true,
@@ -579,6 +607,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     },
     cancelModal: {
       open: cancelOpen,
+      noticeLine: schedule ? scheduleCancelNoticeLine(schedule.visibility, recruitment?.approvedCount ?? 0) : '',
       reason: cancelReason,
       onReasonChange: setCancelReason,
       onConfirm: onCancelConfirm,

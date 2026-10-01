@@ -25,6 +25,9 @@ type PrismaStub = {
   board: Record<string, unknown> | null;
   /** [P1-d] 이 경기 종목의 라인업 설정(선발 최소·최대 인원). 없으면 파서 기본값. */
   lineupConfig?: unknown;
+  sportCode?: string;
+  /** 친선 경기의 경기방식(자유 입력). undefined 면 대회·리그 경기(팀매치 없음). */
+  matchFormat?: string | null;
   /**
    * compare-and-swap 결과. 0 이면 "내가 읽은 뒤 다른 트랜잭션이 버전을 올렸다" —
    * 조건부 updateMany 의 WHERE 가 더 이상 맞지 않는 상태를 재현한다.
@@ -70,10 +73,16 @@ function buildPrisma(stub: PrismaStub) {
     // 검사가 이 보드로 옮겨 왔다). 설정을 못 찾으면 파서 기본값이 쓰이므로, 여기서는
     // 조회 자체가 되는지만 만족시키고 한도 값 검증은 전용 테스트에서 한다.
     v1Game: {
-      findUnique: jest.fn().mockResolvedValue({ competitionConfigVersionId: 'config-1' }),
+      findUnique: jest.fn().mockResolvedValue({
+        competitionConfigVersionId: 'config-1',
+        teamMatch: stub.matchFormat === undefined ? null : { matchFormat: stub.matchFormat },
+      }),
     },
     v1CompetitionConfigVersion: {
-      findUnique: jest.fn().mockResolvedValue({ lineup: stub.lineupConfig ?? null }),
+      findUnique: jest.fn().mockResolvedValue({
+        lineup: stub.lineupConfig ?? null,
+        sportCode: stub.sportCode ?? 'football',
+      }),
     },
     v1TeamTacticsBoard: {
       findUnique: jest.fn().mockResolvedValue(stub.board),
@@ -511,4 +520,57 @@ describe('TeamTacticsBoardService — 저장 규칙', () => {
       await moduleRef.close();
     }
   });
+});
+
+/**
+ * Task 180 H7 — 보드가 코트 모양과 대형 목록을 고르는 근거. 친선 풋살은 설정이 종목 기본값
+ * (출전 인원 6)이라, 실제 경기방식("5:5")을 읽지 않으면 5:5 경기에 필드 5명 대형이 뜬다.
+ */
+describe('TeamTacticsBoardService — 종목·경기 인원·대형 사전', () => {
+  const FUTSAL_LINEUP = {
+    minPlayers: 3,
+    maxPlayers: 6,
+    positions: [
+      { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+      { code: 'FIXO', label: '픽소', short: 'FX' },
+    ],
+    formations: [{ code: '1-2-1', label: '다이아몬드', outfield: 4, slots: [{ position: 'FIXO', x: 50, y: 35 }] }],
+  };
+
+  async function readSetup(stub: Partial<PrismaStub>) {
+    const { prisma } = buildPrisma({
+      team: { id: TEAM_ID, deletedAt: null },
+      membershipRole: 'member',
+      side: HOME_SIDE,
+      board: null,
+      ...stub,
+    });
+    const { service, moduleRef } = await buildService(prisma);
+    try {
+      return await service.get(USER, TEAM_ID, GAME_ID);
+    } finally {
+      await moduleRef.close();
+    }
+  }
+
+  it('친선은 경기방식 "5:5" 가 설정의 출전 인원(6)보다 앞선다', async () => {
+    const result = await readSetup({ sportCode: 'futsal', lineupConfig: FUTSAL_LINEUP, matchFormat: '5:5' });
+    expect(result.sportCode).toBe('futsal');
+    expect(result.playersPerSide).toBe(5);
+    expect(result.lineupConfig.formations.map((formation) => formation.code)).toEqual(['1-2-1']);
+    expect(result.lineupConfig.positions.map((position) => position.short)).toEqual(['GK', 'FX']);
+  });
+
+  it('대회·리그 경기(팀매치 없음)는 설정의 출전 인원을 쓴다', async () => {
+    const result = await readSetup({ sportCode: 'futsal', lineupConfig: { ...FUTSAL_LINEUP, maxPlayers: 5 } });
+    expect(result.playersPerSide).toBe(5);
+  });
+
+  it.each([['5대5 친선'], ['5:6'], [''], [null]])(
+    '경기방식 %p 처럼 "N:N" 으로 읽히지 않으면 설정의 출전 인원으로 돌아간다',
+    async (matchFormat) => {
+      const result = await readSetup({ sportCode: 'futsal', lineupConfig: FUTSAL_LINEUP, matchFormat });
+      expect(result.playersPerSide).toBe(6);
+    },
+  );
 });

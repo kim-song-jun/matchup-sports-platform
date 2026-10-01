@@ -377,6 +377,11 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     return rowLabelFor(item, leagueTitlesByFixtureId.get(item.fixtureId));
   }
 
+  /** 행 버튼의 접근 가능한 이름. 리그 행 제목은 "N주차"라 같은 주의 경기끼리 겹친다 — 일정까지 붙인다. */
+  function rowControlName(item: V1TournamentOperationsBoardItem): string {
+    return item.scheduledAt ? `${rowLabel(item)} ${formatAdminDateTime(item.scheduledAt)}` : rowLabel(item);
+  }
+
   /* 예전에는 NO_FIELD_ASSIGNED·NO_STAFF_ASSIGNED 를 여기서 통째로 걸러냈다 — 경기장 배정
    * API 는 백엔드에 있는데 그걸 호출하는 화면이 없어서, 두 경고가 모든 경기에 영구히 켜진
    * 채 끌 방법이 없었기 때문이다(해소 불가능한 경고가 상시 주황이면 정말 조치가 필요한
@@ -419,7 +424,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     return (
       <button
         type="button"
-        aria-label={`${rowLabel(item)} 더보기`}
+        aria-label={`${rowControlName(item)} 더보기`}
         aria-haspopup="dialog"
         onClick={() => setMenuFixtureId(item.fixtureId)}
         className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
@@ -671,6 +676,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         <div className="flex items-center gap-2">
                           <Link
                             href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                            aria-label={`${rowControlName(item)} 운영 콘솔`}
                             className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                           >
                             운영 콘솔
@@ -741,6 +747,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 <div className="mt-2 flex items-center gap-2">
                   <Link
                     href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                    aria-label={`${rowControlName(item)} 운영 콘솔로 이동`}
                     className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     운영 콘솔로 이동

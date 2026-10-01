@@ -74,15 +74,16 @@ describe('LeagueFixtureCard', () => {
     expect(screen.queryByText('몰수')).toBeNull();
   });
 
-  it.each([
-    ['recruiting', '모집 중'],
-    ['closed', '마감'],
-    ['matched', '매칭됨'],
-    ['completed', '완료'],
-    ['expired', '기한 만료'],
-  ])('배지는 리그 상태 %s 를 "%s" 로 적는다 — 대회의 3분기로 뭉개지 않는다', (status, label) => {
-    renderCard({ status });
-    expect(screen.getByText(label)).toBeInTheDocument();
+  it('배지는 경기 단계 칩 하나다 — 기본 상태인 "매칭됨"은 칩으로 싣지 않는다(G13)', () => {
+    renderCard({ startAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() });
+    expect(screen.getByText('예정')).toBeInTheDocument();
+    expect(screen.queryByText('매칭됨')).toBeNull();
+  });
+
+  it('확정 점수가 있는 대진은 종료 칩과 점수를 함께 싣는다', () => {
+    renderCard({ status: 'completed', homeScore: 2, awayScore: 1 });
+    expect(screen.getByText('종료')).toBeInTheDocument();
+    expect(screen.getByText('2 : 1')).toBeInTheDocument();
   });
 
   it('실을 게 없으면 캡션 줄 자체를 그리지 않는다 — 빈 줄이 간격을 어긋나게 한다', () => {

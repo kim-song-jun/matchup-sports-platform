@@ -1,6 +1,7 @@
 import type { V1TeamMatchApiStatus } from '@/types/api';
 
 export type TeamMatchModel = {
+  lifecycleLabel?: '보류';
   id: string;
   title: string;
   /**

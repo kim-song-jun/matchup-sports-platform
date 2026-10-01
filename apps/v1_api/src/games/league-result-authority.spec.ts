@@ -96,8 +96,6 @@ describe('정규 리그 결과는 운영·어드민 전용 레인이다', () => 
   it.each([
     ['홈팀 매니저', 'team_result_submit', hostManager, ids.hostManager],
     ['원정팀 오너', 'opponent_result_decide', awayOwner, ids.awayOwner],
-    ['홈팀 매니저', 'team_result_correction', hostManager, ids.hostManager],
-    ['원정팀 오너', 'team_result_void', awayOwner, ids.awayOwner],
   ])('%s 는 %s 를 할 수 없다', async (_label, action, membership, userId) => {
     const { service, prisma } = makeService({ memberships: [membership] });
 

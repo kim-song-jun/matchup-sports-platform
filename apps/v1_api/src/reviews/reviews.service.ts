@@ -777,7 +777,7 @@ export class ReviewsService {
         hostTeam: { select: teamSelect() },
         approvedApplicantTeam: { select: teamSelect() },
         // 무효(VOID) 판정에 필요한 최소 필드. 결과 무효화는 V1TeamMatch 를 건드리지 않고
-        // 게임의 공식 리비전만 VOID 로 바꾼다(games.service.ts voidTeamMatchResult).
+        // 게임의 공식 리비전만 VOID 로 바꾼다(tournament-result-review.service.ts voidResultRevision).
         game: { select: { currentOfficialRevision: { select: { state: true } } } },
       },
     });
@@ -1594,7 +1594,7 @@ function isCompleted(source: { status: string; completedAt: Date | null }) {
  * 결과가 무효(VOID)로 뒤집혔는가.
  *
  * 무효화는 `V1TeamMatch.status`/`completedAt` 을 건드리지 않고 게임의 공식 리비전만
- * VOID 로 바꾼다(games.service.ts voidTeamMatchResult, 호출부는 리그 이의 처리). 그래서
+ * VOID 로 바꾼다(tournament-result-review.service.ts voidResultRevision, 어드민 결과 무효 처리). 그래서
  * status/completedAt 만 보는 `isCompleted` 로는 무효 경기와 정상 완료 경기를 구별할 수
  * 없었고, 없던 일이 된 경기에 계속 평가를 남길 수 있었다.
  *

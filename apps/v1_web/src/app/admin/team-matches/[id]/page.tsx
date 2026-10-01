@@ -360,6 +360,14 @@ export default function AdminTeamMatchDetailPage() {
               {teamMatch.status === 'completed' && <Link className="tm-btn tm-btn-md tm-btn-outline" href={`/admin/team-matches/${teamMatchId}/reviews`}>운영 리뷰 남기기</Link>}
             </section>
           )}
+          {/* 플랫폼 주관이 아닌 친선도 확정 뒤에는 어드민만 고칠 수 있다(2026-10-01 사용자 결정) — 주관 경기는 위 카드의 같은 화면으로 간다. */}
+          {!teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament && teamMatch.hasGame && teamMatch.status === 'completed' && adminMe?.capabilities.includes('status:write') && (
+            <section className="tm-card p-4 flex flex-col gap-3" aria-label="경기 결과 정정">
+              <h2 className="tm-text-body-lg">경기 결과 정정</h2>
+              <p className="tm-text-caption">양 팀이 확인한 결과를 고치면 새 공식 결과로 남고, 이전 결과와 변경 이력은 그대로 보존돼요.</p>
+              <Link className="tm-btn tm-btn-md tm-btn-outline" href={`/admin/team-matches/${teamMatchId}/record`}>결과 정정</Link>
+            </section>
+          )}
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">

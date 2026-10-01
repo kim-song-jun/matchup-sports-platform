@@ -391,11 +391,11 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
 //   return '9999-12-31T23:59:59.999Z';
 // }
 
-/** 내가 참여·개설한 매치 중 다가오는 것만, 중복 없이 빠른 순. */
-function upcomingMatches(matches: Array<{ id: string; title: string; startsAt: string; placeName: string }>, fromIso: string): ChatShareCandidate[] {
+/** 내가 참여·개설한 매치 중 다가오고 취소되지 않은 것만, 중복 없이 빠른 순(서버도 취소 매치 공유를 400 으로 막는다). */
+function upcomingMatches(matches: Array<{ id: string; title: string; startsAt: string; placeName: string; status: string }>, fromIso: string): ChatShareCandidate[] {
   const seen = new Set<string>();
   return matches
-    .filter((match) => match.startsAt >= fromIso && !seen.has(match.id) && seen.add(match.id))
+    .filter((match) => match.status !== 'cancelled' && match.startsAt >= fromIso && !seen.has(match.id) && seen.add(match.id))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
     .map((match) => ({
       kind: 'match' as const,

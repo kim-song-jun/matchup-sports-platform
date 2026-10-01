@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class ChatRoomsQueryDto {
   @IsOptional()
@@ -72,7 +72,9 @@ export class SendChatMessageDto {
   @MaxLength(512)
   imageUrl?: string;
 
+  // @IsObject 가 없으면 `share: []` 가 ValidateNested 를 그냥 통과한다(검사할 원소가 없어서) — 대상 없는 공유를 막는다.
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => ChatShareTargetDto)
   share?: ChatShareTargetDto;

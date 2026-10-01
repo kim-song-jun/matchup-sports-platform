@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -86,6 +86,18 @@ export class MatchesController {
     @Body() dto: UpdateMatchDto,
   ) {
     return this.matchesService.update(user, matchId, dto);
+  }
+
+  @Post(':matchId/confirm-proceed')
+  @UseGuards(V1AuthGuard)
+  confirmProceed(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.matchesService.confirmProceed(user, matchId);
+  }
+
+  @Delete(':matchId')
+  @UseGuards(V1AuthGuard)
+  remove(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.matchesService.remove(user, matchId);
   }
 
   @Post(':matchId/cancel')

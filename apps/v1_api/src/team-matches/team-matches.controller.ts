@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -83,6 +83,12 @@ export class TeamMatchesController {
     @Body() dto: UpdateTeamMatchDto,
   ) {
     return this.teamMatchesService.update(user, teamMatchId, dto);
+  }
+
+  @Delete('team-matches/:teamMatchId')
+  @UseGuards(V1AuthGuard)
+  remove(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
+    return this.teamMatchesService.remove(user, teamMatchId);
   }
 
   @Post('team-matches/:teamMatchId/cancel')

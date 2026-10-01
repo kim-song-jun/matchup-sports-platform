@@ -31,8 +31,8 @@ export function resolveResultStage(game: LeagueFixtureResultSource | null): Leag
   // 대진에는 항상 경기가 붙지만(생성 시 함께 만든다), 방어적으로 null 을 미입력으로 읽는다.
   if (game === null) return 'not_entered';
   const latest = game.resultRevisions[0];
-  // 무효화(VOID)는 games.service.ts의 voidTeamMatchResult가 새로 만든 VOID 리비전을
-  // `currentOfficialRevisionId`가 **그대로 가리키도록 옮겨간다**(4111행) — 즉 VOID는
+  // 무효화(VOID)는 tournament-result-review.service.ts 의 voidResultRevision 이 새로 만든 VOID 리비전을
+  // `currentOfficialRevisionId`가 **그대로 가리키도록 옮겨간다** — 즉 VOID는
   // 항상 포인터가 세팅된 채로 도착한다. 그래서 "포인터가 있으면 무조건 확정"이라는
   // 아래 규칙보다 반드시 먼저 걸러야 한다 — 아니면 이 분기는 영원히 도달 불가능한
   // dead code가 되고, 무효화된 대진이 '확정'으로 읽혀 화면이 정정 모드로 열린다

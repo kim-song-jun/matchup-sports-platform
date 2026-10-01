@@ -78,6 +78,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     wins: match.hostTeam?.wins ?? null,
     status,
     apiStatus,
+    lifecycleLabel: apiStatus === 'on_hold' ? '보류' : undefined,
     closed: isClosedApiStatus(apiStatus),
   };
 }
@@ -195,7 +196,7 @@ export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
  * 그 때문에 호스트는 자기 매치가 마감돼도 목록에서 마감 표시를 못 봤다(2026-09-07).
  */
 export function isClosedApiStatus(status: V1TeamMatchApiStatus): boolean {
-  return status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired';
+  return status === 'on_hold' || status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired';
 }
 
 export function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState = 'none'): TeamMatchModel['status'] {

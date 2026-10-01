@@ -7,6 +7,7 @@ import {
   type TeamSeed,
 } from '../../prisma/seed-alpha-tournament-qa';
 import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { tournamentRoundLabel } from '../../src/tournaments/tournament-round-label';
 
 /**
  * Part 2 (delete→upsert 근본 해소): the alpha QA seed no longer deletes the fixed
@@ -206,6 +207,18 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
     expect(operationalAfter).toEqual(operationalBefore);
     expect(await prisma.v1ParticipantIdentityLinkCurrent.findUnique({ where: { participantId: operatorParticipant.id } })).toBeNull();
     expect(await prisma.v1ParticipantIdentityLinkEvent.findFirst({ where: { participantId: operatorParticipant.id, action: 'REVOKED' } })).not.toBeNull();
+  });
+
+  it('대진 제목에 라운드 키 원값이 아니라 서버와 같은 화면 이름을 쓴다', async () => {
+    await seedScenarioOnce();
+    const fixtures = await prisma.v1TournamentMatchDetails.findMany({
+      where: { tournamentId: ids.tournament },
+      select: { round: true, fixtureNumber: true, teamMatch: { select: { title: true } } },
+    });
+    expect(new Set(fixtures.map((fixture) => fixture.round))).toEqual(new Set(['group', 'semi', 'final', 'third_place']));
+    expect(fixtures.map((fixture) => fixture.teamMatch.title)).toEqual(
+      fixtures.map((fixture) => `${scenario.title} · ${tournamentRoundLabel(fixture.round)} ${fixture.fixtureNumber}`),
+    );
   });
 
   it('preserves an anonymous historical participant snapshot when re-seeding an existing canonical game', async () => {

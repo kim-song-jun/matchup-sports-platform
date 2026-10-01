@@ -583,15 +583,18 @@ export default function AdminInquiryDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">답변 작성</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleReplySubmit}>
-              <textarea
-                value={replyBody}
-                onChange={(event) => setReplyBody(event.target.value)}
-                rows={8}
-                maxLength={2000}
-                disabled={!canEditInquiry || replyMutation.isPending}
-                className="resize-y rounded-xl border border-[var(--border)] px-3 py-3 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
-                placeholder="답변 내용"
-              />
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">답변 내용</span>
+                <textarea
+                  value={replyBody}
+                  onChange={(event) => setReplyBody(event.target.value)}
+                  rows={8}
+                  maxLength={2000}
+                  disabled={!canEditInquiry || replyMutation.isPending}
+                  className="resize-y rounded-xl border border-[var(--border)] px-3 py-3 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                  placeholder="답변 내용"
+                />
+              </label>
               {!canEditInquiry ? (
                 <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">
                   {purged ? '개인정보를 파기한 문의라 답변이나 상태를 바꿀 수 없어요.' : '지원 권한은 조회만 가능해요.'}
@@ -611,18 +614,21 @@ export default function AdminInquiryDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">상태 변경</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleStatusSubmit}>
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as V1InquiryStatus)}
-                disabled={!canEditInquiry || statusMutation.isPending}
-                className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">문의 처리 상태</span>
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as V1InquiryStatus)}
+                  disabled={!canEditInquiry || statusMutation.isPending}
+                  className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="submit"
                 disabled={!canEditInquiry || statusMutation.isPending}

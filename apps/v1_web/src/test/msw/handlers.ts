@@ -1174,7 +1174,7 @@ export const v1MswHandlers = [
       lineupReady: false,
       missingSides: v1GameFixture.sides.map((side) => ({ sideId: side.id, sideKey: side.sideKey, teamName: side.displayNameSnapshot })),
       sides: v1GameFixture.sides.map((side) => ({ id: side.id, key: side.sideKey, name: side.displayNameSnapshot, score: null })),
-      participants: [], subMatches: [], goals: [], history: [], confirmations: [], officialAt: null,
+      participants: [], subMatches: [], goals: [], history: [], confirmations: [], officialAt: null, officialCorrected: false,
     } satisfies SharedRecord);
   }),
   http.post(`${api}/team-matches/:teamMatchId/record`, () => HttpResponse.json({

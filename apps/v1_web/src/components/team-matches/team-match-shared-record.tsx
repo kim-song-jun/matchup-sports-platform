@@ -264,7 +264,7 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
     </div>}
 
     <section className={styles.board} aria-label="공동 점수판">
-      <div className={styles.muted}>{data.phase === 'official' ? '양 팀이 확인한 최종 결과' : data.canEdit ? '양 팀 참가자가 함께 기록하고 있어요 · 2초마다 자동 반영' : '경기 현황'}</div>
+      <div className={styles.muted}>{data.phase === 'official' ? (data.officialCorrected ? '운영팀이 정정한 최종 결과' : '양 팀이 확인한 최종 결과') : data.canEdit ? '양 팀 참가자가 함께 기록하고 있어요 · 2초마다 자동 반영' : '경기 현황'}</div>
       <div className={styles.score}>
         <div className={styles.team}>{home?.name}</div>
         <strong aria-label={`점수 ${home?.score ?? '?'} 대 ${away?.score ?? '?'}`}>{home?.score ?? '?'} : {away?.score ?? '?'}</strong>

@@ -45,7 +45,7 @@ beforeEach(() => {
       { id: 'h1', sideId: 'home', name: '김민수', jerseyNumber: 7, profileImageUrl: '/mock/players/minsu.jpg' },
       { id: 'a1', sideId: 'away', name: '박지훈', jerseyNumber: 10, profileImageUrl: null },
     ],
-    subMatches: [], goals: [], confirmations: [], history: [], officialAt: null,
+    subMatches: [], goals: [], confirmations: [], history: [], officialAt: null, officialCorrected: false,
   };
 });
 describe('shared record participant flow', () => {
@@ -334,6 +334,17 @@ describe('shared record participant flow', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '득점 팀' }), { target: { value: 'away' } });
     fireEvent.click(screen.getByRole('button', { name: '득점 등록' }));
     await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'add', sideId: 'away', expectedVersion: 3 })));
+  });
+  // W5-V5 — 운영자가 정정한 공식 결과를 "양 팀이 확인한" 결과라고 부르지 않는다(서버 officialCorrected).
+  it.each([
+    [true, '운영팀이 정정한 최종 결과', '양 팀이 확인한 최종 결과'],
+    [false, '양 팀이 확인한 최종 결과', '운영팀이 정정한 최종 결과'],
+  ])('확정 결과 머리말 — officialCorrected=%s 이면 "%s"', (officialCorrected, shown, hidden) => {
+    state.data = { ...state.data, phase: 'official', canEdit: false, officialAt: state.data.serverTime, officialCorrected };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    const board = screen.getByRole('region', { name: '공동 점수판' });
+    expect(within(board).getByText(shown)).toBeInTheDocument();
+    expect(within(board).queryByText(hidden)).toBeNull();
   });
   // W5-V4 — 확정된 결과의 [삭제]·[이 변경 되돌리기]는 한 번에 새 공식 결과를 만든다(H9 A: 그 앞에만 확인 창).
   describe('확정 결과 정정 — 폼 없이 공식 결과를 바꾸는 버튼은 확인 창을 거친다', () => {

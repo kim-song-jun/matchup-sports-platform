@@ -243,6 +243,17 @@ describe('TeamMatchRecordService — 확정 뒤 어드민 정정', () => {
     expect(view.sides.map((side) => side.score)).toEqual([0, 1]);
   });
 
+  it('정정하면 응답의 officialCorrected 가 참이 된다 — 관전자에게도 같고, 정정 전 확정·진행 중은 거짓이다', async () => {
+    const { service } = createFake({ memberships: [], admins: ['ops-admin'], official: true });
+
+    expect(await service.read(user('ops-admin'), 'tm-1')).toMatchObject({ phase: 'official', officialCorrected: false });
+    expect(await service.mutate(user('ops-admin'), 'tm-1', editGoal(3))).toMatchObject({ phase: 'official', officialCorrected: true });
+    expect(await service.read(null, 'tm-1')).toMatchObject({ phase: 'official', officialCorrected: true });
+
+    const live = createFake({ memberships: [], admins: ['ops-admin'] });
+    expect(await live.service.read(user('ops-admin'), 'tm-1')).toMatchObject({ phase: 'live', officialCorrected: false });
+  });
+
   it('정정된 경기를 한 번 더 고치면 rev-2 를 대체한다', async () => {
     const { service, game } = createFake({ memberships: [], admins: ['ops-admin'], official: true });
 

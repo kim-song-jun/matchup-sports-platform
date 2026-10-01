@@ -364,7 +364,7 @@ export default function AdminTeamMatchDetailPage() {
           {!teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament && teamMatch.hasGame && teamMatch.status === 'completed' && adminMe?.capabilities.includes('status:write') && (
             <section className="tm-card p-4 flex flex-col gap-3" aria-label="경기 결과 정정">
               <h2 className="tm-text-body-lg">경기 결과 정정</h2>
-              <p className="tm-text-caption">양 팀이 확인한 결과를 고치면 새 공식 결과로 남고, 이전 결과와 변경 이력은 그대로 보존돼요.</p>
+              <p className="tm-text-caption">확정된 결과를 고치면 새 공식 결과로 남고, 이전 결과와 변경 이력은 그대로 보존돼요.</p>
               <Link className="tm-btn tm-btn-md tm-btn-outline" href={`/admin/team-matches/${teamMatchId}/record`}>결과 정정</Link>
             </section>
           )}

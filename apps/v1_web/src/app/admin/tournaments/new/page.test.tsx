@@ -561,16 +561,27 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
-  it('rejects promo priorities outside the API integer range', () => {
+  it('rejects promo priorities outside the API integer range on enabled cards', () => {
     const state = {
       ...INITIAL_TOURNAMENT_CREATE_STATE,
-      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, priority: '-1' },
-      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, priority: '2.5' },
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: true, priority: '-1' },
+      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, enabled: true, priority: '2.5' },
     };
 
     expect(validateTournamentCreateStep(state, 3)).toMatchObject({
       promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
       promoListPriority: '목록 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
+    });
+  });
+
+  it('꺼진 홍보 카드의 잘못된 우선순위도 서버 DTO 처럼 막고 값은 바꾸지 않는다', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: false, priority: '-1' },
+    };
+
+    expect(validateTournamentCreateStep(state, 3)).toMatchObject({
+      promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
     });
   });
 });
@@ -924,6 +935,69 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         locationText: '서울월드컵보조경기장',
       });
       expect(reset.promoList.locationText).toBe('목록 전용 장소');
+    });
+  });
+
+  describe('홍보 카드 켠 것만 펼치기 (#1439)', () => {
+    it('꺼진 홍보 카드는 입력 없이 한 줄 요약과 꺼진 스위치만 보인다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('노출 우선순위')).not.toBeInTheDocument();
+      for (const name of ['홈 오늘의 추천 노출', '대회 목록 상단 노출']) {
+        expect(screen.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'false');
+      }
+    });
+
+    it('스위치로 켜면 입력이 펼쳐지고 포커스가 스위치에 남으며, 껐다 켜도 값이 남고 payload 는 그대로 간다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      fireEvent.click(screen.getByRole('switch', { name: '홈 오늘의 추천 노출' }));
+      const on = screen.getByRole('switch', { name: '홈 오늘의 추천 노출' });
+      expect(on).toHaveAttribute('aria-checked', 'true');
+      on.focus();
+      fireEvent.change(screen.getByLabelText('카드 제목'), { target: { value: '이번 주 추천' } });
+      fireEvent.click(on);
+
+      const off = screen.getByRole('switch', { name: '홈 오늘의 추천 노출' });
+      expect(off).toHaveAttribute('aria-checked', 'false');
+      expect(off).toHaveFocus();
+      expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
+      expect(screen.getByText('꺼짐 · 입력한 항목 1개 보관 중')).toBeInTheDocument();
+
+      fireEvent.click(off);
+      expect(screen.getByLabelText('카드 제목')).toHaveValue('이번 주 추천');
+      fireEvent.click(screen.getByRole('switch', { name: '홈 오늘의 추천 노출' }));
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+      expect(createMutate.mock.calls[0][0]).toMatchObject({
+        promoHomeEnabled: false,
+        promoHomeTitle: '이번 주 추천',
+        promoListEnabled: false,
+      });
+    });
+
+    it('꺼진 카드에 잘못된 우선순위가 있으면 제출이 막히고 그 카드가 펼쳐져 입력에 포커스한다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      fireEvent.click(screen.getByRole('switch', { name: '대회 목록 상단 노출' }));
+      fireEvent.change(screen.getByLabelText('노출 우선순위'), { target: { value: '-3' } });
+      fireEvent.click(screen.getByRole('switch', { name: '대회 목록 상단 노출' }));
+      expect(screen.queryByLabelText('노출 우선순위')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+      expect(createMutate).not.toHaveBeenCalled();
+      const input = screen.getByLabelText('노출 우선순위');
+      expect(input).toHaveValue(-3);
+      expect(input).toHaveFocus();
+      // 오류로 펼쳐졌어도 스위치는 실제 상태(꺼짐)를 말한다.
+      expect(screen.getByRole('switch', { name: '대회 목록 상단 노출' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
     });
   });
 

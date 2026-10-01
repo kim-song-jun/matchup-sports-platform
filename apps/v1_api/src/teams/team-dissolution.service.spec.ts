@@ -29,13 +29,22 @@ function setup(state: {
   members?: string[];
   /** 마지막 보관 기록의 주체. 기본은 팀장 해체. */
   archivedByActor?: 'user' | 'admin';
+  /** 이 팀 말고 같은 종목·지역에서 같은 이름인 팀. */
+  sameNameTeams?: Array<Record<string, unknown>>;
 } = {}) {
   const team = state.team === undefined ? { id: TEAM, name: '마포 FC', status: 'active', deletedAt: null } : state.team;
   const roles = state.roles ?? { [OWNER]: 'owner', 'manager-1': 'manager', 'member-1': 'member' };
   const prisma = {
     $queryRaw: jest.fn().mockResolvedValue([]),
     $executeRaw: jest.fn().mockResolvedValue(1),
-    v1Team: { findUnique: jest.fn().mockResolvedValue(team), update: jest.fn().mockResolvedValue(team) },
+    v1Team: {
+      findUnique: jest.fn().mockResolvedValue(team),
+      update: jest.fn().mockResolvedValue(team),
+      // 이름 확인 — 팀 자신도 같은 이름이라, 자신을 빼는 조건(id.not)이 없으면 늘 겹친다.
+      findMany: jest.fn(({ where }) =>
+        Promise.resolve([...(state.sameNameTeams ?? []), ...(team ? [team] : [])].filter((row) => !where.id || row.id !== where.id.not)),
+      ),
+    },
     v1TeamMembership: {
       findFirst: jest.fn(({ where }) => Promise.resolve(roles[where.userId] === where.role ? { id: `m-${where.userId}` } : null)),
       findMany: jest.fn().mockResolvedValue((state.members ?? Object.keys(roles)).map((userId) => ({ userId }))),
@@ -199,7 +208,7 @@ describe('TeamDissolutionService.dissolve — 자동 정리와 알림', () => {
 
 describe('TeamDissolutionService.restore — 30일 경계', () => {
   const dissolvedAt = new Date('2026-09-01T09:00:00.000Z');
-  const archived = { id: TEAM, name: '마포 FC', status: 'archived', deletedAt: dissolvedAt };
+  const archived = { id: TEAM, name: '마포 FC', sportId: 'sport-1', regionId: 'region-1', status: 'archived', deletedAt: dissolvedAt };
   afterEach(() => jest.useRealTimers());
 
   it('정확히 30일째에는 복구되고, 취소된 경기·일정은 되살리지 않으며 채팅방만 다시 연다', async () => {
@@ -237,6 +246,17 @@ describe('TeamDissolutionService.restore — 30일 경계', () => {
     await expect(service.restore(user(OWNER), TEAM)).rejects.toMatchObject({ status: 403, response: { code: 'TEAM_RESTORE_ADMIN_ONLY' } });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.v1Team.update).not.toHaveBeenCalled();
+  });
+
+  it('기간 안이어도 같은 종목·지역에 같은 이름의 팀이 있으면 409 TEAM_RESTORE_NAME_TAKEN 이고 아무것도 되살리지 않는다', async () => {
+    jest.useFakeTimers({ now: new Date('2026-09-02T09:00:00.000Z'), doNotFake: ['nextTick', 'setImmediate'] });
+    const { service, prisma } = setup({
+      team: archived,
+      sameNameTeams: [{ id: 'team-2', name: ' 마포 fc', sportId: 'sport-1', regionId: 'region-1', status: 'active', deletedAt: null }],
+    });
+    await expect(service.restore(user(OWNER), TEAM)).rejects.toMatchObject({ status: 409, response: { code: 'TEAM_RESTORE_NAME_TAKEN' } });
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
   });
 
   it('해체되지 않은 팀은 409 TEAM_NOT_DISSOLVED', async () => {

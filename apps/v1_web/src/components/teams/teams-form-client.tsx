@@ -5,17 +5,17 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
-import { useRouter } from 'next/navigation';
-import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1Profile, useV1TeamDetail, useV1TeamNameAvailability, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { isTeamOperatorRole } from '@/lib/team-role';
-import { withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
-import { teamErrorMessage } from '@/lib/team-error-messages';
+import { TEAM_NAME_TAKEN_MESSAGE, teamErrorMessage } from '@/lib/team-error-messages';
 import { labelToLevelCode } from '@/lib/v1-levels';
-import { toTeamRegionOptions } from '@/lib/v1-regions';
+import { formatProvinceWide, toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
 import { TeamDetailPageSkeleton, TeamFormPageView } from './teams-page';
 import type { TeamFormViewModel } from './teams.types';
@@ -77,7 +77,18 @@ export function TeamCreatePageClient() {
   const selectedSportId = sportId || sports.data?.[0]?.id || '';
   const [touched, setTouched] = useState(false);
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(touched);
-  const edited = userEdits(() => setTouched(true), { setDraft, setSportId, setRegionId, setJoinPolicy });
+  const profile = useV1Profile();
+  const [regionPrefilled, setRegionPrefilled] = useState(false);
+  const nameError = useTeamNameError({ name: draft.name, sportId: selectedSportId, regionId });
+  const edited = userEdits(() => setTouched(true), {
+    setDraft,
+    setSportId,
+    setRegionId: (nextRegionId: string) => {
+      setRegionPrefilled(false);
+      setRegionId(nextRegionId);
+    },
+    setJoinPolicy,
+  });
 
   const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
     try {
@@ -88,9 +99,16 @@ export function TeamCreatePageClient() {
     }
   };
 
+  // 온보딩에서 고른 내 지역으로 채운다(F23) — 프로필이 올 때까지 기다려야 첫 지역이 먼저 박히지 않는다.
+  const profilePending = profile.isPending;
+  const profileRegions = profile.data?.regions;
   useEffect(() => {
-    if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
-  }, [regionId, regionOptions]);
+    if (regionId || !regionOptions[0] || profilePending) return;
+    const mine = profileRegions?.find((region) => region.primary) ?? profileRegions?.[0];
+    const match = mine ? regionOptions.find((option) => option.id === mine.regionId) : undefined;
+    setRegionId(match?.id ?? regionOptions[0].id);
+    setRegionPrefilled(Boolean(match));
+  }, [profilePending, profileRegions, regionId, regionOptions]);
 
   const model = buildModel({
     mode: 'create',
@@ -101,6 +119,8 @@ export function TeamCreatePageClient() {
     joinPolicy,
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
     regions: regionOptions,
+    regionPrefilled,
+    nameError,
     error,
     submitting: createTeam.isPending,
     ...edited,
@@ -117,7 +137,7 @@ export function TeamCreatePageClient() {
         .then((result) => {
           const sportType = sports.data?.find((sport) => sport.id === selectedSportId)?.code ?? selectedSportId;
           trackEvent('team_create_complete', { sportType });
-          router.push(result.detailRoute || `/teams/${result.teamId}`);
+          router.push(withCreatedFlag(result.detailRoute || `/teams/${result.teamId}`));
         })
         .catch((err) => {
           const prompt = getCreatorProfilePrompt(err, '팀');
@@ -133,7 +153,7 @@ export function TeamCreatePageClient() {
             });
             return;
           }
-          setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+          setError(teamErrorMessage(err, '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
         })
         .finally(() => {
           submitLockRef.current = false;
@@ -152,8 +172,8 @@ export function TeamCreatePageClient() {
 
 export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
-  const cancelHref = '/teams';
-  const successHref = undefined; // API 응답 detailRoute 사용
+  // 취소하면 들어온 곳(보통 팀 상세)으로 돌아간다 — 팀 목록으로 보내면 방금 보던 팀을 잃는다.
+  const cancelHref = sanitizeRedirectPath(useSearchParams().get('from')) ?? `/teams/${teamId}`;
   const query = useV1TeamDetail(teamId);
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
@@ -183,6 +203,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   });
   const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
+  const nameError = useTeamNameError({ name: draft.name, sportId, regionId }, teamId);
   const updateTeamWithActivityCompatibility = async (
     payload: V1TeamMutationPayload & { version: string; membersVisibilityEnabled?: boolean },
     draft: TeamDraft,
@@ -261,6 +282,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     joinPolicy,
     membersVisibilityEnabled,
     minCapacity: query.data.memberCount,
+    nameError,
     // query.data는 위 skeleton gate를 통과했으므로 여기서는 항상 정의돼 있다.
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [{ id: query.data.sport.sportId, name: query.data.sport.name }],
     regions: regionOptions.length
@@ -281,8 +303,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       }
       submitLockRef.current = true;
       void updateTeamWithActivityCompatibility({ ...payload, version, membersVisibilityEnabled }, draft)
-        // #16: from=my이면 저장 후 canonical /teams/[id]로 복귀, 아니면 API 응답 경로 사용
-        .then((result) => router.push(successHref ?? result.detailRoute ?? `/teams/${teamId}`))
+        .then((result) => router.push(result.detailRoute ?? `/teams/${teamId}`))
         .catch((err) => setError(teamErrorMessage(err, '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.', { memberCount: query.data.memberCount })))
         .finally(() => {
           submitLockRef.current = false;
@@ -304,6 +325,36 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       {UnsavedChangesModal}
     </>
   );
+}
+
+const NAME_CHECK_DELAY_MS = 300;
+
+/**
+ * 입력을 멈추면 같은 종목·지역에 같은 이름의 팀이 있는지 묻는다(H2). 같은 이름 판정과 "수정 중 처음 그대로면 통과"는
+ * 서버(excludeTeamId)가 저장과 같은 규칙으로 답한다 — 여기서 따로 비교하면 정규화가 어긋난다.
+ */
+function useTeamNameError(target: { name: string; sportId: string; regionId: string }, editingTeamId?: string): string | undefined {
+  const name = target.name.trim();
+  const params =
+    name && target.sportId && target.regionId
+      ? { name, sportId: target.sportId, regionId: target.regionId, excludeTeamId: editingTeamId }
+      : null;
+  const key = params ? JSON.stringify(params) : null;
+  const [settledKey, setSettledKey] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledKey(key), NAME_CHECK_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [key]);
+  // 아직 치는 중이면(입력이 확인한 값과 다르면) 앞 이름의 결과를 보이지 않는다.
+  const availability = useV1TeamNameAvailability(key !== null && settledKey === key ? params : null);
+  return availability.data?.available === false ? TEAM_NAME_TAKEN_MESSAGE : undefined;
+}
+
+/** 팀 상세가 "막 만든 팀" 안내를 한 번 보이도록 표시를 붙인다(서버가 준 경로의 쿼리는 보존). */
+function withCreatedFlag(path: string) {
+  const url = new URL(path, 'https://teameet.internal');
+  url.searchParams.set('created', '1');
+  return `${url.pathname}${url.search}`;
 }
 
 /** 사용자가 바꾼 입력만 표시한다 — 서버 값·기본값을 채우는 effect 는 원래 setter 를 쓴다. */
@@ -329,6 +380,8 @@ function buildModel({
   joinPolicy,
   membersVisibilityEnabled,
   minCapacity,
+  regionPrefilled,
+  nameError,
   sports,
   regions,
   error,
@@ -348,6 +401,8 @@ function buildModel({
   joinPolicy: 'approval_required' | 'closed';
   membersVisibilityEnabled?: boolean;
   minCapacity?: number;
+  regionPrefilled?: boolean;
+  nameError?: string;
   sports: Array<{ id: string; name: string }>;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   error: string | null;
@@ -374,6 +429,8 @@ function buildModel({
       joinPolicy,
       membersVisibilityEnabled,
       minCapacity,
+      regionPrefilled,
+      nameError,
       onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
       onSportChange: setSportId,
       onRegionChange: (nextRegionId) => {
@@ -400,7 +457,7 @@ function buildModel({
 
 function formatTeamRegionName(region?: { name: string; parentName?: string | null } | null) {
   if (!region) return null;
-  return region.parentName ? `${region.parentName} ${region.name}` : `${region.name} 전체`;
+  return region.parentName ? `${region.parentName} ${region.name}` : formatProvinceWide(region.name);
 }
 
 function toTeamRegionFallbackOption(region: { regionId: string; name: string; parentName?: string | null }) {
@@ -415,7 +472,7 @@ function toTeamRegionFallbackOption(region: { regionId: string; name: string; pa
 
   return {
     id: region.regionId,
-    name: `${region.name} 전체`,
+    name: formatProvinceWide(region.name),
     shortName: '전체',
     parentName: region.name,
   };

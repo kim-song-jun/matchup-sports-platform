@@ -220,7 +220,7 @@ export class TeamTacticsBoardService {
   private versionConflict() {
     return new ConflictException({
       code: 'TACTICS_BOARD_VERSION_CONFLICT',
-      message: '다른 운영진이 먼저 저장했어요. 최신 배치를 불러와 다시 저장해 주세요.',
+      message: '다른 팀장·매니저가 먼저 저장했어요. 최신 배치를 불러와 다시 저장해 주세요.',
     });
   }
 

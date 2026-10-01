@@ -33,6 +33,8 @@ import {
   UpdateTeamDto,
 } from './dto/mutate-team.dto';
 import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
+import type { TeamNameAvailabilityQueryDto } from './dto/teams-query.dto';
+import { assertTeamNameAvailable, hasTeamWithSameName, isSameTeamName } from './team-name';
 import {
   ApproveTeamJoinApplicationDto,
   CreateTeamJoinApplicationDto,
@@ -267,6 +269,7 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await assertTeamNameAvailable(tx, { name: dto.name, sportId: dto.sportId, regionId: dto.regionId });
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const team = await tx.v1Team.create({
         data: {
@@ -358,6 +361,9 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     this.assertMemberGoalFitsCurrentMembers(dto.memberGoalCount, team.memberCount);
     const updated = await this.prisma.$transaction(async (tx) => {
+      // 이름·종목·지역이 그대로면 묻지 않는다 — 규칙 전부터 있던 중복 팀도 다른 항목은 고칠 수 있어야 한다.
+      const nameTarget = { name: dto.name, sportId: dto.sportId, regionId: dto.regionId, excludeTeamId: team.id };
+      if (!isSameTeamName(team, nameTarget)) await assertTeamNameAvailable(tx, nameTarget);
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const nextTeam = await tx.v1Team.update({
         where: { id: team.id },
@@ -442,6 +448,22 @@ export class TeamsService {
       membersVisibilityEnabled: updated.membersVisible,
       detailRoute: `/teams/${updated.id}`,
     };
+  }
+
+  /**
+   * 입력 중 이름 확인 — 가능/불가만 알려 주고 겹치는 팀이 어디인지는 말하지 않는다. 답은 "저장하면 이름으로 막히나"와
+   * 같아야 해서, 수정 중인 팀의 이름·종목·지역이 그대로면 update 처럼 묻지 않고 통과시킨다(이미 있던 중복 팀).
+   */
+  async nameAvailability(user: V1AuthUser, query: TeamNameAvailabilityQueryDto) {
+    this.assertActiveAccount(user);
+    if (query.excludeTeamId) {
+      const current = await this.prisma.v1Team.findFirst({
+        where: { id: query.excludeTeamId, deletedAt: null },
+        select: { name: true, sportId: true, regionId: true },
+      });
+      if (current && isSameTeamName(current, query)) return { available: true };
+    }
+    return { available: !(await hasTeamWithSameName(this.prisma, query, new Date())) };
   }
 
   async members(user: V1AuthUser | null, teamId: string, query: TeamMembersQueryDto) {
@@ -778,7 +800,7 @@ export class TeamsService {
       });
     }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
-      throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
+      throw stateConflict('매니저는 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -790,7 +812,7 @@ export class TeamsService {
           data: { managerCount: { increment: 1 } },
         });
         if (capGuard.count !== 1) {
-          throw stateConflict('운영진은 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
+          throw stateConflict('매니저는 최대 5명까지 둘 수 있어요.', 'MANAGER_LIMIT_EXCEEDED');
         }
       }
       const updated = await tx.v1TeamMembership.update({
@@ -2278,18 +2300,6 @@ export class TeamsService {
         displayName: team.ownerUser.profile?.nickname ?? team.ownerUser.profile?.displayName ?? '팀장',
         profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
       },
-      manager: this.findManager(team),
-    };
-  }
-
-  private findManager(team: TeamWithRelations) {
-    const manager = team.memberships.find((membership) => membership.role === 'manager' && membership.status === 'active');
-    if (!manager) {
-      return null;
-    }
-    return {
-      userId: manager.userId,
-      displayName: manager.user.profile?.nickname ?? manager.user.profile?.displayName ?? '감독',
     };
   }
 

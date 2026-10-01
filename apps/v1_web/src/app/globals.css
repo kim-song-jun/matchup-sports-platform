@@ -3424,6 +3424,19 @@ label.tm-btn:focus-within {
   z-index: var(--z-floating);
 }
 
+/* 글자가 붙은 FAB — 아이콘만으로는 뜻이 약한 첫 진입점(팀 만들기)에 쓴다. */
+.tm-floating-fab-extended {
+  width: auto;
+  height: 48px;
+  padding: 0 20px 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .tm-create-fixed-cta {
   padding-top: 12px;
 }
@@ -4083,6 +4096,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--grey100);
 }
 
+/* 정원 하한에 닿아 막힌 "−" — 활성 "+" 와 같은 파랑으로 두면 눌리는 것처럼 보인다(.tm-btn:disabled 와 같은 토큰). */
+.tm-create-stepper-button:disabled {
+  background: var(--grey100);
+  border-color: var(--grey100);
+  color: var(--text-caption);
+  cursor: not-allowed;
+}
+
 /* Capacity stepper: the middle <select> sits between −/+ buttons, so drop its
    chevron and centre the value — the steppers are the primary control.
    Pin its height to 48px so all three controls match exactly. */
@@ -4401,7 +4422,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 .tm-team-card-stack {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   margin-top: 16px;
 }
 
@@ -4416,6 +4437,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: inherit;
   text-decoration: none;
   padding: 16px;
+}
+
+/* 목록 카드는 로고 54 + 세 줄로 98px 를 맞춘다(390 에서 화면당 5장, F19). */
+.tm-team-card-compact {
+  padding: 12px 16px;
 }
 
 .tm-team-card:active {
@@ -4499,6 +4525,45 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-bottom: 12px;
 }
 
+/* 팀을 막 만든 팀장에게 보이는 성공·다음 할 일 카드(G12 F25). */
+.tm-team-created-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: var(--blue50);
+  border-color: var(--blue100);
+}
+
+.tm-team-created-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-circle);
+  background: var(--blue500);
+  color: var(--static-white);
+}
+
+/* 팀장·매니저 바로가기 두 칸(G12 F26). */
+.tm-team-shortcut-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tm-team-shortcut {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 12px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
 /* 가입 승인 대기 안내 — 토스트가 사라진 뒤에도 상태를 알려주는 상시 카드.
    배경은 팀매치·매치 안내 카드와 같은 --tint-orange 톤을 쓴다(주황 안내 카드 관례). */
 .tm-team-join-pending {
@@ -4555,28 +4620,149 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 8px;
 }
 
+/* 팀 만들기 "더 꾸미기" — 선택 항목을 접어 두는 한 줄(G12 B-1). */
+.tm-team-form-more {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 24px;
+  padding: 12px 16px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tm-team-form-more-chevron {
+  flex: none;
+  color: var(--text-caption);
+  transition: transform var(--duration-fast) ease;
+}
+
+.tm-team-form-more-chevron[data-open='true'] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-team-form-more-chevron {
+    transition: none;
+  }
+}
+
 .tm-team-form-chip-row .tm-chip {
   /* a11y: min-height 44px 유지 (base .tm-chip 상속) — padding만 축소해 밀도 조정 */
   padding: 0 12px;
 }
 
-/* 카드 마지막 줄이 플로팅 FAB 아래로 들어간다 — 예전 액션 행에 주던 여백을 물려준다.
-   활동 줄은 값이 있을 때만 그려지므로 그 클래스에 걸면 없는 카드가 무방비가 된다
-   (#1095 Copilot). 무엇이 마지막이든 보호되도록 카드의 마지막 자식에 건다. */
-@media (max-width: 767px) {
-  .tm-team-list .tm-team-card > :last-child {
-    padding-right: 64px;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1023px) {
-  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) > :last-child {
-    padding-right: 64px;
-  }
-}
-
 .tm-member-section {
   margin-top: 20px;
+}
+
+/* 멤버 관리 권한 안내 한 줄 — 예전 "권한 규칙" 카드(G12·H2 A-1). */
+.tm-member-rule-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 12px 0 0;
+  color: var(--text-muted);
+}
+
+/* 사람 이름 첫 글자 동그라미(가입 신청·초대·멤버 행). grey100 지면이라 글자는 grey700. */
+.tm-member-initial {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-circle);
+  background: var(--grey100);
+  color: var(--grey700);
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+}
+
+.tm-member-name-link {
+  display: block;
+  color: var(--text-strong);
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+/* 멤버 행 64px — 버튼 4개 대신 ⋯ 하나(H2 A-1). 행 사이는 hairline 한 줄. */
+.tm-member-rows {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tm-member-row-main {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tm-member-row-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 확인 창 뒤 방금 바뀐 행(H2 A-3) — 내용 자리는 그대로 두고 바탕만 양옆으로 8px 넓힌다. */
+.tm-member-row-highlight {
+  margin-inline: -8px;
+  padding-inline: 8px;
+  border-radius: var(--radius-control);
+  border-bottom-color: transparent;
+  background: var(--blue50);
+}
+
+/* 가입 신청 목록 — 모바일에서 카드 사이가 0 이던 것(F95)을 목록 자체의 간격으로 준다. */
+.tm-member-request-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tm-member-request-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.tm-member-reject {
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
+.tm-member-approve-all {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+}
+
+@media (min-width: 1024px) {
+  .tm-member-request-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
 }
 
 .tm-member-actions {

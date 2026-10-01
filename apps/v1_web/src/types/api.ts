@@ -608,11 +608,6 @@ export type V1Team = {
     displayName: string;
     profileImageUrl: string | null;
   };
-  /** 감독 — manager 역할 멤버가 없으면 null */
-  manager?: {
-    userId: string;
-    displayName: string;
-  } | null;
   viewerRole?: string;
   viewerJoinState?: string;
 };
@@ -847,6 +842,9 @@ export type V1TeamJoinEligibility = {
   requiresApproval: boolean;
   immediateJoinSupported: boolean;
 };
+
+/** GET /teams/name-availability — 같은 종목·지역에 같은 이름의 팀이 있는지만(H2). */
+export type V1TeamNameAvailability = { available: boolean };
 
 export type V1TeamJoinApplicationResult = {
   applicationId: string;

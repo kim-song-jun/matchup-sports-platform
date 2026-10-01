@@ -12,6 +12,7 @@ import { trackEvent } from '@/lib/analytics';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { AUTH_NOTICE_STAGE } from '@/components/auth/auth-page';
 import { withFromPath } from '@/lib/session-storage';
+import { teamRecruitmentLabel } from '@/lib/v1-status-labels';
 
 type SearchState = 'results' | 'new' | 'empty' | 'error' | 'stale';
 
@@ -322,7 +323,7 @@ function toTeamResult(item: V1Team, from: string) {
   return {
     type: '팀',
     title: item.name,
-    meta: [item.sport?.name ?? item.sportName, item.region?.name ?? item.regionName, `${item.memberCount}명`, item.joinPolicy === 'approval_required' ? '신입 환영' : '모집 마감'].filter(Boolean).join(' · '),
+    meta: [item.sport?.name ?? item.sportName, item.region?.name ?? item.regionName, `${item.memberCount}명`, teamRecruitmentLabel(item)].filter(Boolean).join(' · '),
     href: withFromPath(`/teams/${item.teamId ?? item.id}`, from),
   };
 }

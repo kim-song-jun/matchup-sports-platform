@@ -190,6 +190,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
         ? fallback.context
         : { title: '', sub: '', href: '/chat' },
     teamContact: contact,
+    // 더 오래된 메시지가 남아 있으면 여기가 대화의 맨 위가 아니다.
+    historyNotice: room.data?.roomType === 'team' && messages.data?.pageInfo?.hasNext !== true ? '들어오기 전 대화는 보이지 않아요' : undefined,
     inputLockedMessage,
     messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',

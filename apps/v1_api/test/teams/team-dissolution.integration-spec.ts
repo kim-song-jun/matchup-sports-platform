@@ -303,4 +303,45 @@ describe('팀 해체(보관)·복구 계약', () => {
     expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: recruitingMatchId } })).status).toBe('recruiting');
     expect(await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } })).toBe(0);
   });
+
+  // 팀 이름 예약(H2 × H3) — 이름 확인 조회와 만들기·수정이 같은 판정을 쓴다.
+  const nameTaken = async () =>
+    !(await teams.nameAvailability(asUser(rivalOwnerId), { name: ' 해체 테스트팀 ', sportId, regionId })).available;
+
+  it('팀장이 해체한 팀의 이름은 복구 기간 동안 같은 종목·지역에서 쓸 수 없고, 기간이 지나면 풀린다', async () => {
+    expect(await nameTaken()).toBe(true);
+    await dissolve();
+    expect(await nameTaken()).toBe(true);
+    await prisma.v1Team.update({ where: { id: teamId }, data: { deletedAt: new Date(Date.now() - 31 * DAY) } });
+    expect(await nameTaken()).toBe(false);
+  });
+
+  it('운영팀이 보관한 팀의 이름은 바로 풀린다', async () => {
+    await archiveByOps();
+    expect(await nameTaken()).toBe(false);
+  });
+
+  it('복구하려는 팀과 같은 이름의 팀이 있으면 409 TEAM_RESTORE_NAME_TAKEN 이고 보관 그대로다', async () => {
+    await dissolve();
+    // 규칙 전부터 있던 중복이나 기간 경계에서 먼저 생긴 팀 — 서비스 검사를 거치지 않고 만든다.
+    await prisma.v1Team.update({ where: { id: rivalTeamId }, data: { name: '해체 테스트팀' } });
+    await expect(dissolution.restore(asUser(ownerId), teamId)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'TEAM_RESTORE_NAME_TAKEN' },
+    });
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('archived');
+  });
+
+  it('운영팀이 보관을 풀 때도 그 사이 같은 이름의 팀이 생겼으면 409 TEAM_RESTORE_NAME_TAKEN 이고 보관 그대로다', async () => {
+    await archiveByOps();
+    // 운영팀 보관은 이름을 바로 풀어 주므로 다른 팀이 그 이름을 가져갈 수 있다.
+    await prisma.v1Team.update({ where: { id: rivalTeamId }, data: { name: '해체 테스트팀' } });
+    const logsBefore = await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } });
+    await expect(admin.changeTeamStatus(asUser(opsUserId), teamId, { status: 'active', reason: '복구 요청' })).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'TEAM_RESTORE_NAME_TAKEN' },
+    });
+    expect((await prisma.v1Team.findUniqueOrThrow({ where: { id: teamId } })).status).toBe('archived');
+    expect(await prisma.v1AdminActionLog.count({ where: { adminUserId: opsAdminId } })).toBe(logsBefore);
+  });
 });

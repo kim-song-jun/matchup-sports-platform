@@ -17,8 +17,8 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** 'danger' = 확인 버튼이 빨간색 — 비가역 액션(거절/탈퇴/취소)에 사용 */
   tone?: ConfirmTone;
-  /** 정확히 입력해야 확인 버튼이 활성화되는 문구. 비가역 작업의 이중 확인에 사용 */
-  confirmationPhrase?: string;
+  /** 체크해야 확인 버튼이 켜지는 한 줄(예: '이해했어요') — 되돌리기 어려운 작업을 단순 확인보다 한 단계 무겁게(H2). */
+  acknowledgement?: string;
 }
 
 interface ConfirmState extends ConfirmOptions {
@@ -86,7 +86,7 @@ export function useConfirm() {
       confirmLabel={state?.confirmLabel}
       cancelLabel={state?.cancelLabel}
       tone={state?.tone}
-      confirmationPhrase={state?.confirmationPhrase}
+      acknowledgement={state?.acknowledgement}
       onConfirm={() => handleResolve(true)}
       onCancel={() => handleResolve(false)}
     />
@@ -109,7 +109,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
-  confirmationPhrase?: string;
+  acknowledgement?: string;
   /** 확인 창 안에서 사유를 받는다 — 값은 호출자가 들고(제출 실패 뒤에도 남게) 창은 보여 주기만 한다. */
   reasonField?: ConfirmReasonField;
   /** 호출자가 요청을 보내는 동안 true — 버튼·입력과 ESC·바깥 클릭 닫기를 잠근다. */
@@ -143,7 +143,7 @@ export function ConfirmModal({
   confirmLabel = '확인',
   cancelLabel = '취소',
   tone = 'default',
-  confirmationPhrase,
+  acknowledgement,
   reasonField,
   busy = false,
   error = null,
@@ -153,19 +153,17 @@ export function ConfirmModal({
   const idPrefix = useId();
   const titleId = `${idPrefix}-confirm-title`;
   const messageId = `${idPrefix}-confirm-message`;
-  const phraseId = `${idPrefix}-confirm-phrase`;
   const reasonId = `${idPrefix}-confirm-reason`;
   const reasonHintId = `${idPrefix}-confirm-reason-hint`;
-  const [confirmationInput, setConfirmationInput] = useState('');
-  const confirmationMatched =
-    confirmationPhrase === undefined || confirmationInput === confirmationPhrase;
+  const [acknowledged, setAcknowledged] = useState(false);
+  const acknowledgementReady = acknowledgement === undefined || acknowledged;
   const reasonReady = !reasonField?.required || reasonField.value.trim().length > 0;
-  const canConfirm = confirmationMatched && reasonReady && !busy;
+  const canConfirm = acknowledgementReady && reasonReady && !busy;
   // 초기 포커스는 패널의 첫 컨트롤 — 입력칸이 있으면 입력칸, 없으면 취소 버튼(실수로 확인하지 않게).
   const { dialogRef, onBackdropClick } = useModalA11y({ open, onClose: onCancel, pending: busy, exitMs: 0 }); // 닫히면 즉시 렌더를 떼므로 잠금·포커스 복원도 즉시.
 
   useEffect(() => {
-    if (open) setConfirmationInput('');
+    if (open) setAcknowledged(false);
   }, [open]);
 
   if (!open) return null;
@@ -239,31 +237,25 @@ export function ConfirmModal({
               ) : null}
             </div>
           ) : null}
+          {acknowledgement ? (
+            <label
+              className="tm-text-label"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, marginTop: 16, color: 'var(--text-strong)', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+                disabled={busy}
+                style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--blue500)' }}
+              />
+              {acknowledgement}
+            </label>
+          ) : null}
           {error ? (
             <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', margin: '12px 0 0' }}>
               {error}
             </p>
-          ) : null}
-          {confirmationPhrase ? (
-            <div style={{ marginTop: 20 }}>
-              <label
-                htmlFor={phraseId}
-                className="tm-text-label"
-                style={{ display: 'block', color: 'var(--text-strong)', fontWeight: 600, marginBottom: 8 }}
-              >
-                계속하려면 <strong>{confirmationPhrase}</strong>를 입력해 주세요.
-              </label>
-              <input
-                id={phraseId}
-                type="text"
-                value={confirmationInput}
-                onChange={(event) => setConfirmationInput(event.target.value)}
-                autoComplete="off"
-                placeholder={confirmationPhrase}
-                className="tm-input"
-                style={{ width: '100%', minHeight: 44 }}
-              />
-            </div>
           ) : null}
         </div>
 

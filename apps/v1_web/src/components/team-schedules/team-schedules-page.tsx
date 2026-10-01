@@ -864,7 +864,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
   // (fragments/team-schedules.ts)이 라우트별로 이미 "일정 만들기"/"일정 수정"을 갖고
   // 있다 — override가 필요 없다(app-motion-wave-plan.md §2.25~2.38 공통 절차 2).
   if (model.forbidden) {
-    return <EmptyState title="일정을 관리할 권한이 없어요" sub="팀장 또는 운영진만 일정을 만들거나 수정할 수 있어요." />;
+    return <EmptyState title="일정을 관리할 권한이 없어요" sub="팀장·매니저만 일정을 만들거나 수정할 수 있어요." />;
   }
 
   if (model.loadError) {

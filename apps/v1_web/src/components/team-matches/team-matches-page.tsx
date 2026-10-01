@@ -1134,8 +1134,8 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
             <div className="tm-text-label" style={blocked ? { color: 'var(--orange700)' } : undefined}>권한 기준</div>
             <div className="tm-text-caption" style={{ marginTop: 8 }}>
               {blocked
-                ? '팀장이거나 매치 생성 권한이 있어야 다음으로 진행할 수 있어요. 팀을 만들거나 팀 목록에서 권한이 있는 팀을 찾아 주세요.'
-                : '팀장이거나 매치 생성 권한이 있는 관리자만 다음으로 진행할 수 있어요.'}
+                ? '팀장·매니저인 팀이 있어야 다음으로 진행할 수 있어요. 팀을 만들거나 팀 목록에서 함께할 팀을 찾아 주세요.'
+                : '팀장·매니저만 다음으로 진행할 수 있어요.'}
             </div>
             {blocked ? <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><Link className="tm-btn tm-btn-sm tm-btn-primary" href="/teams/new">팀 만들기</Link><Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/teams">팀 찾기</Link></div> : null}
           </Card>

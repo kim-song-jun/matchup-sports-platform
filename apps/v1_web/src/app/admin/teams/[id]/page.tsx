@@ -14,6 +14,7 @@ import {
 import { useV1AdminTeam } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1AdminTeamDetail } from '@/types/api';
 
 function BackLink() {
@@ -57,12 +58,6 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
   );
 }
 
-const MEMBER_ROLE_LABEL: Record<V1AdminTeamDetail['members'][number]['role'], string> = {
-  owner: '팀장',
-  manager: '운영진',
-  member: '멤버',
-};
-
 function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="팀원 목록">
@@ -82,7 +77,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
                   {member.name && member.nickname ? <p className="mt-1 text-xs text-[var(--text-muted)]">{member.nickname}</p> : null}
                 </div>
                 <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
-                  {MEMBER_ROLE_LABEL[member.role]}
+                  {teamRoleLabel(member.role)}
                 </span>
               </div>
               <dl className="mt-3 grid gap-2 text-xs">

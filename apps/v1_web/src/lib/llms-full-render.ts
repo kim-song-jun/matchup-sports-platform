@@ -2,7 +2,7 @@ import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong 
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
-import { leagueStateLabel } from '@/lib/v1-status-labels';
+import { leagueStateLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
 import type { V1Match, V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 /**
@@ -72,7 +72,7 @@ const PARTICIPATION_GUIDE = [
   '',
   `- **개인 매치** (${absoluteSiteUrl('/matches')}): 혼자서도 참가할 수 있는 매치를 종목·지역·일정으로 찾아 신청해요.`,
   '  호스트 승인이 필요한 매치는 승인 뒤에 참가가 확정돼요.',
-  `- **팀** (${absoluteSiteUrl('/teams')}): 종목·활동 지역별 팀을 찾아 가입을 신청하면, 팀장이나 감독이 수락해요.`,
+  `- **팀** (${absoluteSiteUrl('/teams')}): 종목·활동 지역별 팀을 찾아 가입을 신청하면, 팀장이나 매니저가 수락해요.`,
   '  팀을 직접 만들어 팀장으로 멤버를 모을 수도 있어요.',
   `- **팀 매치** (${absoluteSiteUrl('/team-matches')}): 팀 대 팀 친선 경기예요. 한 팀이 경기를 올리면 상대 팀이 신청하고,`,
   '  올린 팀이 승인하면 경기가 성사돼요.',
@@ -174,7 +174,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     t.sport?.name ?? t.sportName,
     t.regionName && `활동 지역 ${inline(t.regionName, 30)}`,
     `멤버 ${t.memberCount}명`,
-    t.joinPolicy === 'approval_required' ? '가입 신청 받는 중' : '가입 신청 닫힘',
+    teamRecruitmentLabel(t),
   ])) ?? null;
 
   const venues = new Map<string, string[]>();

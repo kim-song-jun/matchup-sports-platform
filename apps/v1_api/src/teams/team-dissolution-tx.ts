@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1ScheduleState, V1TeamStatus } from '@prisma/client';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { classifyTeamMatch, findDissolutionBlockers, loadTeamMatchCandidates } from './team-dissolution';
+import { assertRestoredTeamNameFree, lockTeamNameScope } from './team-name';
 
 type Tx = Prisma.TransactionClient;
 
@@ -32,7 +33,10 @@ function actorFields(actor: DissolutionActor) {
 
 async function lockTeam(tx: Tx, teamId: string) {
   await tx.$queryRaw`SELECT id FROM v1_teams WHERE id = ${teamId} FOR UPDATE`;
-  const team = await tx.v1Team.findUnique({ where: { id: teamId }, select: { id: true, name: true, status: true, deletedAt: true } });
+  const team = await tx.v1Team.findUnique({
+    where: { id: teamId },
+    select: { id: true, name: true, sportId: true, regionId: true, status: true, deletedAt: true },
+  });
   if (!team) throw new NotFoundException({ code: 'NOT_FOUND', message: '팀을 찾을 수 없어요.' });
   return team;
 }
@@ -185,21 +189,24 @@ async function cancelUpcomingTeamSchedulesInTx(tx: Tx, teamId: string, now: Date
 
 /**
  * 보관된 팀을 되살린다. 해체 때 취소한 경기·일정·신청은 되살리지 않고(상대 팀과 신청자에게 이미
- * 알림이 갔다) 팀 채팅방만 다시 연다. 기간·권한 판정은 호출부(팀장 셀프 / 어드민) 몫이다.
+ * 알림이 갔다) 팀 채팅방만 다시 연다. 기간·권한 판정은 호출부(팀장 셀프 / 어드민) 몫이고, 같은 이름의
+ * 팀이 있으면 두 경로 모두 막는다 — 이름 잠금 안에서 guard 와 이름 확인이 같은 시점을 본다.
  */
 export async function restoreTeamInTx(
   tx: Tx,
   input: {
     teamId: string;
     toStatus: Exclude<V1TeamStatus, 'archived'>;
-    guard?: (team: { deletedAt: Date | null }) => void | Promise<void>;
+    guard?: (team: Awaited<ReturnType<typeof lockTeam>>) => void | Promise<void>;
   },
 ) {
   const team = await lockTeam(tx, input.teamId);
   if (team.status !== 'archived') {
     throw new ConflictException({ code: 'TEAM_NOT_DISSOLVED', message: '해체된 팀이 아니에요.' });
   }
+  await lockTeamNameScope(tx, team);
   await input.guard?.(team);
+  await assertRestoredTeamNameFree(tx, team);
   await tx.v1Team.update({ where: { id: team.id }, data: { status: input.toStatus, deletedAt: null } });
   await tx.v1ChatRoom.updateMany({ where: { teamId: team.id }, data: { status: 'active' } });
   return team;

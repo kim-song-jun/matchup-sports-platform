@@ -1001,7 +1001,7 @@ describe('NotificationsService', () => {
         invite('other-user', { recipientUserId: 'user-2' }),
         invite('already-read', { readAt: new Date('2026-06-14T09:00:00Z') }),
         // 같은 팀이지만 초대가 아닌 알림 — 가입 신청 도착(팀장에게 가는 것)
-        invite('join-request', { title: '팀 가입 신청이 도착했어요', deepLink: '/teams/team-1/members' }),
+        invite('join-request', { title: '팀 가입 신청이 도착했어요', deepLink: '/teams/team-1/members?tab=requests' }),
         // 같은 사람·같은 팀의 옛 초대(만료된 채 안 읽음) — 이번 초대가 아니다(W2-V7 대조군).
         invite('older-invitation', { createdAt: new Date('2026-06-01T10:00:00Z') }),
       ];
@@ -1060,7 +1060,7 @@ describe('NotificationsService', () => {
       expect(byId(rows, 'older-invitation')).toMatchObject({ title: '팀 초대가 도착했어요', readAt: null });
       expect(byId(rows, 'other-team').title).toBe('팀 초대가 도착했어요');
       expect(byId(rows, 'join-request').title).toBe('팀 가입 신청이 도착했어요');
-      expect(byId(rows, 'join-request').deepLink).toBe('/teams/team-1/members');
+      expect(byId(rows, 'join-request').deepLink).toBe('/teams/team-1/members?tab=requests');
     });
 
     it('알림 갱신이 실패해도 던지지 않고 로그를 남긴다 — 수락·거절·취소 응답을 깨지 않는다', async () => {

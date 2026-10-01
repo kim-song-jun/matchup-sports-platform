@@ -151,6 +151,7 @@ import type {
   V1TeamJoinApplicationResult,
   V1TeamJoinApplicationsPage,
   V1TeamJoinEligibility,
+  V1TeamNameAvailability,
   V1TeamMembersPage,
   V1TeamMembershipMutationResult,
   V1TeamMatch,
@@ -1111,6 +1112,16 @@ export function useV1TeamJoinEligibility(teamId: string, options?: { enabled?: b
     queryKey: [...v1Keys.team(teamId), 'join-eligibility'] as const,
     queryFn: () => v1Get<V1TeamJoinEligibility>(`/teams/${teamId}/join-eligibility`),
     enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+/** 팀 만들기·수정 입력 중 이름 확인. null 이면 묻지 않는다. */
+export function useV1TeamNameAvailability(params: { name: string; sportId: string; regionId: string; excludeTeamId?: string } | null) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'team-name-availability', params] as const,
+    queryFn: () => v1Get<V1TeamNameAvailability>('/teams/name-availability', params ?? undefined),
+    enabled: params !== null,
     retry: false,
   });
 }

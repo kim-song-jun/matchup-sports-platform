@@ -90,7 +90,11 @@ export class TeamDissolutionService {
 
     await this.prisma.$transaction(async (tx) => {
       // 잠금 뒤 다시 본다 — 위 판정과 잠금 사이에 기간 경계를 넘거나 운영팀이 풀었다 다시 보관할 수 있다.
-      await restoreTeamInTx(tx, { teamId, toStatus: 'active', guard: (locked) => assertSelfRestorable(tx, teamId, locked.deletedAt) });
+      await restoreTeamInTx(tx, {
+        teamId,
+        toStatus: 'active',
+        guard: (locked) => assertSelfRestorable(tx, teamId, locked.deletedAt),
+      });
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team',

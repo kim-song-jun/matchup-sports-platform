@@ -24,7 +24,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import { lockedReasonLabel } from '@/lib/v1-status-labels';
+import { lockedReasonLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
 import { TEAM_MATCH_CANCEL_CONFIRM } from './team-match-cancel-confirm';
 import { TeamMatchCreatePageView } from './team-matches-page';
@@ -191,7 +191,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       name: team.name,
       sport: team.sport.name,
       members: team.memberCount,
-      role: team.role === 'owner' ? '팀장' : team.role === 'manager' ? '관리자' : '멤버',
+      role: teamRoleLabel(team.role) ?? '멤버',
       disabled: !team.canCreateTeamMatch,
     })),
     sports: sports.data
@@ -341,7 +341,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         name: currentTeam?.name ?? '현재 팀',
         sport: currentTeam?.sport.name ?? '현재 종목',
         members: currentTeam?.memberCount ?? 0,
-        role: currentTeam?.role === 'owner' ? '팀장' : '관리자',
+        role: teamRoleLabel(currentTeam?.role) ?? '매니저',
       }]
     : [];
   const sportOptions = sports.data

@@ -8,15 +8,29 @@ import { AdminService } from './admin.service';
 
 const ADMIN_USER = { id: 'admin-user', email: 'a@t.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
-function setup(team: { status: string; deletedAt: Date | null }, options: { matched?: boolean } = {}) {
-  const row = { id: 'team-1', name: '마포 FC', ...team };
+type TeamRow = { id: string; name: string; sportId: string; regionId: string; status: string; deletedAt: Date | null };
+
+/** sameNameTeams: 이 팀 말고 이미 있는 팀 — 이름 확인 조회가 where 의 종목·지역·자기 제외 조건대로 거른다. */
+function setup(team: { status: string; deletedAt: Date | null }, options: { matched?: boolean; otherTeams?: TeamRow[] } = {}) {
+  const row: TeamRow = { id: 'team-1', name: '마포 FC', sportId: 'sport-1', regionId: 'region-1', ...team };
+  type NameWhere = { sportId: string; regionId: string; id?: { not: string } };
   const prisma = {
     $queryRaw: jest.fn().mockResolvedValue([]),
     $executeRaw: jest.fn().mockResolvedValue(1),
     v1AdminUser: {
       findUnique: jest.fn().mockResolvedValue({ id: 'admin-1', userId: ADMIN_USER.id, adminRole: 'ops', status: 'active', user: { accountStatus: 'active' } }),
     },
-    v1Team: { findUnique: jest.fn().mockResolvedValue(row), update: jest.fn(({ data }) => Promise.resolve({ ...row, ...data })) },
+    v1Team: {
+      findUnique: jest.fn().mockResolvedValue(row),
+      update: jest.fn(({ data }) => Promise.resolve({ ...row, ...data })),
+      findMany: jest.fn(({ where }: { where: NameWhere }) =>
+        Promise.resolve(
+          [...(options.otherTeams ?? []), row].filter(
+            (team) => team.sportId === where.sportId && team.regionId === where.regionId && (!where.id || team.id !== where.id.not),
+          ),
+        ),
+      ),
+    },
     v1Game: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamMatch: {
       findMany: jest.fn().mockResolvedValue(
@@ -35,7 +49,7 @@ function setup(team: { status: string; deletedAt: Date | null }, options: { matc
     v1ScheduleGuestRecruitment: { updateMany: jest.fn() },
     v1ChatRoom: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ userId: 'owner-user' }, { userId: 'member-1' }]) },
-    v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }), createMany: jest.fn() },
+    v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }), createMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-1' }) },
     $transaction: jest.fn(),
   };
@@ -88,6 +102,35 @@ describe('AdminService.changeTeamStatus — 보관은 해체 경로', () => {
     expect(prisma.v1Team.update).toHaveBeenCalledWith({ where: { id: 'team-1' }, data: { status: 'active', deletedAt: null } });
     expect(prisma.v1ChatRoom.updateMany).toHaveBeenCalledWith({ where: { teamId: 'team-1' }, data: { status: 'active' } });
     expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
+  it('보관을 풀 때 같은 종목·지역에 같은 이름의 팀이 생겼으면 409 TEAM_RESTORE_NAME_TAKEN 이고 보관 그대로다', async () => {
+    const { service, prisma } = setup(
+      { status: 'archived', deletedAt: new Date('2026-09-20') },
+      { otherTeams: [{ id: 'team-2', name: ' 마포 fc', sportId: 'sport-1', regionId: 'region-1', status: 'active', deletedAt: null }] },
+    );
+    await expect(service.changeTeamStatus(ADMIN_USER, 'team-1', { status: 'active', reason: '복구 요청' })).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'TEAM_RESTORE_NAME_TAKEN', message: '같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.' },
+    });
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('같은 이름이 다른 지역에만, 같은 지역엔 다른 이름만 있으면 보관을 푼다', async () => {
+    const { service, prisma } = setup(
+      { status: 'archived', deletedAt: new Date('2026-09-20') },
+      {
+        otherTeams: [
+          { id: 'team-2', name: '마포 FC', sportId: 'sport-1', regionId: 'region-2', status: 'active', deletedAt: null },
+          { id: 'team-3', name: '합정 FC', sportId: 'sport-1', regionId: 'region-1', status: 'active', deletedAt: null },
+        ],
+      },
+    );
+    await service.changeTeamStatus(ADMIN_USER, 'team-1', { status: 'active', reason: '복구 요청' });
+    expect(prisma.v1Team.update).toHaveBeenCalledWith({ where: { id: 'team-1' }, data: { status: 'active', deletedAt: null } });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
   });
 
   it('활동 중 ↔ 운영 중지는 지금처럼 상태만 바꾼다', async () => {

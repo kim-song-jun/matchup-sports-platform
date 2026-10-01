@@ -61,3 +61,12 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   (forfeit/abandon end) first. Scheduled and ended games stay cancellable
   (ended ones for result corrections). The admin fixture table disables the
   cancel action on the same condition.
+- The two other paths that cancel fixtures apply the same rule to every
+  not-yet-cancelled fixture they would cancel, with the same
+  `409 LEAGUE_FIXTURE_GAME_IN_PROGRESS` and nothing changed:
+  `DELETE /api/v1/admin/league-matches/:leagueId/teams/:teamId` (team removal —
+  that team's fixtures) and
+  `POST /api/v1/admin/league-matches/:leagueId/fixtures/regenerate` (all
+  fixtures). Already-cancelled fixtures are skipped, so an orphaned live game
+  on a cancelled fixture does not block them. The admin screen disables the
+  team's remove button and the regenerate button on the same condition.

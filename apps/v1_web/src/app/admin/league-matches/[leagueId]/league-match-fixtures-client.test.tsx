@@ -1810,24 +1810,21 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
   const W1 = '2026-09-30T01:10:00.000Z';
   const W2 = '2026-10-07T01:10:00.000Z';
 
-  function renderLeague(fixtures: Fixture[]) {
+  const TEAMS = [
+    { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null },
+    { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null },
+  ];
+
+  function renderLeague(fixtures: Fixture[], teams = TEAMS) {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
-        leagueId: 'league-1', title: '마포 주말 리그', state: 'active', teamIds: ['t1', 't2'],
+        leagueId: 'league-1', title: '마포 주말 리그', state: 'active', teamIds: teams.map((team) => team.teamId),
         startsOn: '2026-09-01T00:00:00.000Z', recentVenues: [], fixtures,
       },
       isPending: false,
     } as never);
-    useV1AdminLeagueTeamsMock.mockReturnValue({
-      data: {
-        leagueId: 'league-1',
-        teams: [
-          { teamId: 't1', name: '마포 FC', status: 'active', memberCount: 5, logoUrl: null },
-          { teamId: 't2', name: '합정 유나이티드', status: 'active', memberCount: 5, logoUrl: null },
-        ],
-      },
-    } as never);
+    useV1AdminLeagueTeamsMock.mockReturnValue({ data: { leagueId: 'league-1', teams } } as never);
     useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
     useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
     render(
@@ -1959,5 +1956,37 @@ describe('LeagueMatchFixturesClient — 지금 할 일 카드와 콘솔 열기',
     const cancel = within(openRowMenu('1주차')).getByRole('button', { name: /^대진 취소/ });
     expect(cancel).not.toBeDisabled();
     expect(cancel).not.toHaveTextContent('경기가 진행 중이에요');
+  });
+
+  // 팀 제외·재생성도 대진을 취소한다 — 서버가 같은 409 로 막는 조건에서 버튼을 미리 막는다.
+  const THREE_TEAMS = [...TEAMS, { teamId: 't3', name: '성수 FC', status: 'active', memberCount: 5, logoUrl: null }];
+  const regenerateButton = () => screen.getAllByRole('button', { name: '대진 재생성' })[0];
+
+  it('경기가 진행 중이면 그 두 팀의 제외와 대진 재생성이 막히고 이유를 적는다', () => {
+    renderLeague([{ ...base, teamMatchId: 'tm-live', title: '1주차', startAt: W1, gameState: 'PAUSED' }], THREE_TEAMS);
+    openFixtureManage();
+
+    expect(screen.getByRole('button', { name: '마포 FC 제외' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '합정 유나이티드 제외' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '성수 FC 제외' })).not.toBeDisabled();
+    expect(screen.getByText(/경기가 진행 중인 팀은/)).toBeInTheDocument();
+    expect(regenerateButton()).toBeDisabled();
+    expect(screen.getByText(/진행 중인 경기가 있어 대진을 다시 만들 수 없어요/)).toBeInTheDocument();
+  });
+
+  it('끝난 경기와 이미 취소된 대진만 있으면 제외·재생성은 예전대로 열린다', () => {
+    renderLeague(
+      [
+        { ...base, teamMatchId: 'tm-done', title: '1주차', startAt: W1, resultStage: 'awaiting_approval', gameState: 'ENDED' },
+        { ...base, teamMatchId: 'tm-void', title: '2주차', startAt: W2, status: 'cancelled', gameState: 'LIVE' },
+      ],
+      THREE_TEAMS,
+    );
+    openFixtureManage();
+
+    expect(screen.getByRole('button', { name: '마포 FC 제외' })).not.toBeDisabled();
+    expect(regenerateButton()).not.toBeDisabled();
+    expect(screen.queryByText(/경기가 진행 중인 팀은/)).toBeNull();
+    expect(screen.queryByText(/진행 중인 경기가 있어 대진을 다시 만들 수 없어요/)).toBeNull();
   });
 });

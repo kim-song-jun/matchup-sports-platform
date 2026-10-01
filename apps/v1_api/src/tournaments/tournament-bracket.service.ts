@@ -60,6 +60,7 @@ import { createTournamentMatchInTx } from './tournament-match-creation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
+import { tournamentRoundLabel } from './tournament-round-label';
 
 type AdminBracketResult = {
   id: string;
@@ -562,7 +563,7 @@ export class TournamentBracketService {
         awayRegistrationId: dto.awayRegistrationId ?? null,
         sportId: pinnedTournament.sportId,
         regionId: pinnedTournament.regionId ?? null,
-        title: pinnedTournament.title + ' · ' + dto.round + ' ' + dto.fixtureNumber,
+        title: pinnedTournament.title + ' · ' + tournamentRoundLabel(dto.round) + ' ' + dto.fixtureNumber,
         placeName: commandPayload.venue,
         startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdByUserId: user.id,

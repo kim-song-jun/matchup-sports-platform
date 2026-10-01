@@ -556,6 +556,21 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     expect(creations.map((creation) => creation.input.competitionConfigVersionId)).toEqual(Array(6).fill('ccv-1'));
   });
 
+  // W8-V3 후속 — 제목에 좌표 키 원값("· league_r1 1")이 저장돼 팀 일정·알림에 그대로 복사됐다.
+  it('팀매치 제목은 라운드 키가 아니라 화면 이름을 쓴다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      id: 't1', title: '봄 대회', format: 'league', minMatchesPerTeam: null, competitionConfigVersionId: 'ccv-1',
+    });
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
+
+    await service.generate(user, 't1', dto());
+
+    const titles = prisma.v1TeamMatch.create.mock.calls.map((call) => String(call[0].data.title));
+    expect(titles).toHaveLength(6);
+    expect(titles).toContain('봄 대회 · 조별리그 1라운드 1');
+    expect(titles.filter((title) => title.includes('league_r'))).toEqual([]);
+  });
+
   it('만든 대진의 모든 팀에 명단 재계산 이벤트를 남긴다 — 결장 기간·출전정지가 새 경기에도 걸린다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
 

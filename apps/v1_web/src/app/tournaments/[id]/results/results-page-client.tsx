@@ -14,6 +14,7 @@ import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 import type {
   V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
@@ -732,8 +733,7 @@ function TournamentSummaryCard({ tournament, detailHref }: { tournament: V1Tourn
 
 /* ── 경기 영상 모아보기 — 전 경기 하이라이트를 한 섹션에 (경기 행은 스코어만 유지) ── */
 function fixtureVideoLabel(f: V1TournamentFixture): string {
-  const round: Record<string, string> = { final: '결승', semi: '4강', third_place: '3·4위전', group: '조별리그' };
-  const base = round[f.round] ?? f.round;
+  const base = tournamentRoundLabel(f.round);
   const leg = f.round === 'semi' || f.round === '4강' ? ` ${f.legNumber}차` : '';
   return `${base}${leg}`;
 }

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 // 신뢰 등급 경계는 team-trust-aggregation.ts의 단일 정의를 쓴다 — 예전엔 여기에도 사본이 있었고,
 // 그런 복제가 "DB 저장값과 화면 재계산값이 갈라지는" 사고의 원인이었다(reviews.service.ts 하단 주석 참고).
 import { trustStateForReviewCount } from './team-trust-aggregation';
+import { tournamentRoundLabel } from '../tournaments/tournament-round-label';
 
 export const TOURNAMENT_FIXTURE_SOURCE_TYPE = 'tournament_fixture' as const;
 export const REVIEW_TAGS = {
@@ -113,7 +114,7 @@ export function fixtureTeams(fixture: CanonicalTournamentFixture) {
 
 export function fixtureTitle(fixture: CanonicalTournamentFixture) {
   const details = fixture.tournamentDetails;
-  return `${fixture.tournament.title} · ${details?.round ?? '대회'} ${details?.fixtureNumber ?? ''}경기`;
+  return `${fixture.tournament.title} · ${details ? tournamentRoundLabel(details.round) : '대회'} ${details?.fixtureNumber ?? ''}경기`;
 }
 
 export function sourceSummary(sourceId: string, title: string, completedAt: Date | null) {

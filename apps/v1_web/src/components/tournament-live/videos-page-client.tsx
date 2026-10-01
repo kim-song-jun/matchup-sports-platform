@@ -13,6 +13,7 @@ import { FixtureVideoAddForm } from '@/components/fixture-videos/fixture-video-a
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 import {
   useCreateFixtureVideoLink,
   useDeleteFixtureVideo,
@@ -28,16 +29,8 @@ interface Props {
   tournamentId: string;
 }
 
-// 대진표(tournament-bracket.tsx)와 같은 표기. 그 맵은 export 되지 않아 여기서 필요한 값만 둔다.
-const ROUND_LABEL: Record<string, string> = {
-  group: '조별리그',
-  semi: '4강',
-  final: '결승',
-  third_place: '3·4위전',
-};
-
 function fixtureLabel(fixture: TournamentVideoFixture): string {
-  const round = ROUND_LABEL[fixture.round] ?? fixture.round;
+  const round = tournamentRoundLabel(fixture.round);
   const home = fixture.homeTeamName ?? '미정';
   const away = fixture.awayTeamName ?? '미정';
   return `${round} ${fixture.fixtureNumber}경기 · ${home} vs ${away}`;

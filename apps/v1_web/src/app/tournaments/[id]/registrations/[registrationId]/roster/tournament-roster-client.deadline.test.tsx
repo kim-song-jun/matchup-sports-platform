@@ -461,6 +461,17 @@ describe('등번호 수정', () => {
     expect(screen.queryByText('선수 정보를 수정했어요.')).not.toBeInTheDocument();
   });
 
+  // W8-V1 — 아래쪽 행을 저장하면 목록 위 상태 줄이 화면 밖이었다(alpha 1440: top -379px).
+  it('저장 확인 문구는 스크롤과 무관한 화면 고정 안내에 뜨고, 스크린리더에도 읽힌다', async () => {
+    renderRow(7);
+    fireEvent.change(screen.getByLabelText('등번호'), { target: { value: '19' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    const live = (await screen.findByText('등번호를 저장했어요.')).closest('[role="status"]');
+    expect(live).toHaveClass('fixed', 'tm-native-toast-stack');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('대조군: 자격과 등번호를 함께 저장하면 문구는 저장 전체를 말하는 하나다', async () => {
     renderRow(7);
     fireEvent.click(screen.getByRole('radio', { name: '선출' }));

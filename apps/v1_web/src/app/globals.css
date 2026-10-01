@@ -138,7 +138,6 @@
   --overlay-white-35: rgba(255, 255, 255, 0.35);  /* 푸터 copy 텍스트 */
   --overlay-white-55: rgba(255, 255, 255, 0.55);  /* 푸터 링크 기본 */
   --overlay-white-66: rgba(255, 255, 255, 0.66);  /* 랜딩 CTA 서브 */
-  --overlay-white-68: rgba(255, 255, 255, 0.68);  /* 팀매치 히어로 팀 레이블 */
   --overlay-white-70: rgba(255, 255, 255, 0.70);  /* 대회 고스트 버튼 테두리 */
   --overlay-white-72: rgba(255, 255, 255, 0.72);  /* 팀매치·팀 페이지 서브텍스트 */
   --overlay-white-75: rgba(255, 255, 255, 0.75);  /* 프로모 메타 */
@@ -147,7 +146,7 @@
   --overlay-white-85: rgba(255, 255, 255, 0.85);  /* 푸터 링크 hover */
   --overlay-white-86: rgba(255, 255, 255, 0.86);  /* 히어로 메시지 */
   --overlay-white-88: rgba(255, 255, 255, 0.88);  /* 프로모 prize 레이블 */
-  --overlay-white-90: rgba(255, 255, 255, 0.90);  /* 푸터 브랜드 */
+  --overlay-white-90: rgba(255, 255, 255, 0.90);  /* 푸터 브랜드 · 팀매치 히어로 글씨(파랑 위 4.71:1) */
   --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
   --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
   /* 모달·사이드바 그림자 */
@@ -4183,7 +4182,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /*
  * 사진 없는 팀매치의 VS 카드/히어로 배경 — matches.tm-match-media-sport 와 같은 이유(웨이브4,
  * 2026-09-04). 이쪽은 matches 히어로와 달리 양옆에 팀 이름 텍스트가 항상 있어(비어 있는 쪽이
- * 없다) 그래픽을 우하단 모서리에 살짝 걸치듯 배치하고, overflow:hidden 으로 카드 밖 노출을
+ * 없다) 그래픽을 위쪽 가운데에 배치하고, overflow:hidden 으로 카드 밖 노출을
  * 막는다. z-index 를 음수로 둬 흰 텍스트(비-포지션 콘텐츠)가 항상 그 위에 그려지게 한다 —
  * CSS 페인트 순서상 음수 z-index 자식은 비-포지션 콘텐츠보다 아래에 그려진다(CSS2.1 Appendix E).
  */
@@ -4197,15 +4196,16 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   isolation: isolate;
 }
 
-/* 팀 이름이 좌우에 있는 VS 레이아웃이라 그래픽은 하단 우측 안쪽에 두고(잘리지 않게) 텍스트 뒤(z-index:-1)에 깐다.
-   z-index는 페인트 순서만 정할 뿐 색 대비는 보장하지 않으므로 opacity로 항상 낮춘다(팀 미배정 상태와 동일 값). */
+/* 글씨가 놓이는 좌우·하단을 피해 위쪽 가운데(뒤로가기·공유 버튼 사이)에 둔다 — 글씨 뒤에 깔리면
+   opacity 로 낮춰도 파랑이 밝아져 흰 글씨 대비가 4.5:1 아래로 내려간다. */
 .tm-team-vs-hero-illustration {
   position: absolute;
   z-index: -1;
-  right: 16px;
-  bottom: 16px;
-  width: 120px;
-  height: 120px;
+  left: 50%;
+  top: 8px;
+  width: 88px;
+  height: 88px;
+  transform: translateX(-50%);
   pointer-events: none;
   opacity: 0.2;
 }

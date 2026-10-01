@@ -167,9 +167,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
   const submitMutation = useV1SubmitTeamMatchLineup(teamMatchId);
-  const [submittedInSession, setSubmittedInSession] = useState(false);
+  const [submittedRevision, setSubmittedRevision] = useState<number | null>(null);
   const [resubmittedAt, setResubmittedAt] = useState<number | null>(null);
-  const submittedLineup = lineupQuery.data ? isLineupSubmitted(lineupQuery.data.state, submittedInSession) : false;
+  const submittedLineup = lineupQuery.data ? isLineupSubmitted(lineupQuery.data, submittedRevision) : false;
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
   const matchCancelled = teamMatchQuery.data ? getStatus(teamMatchQuery.data) === 'cancelled' : false;
@@ -248,8 +248,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             return prev === current ? updated : { ...updated, dirty: true };
           });
           setSaveStatus('saved');
-          // 낸 명단의 저장은 서버가 곧바로 새 제출본으로 만든다(R-2) — 제출 API 를 따로 부르지 않는다.
-          if (result.state === 'SUBMITTED') setResubmittedAt(Date.now());
+          // 낸 명단의 저장은 서버가 곧바로 새 제출본으로 만든다(R-2). 초안 저장이면 지난 "다시 제출했어요"를 지운다.
+          setResubmittedAt(result.state === 'SUBMITTED' ? Date.now() : null);
           if (pendingSubmitRef.current) {
             if (editedDuringSave) {
               // 방금 저장에 실리지 못한 편집이 남아 있다 — 디바운스를 기다리지 않고
@@ -296,7 +296,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       { idempotencyKey: randomUuid(), expectedVersion },
       {
         onSuccess: () => {
-          setSubmittedInSession(true);
+          setSubmittedRevision(expectedVersion);
           // 불러오기·프리셋 저장 결과 안내는 제출 전 작업의 것이다 — 제출 뒤에도 남으면 지금 상태처럼 읽힌다.
           setLoadNotice(null);
         },

@@ -1976,6 +1976,61 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();
   });
 
+  /** 서버 응답이 바뀐 것을 화면이 다시 읽게 한다(재조회 결과). */
+  function serveAndRerender(rerender: (ui: React.ReactElement) => void, data: V1TeamMatchLineup) {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data, isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
+    rerender(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+  }
+
+  it('낸 직후 재조회가 더 새 초안(상대 팀 정정 요청)을 주면 [저장]·[참석명단 제출하기]로 돌아간다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: draftLineup(), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
+    const { rerender } = render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+    expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();
+
+    serveAndRerender(rerender, baseLineup({ state: 'DRAFT', revision: 5, version: 5, starters }));
+
+    expect(screen.queryByRole('button', { name: '변경 취소' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeEnabled();
+  });
+
+  it('대조군 — 재조회 전 틈(낸 리비전 그대로인 초안 응답)에는 낸 상태를 지킨다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: draftLineup(), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
+    const { rerender } = render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+
+    serveAndRerender(rerender, draftLineup());
+
+    expect(screen.queryByRole('button', { name: '참석명단 제출하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();
+  });
+
+  it('다시 낸 뒤 정정 요청으로 초안이 되면, 다음 첫 제출에 지난 "다시 제출했어요"가 되살아나지 않는다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: submittedLineup(), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
+    const { rerender } = render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에서 빼기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 제출하기' }));
+    act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 5, state: 'SUBMITTED' }));
+    act(() => hoisted.saveMutate.mock.calls[0][1].onSettled());
+    expect(screen.getByText(/^다시 제출했어요/)).toBeInTheDocument();
+
+    serveAndRerender(rerender, baseLineup({ state: 'DRAFT', revision: 6, version: 6, starters: starters.slice(0, 1) }));
+    expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeInTheDocument();
+    expect(screen.queryByText(/^다시 제출했어요/)).not.toBeInTheDocument();
+
+    // 초안에서 고쳐 처음 내기: 저장(초안) → 그 리비전으로 제출.
+    fireEvent.click(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    act(() => hoisted.saveMutate.mock.calls[1][1].onSuccess({ revision: 7, state: 'DRAFT' }));
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+
+    expect(hoisted.submitMutate.mock.calls[0][0]).toMatchObject({ expectedVersion: 7 });
+    expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();
+    expect(screen.queryByText(/^다시 제출했어요/)).not.toBeInTheDocument();
+  });
+
   it('대조군 — 내기 전 초안은 그대로 [저장]·[참석명단 제출하기]다', () => {
     renderLineup(draftLineup());
     fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에서 빼기' }));

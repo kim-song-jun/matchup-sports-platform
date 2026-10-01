@@ -574,11 +574,16 @@ export function describeLineupPhase(
 }
 
 /**
- * 한 번이라도 낸 명단인가(Task 180 R-2) — 그 뒤로는 [저장] 없이 [변경 취소]·[다시 제출하기]만 있다. 서버도 이 명단의
- * 저장을 곧바로 새 제출본으로 만든다. `submittedInSession` 은 제출 성공부터 재조회 응답까지의 틈을 메운다.
+ * 지금 낸 명단인가(Task 180 R-2) — 그렇다면 [저장] 없이 [변경 취소]·[다시 제출하기]만 있다. 서버도 이 명단의
+ * 저장을 곧바로 새 제출본으로 만든다. `submittedRevision`(이 화면에서 방금 낸 리비전)은 제출 성공부터 재조회
+ * 응답까지의 틈만 메운다 — 서버가 그보다 새 리비전(상대 팀 정정 요청이 만든 초안 등)을 주면 서버 상태를 따른다.
  */
-export function isLineupSubmitted(serverState: V1TeamMatchLineupState, submittedInSession: boolean): boolean {
-  return submittedInSession || serverState === 'SUBMITTED' || serverState === 'LOCKED';
+export function isLineupSubmitted(
+  server: { state: V1TeamMatchLineupState; revision: number },
+  submittedRevision: number | null,
+): boolean {
+  if (server.state === 'SUBMITTED' || server.state === 'LOCKED') return true;
+  return submittedRevision !== null && server.revision <= submittedRevision;
 }
 
 /** 낸 명단을 고치는 중(R-2 A-1) — 다시 내기 전까지 상대 팀에는 원래 제출본이 보인다. */

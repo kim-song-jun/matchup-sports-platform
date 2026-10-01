@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -363,6 +364,16 @@ function isRegisterableForm(form: AddPlayerFormState) {
   return Boolean(form.realName.trim() && form.birthDate.trim() && form.phone.trim());
 }
 
+/** 제출 버튼 위에 알려 줄 "아직 비어 있는 필수 항목" — canSubmit 이 이미 보는 값에서 그대로 뽑는다. */
+function remainingRequiredLabels(form: AddPlayerFormState): string[] {
+  const missing: string[] = [];
+  if (!form.userId.trim()) missing.push('팀원 선택');
+  if (!form.realName.trim()) missing.push('실명');
+  if (!form.birthDate.trim()) missing.push('생년월일');
+  if (!form.phone.trim()) missing.push('휴대폰 번호');
+  return missing;
+}
+
 function memberMissingReason(
   member: { realName?: unknown; birthDate?: unknown; phone?: unknown; gender?: 'male' | 'female' | null },
   genderCategory: V1TournamentGenderCategory | null | undefined,
@@ -381,6 +392,11 @@ function AddPlayerForm({
   pendingUserIds,
   isSubmitting,
   error,
+  footerSlot,
+  isActive,
+  multipleDrafts,
+  onActivate,
+  onFooterNeededChange,
 }: {
   formId: string;
   teamId: string;
@@ -393,6 +409,14 @@ function AddPlayerForm({
   pendingUserIds: Set<string>;
   isSubmitting: boolean;
   error: string | null;
+  /** 제출 버튼이 들어갈 화면 하단 고정 영역. 스크롤 영역 밖이라 입력칸을 덮지 않는다. */
+  footerSlot: HTMLElement | null;
+  /** 여러 추가 칸 중 하단 영역이 지금 제출하는 칸인가. */
+  isActive: boolean;
+  multipleDrafts: boolean;
+  onActivate: (formId: string) => void;
+  /** 이 칸이 하단 제출 영역을 실제로 채우는지(팀원 없음 안내 상태에서는 채우지 않는다). */
+  onFooterNeededChange: (formId: string, needed: boolean) => void;
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
   const [birthDateError, setBirthDateError] = useState<string | null>(null);
@@ -469,6 +493,7 @@ function AddPlayerForm({
     !selectedAlreadyRegistered &&
     !selectedAlreadyPending &&
     selectedIneligibility === null;
+  const remainingRequired = remainingRequiredLabels(form);
   const selectedMemberMissing = form.userId ? selectedIneligibility !== null : false;
   const memberFieldId = `${formId}-member`;
   const realNameFieldId = `${formId}-realname`;
@@ -482,13 +507,18 @@ function AddPlayerForm({
   // 제출도 불가능하다(canSubmit이 form.userId를 요구). 크리플드 폼을 보여주는 대신
   // 폼 전체를 "먼저 멤버를 추가하라" 안내로 대체한다.
   const noMembers = !membersLoading && !membersError && members.length === 0;
+  useEffect(() => {
+    onFooterNeededChange(formId, !noMembers);
+    return () => onFooterNeededChange(formId, false);
+  }, [formId, noMembers, onFooterNeededChange]);
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
+    <div onFocusCapture={() => onActivate(formId)}>
     <Card pad={16} style={{ border: '1px solid var(--grey200)', background: 'var(--surface)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-          선수 추가
+          새 선수 정보
         </div>
         <button
           type="button"
@@ -496,9 +526,9 @@ function AddPlayerForm({
           style={{ minWidth: 44, padding: '0 12px' }}
           onClick={() => onRemove(formId)}
           disabled={isSubmitting}
-          aria-label="선수 추가 칸 삭제"
+          aria-label="선수 추가 칸 닫기"
         >
-          X
+          닫기
         </button>
       </div>
 
@@ -760,32 +790,37 @@ function AddPlayerForm({
         </div>
       ) : null}
 
-      {/* #8: Sticky CTA bar — stays in view even when the form is taller than the viewport */}
-      <div
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          marginTop: 16,
-          paddingTop: 12,
-          paddingBottom: 8,
-          background: 'var(--surface)',
-          borderTop: '1px solid var(--grey100)',
-          zIndex: 10,
-        }}
-      >
-        <button
-          type="button"
-          className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
-          style={{ minHeight: 44 }}
-          disabled={!canSubmit || isSubmitting}
-          onClick={() => onSubmit(formId, form)}
-        >
-          {isSubmitting ? '추가 중…' : '추가'}
-        </button>
-      </div>
+      {isActive && footerSlot
+        ? createPortal(
+            <>
+              {/* 비활성 이유를 버튼 바로 위에서 알려 준다. 값은 채웠는데 못 보내는 경우(생년월일 형식·이미 등록 등)는
+                  해당 칸이 이유를 직접 말하므로 여기선 점검만 안내한다. */}
+              <p className="tm-text-caption" style={{ margin: '0 0 8px', color: 'var(--text-muted)' }} aria-live="polite">
+                {remainingRequired.length > 0
+                  ? `${multipleDrafts ? '선택한 칸 · ' : ''}필수 항목 ${remainingRequired.length}개가 남았어요 · ${remainingRequired.join(', ')}`
+                  : !canSubmit
+                    ? '입력한 내용을 한 번 더 확인해 주세요.'
+                    : multipleDrafts
+                      ? '선택한 칸을 등록해요.'
+                      : '모두 입력했어요.'}
+              </p>
+              <button
+                type="button"
+                className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
+                style={{ minHeight: 44 }}
+                disabled={!canSubmit || isSubmitting}
+                onClick={() => onSubmit(formId, form)}
+              >
+                {isSubmitting ? '등록 중…' : '선수 등록'}
+              </button>
+            </>,
+            footerSlot,
+          )
+        : null}
       </>
       )}
     </Card>
+    </div>
   );
 }
 
@@ -1196,6 +1231,10 @@ export function TournamentRosterPageClient({
 
   const [draftForms, setDraftForms] = useState<DraftPlayerForm[]>([]);
   const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
+  // 추가 칸이 여러 개여도 하단 제출 영역은 하나다 — 마지막으로 포커스한(없으면 마지막으로 연) 칸을 제출한다.
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [footerDraftIds, setFooterDraftIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   // [primary cap] 한 번에 한 행만 편집 모드로 둔다 — PlayerRow가 각자 로컬 상태로
   // isEditing을 가지면 여러 행이 동시에 열려 "저장" 버튼이 화면에 여럿 primary로
@@ -1249,6 +1288,9 @@ export function TournamentRosterPageClient({
     () => new Set(players.map((player) => player.userId)),
     [players],
   );
+  const showSubmitFooter = canEditRoster && footerDraftIds.size > 0;
+  const activeDraftFormId =
+    draftForms.find((form) => form.id === activeDraftId)?.id ?? draftForms[draftForms.length - 1]?.id ?? null;
   const canAddDraftForm = canEditRoster && players.length + draftForms.length < maxPlayers;
 
   // 권한이 사라지면(팀에서 제외됨, 세션 중 역할 강등 등) 남아 있던 편집 상태를 비운다 —
@@ -1291,9 +1333,21 @@ export function TournamentRosterPageClient({
       );
   }
 
+  const handleFooterNeededChange = useCallback((formId: string, needed: boolean) => {
+    setFooterDraftIds((prev) => {
+      if (prev.has(formId) === needed) return prev;
+      const next = new Set(prev);
+      if (needed) next.add(formId);
+      else next.delete(formId);
+      return next;
+    });
+  }, []);
+
   function handleAddDraftForm() {
     if (!canAddDraftForm) return;
-    setDraftForms((prev) => [...prev, createDraftPlayerForm()]);
+    const draft = createDraftPlayerForm();
+    setDraftForms((prev) => [...prev, draft]);
+    setActiveDraftId(draft.id);
     hideToast();
     setRemoveError(null);
   }
@@ -1415,7 +1469,14 @@ export function TournamentRosterPageClient({
 
   return (
     <>
-      <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
+      <div
+        className="tm-tournament-roster-body"
+        // 하단 고정 제출 영역(.tm-fixed-cta, 안내 한 줄 + 버튼)이 마지막 입력칸을 덮지 않게 그 높이만큼 비운다.
+        style={{
+          padding: `0 20px ${showSubmitFooter ? 'calc(168px + var(--v1-shell-safe-bottom))' : '48px'}`,
+          marginTop: 12,
+        }}
+      >
 
         {tournament && registration ? (
           <TournamentRosterDeadlineCard
@@ -1580,9 +1641,8 @@ export function TournamentRosterPageClient({
               className={`tm-btn tm-btn-sm ${draftForms.length > 0 || editingPlayerId !== null ? 'tm-btn-outline' : 'tm-btn-primary'}`}
               style={{ flexShrink: 0, minWidth: 64 }}
               onClick={handleAddDraftForm}
-              aria-label="선수 추가하기"
             >
-              + 추가
+              선수 추가
             </button>
           ) : null}
           {canEditRoster && !canAddDraftForm ? (
@@ -1614,6 +1674,11 @@ export function TournamentRosterPageClient({
                   pendingUserIds={pendingUserIds}
                   isSubmitting={addPlayer.isPending}
                   error={draftErrors[draftForm.id] ?? null}
+                  footerSlot={footerSlot}
+                  isActive={draftForm.id === activeDraftFormId}
+                  multipleDrafts={draftForms.length > 1}
+                  onActivate={setActiveDraftId}
+                  onFooterNeededChange={handleFooterNeededChange}
                 />
               );
             })}
@@ -1667,6 +1732,10 @@ export function TournamentRosterPageClient({
           </Link>
         </div>
       </div>
+
+      {showSubmitFooter ? (
+        <div className="tm-fixed-cta" role="group" aria-label="선수 등록" ref={setFooterSlot} />
+      ) : null}
 
       {/* 선수 삭제 confirm modal */}
       {RemoveConfirmModal}

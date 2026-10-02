@@ -1,0 +1,192 @@
+{
+  "candidate": "Team creation tablet keyboard focus is partially hidden by fixed action area",
+  "role": "captain B",
+  "url": "https://alpha.teameet.co.kr/teams/new",
+  "observedAt": "2026-10-02T08:57:25.731Z",
+  "reconfirmedEmptyAt": "2026-10-02T08:59:55.209Z",
+  "viewport": {
+    "width": 787,
+    "height": 505
+  },
+  "steps": [
+    "Open Teams > Create team",
+    "Expand 더 꾸미기 (선택)",
+    "Move keyboard focus to 팀 소개 (Tab from 이미지 선택)",
+    "Press Tab to 레벨",
+    "Observe lower selector edge and focus ring under fixed actions"
+  ],
+  "expected": "The focused level selector and its focus indicator are fully visible above the fixed action area",
+  "actual": {
+    "selector": {
+      "bottom": 435.3333435058594,
+      "height": 48,
+      "width": 274,
+      "x": 113.33333587646484,
+      "y": 387.3333435058594
+    },
+    "fixedActionAreaTop": 416,
+    "overlapCssPixels": 19.3333435058594,
+    "hitTest": [
+      {
+        "label": "center",
+        "tag": "SELECT",
+        "targetIsSelect": true,
+        "text": "전체 레벨\n입문\n초보\n초보-중수\n중수\n중수-고수\n고수",
+        "x": 250.33333587646484,
+        "y": 411.3333435058594
+      },
+      {
+        "label": "bottom-2",
+        "tag": "A",
+        "targetIsSelect": false,
+        "text": "이전",
+        "x": 250.33333587646484,
+        "y": 433.3333435058594
+      }
+    ],
+    "reproducibility": "Repeated Shift+Tab/Tab and again after cancel/reenter with empty values"
+  },
+  "recovery": {
+    "method": "Ordinary page scroll on right content margin, outside textarea",
+    "focusedSelector": {
+      "centerHitTarget": true,
+      "clientHeight": 47,
+      "id": "",
+      "name": "레벨\n전체 레벨\n입문\n초보\n초보-중수\n중수\n중수-고수\n고수",
+      "outline": "rgb(49, 130, 246) solid 2px",
+      "rect": {
+        "bottom": 275.3333435058594,
+        "height": 48,
+        "width": 274,
+        "x": 113.33333587646484,
+        "y": 227.33334350585935
+      },
+      "scrollHeight": 47,
+      "scrollTop": 0,
+      "selectionEnd": null,
+      "selectionStart": null,
+      "tag": "SELECT"
+    }
+  },
+  "severityCandidate": "Low usability; partially obscured, center remains usable and manual scroll recovers. Not claimed totally inaccessible or a conformance verdict.",
+  "controls": {
+    "mobile402": [
+      {
+        "centerHitTarget": true,
+        "clientHeight": 46,
+        "id": "",
+        "name": "레벨\n전체 레벨\n입문\n초보\n초보-중수\n중수\n중수-고수\n고수",
+        "outline": "rgb(49, 130, 246) solid 1.6px",
+        "rect": {
+          "bottom": 485.2000122070313,
+          "height": 48,
+          "width": 175.1999969482422,
+          "x": 20,
+          "y": 437.2000122070313
+        },
+        "scrollHeight": 46,
+        "scrollTop": 0,
+        "selectionEnd": null,
+        "selectionStart": null,
+        "tag": "SELECT"
+      }
+    ],
+    "desktop1180": {
+      "centerHitTarget": true,
+      "clientHeight": 46,
+      "id": "",
+      "name": "레벨\n전체 레벨\n입문\n초보\n초보-중수\n중수\n중수-고수\n고수",
+      "outline": "rgb(49, 130, 246) solid 2px",
+      "rect": {
+        "bottom": 533,
+        "height": 48,
+        "width": 272,
+        "x": 54,
+        "y": 485
+      },
+      "scrollHeight": 46,
+      "scrollTop": 0,
+      "selectionEnd": null,
+      "selectionStart": null,
+      "tag": "SELECT"
+    }
+  },
+  "images": [
+    {
+      "file": "input-qa-team-tablet-787-empty-level-focus-viewport.jpg",
+      "timestamp": "2026-10-02T08:59:55.209Z",
+      "url": "https://alpha.teameet.co.kr/teams/new",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "67f557529db8163c1c83c11eafc8f2cd219d5d2a5bcb07ff56bb98a5a6d752c4",
+      "bytes": 17605,
+      "git_blob_sha": "67723884cb1bc1fada655c22043b39334808b9ce",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "input-qa-team-tablet-787-level-page-scroll-recovery-viewport.jpg",
+      "timestamp": "2026-10-02T09:00:07.907Z",
+      "url": "https://alpha.teameet.co.kr/teams/new",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "47457677511550678302f9366c2be4bd7f6b0ddde04dadc7422ccb44afaa8fbf",
+      "bytes": 19873,
+      "git_blob_sha": "6fa4dd1c80b444a0859fe27067e187f7e280b1b9",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "input-qa-team-desktop-1180-level-focus-viewport.jpg",
+      "timestamp": "2026-10-02T09:00:54.030Z",
+      "url": "https://alpha.teameet.co.kr/teams/new",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "4da96508cf3896c8d3711ed7e4ce717ed5ba2804d97b6a7adbc7d7956aa3a4ad",
+      "bytes": 114973,
+      "git_blob_sha": "c8de9b54c525667be849b856ef06703015fdb4be",
+      "pixel_reviewed": true,
+      "exif_present": false
+    }
+  ],
+  "mutations": "No create/save/upload. All local text and capacity changes discarded; reset verified.",
+  "priorityCandidate": "P3; triage pending; no issue number assigned by this evidence package",
+  "servingCommitSha": "unobserved",
+  "limitations": [
+    "Partial focus/selector occlusion only. The center remains usable and ordinary page scroll recovers full visibility; no total-inaccessibility or WCAG-conformance conclusion.",
+    "Tablet screenshots show the clean empty-form reproduction and manual-scroll recovery. The desktop control screenshot contains long synthetic QA LOCAL input and is not an identical-input comparison.",
+    "No same overlap was reported in the tested 402 and 1180 controls; this is not a comprehensive accessibility pass.",
+    "Only the targeted /teams/new level-focus evidence is included. No inquiry-form, member-list, contact, birth-date, profile-ID, or credential evidence is included.",
+    "Exact serving page SHA was not directly observed.",
+    "Browser-native window/zoom testing; no physical mobile, software keyboard, touch, or screen-reader testing."
+  ],
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All three originals were pixel-reviewed. Tablet fields are empty; desktop text is explicitly synthetic QA LOCAL input. No personal data or credentials are visible.",
+    "sourceScope": "Dedicated team-create-tablet-focus-occlusion-candidate.json only. Unrelated weekday-focus control omitted; all level-control observations and selected image measurements preserved."
+  }
+}

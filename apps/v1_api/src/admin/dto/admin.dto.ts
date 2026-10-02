@@ -121,6 +121,10 @@ export class AdminTeamListQueryDto {
 
 export class AdminTeamMatchListQueryDto {
   @IsOptional()
+  @IsIn(['friendly', 'league', 'tournament'])
+  kind?: 'friendly' | 'league' | 'tournament';
+
+  @IsOptional()
   @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
   status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 

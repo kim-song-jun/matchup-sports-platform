@@ -24,6 +24,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
 import { displayInitials } from '@/lib/display-initials';
@@ -194,11 +195,14 @@ export function TeamMatchSharedRecord({ teamMatchId, admin = false }: { teamMatc
   const data = query.data;
   const router = useRouter();
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  // 공동 기록 이전 경기는 이 화면에 보여줄 기록이 없다 — 목록에서 곧장 들어와도 매치 상세로 넘기고
-  // 출처를 이어 실어 뒤로가기가 목록으로 돌아가게 한다. view=detail 은 참가자 자동 진입을 막는다.
-  const handoffHref = !admin && (data?.phase === 'legacy' || data?.phase === 'managed')
-    ? withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromPath)
-    : null;
+  // Competition fixtures have their own public detail contract. Regular leagues also
+  // carry tournamentId, so choose league ownership first and preserve the source page.
+  const competitionId = data?.leagueId ?? data?.tournamentId;
+  const handoffHref = admin ? null : data?.phase === 'managed' && competitionId
+    ? fixtureDetailHref({ isRegularLeague: !!data.leagueId, competitionId, fixtureId: teamMatchId, fromHref: fromPath })
+    : data?.phase === 'legacy'
+      ? withFromPath(`/team-matches/${encodeURIComponent(teamMatchId)}?view=detail`, fromPath)
+      : null;
   useEffect(() => {
     if (handoffHref) router.replace(handoffHref);
   }, [handoffHref, router]);

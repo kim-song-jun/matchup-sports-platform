@@ -257,6 +257,7 @@ export class TeamMatchRecordService {
     const participants = privateView ? await this.participantViews(tx, game) : [];
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
+      leagueId: game.teamMatch!.leagueId, tournamentId: game.teamMatch!.tournamentId,
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
       canEdit: !!actor && ((phase === 'live' && readiness.lineupReady) || (phase === 'official' && actor.operator)), participant: !!actor && !actor.operator, operator: actor?.operator ?? false, teamAuthority: actor?.teamAuthority ?? false, ownSideId,
       ...readiness,

@@ -128,7 +128,9 @@ export function isOpenCompetitionEntry(entry: CompetitionEntryCandidate): boolea
   return !ENDED_COMPETITION_STATUSES.includes(entry.tournament.status);
 }
 
-function teamMatchRoute(match: { id: string; tournamentId: string | null }) {
+function teamMatchRoute(match: { id: string; leagueId: string | null; tournamentId: string | null }) {
+  // Regular leagues also carry tournamentId; league ownership must win.
+  if (match.leagueId) return `/league-matches/${match.leagueId}/fixtures/${match.id}`;
   return match.tournamentId ? `/tournaments/${match.tournamentId}/matches/${match.id}` : `/team-matches/${match.id}`;
 }
 
@@ -165,7 +167,7 @@ export async function findDissolutionBlockers(db: Db, teamId: string, now: Date)
       select: {
         id: true,
         sides: { select: { teamId: true, displayNameSnapshot: true } },
-        teamMatch: { select: { id: true, title: true, startAt: true, placeName: true, tournamentId: true } },
+        teamMatch: { select: { id: true, title: true, startAt: true, placeName: true, leagueId: true, tournamentId: true } },
       },
       orderBy: { createdAt: 'asc' },
     }),

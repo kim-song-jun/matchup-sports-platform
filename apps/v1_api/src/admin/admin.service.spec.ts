@@ -530,3 +530,49 @@ describe('AdminService.changeMatchStatus — 이전 상태를 트랜잭션 안�
   });
 });
 
+
+
+describe('AdminService.changeTeamMatchStatus — competition ownership', () => {
+  function setup(ownership: { leagueId: string | null; tournamentId: string | null }) {
+    const target = { id: 'fixture-1', status: 'matched', ...ownership };
+    const prisma = {
+      v1AdminUser: { findUnique: jest.fn().mockResolvedValue(actorAdminRecord) },
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue(target),
+        update: jest.fn().mockImplementation(({ data }) => ({ ...target, ...data })),
+      },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-1' }) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback) => callback(prisma));
+    const service = new AdminService(prisma as never);
+    return { service, prisma, target };
+  }
+
+  it.each([
+    { leagueId: null, tournamentId: 'cup-1' },
+    { leagueId: 'league-1', tournamentId: 'league-1' },
+    { leagueId: 'league-1', tournamentId: null },
+  ])('competition fixture cannot be reopened/cancelled through generic moderation: %j', async (ownership) => {
+    for (const status of ['recruiting', 'cancelled', 'archived'] as const) {
+      const { service, prisma, target } = setup(ownership);
+      await expect(service.changeTeamMatchStatus(actorAuthUser, target.id, { status, reason: '운영 확인' })).rejects.toMatchObject({
+        status: 409, response: { code: 'COMPETITION_TEAM_MATCH_STATUS_MANAGED' },
+      });
+      expect(target.status).toBe('matched');
+      expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    }
+  });
+
+  it('friendly moderation keeps both audit records', async () => {
+    const { service, prisma } = setup({ leagueId: null, tournamentId: null });
+    await expect(service.changeTeamMatchStatus(actorAuthUser, 'fixture-1', { status: 'cancelled', reason: '운영 확인' })).resolves.toMatchObject({
+      teamMatchId: 'fixture-1', previousStatus: 'matched', status: 'cancelled', actionLogId: 'action-1', statusChangeLogId: 'status-1',
+    });
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fromStatus: 'matched', toStatus: 'cancelled' }) }));
+  });
+});

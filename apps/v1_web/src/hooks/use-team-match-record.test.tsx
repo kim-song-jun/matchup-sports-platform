@@ -23,7 +23,7 @@ const server = { recordVersion: 3, lateAdditionAllowed: false };
 
 function record(version: number): SharedRecord {
   return {
-    teamMatchId: MATCH, title: '한강 vs 마포', startsAt: '2026-10-01T01:55:00Z', phase: 'live', version,
+    leagueId: null, tournamentId: null, teamMatchId: MATCH, title: '한강 vs 마포', startsAt: '2026-10-01T01:55:00Z', phase: 'live', version,
     serverTime: '2026-10-01T02:00:00Z', canEdit: true, participant: true, operator: false, ownSideId: 'home',
     lineupReady: true, missingSides: [], sides: [], subMatches: [], participants: [], goals: [], history: [], confirmations: [], officialAt: null, officialCorrected: false,
   };

@@ -610,6 +610,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatchId} FOR UPDATE`;
       const target = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
+      // Competition fixtures share TeamMatch storage, but their lifecycle belongs to
+      // competition operations. A generic flip would leave Game/schedule state stale.
+      if (target.leagueId || target.tournamentId) {
+        throw new ConflictException({
+          code: 'COMPETITION_TEAM_MATCH_STATUS_MANAGED',
+          message: '대회·리그 경기의 상태는 해당 대회·리그 운영 화면에서 관리해 주세요.',
+        });
+      }
       const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -2468,23 +2476,34 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
     // 경기 제목이나 확정된 양 팀 이름으로 찾는다.
-    const statusFacetWhere: Prisma.V1TeamMatchWhereInput = query.q
-      ? {
-          OR: [
-            { title: { contains: query.q, mode: 'insensitive' as const } },
-            { hostTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
-            { approvedApplicantTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
-            {
-              applications: {
-                some: {
-                  status: 'approved',
-                  applicantTeam: { name: { contains: query.q, mode: 'insensitive' as const } },
+    // Regular leagues have both ownership relations; the category follows leagueId first.
+    const kindWhere: Prisma.V1TeamMatchWhereInput = query.kind === 'league'
+      ? { leagueId: { not: null } }
+      : query.kind === 'tournament'
+        ? { leagueId: null, tournamentId: { not: null } }
+        : query.kind === 'friendly'
+          ? { leagueId: null, tournamentId: null }
+          : {};
+    const statusFacetWhere: Prisma.V1TeamMatchWhereInput = {
+      ...kindWhere,
+      ...(query.q
+        ? {
+            OR: [
+              { title: { contains: query.q, mode: 'insensitive' as const } },
+              { hostTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
+              { approvedApplicantTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
+              {
+                applications: {
+                  some: {
+                    status: 'approved',
+                    applicantTeam: { name: { contains: query.q, mode: 'insensitive' as const } },
+                  },
                 },
               },
-            },
-          ],
-        }
-      : {};
+            ],
+          }
+        : {}),
+    };
 
     const [rows, statusGroups] = await Promise.all([this.prisma.v1TeamMatch.findMany({
       where: {

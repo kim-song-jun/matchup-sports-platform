@@ -260,3 +260,14 @@ describe('AdminTeamMatchDetailPage', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 });
+
+
+it('대회 경기를 단발 경기로 오인하지 않고 관리자 대회로 연결한다', () => {
+  renderWith({ ...OK, data: { ...DETAIL, league: null, tournament: { tournamentId: 'cup-1', title: '가을 컵' }, platformManaged: true } });
+  expect(screen.getByRole('link', { name: '대회 · 가을 컵' })).toHaveAttribute('href', '/admin/tournaments/cup-1');
+  const summary = screen.getByRole('complementary', { name: '팀매치 운영 요약' });
+  expect(within(summary).getByText('대회')).toBeInTheDocument();
+  expect(within(summary).getByText('가을 컵')).toBeInTheDocument();
+  expect(within(summary).queryByText('단발 경기')).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '모집 수정' })).not.toBeInTheDocument();
+});

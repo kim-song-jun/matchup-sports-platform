@@ -1,0 +1,89 @@
+{
+  "timestamp": "2026-10-02T02:20:09.289Z",
+  "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+  "selectedTab": "약관",
+  "css": {
+    "height": 757,
+    "scrollWidth": 1180,
+    "width": 1180
+  },
+  "controls": [
+    {
+      "ariaLabel": "노출 위치 필터",
+      "ariaLabelledby": null,
+      "id": "",
+      "labels": [],
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": ""
+    },
+    {
+      "ariaLabel": null,
+      "ariaLabelledby": null,
+      "id": "",
+      "labels": [
+        {
+          "containsControl": true,
+          "htmlFor": "",
+          "id": "",
+          "labelTextWithoutControls": "노출 위치",
+          "text": "노출 위치회원가입대회 신청하단 메뉴"
+        }
+      ],
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "signup"
+    },
+    {
+      "ariaLabel": null,
+      "ariaLabelledby": null,
+      "id": "",
+      "labels": [
+        {
+          "containsControl": true,
+          "htmlFor": "",
+          "id": "",
+          "labelTextWithoutControls": "동의 유형",
+          "text": "동의 유형필수선택"
+        }
+      ],
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "required"
+    },
+    {
+      "ariaLabel": null,
+      "ariaLabelledby": null,
+      "id": "",
+      "labels": [
+        {
+          "containsControl": true,
+          "htmlFor": "",
+          "id": "",
+          "labelTextWithoutControls": "노출 순서",
+          "text": "노출 순서"
+        }
+      ],
+      "tag": "INPUT",
+      "type": "number",
+      "value": "0"
+    }
+  ],
+  "axNames": {
+    "placement": {
+      "role": "combobox",
+      "name": "노출 위치",
+      "matches": 1
+    },
+    "consent": {
+      "role": "combobox",
+      "name": "동의 유형",
+      "matches": 1
+    },
+    "order": {
+      "role": "spinbutton",
+      "name": "노출 순서",
+      "matches": 1
+    }
+  }
+}

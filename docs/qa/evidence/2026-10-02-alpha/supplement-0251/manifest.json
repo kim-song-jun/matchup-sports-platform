@@ -1,0 +1,124 @@
+{
+  "scope": "Supplemental exact-402 popup and specific terms/inquiry accessibility label evidence",
+  "phase": "current deployed alpha verification",
+  "pageSHA": "unobserved",
+  "imageBytes": "unchanged",
+  "records": [
+    {
+      "issue": 1463,
+      "file": "supplement-0251/issue-1463/1463-popup-mobile-402-selected-viewport.jpg",
+      "sha256": "8fd3e2678cc1816600aae741b12da00ea5d209894c8ddb3c27046208740340ee",
+      "git_blob_sha": "fdb26bb8cf3fad42713758e3d1efca705810c526",
+      "timestamp": "2026-10-02T02:18:22.211Z",
+      "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 402,
+        "height": 605
+      }
+    },
+    {
+      "issue": 1463,
+      "file": "supplement-0251/issue-1463/1463-popup-mobile-402-longpath-viewport.jpg",
+      "sha256": "ba07cf27cb3ef615c44d1e8dc743839a71b7d375bea00e4a31003ebc238d3e2d",
+      "git_blob_sha": "0078fc0612a63af3880fe0849f1bc56ffee6f144",
+      "timestamp": "2026-10-02T02:18:22.422Z",
+      "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 402,
+        "height": 605
+      }
+    },
+    {
+      "issue": 1463,
+      "file": "supplement-0251/issue-1463/1463-mobile-402-outcome.json",
+      "sha256": "af2a5f66c96a265d142405269893c6f051ba28644d18656bbe254125a3e942fa",
+      "git_blob_sha": "db5f56aac1d760021596631e0b3634f48e3b2ced",
+      "timestamp": "2026-10-02T02:18:22.211Z",
+      "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+      "css": {
+        "width": 402,
+        "height": 606,
+        "scrollWidth": 402
+      },
+      "pageSHA": "unobserved"
+    },
+    {
+      "issue": 1464,
+      "file": "supplement-0251/issue-1464/1464-terms-select-number-ax-proof.json",
+      "sha256": "4d6f4bac3bc83abf1cb1c6a2aa230c92ebf95e5a84e56cb689628b900965070f",
+      "git_blob_sha": "cfa8b7ead2eea87e6237b78bf9f817dd85e83890",
+      "timestamp": "2026-10-02T02:20:09.289Z",
+      "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+      "selectedTab": "약관",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "urlNote": "Address bar retains tab=popups while the selected rendered tab is 약관; preserve both observed values."
+    },
+    {
+      "issue": 1464,
+      "file": "supplement-0251/issue-1464/1464-inquiry-textarea-status-ax-proof.json",
+      "sha256": "8f5293f6736c13e91f0117dff32ae2d4893aebf4dcfed51cb35447b7693dca4d",
+      "git_blob_sha": "f52b3bce9acab2f3801cb69844c283e39853ba80",
+      "timestamp": "2026-10-02T02:20:53.594Z",
+      "url": "https://alpha.teameet.co.kr/admin/inquiries/954bbeb5-40dc-44ce-be02-6b4194b42812",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      }
+    },
+    {
+      "issue": 1464,
+      "file": "supplement-0251/issue-1464/1464-terms-select-number-desktop-1180-viewport.jpg",
+      "sha256": "7463ed9242e398db8884b39076a441dc5f68b58299e6a96fb10570b925ee6787",
+      "git_blob_sha": "ddcd3853afe668f445396753448848f2e7113d70",
+      "timestamp": "2026-10-02T02:20:09.731Z",
+      "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      },
+      "selectedTab": "약관",
+      "urlNote": "Address bar retains tab=popups while the selected rendered tab is 약관; preserve both observed values."
+    },
+    {
+      "issue": 1464,
+      "file": "supplement-0251/issue-1464/1464-inquiry-textarea-status-desktop-1180-viewport.jpg",
+      "sha256": "b2367dc8cfccd5c2f2d03d3d89882b3059712281009099cf66958e4fc8c3808f",
+      "git_blob_sha": "d7bc9bf257dc7ef2844d56dad9cbba12cc2bb460",
+      "timestamp": "2026-10-02T02:20:53.995Z",
+      "url": "https://alpha.teameet.co.kr/admin/inquiries/954bbeb5-40dc-44ce-be02-6b4194b42812",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      }
+    }
+  ]
+}

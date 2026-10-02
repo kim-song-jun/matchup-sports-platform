@@ -1,0 +1,29 @@
+{
+  "issue": 1463,
+  "outcome": "pass",
+  "timestamp": "2026-10-02T02:18:22.211Z",
+  "url": "https://alpha.teameet.co.kr/admin/content?tab=popups",
+  "css": {
+    "width": 402,
+    "height": 606,
+    "scrollWidth": 402
+  },
+  "method": "Native cloud Chromium window resize with 125% browser zoom; not device emulation",
+  "controlRect": {
+    "left": 45.6,
+    "right": 356.8,
+    "width": 311.2,
+    "parentWidth": 311.2
+  },
+  "selectedTournament": "ALPHA QA E2E 대회 20261001-1543",
+  "longPath": "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations/29c85849-f93e-4076-876d-b6430cd4c85a/roster",
+  "pathCharacters": 107,
+  "fullPage": false,
+  "persistedChanges": false,
+  "discardVerified": {
+    "exactPath": "없음",
+    "publication": "미게시",
+    "modified": "2026.10.1 06:21"
+  },
+  "pageSHA": "unobserved"
+}

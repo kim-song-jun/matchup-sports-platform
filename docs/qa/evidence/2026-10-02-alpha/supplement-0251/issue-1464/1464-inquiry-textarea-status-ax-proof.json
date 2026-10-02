@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-10-02T02:20:53.594Z",
+  "url": "https://alpha.teameet.co.kr/admin/inquiries/954bbeb5-40dc-44ce-be02-6b4194b42812",
+  "css": {
+    "height": 757,
+    "scrollWidth": 1180,
+    "width": 1180
+  },
+  "controls": [
+    {
+      "ariaLabel": null,
+      "ariaLabelledby": null,
+      "id": "",
+      "labels": [
+        {
+          "containsControl": true,
+          "htmlFor": "",
+          "id": "",
+          "labelTextWithoutControls": "답변 내용",
+          "text": "답변 내용"
+        }
+      ],
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "value": ""
+    },
+    {
+      "ariaLabel": null,
+      "ariaLabelledby": null,
+      "id": "",
+      "labels": [
+        {
+          "containsControl": true,
+          "htmlFor": "",
+          "id": "",
+          "labelTextWithoutControls": "문의 처리 상태",
+          "text": "문의 처리 상태접수검토중답변완료종결"
+        }
+      ],
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received"
+    }
+  ],
+  "axNames": {
+    "reply": {
+      "role": "textbox",
+      "name": "답변 내용",
+      "matches": 1
+    },
+    "status": {
+      "role": "combobox",
+      "name": "문의 처리 상태",
+      "matches": 1
+    }
+  },
+  "changes": "None; reply empty, status received, 0 replies"
+}

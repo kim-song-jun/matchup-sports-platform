@@ -87,7 +87,7 @@ describe('VideosPageClient', () => {
   it('등록된 영상을 출처와 함께 보여준다 — 아이콘만으로 구분하지 않는다', () => {
     render(<VideosPageClient tournamentId="t-1" />);
 
-    expect(screen.getByText(/결승 1경기 · 서울FC vs 부산FC/)).toBeInTheDocument();
+    expect(screen.getByText(/결승 · 1번 경기 · 서울FC vs 부산FC/)).toBeInTheDocument();
     expect(screen.getByText('결승골')).toBeInTheDocument();
     // 출처는 아이콘 옆 문구로도 드러나야 한다(색·아이콘만으로 구분 금지).
     expect(screen.getByText(/^외부 링크 · https:\/\/youtu\.be\/abcdefghijk$/)).toBeInTheDocument();
@@ -105,8 +105,8 @@ describe('VideosPageClient', () => {
 
     render(<VideosPageClient tournamentId="t-1" />);
 
-    expect(screen.getByText('A조 · 조별리그 2라운드 3경기 · 서울FC vs 부산FC')).toBeInTheDocument();
-    expect(screen.getByText('4강 9경기 · 서울FC vs 부산FC')).toBeInTheDocument();
+    expect(screen.getByText('A조 · 조별리그 2라운드 · 3번 경기 · 서울FC vs 부산FC')).toBeInTheDocument();
+    expect(screen.getByText('4강 · 9번 경기 · 서울FC vs 부산FC')).toBeInTheDocument();
   });
 
   it('업로드 한도와 허용 형식을 미리 알려준다', () => {

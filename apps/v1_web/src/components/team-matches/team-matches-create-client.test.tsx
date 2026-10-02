@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { toKstDateString } from '@/lib/kst-calendar';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
 import { draftFromTeamMatchEdit, TeamMatchCreatePageClient, TeamMatchEditPageClient } from './team-matches-create-client';
 import { buildTeamMatchPayloadResult } from './team-matches.validation';
@@ -231,6 +232,36 @@ describe('TeamMatchCreatePageClient — GA events', () => {
 });
 
 describe('team match edit hydration', () => {
+  it('저장된 시각을 KST 벽시계 날짜·시간으로 펼친다 (브라우저 TZ=UTC 라도)', () => {
+    const draft = draftFromTeamMatchEdit({
+      teamMatchId: 'team-match-kst',
+      editable: true,
+      lockedReason: null,
+      form: {
+        hostTeamId: 'team-real',
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: 'KST 팀매치',
+        imageUrl: null,
+        startsAt: '2026-10-20T10:00:00.000Z',
+        endsAt: '2026-10-20T16:00:00.000Z',
+        deadlineAt: '2026-10-18T14:59:00.000Z',
+        manualPlaceName: '장소',
+      },
+      status: 'recruiting',
+      version: '2026-10-01T00:00:00.000Z',
+    });
+
+    expect(draft).toMatchObject({
+      date: '2026-10-20',
+      startTime: '19:00',
+      endDate: '2026-10-21',
+      endTime: '01:00',
+      deadlineDate: '2026-10-18',
+      deadlineTime: '23:59',
+    });
+  });
+
   it('keeps the route entity image empty when the API stores null', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const draft = draftFromTeamMatchEdit({
@@ -331,17 +362,17 @@ describe('team-match deadline payload', () => {
   it('sends the selected application deadline before the match start', () => {
     const draft = getTeamMatchCreateViewModel('place-time').draft;
     const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    start.setHours(18, 0, 0, 0);
-    const deadline = new Date(start.getTime() - 24 * 60 * 60 * 1000);
+    const startDate = toKstDateString(start);
+    const deadlineDate = toKstDateString(new Date(start.getTime() - 24 * 60 * 60 * 1000));
     const payload = buildTeamMatchPayloadResult(
       {
         ...draft,
         title: '마감 시간이 있는 팀매치',
         venue: '한강 풋살장',
-        date: start.toISOString().slice(0, 10),
+        date: startDate,
         startTime: '18:00',
         endTime: '20:00',
-        deadlineDate: deadline.toISOString().slice(0, 10),
+        deadlineDate,
         deadlineTime: '18:00',
       },
       'team-1',
@@ -349,7 +380,9 @@ describe('team-match deadline payload', () => {
       'region-gangnam',
     ).payload;
 
-    expect(payload?.deadlineAt).toBe(deadline.toISOString());
+    // 입력은 KST 벽시계 — 브라우저(TZ=UTC 러너)가 아니라 +09:00 으로 해석한다.
+    expect(payload?.startsAt).toBe(new Date(`${startDate}T18:00:00+09:00`).toISOString());
+    expect(payload?.deadlineAt).toBe(new Date(`${deadlineDate}T18:00:00+09:00`).toISOString());
   });
 });
 
@@ -366,9 +399,10 @@ describe('team-match draft date normalization — step round-trip', () => {
   // 일주일 뒤로 리셋된다 — 사용자가 만료된 초안을 복원한 게 아니라 같은 세션 안에서다.
   it('오늘 날짜 + 빈 시작시간으로 저장된 초안은 18시 이후 재마운트돼도 날짜를 유지한다', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-27T20:00:00'));
+    // 2026-08-27 20:00 KST
+    vi.setSystemTime(new Date('2026-08-27T11:00:00.000Z'));
 
-    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayDate = '2026-08-27';
     window.localStorage.setItem(
       'teameet:v1:team-match-draft:v3',
       JSON.stringify({
@@ -393,6 +427,26 @@ describe('team-match draft date normalization — step round-trip', () => {
 
     expect(screen.getByLabelText('제목')).toHaveValue('오늘 밤 급구 팀매치');
     expect(screen.getByLabelText('날짜')).toHaveValue(todayDate);
+  });
+
+  // 2026-08-27 16:00Z = KST 8/28 01:00 — UTC 달력으론 아직 8/27 이라 시간대를 섞으면 갈리는 자리.
+  it.each([
+    ['KST 오늘(8/28)은 유지한다', '2026-08-28', '2026-08-28'],
+    ['KST 로 이미 지난 어제(8/27)는 기본 날짜(+7일)로 되돌린다', '2026-08-27', '2026-09-04'],
+  ])('KST 자정 직후: %s', async (_name, saved, expected) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-27T16:00:00.000Z'));
+    window.localStorage.setItem(
+      'teameet:v1:team-match-draft:v3',
+      JSON.stringify({ savedAt: Date.now(), value: { title: '자정 경계', date: saved, startTime: '', endTime: '' } }),
+    );
+
+    render(<TeamMatchCreatePageClient step="confirm" />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('날짜')).toHaveValue(expected);
   });
 });
 

@@ -1,3 +1,4 @@
+import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
@@ -34,16 +35,20 @@ export type TeamMatchValidationContext = {
 
 const defaultGenderRule = '성별 무관';
 
-function parseStartsAt(draft: TeamMatchDraft): Date | null {
+// 날짜·시간 입력은 KST 벽시계다 — 브라우저 시간대와 무관하게 KST 로 해석한다.
+function parseStartsAt(draft: TeamMatchDraft): string | null {
   if (!draft.date || !draft.startTime) return null;
-  const value = new Date(`${draft.date}T${draft.startTime}:00`);
-  return Number.isNaN(value.getTime()) ? null : value;
+  return fromDatetimeLocalValue(`${draft.date}T${draft.startTime}`) ?? null;
 }
 
-function parseDeadlineAt(draft: TeamMatchDraft): Date | null {
+function parseDeadlineAt(draft: TeamMatchDraft): string | null {
   if (!draft.deadlineDate || !draft.deadlineTime) return null;
-  const value = new Date(`${draft.deadlineDate}T${draft.deadlineTime}:00`);
-  return Number.isNaN(value.getTime()) ? null : value;
+  return fromDatetimeLocalValue(`${draft.deadlineDate}T${draft.deadlineTime}`) ?? null;
+}
+
+function parseEndsAt(draft: TeamMatchDraft): string | null {
+  if (!draft.endTime) return null;
+  return fromDatetimeLocalValue(`${draft.endDate || draft.date}T${draft.endTime}`) ?? null;
 }
 
 const RULES: Array<{
@@ -88,9 +93,9 @@ export function getTeamMatchMissingFields(ctx: TeamMatchValidationContext): Team
     missing.push({ field: 'date', label: '날짜를 확인해 주세요', step: 'place-time' });
   }
   const errors = teamMatchDateErrors({
-    startsAt: d.date && d.startTime ? `${d.date}T${d.startTime}:00` : '',
-    endsAt: d.endTime ? `${d.endDate || d.date}T${d.endTime}:00` : null,
-    deadlineAt: d.deadlineDate && d.deadlineTime ? `${d.deadlineDate}T${d.deadlineTime}:00` : null,
+    startsAt: parseStartsAt(d) ?? '',
+    endsAt: parseEndsAt(d),
+    deadlineAt: parseDeadlineAt(d),
     existingDeadlineAt: ctx.existingDeadlineAt,
   });
   const fields = { startsAt: 'startTime', endsAt: 'endTime', deadlineAt: 'deadlineTime' } as const;
@@ -147,8 +152,6 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
     // 단언 후 크래시 대신 결측 필드로 되돌려 상위 UI가 그 스텝으로 안내하게 한다.
     return { missingFields: [missingFieldFor('date'), missingFieldFor('startTime')] };
   }
-  const endsAt = draft.endTime ? new Date(`${draft.endDate || draft.date}T${draft.endTime}:00`) : null;
-  const deadlineAt = parseDeadlineAt(draft);
 
   return {
     payload: {
@@ -157,9 +160,9 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       regionId,
       title: draft.title.trim(),
       description: draft.description.trim() || null,
-      startsAt: startsAt.toISOString(),
-      endsAt: endsAt?.toISOString() ?? null,
-      deadlineAt: deadlineAt?.toISOString() ?? null,
+      startsAt,
+      endsAt: parseEndsAt(draft),
+      deadlineAt: parseDeadlineAt(draft),
       imageUrl: draft.imageUrl.trim() || null,
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,

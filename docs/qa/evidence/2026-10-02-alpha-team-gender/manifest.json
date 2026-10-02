@@ -1,0 +1,98 @@
+{
+  "observations": [
+    {
+      "height": 844,
+      "scrollWidth": 390,
+      "url": "https://alpha.teameet.co.kr/teams",
+      "utc": "2026-10-02T03:05:04.724Z",
+      "width": 390,
+      "surface": "teams-gender-raw-before",
+      "file": "teams-gender-raw-before-css390.jpg",
+      "sha256": "33d27826c2630e4b0901b931e2c8a7d9db8e2f0a0ef89c2e776c077cd0cb678e",
+      "git_blob_sha": "968adf76b87194f6ac33885efc1cd06a45a4eaf5",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium with CSS viewport override; not a physical device",
+      "serving_sha_at_capture": "unobserved"
+    },
+    {
+      "height": 1024,
+      "scrollWidth": 768,
+      "url": "https://alpha.teameet.co.kr/teams",
+      "utc": "2026-10-02T03:05:05.030Z",
+      "width": 768,
+      "surface": "teams-gender-raw-before",
+      "file": "teams-gender-raw-before-css768.jpg",
+      "sha256": "d6b6e497b5827051558e5aced7390c70b8ec2c32226d0391db80871f91fac9b2",
+      "git_blob_sha": "503e78b96a6cfd2e6ea229816b911741ee324822",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium with CSS viewport override; not a physical device",
+      "serving_sha_at_capture": "unobserved"
+    },
+    {
+      "height": 900,
+      "scrollWidth": 1440,
+      "url": "https://alpha.teameet.co.kr/teams",
+      "utc": "2026-10-02T03:05:05.397Z",
+      "width": 1440,
+      "surface": "teams-gender-raw-before",
+      "file": "teams-gender-raw-before-css1440.jpg",
+      "sha256": "fc6ff195cb5795f0e4c8fb60e8fe5de00cd5829f2c3462850ca4bdfd880d198a",
+      "git_blob_sha": "bc22de010a21f0ef50353d6775352d00a1df0d07",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium with CSS viewport override; not a physical device",
+      "serving_sha_at_capture": "unobserved"
+    },
+    {
+      "height": 844,
+      "scrollWidth": 390,
+      "url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "utc": "2026-10-02T03:07:06.109Z",
+      "width": 390,
+      "surface": "team-detail-gender-raw-before",
+      "file": "team-detail-gender-raw-before-css390.jpg",
+      "sha256": "af07ad31eea2b1d9d935335de807bafac2b3bf4e281a27e0cf577073a58181eb",
+      "git_blob_sha": "690c0b2a314489ce514ce7fa04835621152c98a7",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium with CSS viewport override; not a physical device",
+      "serving_sha_at_capture": "unobserved"
+    },
+    {
+      "height": 1024,
+      "scrollWidth": 768,
+      "url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "utc": "2026-10-02T03:06:53.393Z",
+      "width": 768,
+      "surface": "team-detail-gender-raw-before",
+      "file": "team-detail-gender-raw-before-css768.jpg",
+      "sha256": "c43699960d6ba3f1b8ddf40f50e9d34306c1d9899a82095e1485704f4fae790e",
+      "git_blob_sha": "b488b380bae90dfb9c74560bdb114fbf678880f1",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium with CSS viewport override; not a physical device",
+      "serving_sha_at_capture": "unobserved"
+    },
+    {
+      "height": 900,
+      "scrollWidth": 1440,
+      "url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "utc": "2026-10-02T03:06:53.663Z",
+      "width": 1440,
+      "surface": "team-detail-gender-raw-before",
+      "file": "team-detail-gender-raw-before-css1440.jpg",
+      "sha256": "104798ee684c741df21b38a0df0fb64b92f587a72830e96a0018c546cc5b4923",
+      "git_blob_sha": "4f5b7be52c7899e10015e9392c3aef2f5d7aa747",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium with CSS viewport override; not a physical device",
+      "serving_sha_at_capture": "unobserved"
+    }
+  ],
+  "phase": "current raw male UI defect; no fix after",
+  "actions": [
+    "Public synthetic team list and detail read-only at390/768/1440"
+  ],
+  "limits": [
+    "No physical device or screen reader",
+    "Only male display verified; other gender codes, filtering, save paths or creation not tested",
+    "No app data changed",
+    "Image commit is not serving application SHA"
+  ]
+}

@@ -67,7 +67,8 @@ PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "
   `summary.monthlyMatches` 와 같은 함수(`profile/activity-counts.ts` `countMonthlyGames`)로 센다 — 두 화면의 "이번 달 경기"가
   갈리지 않게 한다(Task 180 F85). 홈의 신청 대기는 숫자에 더하지 않고 `summary.pendingLabel`("대기 중인 신청 N건")로 싣는다.
 - `GET /users/:userId/public-profile`은 optional auth이며 active/non-deleted 사용자만 반환한다.
-- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`만 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다. `displayName`은 공개 닉네임에서만 파생되며 `realName`에서 파생되지 않는다.
+- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `bio`, 공개 명단의 `teams`, `recentActivity`, `playerCard`, `reputation`, `activitySummary`를 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다. `displayName`은 공개 닉네임에서만 파생되며 `realName`에서 파생되지 않는다.
+- `playerCard`는 카드 숨김을 켜면 `null`이다. 카드가 있으면 `stats[].value`와 `overall`은 1~99 능력치 점수이며 실제 골·도움 개수가 아니다. `records: { appearances, goals, assists } | null`은 카드와 동일한 공식 결과/신원 연결/공개 동의 게이트를 통과한 원본 집계다. 공개 동의가 없으면 `records=null`이며, 1~2경기로 골·도움 능력치가 잠겨 있어도 동의한 원본 집계는 반환한다. `appearances`는 gameId 기준 중복 제거 수다. 본인/타인 모두 같은 카드 계약을 쓰며, 본인 기록 목록의 동의 우회를 카드 원본 집계에 적용하지 않는다. 구 API에 `records` 필드가 없으면 클라이언트는 원본 수치를 추정하거나 0으로 표시하지 않는다.
 - `reputation`은 `mannerScore`, `reviewCount`, `trustState`에 더해 `highlight`(`tagCode`, `label`, `rate`
   0-1, `reviewCount`)를 포함한다. `highlight`는 `mannerScore`와 같은 리뷰 중 가장 많이 공개된 태그이며,
   서로 다른 리뷰어 3명 미만이면 `null`이다(2명 이하 평가로 비율을 단정하지 않기 위함). `GET

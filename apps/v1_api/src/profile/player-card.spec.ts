@@ -35,6 +35,32 @@ const base: PlayerCardInput = {
 const stat = (input: PlayerCardInput, code: PlayerCardStatCode) =>
   buildPlayerCard(input).stats.find((s) => s.code === code)!;
 
+describe('카드 원본 기록 공개', () => {
+  it('점수와 원본 집계를 별도로 반환한다', () => {
+    const card = buildPlayerCard({ ...base, appearances: 17, goals: 10, assists: 0, position: 'GK' });
+    expect(card.records).toEqual({ appearances: 17, goals: 10, assists: 0 });
+    expect(card.stats.find((s) => s.code === 'SHO')?.value).toBe(62);
+    expect(card.stats.find((s) => s.code === 'PAS')?.value).toBe(30);
+    expect(card.overall).toBe(66);
+  });
+
+  it('공개 동의가 없으면 원본도 반환하지 않는다', () => {
+    const card = buildPlayerCard({ ...base, appearances: 17, goals: 10, assists: 2, recordsConsented: false });
+    expect(card.records).toBeNull();
+    expect(card.stats.find((s) => s.code === 'SHO')?.value).toBeNull();
+  });
+
+  it('표본이 적어 능력치가 잠겨도 공개된 실제 기록은 보존한다', () => {
+    const card = buildPlayerCard({ ...base, appearances: 1, goals: 2, assists: 0 });
+    expect(card.records).toEqual({ appearances: 1, goals: 2, assists: 0 });
+    expect(card.stats.find((s) => s.code === 'SHO')?.value).toBeNull();
+  });
+
+  it('공식 결과가 없으면 동의했어도 원본 집계를 공개하지 않는다', () => {
+    expect(buildPlayerCard({ ...base, hasUnlockableRecords: false }).records).toBeNull();
+  });
+});
+
 describe('선수 카드 산식', () => {
   describe('표본이 모자라면 숫자를 만들지 않는다', () => {
     it('1경기 1골은 SHO 를 잠근다 -- 경기당 1골이라고 99 를 주지 않는다', () => {

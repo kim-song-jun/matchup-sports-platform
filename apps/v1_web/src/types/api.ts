@@ -2320,6 +2320,8 @@ export type V1PlayerCard = {
   /** 카드 모양(코스메틱). 후기 10건 업적으로 방패가 열린다. */
   shape: 'rect' | 'shield';
   appearances: number;
+  /** 공개 가능한 카드 원본 집계. 비동의 시 null; 구 API의 필드 부재를 0으로 추정하지 않는다. */
+  records?: { appearances: number; goals: number; assists: number } | null;
   stats: V1PlayerCardStat[];
   unlockedCount: number;
   nextUnlock: { code: V1PlayerCardStat['code']; reason: NonNullable<V1PlayerCardStat['lockedBy']> } | null;

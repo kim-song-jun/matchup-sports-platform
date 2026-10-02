@@ -1,109 +1,59 @@
 # 점검 모드 (maintenance mode)
 
-프로덕션을 잠시 세워야 할 때 사용자에게 **우리가 만든 안내 페이지**를 보여주는 절차. ALB 리스너의
-기본 규칙 액션을 `fixed-response`로 바꾸는 방식이다.
+환경을 잠시 세워야 할 때 사용자에게 **우리가 만든 안내 페이지**를 보여주는 절차. 각 인스턴스의
+nginx가 호스트의 플래그 파일을 보고, 있으면 모든 요청에 `503` + 안내 HTML을 돌려준다. alpha와
+production은 인스턴스가 따로라 **환경별로 독립**이다.
 
-2026-08-03에 **사용자 영향 없이 전체 메커니즘을 실증**했다(아래 "검증 기록" 참조).
+## 동작 방식
 
-## 왜 nginx가 아니라 ALB인가
-
-두 방식을 비교했고 ALB를 택했다. 결정적인 이유는 **헬스체크가 리스너 규칙을 타지 않는다**는 것이다.
-
-| | ALB 고정응답 | nginx 플래그 |
-|---|---|---|
-| 앱/인스턴스가 죽어 있어도 동작 | ⭕ | ❌ nginx가 살아 있어야 함 |
-| 헬스체크 영향 | **없음** — 타깃에 직접 붙는다 | 게이팅이 헬스체크 경로를 막으면 타깃이 unhealthy |
-| 전환 속도 | API 호출 1번 | 컨테이너 재기동 또는 reload |
-| 되돌리기 | 액션 되돌리기 1번 | 플래그 제거 + reload |
-
-nginx 방식의 실패 모드가 특히 나쁘다. 타깃이 **1개뿐**이라 unhealthy가 되는 순간 100% 장애이고,
-그때 사용자가 보는 것은 우리 점검 페이지가 아니라 **ALB의 기본 503**이다. 점검 페이지를 띄우려다
-점검 페이지를 잃는다.
-
-## 한계 (ALB의 하드 리밋)
-
-- **커스텀 응답 헤더를 붙일 수 없다** — `Retry-After` 불가. `FixedResponseConfig`는
-  `MessageBody` / `StatusCode` / `ContentType`만 지원한다. 자동 재시도는 HTML의
-  `<meta http-equiv="refresh">`로 대신한다.
-- **본문 최대 1024자.** 현재 페이지는 750바이트다. 문구를 늘릴 때 이 한도를 먼저 확인할 것.
-
-## 켜기
-
-`default` 규칙(조건 없음 → prod 타깃)의 **액션만** 바꾼다. `alpha.teameet.co.kr`은 우선순위 10
-규칙이 따로 처리하므로 **alpha는 계속 살아 있다.**
-
-```bash
-LB=$(aws elbv2 describe-load-balancers --region ap-northeast-2 --names teameet-alb \
-  --query 'LoadBalancers[0].LoadBalancerArn' --output text)
-L=$(aws elbv2 describe-listeners --load-balancer-arn "$LB" --region ap-northeast-2 \
-  --query 'Listeners[?Port==`443`].ListenerArn' --output text)
-
-# 되돌릴 대상을 먼저 저장한다 — 점검 해제 때 이 값이 필요하다
-aws elbv2 describe-rules --listener-arn "$L" --region ap-northeast-2 \
-  --query 'Rules[?IsDefault==`true`]' --output json > /tmp/alb-default-rule-before.json
-
-RULE=$(jq -r '.[0].RuleArn' /tmp/alb-default-rule-before.json)
-aws elbv2 modify-rule --rule-arn "$RULE" --region ap-northeast-2 --actions "$(
-  python3 -c "
-import json
-print(json.dumps([{'Type':'fixed-response','FixedResponseConfig':{
-  'StatusCode':'503','ContentType':'text/html',
-  'MessageBody':open('docs/ops/maintenance.html').read()}}]))"
-)"
-```
-
-**켠 직후 확인** — alpha가 살아 있는지까지 본다.
-
-```bash
-curl -sSI --no-keepalive https://teameet.co.kr/        # 503 기대
-curl -sS  --no-keepalive -o /dev/null -w '%{http_code}\n' https://alpha.teameet.co.kr/   # 200 기대
-```
-
-## 끄기
-
-```bash
-TG=$(jq -r '.[0].Actions[0].TargetGroupArn' /tmp/alb-default-rule-before.json)
-aws elbv2 modify-rule --rule-arn "$RULE" --region ap-northeast-2 \
-  --actions "Type=forward,TargetGroupArn=$TG"
-```
-
-**해제 확인은 반드시 새 연결로 한다.**
-
-```bash
-curl -sS --no-keepalive -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/
-```
-
-`--no-keepalive` 없이 확인하면 **기존 연결이 재사용돼 503이 계속 보인다.** 2026-08-03 검증에서
-실제로 이 오판을 했다 — 규칙은 이미 정상으로 돌아왔는데 같은 연결을 재사용해 503이 이어졌고,
-제3의 위치에서 200을 확인하고서야 서비스가 멀쩡함을 알았다. 점검이 안 풀렸다고 착각해 불필요한
-조치를 하지 않으려면 이 확인 방법을 지켜야 한다.
-
-## 검증 기록 (2026-08-03)
-
-프로덕션 사용자에게 영향을 주지 않고 전체 경로를 실증했다. 방법은 **`source-ip` 조건으로 운영자
-IP에만 적용되는 규칙을 임시로 만드는 것**이었다.
-
-| 확인 | 결과 |
+| 구성 | 위치 |
 |---|---|
-| 503 + 한국어 점검 페이지 렌더 | `<h1>잠시 점검 중이에요</h1>` |
-| 본문 크기 | 750 bytes (한도 1024) |
-| 다른 IP 영향 | 없음 — 제3의 위치에서 prod·alpha 모두 200 |
-| 타깃 상태 | 둘 다 healthy 유지 |
-| 규칙 삭제 후 복구 | 새 연결에서 즉시 200 |
+| 안내 HTML | `deploy/maintenance/index.html` → 컨테이너 `/etc/nginx/teameet-maintenance` (배포마다 릴리스와 함께 교체) |
+| 플래그 디렉터리 | 호스트 `/home/ec2-user/.teameet-maintenance` → 컨테이너 `/etc/nginx/maintenance` (릴리스 밖이라 배포가 지우지 않음) |
+| 켜짐 조건 | `/etc/nginx/maintenance/on` 파일 존재 |
+| 응답 | `503`, `Retry-After: 300`, `Cache-Control: no-store`, HTML은 60초마다 자동 새로고침 |
 
-**주의**: `source-ip` 조건 규칙은 **host header와 무관하게 매칭된다.** 테스트 중 운영자 IP에서는
-`alpha.teameet.co.kr`도 점검 페이지를 받았다. 실제 점검에서 alpha를 살려두려면 `source-ip`가
-아니라 **`default` 규칙의 액션**을 바꿔야 한다.
+- 플래그는 요청마다 평가되므로 **reload·재기동이 필요 없다.** 파일을 만들면 즉시, 지우면 즉시 풀린다.
+- `limit_req` 초과·upstream 오류 같은 **일반 503은 점검 페이지로 바뀌지 않는다**(점검 전용 내부 코드 418을
+  503으로 바꿔 내보내는 구조다).
 
-## 운영자만 통과시키기
+## 켜기 / 끄기 / 확인
 
-점검 중에 운영자가 실제 서비스를 확인해야 하면, 우선순위 1에 예외 규칙을 먼저 둔다.
+인스턴스는 태그 `Environment`(`production` 또는 `alpha`)로 고르고, **정확히 1개인지 단언**한다.
 
 ```bash
-aws elbv2 create-rule --listener-arn "$L" --region ap-northeast-2 --priority 1 \
-  --conditions '[{"Field":"source-ip","SourceIpConfig":{"Values":["<운영자IP>/32"]}}]' \
-  --actions "Type=forward,TargetGroupArn=$TG"
+ENV=production   # 또는 alpha
+IID=$(aws ec2 describe-instances --region ap-northeast-2 \
+  --filters "Name=tag:Environment,Values=${ENV}" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[].Instances[].InstanceId' --output text)
+[ "$(echo "$IID" | wc -w)" -eq 1 ] || { echo "인스턴스가 1개가 아닙니다: $IID"; exit 1; }
+
+# 켜기
+aws ssm send-command --region ap-northeast-2 --instance-ids "$IID" --document-name AWS-RunShellScript \
+  --parameters '{"commands":["mkdir -p /home/ec2-user/.teameet-maintenance && touch /home/ec2-user/.teameet-maintenance/on"]}'
+
+# 끄기
+aws ssm send-command --region ap-northeast-2 --instance-ids "$IID" --document-name AWS-RunShellScript \
+  --parameters '{"commands":["rm -f /home/ec2-user/.teameet-maintenance/on"]}'
 ```
 
-규칙은 우선순위 순으로 평가되므로, 이 규칙에 걸린 요청은 `default`의 점검 응답에 닿지 않는다.
-점검 해제 시 이 예외 규칙도 함께 지운다.
+확인은 새 연결로 한다. `--no-keepalive` 없이 확인하면 기존 연결이 재사용돼 이전 응답이 보일 수 있다.
+
+```bash
+# 켠 뒤: 503 + 점검 페이지 기대
+curl -sS --no-keepalive -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/     # production
+curl -sS --no-keepalive https://teameet.co.kr/ | grep -o '잠시 점검 중이에요'
+# 끈 뒤: 200 기대
+curl -sS --no-keepalive -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/landing
+```
+
+## 한계
+
+- **서버나 nginx 컨테이너 자체가 죽으면 이 점검 페이지는 뜨지 않는다.** 그 경우는 CloudFront 사용자 지정 오류 페이지(502/504)가 맡는다 — 설정은 앞단 전환 문서에서 다룬다.
+- **켜 둔 동안 배포 검증이 실패한다.** `deploy.yml`·`deploy-alpha.yml`의 공개 경로 헬스 확인
+  (`/landing`, `/api/v1/health`, 릴리스 헤더)이 503을 받는다. 배포 전에 끄거나, 배포가 끝난 뒤 켠다.
+- **ACME 인증서 검증과 ALB 헬스체크도 503을 받는다.** 플래그 검사가 위치(location) 선택보다 먼저 돌기 때문이다.
+  alpha 인증서 갱신 타이머(`teameet-alpha-certbot.timer`)가 도는 시각과 겹치지 않게 짧게 쓴다.
+- **운영자 예외 통과는 없다.** 켜면 모든 접속자(운영자 포함)가 점검 페이지를 본다. 확인이 필요하면 인스턴스에서
+  내부 포트로 직접 본다(`curl http://localhost:8121/api/v1/health`).
+- 안내 문구를 바꾸려면 `deploy/maintenance/index.html`을 수정해 배포한다(외부 리소스 없이 인라인 스타일만 쓴다).

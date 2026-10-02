@@ -15,6 +15,7 @@ import {
   datetimeLocalToIso,
   isoToDatetimeLocal,
 } from '@/components/admin/tournaments/tournament-datetime-field';
+import { DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import {
   applyPromoFactDefaults,
@@ -794,9 +795,9 @@ const REGISTRATION_DEADLINE_SUGGEST_DAYS = 3;
  * 띄우는 근거다. 값이 없거나 형식이 깨졌으면 `false`(입력 중에 배너가 깜빡이지 않게).
  */
 export function isShortLeadTime(scheduledAt: string) {
-  const start = new Date(scheduledAt);
-  if (!scheduledAt || Number.isNaN(start.getTime())) return false;
-  const remaining = start.getTime() - Date.now();
+  const start = localTimestamp(scheduledAt);
+  if (start === null) return false;
+  const remaining = start - Date.now();
   // **과거 시작일은 경고 대상이 아니다.** `remaining <= N일` 만 보면 과거는 음수라 항상 참이 돼서
   // 이미 지난 날짜를 넣었을 때 "대회 시작이 N일 이내예요" 라는 엉뚱한 경고가 뜬다.
   // 과거 시작일은 아래 `scheduledAt` 검증이 원인 있는 필드에서 잡는다.
@@ -809,24 +810,18 @@ export function isShortLeadTime(scheduledAt: string) {
  * 저장되면 아무도 신청할 수 없다. 빈 값은 필수 검증에 걸려 운영자가 직접 정한다.
  */
 function suggestDeadline(startValue: string, daysBefore: number) {
-  const start = new Date(startValue);
-  if (!startValue || Number.isNaN(start.getTime())) return '';
-  const deadline = new Date(start);
-  deadline.setDate(deadline.getDate() - daysBefore);
-  deadline.setHours(23, 59, 0, 0);
-  if (deadline.getTime() <= Date.now()) return '';
-  return formatDatetimeLocal(deadline);
+  const start = localTimestamp(startValue);
+  if (start === null) return '';
+  const deadlineDate = toKstDateString(new Date(kstMidnightMs(toKstDateString(new Date(start))) - daysBefore * DAY_MS));
+  const deadline = `${deadlineDate}T23:59`;
+  const deadlineTs = localTimestamp(deadline);
+  return deadlineTs !== null && deadlineTs > Date.now() ? deadline : '';
 }
 
-function formatDatetimeLocal(value: Date) {
-  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
+/** 입력값(KST 벽시계)의 인스턴트 밀리초. 비었거나 깨졌으면 `null`. */
 function localTimestamp(value: string) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+  const iso = datetimeLocalToIso(value);
+  return iso ? Date.parse(iso) : null;
 }
 
 function numeric(value: string) {

@@ -20,9 +20,9 @@ describe('대회 생성 — 마감 일시 하한', () => {
   // 2026-09-04(금) 10:00 KST = 01:00 UTC
   const NOW = new Date('2026-09-04T01:00:00.000Z');
   const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
-  /** `datetime-local` 입력값 포맷(로컬 시각) — 화면이 넘기는 것과 같은 모양이어야 한다. */
+  /** `datetime-local` 입력값 포맷(KST 벽시계) — 화면이 넘기는 것과 같은 모양이어야 한다. */
   const toDatetimeLocal = (at: Date) =>
-    new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    new Date(at.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 16);
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -138,8 +138,7 @@ describe('대회 생성 — 마감 일시 하한', () => {
     // 명단 마감 D-7 제안이 없어졌으므로 4~7일 남은 대회에는 경고하지 않는다.
     expect(isShortLeadTime('2026-09-09T10:00')).toBe(false);
     // 경계: 문구가 "3일 이내" 이므로 **정확히 3일**도 경고 대상이다.
-    // 리터럴 날짜로 쓰면 `datetime-local` 값이 **로컬 타임존으로 파싱**되므로 TZ 가 다른
-    // 환경(로컬 KST / CI UTC)에서 결과가 갈린다 — NOW 에서 계산해 로컬 포맷으로 만든다.
+    // 입력값은 KST 벽시계로 해석되므로 NOW 에서 KST 포맷으로 만든다.
     expect(isShortLeadTime(toDatetimeLocal(new Date(NOW.getTime() + THREE_DAYS)))).toBe(true);
     expect(isShortLeadTime(toDatetimeLocal(new Date(NOW.getTime() + THREE_DAYS + 60_000)))).toBe(false);
     // 값이 없거나 형식이 깨지면 경고하지 않는다(입력 중에 배너가 깜빡이면 안 된다).
@@ -190,4 +189,57 @@ it('명단 마감을 비우면 payload 에 null 을 싣는다 — 초안을 이�
   // undefined 를 보내면 서버 update 가 "안 건드림"으로 읽어 예전 마감이 그대로 남는다.
   const payload = buildTournamentCreatePayload({ ...INITIAL_TOURNAMENT_CREATE_STATE, rosterDeadlineAt: '' });
   expect(payload.rosterDeadlineAt).toBeNull();
+});
+
+/** 브라우저 시간대가 아니라 KST 로 읽고 쓴다 — 러너는 TZ=UTC 라 로컬 해석이면 9시간 어긋난다. */
+describe('대회 생성 — 입력값은 KST 벽시계', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // 2026-09-04 23:30 KST = 14:30Z
+    vi.setSystemTime(new Date('2026-09-04T14:30:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('저장 payload 의 일정은 입력한 시각을 KST 로 해석한 ISO 다', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      scheduledAt: '2026-10-10T10:00',
+      scheduledEndAt: '2026-10-10T18:00',
+      registrationDeadlineAt: '2026-10-07T23:59',
+      rosterDeadlineAt: '2026-10-08T23:59',
+    });
+    expect(payload.scheduledAt).toBe('2026-10-10T01:00:00.000Z');
+    expect(payload.scheduledEndAt).toBe('2026-10-10T09:00:00.000Z');
+    expect(payload.registrationDeadlineAt).toBe('2026-10-07T14:59:00.000Z');
+    expect(payload.rosterDeadlineAt).toBe('2026-10-08T14:59:00.000Z');
+  });
+
+  it('신청 마감 제안은 KST 기준 D-3 23:59 다', () => {
+    const state = tournamentCreateReducer(
+      { ...INITIAL_TOURNAMENT_CREATE_STATE, step: 1 },
+      { type: 'set-scheduled-at', value: '2026-10-10T00:30' },
+    );
+    expect(state.registrationDeadlineAt).toBe('2026-10-07T23:59');
+  });
+
+  it('시작·마감의 과거/미래 경계를 KST 로 판정한다 (자정 근처)', () => {
+    const validate = (scheduledAt: string, registrationDeadlineAt: string) =>
+      validateTournamentCreateStep(
+        { ...INITIAL_TOURNAMENT_CREATE_STATE, step: 1, scheduledAt, registrationDeadlineAt },
+        1,
+      );
+    // 지금은 KST 09-04 23:30 — 23:00 은 과거, 23:59 는 미래(로컬=UTC 해석이면 둘 다 반대로 뒤집힌다).
+    expect(validate('2026-09-04T23:00', '2026-09-04T22:00').scheduledAt).toBe('대회 시작 일시는 지금 이후여야 해요.');
+    expect(validate('2026-09-05T00:30', '2026-09-04T23:59').scheduledAt).toBeUndefined();
+    expect(validate('2026-09-05T00:30', '2026-09-04T23:59').registrationDeadlineAt).toBeUndefined();
+    expect(validate('2026-09-05T00:30', '2026-09-04T23:00').registrationDeadlineAt).toBe('신청 마감은 지금 이후여야 해요.');
+  });
+
+  it('시작이 3일 이내인지를 KST 로 판정한다', () => {
+    // 지금 + 3일 = KST 09-07 23:30
+    expect(isShortLeadTime('2026-09-07T23:30')).toBe(true);
+    expect(isShortLeadTime('2026-09-07T23:31')).toBe(false);
+  });
 });

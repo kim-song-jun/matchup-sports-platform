@@ -989,7 +989,7 @@ export function TeamFormPageView({
   const descriptionField = <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />;
   const detailFields = (
     <>
-      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
       <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
       <TeamActivityFields team={team} form={form} />
     </>
@@ -1127,7 +1127,7 @@ export function TeamFormPageView({
         </div>
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
-          <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} />
+          <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} editing={edit} />
           <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
@@ -1532,16 +1532,18 @@ function TeamFormPreview({
   team,
   sportName,
   regionName,
+  editing,
 }: {
   team: TeamFormViewModel['team'];
   sportName: string;
   regionName: string;
+  editing: boolean;
 }) {
   const trimmedName = team.name.trim();
   const hasName = trimmedName.length > 0;
   const sport = sportName || team.sports[0] || '종목 미정';
   const region = regionName || team.region || '지역 미정';
-  const level = team.level.trim() || '전체 레벨';
+  const level = team.level.trim() || (editing ? '레벨 미설정' : '전체 레벨');
   const capacity = team.capacity ? `${team.capacity}명` : '정원 미정';
   const gender = team.genderRule || '성별 무관';
   const intro = team.description.trim();
@@ -2108,14 +2110,16 @@ function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (va
   );
 }
 
-function TeamLevelSelect({ value, onChange }: { value: string; onChange?: (value: string) => void }) {
+function TeamLevelSelect({ value, editing, onChange }: { value: string; editing: boolean; onChange?: (value: string) => void }) {
   const options = ['전체 레벨', '입문', '초보', '초보-중수', '중수', '중수-고수', '고수'];
-  const normalized = options.includes(value) ? value : '전체 레벨';
+  const normalized = editing || options.includes(value) ? value : '전체 레벨';
 
   return (
     <label className="tm-create-field">
       <div className="tm-text-label">레벨</div>
       <select className="tm-create-input tm-create-select-control" value={normalized} onChange={(event) => onChange?.(event.target.value)}>
+        {editing ? <option value="">레벨 미설정</option> : null}
+        {editing && value && !options.includes(value) ? <option value={value}>{value}</option> : null}
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     </label>

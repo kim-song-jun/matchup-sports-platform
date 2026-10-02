@@ -317,6 +317,18 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
         setError('팀 정보를 다시 확인하고 저장해 주세요.');
         return;
       }
+      // 수정 API는 프로필 전체를 저장한다. 표시 라벨로 원본 코드·텍스트를 다시 만들면
+      // 소개만 고쳐도 null이 전체 범위로, 원본 skillLevelText가 범위 라벨로 덮인다.
+      const profile = query.data.profile;
+      if (draft.level === (profile.levelLabel ?? profile.skillLevelText ?? '')) {
+        payload.skillLevelText = profile.skillLevelText ?? null;
+        payload.minLevelCode = profile.minLevel?.code ?? null;
+        payload.maxLevelCode = profile.maxLevel?.code ?? null;
+      } else if (!draft.level.trim()) {
+        payload.skillLevelText = null;
+        payload.minLevelCode = null;
+        payload.maxLevelCode = null;
+      }
       submitLockRef.current = true;
       void updateTeamWithActivityCompatibility({ ...payload, version, membersVisibilityEnabled }, draft)
         .then((result) => router.push(result.detailRoute ?? `/teams/${teamId}`))

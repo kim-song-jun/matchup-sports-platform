@@ -1,5 +1,9 @@
 # Teameet QA Scenario Index
 
+## 2026-10-02 — 승격 보류 후 Alpha QA
+
+[Task 182](../../.github/tasks/182-alpha-qa-continuation.md) · [실행 기록](./alpha-qa-continuation-2026-10-02.md): 관리자 전용 경기 운영 API와 공식 1:0 화면 확인. 1명 팀 편집의 정원 저장 오류 수정안은 회귀 31/31 통과, dev CI·Alpha 재검증 진행 중. 실제 Kakao OAuth·Android·역할별 명단 QA와 최신 외부 clean 리뷰는 미완. main·Production 승격은 보류.
+
 2026-10-01 마이페이지 수정: 생년월일 저장·출발 화면 복귀·비밀번호 재설정 진입 구현 및 회귀 148개 통과. dev 리뷰/배포·Alpha 재검증 대기. [MY 실행 기록](executions/my-flow-execution.md).
 
 ## 2026-09-30 — 플랫폼 팀매치 공동 운영

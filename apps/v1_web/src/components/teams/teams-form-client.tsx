@@ -253,7 +253,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       activityTimeSlots: query.data.profile.activityTimeSlots ?? [],
       activityTypes: query.data.profile.activityTypes ?? [],
       activityMemo: normalizeHydratedActivityMemo(query.data.profile),
-      capacity: Math.max(query.data.profile.memberGoalCount ?? 0, query.data.memberCount),
+      capacity: Math.max(2, query.data.profile.memberGoalCount ?? 0, query.data.memberCount),
     });
     setDraft((current) => ({
       ...current,

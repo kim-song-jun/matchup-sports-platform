@@ -1,0 +1,119 @@
+{
+  "pipelineContext": "Deployment run 36979105341 was reported successful at 2026-10-02 07:54:18 UTC, head 9a35d05abd32afd16c1becc1e00a5fd4ced2fc99 includes #1508; exact page serving SHA was not observed during this capture session.",
+  "results": [
+    {
+      "page": "player-card",
+      "timestamp": "2026-10-02T08:07:01.933Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/player-card?from=%2Fmy",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "backLinks": 1,
+      "visibleH1": [],
+      "switches": [
+        {
+          "checked": "false",
+          "label": "선수 카드 숨기기"
+        }
+      ]
+    },
+    {
+      "page": "player-card",
+      "timestamp": "2026-10-02T08:07:08.474Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/player-card?from=%2Fmy",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "backLinks": 1,
+      "visibleH1": [],
+      "switches": [
+        {
+          "checked": "false",
+          "label": "선수 카드 숨기기"
+        }
+      ]
+    },
+    {
+      "page": "player-card",
+      "timestamp": "2026-10-02T08:07:08.760Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/player-card?from=%2Fmy",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "backLinks": 1,
+      "visibleH1": [
+        "선수 카드"
+      ],
+      "switches": [
+        {
+          "checked": "false",
+          "label": "선수 카드 숨기기"
+        }
+      ]
+    },
+    {
+      "page": "tournament-real-name",
+      "timestamp": "2026-10-02T08:07:51.100Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/tournament-real-name",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "backLinks": 1,
+      "visibleH1": [],
+      "switches": [
+        {
+          "checked": "true",
+          "label": "대회 기록 실명 표시"
+        }
+      ]
+    },
+    {
+      "page": "tournament-real-name",
+      "timestamp": "2026-10-02T08:07:53.024Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/tournament-real-name",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "backLinks": 1,
+      "visibleH1": [],
+      "switches": [
+        {
+          "checked": "true",
+          "label": "대회 기록 실명 표시"
+        }
+      ]
+    },
+    {
+      "page": "tournament-real-name",
+      "timestamp": "2026-10-02T08:07:53.301Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/tournament-real-name",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "backLinks": 1,
+      "visibleH1": [
+        "대회 기록 실명 표시"
+      ],
+      "switches": [
+        {
+          "checked": "true",
+          "label": "대회 기록 실명 표시"
+        }
+      ]
+    }
+  ],
+  "privacyChanges": 0,
+  "interpretation": "Both original pages have one Back link at each width and one visible H1 on desktop1180. Mobile/tablet use one app-bar text title; no duplicate in-page title. This is the original duplicate-header regression scope, not a claim of broader accessibility compliance."
+}

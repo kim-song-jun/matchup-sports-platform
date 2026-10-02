@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "purpose": "After-gallery for issue #1458, following fix #1508",
+  "environment": "https://alpha.teameet.co.kr",
+  "capture_window_utc": {
+    "first": "2026-10-02T08:07:01.933Z",
+    "last": "2026-10-02T08:07:53.301Z"
+  },
+  "review_scope": "Duplicate-header regression on /my/settings/player-card and /my/settings/tournament-real-name at CSS widths 402, 787, and 1180. Not a broader accessibility-compliance claim.",
+  "privacy_review": "All six original JPEGs were reviewed as pixels. No member list, names, profile IDs, join dates, credentials, or tokens are visible. No privacy settings were changed. No EXIF fields are present.",
+  "proof_note": "The proof preserves every recorded measurement, route, timestamp, toggle observation, and conclusion. Only the pipelineContext prose is normalized for publication. CSS viewport height is 606 for the two mobile observations while the saved JPEGs measure 605 pixels high; both are recorded without alteration.",
+  "images": [
+    {
+      "file": "1458-player-card-header-mobile-402-after1508-viewport.jpg",
+      "width": 402,
+      "height": 605,
+      "bytes": 20580,
+      "sha256": "e2c3b2c5280c0d7c81020fd880bcb5d93b2fd4cddd9cd1d7ade21177bab4b94c",
+      "git_blob_sha": "8a6bcf66116bcafa635ef94b57bd1df3e91ca593",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1458-player-card-header-tablet-787-after1508-viewport.jpg",
+      "width": 787,
+      "height": 505,
+      "bytes": 19521,
+      "sha256": "27821cb9dfc533c17fe02c44516bb1d471588de3d230883df864d7f2d01bfd19",
+      "git_blob_sha": "5df1b8fdcc60b8db4ba7ea33f8be2cc1eceb7757",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1458-player-card-header-desktop-1180-after1508-viewport.jpg",
+      "width": 1180,
+      "height": 757,
+      "bytes": 35873,
+      "sha256": "1ae59f459d1484c61100abf611842de5be14b51d9a4962db982f6ed4dd96458e",
+      "git_blob_sha": "97c477b790ce6191c7a8149717f67893ba55c143",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1458-tournament-real-name-header-mobile-402-after1508-viewport.jpg",
+      "width": 402,
+      "height": 605,
+      "bytes": 13709,
+      "sha256": "6356bd87456651fd4b9a17a1f9277a04d5f24c7b1510ef6747e1858765c1aa31",
+      "git_blob_sha": "6fc3d0920cbbe5c958b292dcbdb4cff977ae1745",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1458-tournament-real-name-header-tablet-787-after1508-viewport.jpg",
+      "width": 787,
+      "height": 505,
+      "bytes": 15140,
+      "sha256": "daff79997a81edd364e7ec489f4bbe4e183dda0275fd8e7ffb4939cd936b886e",
+      "git_blob_sha": "b6326b73d361bfc70a8452c6831321315881c084",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1458-tournament-real-name-header-desktop-1180-after1508-viewport.jpg",
+      "width": 1180,
+      "height": 757,
+      "bytes": 31521,
+      "sha256": "93b1debccf3b639364860b1293c7f88cfba7e3c4a684cebbc50ee59c3a8040ac",
+      "git_blob_sha": "d2811da6116858776aca641a837ae89f391929f6",
+      "pixel_reviewed": true,
+      "exif_present": false
+    }
+  ]
+}

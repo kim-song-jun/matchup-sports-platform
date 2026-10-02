@@ -2,6 +2,31 @@
 
 Status: Implemented — 승격(dev→main)과 Stage A/B 실행은 사용자 결정 대기. 런북 `docs/ops/prod-task168-transition-runbook.md`.
 
+## Progress Snapshot — 2026-10-02 Alpha seed applicant follow-up
+
+#1513은 clean Sonnet/API/Web/Gates 후 dev92334b76f에 반영됐고 Alpha 배포36953527183도 SUCCESS였다.
+그러나 실제 headed QA에서 memberCount4/active roster6이 다시 확인됐다. 정확한 SSM 배포 stdout/stderr를 대조해 league seed의 `v1_tournament_registrations_applied_by_user_id_fkey` 실패와 non-fatal warning을 확인했다. 전체 seed transaction rollback으로 카운터 변경도 반영되지 않았다.
+
+- [x] 일반/티어 리그 seed의 `V1AdminUser.id`와 `V1User.id` 혼용을 실제 팀 로스터 사용자 ID로 수정. 관리자 생성자 ID와 기존 registration은 보존한다.
+- [x] 실제 seed 함수2개에서 외래키 의미 RED2건 → GREEN3건(재실행/creator 보존/빈 로스터 거부), backend/seed typecheck PASS. 스키마·migration·API 형태 변경0.
+- [ ] 최신 dev PR CI/clean 리뷰·반영 → Alpha seed 성공/표시·명단 일치 → Changeset 소비. source 수정만으로 실제 Alpha 결함을 해결 표시하지 않는다.
+
+Owned: league seed, actor 회귀 spec, Changeset, 본 task. Forbidden: 원본 WIP, production DB 변경·main 승격, 유료 리소스 생성·운영 dump 반출. NO-GO 유지.
+
+## Progress Snapshot — 2026-10-02 Alpha counter follow-up
+
+판정 NO-GO. bf63 인증24/24와 실제189개 DB fixture 검증은 운영 데이터 보존 리허설을 대체하지 않는다.
+Alpha 팀 표시4/활성명단6 결함을 발견해 league/tournament/squad seed가 기존 활성 멤버까지 집계하도록 수정했다.
+V1TeamMembership의 active role별 집계로 V1Team.memberCount/managerCount를 재계산하며 owner는 managerCount에 포함하지 않는다. 스키마·migration·API 응답 형태 변경 없음.
+
+- [x] 실제 tournament roster seed 재실행으로 추가 멤버 보존 회귀 RED(memberCount1/기대3) → GREEN, 좁은3테스트 PASS.
+- [x] seed와 backend TypeScript 검사 PASS. Docker 보관 이미지의 Linux 의존성 사용, 자체 컨테이너 자동 정리.
+- [ ] dev PR 최신 CI/리뷰·반영 후 Alpha 표시/활성명단 재대조. 로컬 소스 수정으로 배포된 결함을 해결 처리하지 않는다.
+- [ ] 최종 Changesets 전체 소비/release-only dev PR/최종 SHA CI·Alpha QA.
+- [ ] 기존 운영 dump의 데이터 보존 리허설, 공지/운영자/동결 조건. 사람 결정은 배포 전 확정하며 현재 미정.
+
+Owned: alpha seed3개, 공유 카운터 helper/회귀 spec, Changeset, 본 task. Forbidden: 원본 WIP, main 승격, production DB 변경, 과금 리소스·운영 dump 반출.
+
 ## Progress Snapshot — 2026-10-01 production readiness
 
 판정 **NO-GO**. 보고서 `docs/ops/prod-readiness-2026-10-01.md`, 승격 PR 본문 `docs/ops/prod-promotion-pr1325-body.md`.

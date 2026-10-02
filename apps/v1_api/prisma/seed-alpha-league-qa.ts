@@ -7,6 +7,7 @@ import {
   V1TeamMatchStatus,
   V1VisibilityMode,
 } from '@prisma/client';
+import { refreshAlphaTeamMembershipCounts } from './seed-alpha-membership-counts';
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다(`seed-alpha-tournament-qa.ts`
 // 상단 주석과 같은 이유). `assertAlphaSeedAllowed`는 alpha 전용 4중 가드를 그대로 재사용하고,
 // `ensureAlphaQaRecordConsent`는 득점/도움 순위 화면을 실 API로 검증할 수 있게 페르소나의
@@ -294,7 +295,7 @@ async function ensureLeagueTeams(
         create: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now, jerseyNumber },
       });
     }
-    await tx.v1Team.update({ where: { id: team.id }, data: { memberCount: memberIds.length, managerCount: 1 } });
+    await refreshAlphaTeamMembershipCounts(tx, team.id);
     teams.push({ id: team.id, name: team.name, playerIds: memberIds });
   }
   return teams;
@@ -559,8 +560,9 @@ async function ensureShowcaseRoster(
   }
   await tx.v1Team.update({
     where: { id: teamSeed.id },
-    data: { memberCount: playerIds.length, managerCount: 1, membersVisible: true },
+    data: { membersVisible: true },
   });
+  await refreshAlphaTeamMembershipCounts(tx, teamSeed.id);
   await tx.v1TeamProfile.update({
     where: { teamId: teamSeed.id },
     data: {
@@ -986,7 +988,7 @@ async function ensureFixture(
   });
 }
 
-async function ensureLeague(
+export async function ensureLeague(
   tx: Prisma.TransactionClient,
   sportId: string,
   regionId: string,
@@ -1034,13 +1036,15 @@ async function ensureLeague(
   // 참가팀 연결 — 로스터 = confirmed 등록이다. 순위표·득점/도움 순위가 이 목록으로 참가팀을
   // 읽으므로 없으면 리그가 빈 리그로 보인다.
   for (const team of teams) {
+    const appliedByUserId = team.playerIds[0];
+    if (!appliedByUserId) throw new Error('Alpha league roster must contain an applicant user');
     await tx.v1TournamentRegistration.upsert({
       where: { tournamentId_teamId: { tournamentId: league.id, teamId: team.id } },
       update: {},
       create: {
         tournamentId: league.id,
         teamId: team.id,
-        appliedByUserId: createdByAdminUserId,
+        appliedByUserId,
         status: 'confirmed',
         entrySource: 'seeded',
       },
@@ -1054,7 +1058,7 @@ async function ensureLeague(
  * 단발 리그와 같은 팀을 재사용하므로 팀을 새로 만들지 않는다 — 한 팀이 여러 리그에
  * 참가하는 것은 실제로도 정상이고, 마이 화면의 "내 리그"가 여러 건 뜨는 표본도 된다.
  */
-async function ensureTierSeries(
+export async function ensureTierSeries(
   tx: Prisma.TransactionClient,
   sportId: string,
   regionId: string,
@@ -1126,13 +1130,15 @@ async function ensureTierSeries(
       },
     });
     for (const team of tierTeams) {
+      const appliedByUserId = team.playerIds[0];
+      if (!appliedByUserId) throw new Error('Alpha league roster must contain an applicant user');
       await tx.v1TournamentRegistration.upsert({
         where: { tournamentId_teamId: { tournamentId: leagueId, teamId: team.id } },
         update: {},
         create: {
           tournamentId: leagueId,
           teamId: team.id,
-          appliedByUserId: createdByAdminUserId,
+          appliedByUserId,
           status: 'confirmed',
           entrySource: 'seeded',
         },

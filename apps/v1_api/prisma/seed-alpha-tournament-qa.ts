@@ -10,6 +10,7 @@ import {
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다 — 아래 경고가 금지하는
 // 건 이 이미지에 없는 `../src/...` import 다.
 import { seedAlphaQaSquads } from './seed-alpha-qa-squads';
+import { refreshAlphaTeamMembershipCounts } from './seed-alpha-membership-counts';
 import { deterministicCanonicalMatchId, ensureCanonicalOfficialResult, ensureCanonicalTournamentMatch, findTournamentOnSurfaceOrThrow } from './canonical-tournament-seed';
 import { seedCompetitionMatchLabel } from './seed-tournament-round-label';
 
@@ -500,7 +501,8 @@ export async function ensureTeamRoster(
         joinedAt: new Date(),
       },
     });
-    teams.push({ team, user, persona });
+    const refreshedTeam = await refreshAlphaTeamMembershipCounts(tx, team.id);
+    teams.push({ team: refreshedTeam, user, persona });
   }
   return teams;
 }

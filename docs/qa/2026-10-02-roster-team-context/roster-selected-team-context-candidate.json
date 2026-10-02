@@ -1,0 +1,355 @@
+{
+  "candidate": "Selected team and league identity absent from editable empty roster page for a multi-team captain",
+  "role": "Captain B verified at /my at17:25:17 UTC",
+  "observedUtc": {
+    "started": "2026-10-02T17:26:14.226Z",
+    "completed": "2026-10-02T17:34:45.769Z"
+  },
+  "repro": [
+    "My→My leagues→future league C next match→참가 명단",
+    "Choose C from B/C chooser→C registration detail shows team name→선수 등록",
+    "Observe empty 선수 명단 page: no selected team name or league title",
+    "Return→choose B→B registration detail identifies B→선수 등록; same roster main text"
+  ],
+  "actual": "C and B roster pages differ by opaque registration URL identifiers but have identical visible main text: generic roster title, dates, minimum6/maximum10, zero players. Selected team and league name absent at C402/787/1180 and B402.",
+  "expected": "Identify the selected team and league on the roster page near the roster title and add-player controls so a captain managing multiple teams can confirm the target.",
+  "impact": "Wrong-target editing risk / loss of context. No wrong write, server mutation, or permission bypass was observed.",
+  "checks": [
+    {
+      "backLinks": [
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": ""
+        },
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": ""
+        },
+        {
+          "ariaLabel": null,
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": "내 신청으로 돌아가기"
+        }
+      ],
+      "bodyHasBTeam": false,
+      "bodyHasCTeam": false,
+      "bodyHasLeagueTitle": false,
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "headings": [
+        "선수 명단"
+      ],
+      "mainText": "리그 기간\n2026년 10월 4일 (일) ~ 2026년 11월 29일 (일)\n진행 중\n선수 명단\n수정 가능\n운영진이 명단을 잠그기 전까지 수정할 수 있어요.\n최소 6명 이상 등록해야 해요. 현재 0명 등록됐어요. → 6명 더 필요해요\n0\n명\n선수 명단\n최소 6명 · 최대 10명\n선수 추가\n등록된 선수가 없어요\n최소 6명 이상 등록해 주세요.\n내 신청으로 돌아가기",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/95c7acb5-7967-48ae-a541-463f0e4a7f18/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3D95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "utc": "2026-10-02T17:29:03.059Z"
+    },
+    {
+      "backLinks": [
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": ""
+        },
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": ""
+        },
+        {
+          "ariaLabel": null,
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": "내 신청으로 돌아가기"
+        }
+      ],
+      "bodyHasBTeam": false,
+      "bodyHasCTeam": false,
+      "bodyHasLeagueTitle": false,
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "headings": [
+        "선수 명단"
+      ],
+      "mainText": "리그 기간\n2026년 10월 4일 (일) ~ 2026년 11월 29일 (일)\n진행 중\n선수 명단\n수정 가능\n운영진이 명단을 잠그기 전까지 수정할 수 있어요.\n최소 6명 이상 등록해야 해요. 현재 0명 등록됐어요. → 6명 더 필요해요\n0\n명\n선수 명단\n최소 6명 · 최대 10명\n선수 추가\n등록된 선수가 없어요\n최소 6명 이상 등록해 주세요.\n내 신청으로 돌아가기",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/95c7acb5-7967-48ae-a541-463f0e4a7f18/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3D95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "utc": "2026-10-02T17:29:22.297Z"
+    },
+    {
+      "backLinks": [
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": ""
+        },
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": ""
+        },
+        {
+          "ariaLabel": null,
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+          "text": "내 신청으로 돌아가기"
+        }
+      ],
+      "bodyHasBTeam": false,
+      "bodyHasCTeam": false,
+      "bodyHasLeagueTitle": false,
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "headings": [
+        "선수 명단"
+      ],
+      "mainText": "선수 명단\n리그 기간\n2026년 10월 4일 (일) ~ 2026년 11월 29일 (일)\n진행 중\n선수 명단\n수정 가능\n운영진이 명단을 잠그기 전까지 수정할 수 있어요.\n최소 6명 이상 등록해야 해요. 현재 0명 등록됐어요. → 6명 더 필요해요\n0\n명\n선수 명단\n최소 6명 · 최대 10명\n선수 추가\n등록된 선수가 없어요\n최소 6명 이상 등록해 주세요.\n내 신청으로 돌아가기",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/95c7acb5-7967-48ae-a541-463f0e4a7f18/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3D95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "utc": "2026-10-02T17:29:22.588Z"
+    },
+    {
+      "backLinks": [
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=bda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+          "text": ""
+        },
+        {
+          "ariaLabel": "뒤로가기",
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=bda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+          "text": ""
+        },
+        {
+          "ariaLabel": null,
+          "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=bda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+          "text": "내 신청으로 돌아가기"
+        }
+      ],
+      "bodyHasBTeam": false,
+      "bodyHasCTeam": false,
+      "bodyHasLeagueTitle": false,
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "headings": [
+        "선수 명단"
+      ],
+      "mainText": "리그 기간\n2026년 10월 4일 (일) ~ 2026년 11월 29일 (일)\n진행 중\n선수 명단\n수정 가능\n운영진이 명단을 잠그기 전까지 수정할 수 있어요.\n최소 6명 이상 등록해야 해요. 현재 0명 등록됐어요. → 6명 더 필요해요\n0\n명\n선수 명단\n최소 6명 · 최대 10명\n선수 추가\n등록된 선수가 없어요\n최소 6명 이상 등록해 주세요.\n내 신청으로 돌아가기",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/bda779e6-a465-4f54-bfbd-c0f6a4ea9a20/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3Dbda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+      "utc": "2026-10-02T17:30:43.493Z"
+    }
+  ],
+  "comparison": {
+    "sameMainText": true,
+    "cRegistration": "95c7acb5-7967-48ae-a541-463f0e4a7f18",
+    "bRegistration": "bda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+    "sameMainTextScope": "Exact mobile C402 vs B402 mainText comparison. The C desktop sample additionally begins with the desktop page heading; do not assert byte-identical main text across all widths.",
+    "sameMobileScreenshotBytes": true,
+    "sameMobileScreenshotSha256": "7af4806fd2aa8868436eef9e3b8d69c5fa10c80f90e66b4ed8a4e46ff1395c49",
+    "interpretation": "Identical empty-page rendering with distinct synthetic registration URLs. No wrong-target write, authorization flaw or save error is established."
+  },
+  "backVerification": {
+    "C": {
+      "cTeamVisible": true,
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "utc": "2026-10-02T17:29:43.895Z"
+    },
+    "B": {
+      "bTeamVisible": true,
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=bda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+      "utc": "2026-10-02T17:31:46.855Z"
+    }
+  },
+  "finalState": {
+    "css": {
+      "height": 606,
+      "width": 402
+    },
+    "listPresent": true,
+    "url": "https://alpha.teameet.co.kr/my/leagues",
+    "utc": "2026-10-02T17:34:45.785Z"
+  },
+  "sourceProofFile": "roster-selected-team-context-candidate.json",
+  "scope": "Read-only context identification on synthetic B/C registrations for the same league; C at 402/787/1180 and B at 402 CSS pixels.",
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Not observed on the serving page. Evidence publication commit is not a deployment identifier. Not post-fix evidence.",
+  "checksEvidenceType": "Recorded rendered-body/main-text and link observations. Duplicate back anchors are raw recorded links; they are not a claim that two Back controls were simultaneously visible. Actual Back destinations are separately recorded.",
+  "coverage": [
+    "C next fixture 참가 명단 opens B/C team chooser; C/B selection targets correct registration detail",
+    "C/B detail visibly identifies selected team; both future-league empty roster baselines0 and minimum6/maximum10",
+    "C roster target identity observed at402/787/1180, B compared at402, identical main text without team or league title",
+    "Roster Back returns correct C/B registration detail"
+  ],
+  "limits": [
+    "Read-only view; add-player dialog not opened; no player input or server mutation.",
+    "No permission bypass, wrong write or save error observed. This is a target-identification UX candidate.",
+    "No new issue number; duplicate search and severity are separate.",
+    "No post-fix pass, full-feature pass, real-device or actual screen-reader claim.",
+    "Mobile and tablet empty-message text is partly/below the viewport; the recorded mainText supplements the image.",
+    "The registration-detail screenshot schedule-date difference is outside this candidate and is not counted as a new finding.",
+    "Exact serving SHA was not observed."
+  ],
+  "images": [
+    {
+      "file": "my-leagues-mobile-402-team-chooser.jpg",
+      "timestamp": "2026-10-02T17:27:15.510Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?from=%2Fleague-matches%2F33767023-5e85-4393-910a-9e26b9657b69%2Ffixtures%2F61092f9d-4373-483f-8e0f-59381783e341%3Ffrom%3D%252Fmy%252Fleagues",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "note": "C upcoming match 참가 명단 opens safe two-team chooser (C and B), does not silently select another team.",
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "bfa85d10fc18b47dfb4aa41d874cd5b76eeaae1c421154de092e964435dcf2ee",
+      "bytes": 13260,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    },
+    {
+      "file": "my-leagues-mobile-402-c-registration.jpg",
+      "timestamp": "2026-10-02T17:27:30.502Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "note": "Settled C registration detail visibly identifies E2E 알파 C팀 and 0명 / 최소6명 등록. Earlier immediate AX was transitional and is not treated as a missing-team-name defect. Existing schedule-date discrepancy is not counted as new.",
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "f59eee180bfc6c81e1d64c45aa8f6e1dc0f6b250076f964260daa3e10a2ea7a5",
+      "bytes": 18202,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    },
+    {
+      "file": "my-leagues-mobile-402-empty-roster.jpg",
+      "timestamp": "2026-10-02T17:28:18.933Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/95c7acb5-7967-48ae-a541-463f0e4a7f18/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3D95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "note": "Read-only zero-roster guidance at future league C registration: minimum6/maximum10, six more needed; no add or input action.",
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "7af4806fd2aa8868436eef9e3b8d69c5fa10c80f90e66b4ed8a4e46ff1395c49",
+      "bytes": 20000,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    },
+    {
+      "file": "my-leagues-tablet-787-empty-roster.jpg",
+      "timestamp": "2026-10-02T17:29:22.308Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/95c7acb5-7967-48ae-a541-463f0e4a7f18/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3D95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "note": "C zero-roster at787; no team/league title in rendered body; registration-specific back links present.",
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "03cfc236ce223c35e37ea3c0a22487e945808bd58c3d39bc310f9f4f92d198d6",
+      "bytes": 20874,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    },
+    {
+      "file": "my-leagues-desktop-1180-empty-roster.jpg",
+      "timestamp": "2026-10-02T17:29:22.598Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/95c7acb5-7967-48ae-a541-463f0e4a7f18/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3D95c7acb5-7967-48ae-a541-463f0e4a7f18",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "note": "C zero-roster at1180; no team/league title in rendered body.",
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "1a5aeeb810e6239e6e626432fe4085bd27ce7d0a520e78897122ffe9b203eaed",
+      "bytes": 34115,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    },
+    {
+      "file": "my-leagues-mobile-402-b-registration.jpg",
+      "timestamp": "2026-10-02T17:30:27.554Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/my?reg=bda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "note": "B registration selected from same two-team chooser; settled detail identifies B.",
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "01c66e5a7cf850c0f9c8e88becdece3ab20c6d3226580ec8423afe0bdfd47b08",
+      "bytes": 18398,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    },
+    {
+      "file": "my-leagues-mobile-402-b-empty-roster.jpg",
+      "timestamp": "2026-10-02T17:30:43.507Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/33767023-5e85-4393-910a-9e26b9657b69/registrations/bda779e6-a465-4f54-bfbd-c0f6a4ea9a20/roster?from=%2Ftournaments%2F33767023-5e85-4393-910a-9e26b9657b69%2Fmy%3Freg%3Dbda779e6-a465-4f54-bfbd-c0f6a4ea9a20",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "note": "B registration empty roster matches C text and layout apart from opaque URL identifiers; no selected team/league name.",
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "7af4806fd2aa8868436eef9e3b8d69c5fa10c80f90e66b4ed8a4e46ff1395c49",
+      "bytes": 20000,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original viewport capture, fullPage=false; no crop, redaction or re-encoding",
+      "pixelReview": "Synthetic team labels, aggregate zero-player counts and general controls only; no individual names, photos, birth dates, contact data or credentials"
+    }
+  ],
+  "framingNotes": [
+    "Mobile CSS viewport height606 and raster height605 are retained as separate measurements.",
+    "The seven images show team chooser, C/B registration detail context and empty roster controls; broader fixture/member evidence is excluded.",
+    "The B402 and C402 empty-roster originals have identical pixels/bytes, while their source UTC and registration URLs differ."
+  ]
+}

@@ -27,6 +27,10 @@ let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
 
 beforeEach(() => {
+  // The form defaults to today; keep the fixture clock distinct from the saved interval.
+  // Only Date is fake so MSW and Testing Library polling still use real timers.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   mock = createV1GameRosterMswHandlers();
   server = setupServer(
@@ -41,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   server.close();
+  vi.useRealTimers();
   vi.unstubAllEnvs();
 });
 

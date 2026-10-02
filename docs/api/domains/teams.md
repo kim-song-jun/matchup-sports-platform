@@ -335,3 +335,9 @@ CAUTION:
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`
+
+## Recruiting contact and dissolution fixture routes (2026-10-03)
+
+The `recruiting_only` signal shared by team detail `canSendContact` and contact creation requires `hostTeamId=<recipient>`, `status=recruiting`, `deletedAt=null`, `leagueId=null`, and `tournamentId=null`. Deleted listings or competition fixtures do not open a team's contact inbox. The generic rejection still does not distinguish block/policy/not-recruiting causes.
+
+Live-game dissolution blockers choose league fixture detail first (`/league-matches/:leagueId/fixtures/:teamMatchId`), then tournament detail (`/tournaments/:tournamentId/matches/:teamMatchId`), then friendly detail. This is necessary because regular league fixtures also carry `tournamentId`. Blocker rules and dissolution mutation behavior are unchanged.

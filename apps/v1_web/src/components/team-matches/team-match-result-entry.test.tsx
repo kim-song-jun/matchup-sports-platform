@@ -20,7 +20,7 @@ vi.mock('./team-match-shared-record', () => ({ TeamMatchSharedRecord: () => <div
 
 function record(overrides: Partial<SharedRecord>): SharedRecord {
   return {
-    teamMatchId: 'tm-1',
+    leagueId: null, tournamentId: null, teamMatchId: 'tm-1',
     title: '경기',
     startsAt: null,
     phase: 'scheduled',

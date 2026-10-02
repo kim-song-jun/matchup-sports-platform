@@ -71,13 +71,9 @@ export default function AdminTeamMatchNewPage() {
   const selectedSport = sports?.find((sport) => sport.id === sportId);
   const matchFormatOptions = useMemo(() => formatOptions(selectedSport), [selectedSport]);
 
-  // 검증도 제출과 같은 KST 인스턴트로 한다(원본 문자열을 new Date 로 읽으면 브라우저 로컬 해석).
+  // 입력 원문(KST 벽시계)을 그대로 넘긴다 — 해석 실패는 검증이 필드 오류로 잡는다.
   const startIso = kstDatetimeLocalToIso(startsAt);
-  const dateErrors = teamMatchDateErrors({
-    startsAt: startIso ?? '',
-    endsAt: kstDatetimeLocalToIso(endsAt),
-    deadlineAt: kstDatetimeLocalToIso(deadlineAt),
-  });
+  const dateErrors = teamMatchDateErrors({ startsAt, endsAt, deadlineAt });
   const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
   const canSubmit =
     canWrite &&

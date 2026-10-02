@@ -163,7 +163,9 @@ describe('buildTeamMatchPayloadResult — payload | missingFields 분기', () =>
     expect(() => buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId)).not.toThrow();
     const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
     expect(result.payload).toBeUndefined();
-    expect(result.missingFields?.map((item) => item.field)).toContain('date');
+    const fields = result.missingFields?.map((item) => item.field);
+    expect(fields).toContain('date');
+    expect(fields).toContain('startTime');
   });
 });
 
@@ -260,5 +262,15 @@ describe('KST 기준 검증 — 브라우저 시간대(TZ=UTC 러너)와 무관'
     expect(build({ ...base, deadlineDate: '2026-09-04', deadlineTime: '23:00' }).payload).toBeUndefined();
     expect(build({ ...base, deadlineDate: '2026-09-04', deadlineTime: '23:59' }).payload?.deadlineAt)
       .toBe('2026-09-04T14:59:00.000Z');
+  });
+
+  it('입력했는데 해석되지 않는 종료·마감은 오류로 잡는다 — 입력 안 함(오류 없음)과 구분한다', () => {
+    const base = draftAt('2026-10-10', '10:00');
+    const fieldsOf = (draft: ReturnType<typeof draftAt>) => build(draft).missingFields?.map((item) => item.field) ?? [];
+
+    expect(fieldsOf({ ...base, endDate: 'broken', endTime: '12:00' })).toContain('endTime');
+    expect(fieldsOf({ ...base, deadlineDate: 'broken', deadlineTime: '12:00' })).toContain('deadlineTime');
+    // 대조군: 비어 있으면 오류 없이 null 로 저장된다.
+    expect(build(base).payload).toMatchObject({ endsAt: null, deadlineAt: null });
   });
 });

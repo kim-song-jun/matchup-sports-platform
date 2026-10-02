@@ -92,10 +92,11 @@ export function getTeamMatchMissingFields(ctx: TeamMatchValidationContext): Team
   if (d.date && d.startTime && !parseStartsAt(d)) {
     missing.push({ field: 'date', label: '날짜를 확인해 주세요', step: 'place-time' });
   }
+  // 원문을 넘긴다 — "입력 안 함"과 "입력했는데 해석 불가"를 teamMatchDateErrors 가 가른다.
   const errors = teamMatchDateErrors({
-    startsAt: parseStartsAt(d) ?? '',
-    endsAt: parseEndsAt(d),
-    deadlineAt: parseDeadlineAt(d),
+    startsAt: d.date && d.startTime ? `${d.date}T${d.startTime}` : '',
+    endsAt: d.endTime ? `${d.endDate || d.date}T${d.endTime}` : null,
+    deadlineAt: d.deadlineDate && d.deadlineTime ? `${d.deadlineDate}T${d.deadlineTime}` : null,
     existingDeadlineAt: ctx.existingDeadlineAt,
   });
   const fields = { startsAt: 'startTime', endsAt: 'endTime', deadlineAt: 'deadlineTime' } as const;
@@ -152,6 +153,11 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
     // 단언 후 크래시 대신 결측 필드로 되돌려 상위 UI가 그 스텝으로 안내하게 한다.
     return { missingFields: [missingFieldFor('date'), missingFieldFor('startTime')] };
   }
+  // 입력했는데 해석되지 않는 종료·마감은 null(입력 안 함)로 보내지 않고 결측 필드로 되돌린다.
+  const endsAt = parseEndsAt(draft);
+  if (draft.endTime && !endsAt) return { missingFields: [missingFieldFor('endTime')] };
+  const deadlineAt = parseDeadlineAt(draft);
+  if (draft.deadlineDate && draft.deadlineTime && !deadlineAt) return { missingFields: [missingFieldFor('deadlineTime')] };
 
   return {
     payload: {
@@ -161,8 +167,8 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       title: draft.title.trim(),
       description: draft.description.trim() || null,
       startsAt,
-      endsAt: parseEndsAt(draft),
-      deadlineAt: parseDeadlineAt(draft),
+      endsAt,
+      deadlineAt,
       imageUrl: draft.imageUrl.trim() || null,
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,

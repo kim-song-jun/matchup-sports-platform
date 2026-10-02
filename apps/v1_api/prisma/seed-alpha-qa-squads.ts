@@ -1,4 +1,5 @@
 import { Prisma, V1AuthProvider } from '@prisma/client';
+import { refreshAlphaTeamMembershipCounts } from './seed-alpha-membership-counts';
 
 /**
  * alpha QA 스쿼드 — 팀 10개 × 선수 10명(= 계정 100개).
@@ -218,10 +219,7 @@ export async function seedAlphaQaSquads(
         });
       }
     }
-    await tx.v1Team.update({
-      where: { id: team.id },
-      data: { memberCount: memberIds.length, managerCount: 1 },
-    });
+    await refreshAlphaTeamMembershipCounts(tx, team.id);
     teams += 1;
   }
 

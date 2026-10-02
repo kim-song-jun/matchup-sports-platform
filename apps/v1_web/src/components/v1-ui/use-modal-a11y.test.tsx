@@ -3,7 +3,7 @@
  * 스캐폴딩을 이 훅으로 모으면서, 각 파일에 흩어져 있던(그리고 어디서도 테스트로
  * 고정돼 있지 않던) 동작을 여기서 고정한다.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useModalA11y } from './use-modal-a11y';
@@ -113,6 +113,8 @@ describe('useModalA11y', () => {
     await waitFor(() =>
       expect(inner.container.querySelector('[role="dialog"]')).toBeNull(),
     );
+    // DOM 이 걷힌 뒤에 오는 안쪽 잠금 해제까지 흘려보낸 다음 본다 — 해제 전에 보면 단언이 비어 있다
+    await act(async () => {});
     // 안쪽이 사라져도 바깥 모달은 아직 열려 있다 — 여기서 풀리면 뒤 화면이 스크롤된다
     expect(document.body.style.overflow).toBe('hidden');
     outer.unmount();
@@ -143,8 +145,10 @@ describe('useModalA11y', () => {
     expect(document.body.style.overflow).toBe('hidden');
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(document.body.style.overflow).toBe('');
+    // 해제는 패널을 걷는 커밋 뒤 별도 작업(useEffect cleanup)으로 온다 — 패널이 사라진 것을 기다리면
+    // 해제 전에 단언할 수 있다(CI 간헐 실패). 해제 자체를 기다리고, 새면 시간 초과로 실패한다.
+    await waitFor(() => expect(document.body.style.overflow).toBe(''));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('잠그기 전에 있던 인라인 값은 마지막 오버레이가 닫힐 때 그대로 돌아온다', () => {

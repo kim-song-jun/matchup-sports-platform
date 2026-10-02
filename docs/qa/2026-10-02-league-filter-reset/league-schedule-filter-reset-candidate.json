@@ -1,0 +1,236 @@
+{
+  "title": "League schedule upcoming-only filter resets after season awards and Back",
+  "role": "Authenticated captain B / E2E팀장B",
+  "severityCandidate": "Low/medium usability; duplicate triage required",
+  "expected": "Returning to a league preserves the selected schedule filter",
+  "actual": "Upcoming aria-pressed true before navigation becomes false after browser Back; All becomes true and completed fixture reappears",
+  "steps": [
+    "Open My > My leagues > completed ALPHA QA E2E league",
+    "Select 예정만 in 경기 일정 (Tab/Space used)",
+    "Open 시즌 결산 자세히 보기",
+    "Use browser Back",
+    "Observe 전체 selected and completed fixture instead of upcoming-only empty state"
+  ],
+  "reproductions": [
+    {
+      "scenario": "Schedule upcoming filter reset after awards + browser Back",
+      "before": {
+        "time": "2026-10-02T08:33:32.153Z",
+        "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?from=%2Fmy%2Fleagues",
+        "upcomingPressed": "true",
+        "allPressed": "false"
+      },
+      "via": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Ffrom%3D%252Fmy%252Fleagues",
+      "after": {
+        "time": "2026-10-02T08:33:46.355Z",
+        "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?from=%2Fmy%2Fleagues",
+        "upcomingPressed": "false",
+        "allPressed": "true"
+      },
+      "expected": "Preserve selected upcoming-only filter when returning to league",
+      "actual": "전체 selected again, completed fixture reappears"
+    },
+    {
+      "scenario": "Tablet schedule filter after browser Back",
+      "before": {
+        "time": "2026-10-02T08:35:55.628Z",
+        "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "upcomingPressed": "true",
+        "focus": {
+          "boxShadow": "none",
+          "checked": null,
+          "expanded": null,
+          "href": null,
+          "name": "예정만",
+          "outline": "rgb(49, 130, 246) solid 2px",
+          "rect": {
+            "height": 44,
+            "width": 59.04166793823242,
+            "x": 618.2916870117188,
+            "y": 221.36459350585935
+          },
+          "role": null,
+          "tabIndex": 0,
+          "tag": "BUTTON"
+        }
+      },
+      "via": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb",
+      "after": {
+        "time": "2026-10-02T08:36:18.625Z",
+        "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "upcomingPressed": "false",
+        "allPressed": "true"
+      }
+    },
+    {
+      "scenario": "Desktop schedule filter after browser Back",
+      "before": {
+        "time": "2026-10-02T08:36:42.989Z",
+        "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "upcomingPressed": "true",
+        "focus": {
+          "boxShadow": "none",
+          "checked": null,
+          "expanded": null,
+          "href": null,
+          "name": "예정만",
+          "outline": "rgb(49, 130, 246) solid 2px",
+          "rect": {
+            "height": 44,
+            "width": 59.71875,
+            "x": 962.28125,
+            "y": 356.6875
+          },
+          "role": null,
+          "tabIndex": 0,
+          "tag": "BUTTON"
+        }
+      },
+      "via": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb",
+      "after": {
+        "time": "2026-10-02T08:37:07.098Z",
+        "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+        "upcomingPressed": "false",
+        "allPressed": "true"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "league-audit-05-mobile-filter-before-away-402-viewport.jpg",
+      "timestamp": "2026-10-02T08:33:32.230Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?from=%2Fmy%2Fleagues",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "d37bf105d2cca5943bea9cb47660439502f27b6e6f98fedf1656928105ac93fa",
+      "bytes": 19471,
+      "git_blob_sha": "54f5b534e9dff1c1f41ba20b7a179090481601ef",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "league-audit-06-mobile-browser-back-filter-reset-402-viewport.jpg",
+      "timestamp": "2026-10-02T08:33:46.439Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?from=%2Fmy%2Fleagues",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "82b7de013d99ab3d811b96a6763fe864e4ac20ff809b2395c9b7b9fbf3a51c9b",
+      "bytes": 25510,
+      "git_blob_sha": "659908bd48bc2534e0364e4028b34fe031cc1c9d",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "league-audit-14-tablet-filter-before-away-787-viewport.jpg",
+      "timestamp": "2026-10-02T08:35:55.720Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "8d9cbc4cda18f6aac2191530f40812e51d0fadef348c49f8211ceded17c25ede",
+      "bytes": 18502,
+      "git_blob_sha": "8a79dab477a556548a8eae28837d5c41c76930ba",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "league-audit-15-tablet-browser-back-filter-reset-787-viewport.jpg",
+      "timestamp": "2026-10-02T08:36:18.710Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "314355df56d135ad47aba16e5561b7e64cb502718e4ec7410e6a2a9533b709dc",
+      "bytes": 25671,
+      "git_blob_sha": "2d23f3d88cfc5cb8428ffbd6d1ebd498f09a1616",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "league-audit-17-desktop-filter-before-away-1180-viewport.jpg",
+      "timestamp": "2026-10-02T08:36:43.077Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "a9ca92b77f5c3c7a33874ea914b1ec0c721c9e148ded19aaed5e3021cc681258",
+      "bytes": 30251,
+      "git_blob_sha": "c684e3cdaf01b664589fedd145d44d3341502f49",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "league-audit-18-desktop-browser-back-filter-reset-1180-viewport.jpg",
+      "timestamp": "2026-10-02T08:37:07.202Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "40ecf15ef3938c10a8d681972cd2ede4905c6dd9bcda8c2ba4c3d3dddb25988f",
+      "bytes": 43539,
+      "git_blob_sha": "e85faed1622debdc2fc5514a551f2d30cba9a35b",
+      "pixel_reviewed": true,
+      "exif_present": false
+    }
+  ],
+  "limits": [
+    "Same authenticated captain B session; no guest run",
+    "No mutations; filter is local UI state",
+    "Mobile page Back also observed resetting, but browser Back is the fully captured three-width reproduction",
+    "No #1418 profile Back retest; this is league schedule filter state",
+    "Exact serving page commit SHA was not directly observed.",
+    "Mobile and tablet before screenshots show the upcoming-only empty state with filter buttons outside the saved viewport; selected-filter evidence comes from the recorded aria-pressed observations. Desktop before screenshot also shows the selected filter.",
+    "Original mobile CSS viewport is 402×606 and JPEG raster is 402×605; both are preserved."
+  ],
+  "servingCommitSha": "unobserved",
+  "triageStatus": "Candidate only; duplicate triage pending; no issue number assigned by this evidence package",
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "Only the six selected filter before/after images are published. They show synthetic team names, league standings, fixture status, and local filter UI. No player names, birth dates, profile IDs, join dates, credentials, or member-list payload are visible.",
+    "sourceScope": "Only league-schedule-filter-reset-candidate.json and its exact six referenced image files were used. No broader league audit or roster evidence is included."
+  }
+}

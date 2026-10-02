@@ -45,11 +45,32 @@ and therefore has no host participant row.
 
 ## Room entry and read state
 
+### Platform team-match rooms
+
+- Platform recruitment creation atomically creates a `team_match` chat room and adds the creating
+  operator (`createdByUserId`). Each HOME/AWAY approval atomically adds that team's active
+  owner/manager accounts. Ordinary members and unapproved applicants have no access.
+- The creating operator needs an active, non-revoked `owner`/`ops` admin account and active user
+  account. This is scoped to their own `platformManaged` match; other admins gain no implicit access.
+  Operator entitlement is checked for list, resolve, detail, messages and delivery recipients.
+- Platform chat is available during `recruiting`, `closed`, `matched`, and `completed`; cancelled,
+  expired and deleted matches are excluded. Ordinary team matches still require both assigned teams
+  and `matched`/`completed`. Failed team-match entitlement returns `403 PERMISSION_DENIED`.
+- The creating operator cannot leave (`403 PLATFORM_OPERATOR_REQUIRED`). Membership alone never
+  preserves admin access after suspension, revocation, or a change to the support role.
+- New automatic participants see history from room creation. Existing participant visibility,
+  read cursors, preferences and team exits are preserved. The data-only migration
+  `20261002110000_v1_platform_team_match_chat_backfill` adds missing rooms/participants and repairs
+  a left creator only if they still have active operator authorization. Existing archived rooms
+  remain archived; no existing messages are overwritten.
+- No Prisma model/schema changes. `prisma migrate deploy` applies the backfill on deployment,
+  including production after the user's dev-to-main promotion. Migration SQL is rerunnable.
+
 - `v1_chat_room_participants.visible_from_at` is the participant visibility boundary; `GET
   /chat/rooms/:roomId/messages` returns only messages at or after it, and `PATCH
   /chat/rooms/:roomId/me` rejects `lastReadMessageId` values outside that visible window.
 - Newly created or reactivated team-chat participants set `visible_from_at` at confirmed membership
-  activation; team-match participants start with `visible_from_at = null` and the first room
+  activation; ordinary on-demand team-match participants start with `visible_from_at = null` and the first room
   detail/message entry sets it and creates the joined system message.
 - Personal match: approving an application (`POST /match-applications/:id/approve`) creates or finds the
   match room in the same transaction, registers the approved participant with `visible_from_at` = the

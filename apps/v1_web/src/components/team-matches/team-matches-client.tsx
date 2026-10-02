@@ -302,7 +302,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // 서버는 취소된 매치의 채팅방을 열지도, 기존 방에 들어오지도 못하게 막는다(chat.service.ts
   // assertCanUseTeamMatchChat) — 버튼을 남기면 눌러서 409 를 봐야만 알게 된다.
   const isCancelled = query.data ? getStatus(query.data) === 'cancelled' : false;
-  const chatAvailable = !isCancelled && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned);
+  const chatAvailable = !isCancelled && (query.data?.viewer?.canChat
+    ?? canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned));
   // platformManaged의 hostTeam은 경기 HOME 사이드일 뿐 모집 운영자가 아니다. 서버가
   // host_team을 내리지 않는 것이 정본이지만, API/Web 롤링 배포 중 구 응답이 남아도
   // "내가 만든 팀매치"/"매치 관리"가 다시 노출되지 않도록 화면에서도 방어한다.

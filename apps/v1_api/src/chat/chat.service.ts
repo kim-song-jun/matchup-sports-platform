@@ -12,7 +12,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
+import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere, teamMatchChatEntitlementWhere } from './chat-entitlement';
 import { archiveEndedContactRooms } from '../team-contacts/contact-room-archive';
 import {
   CHAT_SHARE_KINDS,
@@ -52,7 +52,7 @@ const RECIPIENT_ROOM_SELECT = {
   matchId: true,
   teamId: true,
   teamMatchId: true,
-  teamMatch: { select: { hostTeamId: true, approvedApplicantTeamId: true } },
+  teamMatch: { select: { hostTeamId: true, approvedApplicantTeamId: true, platformManaged: true, createdByUserId: true } },
   teamContactId: true,
   teamContact: { select: { fromTeamId: true, toTeamId: true } },
 } satisfies Prisma.V1ChatRoomSelect;
@@ -61,7 +61,7 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
   include: {
     match: { select: { id: true; title: true } };
     team: { select: { id: true; name: true } };
-    teamMatch: { select: { id: true; title: true; hostTeamId: true; approvedApplicantTeamId: true } };
+    teamMatch: { select: { id: true; title: true; hostTeamId: true; approvedApplicantTeamId: true; platformManaged: true; createdByUserId: true } };
     teamContact: {
       select: {
         id: true;
@@ -699,6 +699,9 @@ export class ChatService {
 
   async leave(user: V1AuthUser, roomId: string, dto: LeaveChatRoomDto) {
     const room = await this.getRoomParticipant(user.id, roomId);
+    if (room.teamMatch?.platformManaged && room.teamMatch.createdByUserId === user.id) {
+      throw new ForbiddenException({ code: 'PLATFORM_OPERATOR_REQUIRED', message: '플랫폼 주관 운영자는 해당 채팅방에서 나갈 수 없어요.' });
+    }
     const participant = room.participants[0];
     if (participant.status === 'left') {
       throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Already left this chat room' });
@@ -818,25 +821,11 @@ export class ChatService {
   }
 
   private async assertCanUseTeamMatchChat(userId: string, teamMatchId: string) {
-    // chat-entitlement.ts currentChatEntitlementWhere와 같은 이유로 completed도 허용한다:
-    // 결과 제출로 status가 matched→completed 로 넘어가는 순간이 채팅 봉쇄 시점이 되면 안 된다
-    // (경기 종료 뒤에도 두 팀장이 대화를 이어갈 수 있어야 한다). cancelled/expired/pre-match는
-    // 여전히 배제된다.
-    const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, status: { in: ['matched', 'completed'] }, deletedAt: null },
-      select: { hostTeamId: true, approvedApplicantTeamId: true },
-    });
-    if (!teamMatch?.hostTeamId || !teamMatch.approvedApplicantTeamId) throw stateConflict('Team match chat is available after both teams are assigned');
-    const membership = await this.prisma.v1TeamMembership.findFirst({
-      where: {
-        userId,
-        status: 'active',
-        role: { in: ['owner', 'manager'] },
-        teamId: { in: [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId] },
-      },
+    const entitled = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatchId, ...teamMatchChatEntitlementWhere(userId) },
       select: { id: true },
     });
-    if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Team match chat requires team owner or manager role' });
+    if (!entitled) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Team match chat requires assigned team management or the active platform organizer' });
   }
 
   private async assertCanUseTeamContactChat(userId: string, teamContactId: string) {
@@ -1031,7 +1020,7 @@ export class ChatService {
     return {
       match: { select: { id: true, title: true } },
       team: { select: { id: true, name: true } },
-      teamMatch: { select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true } },
+      teamMatch: { select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, platformManaged: true, createdByUserId: true } },
       teamContact: {
         select: {
           id: true,

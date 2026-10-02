@@ -22,6 +22,16 @@ API 99/99, Web 200/200, 두 패키지 타입 검사 PASS. Headed 컴포넌트 fi
 
 [감사 및 후속 작업](../../.github/tasks/20261003-competition-team-match-surface-audit.md): 기존 감사 20/20에서 발견한 관리자 분류·상태 변경, 사용자 공동 기록 이동, 조건부 컨택 판정·해체 리그 링크를 최신 dev에서 수정한다. [관리자 시나리오](./10-profile-settings-admin.md), [팀매치 시나리오](./05-team-match-flows.md). 회귀·타입 검사, dev PR 리뷰·CI, Alpha 배포·3폭 실제 화면 확인 진행 중.
 
+## 2026-10-02 — 플랫폼 주관 채팅 자동 참여
+
+[Task 149](../../.github/tasks/149-admin-assigned-team-match.md)의 채팅 후속 작업:
+모집 생성 시 운영자 참여, 각 팀 승인 시 운영진 참여, 기존 매치 data-only backfill 구현.
+[시나리오](./05-team-match-flows.md)는 실제 PostgreSQL 및 headed QA 미실행 상태로 유지한다.
+운영 DB 적용과 main 승격은 아직 하지 않았다.
+범위 회귀: API 126/126, Web 89/89, 양쪽 타입 검사 0. 실제 DB 테스트는
+`DATABASE_URL is required for isolated integration suites`로 실행 전 차단됐다.
+
+
 ## 2026-10-02 — 승격 보류 후 Alpha QA
 
 [Task 182](../../.github/tasks/182-alpha-qa-continuation.md) · [실행 기록](./alpha-qa-continuation-2026-10-02.md): 관리자 전용 경기 운영 API와 공식 1:0 화면 확인. 1명 팀 편집의 정원 저장 오류 수정안은 회귀 31/31 통과, dev CI·Alpha 재검증 진행 중. 실제 Kakao OAuth·Android·역할별 명단 QA와 최신 외부 clean 리뷰는 미완. main·Production 승격은 보류.

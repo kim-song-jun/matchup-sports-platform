@@ -1,5 +1,37 @@
 # 149. Admin Team Match Recruitment
 
+## 2026-10-02 platform chat continuation
+
+Scope: backend chat/recruitment, frontend detail entitlement, data-only migration, API/scenario docs.
+Worktree: `output/worktrees/platform-team-match-chat`; branch `fix/platform-team-match-chat`, latest
+`origin/dev` base `be228ba1b`. Shared-root WIP is untouched. No main promotion or production DB write.
+
+- [x] Platform recruitment creates its room and mandatory creating-operator participant in the same transaction.
+- [x] HOME/AWAY approval adds that team's active owner/manager participants in the approval transaction.
+- [x] List/read/send/recipient entitlement covers the active creating owner/ops operator; revocation blocks access.
+- [x] Detail `viewer.canChat` gates the existing chat CTA independently of application authorship/team membership.
+- [x] Data-only idempotent migration backfills nondeleted platform recruitment/matched/completed rooms and missing participants; preserves existing history/preferences/voluntary team exits.
+- [x] PostgreSQL HTTP integration scenarios added for preassignment access, each side's admission,
+  unauthorized members, operator exit/revocation, cancellation and migration replay/data preservation.
+- [x] Narrow regressions: API 126/126 (79 unchanged team-match cases + final chat/recruitment 47/47), Web 89/89.
+- [x] API including the new integration spec and Web typechecks: 0 diagnostics. Diff/debt checks PASS.
+- [ ] PostgreSQL integration/migration execution (Docker daemon unavailable; no approved test DB configured).
+- [ ] Headed live manual QA at 390/768/1440 (requires actual API/test DB; no screenshot success claimed).
+- [ ] User promotion to main and production `migrate deploy`; existing production rows are not yet modified.
+
+Decisions: “platform operator” means the creating operator as agreed in this conversation, not every admin.
+The latest source has `platformManaged` and staged recruitment approval; old local direct-assignment
+code is not used. A platform room exists immediately, with each side admitted as approval happens.
+Revoked/inactive creators never gain permissions from a backfill. Existing archived rooms stay archived.
+No model/schema changes; tables are `v1_team_matches`, `v1_chat_rooms`, `v1_chat_room_participants`,
+`v1_team_memberships`, `v1_admin_users`, and `v1_users`.
+
+Progress: implementation, scoped regressions, API/Web typechecks and diff/debt review complete.
+Real-DB suite attempted: fails before test setup with `DATABASE_URL is required for isolated integration suites`.
+Docker daemon is absent, WSL unavailable in sandbox, and no PostgreSQL CLI/server is installed on this host.
+No live visual QA or migration replay success claimed; no task-created server/browser processes remain.
+Code is a local branch checkpoint, not deployment/PR-ready evidence. Production data remains unchanged.
+
 ## 2026-09-30 — Additive platform match collaboration
 
 Scope: API, Web, Prisma, docs; branch `feat/platform-team-match-collaboration`, base `46833467c`; DEV/alpha only.

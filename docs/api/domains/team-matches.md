@@ -304,8 +304,13 @@ Rules:
   `matched`로 바꾼다 — 동시 승인 요청이 두 팀을 승인하는 일은 없다.
 - 남은 `requested` 신청은 같은 트랜잭션에서 자동 `rejected`로 전환되고 각각 상태변경 로그와
   신청 팀 관리자 알림이 남는다.
-- `matched`는 매치 단위 상태일 뿐, 조회하는 팀이 승인됐다는 증명이 아니다 — `viewer.state =
-  approved`인 경우에만 승인 UI/채팅 권한을 준다.
+- `matched`는 매치 단위 상태일 뿐, 조회하는 팀이 승인됐다는 증명이 아니다. 채팅 진입은
+  `viewer.canChat`의 서버 판정을 따른다. 신청서를 제출한 개인의 `viewer.state`로 판단하지 않는다.
+- 상세 `viewer.canChat`은 배정된 HOME/AWAY의 활성 owner/manager 또는 해당 플랫폼 모집을
+  만든 활성 owner/ops 운영자를 허용한다. 플랫폼 모집은 생성부터 운영자 채팅방을 만들고,
+  첫 팀·두 번째 팀 승인마다 해당 팀 운영진을 추가한다. 일반 팀매치는 양 팀 확정 후 허용한다.
+  취소·만료·삭제 또는 운영 권한 회수 뒤에는 차단한다. 다른 관리자에게 채팅 접근을 일괄
+  허용하지 않는다. 상세 계약은 `chat.md`를 참조한다.
 
 ### POST /team-match-applications/:applicationId/reject
 

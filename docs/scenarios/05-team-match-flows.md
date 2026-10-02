@@ -25,6 +25,21 @@ Mobile detail [before](../screenshots/team-match-image-brightness/mobile-detail-
 Mobile list [before](../screenshots/team-match-image-brightness/mobile-list-before.png) ·
 [after](../screenshots/team-match-image-brightness/mobile-list-after.png).
 
+## 2026-10-02 platform chat regression
+
+- [ ] New platform recruitment: the creating operator sees its chat before any team is assigned.
+- [ ] First HOME approval: all HOME owners/managers see the room; members/unapproved teams get 403.
+- [ ] AWAY approval: all AWAY owners/managers join the same room; both teams receive operator messages.
+- [ ] The operator cannot leave; revocation/inactive/support role removes list/read/send/resolve access.
+- [ ] Completed matches retain conversation; cancelled/expired/deleted matches deny entry.
+- [ ] Apply backfill twice: missing rooms/participants added once; messages, read markers, preferences,
+  archived rooms and voluntary team exits retained.
+- [ ] 390/768/1440 headed screenshots and console/network checks for operator/HOME/AWAY.
+
+Evidence: `apps/v1_api/test/chat/platform-team-match-chat.integration-spec.ts` (real PostgreSQL HTTP).
+Local execution is pending approved PostgreSQL; no production backfill has run.
+
+
 > **Stack scope note (Todo 26 reconciliation, 2026-08-04):** everything from `## Scenario Checklist` through `## Notes` below describes the **legacy** `apps/api` (port 8111) / `apps/web` (port 3003) stack. Its routes (`POST /team-matches/:id/result`, `POST /team-matches/:id/check-in`, `POST /team-matches/:id/evaluate`, `GET /team-matches/:id/referee-schedule`) still exist verbatim in `apps/api/src/team-matches/team-matches.controller.ts` — none of this is false, it just documents a different, older team-match implementation than the one Tasks 12-24 shipped. The **v1 team-match implementation is a full rewrite** with a different controller, different route shapes, a versioned `Game`/`GameResultRevision` result model, and no `check-in`/`evaluate`/`referee-schedule` routes at all. See `## v1 stack (Tasks 12-24)` immediately below for the current, verified v1 surface and the two Todo-26 E2E scenario IDs this domain owns.
 
 ## v1 stack (Tasks 12-24)

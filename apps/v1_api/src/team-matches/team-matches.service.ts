@@ -1,4 +1,5 @@
 import { genderRuleColumnFilter, normalizeGenderRule } from '../common/gender-rule';
+import { teamMatchChatEntitlementWhere } from '../chat/chat-entitlement';
 import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
 import {
   BadRequestException,
@@ -1770,6 +1771,7 @@ export class TeamMatchesService {
         manageableHostTeam: false,
         manageableOpponentTeam: false,
         participantMember: false,
+        canChat: false,
         eligibleTeams: [],
         manageRoute: null,
       };
@@ -1800,11 +1802,15 @@ export class TeamMatchesService {
     // 판정해야 한다. 한쪽만 원장을 보게 두면 같은 팀이 두 응답에서 다른 자격으로 내려가고,
     // 그 갈림이 다시 "누를 수 있는데 반드시 실패하는 버튼"이 된다.
     const ledger = await readTeamMatchApplicationLedger(this.prisma, teamMatch.id);
+    const canChat = Boolean(await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatch.id, ...teamMatchChatEntitlementWhere(user.id) }, select: { id: true },
+    }));
     return {
       state: this.getViewerState(teamMatch, user),
       manageableHostTeam,
       manageableOpponentTeam,
       participantMember,
+      canChat,
       eligibleTeams: eligibleTeams.map((team) => {
         const { reasonCode } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id, team.sportId);
         return { teamId: team.id, name: team.name, role: team.memberships[0]?.role ?? 'member', eligible: reasonCode === 'OK', reasonCode };

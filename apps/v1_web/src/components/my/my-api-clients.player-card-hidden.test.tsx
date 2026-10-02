@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { PlayerCardHiddenSettingsPageClient } from './my-api-clients';
 
 /**
@@ -17,6 +18,7 @@ import { PlayerCardHiddenSettingsPageClient } from './my-api-clients';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/my/settings/player-card',
 }));
 
 const stateMock = vi.fn();
@@ -182,5 +184,19 @@ describe('선수 카드 숨김 설정', () => {
     expect(screen.getByText('사진')).toBeInTheDocument();
     // 숨김·모양·사진 세 섹션이 각각 조작 카드 하나씩(설명 전용 카드는 없다).
     expect(container.querySelectorAll('.tm-card').length).toBe(3);
+  });
+
+  // 성공·로딩 분기는 자기 헤더를 그리므로 셸 헤더가 겹치지 않게 꺼야 하고, 에러는 셸 헤더가 유일한 헤더다.
+  it.each([
+    ['성공', { data: { hidden: false }, isLoading: false, isError: false }, false],
+    ['로딩', { data: undefined, isLoading: true, isError: false }, false],
+    ['에러', { data: undefined, isLoading: false, isError: true }, undefined],
+  ])('데스크톱 셸 헤더 override: %s', (_name, state, expected) => {
+    stateMock.mockReturnValue({ ...state, refetch: vi.fn() });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    const { result } = renderHook(() => useShellOverrideForRoute('/my/settings/player-card'));
+    expect(result.current.desktopHead).toBe(expected);
   });
 });

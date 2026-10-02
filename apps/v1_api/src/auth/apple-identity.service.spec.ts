@@ -1,18 +1,20 @@
+import { createSign, generateKeyPairSync, type KeyObject } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 
 import { AppleIdentityService, APPLE_AUDIENCES_VARIABLE } from './apple-identity.service';
+import { APPLE_ISSUER, hashAppleNonce, type AppleJsonWebKey } from './apple-identity-token';
 
 /**
  * The key cache, and the wiring around it.
  *
- * The pure verification lives in `apple-identity-token.spec.ts`; what is left here is the
- * part that talks to Apple — how often, and what it does when Apple does not answer.
+ * The pure verification has detailed cases in `apple-identity-token.spec.ts`. These cases
+ * exercise the service with the real verifier: concurrency, rotation and Apple outages.
  */
 
 const logger = { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() };
 
-/** Whatever the JWKS body is, the token check fails — this spec only counts the fetches. */
+/** Placeholder keys for the sequential fetch-count cases, which use malformed tokens. */
 const keysBody = { keys: [{ kid: 'k1', n: 'AQAB', e: 'AQAB', kty: 'RSA', alg: 'RS256' }] };
 
 const okResponse = () => ({ ok: true, status: 200, json: async () => keysBody }) as unknown as Response;
@@ -22,7 +24,7 @@ const failedResponse = () => ({ ok: false, status: 503, json: async () => ({}) }
 class TestableAppleIdentityService extends AppleIdentityService {
   clock = 1_000_000;
   fetches = 0;
-  respond: () => Response = okResponse;
+  respond: () => Response | Promise<Response> = okResponse;
 
   protected override now(): number {
     return this.clock;
@@ -34,7 +36,7 @@ class TestableAppleIdentityService extends AppleIdentityService {
   }
 
   /**
-   * `verifyIdentityToken` is the only public way in, and every token here is rejected.
+   * The sequential fetch-count cases deliberately use a rejected token.
    *
    * The nonce has to be a real one — the service checks it before it looks at any key, so a
    * made-up string would return without ever reaching the cache and every count would be
@@ -57,6 +59,61 @@ const build = async () => {
   }).compile();
   return module.get(TestableAppleIdentityService);
 };
+
+const signingKey = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const impostorKey = generateKeyPairSync('rsa', { modulusLength: 2048 });
+
+function signedRequest(
+  service: TestableAppleIdentityService,
+  subject: string,
+  options: { kid?: string; key?: KeyObject; payload?: Record<string, unknown> } = {},
+) {
+  const { nonce } = service.issueNonce();
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const body = `${encode({ alg: 'RS256', kid: options.kid ?? 'k1' })}.${encode({
+    iss: APPLE_ISSUER,
+    aud: 'kr.co.teameet',
+    sub: subject,
+    iat: Math.floor(service.clock / 1000),
+    exp: Math.floor(service.clock / 1000) + 600,
+    nonce: hashAppleNonce(nonce),
+    ...options.payload,
+  })}`;
+  const signature = createSign('RSA-SHA256').update(body)
+    .sign(options.key ?? signingKey.privateKey).toString('base64url');
+  return { token: `${body}.${signature}`, nonce };
+}
+
+function signingResponse(kid = 'k1'): Response {
+  const publicJwk = signingKey.publicKey.export({ format: 'jwk' });
+  const key: AppleJsonWebKey = {
+    kid, kty: 'RSA', n: publicJwk.n!, e: publicJwk.e!, alg: 'RS256', use: 'sig',
+  };
+  return { ok: true, status: 200, json: async () => ({ keys: [key] }) } as Response;
+}
+
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((release) => { resolve = release; });
+  return { promise, resolve };
+}
+
+const drainRequests = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+function verifyRequest(service: TestableAppleIdentityService, request: ReturnType<typeof signedRequest>) {
+  return service.verifyIdentityToken(request.token, request.nonce);
+}
+
+function expectUnauthorized(result: PromiseSettledResult<unknown>) {
+  expect(result.status).toBe('rejected');
+  if (result.status === 'rejected') {
+    expect(result.reason.getStatus()).toBe(401);
+    expect(result.reason.getResponse()).toEqual({
+      code: 'APPLE_SIGN_IN_FAILED',
+      message: 'Apple 로그인에 실패했어요. 다시 시도해 주세요.',
+    });
+  }
+}
 
 describe('AppleIdentityService', () => {
   const originalAudiences = process.env[APPLE_AUDIENCES_VARIABLE];
@@ -128,6 +185,152 @@ describe('AppleIdentityService', () => {
     service.clock += 13 * 60 * 60 * 1000;
     await service.attemptSignIn();
 
+    expect(service.fetches).toBe(2);
+  });
+
+  it.each(['sign-in', 'token-exchange'] as const)(
+    'shares a pending cold-cache fetch with a concurrent valid %s', async (entry) => {
+      const service = await build();
+      const gate = deferredResponse();
+      service.respond = () => gate.promise;
+      const first = signedRequest(service, 'synthetic-first');
+      const second = signedRequest(service, 'synthetic-second');
+      const results = Promise.allSettled([
+        verifyRequest(service, first),
+        entry === 'sign-in'
+          ? verifyRequest(service, second)
+          : service.verifyExchangedIdToken(second.token),
+      ]);
+      // Observe the concurrent request before releasing JWKS: releasing immediately could
+      // populate the cache before the broken unknown-key retry and hide the regression.
+      await drainRequests();
+      const fetchesWhilePending = service.fetches;
+      gate.resolve(signingResponse());
+      const [firstResult, secondResult] = await results;
+
+      expect(fetchesWhilePending).toBe(1);
+      expect(firstResult).toMatchObject({ status: 'fulfilled', value: { subject: 'synthetic-first' } });
+      expect(secondResult).toMatchObject({
+        status: 'fulfilled',
+        value: entry === 'sign-in'
+          ? { subject: 'synthetic-second' }
+          : { ok: true, claims: { subject: 'synthetic-second' } },
+      });
+      await expect(verifyRequest(service, signedRequest(service, 'synthetic-cached')))
+        .resolves.toMatchObject({ subject: 'synthetic-cached' });
+      expect(service.fetches).toBe(1);
+    },
+  );
+
+  it('shares a rotated-key refresh while known cached keys remain immediately usable', async () => {
+    const service = await build();
+    service.respond = () => signingResponse();
+    await verifyRequest(service, signedRequest(service, 'synthetic-warm'));
+    service.clock += 61_000;
+    const gate = deferredResponse();
+    service.respond = () => gate.promise;
+    let cachedFinished = false;
+    const results = Promise.allSettled([
+      verifyRequest(service, signedRequest(service, 'synthetic-rotated-first', { kid: 'k2' })),
+      verifyRequest(service, signedRequest(service, 'synthetic-rotated-second', { kid: 'k2' })),
+      verifyRequest(service, signedRequest(service, 'synthetic-cached')).then((claims) => {
+        cachedFinished = true;
+        return claims;
+      }),
+    ]);
+    await drainRequests();
+    const cachedFinishedWhilePending = cachedFinished;
+    gate.resolve(signingResponse('k2'));
+    const [first, second, cached] = await results;
+
+    expect(cachedFinishedWhilePending).toBe(true);
+    expect(first).toMatchObject({ status: 'fulfilled', value: { subject: 'synthetic-rotated-first' } });
+    expect(second).toMatchObject({ status: 'fulfilled', value: { subject: 'synthetic-rotated-second' } });
+    expect(cached).toMatchObject({ status: 'fulfilled', value: { subject: 'synthetic-cached' } });
+    expect(service.fetches).toBe(2);
+  });
+
+  it('shares a refresh after the cached keys expire', async () => {
+    const service = await build();
+    service.respond = () => signingResponse();
+    await verifyRequest(service, signedRequest(service, 'synthetic-warm'));
+    service.clock += 13 * 60 * 60 * 1000;
+    const gate = deferredResponse();
+    service.respond = () => gate.promise;
+    let secondFinished = false;
+    const results = Promise.allSettled([
+      verifyRequest(service, signedRequest(service, 'synthetic-stale-first')),
+      verifyRequest(service, signedRequest(service, 'synthetic-stale-second')).then((claims) => {
+        secondFinished = true;
+        return claims;
+      }),
+    ]);
+    await drainRequests();
+    const secondFinishedWhilePending = secondFinished;
+    gate.resolve(signingResponse());
+    const outcomes = await results;
+
+    expect(secondFinishedWhilePending).toBe(false);
+    expect(outcomes.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
+    expect(service.fetches).toBe(2);
+  });
+
+  it('fails closed for a failed shared fetch, keeps the attempt floor, and recovers after it', async () => {
+    const service = await build();
+    const gate = deferredResponse();
+    service.respond = () => gate.promise;
+    const results = Promise.allSettled([
+      verifyRequest(service, signedRequest(service, 'synthetic-first')),
+      verifyRequest(service, signedRequest(service, 'synthetic-second')),
+    ]);
+    await drainRequests();
+    gate.resolve(failedResponse());
+    (await results).forEach(expectUnauthorized);
+    const [insideFloor] = await Promise.allSettled([
+      verifyRequest(service, signedRequest(service, 'synthetic-inside-floor')),
+    ]);
+    expectUnauthorized(insideFloor);
+    expect(service.fetches).toBe(1);
+
+    service.clock += 61_000;
+    service.respond = () => signingResponse();
+    await expect(verifyRequest(service, signedRequest(service, 'synthetic-recovered')))
+      .resolves.toMatchObject({ subject: 'synthetic-recovered' });
+    expect(service.fetches).toBe(2);
+  });
+
+  it.each([
+    { reason: 'bad_signature', options: { key: impostorKey.privateKey } },
+    { reason: 'wrong_audience', options: { payload: { aud: 'different.app' } } },
+    { reason: 'nonce_mismatch', options: { payload: { nonce: hashAppleNonce('different-sign-in') } } },
+    { reason: 'unknown_key', options: { kid: 'unpublished-key' } },
+  ])('rejects $reason even when sharing a fetch with a valid sign-in', async ({ reason, options }) => {
+    const service = await build();
+    const gate = deferredResponse();
+    service.respond = () => gate.promise;
+    const results = Promise.allSettled([
+      verifyRequest(service, signedRequest(service, 'synthetic-valid')),
+      verifyRequest(service, signedRequest(service, 'synthetic-invalid', options)),
+    ]);
+    await drainRequests();
+    gate.resolve(signingResponse());
+    const [valid, invalid] = await results;
+
+    expect(valid).toMatchObject({ status: 'fulfilled', value: { subject: 'synthetic-valid' } });
+    expectUnauthorized(invalid);
+    expect(logger.warn).toHaveBeenCalledWith({ reason }, 'Apple identity token refused');
+    expect(service.fetches).toBe(1);
+  });
+
+  it('continues verifying cached valid keys when the refresh fails', async () => {
+    const service = await build();
+    service.respond = () => signingResponse();
+    await verifyRequest(service, signedRequest(service, 'synthetic-warm'));
+    service.clock += 13 * 60 * 60 * 1000;
+    service.respond = failedResponse;
+
+    await expect(verifyRequest(service, signedRequest(service, 'synthetic-outage')))
+      .resolves.toMatchObject({ subject: 'synthetic-outage' });
     expect(service.fetches).toBe(2);
   });
 });

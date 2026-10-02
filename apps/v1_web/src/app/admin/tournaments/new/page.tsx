@@ -833,7 +833,7 @@ function ParticipationStep({
     isPending: lineupSizeOptionsPending,
     isError: lineupSizeOptionsFailed,
   } = useV1LineupSizeOptions(state.sportId || null);
-  // 아래 교체 방식 카드에서 '허용 교체 횟수' 입력칸이 실제로 그려지는 조건(JSX 분기와 같아야 해요).
+  // '허용 교체 횟수' 입력칸을 그리는 조건 — 입력칸 렌더와 바깥 항목의 오류 표시가 이 값 하나를 같이 쓴다.
   const substitutionCountInputShown =
     !lineupSizeOptionsPending &&
     !lineupSizeOptionsFailed &&
@@ -994,7 +994,7 @@ function ParticipationStep({
                 );
               })}
             </div>
-            {state.substitutionMode === 'limited' ? (
+            {substitutionCountInputShown ? (
               <NumberField
                 id="max-substitutions"
                 label="허용 교체 횟수"

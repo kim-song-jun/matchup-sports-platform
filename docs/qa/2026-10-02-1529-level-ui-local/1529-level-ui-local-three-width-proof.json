@@ -1,0 +1,415 @@
+{
+  "issue": 1529,
+  "issueUrl": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1529",
+  "startedAt": "2026-10-02T10:05:57.356Z",
+  "finishedAt": "2026-10-02T10:13:52.475Z",
+  "role": "captainB",
+  "scope": "Read B/C baseline; only B intro local draft at3 widths, cancel without Save",
+  "runs": [
+    {
+      "width": 402,
+      "baseline": {
+        "at": "2026-10-02T10:07:45.697Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "intro": "E2E 테스트 전용 팀입니다.",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      },
+      "afterIntroOnly": {
+        "at": "2026-10-02T10:07:46.217Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "intro": "E2E 테스트 전용 팀입니다. [QA LOCAL ONLY level-preservation 20261002]",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      },
+      "cancelPrompt": {
+        "at": "2026-10-02T10:08:29.802Z",
+        "text": "작성 중인 내용이 사라져요. 나갈까요? 나가면 지금까지 입력한 내용은 저장되지 않아요."
+      },
+      "afterDiscardPublic": {
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781?from=%2Fmy%2Fteams",
+        "at": "2026-10-02T10:08:30.058Z",
+        "visibleBaselineTexts": [
+          "레벨 미설정",
+          "정원 미정",
+          "E2E 테스트 전용 팀입니다."
+        ]
+      }
+    },
+    {
+      "width": 787,
+      "baseline": {
+        "at": "2026-10-02T10:09:02.610Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "intro": "E2E 테스트 전용 팀입니다.",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      },
+      "afterIntroOnly": {
+        "at": "2026-10-02T10:09:02.850Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "intro": "E2E 테스트 전용 팀입니다. [QA LOCAL ONLY level-preservation 20261002]",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      },
+      "cancelPrompt": {
+        "at": "2026-10-02T10:09:29.124Z",
+        "visible": true
+      },
+      "afterDiscardPublic": {
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781?from=%2Fmy%2Fteams",
+        "at": "2026-10-02T10:10:08.853Z",
+        "visibleBaselineTexts": [
+          "레벨 미설정",
+          "정원 미정",
+          "E2E 테스트 전용 팀입니다."
+        ]
+      },
+      "contextRecaptureState": {
+        "at": "2026-10-02T10:12:43.483Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "intro": "E2E 테스트 전용 팀입니다. [QA LOCAL ONLY level-preservation 20261002]",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      }
+    },
+    {
+      "width": 1180,
+      "baseline": {
+        "at": "2026-10-02T10:10:09.691Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "intro": "E2E 테스트 전용 팀입니다.",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      },
+      "afterIntroOnly": {
+        "at": "2026-10-02T10:10:10.013Z",
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "intro": "E2E 테스트 전용 팀입니다. [QA LOCAL ONLY level-preservation 20261002]",
+        "capacity": {
+          "selectedText": "11명",
+          "value": "11"
+        },
+        "saveEnabled": true,
+        "level": {
+          "selectedText": "레벨 미설정",
+          "value": "",
+          "selectedOptions": [
+            {
+              "selected": true,
+              "text": "레벨 미설정",
+              "value": ""
+            }
+          ],
+          "unsetOptionAvailable": true
+        }
+      },
+      "cancelPrompt": {
+        "at": "2026-10-02T10:10:56.493Z",
+        "visible": true
+      },
+      "afterDiscardPublic": {
+        "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781?from=%2Fmy%2Fteams",
+        "at": "2026-10-02T10:10:57.819Z",
+        "fullReload": true,
+        "visibleBaselineTexts": [
+          "레벨 미설정",
+          "정원 미정",
+          "E2E 테스트 전용 팀입니다."
+        ]
+      }
+    }
+  ],
+  "BPublicBaseline": {
+    "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781?from=%2Fmy%2Fteams",
+    "at": "2026-10-02T10:06:17.215Z",
+    "visibleTexts": [
+      "레벨",
+      "레벨 미설정",
+      "E2E 테스트 전용 팀입니다."
+    ],
+    "editHref": "/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams"
+  },
+  "CFormReadOnlyBaseline": {
+    "at": "2026-10-02T10:11:30.823Z",
+    "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/edit?from=%2Fteams%2F9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da%3Ffrom%3D%252Fmy%252Fteams",
+    "css": {
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "intro": "컨택 보관 실측용 팀",
+    "capacity": {
+      "selectedText": "2명",
+      "value": "2"
+    },
+    "saveEnabled": true,
+    "level": {
+      "selectedText": "입문-고수",
+      "value": "입문-고수",
+      "selectedOptions": [
+        {
+          "selected": true,
+          "text": "입문-고수",
+          "value": "입문-고수"
+        }
+      ],
+      "unsetOptionAvailable": true
+    }
+  },
+  "CFixtureLimit": "C already normalized to 입문-고수 in earlier bug reproduction; not a null-preservation fixture and no reset attempted",
+  "originalIntro": "E2E 테스트 전용 팀입니다.",
+  "localDraftIntro": "E2E 테스트 전용 팀입니다. [QA LOCAL ONLY level-preservation 20261002]",
+  "finalPublic": {
+    "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781?from=%2Fmy%2Fteams",
+    "at": "2026-10-02T10:13:52.478Z",
+    "texts": [
+      "레벨 미설정",
+      "정원 미정",
+      "E2E 테스트 전용 팀입니다."
+    ]
+  },
+  "localOnly": {
+    "saveClicks": 0,
+    "levelSelectChanges": 0,
+    "capacityChanges": 0,
+    "privacyChanges": 0,
+    "CFormEdits": 0,
+    "TtttTouched": false,
+    "discardConfirmedAtAllWidths": true
+  },
+  "result": "UI-only observation: B unset level label and empty select value remain unchanged through local introduction editing at 402/787/1180 and cancel/discard. C existing text option is present and selected on read-only inspection. Server save, serialization, and backend-value preservation are untested.",
+  "serverPhaseConsiderations": [
+    "B public level says 레벨 미설정 and form select.value is empty string; raw backend null/code/text value was not read.",
+    "B public capacity says 정원 미정; edit UI selects11/current member count. A future Save may normalize capacity, but this was not submitted or asserted. Current capacity options contain11..50 and no unset option, so complete restoration of an unset capacity would not be demonstrated through this UI if normalization occurs.",
+    "The level form offers an unset option, but this alone does not prove backend null round-trip behavior.",
+    "C currently has legacy text value 입문-고수 in both selected text and select.value; new editor inserts/preserves that existing option. C was not edited and is not a null fixture.",
+    "No code-form level fixture observed. Raw request payload and database state not inspected.",
+    "PR1536/1537 regression was not performed or passed."
+  ],
+  "images": [
+    {
+      "file": "1529-b-level-mobile-402-intro-draft-context.jpg",
+      "timestamp": "2026-10-02T10:08:07.921Z",
+      "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "fullPage": false,
+      "bytes": 23836,
+      "sha256": "7fdbe92337abeaa3cbb5cfd8bbb26790dccd3735877545f02883267efd4709cd",
+      "git_blob_sha": "3fa86a572aeee24216238ef12d0875d01b514c26",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1529-b-level-tablet-787-intro-draft.jpg",
+      "timestamp": "2026-10-02T10:09:03.021Z",
+      "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "fullPage": false,
+      "bytes": 21202,
+      "sha256": "627c631bad21953dae9873b19ac1ea012c1c5c6a1d430024d4dd92efcb4128ab",
+      "git_blob_sha": "146e256cc468cbbd55e42fa5c3a5dceaa1e6cd58",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1529-b-level-desktop-1180-intro-draft.jpg",
+      "timestamp": "2026-10-02T10:10:10.208Z",
+      "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/edit?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%3Ffrom%3D%252Fmy%252Fteams",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "fullPage": false,
+      "bytes": 54506,
+      "sha256": "03d92e372a6be5269ae9f7e05fa44625653bc1840b5b16722001909bea649a0d",
+      "git_blob_sha": "da57041d53fb442a471f3315a634c0f85e8b5c6b",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1529-c-existing-text-level-desktop-1180-readonly.jpg",
+      "timestamp": "2026-10-02T10:12:18.800Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/edit?from=%2Fteams%2F9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da%3Ffrom%3D%252Fmy%252Fteams",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "fullPage": false,
+      "bytes": 47048,
+      "sha256": "e1a7b50c164ac2f81ef9391628fd304c8c6291a1945279fc7caca71a56efbc2a",
+      "git_blob_sha": "01e4e92d1b5d54d88cb63e13334068aae08463e6",
+      "pixelReviewed": true,
+      "exifPresent": false
+    }
+  ],
+  "framingNotes": [
+    "Tablet canonical image visibly proves unset selected level; its intro field is above viewport. Exact filled introduction is proven by live DOM value in that run, not by the tablet screenshot alone. Mobile and desktop canonical shots show local intro plus selected level.",
+    "Tablet intro-draft-context and intro-draft-context-clear filenames are intermediate framing attempts; neither contains complete intro text. Do not label them full-context images."
+  ],
+  "servingCommitSha": "unobserved",
+  "deploymentContext": {
+    "run": "36989593396",
+    "headPrefix": "e0f5863",
+    "completedAt": "2026-10-02T09:47:04Z",
+    "limitation": "Previously verified pipeline context only; actual serving page commit was not observed."
+  },
+  "closureAssessment": "Not sufficient to close #1529. No Save was performed and raw backend values were not read.",
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All four exact canonical screenshots were reviewed as pixels. Only synthetic team form fields and previews are visible. No member names, profile IDs, birth dates, contact details, credentials, or member-list payload are included.",
+    "minimization": "Only canonical images and relevant selected-value/action observations are published. Intermediate screenshots, full option-list duplication, and unrelated source data are omitted. Original complete source proof remains local and unchanged.",
+    "dimensionNote": "Mobile source CSS viewport is 402×606 and original JPEG raster is 402×605; neither was altered."
+  }
+}

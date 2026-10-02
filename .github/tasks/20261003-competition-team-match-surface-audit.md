@@ -128,7 +128,7 @@ Status: code/dev/Alpha complete; authenticated admin QA pending — original aud
 - [x] Phase 3: narrow regression tests, scoped typechecks, committed diff review.
 - [x] Phase 4: PR to dev, external review limitation recorded, required CI PASS, dev merge. Copilot clean review unavailable due monthly quota.
 - [x] Phase 5a: confirm final Alpha deployed SHA/health; public tournament/league record QA at 390/768/1440.
-- [ ] Phase 5c: publish SHA-pinned PR screenshot gallery.
+- [x] Phase 5c: publish SHA-pinned PR screenshot gallery (12/12 image URLs HTTP 200 verified).
 - [ ] Phase 5b: authenticated admin visual/click QA at 390/768/1440 — blocked by missing private account/session; not represented as completed.
 - Acceptance: competition generic moderation returns 409 without writes; friendly moderation retains audit logs; admin shows competition title/type/manage link; public managed records choose actual competition fixture routes with sanitized `from`; only non-deleted friendly recruiting rows enable recruiting-only contact; live league dissolution blocker links to league fixture.
 - No migration needed. All competitions continue using canonical TeamMatch storage.
@@ -177,3 +177,5 @@ Status: code/dev/Alpha complete; authenticated admin QA pending — original aud
 - Execution details: [Alpha QA scenario](../../docs/scenarios/competition-team-match-alpha-qa-20261003.md). Reusable read-only headed runner: `scripts/qa/verify-competition-team-match-boundaries.mjs`. Raw results remain under ignored output/playwright; only referenced screenshots promoted.
 - Review limitation: initial Copilot requests failed monthly quota (HTTP 402); follow-up request failed weekly usage limit (HTTP 429). No fresh external clean review; internal review and required CI PASS are distinct evidence.
 - Runtime changes are merged/deployed. Subsequent evidence-only commits publish screenshots/task/scenario on the existing feature branch without triggering another app deployment. Authenticated admin 3-width/click QA remains open because the private session/account is unavailable.
+
+- Published final evidence: [#1545 gallery](https://github.com/kim-song-jun/matchup-sports-platform/pull/1545#issuecomment-5959013731) · [#1552 gallery](https://github.com/kim-song-jun/matchup-sports-platform/pull/1552#issuecomment-5959015078). Image/evidence commit `8680e7ebbfeba39ff19e7dc3db13b1d1620ca666`; both comments explicitly leave authenticated admin visual QA and external clean review incomplete.

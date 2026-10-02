@@ -1,0 +1,56 @@
+{
+  "observations": [
+    {
+      "file": "friendly-completed-goals-css390.jpg",
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "utc_observed_after_capture": "2026-10-02T02:38:58.662Z",
+      "phase": "before",
+      "persona": "guest",
+      "environment": "alpha actual UI with CSS viewport override; not a physical device",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "sha256": "4a0a7e4cd07ba1e9530ae0ee75c3f33ef2ebacd0362c7e11c54d2b26d7a6cdb7",
+      "git_blob_sha": "3ea86a92e61721590e25bdcd0d0d899560fba27f",
+      "serving_sha_at_capture": "not recorded"
+    },
+    {
+      "file": "friendly-completed-goals-css768.jpg",
+      "width": 768,
+      "height": 1024,
+      "scrollWidth": 768,
+      "utc_observed_after_capture": "2026-10-02T02:39:46.946Z",
+      "phase": "before",
+      "persona": "guest",
+      "environment": "alpha actual UI with CSS viewport override; not a physical device",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "sha256": "ba8dbaa4cabc0858ea3931575ce6d00bcba836e067be509760c269c7f5e12e08",
+      "git_blob_sha": "aeee1cd1315d95dad8f0aeb3fbf79f5128d729d0",
+      "serving_sha_at_capture": "not recorded"
+    },
+    {
+      "file": "friendly-completed-goals-css1440.jpg",
+      "width": 1440,
+      "height": 900,
+      "scrollWidth": 1440,
+      "utc_observed_after_capture": "2026-10-02T02:39:48.059Z",
+      "phase": "before",
+      "persona": "guest",
+      "environment": "alpha actual UI with CSS viewport override; not a physical device",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "sha256": "0f3ec06536d18e59ed87fe457209f717cde6031f8a873059ec510bec3259e6ad",
+      "git_blob_sha": "087d1613c338897b6ed03d934d175acf6af0ba08",
+      "serving_sha_at_capture": "not recorded"
+    }
+  ],
+  "actions": [
+    "Opened completed synthetic fixture read-only after parent clarified that reopen prohibition refers to state mutation",
+    "Expanded goal history only; no app data, permissions, results, scores, or roster changed"
+  ],
+  "limits": [
+    "Copy mismatch only; no claim that completed-record mutations are possible",
+    "No physical device or screen-reader verification",
+    "No after image because no fix deployed",
+    "Evidence commit is not a serving application SHA"
+  ]
+}

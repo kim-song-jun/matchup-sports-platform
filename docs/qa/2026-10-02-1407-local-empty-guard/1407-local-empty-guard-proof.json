@@ -1,0 +1,158 @@
+{
+  "matchId": "ed6cdaa3-a6b5-439c-b219-eb9c8827f827",
+  "url": "https://alpha.teameet.co.kr/team-matches/ed6cdaa3-a6b5-439c-b219-eb9c8827f827/lineup?from=%2Fteams%2F9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da%2Fschedules%2Fb8bdfbba-7467-4ba6-a1b2-459aa578a594",
+  "baselineCount": 0,
+  "tests": [
+    {
+      "width": 402,
+      "step": "bulk add1",
+      "saveEnabled": true,
+      "submitEnabled": true,
+      "unsavedText": "저장하지 않은 변경사항이 있어요."
+    },
+    {
+      "step": "mobile dirty empty",
+      "at": "2026-10-02T08:12:23.822Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "saveEnabled": false,
+      "submitEnabled": false,
+      "guidanceCount": 1
+    },
+    {
+      "step": "mobile restored1",
+      "at": "2026-10-02T08:12:38.344Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "saveEnabled": true,
+      "submitEnabled": true,
+      "guidanceCount": 0,
+      "method": "팀원 1명 모두 넣기"
+    },
+    {
+      "step": "tablet dirty empty",
+      "at": "2026-10-02T08:12:40.348Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "saveEnabled": false,
+      "submitEnabled": false,
+      "guidanceCount": 1
+    },
+    {
+      "step": "tablet restored1",
+      "at": "2026-10-02T08:13:26.576Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "saveEnabled": true,
+      "submitEnabled": true,
+      "guidanceCount": 0,
+      "method": "팀원 1명 모두 넣기"
+    },
+    {
+      "step": "desktop dirty empty",
+      "at": "2026-10-02T08:13:27.075Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "saveEnabled": false,
+      "submitEnabled": false,
+      "guidanceCount": 1
+    },
+    {
+      "step": "desktop re-added1",
+      "at": "2026-10-02T08:14:06.485Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "saveEnabled": true,
+      "submitEnabled": true,
+      "guidanceCount": 0,
+      "method": "bulk add after undo notice expired"
+    },
+    {
+      "step": "desktop immediate undo restores1",
+      "at": "2026-10-02T08:14:07.099Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "saveEnabled": true,
+      "submitEnabled": true,
+      "guidanceCount": 0,
+      "method": "실행 취소"
+    }
+  ],
+  "scope": "Local add/remove/undo only; no server Save/Submit",
+  "final": {
+    "at": "2026-10-02T08:14:43.596Z",
+    "url": "https://alpha.teameet.co.kr/team-matches/ed6cdaa3-a6b5-439c-b219-eb9c8827f827/lineup?from=%2Fteams%2F9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da%2Fschedules%2Fb8bdfbba-7467-4ba6-a1b2-459aa578a594",
+    "count": 0,
+    "emptyText": "참석명단이 비어 있어요",
+    "savedButtonEnabled": false,
+    "submitEnabled": false,
+    "unsavedWarningCount": 0,
+    "writes": 0,
+    "verification": "Back confirmation discarded local1; re-entry and full reload restored untouched baseline0"
+  },
+  "limitations": [
+    "Fixture kickoff is past-dated (2026-09-24 19:00 displayed) but lineup remains draft in UI; eligibility observed only for this fixture, not generalized to other phases.",
+    "No request was sent to Save or Submit; server-side rejection and network status were not tested.",
+    "Original QA179 fixture and completed cb3442 fixture were not modified.",
+    "Exact serving commit SHA was not directly observed; this package does not claim a full phase/state-matrix pass."
+  ],
+  "servingCommitSha": "unobserved",
+  "evidenceReview": {
+    "images": [
+      {
+        "file": "1407-dirty-empty-guard-mobile-402-viewport.jpg",
+        "width": 402,
+        "height": 605,
+        "bytes": 21999,
+        "sha256": "4c2b2b3875623422d822e3a3d434d3b858829b72d70577cb76ccf5b2396535c8",
+        "git_blob_sha": "cd5b23513c78aef87930c7a31d22cdd3053edd0d",
+        "pixel_reviewed": true,
+        "exif_present": false
+      },
+      {
+        "file": "1407-dirty-empty-guard-tablet-787-viewport.jpg",
+        "width": 787,
+        "height": 505,
+        "bytes": 23435,
+        "sha256": "d2fa458189d3b4ba3f171cd74d10b1b0970c36e1105667395fdb19041e0d4065",
+        "git_blob_sha": "595d10f1027f31c30c3032ac19c51e75894decbe",
+        "pixel_reviewed": true,
+        "exif_present": false
+      },
+      {
+        "file": "1407-dirty-empty-guard-desktop-1180-viewport.jpg",
+        "width": 1180,
+        "height": 757,
+        "bytes": 50109,
+        "sha256": "73ca00aea2db6f1d12ab4fc9b8acca6e0d646a4380156d7933fe04c03dd9a663",
+        "git_blob_sha": "a777c98ab5bcde9c812adfeea6bb301f0b073186",
+        "pixel_reviewed": true,
+        "exif_present": false
+      }
+    ],
+    "image_bytes_unchanged": true,
+    "privacy": "No credentials, contact details, profile IDs, or member-list payload are visible. The desktop Undo notification includes the synthetic QA display label E2E팀장B. No A-team member-list files are included.",
+    "dimensions_note": "The mobile CSS viewport height is recorded as 606; the original JPEG height is 605. Both measurements are preserved."
+  }
+}

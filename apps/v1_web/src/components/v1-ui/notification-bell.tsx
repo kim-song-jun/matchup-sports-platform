@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ComponentProps } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { BellIcon } from './icons';
 
 type NotificationBellProps = {
@@ -93,6 +94,13 @@ function UnreadIndicator({
   );
 }
 
+function NotificationBellOriginLink(props: Omit<ComponentProps<typeof Link>, 'href'>) {
+  const pathname = usePathname();
+  const query = useSearchParams()?.toString() ?? '';
+  const source = `${pathname ?? '/home'}${query ? `?${query}` : ''}`;
+  return <Link {...props} href={withFromPath('/notifications', source)} />;
+}
+
 export function NotificationBellLink({
   className,
   ariaLabel = '알림',
@@ -104,8 +112,8 @@ export function NotificationBellLink({
   prefetch,
 }: NotificationBellProps) {
   const { count, unknown } = useUnreadState(forceUnread);
-  return (
-    <Link className={className} href="/notifications" aria-label={buildAriaLabel(ariaLabel, count, unknown)} prefetch={prefetch}>
+  const content = (
+    <>
       <BellIcon size={iconSize} strokeWidth={2} />
       <UnreadIndicator
         unreadCount={count}
@@ -114,7 +122,13 @@ export function NotificationBellLink({
         dotClassName={dotClassName}
         unknownDotClassName={unknownDotClassName}
       />
-    </Link>
+    </>
+  );
+  const linkProps = { className, 'aria-label': buildAriaLabel(ariaLabel, count, unknown), prefetch };
+  return (
+    <Suspense fallback={<Link {...linkProps} href="/notifications">{content}</Link>}>
+      <NotificationBellOriginLink {...linkProps}>{content}</NotificationBellOriginLink>
+    </Suspense>
   );
 }
 

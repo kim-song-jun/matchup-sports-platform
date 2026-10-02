@@ -53,6 +53,14 @@ afterEach(() => {
 });
 
 describe('선수 카드 공유 화면', () => {
+  it('공유받은 사람도 실제 기록과 능력치 점수를 구분해 본다', () => {
+    render(<PlayerCardShareClient userId="u-1" card={{ ...card, records: { appearances: 8, goals: 6, assists: 0 } }} displayName="김선준" profileImageUrl={null} teamName="주말 풋살" />);
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+    expect(screen.getByText('골 능력치 · 실제 6골 / 8경기')).toBeInTheDocument();
+    expect(screen.getByText('도움 능력치 · 실제 0도움 / 8경기')).toBeInTheDocument();
+    expect(screen.queryByText('성실 출석')).not.toBeInTheDocument();
+  });
+
   it('OS 공유 시트가 있으면 그것을 연다 -- 카카오톡으로 바로 보내는 유일한 경로다', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     const writeText = vi.fn();

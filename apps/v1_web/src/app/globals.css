@@ -9659,7 +9659,7 @@ textarea.tm-chat-input-placeholder::placeholder {
 /* 산식 -- 아이콘 / 값 / 설명이 세로로 맞아야 표처럼 읽힌다. */
 .tm-pcard-back-rows { display: grid; gap: 2px; }
 .tm-pcard-brow {
-  display: grid; grid-template-columns: 14px 26px 1fr; gap: 8px; align-items: center;
+  display: grid; grid-template-columns: 14px 38px minmax(0, 1fr); gap: 8px; align-items: center;
   font-size: 10px; color: #8b95a5; padding: 1px 0;
 }
 .tm-pcard-brow svg { width: 13px; height: 13px; color: var(--tm-back-accent); opacity: 0.8; }

@@ -51,6 +51,54 @@ const renderCard = (data: V1PlayerCard, isOwner = false) =>
   );
 
 describe('선수 카드', () => {
+  it.each([true, false])('본인/타인 카드에서 능력치 점수와 실제 기록을 구분한다 (owner=%s)', (isOwner) => {
+    renderCard(card({
+      position: 'GK', overall: 66, tier: 'gold', appearances: 17,
+      records: { appearances: 17, goals: 10, assists: 0 },
+      stats: [stat('SHO', '골', 62), stat('PAS', '도움', 30), stat('APP', '엔트리', 87), ...card().stats.slice(3)],
+    }), isOwner);
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+    const back = within(document.querySelector('.tm-pcard-side[data-side="back"]') as HTMLElement);
+    expect(back.getByText('골 능력치 · 실제 10골 / 17경기')).toBeInTheDocument();
+    expect(back.getByText('도움 능력치 · 실제 0도움 / 17경기')).toBeInTheDocument();
+    expect(back.getByText('엔트리 능력치 · 명단 17경기')).toBeInTheDocument();
+    expect(back.getByText('62점')).toBeInTheDocument();
+    expect(back.getByText('30점')).toBeInTheDocument();
+    expect(back.getByText('엔트리 87점')).toBeInTheDocument();
+    expect(back.queryByText('성실 출석')).not.toBeInTheDocument();
+    expect(back.queryByText('골 결정력')).not.toBeInTheDocument();
+  });
+
+  it('구 API 응답에 원본 집계가 없으면 점수에서 골·도움을 추정하지 않는다', () => {
+    renderCard(card());
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+    const back = within(document.querySelector('.tm-pcard-side[data-side="back"]') as HTMLElement);
+    expect(back.queryByText(/실제 \d/)).not.toBeInTheDocument();
+    expect(back.getByText('골 능력치 · 경기당 골이 많을수록 올라가요')).toBeInTheDocument();
+  });
+
+  it('공개 동의가 없으면 실제 기록을 그리지 않는다', () => {
+    renderCard(card({
+      appearances: 0, records: null,
+      stats: [...card().stats.slice(0, 3).map((s) => ({ ...s, value: null, unlocked: false, lockedBy: { type: 'consent' as const } })), ...card().stats.slice(3)],
+      unlockedCount: 0, overall: null,
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+    const back = within(document.querySelector('.tm-pcard-side[data-side="back"]') as HTMLElement);
+    expect(back.queryByText(/실제 \d/)).not.toBeInTheDocument();
+    expect(back.getByText('기록 공개를 켜면 열려요')).toBeInTheDocument();
+  });
+
+  it('경기 수가 적어 점수가 잠겼어도 공개된 원본 기록을 구분해 표시한다', () => {
+    renderCard(card({
+      appearances: 1, records: { appearances: 1, goals: 2, assists: 0 },
+      stats: [stat('SHO', '골', null, { type: 'appearances', remaining: 2 }), stat('PAS', '도움', null, { type: 'appearances', remaining: 2 }), ...card().stats.slice(2)],
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+    const row = screen.getByText('골 능력치 · 실제 2골 / 1경기').parentElement;
+    expect(row?.querySelector('b')).toHaveTextContent('—');
+  });
+
   it('잠긴 능력치에 숫자를 그리지 않는다', () => {
     renderCard(card());
 
@@ -299,7 +347,7 @@ describe('선수 카드', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
     const back = document.querySelector('.tm-pcard-side[data-side="back"]');
-    const row = within(back as HTMLElement).getByText('골 · 경기당 골이 많을수록 올라가요');
+    const row = within(back as HTMLElement).getByText('골 능력치 · 경기당 골이 많을수록 올라가요');
     const valueCell = row.parentElement?.querySelector('b');
 
     expect(valueCell?.textContent).toBe('—');

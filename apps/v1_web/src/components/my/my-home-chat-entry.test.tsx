@@ -63,7 +63,7 @@ describe('MyHomePageClient — 채팅 진입점', () => {
 
     render(<MyHomePageClient />);
 
-    expect(screen.getByRole('link', { name: /^채팅/ })).toHaveAttribute('href', '/chat');
+    expect(screen.getByRole('link', { name: /^채팅/ })).toHaveAttribute('href', '/chat?from=%2Fmy');
     expect(screen.queryByLabelText(/답장을 기다리는 컨택/)).not.toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe('MyHomePageClient — 채팅 진입점', () => {
     const { rerender, unmount } = render(<MyHomePageClient />);
 
     const link = screen.getByRole('link', { name: /^채팅/ });
-    expect(link).toHaveAttribute('href', '/chat');
+    expect(link).toHaveAttribute('href', '/chat?from=%2Fmy');
     expect(screen.getByLabelText('답장을 기다리는 컨택 3건')).toHaveTextContent('3');
 
     // 마지막 컨택에 답한 뒤 요약이 0 으로 내려오면 배지도 사라져야 한다 — 메뉴 모델이

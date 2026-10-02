@@ -465,3 +465,12 @@ describe('TermsClient entry routing contract', () => {
     expect(screen.queryByRole('heading', { name: '서비스 이용약관' })).toBeNull();
   });
 });
+
+
+describe('공개 약관의 복귀 경로', () => {
+  it.each(['terms', 'privacy', 'location'])('%s 문서는 약관 목록으로 돌아간다', (document) => {
+    searchParamsValue = new URLSearchParams({ document, from: '/my/settings/legal' });
+    render(<TermsClient />);
+    screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', '/my/settings/legal'));
+  });
+});

@@ -52,17 +52,26 @@ const POSITION_LABEL: Record<string, string> = {
  */
 const STAT_BACK: Record<
   V1PlayerCardStat['code'],
-  { icon: typeof Target; source: string; tag: string }
+  { icon: typeof Target; source: string }
 > = {
-  SHO: { icon: Target, source: '골 · 경기당 골이 많을수록 올라가요', tag: '골 결정력' },
-  PAS: { icon: Zap, source: '도움 · 경기당 도움이 많을수록 올라가요', tag: '찬스 메이킹' },
-  APP: { icon: CalendarCheck, source: '엔트리 · 명단에 오른 경기가 쌓일수록 올라가요', tag: '성실 출석' },
-  // 후기 세 항목은 5점 만점 평균을 100점으로 환산한 값이다. 척도를 적지 않으면
-  // 마이페이지의 매너 점수(4.7)와 카드의 MAN(94)이 다른 사실처럼 읽힌다.
-  SKI: { icon: Sparkles, source: '실력 · 동료 후기 평균(5점)을 100점으로 환산했어요', tag: '탄탄한 기본기' },
-  MAN: { icon: HeartHandshake, source: '매너 · 동료 후기 평균(5점)을 100점으로 환산했어요', tag: '매너 플레이' },
-  PUN: { icon: Clock, source: '시간약속 · 동료 후기 평균(5점)을 100점으로 환산했어요', tag: '시간 약속' },
+  SHO: { icon: Target, source: '골 능력치 · 경기당 골이 많을수록 올라가요' },
+  PAS: { icon: Zap, source: '도움 능력치 · 경기당 도움이 많을수록 올라가요' },
+  APP: { icon: CalendarCheck, source: '엔트리 능력치 · 명단에 오른 경기가 쌓일수록 올라가요' },
+  // 후기 세 항목도 실제 후기 평균이 아닌 환산 능력치다.
+  SKI: { icon: Sparkles, source: '실력 능력치 · 동료 후기 평균을 환산했어요' },
+  MAN: { icon: HeartHandshake, source: '매너 능력치 · 동료 후기 평균을 환산했어요' },
+  PUN: { icon: Clock, source: '시간약속 능력치 · 동료 후기 평균을 환산했어요' },
 };
+
+function statBackSource(card: V1PlayerCard, code: V1PlayerCardStat['code']): string {
+  const records = card.records;
+  if (records) {
+    if (code === 'SHO') return `골 능력치 · 실제 ${records.goals}골 / ${records.appearances}경기`;
+    if (code === 'PAS') return `도움 능력치 · 실제 ${records.assists}도움 / ${records.appearances}경기`;
+    if (code === 'APP') return `엔트리 능력치 · 명단 ${records.appearances}경기`;
+  }
+  return STAT_BACK[code].source;
+}
 
 function lockReasonText(
   reason: NonNullable<V1PlayerCardStat['lockedBy']>,
@@ -190,13 +199,13 @@ function splitStats(stats: readonly V1PlayerCardStat[]) {
   return { left, right };
 }
 
-/** 뒷면 성향 태그 -- 열린 능력치 중 값이 큰 순서로 최대 2개 + 티어·경기수. */
-function personaTags(card: V1PlayerCard): { text: string; accent: boolean }[] {
+/** 열린 능력치 중 높은 점수 두 개를 표시한다. 실제 출석·성향 평가로 이름 붙이지 않는다. */
+function summaryTags(card: V1PlayerCard): { text: string; accent: boolean }[] {
   const top = card.stats
     .filter((s) => s.unlocked && s.value !== null)
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
     .slice(0, 2)
-    .map((s) => ({ text: STAT_BACK[s.code].tag, accent: false }));
+    .map((s) => ({ text: `${s.label} ${s.value}점`, accent: false }));
   const base = [
     { text: `${TIER_LABEL[card.tier]} 카드`, accent: true },
     { text: `${card.appearances}경기`, accent: false },
@@ -502,16 +511,16 @@ export function PlayerCard({
 
       <div className="tm-pcard-back-sum">{backSummary(card)}</div>
 
-      <div className="tm-pcard-back-sec">성향</div>
+      <div className="tm-pcard-back-sec">카드 요약</div>
       <div className="tm-pcard-back-tags">
-        {personaTags(card).map((tag) => (
+        {summaryTags(card).map((tag) => (
           <span key={tag.text} className="tm-pcard-tag" data-tone={tag.accent ? 'accent' : undefined}>
             {tag.text}
           </span>
         ))}
       </div>
 
-      <div className="tm-pcard-back-sec">능력치</div>
+      <div className="tm-pcard-back-sec">능력치 점수 · 최대 99점</div>
       <div className="tm-pcard-back-rows">
         {backRowItems(card).map((item) => {
           if (item.kind === 'stat') {
@@ -523,8 +532,8 @@ export function PlayerCard({
             return (
               <div key={item.stat.code} className="tm-pcard-brow">
                 <Icon aria-hidden="true" />
-                <b data-locked={locked ? 'true' : undefined}>{locked ? '—' : item.stat.value}</b>
-                <span>{meta.source}</span>
+                <b data-locked={locked ? 'true' : undefined}>{locked ? '—' : `${item.stat.value}점`}</b>
+                <span>{statBackSource(card, item.stat.code)}</span>
               </div>
             );
           }
@@ -538,7 +547,7 @@ export function PlayerCard({
                   <div key={s.code} className="tm-pcard-brow">
                     <Icon aria-hidden="true" />
                     <b data-locked="true">—</b>
-                    <span>{s.label}</span>
+                    <span>{card.records && (s.code === 'SHO' || s.code === 'PAS' || s.code === 'APP') ? statBackSource(card, s.code) : s.label}</span>
                   </div>
                 );
               })}

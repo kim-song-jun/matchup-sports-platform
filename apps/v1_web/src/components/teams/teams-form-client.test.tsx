@@ -77,6 +77,7 @@ vi.mock('./teams-page', () => ({
         />
         <output data-testid="team-logo-url">{model.team.logoUrl}</output>
         <output data-testid="min-capacity">{form.minCapacity}</output>
+        <output data-testid="capacity">{model.team.capacity}</output>
         <output data-testid="region-id">{form.regionId}</output>
         <output data-testid="region-prefilled">{String(Boolean(form.regionPrefilled))}</output>
         <button type="button" onClick={() => form.onRegionChange('region-seoul')}>서울 전체 고르기</button>
@@ -404,6 +405,20 @@ describe('Team form client contracts', () => {
       await submitEdit();
 
       expect(await screen.findByRole('alert')).toHaveTextContent('정원은 지금 팀원 수(12명)보다 적게 정할 수 없어요.');
+    });
+
+    it.each([null, 1])('팀원 1명인 팀의 목표 정원 %s는 표시된 최소 정원 2명으로 저장한다', async (memberGoalCount) => {
+      const current = useV1TeamDetailMock();
+      useV1TeamDetailMock.mockReturnValue({
+        ...current,
+        data: { ...current.data, memberCount: 1, profile: { ...current.data.profile, memberGoalCount } },
+      });
+      await submitEdit();
+
+      expect(screen.getByTestId('capacity')).toHaveTextContent('2');
+
+      await waitFor(() => expect(updateTeamMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ memberGoalCount: 2 })));
+      await waitFor(() => expect(routerPush).toHaveBeenCalled());
     });
 
     it('정원 하한을 지금 팀원 수로 넘기고, 목표 인원이 팀원 수보다 작게 저장된 팀도 하한부터 시작한다', async () => {

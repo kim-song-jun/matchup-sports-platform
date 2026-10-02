@@ -333,7 +333,7 @@ function AdminTeamMatchesPageContent() {
       <AdminReasonModal
         open={!!modalRow}
         title="팀매치 상태 변경"
-        currentStatus={modalRow?.status}
+        currentStatus={REASON_MODAL_STATUS_OPTIONS.some((option) => option.value === modalRow?.status) ? modalRow?.status : undefined}
         statusOptions={REASON_MODAL_STATUS_OPTIONS}
         onSubmit={handleModalSubmit}
         onClose={() => setModalRow(null)}

@@ -146,3 +146,13 @@ it('경기 유형을 바꾸면 API 필터와 첫 페이지에 반영한다', asy
   await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), '');
   expect(hooks.filters).not.toHaveProperty('kind');
 });
+
+it('완료 경기의 일반 상태 모달도 실제로 선택 가능한 상태로 시작한다', async () => {
+  hooks.rows = [{ ...BASE, league: null, tournament: null, status: 'completed' }];
+  const user = userEvent.setup();
+  render(<AdminTeamMatchesPage />);
+  await user.click(screen.getAllByRole('button', { name: /상태 변경/ })[0]);
+  const select = await screen.findByRole('combobox', { name: '변경할 상태' });
+  expect(select).toHaveValue('recruiting');
+  expect(screen.queryByRole('option', { name: '완료' })).not.toBeInTheDocument();
+});

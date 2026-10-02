@@ -150,3 +150,6 @@ Status: implementation in progress — original audit 20/20 preserved below
 - Copilot external review could not start: GitHub reports monthly quota exceeded (HTTP 402). No review/clean verdict exists. Internal committed-diff review and automated CI continue; do not represent quota failure as a passed external review.
 
 - Font-token follow-up: lowered the detail page's literal typography baseline from 15 to 13; same pattern gate now PASS (baseline never increased). Detail regressions 18/18 PASS.
+
+- Latest CI then exposed a pre-existing calendar-dependent Web assertion (`defaultStart != 2026-10-03`) on the current date. Its test fixture clock is now fixed to the existing NOW constant; only Date is faked, leaving MSW/polling timers real. No game-roster product code changed. This test file is added to owned scope solely to restore deterministic required CI.
+- Generic status modal now initializes from an allowed option when current status is completed, avoiding a hidden forbidden selection after removing direct completion. New modal regression plus game-roster regressions: 27/27 PASS (10 + 17).

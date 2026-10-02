@@ -5,13 +5,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { MatchCreatePageView, MatchDetailPageView, MatchListPageView } from './matches-page';
 import { getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
 
+const navState = vi.hoisted(() => ({ pathname: '/matches/match-4', search: '' }));
+
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/matches/match-4',
+  usePathname: () => navState.pathname,
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navState.search),
 }));
 
 function render(ui: ReactElement) {
@@ -790,5 +792,46 @@ describe('MatchListPageView — 필터 시트 버튼 줄', () => {
     expect(actions).toHaveClass('tm-filter-actions');
     expect(actions?.parentElement).toBe(dialog);
     expect(within(actions!).getByRole('link', { name: '닫기' })).toBeInTheDocument();
+  });
+});
+
+describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색어·필터)을 출처로 싣는다', () => {
+  function listWithNearby() {
+    const base = getMatchListViewModel();
+    const card = base.matches[0];
+    return {
+      ...base,
+      isLoading: false,
+      matches: [
+        { ...card, id: 'm-a', image: null },
+        { ...card, id: 'm-b', image: '/mock/a.jpg' },
+      ],
+      nearbyMatches: [{ ...card, id: 'm-n', image: null }],
+    };
+  }
+  const matchHrefs = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href^="/matches/m-"]'))
+      .map((a) => a.getAttribute('href'))
+      .sort();
+
+  it('q·필터가 걸린 목록의 행·사진 레일·인접 레일 카드 href 에 그 URL 이 from 으로 들어간다', () => {
+    navState.pathname = '/matches';
+    navState.search = 'q=QA&sport=futsal';
+    const { container } = render(<MatchListPageView model={listWithNearby()} />);
+
+    const from = encodeURIComponent('/matches?q=QA&sport=futsal');
+    expect(matchHrefs(container)).toEqual(
+      ['m-a', 'm-b', 'm-b', 'm-n'].map((id) => `/matches/${id}?from=${from}`),
+    );
+    navState.pathname = '/matches/match-4';
+    navState.search = '';
+  });
+
+  it('대조군: 쿼리 없는 목록은 from 을 싣지 않는다(fallback 이 같은 목록)', () => {
+    navState.pathname = '/matches';
+    const { container } = render(<MatchListPageView model={listWithNearby()} />);
+
+    expect(matchHrefs(container)).toEqual(['/matches/m-a', '/matches/m-b', '/matches/m-b', '/matches/m-n']);
+    navState.pathname = '/matches/match-4';
   });
 });

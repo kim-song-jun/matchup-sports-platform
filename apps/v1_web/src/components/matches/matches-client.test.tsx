@@ -228,6 +228,14 @@ describe('MatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
     expect(screen.getByTestId('back-href')).toHaveTextContent('/matches');
   });
 
+  it('대조군: 외부 주소·프로토콜 상대 from 은 무시하고 전체 목록으로 돌아간다', () => {
+    searchParamsRef.current = new URLSearchParams('from=%2F%2Fevil.example%2Fx');
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('back-href')).toHaveTextContent('/matches');
+  });
+
   it('알림에서 들어오면 알림 화면으로 돌아간다', () => {
     searchParamsRef.current = new URLSearchParams('from=%2Fnotifications');
 

@@ -23,6 +23,8 @@ import type {
   MatchStateViewModel,
 } from './matches.types';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import type { V1MatchApiStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 
@@ -86,6 +88,10 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   // floatingSlot(매치 만들기 FAB)은 이 화면 성공 분기에서만 필요한 런타임 슬롯이라 override로
   // 밀어넣는다(§1b, home-page.tsx의 동일 패턴 참조).
   useShellOverride({ floatingSlot: <MatchCreateFloatingButton /> });
+  // 상세의 뒤로가기가 검색어·필터가 걸린 이 목록 URL 로 돌아오게 카드마다 출처로 싣는다.
+  // 쿼리 없는 목록은 상세 뒤로가기의 fallback 이 이미 같은 곳이라 싣지 않는다(공개 첫 HTML 의 카드 링크를 깨끗하게 유지).
+  const currentHref = useCurrentHref();
+  const listFromHref = currentHref?.includes('?') ? currentHref : null;
   return (
     <>
       {/* Desktop-only page header with inline "매치 만들기" CTA */}
@@ -117,11 +123,11 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           <PageSkeleton />
         ) : model.matches.length ? (
           <>
-            <MatchFeatureRail matches={model.matches.filter((match) => match.image).slice(0, 6)} />
+            <MatchFeatureRail matches={model.matches.filter((match) => match.image).slice(0, 6)} fromHref={listFromHref} />
             <div className="tm-match-card-stack">
-              {model.matches.map((match) => <MatchRowItem key={match.id} match={match} />)}
+              {model.matches.map((match) => <MatchRowItem key={match.id} match={match} fromHref={listFromHref} />)}
             </div>
-            <MatchNearbyRail matches={model.nearbyMatches ?? []} />
+            <MatchNearbyRail matches={model.nearbyMatches ?? []} fromHref={listFromHref} />
           </>
         ) : (
           /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
@@ -830,10 +836,10 @@ function matchStateBadge(match: MatchCardModel): { label: string; className: str
  * 배너 카드는 미디어가 카드의 절반(146/286px)을 써서 390 폭에서 2.95장밖에 안 보였다.
  * 목록은 이해시키는 화면이 아니라 비교시키는 화면이라 개수가 먼저다(browse-density 스킬).
  */
-function MatchRowItem({ match }: { match: MatchCardModel }) {
+function MatchRowItem({ match, fromHref }: { match: MatchCardModel; fromHref?: string | null }) {
   const stateBadge = matchStateBadge(match);
   return (
-    <Link className={`tm-match-row tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
+    <Link className={`tm-match-row tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={withFromPath(`/matches/${match.id}`, fromHref)}>
       <div className={`tm-match-row-thumb${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
         {match.image ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
@@ -884,7 +890,7 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
  * 배너 카드를 없애지 않고 "몇 개만 눈에 띄는 자리"로 옮긴 것이라, 목록 본문은
  * 행 하나로 통일되면서도 공들인 매치는 그대로 두드러진다.
  */
-function MatchFeatureRail({ matches }: { matches: MatchCardModel[] }) {
+function MatchFeatureRail({ matches, fromHref }: { matches: MatchCardModel[]; fromHref: string | null }) {
   if (matches.length === 0) return null;
   return (
     <section className="tm-match-rail-section" aria-labelledby="match-rail-heading">
@@ -892,7 +898,7 @@ function MatchFeatureRail({ matches }: { matches: MatchCardModel[] }) {
           카드 제목과 같은 크기라 위계가 서지 않았다 — DESIGN.md §2.1 의 섹션 제목 값. */}
       <h2 className="tm-text-body-lg tm-match-rail-heading" id="match-rail-heading">눈에 띄는 매치</h2>
       <div className="tm-match-rail-h">
-        {matches.map((match) => <MatchCardItem key={`rail-${match.id}`} match={match} />)}
+        {matches.map((match) => <MatchCardItem key={`rail-${match.id}`} match={match} fromHref={fromHref} />)}
       </div>
     </section>
   );
@@ -908,23 +914,23 @@ function MatchFeatureRail({ matches }: { matches: MatchCardModel[] }) {
  *
  * 채울 게 없으면 아무것도 그리지 않는다. 빈 레일이나 자리표시를 남기지 않는다.
  */
-function MatchNearbyRail({ matches }: { matches: MatchCardModel[] }) {
+function MatchNearbyRail({ matches, fromHref }: { matches: MatchCardModel[]; fromHref: string | null }) {
   if (matches.length === 0) return null;
   return (
     <section className="tm-match-nearby-section" aria-labelledby="match-nearby-heading">
       <h2 className="tm-text-body-lg tm-match-rail-heading" id="match-nearby-heading">이런 매치는 어때요?</h2>
       <p className="tm-text-caption tm-match-nearby-sub">검색 조건 밖이지만 지금 모집 중인 매치예요</p>
       <div className="tm-match-rail-h">
-        {matches.map((match) => <MatchCardItem key={`nearby-${match.id}`} match={match} />)}
+        {matches.map((match) => <MatchCardItem key={`nearby-${match.id}`} match={match} fromHref={fromHref} />)}
       </div>
     </section>
   );
 }
 
-function MatchCardItem({ match }: { match: MatchCardModel }) {
+function MatchCardItem({ match, fromHref }: { match: MatchCardModel; fromHref: string | null }) {
   const stateBadge = matchStateBadge(match);
   return (
-    <Link className={`tm-match-list-card tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
+    <Link className={`tm-match-list-card tm-card-interactive tm-pressable${stateBadge?.subdued ? ' tm-card-closed' : ''}`} href={withFromPath(`/matches/${match.id}`, fromHref)}>
       <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
         {match.image ? null : <SportIllustration sport={match.sport} sizes="132px" />}
         <span className="tm-badge tm-badge-blue">{match.sport}</span>

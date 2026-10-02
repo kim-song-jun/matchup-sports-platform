@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "case": "QA C-team introduction-only save normalizes an unspecified level",
+  "environment": "https://alpha.teameet.co.kr",
+  "mock_fixture": "E2E 알파 C팀",
+  "capture_window_utc": {
+    "started_at": "2026-10-02T06:54:38.202Z",
+    "final_verified_at": "2026-10-02T06:56:47.236Z"
+  },
+  "observations": {
+    "baseline_level": "레벨 미설정",
+    "editor_level": "전체 레벨",
+    "saved_and_reloaded_level": "입문-고수",
+    "original_intro": "컨택 보관 실측용 팀",
+    "intro_restored": true,
+    "full_baseline_restored": false
+  },
+  "test_scope": "Tester recorded two normal UI saves: change only the introduction, then restore only the original introduction. Both saves survived a full reload. Level and capacity controls were not changed by interaction. Screenshots demonstrate visible states; non-interaction is a tester-recorded observation.",
+  "attribution_limit": "The page deployment SHA was not directly observed during this capture session.",
+  "privacy_review": "Only public team detail and edit fields are included. No member list, member names, profile IDs, join dates, credentials, or original proof JSON are published. All five image files were reviewed as pixels and have no EXIF fields.",
+  "images": [
+    {
+      "file": "01-baseline-level-unset-desktop.jpg",
+      "source_filename": "1527-team-c-baseline-capacity-unset-desktop-1180-viewport.jpg",
+      "caption": "Before edit: public team detail shows 레벨 미설정 (level unspecified).",
+      "format": "JPEG",
+      "width": 1180,
+      "height": 757,
+      "bytes": 38372,
+      "sha256": "92ce0cf02bb7adab5d315a4af56b0c2c47b2b02b50f7b9760cd2ad243246cbe5",
+      "git_blob_sha": "0b4bc6d0736ea90a24cc9c3f5f3c6537584548d5",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "03-untouched-level-control-mobile.jpg",
+      "source_filename": "1527-edit-min-capacity2-mobile-402-viewport.jpg",
+      "caption": "Edit form displays 전체 레벨 (all levels) and capacity 2; the tester reports no interaction with either control.",
+      "format": "JPEG",
+      "width": 402,
+      "height": 605,
+      "bytes": 19817,
+      "sha256": "5c69e9ec08ef199c39d7d61579023a7a569ed2b238afbedbbd034e60437176cf",
+      "git_blob_sha": "aa7400d81a4a8cd1f5bbd93280695d946a4f037e",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "04-introduction-saved-desktop.jpg",
+      "source_filename": "1527-temp-intro-desktop-1180-viewport.jpg",
+      "caption": "After intro-only save: temporary QA introduction is visible with level 입문-고수 and capacity 2.",
+      "format": "JPEG",
+      "width": 1180,
+      "height": 757,
+      "bytes": 43729,
+      "sha256": "93a5b689c6c14351ad5c5782f19fe405f4a0a375a58f4b52fd56556b81d1e332",
+      "git_blob_sha": "7968c5c23ab8343499b6837f56fc8c7d311b76b1",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "05-introduction-reloaded-mobile.jpg",
+      "source_filename": "1527-temp-intro-reloaded-mobile-402-viewport.jpg",
+      "caption": "After full reload: temporary introduction and level 입문-고수 remain visible.",
+      "format": "JPEG",
+      "width": 402,
+      "height": 605,
+      "bytes": 19133,
+      "sha256": "de0679dd7a7812bb8520f43db96d0c13e889b544bb115209cdf7f7d72e562091",
+      "git_blob_sha": "bcff08a1d8675a3481dce8cedab29e68b206878a",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "06-original-introduction-restored-desktop.jpg",
+      "source_filename": "1527-restored-intro-reloaded-desktop-1180-viewport.jpg",
+      "caption": "After restoring only the introduction and full reload: original introduction is back; level remains 입문-고수.",
+      "format": "JPEG",
+      "width": 1180,
+      "height": 757,
+      "bytes": 42385,
+      "sha256": "2119fa1f95a99359ad7a0a6a669355b221cd9cc28fa24817b8a6cfa4f9bd85aa",
+      "git_blob_sha": "24696bd7ac05e9de1b3937a80d6d51b2ee0c731a",
+      "pixel_reviewed": true,
+      "exif_present": false
+    }
+  ]
+}

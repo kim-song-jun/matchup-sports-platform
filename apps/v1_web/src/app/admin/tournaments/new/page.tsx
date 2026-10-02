@@ -833,6 +833,12 @@ function ParticipationStep({
     isPending: lineupSizeOptionsPending,
     isError: lineupSizeOptionsFailed,
   } = useV1LineupSizeOptions(state.sportId || null);
+  // '허용 교체 횟수' 입력칸을 그리는 조건 — 입력칸 렌더와 바깥 항목의 오류 표시가 이 값 하나를 같이 쓴다.
+  const substitutionCountInputShown =
+    !lineupSizeOptionsPending &&
+    !lineupSizeOptionsFailed &&
+    Boolean(lineupSizeOptions?.supported) &&
+    state.substitutionMode === 'limited';
 
   // 종목의 선택지가 로드되면, 관리자가 아직 아무것도 고르지 않았을 때만 canonical
   // 기본값을 자동으로 채워 넣는다 — 값을 이미 골랐거나 다시 비운(종목 변경) 상태를
@@ -948,11 +954,12 @@ function ParticipationStep({
         )}
       </Field>
 
+      {/* 허용 횟수 오류는 입력칸이 있으면 그 아래(NumberField)에서만 보여요. 입력칸이 안 그려지는 동안에는 바깥 항목이 대신 보여 줘요. */}
       <Field
         id="substitution-mode"
         label="교체 방식"
         hint="경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요."
-        error={errors.maxSubstitutions}
+        error={substitutionCountInputShown ? undefined : errors.maxSubstitutions}
       >
         {lineupSizeOptionsPending ? (
           <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
@@ -987,7 +994,7 @@ function ParticipationStep({
                 );
               })}
             </div>
-            {state.substitutionMode === 'limited' ? (
+            {substitutionCountInputShown ? (
               <NumberField
                 id="max-substitutions"
                 label="허용 교체 횟수"

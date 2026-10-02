@@ -1066,6 +1066,35 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       expect(screen.getByLabelText('남성 최소')).toHaveFocus();
     });
 
+    const LIMIT_REQUIRED = '교체 횟수를 제한하려면 허용 횟수를 입력해 주세요.';
+
+    it('교체 "제한"에 횟수를 비우면 오류는 입력칸 아래 한 번만 나오고 그 입력에 포커스한다', () => {
+      renderInScroller();
+      goToParticipationStep();
+      fireEvent.click(screen.getByRole('button', { name: '제한' }));
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getAllByText(LIMIT_REQUIRED)).toHaveLength(1);
+      expect(screen.getByLabelText(/허용 교체 횟수/)).toHaveFocus();
+    });
+
+    it('교체 선택지를 못 불러온 상태에서 "제한"+빈 횟수면 바깥 항목이 오류를 한 번 보여준다', () => {
+      const view = renderInScroller();
+      goToParticipationStep();
+      fireEvent.click(screen.getByRole('button', { name: '제한' }));
+      useV1LineupSizeOptionsMock.mockReturnValue({ data: undefined, isPending: false, isError: true });
+      view.rerender(
+        <Providers>
+          <AdminTournamentsNewPage />
+        </Providers>,
+      );
+      expect(screen.queryByLabelText(/허용 교체 횟수/)).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getAllByText(LIMIT_REQUIRED)).toHaveLength(1);
+    });
+
     it('일정 단계에서 날짜를 비우고 넘기면 화면 순서상 첫 오류인 대회 시작 입력에 포커스한다', () => {
       renderInScroller();
       goToScheduleStep();

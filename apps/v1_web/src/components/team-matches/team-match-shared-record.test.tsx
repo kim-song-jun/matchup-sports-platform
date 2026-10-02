@@ -50,6 +50,56 @@ beforeEach(() => {
     subMatches: [], goals: [], confirmations: [], history: [], officialAt: null, officialCorrected: false,
   };
 });
+describe('확정된 친선 상세의 공동 기록 안내 (#1518)', () => {
+  it.each([false, true])('official 비참가자는 operator=%s에서도 확정 안내와 득점 조회를 제공한다', (operator) => {
+    state.data = {
+      ...state.data, phase: 'official', participant: false, operator, canEdit: operator,
+      ownSideId: null, officialAt: state.data.serverTime,
+      goalEvents: [{ sideId: 'away', participantName: '박지훈', minute: 2, ownGoal: false, subMatchId: null }],
+    };
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
+    expect(screen.getByText('경기 결과가 확정됐어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/경기 시작 뒤 공동 기록에 참여/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '공동 경기 기록 열기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '득점 기록 보기 (1)' }));
+    expect(screen.getByRole('listitem', { name: '원정 2분 박지훈 골' })).toBeInTheDocument();
+    expect(state.replace).not.toHaveBeenCalled();
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 1])('live 비참가자의 안내는 한 팀 확인 여부(%s)와 무관하게 유지된다', (count) => {
+    state.data = {
+      ...state.data, participant: false, canEdit: false, ownSideId: null,
+      confirmations: count ? [{ sideId: 'home', name: '팀장', at: state.data.serverTime }] : [],
+    };
+    render(<TeamMatchRecordEntry teamMatchId="match" detailOnly />);
+    expect(screen.getByText('참석명단 참가자와 팀장·매니저는 경기 시작 뒤 공동 기록에 참여할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText('경기 결과가 확정됐어요.')).not.toBeInTheDocument();
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it.each(['live', 'official'] as const)('%s 참가자의 상세 보기 링크와 자동 redirect 예외를 유지한다', (phase) => {
+    state.data = { ...state.data, phase, canEdit: phase === 'live' };
+    const view = render(<TeamMatchRecordEntry teamMatchId="match" detailOnly fromHref="/my/team-matches" />);
+    const href = `/team-matches/match/record?from=${encodeURIComponent('/my/team-matches')}`;
+    expect(screen.getByRole('link', { name: '공동 경기 기록 열기' })).toHaveAttribute('href', href);
+    expect(screen.queryByText('경기 결과가 확정됐어요.')).not.toBeInTheDocument();
+    expect(state.replace).not.toHaveBeenCalled();
+    view.unmount();
+    render(<TeamMatchRecordEntry teamMatchId="match" fromHref="/my/team-matches" />);
+    expect(state.replace).toHaveBeenCalledWith(href);
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it.each(['scheduled', 'cancelled', 'legacy', 'managed'] as const)('%s는 기존대로 entry를 표시하지 않는다', (phase) => {
+    state.data = { ...state.data, phase, participant: false, canEdit: false };
+    render(<TeamMatchRecordEntry teamMatchId="match" />);
+    expect(screen.queryByRole('region', { name: '경기 현황' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/공동 기록에 참여|경기 결과가 확정됐어요/)).not.toBeInTheDocument();
+    expect(state.replace).not.toHaveBeenCalled();
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+});
 describe('shared record participant flow', () => {
   it('응답 없이 끊긴 저장은 서버 처리 여부를 모르니 재시도를 주고, 서버가 거절한 저장은 그 이유만 보여 준다(대조군)', () => {
     state.mutationError = new V1ApiError(

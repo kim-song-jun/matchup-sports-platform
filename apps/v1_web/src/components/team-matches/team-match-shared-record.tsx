@@ -669,7 +669,11 @@ export function TeamMatchRecordEntry({
           공동 경기 기록 열기
         </Link>
       ) : (
-        <p className={styles.notice}>참석명단 참가자와 팀장·매니저는 경기 시작 뒤 공동 기록에 참여할 수 있어요.</p>
+        <p className={styles.notice}>
+          {data.phase === 'official'
+            ? '경기 결과가 확정됐어요.'
+            : '참석명단 참가자와 팀장·매니저는 경기 시작 뒤 공동 기록에 참여할 수 있어요.'}
+        </p>
       )}
     </section>
   );

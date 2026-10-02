@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MatchCreatePageView, MatchDetailPageView, MatchListPageView } from './matches-page';
 import { getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
 
@@ -814,6 +814,11 @@ describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색�
       .map((a) => a.getAttribute('href'))
       .sort();
 
+  afterEach(() => {
+    navState.pathname = '/matches/match-4';
+    navState.search = '';
+  });
+
   it('q·필터가 걸린 목록의 행·사진 레일·인접 레일 카드 href 에 그 URL 이 from 으로 들어간다', () => {
     navState.pathname = '/matches';
     navState.search = 'q=QA&sport=futsal';
@@ -823,8 +828,6 @@ describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색�
     expect(matchHrefs(container)).toEqual(
       ['m-a', 'm-b', 'm-b', 'm-n'].map((id) => `/matches/${id}?from=${from}`),
     );
-    navState.pathname = '/matches/match-4';
-    navState.search = '';
   });
 
   it('대조군: 쿼리 없는 목록은 from 을 싣지 않는다(fallback 이 같은 목록)', () => {
@@ -832,6 +835,5 @@ describe('MatchListPageView — 상세로 가는 카드는 지금 목록(검색�
     const { container } = render(<MatchListPageView model={listWithNearby()} />);
 
     expect(matchHrefs(container)).toEqual(['/matches/m-a', '/matches/m-b', '/matches/m-b', '/matches/m-n']);
-    navState.pathname = '/matches/match-4';
   });
 });

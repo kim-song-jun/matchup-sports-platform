@@ -14,7 +14,7 @@ Refs #1551. 실제 alpha의 활동 기록에서 리그 1건을 열어 페이지 
 - [x] 리그·대회·친선 탭 선택을 상세 링크의 복귀 주소와 URL에 보존한다(초점 테스트).
 - [x] 전체 선택은 type 파라미터를 제거하고 기존 from=/my 복귀 체인을 유지한다(초점 테스트).
 - [x] 연속 입력의 마지막 선택, 재마운트, Back/Forward를 반영한다(초점 테스트).
-- [x] 개인 탭은 현재 userId에 대해 서버가 본인임을 확인한 경우만 렌더한다(초점 테스트).
+- [x] 개인 패널·내 매치 조회는 현재 userId에 대해 서버가 본인임을 확인한 경우만 활성화한다(초점 테스트). 이전 사용자 응답에서 개인 탭 자체가 보이는 상황도 클릭과 패널·조회를 차단한다.
 - [x] API/DTO/schema·consent·권한·기록/점수·공용 내비게이션 계약을 변경하지 않는다.
 - [ ] Ready/base dev PR과 exact head CI를 확인하고 실제 alpha after는 별도 승인된 배포까지 대기한다.
 
@@ -77,6 +77,7 @@ Refs #1551. 실제 alpha의 활동 기록에서 리그 1건을 열어 페이지 
 - 중간 검증에서 테스트 rerender wrapper의 불일치를 바로잡고, 실제 URL과 상세 from의 query 순서 차이로 shared history가 Back 대신 replace를 고르는 결함을 수정했다. 현재 canonical query와 history mirror 왕복을 함께 검증한다.
 - scope lint(typecheck + v1 pattern) PASS. 첫 lint의 테스트 helper `getByRole` 미지원 옵션을 제거한 뒤 재검증했다. 필수 guardrail 6/6, patch Changeset policy, diff check, touched-path tech-debt marker 검사 PASS.
 - 독립 precommit 정적 리뷰: 제품 client + 새 test 2/2 파일, 20개 테스트 계약 확인, actionable 0. 제품 diff SHA-256 `b943e275f2bdc08bf92f73ae537dc7cedd3d171101dab350edd997a384a708d1`; 새 test 포함 candidate SHA-256 `a23bcb01cae7a594373473d058460b70c5ebda3a28d960ca3f203f42510e41f9`. 이는 아직 exact committed head 리뷰가 아니다.
+- 첫 committed head `3cb3f3f8596db24a7ab92840e142bdc5373b27c0` 독립 리뷰: 4/4 파일, 제품/test 2/2 precommit 바이트 일치, 추가 경로·미추적 import·제품 actionable 없음. P3 문서 지적(개인 탭 렌더와 실제 패널/조회 gate의 표현 차이)을 이 후속 문서 수정으로 정정한다. 제품/test 변경이 없어 같은 34개·lint 결과를 유지하며 최종 head CI는 PR 기록에 남긴다.
 - 원본 alpha 공개 증거: 5/5 HTTP 200·Git blob/bytes 일치, 4 JPEG 실제 픽셀·크기 확인. 데스크톱은 리그 before/Back 후 reset 쌍이고 나머지는 이슈 조건의 컨트롤 크롭이다. 사진 파일명의 after는 버그 발생 후이며 수정 after가 아니다.
 - 2026-10-02 19:07 UTC alpha landing HEAD가 HTTP 503이었다. 수정 after, 실제 Next browser Back/Forward, refresh, console/network, 402→787→1180 전체 흐름은 승인된 배포 뒤 대기한다. 로컬/CI PASS를 alpha 전체 QA 완료로 취급하지 않는다.
 - 현재 단계: 로컬 수정·초점 검증·precommit 리뷰 완료, 명시 4파일 commit/feature push/Ready dev PR와 exact head CI 대기. 이전 /tmp 로그는 현재 검증으로 사용하지 않는다.

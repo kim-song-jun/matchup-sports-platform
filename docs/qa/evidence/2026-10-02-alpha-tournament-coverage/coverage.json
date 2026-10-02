@@ -1,0 +1,459 @@
+{
+  "scope": "Actually observed read-only public scenarios; not all admin/app QA denominator",
+  "recorded_public_scenarios": 24,
+  "checks": [
+    {
+      "id": "P01",
+      "feature": "대회 진행 중 복합 필터의 빈 안내",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "outcome": "FAIL #1516",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "진행 중 요약과 모집 중 빈 제목 모순; 실제 필터 클릭 후 reload 재현",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/f76c771dc0e5144a937a9f2b407928eb46e259a8/docs/qa/evidence/2026-10-02-alpha-public-empty/manifest.json",
+      "limits": "한 복합 필터만; PR1519 OPEN(03:21Z), alpha after 대기"
+    },
+    {
+      "id": "P02",
+      "feature": "팀 목록 성별 배지",
+      "actual_url": "https://alpha.teameet.co.kr/teams",
+      "outcome": "FAIL #1522",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [],
+      "details": "가상 팀 카드 male 원문",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/e2c96540311a20ada9f834aecebc9776eaba0c1e/docs/qa/evidence/2026-10-02-alpha-team-gender/manifest.json",
+      "limits": "female/mixed/unknown·필터·저장 미검증"
+    },
+    {
+      "id": "P03",
+      "feature": "팀 상세 성별 조건",
+      "actual_url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "outcome": "FAIL #1522",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "목록에서 실제 카드 진입, 모바일은 성별 필드까지 스크롤; male 원문",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/e2c96540311a20ada9f834aecebc9776eaba0c1e/docs/qa/evidence/2026-10-02-alpha-team-gender/manifest.json",
+      "limits": "한 가상 팀의 읽기 전용 표시만"
+    },
+    {
+      "id": "P04",
+      "feature": "리그 참가 명단",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "A팀 6명과 등번호3/7/1/5/2/4 가시 영역 확인",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "명단 추가·삭제·중복 등번호 검증 없음"
+    },
+    {
+      "id": "P05",
+      "feature": "리그 경기 일정",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/bracket",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [],
+      "details": "완료된 B1:A0 일정 조회",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "탭 선택의 최초 action 폭은 별도미기록; 일정 변경·등록 없음"
+    },
+    {
+      "id": "P06",
+      "feature": "리그 순위",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/bracket",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [],
+      "details": "B승점3·득실+1, A승점0·득실-1 조회",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "탭 선택의 최초 action 폭은 별도미기록; 모든 순위 동률/다경기 계산 검증 아님"
+    },
+    {
+      "id": "P07",
+      "feature": "리그 최종 결과",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/results",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "완료된 B팀 우승 조회; 애니메이션 중 빈 캡처는 제외",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "결과 재개/정정 없음"
+    },
+    {
+      "id": "P08",
+      "feature": "리그 시상",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/awards",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "B1위/A2위, MVP 집계 중 및 개인 기록 비공개 안내 조회",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "모바일 하단 후기 섹션·후기 제출 미검증"
+    },
+    {
+      "id": "P09",
+      "feature": "리그 확정 경기 기록",
+      "actual_url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Ftournaments%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%2Fbracket",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [],
+      "details": "B1:A0, 6+6명, 득점06·도움07, 확정1차 조회",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "진입의 최초 action 폭은 별도미기록; 결과/명단/권한 변경 없음; 다른 기록 종류 미검증"
+    },
+    {
+      "id": "P10",
+      "feature": "리그 기록 → 선수 → 페이지 뒤로가기",
+      "actual_url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Ftournaments%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%2Fbracket",
+      "outcome": "FAIL #1418",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "details": "실제 선수 링크와 프로필 페이지 뒤로가기 클릭, 원래 기록 대신 /teams",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "브라우저 Back 실패 주장은 아님; 대회/시상 경로와 구분"
+    },
+    {
+      "id": "P11",
+      "feature": "개인 매치 q 검색 → 상세 → 페이지 뒤로가기",
+      "actual_url": "https://alpha.teameet.co.kr/matches?q=1.0.3",
+      "outcome": "PASS scoped",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "details": "abc11044 상세를 실제 클릭 후 페이지 뒤로가기, q=1.0.3 입력과 한 건 유지; PR1506 after",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/219ac7df75a6ace6d29ffc25ee5192ba4cc13b9f/docs/qa/evidence/2026-10-02-alpha-public-flows/manifest.json",
+      "limits": "한 q 조합만; 복합 필터·스크롤·브라우저 Back/Forward·원래 before 없음"
+    },
+    {
+      "id": "P12",
+      "feature": "대회 참가 명단",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "기존 6명 및 등번호5/3/2/1/7/4 가시 캡처",
+      "evidence": "tournament-roster-visible-css*.jpg",
+      "limits": "종료 대회 읽기 전용; 과거 QA179 명단 접근/변경 없음"
+    },
+    {
+      "id": "P13",
+      "feature": "대회 참가팀 후기",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/reviews",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "명시적 QA 후기 1건·별점3 및 게스트 로그인 안내",
+      "evidence": "tournament-review-readonly-css*.jpg",
+      "limits": "후기 작성/수정/삭제 없음; 다중 정렬·0별·모든 검색 조합 미검증"
+    },
+    {
+      "id": "P14",
+      "feature": "대회 후기 검색 빈 상태",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/reviews",
+      "outcome": "PASS scoped",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "실제 검색 QA-NOMATCH-20261002 → 검색 결과 없음 안내",
+      "evidence": "tournament-review-empty-css*.jpg",
+      "limits": "검색 action은1440에서, 같은 상태를 세 폭에서 관측; clear 후 재조회 완료는 미검증"
+    },
+    {
+      "id": "P15",
+      "feature": "대회 최종 결과",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/results",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "A우승/B준우승·1승1득점0실점 조회, desktop 안정 캡처로 대체",
+      "evidence": "tournament-results-readonly-css*.jpg",
+      "limits": "A1:B0 결과/상태 변경 없음; 전체 통계 계산 검증 아님"
+    },
+    {
+      "id": "P16",
+      "feature": "대회 확정 경기 기록",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1%2Fresults",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "A1:B0, 김선수일2′·도움02 및 확정1차 조회",
+      "evidence": "tournament-fixture-readonly-css*.jpg",
+      "limits": "선수/이벤트/결과 변경 없음"
+    },
+    {
+      "id": "P17",
+      "feature": "대회 명단에서 나 찾기 — 게스트",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1%2Fresults",
+      "outcome": "PASS scoped #1401",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "details": "실제 버튼 → 로그인이 필요해요·취소·로그인하기; 원문 인증 오류 없음",
+      "evidence": "tournament-identity-auth-after-css*.jpg",
+      "limits": "PR1410 after; 원래 b9be 대회가 아닌 합성932 대회; 실제 로그인·참가자 조회/등록 및 API 요청 없음 증명은 미검증"
+    },
+    {
+      "id": "P18",
+      "feature": "게스트 명단 찾기 모달 닫기",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1%2Fresults",
+      "outcome": "PASS scoped",
+      "visual_css_widths": [
+        390,
+        768
+      ],
+      "action_css_widths": [
+        390,
+        768
+      ],
+      "details": "390 취소 및 768 취소 버튼에서 Escape로 닫힘;768 원래 찾기 버튼으로 focus 복귀",
+      "evidence": "tournament-identity-auth-after-css390.jpg / css768.jpg",
+      "limits": "전체 Tab 순서·실제 모바일 키보드·1440 close 미검증"
+    },
+    {
+      "id": "P19",
+      "feature": "게스트 명단 찾기 로그인 이동",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1%2Fresults",
+      "outcome": "PASS scoped",
+      "visual_css_widths": [
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "실제 로그인하기 클릭 → /login?redirect=현재 경기+from query 인코딩 유지",
+      "evidence": "tournament-identity-login-redirect-css1440.jpg",
+      "limits": "자격증명 입력/인증 완료/로그인 후 복귀 미검증"
+    },
+    {
+      "id": "P20",
+      "feature": "대회 시상 → 선수 → 페이지 뒤로가기",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/awards",
+      "outcome": "PASS scoped #1418 control",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "details": "실제 링크·페이지 뒤로가기, 원래 awards 복귀",
+      "evidence": "awards-player-return-control-css*.jpg",
+      "limits": "정상 대조 경로;1418 모든 경로 해결 주장 아님; tab/scroll 완전 보존 미검증"
+    },
+    {
+      "id": "P21",
+      "feature": "대회 대진표 경기 일정",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "완료 결승 B0:A1·일정·득점/도움 링크 조회",
+      "evidence": "tournament-bracket-schedule-css*.jpg",
+      "limits": "탭 클릭은1440에서; 다경기/그룹 조합 미검증"
+    },
+    {
+      "id": "P22",
+      "feature": "대회 순위·대진표 탭",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+      "outcome": "VIEW",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "실제 tab 클릭 후 결승·우승 A트리 관측",
+      "evidence": "tournament-bracket-tree-css*.jpg",
+      "limits": "현재 단일 결승 트리만; 대진 생성/변경 없음"
+    },
+    {
+      "id": "P23",
+      "feature": "대진표 → 선수 → 페이지 뒤로가기",
+      "actual_url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+      "outcome": "PASS scoped #1418 control",
+      "visual_css_widths": [
+        1440
+      ],
+      "action_css_widths": [
+        1440
+      ],
+      "details": "득점자 링크 from=bracket 유지 → 실제 뒤로가기 → bracket 정상 복귀",
+      "evidence": "tournament-bracket-profile-control-css1440.jpg / tournament-bracket-return-control-css1440.jpg",
+      "limits": "현재932 대회 desktop만; 원래7e04 대회/로그인 페르소나·태블릿/모바일 동작 미검증"
+    },
+    {
+      "id": "P24",
+      "feature": "확정 친선 득점 기록과 상태 문구",
+      "actual_url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "outcome": "FAIL copy #1518; VIEW result",
+      "visual_css_widths": [
+        390,
+        768,
+        1440
+      ],
+      "action_css_widths": [
+        390
+      ],
+      "details": "완료 A0:B1과 득점1건을 실제 펼침; 공동 기록 참여 가능 안내가 남음",
+      "evidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/04fadf4253c59d2f9facd138b7deee84107db258/docs/qa/evidence/2026-10-02-alpha-completed-copy/manifest.json",
+      "limits": "참가자 로그인·종료 뒤 쓰기 거절 검증 없음; 결과/명단 변경 없음"
+    }
+  ],
+  "targeted_admin_regressions": [
+    {
+      "issue": 1463,
+      "status": "PASS scoped — 팝업 가로넘침 after",
+      "comment": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1463#issuecomment-5944828069",
+      "widths": "402×606 추가 +405/787/1180",
+      "limits": "path draft 폐기; publish/save 없음; 물리 기기 없음"
+    },
+    {
+      "issue": 1461,
+      "status": "PASS scoped — 회원 상세 팀 반복 after",
+      "comment": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1461#issuecomment-5944371249",
+      "widths": "405/787/1180",
+      "limits": "팀13개 표시; 전체13개 상세 링크/역할쓰기 미검증"
+    },
+    {
+      "issue": 1464,
+      "status": "PASS scoped — 입력 라벨 after",
+      "comment": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1464#issuecomment-5944830461",
+      "widths": "405/787/1180 + desktop1180 AX",
+      "limits": "implicit label 포함5control 이름 각1개; 실제 스크린리더/전체키보드/저장 미검증"
+    },
+    {
+      "issue": 1483,
+      "status": "PASS scoped — 신고 집계/기간 안내 after",
+      "comment": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1483#issuecomment-5944395629",
+      "widths": "405/787/1180",
+      "limits": "현재신고4개/null사유1 관측; DB·APIbody·모든 facet 미검증"
+    },
+    {
+      "issue": 1458,
+      "status": "BEFORE only — 선수 카드/대회 실명 설정 중복 헤더 잔여",
+      "comment": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1458#issuecomment-5944404115",
+      "widths": "원본402/787/1180 파일; CSS원본별미관측은manifest구분",
+      "limits": "PR1508 OPEN base dev, mergedAt null(03:21Z); alpha after 대기"
+    }
+  ],
+  "external_cloud_admin_ledger": "https://github.com/kim-song-jun/matchup-sports-platform/blob/f9c2d024576f16ea8b35b29da83cb196c61e2498/docs/qa/evidence/2026-10-02-alpha/supplement-0254/results/functional-matrix-20261002-0234.json",
+  "remaining_gaps": [
+    "전체 admin/app route의 완결 QA를 주장하지 않는다. 이 원장은 실제 공개24개 관측 시나리오와 지정 회귀5건을 구분한다. 소스 라우트 목록/검색한 이슈 수는 QA 분모가 아니다.",
+    "부모 클라우드 관리자가 수행한9개 실제 보조 시나리오는 링크한 외부 ledger만 참조한다. 일부 캡처가 공개되지 않아 그 파일명을 공개 이미지 링크로 가장하지 않는다.",
+    "로컬 IAB는 guest; 부모 원격 클라우드의 관리자 세션을 로컬 인증으로 가정하지 않았다. 실제 팀장/매니저/참가자/상대팀 로그인 권한·서버 쓰기 거절은 미검증.",
+    "완료된 지정 합성 리그/대회/친선만 읽었다. 활성·수정 가능한 disposable roster draft가 없어 중복 등번호 제출/삭제/교체/재등록/검증 오류는 미검증.",
+    "실제 Android/iOS/태블릿 기기, OS 소프트 키보드, 화면 읽기 프로그램, 전체 Tab 순서 미검증. local CSS390/768/1440과 cloud CSS402/787/1180은 다른 환경이다.",
+    "1458/PR1508 및1516/PR1519는03:21Z OPEN이어서 after 미검증. 1518/1520/1522 after도 배포 경계/인증된 원본 브라우저를 기다린다.",
+    "viewport 캡처는 보이는 영역만 증명한다. 모든 below-the-fold, 빈/로딩/오류 조합, 모든 링크·검색·정렬·페이지네이션·필터 연속입력·포커스 순서를 검증한 것이 아니다.",
+    "초기 React419/418 console의 원인은 미확정. guest auth401과 navigation canceled ERR_ABORTED는 예상 행동으로 구분했다. 전체console/network0오류 주장은 하지 않는다.",
+    "이미지 commit은 evidence commit이다. 각 캡처 순간 app serving SHA는 미관측. 배포 run 성공 시각과 캡처 시간만 구분해 기록한다."
+  ]
+}

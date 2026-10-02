@@ -144,3 +144,9 @@ Status: implementation in progress — original audit 20/20 preserved below
 
 - Final focused checks: API 6 suites / 285 tests PASS; Web 5 files / 97 tests PASS; both v1 `tsc --noEmit` PASS. `git diff --check` PASS. No schema migration or new TODO/FIXME/HACK/XXX markers.
 - Remaining: external Copilot/CI, dev merge/deploy, authenticated Alpha visual evidence. No local Next runtime/build loops used.
+
+- PR: #1545. Pre-deploy headed public record QA reproduced 404 at 390/768/1440 (same sample, no auth required); before screenshots/report under output/playwright/visual-audit/competition-team-match-before. Browser tree closed.
+- Web CI initially rejected one newly copied `text-sm` class under the typography baseline; switched competition links to the existing font-size token (no baseline increase).
+- Copilot external review could not start: GitHub reports monthly quota exceeded (HTTP 402). No review/clean verdict exists. Internal committed-diff review and automated CI continue; do not represent quota failure as a passed external review.
+
+- Font-token follow-up: lowered the detail page's literal typography baseline from 15 to 13; same pattern gate now PASS (baseline never increased). Detail regressions 18/18 PASS.

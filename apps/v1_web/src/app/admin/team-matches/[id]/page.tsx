@@ -290,7 +290,7 @@ export default function AdminTeamMatchDetailPage() {
             {teamMatch.league && (
               <Link
                 href={`/admin/league-matches/${encodeURIComponent(teamMatch.league.leagueId)}`}
-                className="mt-4 inline-flex h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="mt-4 inline-flex h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <ListOrdered size={16} aria-hidden="true" />
                 정규 리그 · {teamMatch.league.title}
@@ -300,7 +300,7 @@ export default function AdminTeamMatchDetailPage() {
             {!teamMatch.league && teamMatch.tournament && (
               <Link
                 href={`/admin/tournaments/${encodeURIComponent(teamMatch.tournament.tournamentId)}`}
-                className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <Trophy size={16} aria-hidden="true" />
                 대회 · {teamMatch.tournament.title}
@@ -398,7 +398,7 @@ export default function AdminTeamMatchDetailPage() {
             {teamMatch.hostTeamId && (
               <Link
                 href={`/admin/teams/${encodeURIComponent(teamMatch.hostTeamId)}`}
-                className="mt-3 inline-flex h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="mt-3 inline-flex h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 주최 팀 상세 보기
               </Link>

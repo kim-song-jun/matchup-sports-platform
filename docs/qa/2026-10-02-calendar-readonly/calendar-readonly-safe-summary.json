@@ -1,0 +1,814 @@
+{
+  "role": "Captain B, synthetic QA C team captain; existing authenticated cloud browser",
+  "startedUtc": "2026-10-02T10:57:06.343Z",
+  "completedUtc": "2026-10-02T11:04:55.164Z",
+  "navigationCandidate": {
+    "repro": "My teams → E2E Alpha C team detail → record/review/basic-info area at 402, 787, 1180 CSS pixels",
+    "actual": "The team-schedules anchor exists once in raw DOM at all three widths. At 402 and 787 its desktop-layout ancestor is display:none, leaving no rendered/AX link or keyboard navigation entry; at 1180 it is rendered and its normal click opens schedules.",
+    "expected": "An equivalent team-schedule entry should be discoverable on mobile and tablet",
+    "inventory": [
+      {
+        "action": "C team mobile schedule-link inventory",
+        "utc": "2026-10-02T10:59:29.374Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+        "links": [],
+        "css": {
+          "height": 606,
+          "width": 402
+        },
+        "scope": "Original exposed-link inventory; not a raw DOM count. Raw DOM count is 1, verified from original state links and fresh correction proof."
+      },
+      {
+        "action": "C team tablet schedule-link inventory",
+        "utc": "2026-10-02T10:59:31.212Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+        "links": [],
+        "css": {
+          "height": 505,
+          "width": 787
+        },
+        "scope": "Original exposed-link inventory; not a raw DOM count. Raw DOM count is 1, verified from original state links and fresh correction proof."
+      },
+      {
+        "action": "C team desktop schedule-link inventory",
+        "utc": "2026-10-02T11:00:02.050Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+        "links": [
+          {
+            "href": "/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+            "text": "팀 일정훈련·경기·이벤트 일정을 보고 참석을 체크해요."
+          }
+        ],
+        "css": {
+          "height": 757,
+          "width": 1180
+        },
+        "scope": "Original exposed-link inventory; not a raw DOM count. Raw DOM count is 1, verified from original state links and fresh correction proof."
+      }
+    ],
+    "correction": "Correction verified 2026-10-02 11:13–11:15 UTC: raw DOM contains one team-schedules anchor at both 402×606 and 787×505. Its ancestor .tm-team-detail-desktop-layout.tm-show-desktop has computed display:none. The anchor itself reports display:flex and visibility:visible, but has 0 client rects and a 0×0 box, isVisible=false, and is absent from AX/semantic snapshots. Keyboard Tab from received reviews skips it and moves to game-roster management at both widths. Previous wording “absent from entire DOM” was incorrect; the absence is of a user-exposed/AX navigation link, not a raw DOM node.",
+    "evidenceBasis": "Screenshots show the layout, not absence of raw DOM nodes. Exposed-link inventory, computed ancestor styles, client rectangles, semantic/AX snapshots and actual Tab observations are distinct evidence below."
+  },
+  "emptyDateCandidate": {
+    "repro": "C team schedules → Calendar → October 2026 → select 8",
+    "actual": "Zero matching schedules shows 아직 등록된 일정이 없어요 / 팀원과 함께할 첫 일정을 만들어 보세요. although the same team has 10 existing schedules",
+    "expected": "Explain no schedules for the selected date, rather than implying no schedule has ever been registered",
+    "widths": [
+      402,
+      787,
+      1180
+    ],
+    "selectedStateEvidence": [
+      {
+        "name": "c-team-calendar-mobile-402-oct4",
+        "utc": "2026-10-02T11:02:06.453Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "pressed": [
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": "4일, 일정 1건",
+            "pressed": "true",
+            "selected": null,
+            "text": "4"
+          }
+        ],
+        "syntheticScheduleLinks": [
+          {
+            "href": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules/780a8ea8-d91c-41b2-8a7a-f9aeb270049c",
+            "text": "(테스트) 알파 재구축 정규 리그 2026 가을 1주차\n경기 · 10/4 (일) 00:00~02:00\n상대팀 확정"
+          }
+        ]
+      },
+      {
+        "name": "c-team-calendar-mobile-402-empty-oct8",
+        "utc": "2026-10-02T11:02:24.997Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "pressed": [
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": "8일",
+            "pressed": "true",
+            "selected": null,
+            "text": "8"
+          }
+        ],
+        "syntheticScheduleLinks": []
+      },
+      {
+        "name": "c-team-calendar-mobile-402-empty-copy-clear",
+        "utc": "2026-10-02T11:03:45.275Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "pressed": [
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": "8일",
+            "pressed": "true",
+            "selected": null,
+            "text": "8"
+          }
+        ],
+        "syntheticScheduleLinks": []
+      },
+      {
+        "name": "c-team-calendar-tablet-787-empty-copy",
+        "utc": "2026-10-02T11:04:01.370Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "pressed": [
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": "8일",
+            "pressed": "true",
+            "selected": null,
+            "text": "8"
+          }
+        ],
+        "syntheticScheduleLinks": []
+      },
+      {
+        "name": "c-team-calendar-desktop-1180-empty-copy",
+        "utc": "2026-10-02T11:04:01.646Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "pressed": [
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": "8일",
+            "pressed": "true",
+            "selected": null,
+            "text": "8"
+          }
+        ],
+        "syntheticScheduleLinks": []
+      },
+      {
+        "name": "c-team-calendar-desktop-1180-empty-copy-clear",
+        "utc": "2026-10-02T11:04:54.850Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "pressed": [
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": null,
+            "pressed": "true",
+            "selected": null,
+            "text": "전체"
+          },
+          {
+            "disabled": false,
+            "name": "8일",
+            "pressed": "true",
+            "selected": null,
+            "text": "8"
+          }
+        ],
+        "syntheticScheduleLinks": []
+      }
+    ],
+    "allScheduleCountEvidence": {
+      "count": 10,
+      "evidenceType": "Recorded UI/action observation, not a count of cards visible in these nine screenshots",
+      "observedActions": [
+        "List tab shows all 10; returning to Calendar restores previous selected-date filter",
+        "Date-filter clear using Space restores all 10"
+      ],
+      "finalRestoredState": {
+        "utc": "2026-10-02T11:15:41.161Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "view": "Calendar, October 2026, date filter cleared, all 10 schedules",
+        "serverChanges": false
+      }
+    },
+    "pixelEvidenceLimit": "Mobile October 8 and desktop calendar context show selected-day context without the empty wording in frame; separate clear captures show the wording. Tablet selected day is above frame and retained in the DOM pressed-state evidence. The mobile October 4 screenshot directly shows one existing synthetic schedule."
+  },
+  "framingNotes": [
+    "Mobile empty-oct8 image shows selected day but empty message is below viewport; paired with empty-copy-clear",
+    "Desktop empty-copy image shows selected day context, not the message; paired with empty-copy-clear",
+    "Tablet empty-copy shows message but selected date is above viewport; DOM pressed-state evidence retained",
+    "Mobile CSS height 606 raster height 605 due capture rounding"
+  ],
+  "scope": "Two read-only Alpha QA candidates: responsive team-schedule navigation exposure and selected-empty-date wording. Observations captured 2026-10-02; not post-fix evidence.",
+  "sourceProofFiles": [
+    "calendar-readonly-safe-summary.json",
+    "schedule-link-dom-visibility-correction.json"
+  ],
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Not observed; evidence-repository parent/commit does not identify the code served during capture.",
+  "serverChanges": false,
+  "issueAssignment": "Duplicate search and issue registration are separate; no issue number asserted by this evidence batch.",
+  "domVisibilityCorrection": {
+    "correction": "Correction verified 2026-10-02 11:13–11:15 UTC: raw DOM contains one team-schedules anchor at both 402×606 and 787×505. Its ancestor .tm-team-detail-desktop-layout.tm-show-desktop has computed display:none. The anchor itself reports display:flex and visibility:visible, but has 0 client rects and a 0×0 box, isVisible=false, and is absent from AX/semantic snapshots. Keyboard Tab from received reviews skips it and moves to game-roster management at both widths. Previous wording “absent from entire DOM” was incorrect; the absence is of a user-exposed/AX navigation link, not a raw DOM node.",
+    "role": "Captain B, synthetic C-team captain",
+    "earlierRawEvidence": [
+      {
+        "name": "c-team-schedule-link-desktop-1180",
+        "utc": "2026-10-02T11:00:02.643Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+        "rawScheduleLinks": [
+          {
+            "href": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+            "text": "팀 일정\n훈련·경기·이벤트 일정을 보고 참석을 체크해요."
+          }
+        ]
+      },
+      {
+        "name": "c-team-schedule-link-mobile-402",
+        "utc": "2026-10-02T11:00:29.454Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+        "rawScheduleLinks": [
+          {
+            "href": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+            "text": "팀 일정훈련·경기·이벤트 일정을 보고 참석을 체크해요."
+          }
+        ]
+      },
+      {
+        "name": "c-team-schedule-link-tablet-787",
+        "utc": "2026-10-02T11:00:55.058Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+        "rawScheduleLinks": [
+          {
+            "href": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+            "text": "팀 일정훈련·경기·이벤트 일정을 보고 참석을 체크해요."
+          }
+        ]
+      }
+    ],
+    "observations": [
+      {
+        "mode": "desktop",
+        "dom": {
+          "links": [
+            {
+              "ancestors": [
+                {
+                  "ariaHidden": null,
+                  "className": "tm-team-detail-desktop-main",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-team-detail-desktop-layout tm-show-desktop",
+                  "display": "grid",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-page-transition-enter",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-scroll-area",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "MAIN",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-app-frame tm-app-frame-no-bottom",
+                  "display": "flex",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "BODY",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "HTML",
+                  "visibility": "visible"
+                }
+              ],
+              "clientRects": 1,
+              "display": "flex",
+              "href": "/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+              "opacity": "1",
+              "rect": {
+                "height": 74,
+                "width": 680,
+                "x": 54,
+                "y": 1936.15625
+              },
+              "tabIndex": 0,
+              "textContent": "팀 일정훈련·경기·이벤트 일정을 보고 참석을 체크해요.",
+              "visibility": "visible"
+            }
+          ],
+          "rawDomCount": 1,
+          "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+          "utc": "2026-10-02T11:13:39.864Z",
+          "viewport": {
+            "height": 757,
+            "width": 1180
+          }
+        },
+        "axHasScheduleLink": null,
+        "semanticSnapshotHasScheduleLink": true,
+        "axEvidenceLimit": "axHasScheduleLink is null (not separately recorded); semanticSnapshotHasScheduleLink=true and original screenshot demonstrate exposure. Do not rewrite null as an AX pass."
+      },
+      {
+        "mode": "mobile",
+        "dom": {
+          "links": [
+            {
+              "ancestors": [
+                {
+                  "ariaHidden": null,
+                  "className": "tm-team-detail-desktop-main",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-team-detail-desktop-layout tm-show-desktop",
+                  "display": "none",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-page-transition-enter",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-scroll-area",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "MAIN",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-app-frame tm-app-frame-no-bottom",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "BODY",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "HTML",
+                  "visibility": "visible"
+                }
+              ],
+              "clientRects": 0,
+              "display": "flex",
+              "href": "/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+              "opacity": "1",
+              "rect": {
+                "height": 0,
+                "width": 0,
+                "x": 0,
+                "y": 0
+              },
+              "tabIndex": 0,
+              "textContent": "팀 일정훈련·경기·이벤트 일정을 보고 참석을 체크해요.",
+              "visibility": "visible"
+            }
+          ],
+          "rawDomCount": 1,
+          "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+          "utc": "2026-10-02T11:14:11.592Z",
+          "viewport": {
+            "height": 606,
+            "width": 402
+          }
+        },
+        "locatorVisible": false,
+        "axHasScheduleLink": false,
+        "semanticSnapshotHasScheduleLink": false,
+        "keyboardAfterReview": {
+          "href": "/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/game-rosters",
+          "text": "경기 명단 관리다가오는 대회·리그 경기에서 빠질 선수와 결장 기간을 한 번에 관리해요."
+        }
+      },
+      {
+        "mode": "tablet",
+        "dom": {
+          "links": [
+            {
+              "ancestors": [
+                {
+                  "ariaHidden": null,
+                  "className": "tm-team-detail-desktop-main",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-team-detail-desktop-layout tm-show-desktop",
+                  "display": "none",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-page-transition-enter",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-scroll-area",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "MAIN",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "tm-app-frame tm-app-frame-no-bottom",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "DIV",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "BODY",
+                  "visibility": "visible"
+                },
+                {
+                  "ariaHidden": null,
+                  "className": "",
+                  "display": "block",
+                  "hidden": false,
+                  "tag": "HTML",
+                  "visibility": "visible"
+                }
+              ],
+              "clientRects": 0,
+              "display": "flex",
+              "href": "/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+              "opacity": "1",
+              "rect": {
+                "height": 0,
+                "width": 0,
+                "x": 0,
+                "y": 0
+              },
+              "tabIndex": 0,
+              "textContent": "팀 일정훈련·경기·이벤트 일정을 보고 참석을 체크해요.",
+              "visibility": "visible"
+            }
+          ],
+          "rawDomCount": 1,
+          "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+          "utc": "2026-10-02T11:14:42.704Z",
+          "viewport": {
+            "height": 505,
+            "width": 787
+          }
+        },
+        "locatorVisible": false,
+        "axHasScheduleLink": false,
+        "semanticSnapshotHasScheduleLink": false,
+        "keyboardAfterReview": {
+          "href": "/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/game-rosters",
+          "text": "경기 명단 관리다가오는 대회·리그 경기에서 빠질 선수와 결장 기간을 한 번에 관리해요."
+        }
+      }
+    ],
+    "additionalCorrectionScreenshots": "Not included in this nine-image publication; correction observations retain their own URL, UTC and CSS viewport."
+  },
+  "limits": [
+    "Not post-fix or current-deployment verification. No complete feature PASS or issue closure claimed.",
+    "No create, edit, delete or attendance-response actions were performed in this read-only capture session.",
+    "No physical-device or actual screen-reader test. Browser AX/semantic snapshots are not a screen-reader execution.",
+    "No general timezone, backend date/filter correctness or root-cause validation.",
+    "The desktop correction separately recorded semantic exposure; its direct AX boolean is null.",
+    "Screenshots alone cannot prove hidden DOM/AX/Tab behavior or the all-schedules count of 10.",
+    "Capture timestamps differ from publication time. Exact serving SHA was not observed."
+  ],
+  "privacy": "Only the nine designated original control/synthetic C-team images are included. Each was directly pixel reviewed for publication. No individual member identity, date of birth, contact details, credential or member list is visible. Broader private calendar records and member screenshots are excluded.",
+  "images": [
+    {
+      "file": "c-team-schedule-link-mobile-402.jpg",
+      "utc": "2026-10-02T11:00:29.454Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "ba50f3b73ab73360b8ecf07d6459a8d67ca0cc13f98374fdeeb47581e205f7f5",
+      "note": "Team record and reviews immediately followed by basic information; no rendered/AX team-schedule link; one raw anchor exists inside display:none desktop layout.",
+      "bytes": 18438,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-schedule-link-tablet-787.jpg",
+      "utc": "2026-10-02T11:00:55.058Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "d794834f2a42f3abac82624cc4425de2808b578ab25c5827ca8545f3e5b2d297",
+      "note": "Tablet has same record/review then basicinfo layout, no rendered/AX team-schedule link; one raw anchor exists inside display:none desktop layout.",
+      "bytes": 19247,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-schedule-link-desktop-1180.jpg",
+      "utc": "2026-10-02T11:00:02.643Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da?from=%2Fmy%2Fteams",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "0d87bed851d8d549a3f1bcd2fefe3648fd0038186ed355ceec66359b1d5d0951",
+      "note": "Desktop includes team schedule navigation alongside record/reviews.",
+      "bytes": 38619,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-calendar-mobile-402-oct4.jpg",
+      "utc": "2026-10-02T11:02:06.453Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "8dbc5cc66c571fab2c33328bd8f36bae290044e90e641bbbe63bbdce146ee749",
+      "note": "Selected4inOctober on Sunday column, one Oct4(日)00–02 synthetic league card.",
+      "bytes": 16897,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-calendar-mobile-402-empty-oct8.jpg",
+      "utc": "2026-10-02T11:02:24.997Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "02692bb2f5f2ddaf67d07cd66a77161a661013f417a831c0829a8af559590644",
+      "note": "Selected Oct8 empty, but copy says 아직 등록된 일정이 없어요 / 팀원과 함께할 첫 일정을 만들어 보세요. Team has10 existing schedules.",
+      "bytes": 16450,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-calendar-mobile-402-empty-copy-clear.jpg",
+      "utc": "2026-10-02T11:03:45.275Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "8a58820ff24719c290525c2be601828095840cdb1e7e705619e1f56018a5f513",
+      "note": "Canonical mobile empty-copy screenshot; no people; selected-date state in DOM ledger.",
+      "bytes": 14075,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-calendar-tablet-787-empty-copy.jpg",
+      "utc": "2026-10-02T11:04:01.370Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "b8cb661501a60d74b8f14e5670670e4a4466bb7a7fc0e949e2017a7cea43ecc2",
+      "note": "Same selected October8 empty-copy candidate at787 CSS.",
+      "bytes": 15905,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-calendar-desktop-1180-empty-copy.jpg",
+      "utc": "2026-10-02T11:04:01.646Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "831acad5d15102236f72d904769651ad03cdea53adea77b2ded635325ceb0eb9",
+      "note": "Same selected October8 empty-copy candidate at1180 CSS.",
+      "bytes": 33399,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    },
+    {
+      "file": "c-team-calendar-desktop-1180-empty-copy-clear.jpg",
+      "utc": "2026-10-02T11:04:54.850Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/schedules",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "b00d7862518bf2bee7a9231685f0d271312ff85a8967678bdeb7d4a7e3c6a114",
+      "note": "Canonical desktop empty-copy screenshot. Prior desktop empty-copy file shows selected-day context, not the copy.",
+      "bytes": 28235,
+      "originalBytesUnchanged": true,
+      "imageTreatment": "Original supplied viewport raster; no crop, redaction or re-encoding",
+      "pixelReview": "No individual member data or credentials visible"
+    }
+  ]
+}

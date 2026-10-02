@@ -1,0 +1,86 @@
+{
+  "title": "Alpha availability blocker: rendered 503 on /my and /home",
+  "sourceProofFile": "20261002-1915-availability-blocker.json",
+  "scope": "Cloud Chromium read-only availability observations and two original screenshots; no external-machine HTTP logs included.",
+  "firstMy503ObservedUtc": "2026-10-02T19:13:58Z",
+  "firstFreshHome503ObservedUtc": "2026-10-02T19:14:52Z",
+  "recordedHomeReloadsStill503Utc": [
+    "2026-10-02T19:15:29Z",
+    "2026-10-02T19:18:11Z"
+  ],
+  "observationTimeSource": "Original cloud availability proof, with screenshot/viewport mapping clarified by the capturing browser worker. Times identify observations, not inferred outage start.",
+  "steps": [
+    "Existing home page was usable before the first failing navigation.",
+    "Activate the visible profile control; /my renders 503 Service Temporarily Unavailable.",
+    "An ordinary /my reload remains on the 503 screen.",
+    "Open the previously observed /home URL in a supported new tab of the same Cloud Chromium browser.",
+    "/home renders the same 503; ordinary reloads including the recorded later check remain 503."
+  ],
+  "actual": "Application navigation unavailable on the observed /my and /home paths; both show 503 Service Temporarily Unavailable.",
+  "expected": "The application pages load successfully.",
+  "rootCause": "Unknown. Rendered browser evidence does not establish whether the cause is application, load balancer/proxy, deployment or other infrastructure.",
+  "deploymentContext": {
+    "lastConfirmedRun": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37047094838",
+    "headSha": "1d09562a9b7d1b2be261a89519167ff2a031a576",
+    "completedUtc": "2026-10-02T18:37:35Z",
+    "conclusion": "success",
+    "firstMy503AfterCompletion": "36 minutes 23 seconds",
+    "interpretation": "The first observed /my503 does not overlap this confirmed deployment execution window. This timing does not establish the outage cause or exact page-serving SHA."
+  },
+  "exactServingCommitSha": null,
+  "evidenceType": "Rendered error-page screenshot and browser-navigation observations. HTTP response status/header/body probes from a separate machine are not part of this packet.",
+  "limits": [
+    "No awselb/server header claim is supported by these screenshots alone.",
+    "No Mac/local-QA HEAD/GET counts or log excerpts are included; those logs were not available in this cloud packet.",
+    "No observed outage-start time before the first failing navigation, no recovery time or continuous-availability claim after the last recorded observation.",
+    "The original tab and newly opened tab are in the same browser; a new tab is not an independently authenticated session.",
+    "Admin permissions and blocked feature-specific tests were not established by these error screens.",
+    "No server changes, restarts, permission changes or application-data writes were performed.",
+    "Root cause and exact serving-page SHA remain unverified."
+  ],
+  "privacy": "Only two generic error screens and minimized metadata are published. No greeting/account name, administrator identity, credentials, member list or private activity content is included.",
+  "screenshots": [
+    {
+      "file": "20261002-191427-my-503.png",
+      "url": "https://alpha.teameet.co.kr/my",
+      "capturedAtApproxUtc": "2026-10-02T19:14:27Z",
+      "captureTimePrecision": "Approximate second-level tool-call observation; not a millisecond-accurate shutter timestamp.",
+      "sourceFileWriteUtc": "2026-10-02T19:14:26.905190+00:00",
+      "sourceFileWriteTimeLimit": "Filesystem write timestamp, not an exact capture timestamp.",
+      "cssViewport": null,
+      "cssMeasurementStatus": "unmeasured at capture",
+      "raster": {
+        "width": 1188,
+        "height": 848
+      },
+      "bytes": 52198,
+      "sha256": "6eca991a6dbb14d984c591532ed1170745eaf2d47ee6adf8e0921416e98d26a6",
+      "framing": "Native browser-window screenshot including browser chrome and visible /my address; raster is not CSS viewport.",
+      "originalBytesUnchanged": true,
+      "pixelReview": "Directly viewed original; generic 503 error only, with no personal names or secrets."
+    },
+    {
+      "file": "20261002-1915-home-503.png",
+      "url": "https://alpha.teameet.co.kr/home",
+      "capturedAtApproxUtc": "2026-10-02T19:15:04Z",
+      "captureTimePrecision": "Approximate second-level tool-call observation; not a millisecond-accurate shutter timestamp.",
+      "sourceFileWriteUtc": "2026-10-02T19:15:04.149144+00:00",
+      "sourceFileWriteTimeLimit": "Filesystem write timestamp, not an exact capture timestamp.",
+      "cssViewport": {
+        "width": 1180,
+        "height": 757,
+        "dpr": 1
+      },
+      "cssMeasurementStatus": "directly measured by browser worker",
+      "raster": {
+        "width": 1180,
+        "height": 757
+      },
+      "bytes": 13826,
+      "sha256": "3a6e7d3abe167eb976458648a8ad9ea0cfe5016195e92712a649fd4f983579f1",
+      "framing": "Browser content viewport screenshot; CSS dimensions measured from window.innerWidth/innerHeight and devicePixelRatio.",
+      "originalBytesUnchanged": true,
+      "pixelReview": "Directly viewed original; generic 503 error only, with no personal names or secrets."
+    }
+  ]
+}

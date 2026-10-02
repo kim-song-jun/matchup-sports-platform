@@ -1,6 +1,6 @@
 import type { V1TournamentOperationsBoardItem } from '@/types/api';
 import type { V1LeagueFixture } from '@/types/league-match';
-import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
 /**
  * **운영 목록의 경기 이름표.**
@@ -35,19 +35,22 @@ export function buildLeagueFixtureTitles(
 }
 
 export function resolveFixtureLabel(
-  item: Pick<V1TournamentOperationsBoardItem, 'fixtureId' | 'round' | 'fixtureNumber'>,
+  item: Pick<V1TournamentOperationsBoardItem, 'fixtureId' | 'round' | 'fixtureNumber' | 'legNumber' | 'groupName'>,
   teamNames: { home: string; away: string } | undefined,
   leagueTitles: ReadonlyMap<string, string>,
 ): FixtureLabel {
   // 캐스팅이 필요 없다 — 타입이 이제 사실대로 `| null` 이다(리그 행에서 서버가 null 을 준다).
   const { round, fixtureNumber } = item;
   const hasTournamentAxis = round !== null && fixtureNumber !== null;
+  const tournamentSubtitle = hasTournamentAxis
+    ? `${competitionMatchLabel({ groupName: item.groupName, round, legNumber: item.legNumber })} · ${fixtureNumber}번 경기`
+    : null;
   const leagueTitle = leagueTitles.get(item.fixtureId) ?? null;
 
   if (teamNames) {
     return {
       title: `${teamNames.home} vs ${teamNames.away}`,
-      subtitle: hasTournamentAxis ? `${tournamentRoundLabel(round)} · ${fixtureNumber}번 경기` : leagueTitle,
+      subtitle: tournamentSubtitle ?? leagueTitle,
     };
   }
   if (leagueTitle !== null) {
@@ -55,6 +58,6 @@ export function resolveFixtureLabel(
   }
   return {
     title: hasTournamentAxis ? `${fixtureNumber}번 경기` : '경기',
-    subtitle: hasTournamentAxis ? `${tournamentRoundLabel(round)} · ${fixtureNumber}번 경기` : null,
+    subtitle: tournamentSubtitle,
   };
 }

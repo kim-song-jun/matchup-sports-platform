@@ -2031,6 +2031,7 @@ const stableRevIds = {
   fieldA: '7f000000-0000-4000-8000-000000000030',
   fixtureNoGame: '7f000000-0000-4000-8000-000000000040',
   fixtureWithGame: '7f000000-0000-4000-8000-000000000041',
+  groupA: '7f000000-0000-4000-8000-000000000050',
 } as const;
 
 describe('Task 18 operations board items[].stableRevision incremental key (review finding #5)', () => {
@@ -2274,6 +2275,32 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
     expect(withGameAfter.currentScore).toEqual({ home: 2, away: 1 });
     expect(withGameAfter.stableRevision).toBe(withGameBefore.stableRevision);
     expect(after.watermark).toBe(before.watermark);
+  });
+
+  it('carries groupName and moves stableRevision when the fixture joins a group and when that group is renamed (groupName is hashed as a value)', async () => {
+    const before = await board.list(stableRevIds.tournament, { limit: 50 });
+    const noGameBefore = before.items.find((item) => item.fixtureId === stableRevIds.fixtureNoGame)!;
+    expect(noGameBefore.groupName).toBeNull();
+
+    await stableRevPrisma.v1TournamentGroup.create({
+      data: { id: stableRevIds.groupA, tournamentId: stableRevIds.tournament, name: 'A조' },
+    });
+    await stableRevPrisma.v1TournamentMatchDetails.update({
+      where: { teamMatchId: stableRevIds.fixtureNoGame },
+      data: { groupId: stableRevIds.groupA },
+    });
+    const grouped = await board.list(stableRevIds.tournament, { limit: 50 });
+    const noGameGrouped = grouped.items.find((item) => item.fixtureId === stableRevIds.fixtureNoGame)!;
+    expect(noGameGrouped.groupName).toBe('A조');
+    expect(noGameGrouped.stableRevision).not.toBe(noGameBefore.stableRevision);
+    expect(grouped.watermark).not.toBe(before.watermark);
+
+    await stableRevPrisma.v1TournamentGroup.update({ where: { id: stableRevIds.groupA }, data: { name: 'B조' } });
+    const renamed = await board.list(stableRevIds.tournament, { limit: 50 });
+    const noGameRenamed = renamed.items.find((item) => item.fixtureId === stableRevIds.fixtureNoGame)!;
+    expect(noGameRenamed.groupName).toBe('B조');
+    expect(noGameRenamed.stableRevision).not.toBe(noGameGrouped.stableRevision);
+    expect(renamed.watermark).not.toBe(grouped.watermark);
   });
 });
 

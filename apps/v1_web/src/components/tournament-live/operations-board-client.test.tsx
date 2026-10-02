@@ -82,6 +82,8 @@ const ITEM_A: V1TournamentOperationsBoardItem = {
   tournamentId: 't-1',
   round: '8강',
   fixtureNumber: 1,
+  legNumber: 1,
+  groupName: null,
   gameId: 'game-1',
   gameState: 'LIVE',
   fieldId: 'field-1',
@@ -501,6 +503,43 @@ describe('OperationsBoardClient', () => {
     expect(screen.getByText(/8강 · 1번 경기 ·/)).toBeInTheDocument();
     // 옛 표기는 어느 경로에도 남아 있으면 안 된다
     expect(screen.queryByText(/8강 1경기/)).not.toBeInTheDocument();
+  });
+
+  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선은 라운드만.
+  it('names a group fixture "A조 · 조별리그 2라운드" and a knockout fixture by round only, in table, card and field label', () => {
+    const groupItem = { ...ITEM_A, fixtureId: 'fixture-g', round: 'league_r2', fixtureNumber: 3, groupName: 'A조' };
+    const knockoutItem = { ...ITEM_A, fixtureId: 'fixture-k', round: 'semi', fixtureNumber: 9, groupName: '본선' };
+    mocks.useV1TournamentOperationsBoard.mockReturnValue({
+      data: { ...PAGE, items: [groupItem, knockoutItem], liveWarnings: [] },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    expect(screen.getByText('A조 · 조별리그 2라운드 · 3번 경기')).toBeInTheDocument();
+    expect(screen.getByText(/A조 · 조별리그 2라운드 · 3번 경기 ·/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText('A조 · 조별리그 2라운드 3번 경기장').length).toBeGreaterThan(0);
+    expect(screen.getByText('4강 · 9번 경기')).toBeInTheDocument();
+    expect(screen.queryByText(/본선/)).not.toBeInTheDocument();
+  });
+
+  it('names a knockout second leg "4강 2차" like the public screens', () => {
+    const secondLeg = { ...ITEM_A, fixtureId: 'fixture-k2', round: 'semi', fixtureNumber: 10, legNumber: 2 };
+    mocks.useV1TournamentOperationsBoard.mockReturnValue({
+      data: { ...PAGE, items: [secondLeg], liveWarnings: [] },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    expect(screen.getByText('4강 2차 · 10번 경기')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('4강 2차 10번 경기장').length).toBeGreaterThan(0);
   });
 
   it('updates the URL (deep link) when a filter changes, and does not lose the filter selection across an incremental data refresh', async () => {

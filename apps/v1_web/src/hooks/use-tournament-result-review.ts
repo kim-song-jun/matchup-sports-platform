@@ -161,6 +161,8 @@ export type TournamentOperationsBoardItem = {
    */
   round: string | null;
   fixtureNumber: number | null;
+  /** 조에 속하지 않은 경기(결선)와 리그 행은 `null`. */
+  groupName: string | null;
   gameId: string | null;
   gameState: string | null;
   fieldId: string | null;

@@ -4820,6 +4820,8 @@ export type V1TournamentOperationsBoardItem = {
    */
   round: string | null;
   fixtureNumber: number | null;
+  /** 조 이름. 조에 속하지 않은 경기(결선)와 리그 행은 `null` — 경기 이름은 `competitionMatchLabel` 로 만든다. */
+  groupName: string | null;
   gameId: string | null;
   gameState: V1GameState | null;
   fieldId: string | null;
@@ -4909,6 +4911,8 @@ export type V1MyTournamentStaffFixture = {
   round: string;
   fixtureNumber: number;
   legNumber: number;
+  /** 조에 속하지 않은 경기(결선)는 `null`. */
+  groupName: string | null;
   fieldId: string | null;
   fieldName: string | null;
 };

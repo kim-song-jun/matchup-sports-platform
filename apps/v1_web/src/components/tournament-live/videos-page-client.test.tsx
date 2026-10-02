@@ -96,6 +96,19 @@ describe('VideosPageClient', () => {
     expect(screen.getByText('경기 영상 2')).toBeInTheDocument();
   });
 
+  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선은 라운드만.
+  it('조 경기는 "A조 · 조별리그 2라운드", 결선은 라운드만 쓴다', () => {
+    setVideos([
+      { ...FIXTURE, fixtureId: 'fixture-g', round: 'league_r2', fixtureNumber: 3, groupName: 'A조', videos: [] },
+      { ...FIXTURE, fixtureId: 'fixture-k', round: 'semi', fixtureNumber: 9, groupName: '본선', videos: [] },
+    ]);
+
+    render(<VideosPageClient tournamentId="t-1" />);
+
+    expect(screen.getByText('A조 · 조별리그 2라운드 3경기 · 서울FC vs 부산FC')).toBeInTheDocument();
+    expect(screen.getByText('4강 9경기 · 서울FC vs 부산FC')).toBeInTheDocument();
+  });
+
   it('업로드 한도와 허용 형식을 미리 알려준다', () => {
     render(<VideosPageClient tournamentId="t-1" />);
 

@@ -95,6 +95,7 @@ function fixtureFromEntry(item: PublicScheduleEntry): V1MyTournamentStaffFixture
     round: item.round,
     fixtureNumber: item.fixtureNumber,
     legNumber: item.legNumber,
+    groupName: item.groupName,
     fieldId: item.fieldId,
     fieldName: item.fieldName,
   };
@@ -195,6 +196,19 @@ describe('MyStaffFixturesPageClient', () => {
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선·조 없음은 라운드만.
+  it.each([
+    ['조 경기', { round: 'league_r2', groupName: 'A조' }, 'A조 · 조별리그 2라운드 · 1번 경기'],
+    ['결선', { round: 'semi', groupName: '본선' }, '4강 · 1번 경기'],
+    ['조 없음', { round: 'league_r2', groupName: null }, '조별리그 2라운드 · 1번 경기'],
+  ])('%s의 이름을 다른 화면과 같은 규칙으로 쓴다', (_case, over, name) => {
+    mockData([assignment({ fixtureIds: ['fx-1'] })], [entry({ fixtureId: 'fx-1', ...over })]);
+
+    render(<MyStaffFixturesPageClient tournamentId="t-1" />);
+
+    expect(screen.getByText(`${name} · 일정 미정`)).toBeInTheDocument();
   });
 
   it('담당 경기가 없으면 이유를 정직하게 알린다', () => {

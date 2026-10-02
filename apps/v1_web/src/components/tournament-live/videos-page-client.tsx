@@ -13,7 +13,7 @@ import { FixtureVideoAddForm } from '@/components/fixture-videos/fixture-video-a
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
-import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import {
   useCreateFixtureVideoLink,
   useDeleteFixtureVideo,
@@ -30,7 +30,7 @@ interface Props {
 }
 
 function fixtureLabel(fixture: TournamentVideoFixture): string {
-  const round = tournamentRoundLabel(fixture.round);
+  const round = competitionMatchLabel({ groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
   const home = fixture.homeTeamName ?? '미정';
   const away = fixture.awayTeamName ?? '미정';
   return `${round} ${fixture.fixtureNumber}경기 · ${home} vs ${away}`;

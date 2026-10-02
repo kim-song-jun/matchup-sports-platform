@@ -19,7 +19,7 @@ function pick(select: Record<string, unknown>, value: Record<string, unknown>): 
   return out;
 }
 
-type DetailsRow = { round: string; fixtureNumber: number; group: { name: string } | null };
+type DetailsRow = { round: string; fixtureNumber: number; legNumber: number; group: { name: string } | null };
 
 function teamMatchRow(id: string, details: DetailsRow) {
   return {
@@ -49,10 +49,10 @@ function boardOver(rows: ReturnType<typeof teamMatchRow>[]) {
 const GROUP_FIXTURE = 'fx-group';
 const KNOCKOUT_FIXTURE = 'fx-knockout';
 
-function page(groupName: string | null) {
+function page(groupName: string | null, knockoutLeg = 1) {
   return boardOver([
-    teamMatchRow(GROUP_FIXTURE, { round: 'league_r2', fixtureNumber: 3, group: groupName === null ? null : { name: groupName } }),
-    teamMatchRow(KNOCKOUT_FIXTURE, { round: 'semi', fixtureNumber: 9, group: null }),
+    teamMatchRow(GROUP_FIXTURE, { round: 'league_r2', fixtureNumber: 3, legNumber: 1, group: groupName === null ? null : { name: groupName } }),
+    teamMatchRow(KNOCKOUT_FIXTURE, { round: 'semi', fixtureNumber: 9, legNumber: knockoutLeg, group: null }),
   ]).list(tournamentId, { limit: 20 }, new Date('2026-10-02T00:00:00.000Z'));
 }
 
@@ -62,12 +62,22 @@ function itemOf(snapshot: Awaited<ReturnType<typeof page>>, fixtureId: string) {
   return item;
 }
 
-describe('TournamentOperationsBoardService — 조 이름', () => {
+describe('TournamentOperationsBoardService — 조 이름·차수', () => {
   it('조에 속한 경기는 조 이름을, 조 없는 결선 경기는 null 을 싣는다', async () => {
     const snapshot = await page('A조');
 
     expect(itemOf(snapshot, GROUP_FIXTURE)).toMatchObject({ round: 'league_r2', groupName: 'A조' });
     expect(itemOf(snapshot, KNOCKOUT_FIXTURE)).toMatchObject({ round: 'semi', groupName: null });
+  });
+
+  it('차수를 싣고, 차수만 바뀌어도 그 경기의 stableRevision 이 움직인다', async () => {
+    const firstLeg = await page('A조', 1);
+    const secondLeg = await page('A조', 2);
+
+    expect(itemOf(firstLeg, KNOCKOUT_FIXTURE).legNumber).toBe(1);
+    expect(itemOf(secondLeg, KNOCKOUT_FIXTURE).legNumber).toBe(2);
+    expect(itemOf(secondLeg, KNOCKOUT_FIXTURE).stableRevision).not.toBe(itemOf(firstLeg, KNOCKOUT_FIXTURE).stableRevision);
+    expect(itemOf(secondLeg, GROUP_FIXTURE).stableRevision).toBe(itemOf(firstLeg, GROUP_FIXTURE).stableRevision);
   });
 
   it('조 이름만 바뀌어도 그 경기의 stableRevision 과 watermark 가 움직인다', async () => {

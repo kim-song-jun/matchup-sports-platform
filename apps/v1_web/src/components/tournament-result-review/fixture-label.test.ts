@@ -38,10 +38,11 @@ describe('buildLeagueFixtureTitles', () => {
 
 // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 결과 검토 목록의 부제도 같은 규칙을 쓴다.
 describe('resolveFixtureLabel — 경기 이름', () => {
-  const item = (over: { round?: string; fixtureNumber?: number; groupName?: string | null }) => ({
+  const item = (over: { round?: string; fixtureNumber?: number; legNumber?: number; groupName?: string | null }) => ({
     fixtureId: 'fx-1',
     round: 'league_r2',
     fixtureNumber: 3,
+    legNumber: 1 as number | null,
     groupName: 'A조' as string | null,
     ...over,
   });
@@ -57,6 +58,11 @@ describe('resolveFixtureLabel — 경기 이름', () => {
   it('결선은 조 이름 없이 라운드만 쓴다', () => {
     expect(resolveFixtureLabel(item({ round: 'semi', fixtureNumber: 9, groupName: '본선' }), teams, new Map()).subtitle)
       .toBe('4강 · 9번 경기');
+  });
+
+  it('결선 2차전은 차수를 붙인다', () => {
+    expect(resolveFixtureLabel(item({ round: 'semi', fixtureNumber: 10, legNumber: 2, groupName: null }), teams, new Map()).subtitle)
+      .toBe('4강 2차 · 10번 경기');
   });
 
   it('조가 없으면 라운드만 쓴다 — 팀 이름을 모를 때도 같다', () => {

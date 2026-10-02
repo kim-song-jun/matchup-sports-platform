@@ -82,6 +82,7 @@ const ITEM_A: V1TournamentOperationsBoardItem = {
   tournamentId: 't-1',
   round: '8강',
   fixtureNumber: 1,
+  legNumber: 1,
   groupName: null,
   gameId: 'game-1',
   gameState: 'LIVE',
@@ -523,6 +524,22 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByLabelText('A조 · 조별리그 2라운드 3번 경기장').length).toBeGreaterThan(0);
     expect(screen.getByText('4강 · 9번 경기')).toBeInTheDocument();
     expect(screen.queryByText(/본선/)).not.toBeInTheDocument();
+  });
+
+  it('names a knockout second leg "4강 2차" like the public screens', () => {
+    const secondLeg = { ...ITEM_A, fixtureId: 'fixture-k2', round: 'semi', fixtureNumber: 10, legNumber: 2 };
+    mocks.useV1TournamentOperationsBoard.mockReturnValue({
+      data: { ...PAGE, items: [secondLeg], liveWarnings: [] },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    expect(screen.getByText('4강 2차 · 10번 경기')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('4강 2차 10번 경기장').length).toBeGreaterThan(0);
   });
 
   it('updates the URL (deep link) when a filter changes, and does not lose the filter selection across an incremental data refresh', async () => {

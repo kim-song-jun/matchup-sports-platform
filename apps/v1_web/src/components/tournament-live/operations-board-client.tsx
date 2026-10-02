@@ -229,7 +229,7 @@ function FixtureFieldCell({
  */
 function rowLabelFor(item: V1TournamentOperationsBoardItem, leagueTitle?: string): string {
   if (item.round === null || item.fixtureNumber === null) return leagueTitle ?? '경기';
-  return `${competitionMatchLabel({ groupName: item.groupName, round: item.round })} ${item.fixtureNumber}번`;
+  return `${competitionMatchLabel({ groupName: item.groupName, round: item.round, legNumber: item.legNumber })} ${item.fixtureNumber}번`;
 }
 
 interface Props {
@@ -644,7 +644,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
                         {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
                         {item.round !== null && item.fixtureNumber !== null ? (
-                          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{competitionMatchLabel({ groupName: item.groupName, round: item.round })} · {item.fixtureNumber}번 경기</p>
+                          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{competitionMatchLabel({ groupName: item.groupName, round: item.round, legNumber: item.legNumber })} · {item.fixtureNumber}번 경기</p>
                         ) : null}
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums">
@@ -714,7 +714,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
                           대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
                       {item.round !== null && item.fixtureNumber !== null
-                        ? `${competitionMatchLabel({ groupName: item.groupName, round: item.round })} · ${item.fixtureNumber}번 경기 · `
+                        ? `${competitionMatchLabel({ groupName: item.groupName, round: item.round, legNumber: item.legNumber })} · ${item.fixtureNumber}번 경기 · `
                         : ''}
                       {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '일정 미정'}
                     </p>

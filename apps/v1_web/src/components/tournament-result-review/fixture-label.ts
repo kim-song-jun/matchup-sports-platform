@@ -35,7 +35,7 @@ export function buildLeagueFixtureTitles(
 }
 
 export function resolveFixtureLabel(
-  item: Pick<V1TournamentOperationsBoardItem, 'fixtureId' | 'round' | 'fixtureNumber' | 'groupName'>,
+  item: Pick<V1TournamentOperationsBoardItem, 'fixtureId' | 'round' | 'fixtureNumber' | 'legNumber' | 'groupName'>,
   teamNames: { home: string; away: string } | undefined,
   leagueTitles: ReadonlyMap<string, string>,
 ): FixtureLabel {
@@ -43,7 +43,7 @@ export function resolveFixtureLabel(
   const { round, fixtureNumber } = item;
   const hasTournamentAxis = round !== null && fixtureNumber !== null;
   const tournamentSubtitle = hasTournamentAxis
-    ? `${competitionMatchLabel({ groupName: item.groupName, round })} · ${fixtureNumber}번 경기`
+    ? `${competitionMatchLabel({ groupName: item.groupName, round, legNumber: item.legNumber })} · ${fixtureNumber}번 경기`
     : null;
   const leagueTitle = leagueTitles.get(item.fixtureId) ?? null;
 

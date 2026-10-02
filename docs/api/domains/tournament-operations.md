@@ -151,7 +151,7 @@ These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK
 
 ```
 {
-  fixtureId, tournamentId, round, fixtureNumber, groupName,
+  fixtureId, tournamentId, round, fixtureNumber, legNumber, groupName,
   gameId, gameState, fieldId, fieldName,
   homeRegistrationId, awayRegistrationId, scheduledAt,
   currentScore, warnings: string[], version, revisionId, stableRevision
@@ -173,7 +173,7 @@ is one `FixtureOperationsRow`; `LiveWarningEntry` is `{fixtureId, warnings: stri
 
 ### Incremental key: `items[].stableRevision` (P0 fix, Task 18 review finding #5)
 
-`(fixtureId, version, revisionId)` alone cannot identify every stable-body change: `version`/`revisionId` are `V1Game` fields, so a fixture-only mutation (field (re)assignment, a field rename, an escalation transition that doesn't flip `RESULT_REVIEW_OVERDUE`'s boolean) can change the response without moving either, and a fixture with no game at all always has `version:null, revisionId:null` regardless of its own mutations. Each item now carries `stableRevision` — a `sha256` hex digest over EVERY persisted input that can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version` (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId` (nullable), the max `V1ResultEscalation.version`/`updatedAt` across ALL escalations tied to the fixture's game, and `groupName` itself (a group rename or a move to another group need not touch any timestamp above, and groups created together share `updatedAt`). A correct client diff compares `stableRevision` per `fixtureId` (falling back to "present in one snapshot but not the other" for adds/removals); `version`/`revisionId` remain for backward compatibility but are no longer sufficient alone.
+`(fixtureId, version, revisionId)` alone cannot identify every stable-body change: `version`/`revisionId` are `V1Game` fields, so a fixture-only mutation (field (re)assignment, a field rename, an escalation transition that doesn't flip `RESULT_REVIEW_OVERDUE`'s boolean) can change the response without moving either, and a fixture with no game at all always has `version:null, revisionId:null` regardless of its own mutations. Each item now carries `stableRevision` — a `sha256` hex digest over EVERY persisted input that can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version` (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId` (nullable), the max `V1ResultEscalation.version`/`updatedAt` across ALL escalations tied to the fixture's game, and `legNumber`/`groupName` themselves (a group rename or a move to another group need not touch any timestamp above, and groups created together share `updatedAt`). `round`/`fixtureNumber`/home·away registrations are covered by `updatedAt` because every write to them also updates the TeamMatch (`updateTournamentMatchInTx`, bracket advancement). A correct client diff compares `stableRevision` per `fixtureId` (falling back to "present in one snapshot but not the other" for adds/removals); `version`/`revisionId` remain for backward compatibility but are no longer sufficient alone.
 
 ### Stable body vs. `liveWarnings` (D3 determinism hardening)
 
@@ -187,6 +187,7 @@ Stable body field → persisted source:
 | `items[].tournamentId` | `V1TournamentFixture.tournamentId` |
 | `items[].round` | `V1TournamentFixture.round` |
 | `items[].fixtureNumber` | `V1TournamentFixture.fixtureNumber` |
+| `items[].legNumber` | `V1TournamentMatchDetails.legNumber`; `null` on regular-league rows. A knockout second leg is named "4강 2차" |
 | `items[].groupName` | `V1TournamentGroup.name` (via `tournamentDetails.group`); `null` outside any group and on regular-league rows. The web names the match with `competitionMatchLabel` |
 | `items[].gameId` | `V1Game.id` (via `fixture.game`, nullable) |
 | `items[].gameState` | `V1Game.state` |
@@ -199,7 +200,7 @@ Stable body field → persisted source:
 | `items[].warnings` | `NO_FIELD_ASSIGNED` ← `fieldId`; `MISSING_SCORER` ← `currentOfficialRevision.missingScorer`; `RESULT_REVIEW_OVERDUE` ← `V1ResultEscalation.status` |
 | `items[].version` | `V1Game.version` |
 | `items[].revisionId` | `V1Game.currentOfficialRevisionId` |
-| `items[].stableRevision` | `sha256` of `[fixture.updatedAt, groupName, field.version, game.version, game.updatedAt, revisionId, revisionState, score, missingScorer, maxEscalationVersion, maxEscalationUpdatedAt]` — see "Incremental key" above |
+| `items[].stableRevision` | `sha256` of `[fixture.updatedAt, legNumber, groupName, field.version, game.version, game.updatedAt, revisionId, revisionState, score, missingScorer, maxEscalationVersion, maxEscalationUpdatedAt]` — see "Incremental key" above |
 | `nextCursor` | opaque-encoded `(tournamentId, round, fixtureNumber, id)` of the last page row (keyset cursor; no longer a bare `V1TournamentFixture.id` — Task 18 review P1-1/P1-2) |
 | `watermark` | `sha256` hash of the page's ordered `(fixtureId, stableRevision)` list |
 

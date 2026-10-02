@@ -390,6 +390,7 @@ let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
     tournamentId: 'tournament-1',
     round: '8강',
     fixtureNumber: 1,
+    legNumber: 1,
     groupName: null,
     gameId: 'game-1',
     gameState: 'SCHEDULED',

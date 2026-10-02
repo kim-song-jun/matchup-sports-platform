@@ -6864,6 +6864,8 @@ textarea.tm-chat-input-placeholder::placeholder {
   flex: 0 0 auto;
 }
 
+/* 노브 여백: border 1px 을 뺀 padding box 는 44x26 이라(켜짐도 테두리 색만 투명, 폭은 그대로) 22px 노브를
+   2px 에 두면 꺼짐은 위·왼·아래, 켜짐(translateX 18px)은 오른쪽까지 모두 2px 이다. */
 .tm-toggle::after {
   content: "";
   position: absolute;
@@ -6875,10 +6877,6 @@ textarea.tm-chat-input-placeholder::placeholder {
   background: var(--static-white);
   transition: transform .18s ease;
 }
-
-/* 노브 여백: 트랙 46x28 의 1px border 를 빼면 absolute 기준(padding box)은 44x26 이다.
-   노브 22px 를 2px 에 두면 꺼짐은 위·왼·아래 2px, 켜짐(translateX 18px)은 오른쪽도 2px 이다.
-   on 상태도 border-color 만 투명이라 폭은 그대로 1px 다. */
 
 /* on 상태: 파란 배경이 이미 충분한 형태 단서 — off 상태 보조 테두리 제거 */
 .tm-toggle-on {

@@ -1,0 +1,188 @@
+{
+  "title": "1545 no-from canonical record fallback, separate supplemental run",
+  "status": "PASS_SCOPED_AFTER_TRANSIENT_502_RECOVERY",
+  "startedAt": "2026-10-02T18:37:08.082Z",
+  "completedAt": "2026-10-02T18:40:48.055Z",
+  "role": "captainB",
+  "environment": "alpha",
+  "pipelineContext": {
+    "sha": "1d09562a9b7d1b2be261a89519167ff2a031a576",
+    "run": "37047094838",
+    "successAt": "2026-10-02T18:37:35Z",
+    "source": "parent verified; actual serving page SHA unobserved; no-from recovery began after this deployment",
+    "independentPublicationCheck": {
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37047094838",
+      "headSha": "1d09562a9b7d1b2be261a89519167ff2a031a576",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-10-02T18:37:35Z"
+    }
+  },
+  "cssViewport": {
+    "width": 402,
+    "height": 606
+  },
+  "browserMethod": "Ordinary native window+Chrome125% zoom; not physical device emulation",
+  "initialFailure": "502 Bad Gateway before product rendering; first observed approximately18:37:22 UTC and still observed in the timestamped18:37:42.323 collection. Cause unconfirmed.",
+  "recovery": "One normal reload at18:38:55 returned normal authenticated route and redirected; successful rendered league detail observed18:39:02. Initial502 was during parent-reported deployment window, causality not independently established.",
+  "observations": [
+    {
+      "label": "mobile-league-no-from-initial-502",
+      "utc": "2026-10-02T18:37:42.323Z",
+      "url": "https://alpha.teameet.co.kr/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9/record",
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "backLinks": []
+    },
+    {
+      "label": "mobile-league-no-from-redirected-after-reload",
+      "utc": "2026-10-02T18:39:20.953Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9",
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "backLinks": [
+        {
+          "href": "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+          "visible": true
+        },
+        {
+          "href": "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "label": "mobile-league-no-from-page-back-parent",
+      "utc": "2026-10-02T18:39:34.134Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "backLinks": [
+        {
+          "href": "/tournaments?kind=league",
+          "visible": true
+        },
+        {
+          "href": "/tournaments?kind=league",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "label": "mobile-tournament-no-from-redirected",
+      "utc": "2026-10-02T18:39:55.183Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "backLinks": [
+        {
+          "href": "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+          "visible": true
+        },
+        {
+          "href": "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+          "visible": false
+        }
+      ]
+    },
+    {
+      "label": "mobile-tournament-no-from-page-back-bracket",
+      "utc": "2026-10-02T18:40:07.305Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "backLinks": [
+        {
+          "href": "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+          "visible": true
+        },
+        {
+          "href": "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+          "visible": false
+        }
+      ]
+    }
+  ],
+  "judgment": "Actual league page Back reaches its parent league detail; actual tournament page Back reaches bracket/schedule for the same tournament. Both preserve completed fixture context. No new return-route defect observed; not a code-contract assertion.",
+  "finalState": {
+    "utc": "2026-10-02T18:41:04.643Z",
+    "view": {
+      "height": 757,
+      "ownCaptainB": true,
+      "privateBanner": true,
+      "visibleDialogs": 0,
+      "visibleEditableFields": 0,
+      "width": 1180
+    },
+    "route": "own activity records"
+  },
+  "sourceProofFile": "1545-no-from-after-safe-summary.json",
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Not observed on the page. Successful fallback observations occurred after the verified pipeline completion; no claim of directly verified page-serving SHA.",
+  "noFromInputs": [
+    "https://alpha.teameet.co.kr/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9/record",
+    "https://alpha.teameet.co.kr/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11/record"
+  ],
+  "routeProvenance": "Same confirmed managed inputs as the earlier evidence. API paths and relevant response fields were reported by the QA session at 18:26:11 UTC and relayed to the browser worker; they were not independently re-queried in this supplemental browser run.",
+  "earlierEvidence": {
+    "commit": "d6f07711a64fd18004b9123e88eeae6006f38594",
+    "proofUrl": "https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/d6f07711a64fd18004b9123e88eeae6006f38594/docs/qa/2026-10-02-1545-record-routing-after/1545-user-route-after-safe-summary.json",
+    "deploymentSha": "d4c7cfd990370f7af7e175849e69db4a9ca9406c",
+    "scope": "Earlier three-width nested-from run. This separate no-from supplement must not be backdated or combined into that deployment-scoped pass."
+  },
+  "limitations": [
+    "Mobile 402x606 CSS only; tablet and desktop no-from flows were not tested.",
+    "No admin classification or 409-guard testing.",
+    "This supplement did not separately test browser Back or reload after reaching the successful no-from destination.",
+    "Only one ordinary reload was used to recover the initial 502; deployment-window overlap does not establish its cause.",
+    "Pipeline SHA and page-serving SHA are distinct; the latter was not observed.",
+    "No server write, roster/result modification or permission change.",
+    "Final restoration at 1180 CSS is cleanup only and does not constitute a desktop no-from test."
+  ],
+  "safeImages": [
+    {
+      "file": "mobile-402-league-parent-after-back.jpg",
+      "utc": "2026-10-02T18:39:34.134Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "rasterWidth": 402,
+      "rasterHeight": 605,
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "sha256": "ecbbd342e71d05322949220ae2f3d42b128c415b5a87d692f9641eb685ee793c",
+      "pixelReview": "Directly re-inspected for publication: synthetic team and competition labels, aggregate player count and general controls only; no individual member names, photos, profile IDs, birth dates, contact data or credentials",
+      "bytes": 24948,
+      "originalBytesUnchanged": true,
+      "captureType": "Original full viewport capture, not a score crop or full-page image; no editing or re-encoding"
+    },
+    {
+      "file": "mobile-402-tournament-bracket-after-back.jpg",
+      "utc": "2026-10-02T18:40:07.305Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/bracket",
+      "rasterWidth": 402,
+      "rasterHeight": 605,
+      "cssWidth": 402,
+      "cssHeight": 606,
+      "sha256": "878ad7a6ee8b16201bdb55af21862107fc5d79809b02a68bc54130aa3efb0cb3",
+      "pixelReview": "Directly re-inspected for publication: synthetic team and competition labels, aggregate player count and general controls only; no individual member names, photos, profile IDs, birth dates, contact data or credentials",
+      "bytes": 20643,
+      "originalBytesUnchanged": true,
+      "captureType": "Original full viewport capture, not a score crop or full-page image; no editing or re-encoding"
+    }
+  ],
+  "framingNotes": [
+    "These two images show the destinations after page Back, not the initial shared-record inputs or the transient 502.",
+    "Redirect URLs and page-Back transitions are recorded in observations; images alone cannot prove the complete navigation sequence.",
+    "Source CSS402x606 and original raster402x605 remain separate measurements."
+  ],
+  "privacy": "Only the two designated original viewports and this minimized proof are published. No private member images, private full proof, or activity userId is included.",
+  "initialFailureTimingClarification": {
+    "source": "Browser worker clarification of its own observation versus subsequent timestamped collection",
+    "firstObservedApproxUtc": "2026-10-02T18:37:22Z",
+    "firstObservedPrecision": "Approximate second from browser getAXState/screenshot tool output and contemporaneous report; not a millisecond-level capture timestamp",
+    "subsequentStill502CollectedUtc": "2026-10-02T18:37:42.323Z",
+    "pipelineCompletedUtc": "2026-10-02T18:37:35Z",
+    "ordinaryReloadApproxUtc": "2026-10-02T18:38:55Z",
+    "successfulDedicatedDetailObservedApproxUtc": "2026-10-02T18:39:02Z",
+    "interpretation": "502 was still observed after pipeline completion. Do not imply immediate recovery at 18:37:35 or established deployment causality. A single ordinary reload subsequently recovered."
+  }
+}

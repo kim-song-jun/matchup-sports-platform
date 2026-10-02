@@ -1,0 +1,495 @@
+{
+  "createdAt": "2026-10-02T10:02:35.072Z",
+  "role": "captainB, sole member/captain of synthetic C-team",
+  "fixture": {
+    "team": "9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+    "game": "75319f4f-087c-408d-869e-fc1edc0de033",
+    "label": "(테스트) 알파 재구축 정규 리그 2026 가을 1주차",
+    "upcoming": "2026-10-04 00:00 as team list displayed"
+  },
+  "result": "Local-only placement, pointer movement, keyboard cancel and slot-first keyboard replacement verified at402/787/1180; reentry resets to6 empty slots atall3 and final desktop fullreload is unchanged.",
+  "coverage": {
+    "allWidths": [
+      402,
+      787,
+      1180
+    ],
+    "placement": "Waiting member button click/Enter places sole member; default GK slot visibly marks GK and accessible name says 골키퍼.",
+    "pointerMove": "Verified mobile/tablet; desktop first attempt did not move, retry from unobscured lower player area successfully changed coordinates. Not a physical touch/device test.",
+    "keyboard": "Tab reaches cancel with visible focus; Space removes. Space on PV then Enter on waiting member re-places atPV. Player button Enter did not open detail panel in sampled mobile state.",
+    "selectionControls": "No pitch/list tabs, dedicated Undo/Reset, or starter/substitute labels exposed. UI concepts are 코트/대기 and tactical GK slot.",
+    "layout": "Measured document scrollWidth equals CSS viewport width atall3. Token labels truncate visually but observed player buttons expose full accessible name. Long-name and jersey-overlap stress not tested because no member/name/jersey changes were allowed.",
+    "hitTargets": "Sampled mobile player and cancel controls each44×44 with overlapping bounding boxes, but both exact centers hit correct controls. Not reported as a conformance/overlap defect."
+  },
+  "findings": [
+    {
+      "title": "Unsaved tactics placement is discarded by page Back without confirmation",
+      "classification": "Reproducible UX candidate; intended behavior/duplicate triage required",
+      "widths": [
+        402,
+        787,
+        1180
+      ],
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+      "steps": [
+        "Open observed C-team upcoming match tactics link; baseline6empty/Save disabled",
+        "Place the sole member, move token or choose PV; UI says 저장하지 않은 변경이 있어요 and manual 전술 저장 is enabled",
+        "Use page Back without pressing Save",
+        "Reopen same tactics link"
+      ],
+      "actual": "Each width returned directly to C-team detail, no observed dialog/guard. Reentry showed6 empty slots, waiting1 and disabled 저장됨.",
+      "expected": "Offer stay/discard confirmation or retain recoverable local draft when using navigation Back from a dirty tactical board; final design decision belongs to product/QA.",
+      "risk": "Unsaved drafting effort can be lost. No saved data loss or permission bypass was observed."
+    }
+  ],
+  "runs": [
+    {
+      "width": 402,
+      "baseline": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:52:19.251Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      },
+      "placed": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:52:19.688Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "emptyPositions": 5,
+        "placedPlayers": 1,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "cancelled": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:54:01.329Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "PVPlaced": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:54:36.881Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "emptyPositions": 5,
+        "placedPlayers": 1,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "exit": {
+        "at": "2026-10-02T09:55:13.594Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+        "dialogPresent": false,
+        "visibleDialogCount": 0,
+        "observation": "Page Back immediately returned to C-team detail without an observed warning or confirmation."
+      },
+      "reentry": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:55:14.169Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      }
+    },
+    {
+      "width": 787,
+      "baseline": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:55:36.858Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      },
+      "placed": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:55:37.069Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "emptyPositions": 5,
+        "placedPlayers": 1,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "cancelled": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:56:27.956Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "PVPlaced": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:56:28.094Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "emptyPositions": 5,
+        "placedPlayers": 1,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "exit": {
+        "at": "2026-10-02T09:57:06.419Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+        "dialogPresent": false,
+        "visibleDialogCount": 0,
+        "observation": "Page Back immediately returned to C-team detail, no observed discard warning."
+      },
+      "reentry": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:57:14.860Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      }
+    },
+    {
+      "width": 1180,
+      "baseline": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:57:15.161Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      },
+      "placed": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:57:15.369Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "emptyPositions": 5,
+        "placedPlayers": 1,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "cancelled": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:58:03.985Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "PVPlaced": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:58:04.138Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "emptyPositions": 5,
+        "placedPlayers": 1,
+        "save": [
+          {
+            "text": "전술 저장",
+            "disabled": false
+          }
+        ],
+        "tabs": []
+      },
+      "exit": {
+        "at": "2026-10-02T09:58:07.527Z",
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da",
+        "dialogPresent": false,
+        "visibleDialogCount": 0,
+        "observation": "Page Back directly returns to C-team detail; no warning observed"
+      },
+      "reentry": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T09:58:48.520Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      },
+      "finalReload": {
+        "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+        "at": "2026-10-02T10:00:47.848Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "emptyPositions": 6,
+        "placedPlayers": 0,
+        "save": [
+          {
+            "text": "저장됨",
+            "disabled": true
+          }
+        ],
+        "tabs": []
+      }
+    }
+  ],
+  "safety": {
+    "saveClicks": 0,
+    "submitClicks": 0,
+    "formationPresetChanges": 0,
+    "memberEdits": 0,
+    "resultReopens": 0,
+    "qa179Touched": false,
+    "privacyChanged": false,
+    "finalReloadEmptySlots": 6,
+    "finalSaveDisabled": true
+  },
+  "safeControlImages": [
+    {
+      "file": "tactics-tablet-787-unsaved-footer-controls.jpg",
+      "timestamp": "2026-10-02T09:56:27.826Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+      "note": "Unsaved-change text plus manual Save only; player/name region excluded",
+      "privacy": "Control-only candidate; pixel reviewed before sharing",
+      "raster": {
+        "width": 561,
+        "height": 136
+      },
+      "sha256": "ad53956c65a6cad1a38578b128b57d0109519d39545ad49bcd1a8f4d8ac940c7",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "sourceClip": {
+        "x": 169,
+        "y": 550,
+        "width": 842,
+        "height": 204
+      },
+      "coordinateNote": "viewportCss is the original page viewport in CSS pixels. sourceClip is the original supplied capture clip, including browser zoom scaling where applicable. raster is the actual delivered crop pixel size; these are distinct coordinate spaces.",
+      "bytes": 6618,
+      "git_blob_sha": "7c2b3d7599020d772a7a5432c531ab21e4e946f1",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "tactics-desktop-1180-manual-save-controls.jpg",
+      "timestamp": "2026-10-02T09:58:04.226Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+      "note": "Explicit manual save control only, unsaved local draft; no Save activation",
+      "privacy": "Control-only candidate; pixel reviewed before sharing",
+      "raster": {
+        "width": 1072,
+        "height": 60
+      },
+      "sha256": "3c5916d55cfa695b91e7a1020f960b7ef6320b7832ffb70de5d57bb0ac3e1d79",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "sourceClip": {
+        "x": 54,
+        "y": 684,
+        "width": 1072,
+        "height": 60
+      },
+      "coordinateNote": "viewportCss is the original page viewport in CSS pixels. sourceClip is the original supplied capture clip, including browser zoom scaling where applicable. raster is the actual delivered crop pixel size; these are distinct coordinate spaces.",
+      "bytes": 5600,
+      "git_blob_sha": "5281a4c2c729007f62d428c2b5ede5633fab63bc",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "tactics-desktop-1180-reloaded-save-disabled-controls.jpg",
+      "timestamp": "2026-10-02T10:00:47.992Z",
+      "url": "https://alpha.teameet.co.kr/teams/9b66d7fb-7b92-4bc3-bc9f-989f6db3b4da/tactics/75319f4f-087c-408d-869e-fc1edc0de033",
+      "note": "Reloaded unchanged baseline, disabled 저장됨 control only",
+      "privacy": "Control-only candidate; pixel reviewed before sharing",
+      "raster": {
+        "width": 1072,
+        "height": 60
+      },
+      "sha256": "a38a9e2abbcfd854eb31c0de82bbcb0e658e89fabe84f07c3683a008a38b06e0",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "sourceClip": {
+        "x": 54,
+        "y": 684,
+        "width": 1072,
+        "height": 60
+      },
+      "coordinateNote": "viewportCss is the original page viewport in CSS pixels. sourceClip is the original supplied capture clip, including browser zoom scaling where applicable. raster is the actual delivered crop pixel size; these are distinct coordinate spaces.",
+      "bytes": 2675,
+      "git_blob_sha": "50b81ca71fb49cf992070853d1717d1189adfb04",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    }
+  ],
+  "publicationLimit": "Raw member image files and full private DOM stay local. Safe controls show only unsaved/save states and need their associated action log to establish the sequence.",
+  "triageStatus": "P3 unsaved local-draft UX candidate; duplicate review against existing #1411 pending; no new issue number assigned",
+  "servingCommitSha": "unobserved",
+  "evidenceBoundaries": {
+    "behaviorWidths": [
+      402,
+      787,
+      1180
+    ],
+    "behaviorSource": "Recorded UI action/state observations in runs. Page Back without an observed warning and reentry with six empty positions are recorded at all three widths.",
+    "imageWidths": [
+      787,
+      1180
+    ],
+    "imageCount": 3,
+    "imageScope": "One tablet unsaved-footer crop, one desktop enabled manual-Save crop, and one desktop post-reload disabled-Saved crop. No mobile image is published. Images alone do not show all Back/reentry transitions or the full pitch.",
+    "persistence": "No server Save or Submit was activated. Final desktop reload retains the initial six-empty-slot baseline. The finding concerns unsaved local drafting effort only, not loss of saved server data.",
+    "navigation": "Observed page Back, not a general claim about every browser/OS navigation path."
+  },
+  "limitations": [
+    "Exact serving page SHA was not directly observed.",
+    "Same synthetic C-team captain session; no physical mobile/touch-device or cross-account test.",
+    "Candidate behavior remains subject to intended-behavior and duplicate triage; no full regression or issue-closure claim.",
+    "Underlying full player images and private-tactics-local material are excluded and were not read for this publication."
+  ],
+  "publicationReview": {
+    "croppedCaptureBytesUnchanged": true,
+    "privacy": "All three exact cropped images were pixel-reviewed. Only aggregate court/waiting counts, unsaved guidance, and Save-state controls are visible. No member names, profile IDs, birth dates, contact details, credentials, or member-list payload are included.",
+    "sourceScope": "Only local-tactics-three-width-summary.json and its three safe control files were used. Original URLs, timestamps, source clip values, and recorded viewport/state observations are preserved. Local file paths were replaced with filenames."
+  }
+}

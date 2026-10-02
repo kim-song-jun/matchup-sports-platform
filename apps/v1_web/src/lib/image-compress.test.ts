@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   compressImageForUpload,
   compressImagesForUpload,
+  encodeCanvasToBlob,
   fitWithin,
   IMAGE_TOO_LARGE_MESSAGE,
   UPLOAD_IMAGE_MAX_BYTES,
@@ -69,11 +70,25 @@ describe('compressImageForUpload', () => {
   });
 
   it('재인코딩 결과가 원본보다 커지면 원본을 그대로 쓴다', async () => {
-    const original = makeFile(2 * MB, 'image/png', 'logo.png');
+    const original = makeFile(3 * MB, 'image/png', 'logo.png');
     const encode: ImageEncoder = vi.fn(async () => makeBlob(4 * MB));
     const result = await compressImageForUpload(original, encode);
 
     expect(result).toBe(original);
+  });
+
+  it('2MB 이하는 손대지 않고, 2MB 를 넘으면 WebP 로 변환한다 -- 사용자 확정 경계', async () => {
+    // "용량 제한을 빼고 2MB 넘어가면 자동으로 WebP 변환"(2026-08-25). 경계가 밀리면
+    // 멀쩡한 사진을 다시 인코딩해 화질만 잃거나, 큰 사진이 변환 없이 서버 한도로 간다.
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(500 * 1024));
+
+    const atLimit = makeFile(2 * MB, 'image/jpeg', 'at.jpg');
+    await expect(compressImageForUpload(atLimit, encode)).resolves.toBe(atLimit);
+    expect(encode).not.toHaveBeenCalled();
+
+    const overLimit = await compressImageForUpload(makeFile(2 * MB + 1, 'image/jpeg', 'over.jpg'), encode);
+    expect(overLimit.type).toBe('image/webp');
+    expect(overLimit.name).toBe('over.webp');
   });
 
   it('한도 이하로 작은 원본은 재인코딩하지 않는다', async () => {
@@ -100,12 +115,49 @@ describe('compressImageForUpload', () => {
     );
   });
 
-  it('캔버스로 다룰 수 없는 형식은 손대지 않고 서버 검증에 맡긴다', async () => {
-    const original = makeFile(12 * MB, 'image/gif', 'anim.gif');
-    const encode: ImageEncoder = vi.fn(async () => makeBlob(100 * 1024));
+  it('서버가 안 받는 형식(HEIC·GIF)은 크기와 무관하게 WebP 로 변환해 살린다', async () => {
+    // 서버는 jpeg/png/webp 만 받는다 -- 원본 그대로 보내면 어차피 거부되므로,
+    // 브라우저가 디코드할 수 있으면 변환해서 업로드가 성공하게 만든다(아이폰 HEIC 실사례).
+    const original = makeFile(1 * MB, 'image/heic', 'photo.heic');
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(800 * 1024));
     const result = await compressImageForUpload(original, encode);
 
+    expect(result.type).toBe('image/webp');
+    expect(result.name).toBe('photo.webp');
+  });
+
+  it('서버가 안 받는 형식인데 디코드도 안 되면 원본을 그대로 보내 서버 검증이 말하게 한다', async () => {
+    // 여기서 용량 에러를 던지면 진짜 문제(형식)를 가린다 -- 서버의 형식 에러가 정답이다.
+    const original = makeFile(12 * MB, 'image/gif', 'anim.gif');
+    const encode: ImageEncoder = vi.fn(async () => null);
+
+    await expect(compressImageForUpload(original, encode)).resolves.toBe(original);
+  });
+});
+
+describe('compressImageForUpload — stripMetadata (채팅 사진, Task 181)', () => {
+  it('2MB 이하 원본도 다시 그려 메타데이터(EXIF 위치)를 지운다 — 결과가 원본보다 커도 채택', async () => {
+    const original = makeFile(300 * 1024);
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(400 * 1024));
+    const result = await compressImageForUpload(original, encode, { stripMetadata: true });
+
+    expect(encode).toHaveBeenCalledTimes(1);
+    expect(result).not.toBe(original);
+    expect(result.type).toBe('image/webp');
+  });
+
+  it('디코드할 수 없으면 원본을 보내 서버 검증에 맡긴다', async () => {
+    const original = makeFile(300 * 1024);
+    const result = await compressImageForUpload(original, vi.fn(async () => null), { stripMetadata: true });
+
     expect(result).toBe(original);
+  });
+
+  it('옵션이 없으면 기존처럼 작은 원본은 손대지 않는다', async () => {
+    const original = makeFile(300 * 1024);
+    const encode: ImageEncoder = vi.fn(async () => makeBlob(100 * 1024));
+
+    expect(await compressImageForUpload(original, encode)).toBe(original);
     expect(encode).not.toHaveBeenCalled();
   });
 });
@@ -139,5 +191,52 @@ describe('compressImagesForUpload', () => {
     );
 
     expect(results.map((file) => file.name)).toEqual(['small.jpg', 'big.webp']);
+  });
+});
+
+describe('encodeCanvasToBlob', () => {
+  function fakeCanvas(supported: Set<string>) {
+    const calls: string[] = [];
+    const canvas = {
+      toBlob(callback: (blob: Blob | null) => void, type?: string) {
+        calls.push(type ?? '');
+        // 브라우저는 지원하지 않는 형식을 요청받으면 PNG 로 조용히 대체한다(Safari 의 WebP).
+        const actual = type && supported.has(type) ? type : 'image/png';
+        callback(makeBlob(10, actual));
+      },
+    };
+    return { canvas, calls };
+  }
+
+  it('WebP 를 지원하는 브라우저는 WebP 한 번으로 끝난다', async () => {
+    const { canvas, calls } = fakeCanvas(new Set(['image/webp', 'image/jpeg']));
+    const blob = await encodeCanvasToBlob(canvas, 0.8);
+    expect(blob?.type).toBe('image/webp');
+    expect(calls).toEqual(['image/webp']);
+  });
+
+  it('WebP 요청이 PNG 로 대체되는 브라우저(Safari)는 JPEG 로 다시 인코딩한다', async () => {
+    const { canvas, calls } = fakeCanvas(new Set(['image/jpeg']));
+    const blob = await encodeCanvasToBlob(canvas, 0.8);
+    expect(blob?.type).toBe('image/jpeg');
+    expect(calls).toEqual(['image/webp', 'image/jpeg']);
+  });
+
+  it('JPEG 로 넘어갈 때만 바탕을 채울 기회를 준다 — 투명 영역이 검게 나오지 않게, WebP 는 알파 유지', async () => {
+    const order: string[] = [];
+    const flatten = vi.fn(() => order.push('flatten'));
+    const safari = fakeCanvas(new Set(['image/jpeg']));
+    const toBlob = safari.canvas.toBlob;
+    safari.canvas.toBlob = (callback, type) => {
+      order.push(type ?? '');
+      toBlob(callback, type);
+    };
+    await encodeCanvasToBlob(safari.canvas, 0.8, flatten);
+    expect(order).toEqual(['image/webp', 'flatten', 'image/jpeg']);
+
+    const chrome = fakeCanvas(new Set(['image/webp', 'image/jpeg']));
+    const keepAlpha = vi.fn();
+    await encodeCanvasToBlob(chrome.canvas, 0.8, keepAlpha);
+    expect(keepAlpha).not.toHaveBeenCalled();
   });
 });

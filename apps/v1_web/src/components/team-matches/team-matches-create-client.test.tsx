@@ -1,25 +1,57 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { toKstDateString } from '@/lib/kst-calendar';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
-import { draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { draftFromTeamMatchEdit, TeamMatchCreatePageClient, TeamMatchEditPageClient } from './team-matches-create-client';
 import { buildTeamMatchPayloadResult } from './team-matches.validation';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
-const { createTeamMatchMutate, routerPush, uploadImagesMutateAsync } = vi.hoisted(() => ({
+const {
+  createTeamMatchMutate,
+  routerPush,
+  uploadImagesMutateAsync,
+  confirmMock,
+  updateTeamMatchMutate,
+  cancelTeamMatchMutate,
+  teamMatchEditData,
+} = vi.hoisted(() => ({
   createTeamMatchMutate: vi.fn(),
   routerPush: vi.fn(),
   uploadImagesMutateAsync: vi.fn(),
+  confirmMock: vi.fn(),
+  updateTeamMatchMutate: vi.fn(),
+  cancelTeamMatchMutate: vi.fn(),
+  // useEffect(..., [editQuery.data])가 참조로 비교하므로, 매 렌더마다 새 객체를 돌려주면
+  // 훅이 재실행 → setDraft → 리렌더 → 훅 재실행의 무한 루프에 빠진다. 안정적인 참조 하나를
+  // 모듈 스코프에 고정해 실제 React Query의 캐시된 참조 안정성을 흉내낸다.
+  teamMatchEditData: {
+    teamMatchId: 'team-match-edit-1',
+    editable: true,
+    lockedReason: null,
+    form: {
+      hostTeamId: 'team-1',
+      sportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      title: '수정 중인 팀매치',
+      imageUrl: null,
+      startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      manualPlaceName: '한강 풋살장',
+    },
+    status: 'recruiting',
+    version: 'v1',
+  },
 }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
-  useConfirm: () => ({ confirm: vi.fn(), ConfirmModal: null }),
+  useConfirm: () => ({ confirm: confirmMock, ConfirmModal: null }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -62,6 +94,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
   useV1TeamRecentVenues: () => ({ data: undefined }),
+  useV1TeamMatchEdit: () => ({ data: teamMatchEditData, isError: false, isLoading: false }),
+  useV1UpdateTeamMatch: () => ({ mutate: updateTeamMatchMutate, isPending: false }),
+  useV1CancelTeamMatch: () => ({ mutate: cancelTeamMatchMutate, isPending: false }),
 }));
 
 vi.mock('./team-matches-page', () => ({
@@ -91,9 +126,14 @@ vi.mock('./team-matches-page', () => ({
             if (file && form.uploadImage) form.onFieldChange('imageUrl', await form.uploadImage(file));
           }}
         />
-        <button type="button" onClick={form.onSubmit}>
-          팀매치 만들기
+        <button type="button" disabled={form.submitting} onClick={form.onSubmit}>
+          {form.imageUploading ? '이미지 업로드 중' : '팀매치 만들기'}
         </button>
+        {form.onCancel ? (
+          <button type="button" onClick={form.onCancel}>
+            팀매치 취소
+          </button>
+        ) : null}
       </div>
     );
   },
@@ -172,9 +212,56 @@ describe('TeamMatchCreatePageClient — GA events', () => {
       );
     });
   });
+
+  it('does not create with an empty image URL while the selected image is still uploading', async () => {
+    let finishUpload!: (value: { urls: string[] }) => void;
+    uploadImagesMutateAsync.mockImplementation(() => new Promise((resolve) => { finishUpload = resolve; }));
+    render(<TeamMatchCreatePageClient step="confirm" />);
+
+    fireEvent.change(screen.getByLabelText('대표 이미지'), {
+      target: { files: [new File(['image'], 'slow-cover.webp', { type: 'image/webp' })] },
+    });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '이미지 업로드 중' })).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: '이미지 업로드 중' }));
+    expect(createTeamMatchMutate).not.toHaveBeenCalled();
+
+    await act(async () => finishUpload({ urls: ['/uploads/slow-cover.webp'] }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '팀매치 만들기' })).toBeEnabled());
+  });
 });
 
 describe('team match edit hydration', () => {
+  it('저장된 시각을 KST 벽시계 날짜·시간으로 펼친다 (브라우저 TZ=UTC 라도)', () => {
+    const draft = draftFromTeamMatchEdit({
+      teamMatchId: 'team-match-kst',
+      editable: true,
+      lockedReason: null,
+      form: {
+        hostTeamId: 'team-real',
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: 'KST 팀매치',
+        imageUrl: null,
+        startsAt: '2026-10-20T10:00:00.000Z',
+        endsAt: '2026-10-20T16:00:00.000Z',
+        deadlineAt: '2026-10-18T14:59:00.000Z',
+        manualPlaceName: '장소',
+      },
+      status: 'recruiting',
+      version: '2026-10-01T00:00:00.000Z',
+    });
+
+    expect(draft).toMatchObject({
+      date: '2026-10-20',
+      startTime: '19:00',
+      endDate: '2026-10-21',
+      endTime: '01:00',
+      deadlineDate: '2026-10-18',
+      deadlineTime: '23:59',
+    });
+  });
+
   it('keeps the route entity image empty when the API stores null', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const draft = draftFromTeamMatchEdit({
@@ -275,17 +362,17 @@ describe('team-match deadline payload', () => {
   it('sends the selected application deadline before the match start', () => {
     const draft = getTeamMatchCreateViewModel('place-time').draft;
     const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    start.setHours(18, 0, 0, 0);
-    const deadline = new Date(start.getTime() - 24 * 60 * 60 * 1000);
+    const startDate = toKstDateString(start);
+    const deadlineDate = toKstDateString(new Date(start.getTime() - 24 * 60 * 60 * 1000));
     const payload = buildTeamMatchPayloadResult(
       {
         ...draft,
         title: '마감 시간이 있는 팀매치',
         venue: '한강 풋살장',
-        date: start.toISOString().slice(0, 10),
+        date: startDate,
         startTime: '18:00',
         endTime: '20:00',
-        deadlineDate: deadline.toISOString().slice(0, 10),
+        deadlineDate,
         deadlineTime: '18:00',
       },
       'team-1',
@@ -293,6 +380,122 @@ describe('team-match deadline payload', () => {
       'region-gangnam',
     ).payload;
 
-    expect(payload?.deadlineAt).toBe(deadline.toISOString());
+    // 입력은 KST 벽시계 — 브라우저(TZ=UTC 러너)가 아니라 +09:00 으로 해석한다.
+    expect(payload?.startsAt).toBe(new Date(`${startDate}T18:00:00+09:00`).toISOString());
+    expect(payload?.deadlineAt).toBe(new Date(`${deadlineDate}T18:00:00+09:00`).toISOString());
+  });
+});
+
+describe('team-match draft date normalization — step round-trip', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  // Regression: usePersistedDraft가 마운트마다(위저드 스텝은 각각 별도 라우트라
+  // '이전' 버튼만 눌러도 재마운트된다) normalizeDraftDate를 재평가한다. 이 함수가 빈
+  // startTime을 18:00으로 가정해 "지난 초안"을 판정하면, 사용자가 오늘 날짜를 고르고
+  // 아직 시작 시간을 안 넣은 채 18시 이후에 스텝을 왕복하기만 해도 날짜가 조용히
+  // 일주일 뒤로 리셋된다 — 사용자가 만료된 초안을 복원한 게 아니라 같은 세션 안에서다.
+  it('오늘 날짜 + 빈 시작시간으로 저장된 초안은 18시 이후 재마운트돼도 날짜를 유지한다', async () => {
+    vi.useFakeTimers();
+    // 2026-08-27 20:00 KST
+    vi.setSystemTime(new Date('2026-08-27T11:00:00.000Z'));
+
+    const todayDate = '2026-08-27';
+    window.localStorage.setItem(
+      'teameet:v1:team-match-draft:v3',
+      JSON.stringify({
+        savedAt: Date.now(),
+        value: {
+          title: '오늘 밤 급구 팀매치',
+          venue: '한강 풋살장',
+          date: todayDate,
+          startTime: '',
+          endTime: '',
+        },
+      }),
+    );
+
+    render(<TeamMatchCreatePageClient step="confirm" />);
+    // usePersistedDraft의 useEffect(마운트 시 1회)가 커밋 이후 마이크로태스크로 플러시된다.
+    // 이 파일의 다른 테스트들은 waitFor로 이를 기다리지만, waitFor의 내부 폴링은 실제
+    // setTimeout에 의존해 fake timer 아래서는 영원히 끝나지 않는다 — act(async)로 직접 플러시한다.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('제목')).toHaveValue('오늘 밤 급구 팀매치');
+    expect(screen.getByLabelText('날짜')).toHaveValue(todayDate);
+  });
+
+  // 2026-08-27 16:00Z = KST 8/28 01:00 — UTC 달력으론 아직 8/27 이라 시간대를 섞으면 갈리는 자리.
+  it.each([
+    ['KST 오늘(8/28)은 유지한다', '2026-08-28', '2026-08-28'],
+    ['KST 로 이미 지난 어제(8/27)는 기본 날짜(+7일)로 되돌린다', '2026-08-27', '2026-09-04'],
+  ])('KST 자정 직후: %s', async (_name, saved, expected) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-27T16:00:00.000Z'));
+    window.localStorage.setItem(
+      'teameet:v1:team-match-draft:v3',
+      JSON.stringify({ savedAt: Date.now(), value: { title: '자정 경계', date: saved, startTime: '', endTime: '' } }),
+    );
+
+    render(<TeamMatchCreatePageClient step="confirm" />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('날짜')).toHaveValue(expected);
+  });
+});
+
+// Regression: 팀매치 취소는 되돌리는 API가 없는 파괴적 동작이다 — 신청자 전원이 강제 취소되고
+// 알림이 발송된다. '변경사항 저장' 바로 아래 붙은 전폭 버튼이라 오탭 가능성이 높은데도
+// 확인 절차 없이 한 번의 탭으로 즉시 실행되던 결함(finding #33)의 회귀 테스트.
+describe('TeamMatchEditPageClient — cancel confirmation', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('팀매치 취소 버튼을 눌러도 확인 전에는 취소 API를 호출하지 않는다', async () => {
+    confirmMock.mockResolvedValue(false); // 사용자가 확인 모달에서 '취소'를 누른 경우
+    render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    expect(cancelTeamMatchMutate).not.toHaveBeenCalled();
+  });
+
+  // L29 — 닫기 버튼이 확정 버튼과 같은 '취소'였고, 제출한 참석명단이 잠긴다는 말이 없었다.
+  it('확인창은 닫기 버튼을 "닫기"로 부르고 참석명단이 잠긴다고 알린다', async () => {
+    confirmMock.mockResolvedValue(false);
+    render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      confirmLabel: '팀매치 취소',
+      cancelLabel: '닫기',
+      tone: 'danger',
+      message: expect.stringContaining('제출한 참석명단은 잠겨서 더는 수정할 수 없어요'),
+    })));
+  });
+
+  it('확인 모달에서 승인하면 그제서야 취소 API를 호출한다', async () => {
+    confirmMock.mockResolvedValue(true);
+    render(<TeamMatchEditPageClient teamMatchId="team-match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '팀매치 취소' }));
+
+    await waitFor(() => {
+      expect(cancelTeamMatchMutate).toHaveBeenCalledWith(
+        { reason: 'host_cancelled_from_v1_web' },
+        expect.any(Object),
+      );
+    });
   });
 });

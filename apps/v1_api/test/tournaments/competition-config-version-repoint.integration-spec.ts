@@ -40,9 +40,20 @@ const REPOINT_SEED_SPORT_CODE = 'futsal';
 const REPOINT_SEED_NAME = 'repoint-test-futsal-v1';
 const REPOINT_TOURNAMENT_ID = '99990000-0000-4000-8000-000000000002';
 const REPOINT_COMPLETED_FIXTURE_ID = '99990000-0000-4000-8000-000000000003';
+const REPOINT_COMPLETED_FIXTURE_GAME_ID = '99990000-0000-4000-8000-000000000011';
 const REPOINT_SCHEDULED_FIXTURE_ID = '99990000-0000-4000-8000-000000000004';
 const REPOINT_RECRUITING_TEAM_MATCH_ID = '99990000-0000-4000-8000-000000000005';
 const REPOINT_COMPLETED_TEAM_MATCH_ID = '99990000-0000-4000-8000-000000000006';
+const REPOINT_LEAGUE_ID = '99990000-0000-4000-8000-000000000007';
+const REPOINT_LEAGUE_TEAM_MATCH_ID = '99990000-0000-4000-8000-000000000008';
+const REPOINT_LEAGUE_UNTOUCHED_ID = '99990000-0000-4000-8000-000000000009';
+const REPOINT_LEAGUE_HISTORY_ID = '99990000-0000-4000-8000-00000000000a';
+const REPOINT_STANDALONE_ID = '99990000-0000-4000-8000-00000000000b';
+const REPOINT_STANDALONE_HISTORY_ID = '99990000-0000-4000-8000-00000000000c';
+const REPOINT_LEAGUE_UNTOUCHED_GAME_ID = '99990000-0000-4000-8000-00000000000d';
+const REPOINT_LEAGUE_HISTORY_GAME_ID = '99990000-0000-4000-8000-00000000000e';
+const REPOINT_STANDALONE_GAME_ID = '99990000-0000-4000-8000-00000000000f';
+const REPOINT_STANDALONE_HISTORY_GAME_ID = '99990000-0000-4000-8000-000000000010';
 
 // Mirrors the real alpha drift this task exists to fix: futsal's `lineup`
 // pre-dates T1-5 (no formation catalog) and `events` still uses the old
@@ -202,25 +213,125 @@ describe('competition-config-version-repoint', () => {
         competitionConfigVersionId: REPOINT_SEED_ID,
       },
     });
-    await prisma.v1TournamentFixture.create({
+    // The runner intentionally handles the regular-league mirror too. The
+    // public PATCH remains tournament-only; this row proves the internal
+    // all-kinds path does not leave its league TeamMatch on the stale pin.
+    await prisma.v1Tournament.create({
       data: {
-        id: REPOINT_COMPLETED_FIXTURE_ID,
-        tournamentId: REPOINT_TOURNAMENT_ID,
-        round: 'test',
-        fixtureNumber: 1,
-        status: 'completed',
+        id: REPOINT_LEAGUE_ID,
+        kind: 'regular_league',
+        sportId: competitionConfigFixture.futsalSportId,
+        title: 'Repoint test regular-league mirror',
+        status: 'in_progress',
         competitionConfigVersionId: REPOINT_SEED_ID,
       },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: REPOINT_LEAGUE_TEAM_MATCH_ID,
+        tournamentId: REPOINT_LEAGUE_ID,
+        leagueId: REPOINT_LEAGUE_ID,
+        hostTeamId: competitionConfigFixture.teamIds[0],
+        createdByUserId: competitionConfigFixture.adminUserId,
+        sportId: competitionConfigFixture.futsalSportId,
+        regionId: competitionConfigFixture.regionId,
+        title: 'Repoint stale regular-league match',
+        placeName: 'Repoint league venue',
+        startAt: competitionConfigFixture.now,
+        status: 'recruiting',
+        competitionConfigVersionId: REPOINT_SEED_ID,
+      },
+    });
+    await prisma.v1TeamMatch.createMany({
+      data: [
+        {
+          id: REPOINT_LEAGUE_UNTOUCHED_ID,
+          tournamentId: REPOINT_LEAGUE_ID,
+          leagueId: REPOINT_LEAGUE_ID,
+          hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+          sportId: competitionConfigFixture.futsalSportId, regionId: competitionConfigFixture.regionId,
+          title: 'Repoint untouched league match', placeName: 'Repoint league venue',
+          startAt: competitionConfigFixture.now, status: 'recruiting', competitionConfigVersionId: REPOINT_SEED_ID,
+        },
+        {
+          id: REPOINT_LEAGUE_HISTORY_ID,
+          tournamentId: REPOINT_LEAGUE_ID,
+          leagueId: REPOINT_LEAGUE_ID,
+          hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+          sportId: competitionConfigFixture.futsalSportId, regionId: competitionConfigFixture.regionId,
+          title: 'Repoint history league match', placeName: 'Repoint league venue',
+          startAt: competitionConfigFixture.now, status: 'recruiting', competitionConfigVersionId: REPOINT_SEED_ID,
+        },
+        {
+          id: REPOINT_STANDALONE_ID,
+          hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+          sportId: competitionConfigFixture.futsalSportId, regionId: competitionConfigFixture.regionId,
+          title: 'Repoint untouched standalone match', placeName: 'Repoint venue',
+          startAt: competitionConfigFixture.now, status: 'recruiting', competitionConfigVersionId: REPOINT_SEED_ID,
+        },
+        {
+          id: REPOINT_STANDALONE_HISTORY_ID,
+          hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+          sportId: competitionConfigFixture.futsalSportId, regionId: competitionConfigFixture.regionId,
+          title: 'Repoint history standalone match', placeName: 'Repoint venue',
+          startAt: competitionConfigFixture.now, status: 'recruiting', competitionConfigVersionId: REPOINT_SEED_ID,
+        },
+      ],
+    });
+    await prisma.v1Game.createMany({
+      data: [
+        { id: REPOINT_LEAGUE_UNTOUCHED_GAME_ID, sourceType: 'TEAM_MATCH', teamMatchId: REPOINT_LEAGUE_UNTOUCHED_ID, competitionConfigVersionId: REPOINT_SEED_ID },
+        { id: REPOINT_LEAGUE_HISTORY_GAME_ID, sourceType: 'TEAM_MATCH', teamMatchId: REPOINT_LEAGUE_HISTORY_ID, competitionConfigVersionId: REPOINT_SEED_ID, state: 'ENDED' },
+        { id: REPOINT_STANDALONE_GAME_ID, sourceType: 'TEAM_MATCH', teamMatchId: REPOINT_STANDALONE_ID, competitionConfigVersionId: REPOINT_SEED_ID },
+        { id: REPOINT_STANDALONE_HISTORY_GAME_ID, sourceType: 'TEAM_MATCH', teamMatchId: REPOINT_STANDALONE_HISTORY_ID, competitionConfigVersionId: REPOINT_SEED_ID, state: 'ENDED' },
+      ],
+    });
+    await prisma.v1GamePeriod.createMany({
+      data: [
+        { gameId: REPOINT_LEAGUE_HISTORY_GAME_ID, number: 1 },
+        { gameId: REPOINT_LEAGUE_HISTORY_GAME_ID, number: 2 },
+        { gameId: REPOINT_STANDALONE_GAME_ID, number: 1 },
+        { gameId: REPOINT_STANDALONE_HISTORY_GAME_ID, number: 1 },
+        { gameId: REPOINT_STANDALONE_HISTORY_GAME_ID, number: 2 },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: REPOINT_COMPLETED_FIXTURE_ID,
+        tournamentId: REPOINT_TOURNAMENT_ID,
+        hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+        sportId: competitionConfigFixture.futsalSportId, regionId: competitionConfigFixture.regionId,
+        title: 'Repoint completed canonical match', placeName: 'Repoint venue', status: 'completed',
+        startAt: competitionConfigFixture.now, competitionConfigVersionId: REPOINT_SEED_ID,
+      },
+    });
+    await prisma.v1TeamMatch.create({
       data: {
         id: REPOINT_SCHEDULED_FIXTURE_ID,
         tournamentId: REPOINT_TOURNAMENT_ID,
-        round: 'test',
-        fixtureNumber: 2,
-        status: 'scheduled',
+        hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+        sportId: competitionConfigFixture.futsalSportId, regionId: competitionConfigFixture.regionId,
+        title: 'Repoint scheduled canonical match', placeName: 'Repoint venue', status: 'matched',
+        startAt: competitionConfigFixture.now,
         competitionConfigVersionId: REPOINT_SEED_ID,
       },
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [REPOINT_COMPLETED_FIXTURE_ID, REPOINT_SCHEDULED_FIXTURE_ID].map((teamMatchId, index) => ({
+        teamMatchId, tournamentId: REPOINT_TOURNAMENT_ID, round: 'test', fixtureNumber: index + 1,
+      })),
+    });
+    await prisma.v1Game.create({
+      data: {
+        id: REPOINT_COMPLETED_FIXTURE_GAME_ID,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: REPOINT_COMPLETED_FIXTURE_ID,
+        competitionConfigVersionId: REPOINT_SEED_ID,
+        state: 'ENDED',
+      },
+    });
+    await prisma.v1GamePeriod.createMany({
+      data: [1, 2].map((number) => ({ gameId: REPOINT_COMPLETED_FIXTURE_GAME_ID, number })),
     });
     await prisma.v1TeamMatch.createMany({
       data: [
@@ -276,15 +387,19 @@ describe('competition-config-version-repoint', () => {
         competitionConfigVersionId: SCORING_GUARD_SEED_ID,
       },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
       data: {
         id: SCORING_GUARD_FIXTURE_ID,
         tournamentId: SCORING_GUARD_TOURNAMENT_ID,
-        round: 'test',
-        fixtureNumber: 1,
-        status: 'scheduled',
+        hostTeamId: competitionConfigFixture.teamIds[0], createdByUserId: competitionConfigFixture.adminUserId,
+        sportId: competitionConfigFixture.soccerSportId, regionId: competitionConfigFixture.regionId,
+        title: 'Repoint scoring guard canonical match', placeName: 'Repoint venue', status: 'matched',
+        startAt: competitionConfigFixture.now,
         competitionConfigVersionId: SCORING_GUARD_SEED_ID,
       },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: { teamMatchId: SCORING_GUARD_FIXTURE_ID, tournamentId: SCORING_GUARD_TOURNAMENT_ID, round: 'test', fixtureNumber: 1 },
     });
 
     await createConfigVersion({
@@ -355,16 +470,17 @@ describe('competition-config-version-repoint', () => {
         newVersionId: null,
         newVersion: 2,
         published: true,
-        tournamentsRepointed: 1,
-        teamMatchesRepointed: 1,
+        tournamentsRepointed: 2,
+        teamMatchesRepointed: 5,
         skippedDeletedTournaments: 0,
-        tournamentIds: [REPOINT_TOURNAMENT_ID],
+        tournamentIds: [REPOINT_TOURNAMENT_ID, REPOINT_LEAGUE_ID],
       },
     ]);
 
     // Dry-run made no writes.
     const untouchedTournament = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: REPOINT_TOURNAMENT_ID } });
     expect(untouchedTournament.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const standalonePeriodBefore = await prisma.v1GamePeriod.findFirstOrThrow({ where: { gameId: REPOINT_STANDALONE_GAME_ID, number: 1 } });
     const versionsBeforeApply = await prisma.v1CompetitionConfigVersion.count({
       where: { sportCode: REPOINT_SEED_SPORT_CODE, name: REPOINT_SEED_NAME },
     });
@@ -382,10 +498,10 @@ describe('competition-config-version-repoint', () => {
       previousVersionId: REPOINT_SEED_ID,
       newVersion: 2,
       published: true,
-      tournamentsRepointed: 1,
-      teamMatchesRepointed: 1,
+      tournamentsRepointed: 2,
+      teamMatchesRepointed: 5,
       skippedDeletedTournaments: 0,
-      tournamentIds: [REPOINT_TOURNAMENT_ID],
+      tournamentIds: [REPOINT_TOURNAMENT_ID, REPOINT_LEAGUE_ID],
     });
     const newVersionId = outcome.newVersionId as string;
     expect(newVersionId).not.toBe(REPOINT_SEED_ID);
@@ -396,13 +512,19 @@ describe('competition-config-version-repoint', () => {
 
     const repointedTournament = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: REPOINT_TOURNAMENT_ID } });
     expect(repointedTournament.competitionConfigVersionId).toBe(newVersionId);
+    const repointedLeague = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: REPOINT_LEAGUE_ID } });
+    expect(repointedLeague.competitionConfigVersionId).toBe(newVersionId);
 
-    const completedFixture = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const completedFixture = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: REPOINT_COMPLETED_FIXTURE_ID },
     });
     expect(completedFixture.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const completedFixtureGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: REPOINT_COMPLETED_FIXTURE_GAME_ID } });
+    expect(completedFixtureGame.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const completedFixturePeriods = await prisma.v1GamePeriod.findMany({ where: { gameId: REPOINT_COMPLETED_FIXTURE_GAME_ID }, orderBy: { number: 'asc' } });
+    expect(completedFixturePeriods.map((period) => period.number)).toEqual([1, 2]);
 
-    const scheduledFixture = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const scheduledFixture = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: REPOINT_SCHEDULED_FIXTURE_ID },
     });
     expect(scheduledFixture.competitionConfigVersionId).toBe(newVersionId);
@@ -411,6 +533,29 @@ describe('competition-config-version-repoint', () => {
       where: { id: REPOINT_RECRUITING_TEAM_MATCH_ID },
     });
     expect(recruitingTeamMatch.competitionConfigVersionId).toBe(newVersionId);
+    const repointedLeagueTeamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: REPOINT_LEAGUE_TEAM_MATCH_ID } });
+    expect(repointedLeagueTeamMatch.competitionConfigVersionId).toBe(newVersionId);
+    const untouchedLeague = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: REPOINT_LEAGUE_UNTOUCHED_ID } });
+    expect(untouchedLeague.competitionConfigVersionId).toBe(newVersionId);
+    const untouchedLeagueGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: REPOINT_LEAGUE_UNTOUCHED_GAME_ID } });
+    expect(untouchedLeagueGame.competitionConfigVersionId).toBe(newVersionId);
+    const untouchedStandalone = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: REPOINT_STANDALONE_ID } });
+    expect(untouchedStandalone.competitionConfigVersionId).toBe(newVersionId);
+    const untouchedStandaloneGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: REPOINT_STANDALONE_GAME_ID } });
+    expect(untouchedStandaloneGame.competitionConfigVersionId).toBe(newVersionId);
+    const standalonePeriods = await prisma.v1GamePeriod.findMany({ where: { gameId: REPOINT_STANDALONE_GAME_ID }, orderBy: { number: 'asc' } });
+    expect(standalonePeriods.map((period) => period.number)).toEqual([1, 2]);
+    expect(standalonePeriods[0]?.id).toBe(standalonePeriodBefore.id);
+    const leagueHistory = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: REPOINT_LEAGUE_HISTORY_ID } });
+    expect(leagueHistory.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const leagueHistoryGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: REPOINT_LEAGUE_HISTORY_GAME_ID } });
+    expect(leagueHistoryGame.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const standaloneHistory = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: REPOINT_STANDALONE_HISTORY_ID } });
+    expect(standaloneHistory.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const standaloneHistoryGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: REPOINT_STANDALONE_HISTORY_GAME_ID } });
+    expect(standaloneHistoryGame.competitionConfigVersionId).toBe(REPOINT_SEED_ID);
+    const standaloneHistoryPeriods = await prisma.v1GamePeriod.findMany({ where: { gameId: REPOINT_STANDALONE_HISTORY_GAME_ID }, orderBy: { number: 'asc' } });
+    expect(standaloneHistoryPeriods.map((period) => period.number)).toEqual([1, 2]);
 
     const completedTeamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: REPOINT_COMPLETED_TEAM_MATCH_ID },
@@ -422,7 +567,7 @@ describe('competition-config-version-repoint', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(auditLog).not.toBeNull();
-    expect(auditLog?.afterJson).toMatchObject({ newVersionId, tournamentsRepointed: 1, teamMatchesRepointed: 1 });
+    expect(auditLog?.afterJson).toMatchObject({ newVersionId, tournamentsRepointed: 2, teamMatchesRepointed: 5 });
 
     const reapplied = await runCompetitionConfigVersionRepoint(prisma, { mode: 'apply', actor: authUser, seeds });
     expect(reapplied).toEqual([
@@ -472,7 +617,7 @@ describe('competition-config-version-repoint', () => {
 
     const tournament = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: SCORING_GUARD_TOURNAMENT_ID } });
     expect(tournament.competitionConfigVersionId).toBe(SCORING_GUARD_SEED_ID);
-    const fixture = await prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: SCORING_GUARD_FIXTURE_ID } });
+    const fixture = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: SCORING_GUARD_FIXTURE_ID } });
     expect(fixture.competitionConfigVersionId).toBe(SCORING_GUARD_SEED_ID);
   });
 

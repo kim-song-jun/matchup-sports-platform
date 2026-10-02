@@ -1,0 +1,3 @@
+{
+  "_comment": "원시 v1Tournament 단건 조회 허용치. **지금 0 이다** — 모든 단건 조회가 findTournamentOnSurface(OrThrow) 를 거친다. 리그를 의도적으로 허용하는 곳은 baseline 주석이 아니라 호출부의 ALL_COMPETITION_KINDS 로 코드에 명시한다. 항목이 다시 생기면 그 자체가 리뷰 대상이다."
+}

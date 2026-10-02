@@ -43,6 +43,7 @@ for required_path in \
   "${ALPHA_SOURCE_DIR}/deploy/deploy-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-manifest-common.sh" \
+  "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-source-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/rollback-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-sanitize.sql" \
@@ -56,7 +57,7 @@ for required_path in \
 done
 
 source "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh"
-validate_alpha_release_manifest \
+validate_alpha_final_release_manifest \
   "${ALPHA_MANIFEST_FILE}" \
   "${ALPHA_SHA}" \
   "${ALPHA_RELEASE_VERSION}" \
@@ -71,6 +72,7 @@ if [[ -f "${ALPHA_RELEASE_STATE_FILE}" ]]; then
 fi
 runtime_mutated=false
 source_activated=false
+task168_irreversible=false
 legacy_api_image=''
 legacy_web_image=''
 legacy_release_version=''
@@ -119,7 +121,9 @@ restore_on_failure() {
   local status="$?"
   trap - ERR
   archive_failed_candidate
-  if [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
+  if [[ "${task168_irreversible}" == true ]]; then
+    echo "[alpha-deploy] Task 168 Stage A began; old writers remain stopped for operator recovery" >&2
+  elif [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
     echo "[alpha-deploy] Candidate failed; restoring active release" >&2
     if ! restore_active_release; then
       echo "[alpha-deploy] CRITICAL: active release restore failed" >&2
@@ -134,33 +138,47 @@ restore_on_failure() {
 }
 trap 'restore_on_failure' ERR
 
+# 파이프라인은 `alpha_restore_step` 의 인자로 넘길 수 없어 이름 있는 함수로 뺀다 —
+# 그래야 실패했을 때 "무엇이" 실패했는지 남는다.
+legacy_local_health_ok() {
+  curl -fsS --connect-timeout 3 --max-time 10 \
+    http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null
+}
+
+container_image_state() {
+  docker inspect --format '{{.Config.Image}} {{.State.Running}}' "$1"
+}
+
 restore_legacy_runtime() {
-  [[ -n "${legacy_api_image}" && -n "${legacy_web_image}" ]] || return 1
-  restore_legacy_alpha_source || return 1
+  alpha_restore_step legacy_api_image_known test -n "${legacy_api_image}" || return 1
+  alpha_restore_step legacy_web_image_known test -n "${legacy_web_image}" || return 1
+  alpha_restore_step legacy_source restore_legacy_alpha_source || return 1
   ALPHA_API_IMAGE="${legacy_api_image}"
   ALPHA_WEB_IMAGE="${legacy_web_image}"
   ALPHA_RELEASE_VERSION="${legacy_release_version}"
   ALPHA_RELEASE_SHA="${legacy_release_sha}"
   export ALPHA_API_IMAGE ALPHA_WEB_IMAGE ALPHA_RELEASE_VERSION ALPHA_RELEASE_SHA
-  "${compose[@]}" up -d --force-recreate --no-deps \
+  alpha_restore_step legacy_compose_up_app "${compose[@]}" up -d --force-recreate --no-deps \
     v1_api v1_web v1_game_operations_worker || return 1
-  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+  alpha_restore_step legacy_compose_up_nginx "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   local restored_api_container
   local restored_web_container
-  restored_api_container="$("${compose[@]}" ps -q v1_api)" || return 1
-  restored_web_container="$("${compose[@]}" ps -q v1_web)" || return 1
-  [[ -n "${restored_api_container}" && -n "${restored_web_container}" ]] || return 1
-  [[ "$(docker inspect --format '{{.Config.Image}} {{.State.Running}}' "${restored_api_container}")" == "${legacy_api_image} true" ]] || return 1
-  [[ "$(docker inspect --format '{{.Config.Image}} {{.State.Running}}' "${restored_web_container}")" == "${legacy_web_image} true" ]] || return 1
-  curl -fsS --connect-timeout 3 --max-time 10 \
-    http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null || return 1
+  restored_api_container="$(alpha_restore_step legacy_ps_api "${compose[@]}" ps -q v1_api)" || return 1
+  restored_web_container="$(alpha_restore_step legacy_ps_web "${compose[@]}" ps -q v1_web)" || return 1
+  alpha_restore_step legacy_api_container_present test -n "${restored_api_container}" || return 1
+  alpha_restore_step legacy_web_container_present test -n "${restored_web_container}" || return 1
+  alpha_restore_step legacy_api_image_running \
+    test "$(container_image_state "${restored_api_container}")" = "${legacy_api_image} true" || return 1
+  alpha_restore_step legacy_web_image_running \
+    test "$(container_image_state "${restored_web_container}")" = "${legacy_web_image} true" || return 1
+  alpha_restore_step legacy_local_health legacy_local_health_ok || return 1
   local restored_headers restored_release restored_sha
-  restored_headers="$(curl -fsSI --connect-timeout 3 --max-time 10 \
-    https://alpha.teameet.co.kr/landing)" || return 1
+  restored_headers="$(alpha_restore_step legacy_public_headers \
+    curl -fsSI --connect-timeout 3 --max-time 10 https://alpha.teameet.co.kr/landing)" || return 1
   restored_release="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${restored_headers}")"
   restored_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${restored_headers}")"
-  [[ "${restored_release}" == "${legacy_release_version}" ]] || return 1
-  [[ "${restored_sha}" == "${legacy_release_sha}" ]] || return 1
+  alpha_restore_step legacy_release_matches test "${restored_release}" = "${legacy_release_version}" || return 1
+  alpha_restore_step legacy_sha_matches test "${restored_sha}" = "${legacy_release_sha}" || return 1
 }
 
 if ! command -v rsync >/dev/null 2>&1; then
@@ -168,9 +186,39 @@ if ! command -v rsync >/dev/null 2>&1; then
   sudo dnf install -y rsync
 fi
 
+# Task 168 M11 converged: the final-steady ledger/receipt check-only gate
+# runs BEFORE the candidate source is activated and BEFORE the live runtime
+# is touched (source_activated and runtime_mutated are still both false
+# here) — unlike the old Stage A guard, which used to run after activation
+# and pull (deploy/task168-stage-a-migrate.sh, now retired). Postgres has to
+# be up first since the check reads the live `_prisma_migrations` ledger;
+# it uses the CURRENTLY ACTIVE release's compose files (the candidate has
+# not been activated yet), which is fine because the postgres service
+# definition and the data volume are stable across releases.
+"${compose[@]}" up -d v1_postgres
+
+for attempt in $(seq 1 30); do
+  if "${compose[@]}" exec -T v1_postgres \
+    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "${attempt}" -eq 30 ]]; then
+    echo "[alpha-deploy] PostgreSQL did not become ready" >&2
+    false
+  fi
+  sleep 2
+done
+
+[[ "${ALPHA_TASK168_STAGE}" == final ]] || { echo "[alpha-deploy] Refusing a non-final Task168 manifest in this release" >&2; exit 1; }
+bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
+  --check-only --source-dir "${ALPHA_SOURCE_DIR}" \
+  --compose-prod "${COMPOSE_PROD}" --compose-alpha "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}"
+
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
-prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
-activate_alpha_release_source "${ALPHA_SHA}"
+source_key="$(alpha_release_source_key "${ALPHA_MANIFEST_FILE}")"
+prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${source_key}" "${ALPHA_SOURCE_SHA256}"
+
+activate_alpha_release_source "${source_key}"
 source_activated=true
 runtime_mutated=true
 chmod 600 "${ENV_FILE}"
@@ -202,7 +250,11 @@ fi
 # 여기서 배포를 막기로 판단한 이유: 이 preflight 시점은 이미 activate_alpha_release_source
 # 로 소스가 전환된 뒤(runtime_mutated=true)라 ERR 트랩(restore_active_release /
 # restore_legacy_runtime)이 정상 동작해 안전하게 되감아진다 — 즉 막아도 롤백 경로 자체가
-# 막히지 않는다. 반대로 여기서 통과시키면 디스크가 이미 위험 수준인 채로 이미지 pull ·
+# 막히지 않는다.
+#
+# ⚠️ **이 판단은 복구 경로가 실제로 동작한다는 전제 위에 서 있다.** 2026-09-08 에 그 전제가
+# 네 번 거짓이었다(복구가 매번 실패했고 어느 단계인지도 몰랐다 — 그래서
+# `alpha_restore_step` 을 넣었다). **복구 경로를 건드리면 이 가드도 함께 재검토하라.** 반대로 여기서 통과시키면 디스크가 이미 위험 수준인 채로 이미지 pull ·
 # postgres 볼륨 쓰기까지 진행하다 더 나쁜 지점에서 실패할 수 있고, 그 실패 지점이 하필
 # 복구용 재-pull 도 실패시켰던 바로 그 사고 패턴이다(디스크 부족은 복구 시도 자체를
 # 무력화한다는 게 이 사고의 핵심 교훈). 긴급 배포를 막을 위험은 있지만, 그 대가는
@@ -228,129 +280,16 @@ aws ecr get-login-password --region "${ALPHA_AWS_REGION}" |
 
 pull_release_images
 write_release_metadata "${ALPHA_MANIFEST_FILE}"
-"${compose[@]}" up -d v1_postgres
 
-for attempt in $(seq 1 30); do
-  if "${compose[@]}" exec -T v1_postgres \
-    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "${attempt}" -eq 30 ]]; then
-    echo "[alpha-deploy] PostgreSQL did not become ready" >&2
-    false
-  fi
-  sleep 2
-done
-
-readonly RECORDS_PROFILE_REPAIR_MIGRATION="20260819090000_v1_records_profile_integration_repair"
-readonly PLAYED_AT_MIGRATION="20260821120000_v1_team_record_facts_played_at"
-
-recover_known_records_profile_migration_failure() {
-  local migration_table_exists failed_count failure_logs
-  migration_table_exists="$("${compose[@]}" exec -T v1_postgres \
-    psql -v ON_ERROR_STOP=1 -At \
-    -U "${V1_DB_USER:-teameet_v1}" \
-    -d "${V1_DB_NAME:-teameet_v1}" \
-    -c "SELECT to_regclass('public.\"_prisma_migrations\"') IS NOT NULL")"
-  if [[ "${migration_table_exists}" == "f" ]]; then
-    return 0
-  fi
-  [[ "${migration_table_exists}" == "t" ]] || {
-    echo "[alpha-deploy] Could not verify the Prisma migration table" >&2
-    return 1
-  }
-
-  failed_count="$("${compose[@]}" exec -T v1_postgres \
-    psql -v ON_ERROR_STOP=1 -At \
-    -U "${V1_DB_USER:-teameet_v1}" \
-    -d "${V1_DB_NAME:-teameet_v1}" \
-    -c "SELECT COUNT(*) FROM \"_prisma_migrations\" WHERE migration_name = '${RECORDS_PROFILE_REPAIR_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
-
-  [[ "${failed_count}" =~ ^[0-9]+$ ]] || {
-    echo "[alpha-deploy] Could not verify the known migration failure state" >&2
-    return 1
-  }
-  if [[ "${failed_count}" == "0" ]]; then
-    return 0
-  fi
-  if [[ "${failed_count}" != "1" ]]; then
-    echo "[alpha-deploy] Refusing to auto-recover ${failed_count} unresolved ${RECORDS_PROFILE_REPAIR_MIGRATION} attempts" >&2
-    return 1
-  fi
-
-  failure_logs="$("${compose[@]}" exec -T v1_postgres \
-    psql -v ON_ERROR_STOP=1 -At \
-    -U "${V1_DB_USER:-teameet_v1}" \
-    -d "${V1_DB_NAME:-teameet_v1}" \
-    -c "SELECT COALESCE(logs, '') FROM \"_prisma_migrations\" WHERE migration_name = '${RECORDS_PROFILE_REPAIR_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
-
-  if [[ "${failure_logs}" != *'null value in column "goalkeeper"'* ]] ||
-    [[ "${failure_logs}" != *'v1_game_result_participants'* ]] ||
-    [[ "${failure_logs}" != *'23502'* ]]; then
-    echo "[alpha-deploy] Refusing to auto-recover an unrecognized ${RECORDS_PROFILE_REPAIR_MIGRATION} failure" >&2
-    return 1
-  fi
-
-  echo "[alpha-deploy] Marking the reviewed nullable-goalkeeper failure rolled back before retry"
-  "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-    "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back ${RECORDS_PROFILE_REPAIR_MIGRATION}"
-}
-
-recover_known_played_at_migration_failure() {
-  local migration_table_exists failed_count failure_logs
-  migration_table_exists="$("${compose[@]}" exec -T v1_postgres \
-    psql -v ON_ERROR_STOP=1 -At \
-    -U "${V1_DB_USER:-teameet_v1}" \
-    -d "${V1_DB_NAME:-teameet_v1}" \
-    -c "SELECT to_regclass('public.\"_prisma_migrations\"') IS NOT NULL")"
-  if [[ "${migration_table_exists}" == "f" ]]; then
-    return 0
-  fi
-  [[ "${migration_table_exists}" == "t" ]] || {
-    echo "[alpha-deploy] Could not verify the Prisma migration table" >&2
-    return 1
-  }
-
-  failed_count="$("${compose[@]}" exec -T v1_postgres \
-    psql -v ON_ERROR_STOP=1 -At \
-    -U "${V1_DB_USER:-teameet_v1}" \
-    -d "${V1_DB_NAME:-teameet_v1}" \
-    -c "SELECT COUNT(*) FROM \"_prisma_migrations\" WHERE migration_name = '${PLAYED_AT_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
-
-  [[ "${failed_count}" =~ ^[0-9]+$ ]] || {
-    echo "[alpha-deploy] Could not verify the played-at migration failure state" >&2
-    return 1
-  }
-  if [[ "${failed_count}" == "0" ]]; then
-    return 0
-  fi
-  if [[ "${failed_count}" != "1" ]]; then
-    echo "[alpha-deploy] Refusing to auto-recover ${failed_count} unresolved ${PLAYED_AT_MIGRATION} attempts" >&2
-    return 1
-  fi
-
-  failure_logs="$("${compose[@]}" exec -T v1_postgres \
-    psql -v ON_ERROR_STOP=1 -At \
-    -U "${V1_DB_USER:-teameet_v1}" \
-    -d "${V1_DB_NAME:-teameet_v1}" \
-    -c "SELECT COALESCE(logs, '') FROM \"_prisma_migrations\" WHERE migration_name = '${PLAYED_AT_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
-
-  if [[ "${failure_logs}" != *'team record facts are append-only'* ]] ||
-    [[ "${failure_logs}" != *'v1_block_team_record_fact_mutation'* ]] ||
-    [[ "${failure_logs}" != *'55000'* ]]; then
-    echo "[alpha-deploy] Refusing to auto-recover an unrecognized ${PLAYED_AT_MIGRATION} failure" >&2
-    return 1
-  fi
-
-  echo "[alpha-deploy] Marking the reviewed played-at append-only failure rolled back before retry"
-  "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-    "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back ${PLAYED_AT_MIGRATION}"
-}
-
-recover_known_records_profile_migration_failure
-recover_known_played_at_migration_failure
-"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-  'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
+# The steady path has no writer-quiesce or destructive DDL step of its own —
+# M11 was already applied by StageB (this run's check-only above proved it),
+# and anything pending after it is an ordinary additive migration that
+# already passed the expand-contract gate in CI. So, unlike Stage A,
+# task168_irreversible is never set here: an ordinary failure still takes
+# the normal restore_active_release / restore_legacy_runtime path above.
+bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
+  --migrate --source-dir "${ALPHA_SOURCE_DIR}" \
+  --compose-prod "${COMPOSE_PROD}" --compose-alpha "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}"
 # 게임 운영 플래그 불변 행 시드. 마이그레이션에 DML 을 넣을 수 없고(expand-contract 게이트)
 # GameOperationFlagsService.ensureDefaults() 는 platform_ops 가 플래그 API 를 호출할 때만
 # 돌기 때문에, 이걸 안 돌리면 갓 배포된 환경의 대회 운영 보드가 500 GAME_READ_FLAG_MISSING
@@ -366,29 +305,44 @@ recover_known_played_at_migration_failure
   -e V1_ALPHA_QA_SEED=true \
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
-  'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
-# QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 fixture-game 백필은 반드시
-# QA 시드 뒤에 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다).
+  'cd /app/apps/v1_api && node dist/prisma/seed-alpha-tournament-qa.js'
+# 리그 QA 시드. 토너먼트 시드와 같은 alpha 4중 가드를 공유하고 같은 sport/region/admin/
+# futsal-v1 config 선행조건을 쓰므로 반드시 토너먼트 시드 뒤에 둔다.
 #
-# competition-config 백필은 **의도적으로 여기 넣지 않는다.** 그 CLI 는 canonical config 행이
-# 현재 코드의 레지스트리 상수와 다르면 COMPETITION_CONFIG_SEED_DRIFT 로 하드 실패하는데,
-# 그 가드는 옳지만 이 자리에 두면 드리프트가 존재하는 동안 **모든 alpha 배포가 실패**한다.
-# 실제로 2026-08-09 alpha 가 그 상태였다 — #277 이 lineup.positions/formations 를 추가했고
-# DB 행은 이전 내용이라 CLI 가 거부했다(실측). 배포 파이프라인이 그런 운영 판단
-# ("새 버전 발행 후 repoint" vs "행 복원")을 대신 내릴 수는 없으므로, config 채우기는
-# QA 시드가 픽스처 생성 시점에 직접 하고(seed-alpha-tournament-qa.ts) 이 CLI 는 운영자가
-# 필요할 때 수동으로 돌린다.
-#
-# fixture-game 백필은 config 가 없는 픽스처를 **격리(quarantine)만 하고 실패하지 않으므로**
-# 배포를 깨뜨리지 않는다 — 그래서 이 자리에 두어도 안전하다.
+# 의도적으로 비치명(non-fatal)이다. 이 스크립트는 set -Eeuo pipefail 이라 여기서 실패하면
+# alpha 배포 전체가 죽는데, 이 시드는 아직 한 번도 실행된 적이 없다 — 공유 작업트리에
+# Prisma 클라이언트가 생성돼 있지 않아 로컬에서 타입검사도 시험 실행도 못 했다. QA 데이터
+# 하나 때문에 모든 세션의 배포 경로를 막을 수는 없다(같은 판단으로 competition-config
+# 백필 CLI 도 이 파이프라인에서 빠져 있다 — 아래 주석 참고). alpha 에서 한 번 성공하는 것을
+# 확인한 뒤 다른 시드처럼 하드 실패로 조이는 것이 다음 단계다.
+if ! "${compose[@]}" run --rm --no-deps -T \
+  -e V1_ALPHA_QA_SEED=true \
+  -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
+  v1_api sh -c \
+  'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-league-qa.ts'; then
+  echo "WARNING: league QA seed failed - deploy continues; league screens may have no QA data." >&2
+fi
+# QA 시드가 복원한 기존 이름-only 수상도 포함해 단일 로스터 후보만 계정에 연결한다.
+# 이미 연결됐거나 동명이인 후보가 여러 명인 행은 건드리지 않는 멱등 CLI다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-  'cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js'
-# QA 시드는 더 이상 V1TournamentStanding 행을 만들지 않는다(과거엔 배열 인덱스만으로
-# 승점/득실을 하드코딩해 실제 픽스처 결과와 모순되는 값이 나갔다). fixture-game-backfill
-# 뒤에서 돌아야 하는 이유는 순위 재계산이 그 백필이 만드는 V1Game.currentOfficialRevision
-# (새 경로)을 참조하기 때문 — backfill 전에 돌리면 아직 아무 결과도 없는 채로 계산된다.
-# config 가 없거나 유효하지 않은 대회는 격리(quarantine)만 하고 exit 0 을 유지하므로
-# (fixture-game-backfill 과 동일한 격리 패턴) 배포를 막지 않는다.
+  'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
+# Phase 3 시드는 설정과 canonical TeamMatch/Details/Game을 함께 만든다.
+# legacy fixture 이관은 schema retirement 전에 별도 검증된 release로 완료해야 한다.
+# 삭제된 fixture-game 백필을 배포 뒤에 다시 실행하지 않는다.
+# Project the seed-owned completed showcase results into official public records.
+# Production execution is allowed only by the alpha origin/flag/database guard.
+#
+# 대회/결과 시드는 canonical helper와 앱 코드를 import하므로 컴파일본으로 실행한다.
+# 런타임 이미지는 `dist`·`prisma` 만 싣고 `src` 는 싣지 않아(deploy/Dockerfile.v1-api),
+# ts-node 로 .ts 를 돌리면 그 import 가 MODULE_NOT_FOUND 로 죽는다 — 배포 실패 실사례.
+# 컴파일본은 `dist/prisma/…js` 에서 `dist/src/…js` 를 참조하므로 둘 다 이미지 안에 있다.
+"${compose[@]}" run --rm --no-deps -T \
+  -e V1_ALPHA_QA_SEED=true \
+  -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
+  v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/prisma/seed-alpha-showcase-results.js'
+# 공식 결과 시드 이후 canonical Game의 공식 revision으로 순위를 재계산한다.
+# 배열 순서로 순위를 만들어 실제 결과와 모순되는 데이터를 넣지 않는다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/tournament-standings-recalculation.cli.js'
 
@@ -408,10 +362,15 @@ else
   promote_candidate_manifest
 fi
 trap - ERR
-prune_stale_alpha_release_sources \
-  "$(jq -er '.active.release.sha' "${ALPHA_RELEASE_STATE_FILE}")" \
-  "$(jq -r '.previous.release.sha // empty' "${ALPHA_RELEASE_STATE_FILE}")" ||
-  echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
+# Keys are read into variables first: an inline lookup that failed would hand
+# prune an empty key instead of stopping it.
+if active_source_key="$(jq -er ".active | ${ALPHA_SOURCE_KEY_JQ}" "${ALPHA_RELEASE_STATE_FILE}")" &&
+  previous_source_key="$(jq -er "if .previous == null then \"\" else (.previous | ${ALPHA_SOURCE_KEY_JQ}) end" "${ALPHA_RELEASE_STATE_FILE}")"; then
+  prune_stale_alpha_release_sources "${active_source_key}" "${previous_source_key}" ||
+    echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
+else
+  echo "[alpha-deploy] WARNING: could not resolve release source keys; skipped pruning" >&2
+fi
 if ! write_legacy_release_state; then
   echo "[alpha-deploy] WARNING: canonical state is active but legacy receipt could not be written" >&2
 fi

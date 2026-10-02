@@ -1,0 +1,28 @@
+[
+  {
+    "kind": "regular",
+    "id": "08976fc4-e1d9-4f1c-99e9-de34b32c2ae5",
+    "pastDeadlineCreate": 400,
+    "lateApplication": 409,
+    "closedConfirmation": 409,
+    "startedConfirmation": 409,
+    "afterDeadlineConfirmation": 201,
+    "schedules": 2,
+    "game": true
+  },
+  {
+    "kind": "admin",
+    "id": "22916282-7834-4a89-b7bc-e492a2039e41",
+    "pastDeadlineCreate": 400,
+    "lateApplication": 409,
+    "closedConfirmation": 409,
+    "startedConfirmation": 409,
+    "afterDeadlineConfirmation": 201,
+    "schedules": 2,
+    "game": true
+  },
+  {
+    "constraint": "platform host exception only; actor/region/place/start retained",
+    "rejectedMutations": 5
+  }
+]

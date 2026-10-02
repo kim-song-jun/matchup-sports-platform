@@ -1,4 +1,5 @@
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { toKstDateString } from '@/lib/kst-calendar';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type {
   V1AttendanceStatus,
@@ -6,8 +7,10 @@ import type {
   V1ScheduleState,
   V1ScheduleType,
   V1ScheduleVisibility,
+  V1TeamMatch,
   V1TeamScheduleSummary,
 } from '@/types/api';
+import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import type { ScheduleCalendarDayModel, ScheduleCalendarModel, ScheduleListItemModel } from './team-schedules.types';
 
 // ── 권한 판정 ──────────────────────────────────────────────────────────────────
@@ -81,6 +84,14 @@ export function scheduleVisibilityLabel(visibility: V1ScheduleVisibility): strin
   return SCHEDULE_VISIBILITY_LABELS[visibility] ?? visibility;
 }
 
+/**
+ * 취소 확인 창의 알림 안내 — 서버 취소 알림(schedule-reminder.service scheduleCancelledNotificationHandler)의
+ * 수신자와 같아야 한다: 팀원(불참 응답자·본인 제외) + 전체 공개 일정일 때만 승인된 용병.
+ */
+export function scheduleCancelNoticeLine(visibility: V1ScheduleVisibility, approvedGuestCount: number): string {
+  return visibility === 'PUBLIC' && approvedGuestCount > 0 ? '팀원과 승인된 용병에게 알림이 가요.' : '팀원에게 알림이 가요.';
+}
+
 const ATTENDANCE_STATUS_LABELS: Record<V1AttendanceStatus, string> = {
   GOING: '참석',
   MAYBE: '미정',
@@ -102,7 +113,12 @@ export function guestRecruitmentStateLabel(state: V1GuestRecruitmentState): stri
   return GUEST_RECRUITMENT_STATE_LABELS[state] ?? state;
 }
 
-export function attendanceSummaryText(goingCount: number, waitlistedCount: number, capacity: number | null): string {
+/**
+ * 목록 행의 참석 요약. 아무도 답하지 않은 일정(정원 없음)은 요약이 없다 — 리그 경기처럼 참석 체크를
+ * 안 쓰는 일정이 "참석 0명"으로 읽혀 경기 명단(출전 N명)과 엇갈렸다(F67).
+ */
+export function attendanceSummaryText(goingCount: number, waitlistedCount: number, capacity: number | null): string | null {
+  if (goingCount === 0 && waitlistedCount === 0 && capacity === null) return null;
   const capacityPart = capacity !== null ? `/${capacity}` : '';
   const base = `참석 ${goingCount}${capacityPart}명`;
   return waitlistedCount > 0 ? `${base} · 대기 ${waitlistedCount}명` : base;
@@ -127,6 +143,8 @@ const SCHEDULE_ERROR_MESSAGES: Record<string, string> = {
   GUEST_RECRUITMENT_DEADLINE_PASSED: '용병 모집 마감 시간이 지났어요.',
   IDEMPOTENCY_KEY_REQUIRED: '요청을 다시 시도해 주세요.',
   IDEMPOTENCY_PAYLOAD_CONFLICT: '요청이 겹쳤어요. 새로고침 후 다시 시도해 주세요.',
+  PROXY_ATTENDANCE_ALREADY_ANSWERED: '팀원이 이미 응답했어요. 최신 내용으로 새로고침했어요.',
+  PROXY_ATTENDANCE_STATUS_NOT_ALLOWED: '대신 표시할 수 있는 건 참석뿐이에요.',
   SCHEDULE_MATCH_SOURCE_REQUIRED: '경기 일정은 팀매치를 먼저 선택해야 해요.',
   SCHEDULE_TEAM_MATCH_NOT_ALLOWED: '경기가 아닌 일정에는 팀매치를 연결할 수 없어요.',
   TEAM_MATCH_NOT_FOUND_FOR_TEAM: '선택한 팀매치가 이 팀 소속이 아니에요.',
@@ -139,21 +157,33 @@ export function mapScheduleErrorMessage(err: unknown, fallback: string): string 
   return extractErrorMessage(err, fallback);
 }
 
-/** VERSION_CONFLICT/IDEMPOTENCY_PAYLOAD_CONFLICT는 화면을 새 데이터로 되돌려야 하는 409류다. */
+/**
+ * 화면을 새 데이터로 되돌려야 하는 409류. PROXY_ATTENDANCE_ALREADY_ANSWERED 도 여기 든다 --
+ * 팀장이 보고 있던 "미응답" 목록이 낡아서 나는 충돌이라, 메시지만 띄우고 목록을 그대로 두면
+ * 이미 답한 사람 옆에 대리 버튼이 계속 남는다.
+ */
 export function isScheduleStaleConflict(err: unknown): boolean {
   const code = extractErrorCode(err);
-  return code === 'VERSION_CONFLICT' || code === 'IDEMPOTENCY_PAYLOAD_CONFLICT';
+  return (
+    code === 'VERSION_CONFLICT' ||
+    code === 'IDEMPOTENCY_PAYLOAD_CONFLICT' ||
+    code === 'PROXY_ATTENDANCE_ALREADY_ANSWERED'
+  );
 }
 
 // ── 목록 항목 변환 ────────────────────────────────────────────────────────────
 
+/** 일정이 속한 날짜 키. 카드 표시(KST 고정)와 같은 기준이어야 달력 선택이 카드 날짜와 맞는다. */
 export function dateKeyOf(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return toKstDateString(d);
+}
+
+/** 달력 그리드의 기준 달 — KST 기준 `instant` 가 속한 달의 1일(그리드 연산은 로컬 Date 로 하는 순수 달력 계산). */
+export function kstMonthStart(instant: Date): Date {
+  const [year, month] = toKstDateString(instant).split('-').map(Number);
+  return new Date(year, month - 1, 1);
 }
 
 export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId: string): ScheduleListItemModel {
@@ -175,9 +205,53 @@ export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId:
   };
 }
 
+/**
+ * 연결 경기에서 **이 일정을 가진 팀** 기준의 상대 이름. 매치 상세의 `approvedOpponentTeam` 은 호스트
+ * 기준이라 신청(원정) 팀 일정에서 그대로 쓰면 자기 팀 이름이 나온다(W3-V8, 리그 대진도 같다).
+ * 보는 팀이 어느 쪽도 아니면 추측하지 않고 null.
+ */
+export function scheduleOpponentTeamName(
+  match: Pick<V1TeamMatch, 'hostTeamId' | 'hostTeamName' | 'hostTeam' | 'approvedOpponentTeam'> | undefined,
+  scheduleTeamId: string,
+): string | null {
+  const guest = match?.approvedOpponentTeam ?? null;
+  if (!match || guest === null) return null;
+  const hostTeamId = match.hostTeam?.teamId ?? match.hostTeamId ?? null;
+  if (hostTeamId === scheduleTeamId) return guest.name;
+  if (guest.teamId === scheduleTeamId) return match.hostTeam?.name ?? match.hostTeamName ?? null;
+  return null;
+}
+
+/** 이어진 경기의 종류. 리그 대진은 `tournamentId` 도 리그 id 로 채워져 있어 `leagueId` 를 먼저 본다. */
+export function scheduleLinkedMatchKind(linkedMatch: {
+  tournamentId: string | null;
+  leagueId: string | null;
+}): 'FRIENDLY' | 'LEAGUE' | 'TOURNAMENT' {
+  if (linkedMatch.leagueId !== null) return 'LEAGUE';
+  return linkedMatch.tournamentId !== null ? 'TOURNAMENT' : 'FRIENDLY';
+}
+
+/** 대회 경기 공개 상세의 home/away 에서 이 일정을 가진 팀 기준의 상대. 보는 팀이 어느 쪽도 아니면 null. */
+export function scheduleTournamentOpponentTeamName(
+  match: Pick<PublicMatchDetail, 'home' | 'away'> | undefined,
+  scheduleTeamId: string,
+): string | null {
+  if (!match) return null;
+  if (match.home?.teamId === scheduleTeamId) return match.away?.teamName ?? null;
+  if (match.away?.teamId === scheduleTeamId) return match.home?.teamName ?? null;
+  return null;
+}
+
 export function scheduleRsvpDeadlineLabel(rsvpDeadlineAt: string | null): string | null {
   if (!rsvpDeadlineAt) return null;
   return `${formatTournamentDateTimeLong(rsvpDeadlineAt)} 마감`;
+}
+
+/** 참석 응답을 바꿀 수 없는 이유. 취소와 종료는 다른 사실이라 문구를 따로 둔다. */
+export function attendanceLockedReason(state: V1ScheduleState, rsvpDeadlinePassed: boolean): string | null {
+  if (state === 'CANCELLED') return '취소된 일정이라 참석 여부를 바꿀 수 없어요.';
+  if (state !== 'SCHEDULED') return '이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.';
+  return rsvpDeadlinePassed ? '참석 신청 마감 시간이 지났어요.' : null;
 }
 
 export function isDeadlinePassed(deadline: string | null): boolean {
@@ -185,25 +259,6 @@ export function isDeadlinePassed(deadline: string | null): boolean {
   const d = new Date(deadline);
   if (Number.isNaN(d.getTime())) return false;
   return d.getTime() < Date.now();
-}
-
-// ── <input type="datetime-local"> 변환 ────────────────────────────────────────
-// datetime-local 값은 타임존이 없는 "로컬 벽시계" 문자열이다. new Date(그 문자열)은
-// ECMA-262 Date Time String Format 규격상 타임존 오프셋이 없으면 로컬 시간으로 해석되므로
-// (날짜만 있는 형식만 UTC), toISOString()으로의 왕복이 안전하다.
-export function toDatetimeLocalValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function fromDatetimeLocalValue(value: string): string | undefined {
-  if (!value) return undefined;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString();
 }
 
 // ── 캘린더(월간 그리드) ───────────────────────────────────────────────────────
@@ -234,8 +289,8 @@ export function buildScheduleCalendarMonth(
     for (let day = 0; day < 7; day += 1) {
       const current = new Date(gridStart);
       current.setDate(gridStart.getDate() + week * 7 + day);
-      // 로컬 캘린더 필드를 직접 읽는다 — dateKeyOf(iso)와 동일한 포맷(YYYY-MM-DD)이어야
-      // items의 startAt에서 뽑은 키와 정확히 매치한다.
+      // 순수 달력 연산(시각 없음)이라 로컬 필드로 키를 만들어도 시간대와 무관하다 —
+      // dateKeyOf(KST)와 같은 YYYY-MM-DD 포맷이어야 매치한다.
       const localKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
       days.push({
         dateKey: localKey,

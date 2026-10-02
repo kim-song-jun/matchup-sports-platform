@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { relative, resolve } from 'node:path';
+import { readdirSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 const apiRoot = resolve(__dirname, '../..');
@@ -30,6 +31,26 @@ const { recoveryContract } = require('../helpers/isolated-integration-environmen
 
 jest.setTimeout(60_000);
 
+/**
+ * `test/` 아래의 통합 스펙 파일을 **접미사로** 모은다.
+ *
+ * `testMatch` 글롭을 해석하지 않는 이유는 위 계약 주석에 있다 — 재구현이 틀리면 스펙이
+ * 거짓 판정을 낸다. 접미사는 config 의 두 패턴이 공통으로 요구하는 것이고, 위치 조건
+ * (e2e 는 `test/integration/` 아래여야 한다)은 별도 테스트가 따로 못박는다.
+ */
+function collectSpecFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...collectSpecFiles(full));
+    } else if (full.endsWith('.integration-spec.ts') || full.endsWith('.e2e-spec.ts')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
 function runJestResolver(...args: string[]): string {
   const result = spawnSync(process.execPath, [jestBin, ...args], {
     cwd: apiRoot,
@@ -48,7 +69,11 @@ describe('v1_api Jest integration discovery contract', () => {
     const shown = JSON.parse(
       runJestResolver('--selectProjects', 'integration', '--runInBand', '--showConfig', '--json'),
     ) as {
-      configs: Array<{ displayName: { name: string }; testEnvironment: string }>;
+      configs: Array<{
+        displayName: { name: string };
+        testEnvironment: string;
+        testPathIgnorePatterns?: string[];
+      }>;
       globalConfig: { maxWorkers: number };
     };
     const integration = shown.configs.find((project) => project.displayName.name === 'integration');
@@ -61,25 +86,95 @@ describe('v1_api Jest integration discovery contract', () => {
     const listed = JSON.parse(
       runJestResolver('--selectProjects', 'integration', '--runInBand', '--listTests', '--json'),
     ) as string[];
-    expect(listed.map((testPath) => relative(apiRoot, testPath)).sort()).toEqual([
-      'test/games/game-actor-matrix.integration-spec.ts',
-      'test/games/game-lifecycle.integration-spec.ts',
-      'test/games/game-projection.integration-spec.ts',
-      'test/games/game-schema.integration-spec.ts',
-      'test/integration/admin-owner-invariant.e2e-spec.ts',
-      'test/integration/health.e2e-spec.ts',
-      'test/integration/integration-app-cleanup.e2e-spec.ts',
-      'test/integration/phone-verification-write-gate.e2e-spec.ts',
-      'test/integration/phone-verification.e2e-spec.ts',
-      'test/integration/team-logo-persistence.e2e-spec.ts',
-      'test/integration/tournament-campaign.e2e-spec.ts',
-      'test/team-schedules/attendance.integration-spec.ts',
-      'test/team-schedules/schedule-crud.integration-spec.ts',
-      'test/team-schedules/team-schedules.integration-spec.ts',
-      'test/tournaments/competition-config.integration-spec.ts',
-      'test/tournaments/task7-audit-scope.integration-spec.ts',
-      'test/tournaments/tournament-game-adapter.integration-spec.ts',
-    ]);
+    /**
+     * **목록을 적지 않는다 — 디스크와 config 로 만든다.**
+     *
+     * 예전에는 여기에 경로 79 개가 박혀 있었고, 그래서 **낡아 있었다**: `jest --listTests`
+     * 는 89 개를 고르는데 목록은 79 개라 10 건(리그 통합 스펙들)이 빠져 있었다. 새 스펙을
+     * 추가할 때마다 사람이 이 목록을 같이 고쳐야 하는 구조였기 때문이다.
+     *
+     * `jest.config.ts` 는 같은 문제를 이미 겪고 **글롭 한 줄**로 바꿨다(그 파일 주석:
+     * *"등록을 사람이 기억해야 하는 구조가 남아 있으면 같은 사고가 이름만 바꿔 반복된다"*).
+     * **그걸 검사하는 이 스펙만 열거로 남아 있었다.** 같은 원칙을 여기에도 적용한다.
+     *
+     * ## 글롭을 다시 구현하지 않는다
+     * `testMatch` 패턴을 이 파일에서 해석하면 **그 재구현이 틀릴 수 있고**, 그러면 스펙이
+     * 거짓 red/green 을 낸다. 대신 **파일 접미사**로 디스크를 훑고, 제외는 config 가 실제로
+     * 쓰는 `testPathIgnorePatterns` 를 그대로 적용한다 — 판단 기준을 우리가 만들지 않는다.
+     *
+     * 이렇게 하면 보호가 **더 강해진다**: 예전 목록은 새 파일을 추가하면서 목록도 같이
+     * 고치면 통과했지만, 지금은 config 글롭이 파일을 놓치는 순간 red 다.
+     */
+    const integrationConfig = shown.configs.find((project) => project.displayName.name === 'integration');
+    const ignorePatterns = (integrationConfig?.testPathIgnorePatterns ?? []).map(
+      (pattern) => new RegExp(pattern),
+    );
+    const isIgnored = (absPath: string) => ignorePatterns.some((re) => re.test(absPath));
+
+    /* ⚠️ `testPathIgnorePatterns` 는 **두 확장자 모두**에 걸린다 — jest 는 `testMatch` 로 찾은
+       뒤 확장자와 무관하게 거른다(실측: e2e 하나를 ignore 에 넣으면 89→88). 한쪽에만 걸면
+       누가 e2e 를 ignore 에 넣는 순간 **거짓 red** 가 난다(config 는 빼는데 기대값은 포함).
+       이 저장소에서 *"두 확장자가 한 프로젝트에 있다"* 를 놓친 게 이번이 세 번째다. */
+    const expected = collectSpecFiles(resolve(apiRoot, 'test'))
+      .filter((absPath) => !isIgnored(absPath))
+      .map((absPath) => relative(apiRoot, absPath).replaceAll('\\', '/'))
+      .sort();
+
+    expect(
+      listed.map((testPath) => relative(apiRoot, testPath).replaceAll('\\', '/')).sort(),
+    ).toEqual(expected);
+
+    /* 개수는 고정하지 않는다 — 스펙이 늘고 주는 것은 정상이고, 절대 수를 박으면 그 변화마다
+       무관한 red 가 난다. 본 계약은 위 `toEqual`(두 집합이 같다)이고, 여기서 막을 것은
+       **양쪽이 동시에 비어 통과하는 경우** 하나뿐이다. */
+    expect(expected.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * `e2e-spec` 은 **`test/integration/` 아래에만** 둔다 — config 의 두 번째 글롭이
+   * `test/integration/**` 로 한정돼 있어서, 다른 디렉터리에 두면 **조용히 안 돌아간다.**
+   *
+   * ## 위 계약도 이걸 잡는다 — 이 테스트는 **원인을 보이게** 하려고 있다
+   * `collectSpecFiles` 는 접미사만 보므로 stray 도 `expected` 에 들어가고, `listed` 에는
+   * 없으니 위 `toEqual` 이 실패한다. **중복이 아니냐**는 질문이 정당한데, 실패 메시지를
+   * 나란히 재 보면 갈린다(2026-09-01 실측):
+   * ```
+   * 위 계약    89줄 배열 diff 안의 한 줄. 파일명은 보이지만 **왜 문제인지 안 보이고**,
+   *            글롭이 망가졌을 때와 diff 모양이 같아 원인이 구분되지 않는다
+   * 이 테스트  Array [] vs ["test/games/stray-check.e2e-spec.ts"] — 테스트 이름이
+   *            "under test/integration so the config glob can see it" 이라 원인이 즉시 읽힌다
+   * ```
+   * 즉 **같은 결함을 두 번 잡는 게 아니라, 진단을 남기는 것**이다. 위 계약이 잡는다는 이유로
+   * 지우면 다음 사람은 89줄 diff 에서 한 줄을 찾아 의미를 스스로 복원해야 한다.
+   */
+  it('keeps every e2e-spec under test/integration so the config glob can see it', () => {
+    const strays = collectSpecFiles(resolve(apiRoot, 'test'))
+      .filter((f) => f.endsWith('.e2e-spec.ts'))
+      .map((f) => relative(apiRoot, f).replaceAll('\\', '/'))
+      .filter((f) => !f.startsWith('test/integration/'));
+
+    expect(strays).toEqual([]);
+  });
+
+  /**
+   * `testPathIgnorePatterns` 는 config 주석이 *"고쳐야 할 빚 목록"* 이라고 못박은 자리다.
+   * 가리키는 파일이 사라지면 그 항목은 **죽은 제외**가 되고, 죽은 채로 남으면 다음 사람이
+   * "아직 빚이 있다" 고 잘못 읽는다. 각 패턴이 실제 파일을 하나 이상 가리키는지 본다.
+   */
+  it('keeps every integration ignore pattern pointing at a file that exists', () => {
+    const shown = JSON.parse(
+      runJestResolver('--selectProjects', 'integration', '--runInBand', '--showConfig', '--json'),
+    ) as { configs: Array<{ displayName: { name: string }; testPathIgnorePatterns?: string[] }> };
+    const patterns =
+      shown.configs.find((project) => project.displayName.name === 'integration')
+        ?.testPathIgnorePatterns ?? [];
+    const onDisk = collectSpecFiles(resolve(apiRoot, 'test'));
+
+    /* `patterns.length > 0` 을 두지 않는다 — **빚을 다 갚아 목록이 비는 것은 목표 상태**이고,
+       그걸 red 로 만들면 이 스펙이 자기 목적을 방해한다. 여기서 막을 실패는 "죽은 제외가
+       남는 것" 하나뿐이고, 그건 아래 한 줄이 전부 검사한다(빈 배열이면 자연히 통과). */
+    const dead = patterns.filter((pattern) => !onDisk.some((f) => new RegExp(pattern).test(f)));
+    expect(dead).toEqual([]);
   });
 
   it('recovers only expired unleased Task 9 clones within the bounded policy', () => {
@@ -194,9 +289,9 @@ describe('v1_api Jest integration discovery contract', () => {
     const sourceDatabaseName = decodeURIComponent(new URL(sourceDatabaseUrl).pathname.slice(1));
     const maintenance = new PrismaClient({ datasourceUrl: maintenanceDatabaseUrl });
     const blocker = new PrismaClient({ datasourceUrl: maintenanceDatabaseUrl });
-    let releaseLock = () => undefined;
-    let reportLockReady = () => undefined;
-    let reportLockFailure = (_error: unknown) => undefined;
+    let releaseLock: () => void = () => undefined;
+    let reportLockReady: () => void = () => undefined;
+    let reportLockFailure: (error: unknown) => void = (_error) => undefined;
     const lockReleased = new Promise<void>((resolve) => {
       releaseLock = resolve;
     });
@@ -336,9 +431,9 @@ describe('v1_api Jest integration discovery contract', () => {
     const now = Math.floor(Date.now() / 1000);
     const blocked = `${recoveryContract.CLONE_PREFIX}${now - recoveryContract.STALE_AFTER_SECONDS}_${process.pid}_000000000004`;
     const createdNames: string[] = [];
-    let releaseCatalogLock = () => undefined;
-    let reportCatalogLockReady = () => undefined;
-    let reportCatalogLockFailure = (_error: unknown) => undefined;
+    let releaseCatalogLock: () => void = () => undefined;
+    let reportCatalogLockReady: () => void = () => undefined;
+    let reportCatalogLockFailure: (error: unknown) => void = (_error) => undefined;
     const catalogLockRelease = new Promise<void>((resolve) => {
       releaseCatalogLock = resolve;
     });

@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
+import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
+import { withFromPath } from '@/lib/session-storage';
 import type { V1TournamentListItem } from '@/types/api';
 
 /**
@@ -14,26 +16,9 @@ import type { V1TournamentListItem } from '@/types/api';
  */
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
   if (loading) {
-    return (
-      <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }} aria-busy="true">
-        <div
-          className="tm-featured-media"
-          style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
-        >
-          <div className="tm-featured-overlay" />
-          <div className="tm-featured-text">
-            <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>상금 대회 · 모집 중</div>
-            <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
-              추천 대회를 가져오고 있어요
-            </div>
-          </div>
-        </div>
-        <div className="tm-featured-content">
-          <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} aria-hidden="true" />
-          <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} aria-hidden="true" />
-        </div>
-      </Card>
-    );
+    // 자리표시 뼈대는 추천 매치 슬롯과 공유한다 — 각자 만들면 한쪽만 실제 카드와 어긋나고
+    // 그 차이가 그대로 레이아웃 이동이 된다(그 사고를 두 번 냈다).
+    return <FeaturedSlotSkeleton eyebrow="상금 대회 · 모집 중" title="추천 대회를 가져오고 있어요" />;
   }
 
   const featuredItems = getSortedTournamentPromos(items, 'home');
@@ -61,13 +46,13 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             className="tm-featured-link tm-pressable"
             href={featured.campaignSlug
               ? `/tournaments/campaigns/${featured.campaignSlug}`
-              : `/tournaments/${featured.id}`}
+              : withFromPath(`/tournaments/${featured.id}`, '/home')}
             aria-label={`대회 상세 — ${cardTitle}`}
           >
             <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
               <div
                 className="tm-featured-media"
-                style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
+                style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'var(--brand-hero-gradient)' }}
               >
                 {/* 은은한 트로피 워터마크 (장식) — 세로 중앙·우측 살짝 블리드(상단 잘림 방지) */}
                 {!imageUrl ? (
@@ -97,7 +82,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   {facts.length > 0 ? (
                     <div
                       className="tm-text-caption tm-featured-meta"
-                      style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+                      style={{ marginTop: 8, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
                     >
                       {facts.map((fact) => (
                         <span
@@ -113,7 +98,9 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   ) : null}
                 </div>
                 <span
-                  className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
+                  // 카드 CTA 는 secondary(outline) — 추천 대회가 여러 장이라 solid 면
+                  // 한 화면에 primary 가 겹겹이 쌓인다(home-page.tsx 의 같은 자리 참고).
+                  className="tm-btn tm-btn-outline tm-btn-sm tm-featured-cta"
                   aria-hidden="true"
                 >
                   참가 신청하기

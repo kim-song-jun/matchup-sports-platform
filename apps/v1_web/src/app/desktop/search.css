@@ -62,11 +62,11 @@
     max-width: 640px !important;
     width: 100% !important;
     min-height: 52px !important;
-    border-radius: 18px !important;
-    box-shadow: var(--shadow-1);
+    border-radius: var(--radius-container) !important;
+    box-shadow: var(--shadow-card);
     background: var(--bg) !important;
     border: 1.5px solid var(--grey200) !important;
-    padding: 0 10px 0 18px !important;
+    padding: 0 12px 0 20px !important;
     flex: 1;
   }
 
@@ -127,8 +127,13 @@
     scrollbar-width: none;
     background: var(--grey50);
     border: 1px solid var(--grey150);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
+    /* 지면을 --grey50 으로 깔았으니 그 위 보조 텍스트도 함께 올린다 —
+       grey600 은 여기서 4.42:1 로 AA 미달이다(alpha 1440 실측, "최근 검색어가 없어요.").
+       배경을 주는 이 규칙 안에 둔다: 이 배경은 이 미디어 쿼리 안에서만 깔린다. */
+    --text-caption: var(--grey700);
+    --text-muted: var(--grey700);
   }
 
   .tm-search-panel-col::-webkit-scrollbar {
@@ -178,7 +183,7 @@
 @media (min-width: 1440px) {
   .tm-search-results-list {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 14px !important;
+    gap: 16px !important;
   }
 }
 
@@ -188,7 +193,7 @@
  */
 @media (min-width: 1024px) {
   .tm-search-results-header {
-    padding-bottom: 14px;
+    padding-bottom: 16px;
     border-bottom: 1px solid var(--grey100);
     margin-bottom: 4px;
   }
@@ -199,18 +204,19 @@
  * large empty canvas on desktop.
  */
 @media (min-width: 1024px) {
-  .tm-search-state-msg {
-    margin-top: 0 !important;
+  /* 상태 화면(EmptyState/ErrorState)은 결과 컬럼 안에서 패널처럼 보이게 — 모바일 기본
+     padding(60px 32px)은 그대로 두고 데스크톱에서만 테두리·배경을 준다. */
+  .tm-search-results-col .tm-empty-state {
     min-height: 280px;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center;
     justify-content: center;
     border: 1px solid var(--grey100);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 40px 24px;
     background: var(--grey50);
-    text-align: center !important;
+    margin-top: 12px;
+    /* 위와 같은 이유 — 데스크톱에서만 지면에 색이 깔리므로 처방도 여기 둔다. */
+    --text-caption: var(--grey700);
+    --text-muted: var(--grey700);
   }
 }
 
@@ -227,7 +233,7 @@
     bottom: 32px !important;
     transform: translateX(-50%);
     width: min(calc(100vw - 48px), 560px) !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-field) !important;
   }
 }
 

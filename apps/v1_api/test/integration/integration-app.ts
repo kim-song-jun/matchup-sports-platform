@@ -1,5 +1,4 @@
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import type { INestApplication, ValidationError } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -19,32 +18,15 @@ export async function createV1IntegrationApp(): Promise<{
   let app: INestApplication | undefined;
   let setupFailure: { readonly error: unknown } | undefined;
   try {
-    const [appModule, transformInterceptor] = await Promise.all([
+    const [appModule, transformInterceptor, globalValidationPipe] = await Promise.all([
       import('../../src/app.module'),
       import('../../src/common/interceptors/transform.interceptor'),
+      import('../../src/common/global-validation-pipe'),
     ]);
     const moduleRef = await Test.createTestingModule({ imports: [appModule.AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-        exceptionFactory: (errors: ValidationError[]) => {
-          const details = errors.map((error) => ({
-            field: error.property,
-            messages: error.constraints ? Object.values(error.constraints) : [],
-          }));
-          return new BadRequestException({
-            code: 'VALIDATION_ERROR',
-            message: '입력값을 다시 확인해 주세요.',
-            details,
-          });
-        },
-      }),
-    );
+    app.useGlobalPipes(globalValidationPipe.createGlobalValidationPipe());
     // AllExceptionsFilter is registered globally via AppModule's APP_FILTER provider
     // (needed for its PinoLogger DI) — no manual useGlobalFilters() call here.
     app.useGlobalInterceptors(new transformInterceptor.TransformInterceptor());

@@ -87,6 +87,19 @@ export function writeExpiringDraft<T>(key: string, value: T, now: number = Date.
   }
 }
 
+const PROBE_KEY = 'teameet.draft-probe';
+
+/** Can drafts be kept on this device? False when storage is blocked (private mode, locked-down WebView) or full. */
+export function draftStorageAvailable(): boolean {
+  try {
+    window.localStorage.setItem(PROBE_KEY, '1');
+    window.localStorage.removeItem(PROBE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 작성이 끝났을 때(생성 성공) 명시적으로 비운다. */
 export function clearExpiringDraft(key: string): void {
   safeRemove(key);

@@ -1,18 +1,39 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
-import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactElement, ReactNode } from 'react';
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { V1ApiError } from '@/lib/api-client';
+import type { V1AuthMe } from '@/types/api';
+import { v1TeamCompetitionEntriesFixture } from '@/test/msw/fixtures';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TeamDetailPageClient, TeamMembersPageClient } from './teams-client';
+import { TeamListPageView } from './teams-page';
+import { toTeam } from './teams.card-model';
+import { getTeamListViewModel } from './teams.view-model';
+import type { V1Team } from '@/types/api';
+
+type AuthProbeFixture = Partial<Pick<ReturnType<typeof import('@/hooks/use-v1-api').useV1AuthMe>,
+  'data' | 'error' | 'isPending' | 'isFetching' | 'isError'>> & {
+  refetch?: () => Promise<{ data?: V1AuthMe; error?: Error | null }>;
+};
 
 const teamApiMocks = vi.hoisted(() => ({
+  useV1AuthMe: vi.fn((): AuthProbeFixture => ({ data: undefined })),
   useV1TeamDetail: vi.fn(),
   useV1TeamJoinEligibility: vi.fn(),
   useV1CreateTeamJoinApplication: vi.fn(),
   useV1WithdrawTeamJoinApplication: vi.fn(),
   useV1ResolveChatRoom: vi.fn(),
   useV1TeamMatches: vi.fn(),
+  useV1TeamUpcomingGames: vi.fn(() => ({ data: { items: [] }, isLoading: false, isError: false })),
+  // 반환 타입을 vi.fn()의 첫 구현으로 좁히지 않는다 — 좁히면 아래 테스트가 items를 담은
+  // 값을 돌려줄 때 tsc가 undefined 할당으로 잡는다(다른 훅 목들과 같은 형태로 맞춘다).
+  useV1LeagueMatches: vi.fn(),
+  useV1TeamCompetitionEntries: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })),
   useV1TeamMembers: vi.fn(),
+  useV1MyTeams: vi.fn(() => ({ data: undefined })),
+  useV1TeamContactSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
   useV1TeamJoinApplications: vi.fn(),
   useV1ChangeTeamMembershipRole: vi.fn(),
   useV1RemoveTeamMembership: vi.fn(),
@@ -23,6 +44,19 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1TeamInvitations: vi.fn(),
   useV1LeaveTeam: vi.fn(),
 }));
+
+// 결장 기간(Task 179 팀 C) — 팀원 본인 안내가 읽는 조회만 갈아 끼운다. 나머지 명단 훅은 실제 것.
+const rosterMocks = vi.hoisted(() => ({
+  useV1MemberUnavailability: vi.fn((): { data: unknown; isError: boolean } => ({ data: undefined, isError: false })),
+}));
+
+vi.mock('@/hooks/use-v1-game-roster', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/use-v1-game-roster')>()),
+  ...rosterMocks,
+}));
+
+const routerMocks = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const navigationMocks = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
@@ -35,11 +69,8 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1',
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-  }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => routerMocks,
+  useSearchParams: () => navigationMocks.searchParams,
 }));
 
 function render(ui: ReactElement) {
@@ -50,8 +81,20 @@ function render(ui: ReactElement) {
     },
   });
 
-  return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return rtlRender(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
 }
+
+// useV1LeagueMatches 는 팀 상세가 항상 호출한다("내 리그" 섹션). describe 마다 채우면
+// 하나만 빠져도 그 블록 전체가 "myLeaguesQuery 가 undefined" 로 깨지므로 파일 레벨에서
+// 한 번만 기본값을 준다. 값이 필요한 테스트는 각자 mockReturnValue 로 덮어쓴다.
+beforeEach(() => {
+  teamApiMocks.useV1LeagueMatches.mockReturnValue({ data: undefined, isLoading: false });
+  navigationMocks.searchParams = new URLSearchParams();
+});
 
 describe('TeamDetailPageClient GA events', () => {
   beforeEach(() => {
@@ -136,6 +179,7 @@ describe('TeamDetailPageClient GA events', () => {
 
 describe('TeamMembersPageClient GA events', () => {
   const approveMutate = vi.fn();
+  const approveMutateAsync = vi.fn();
   const rejectMutate = vi.fn();
 
   beforeEach(() => {
@@ -181,14 +225,69 @@ describe('TeamMembersPageClient GA events', () => {
         ],
       },
     });
-    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
     teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
-    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: approveMutate });
+    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: approveMutate, mutateAsync: approveMutateAsync });
     teamApiMocks.useV1RejectTeamJoinApplication.mockReturnValue({ isPending: false, mutate: rejectMutate });
     teamApiMocks.useV1SendTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
     teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  // 팀 상세(내 팀에서 들어옴) → 멤버 목록 → 뒤로 → 팀 상세 → 뒤로가 내 팀으로 이어져야 한다.
+  it('팀 상세가 넘긴 출처를 뒤로가기와 멤버 프로필 링크에 이어 싣는다', () => {
+    const detailHref = '/teams/team-1?from=%2Fmy%2Fteams';
+    navigationMocks.searchParams = new URLSearchParams({ from: detailHref });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
+    expect(published).toEqual({});
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', detailHref);
+    const membersHref = `/teams/team-1/members?from=${encodeURIComponent(detailHref)}`;
+    screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
+      expect(link).toHaveAttribute('href', `/users/user-owner?from=${encodeURIComponent(membersHref)}`),
+    );
+  });
+
+  it('비공개 팀이면 상태 제목과 받은 출처를 함께 게시한다', () => {
+    navigationMocks.searchParams = new URLSearchParams({ from: '/teams/team-1?from=%2Fmy%2Fteams' });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: false, viewer: { role: null, membershipId: null } },
+      isError: false,
+    });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
+    expect(published).toEqual({ title: '멤버 목록이 비공개예요' });
+  });
+
+  it('출처 없이 들어오면 팀 상세로 돌아가는 기본값을 그대로 쓴다', () => {
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    expect(published).toEqual({});
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/teams/team-1');
+    screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
+      expect(link).toHaveAttribute('href', '/users/user-owner?from=%2Fteams%2Fteam-1%2Fmembers'),
+    );
   });
 
   it('tracks team_application_accept once the approval mutation succeeds', async () => {
@@ -199,10 +298,9 @@ describe('TeamMembersPageClient GA events', () => {
     render(<TeamMembersPageClient teamId="team-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: /^가입 신청/ }));
-    fireEvent.click(screen.getByRole('button', { name: '관리' }));
-    fireEvent.click(screen.getByRole('button', { name: '승인' }));
-    const approveDialog = screen.getByRole('dialog', { name: '가입 신청 승인' });
-    fireEvent.click(within(approveDialog).getByRole('button', { name: '승인' }));
+    // 개별 승인은 확인 창 없이 바로 반영된다(G12 F37).
+    fireEvent.click(screen.getByRole('button', { name: '이서준 가입 신청 승인' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     await waitFor(() => {
       expect(approveMutate).toHaveBeenCalledWith(
@@ -221,8 +319,7 @@ describe('TeamMembersPageClient GA events', () => {
     render(<TeamMembersPageClient teamId="team-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: /^가입 신청/ }));
-    fireEvent.click(screen.getByRole('button', { name: '관리' }));
-    fireEvent.click(screen.getByRole('button', { name: '거절' }));
+    fireEvent.click(screen.getByRole('button', { name: '이서준 가입 신청 거절' }));
     const rejectDialog = screen.getByRole('dialog', { name: '가입 신청 거절' });
     fireEvent.click(within(rejectDialog).getByRole('button', { name: '거절' }));
 
@@ -233,6 +330,162 @@ describe('TeamMembersPageClient GA events', () => {
       );
       expect(trackEvent).toHaveBeenCalledWith('team_application_reject', { teamId: 'team-1' });
     });
+  });
+
+  // G12(F36): 가입 신청 알림은 ?tab=requests 로 들어온다 — 멤버 탭이 아니라 가입 신청 탭이 열려 있어야 한다.
+  it('tab=requests 로 들어오면 가입 신청 탭이 바로 열린다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=requests');
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(screen.getByRole('button', { name: /^가입 신청/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '이서준 가입 신청 승인' })).toBeInTheDocument();
+  });
+
+  it('권한 없는 사람이 tab=requests 로 들어와도 멤버 목록만 본다', () => {
+    navigationMocks.searchParams = new URLSearchParams('tab=requests');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: true, viewer: { role: 'member', membershipId: 'membership-owner' } },
+      isError: false,
+    });
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(screen.queryByText('이서준')).toBeNull();
+    expect(screen.getAllByText('김도윤').length).toBeGreaterThan(0);
+  });
+
+  it('승인한 신청은 목록 조회에서 빠져도 "승인 완료"로 제자리에 남는다', async () => {
+    approveMutate.mockImplementation((_vars, options) => {
+      options?.onSuccess?.();
+      options?.onSettled?.();
+    });
+    const view = render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(screen.getByRole('button', { name: /^가입 신청/ }));
+    fireEvent.click(screen.getByRole('button', { name: '이서준 가입 신청 승인' }));
+
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    view.rerender(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(await screen.findByText('승인 완료')).toBeInTheDocument();
+    expect(screen.getByText('이서준')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이서준 가입 신청 승인' })).toBeNull();
+  });
+
+  describe('모두 승인', () => {
+    const requested = (id: string, name: string, createdAt: string) => ({
+      applicationId: id,
+      status: 'requested',
+      message: null,
+      createdAt,
+      applicant: { userId: `user-${id}`, displayName: name },
+    });
+
+    beforeEach(() => {
+      teamApiMocks.useV1TeamJoinApplications.mockReturnValue({
+        data: { items: [requested('a-2', '박하늘', '2026-07-02T00:00:00.000Z'), requested('a-1', '이서준', '2026-07-01T00:00:00.000Z')] },
+      });
+      navigationMocks.searchParams = new URLSearchParams('tab=requests');
+    });
+
+    it('한 명뿐이면 모두 승인 버튼을 두지 않는다', () => {
+      teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [requested('a-1', '이서준', '2026-07-01T00:00:00.000Z')] } });
+      render(<TeamMembersPageClient teamId="team-1" />);
+
+      expect(screen.queryByRole('button', { name: '모두 승인' })).toBeNull();
+    });
+
+    it('확인 창에서 취소하면 아무것도 승인하지 않는다', async () => {
+      render(<TeamMembersPageClient teamId="team-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '모두 승인' }));
+      const dialog = await screen.findByRole('dialog', { name: '2명을 모두 승인할까요?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(approveMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('확인하면 신청 순서대로 모두 승인하고 각 행에 결과를 남긴다', async () => {
+      approveMutateAsync.mockResolvedValue({ status: 'approved' });
+      render(<TeamMembersPageClient teamId="team-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '모두 승인' }));
+      const dialog = await screen.findByRole('dialog', { name: '2명을 모두 승인할까요?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: '2명 승인' }));
+
+      await waitFor(() => expect(screen.getAllByText('승인 완료')).toHaveLength(2));
+      expect(approveMutateAsync.mock.calls.map(([vars]) => vars.applicationId)).toEqual(['a-2', 'a-1']);
+    });
+
+    it('일부가 거절되면 몇 명이 왜 안 됐는지 알리고, 된 사람만 승인 완료로 둔다', async () => {
+      approveMutateAsync
+        .mockResolvedValueOnce({ status: 'approved' })
+        .mockRejectedValueOnce(new V1ApiError({ status: 'error', statusCode: 409, code: 'TEAM_FULL', message: '정원이 다 찬 팀이에요.', timestamp: '' }));
+      Element.prototype.scrollIntoView = vi.fn();
+      render(<TeamMembersPageClient teamId="team-1" />);
+      fireEvent.click(screen.getByRole('button', { name: '모두 승인' }));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '2명을 모두 승인할까요?' })).getByRole('button', { name: '2명 승인' }));
+
+      expect(await screen.findByText('1명은 승인하지 못했어요. 정원이 다 찬 팀이에요.')).toBeInTheDocument();
+      expect(screen.getAllByText('승인 완료')).toHaveLength(1);
+      expect(screen.getByRole('button', { name: '이서준 가입 신청 승인' })).toBeInTheDocument();
+    });
+  });
+
+  it('removes stale review controls when the live viewer role changes to member', async () => {
+    const ownerDetail = {
+      name: '성수 풋살 크루',
+      canViewMembers: true,
+      viewer: { role: 'owner', membershipId: 'membership-owner' },
+    };
+    const memberDetail = {
+      name: '성수 풋살 크루',
+      canViewMembers: true,
+      viewer: { role: 'member', membershipId: 'membership-owner' },
+    };
+    teamApiMocks.useV1TeamDetail
+      .mockReset()
+      .mockReturnValue({ data: ownerDetail, isError: false });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [{
+          membershipId: 'membership-owner',
+          userId: 'user-owner',
+          displayName: '김도윤',
+          role: 'member',
+          status: 'active',
+          joinedAt: '2026-01-01T00:00:00.000Z',
+          canChangeRole: false,
+          canRemove: false,
+        }],
+        summary: { ownerCount: 0, managerCount: 0, memberCount: 1 },
+        viewerRole: 'member',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+
+    const rendered = render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /^가입 신청/ }));
+    expect(screen.getByText('이서준')).toBeInTheDocument();
+
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: memberDetail, isError: false });
+    rendered.rerender(<TeamMembersPageClient teamId="team-1" />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^가입 신청/ })).toBeNull();
+      expect(screen.queryByText('이서준')).toBeNull();
+      expect(screen.queryByText(/확인 창을 거쳐요/)).toBeNull();
+      expect(screen.getByRole('heading', { name: '성수 풋살 크루 · 멤버 목록' })).toBeInTheDocument();
+      expect(teamApiMocks.useV1TeamJoinApplications).toHaveBeenLastCalledWith(
+        'team-1',
+        { status: 'requested', limit: 50 },
+        { enabled: false },
+      );
+      expect(teamApiMocks.useV1TeamInvitations).toHaveBeenLastCalledWith('team-1', { enabled: false });
+    });
+    // 멤버가 된 본인 행의 ⋯ 시트에는 나가기만 남는다 — 역할·내보내기 동작이 남아 있으면 안 된다.
+    fireEvent.click(screen.getByRole('button', { name: '김도윤 관리' }));
+    const sheet = screen.getByRole('dialog', { name: '김도윤' });
+    expect(within(sheet).getByRole('button', { name: '팀 나가기' })).toBeEnabled();
+    expect(within(sheet).queryByRole('button', { name: /매니저로 지정|팀장 넘기기|내보내기/ })).toBeNull();
   });
 });
 
@@ -294,6 +547,167 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
   });
 
+  it('운영진이면 운영 메뉴에 "받은 컨택" 행이 팀컨택 필터 채팅 목록으로 연결되고 대기 건수가 배지로 붙는다', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({
+      data: { pendingInbound: 3, byTeam: [{ teamId: 'team-1', pendingInbound: 2 }, { teamId: 'team-9', pendingInbound: 1 }] },
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const links = screen.getAllByRole('link', { name: /받은 컨택/ });
+    expect(links[0]).toHaveAttribute('href', '/chat?category=team_contact');
+    // 이 팀(team-1)의 대기 건수만 배지로 — 다른 팀 건은 섞지 않는다.
+    expect(screen.getAllByLabelText('답장을 기다리는 컨택 2건').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('답장을 기다리는 컨택 3건')).not.toBeInTheDocument();
+    // Task 179 팀 B 진입점.
+    expect(screen.getAllByRole('link', { name: /경기 명단 관리/ })[0]).toHaveAttribute('href', '/teams/team-1/game-rosters');
+  });
+
+  it('"팀매치 만들기" 는 이 팀 상세로 돌아오도록 항상 from= 을 담는다 (받은 출처가 없어도)', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const links = screen.getAllByRole('link', { name: /팀매치 만들기/ });
+    expect(links.length).toBeGreaterThan(0);
+    // 자연스러운 뒤로가기는 (외부에서 받은 출처가 아니라) 이 팀 상세 자신이다.
+    links.forEach((link) => expect(link).toHaveAttribute('href', '/team-matches/new/team?from=%2Fteams%2Fteam-1'));
+    // 회귀 방지: from 이 빠지면 팀매치 생성 완료 후 팀 상세로 못 돌아온다.
+    links.forEach((link) => expect(link.getAttribute('href')).not.toBe('/team-matches/new/team'));
+  });
+
+  it('"팀매치 만들기" 는 팀 상세 자체가 받은 출처(selfHref 의 from)도 함께 실어 나른다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const [link] = screen.getAllByRole('link', { name: /팀매치 만들기/ });
+    expect(link).toHaveAttribute('href', '/team-matches/new/team?from=%2Fteams%2Fteam-1%3Ffrom%3D%252Fmy%252Fteams');
+  });
+
+  // G12(F25·F26·F24·F33): 만든 직후 성공·다음 할 일, 운영 바로가기는 히어로 아래, 팀원에게 관리 안내 없음.
+  describe('만든 직후와 운영 바로가기', () => {
+    const ownerAuth = { data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false };
+    function viewAs(role: 'owner' | 'manager' | 'member') {
+      teamApiMocks.useV1AuthMe.mockReturnValue(ownerAuth);
+      teamApiMocks.useV1TeamDetail.mockReturnValue({
+        data: baseTeamDetail({ viewer: { role, membershipId: 'mem-me', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+        isError: false,
+      });
+      teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+    }
+
+    it('팀을 막 만든 팀장에게 성공 안내와 멤버 초대 바로가기를 보인다', () => {
+      navigationMocks.searchParams = new URLSearchParams('created=1');
+      viewAs('owner');
+      render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
+      screen.getAllByRole('link', { name: '멤버 초대' }).forEach((link) =>
+        expect(link).toHaveAttribute('href', '/teams/team-1/invite'),
+      );
+    });
+
+    it('안내는 처음 연 화면에만 — 표시를 URL 에서 지우되(다른 파라미터는 남김) 그 화면에선 계속 보이고, 다시 열면 없다', () => {
+      routerMocks.replace.mockClear();
+      navigationMocks.searchParams = new URLSearchParams('created=1&from=%2Fmy%2Fteams');
+      viewAs('owner');
+      const view = render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
+      expect(routerMocks.replace).toHaveBeenCalledTimes(1);
+      expect(routerMocks.replace).toHaveBeenCalledWith('/teams/team-1?from=%2Fmy%2Fteams', { scroll: false });
+
+      // replace 가 반영된 URL 로 같은 화면이 다시 그려져도 안내는 남는다.
+      navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+      view.rerender(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.getAllByText('팀을 만들었어요').length).toBeGreaterThan(0);
+      expect(routerMocks.replace).toHaveBeenCalledTimes(1);
+      view.unmount();
+
+      // 새로고침·뒤로가기로 다시 열면 URL 에 표시가 없어 안내도 없다.
+      render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByText('팀을 만들었어요')).toBeNull();
+    });
+
+    it('표시가 없거나 팀장이 아니면 성공 안내를 보이지 않는다', () => {
+      viewAs('owner');
+      const view = render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByText('팀을 만들었어요')).toBeNull();
+      view.unmount();
+
+      navigationMocks.searchParams = new URLSearchParams('created=1');
+      viewAs('member');
+      render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByText('팀을 만들었어요')).toBeNull();
+    });
+
+    it('팀장·매니저는 히어로 아래에서 멤버 관리·팀 정보 수정으로 바로 가고, 팀원에겐 없다', () => {
+      viewAs('manager');
+      const view = render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.getAllByRole('link', { name: /^멤버 관리/ })[0]).toHaveAttribute('href', '/teams/team-1/members');
+      expect(screen.getAllByRole('link', { name: /^팀 정보 수정/ })[0]).toHaveAttribute('href', '/teams/team-1/edit?from=%2Fteams%2Fteam-1');
+      view.unmount();
+
+      viewAs('member');
+      render(<TeamDetailPageClient teamId="team-1" />);
+      expect(screen.queryByRole('link', { name: /^멤버 관리/ })).toBeNull();
+      expect(screen.queryByRole('link', { name: /^팀 정보 수정/ })).toBeNull();
+    });
+
+    it('소속된 사람에게 "관리할 수 있어요" 안내를 붙이지 않는다', () => {
+      viewAs('member');
+      render(<TeamDetailPageClient teamId="team-1" />);
+
+      expect(screen.queryByText('팀 정보와 멤버를 관리할 수 있어요.')).toBeNull();
+      expect(screen.queryByText(/운영 메뉴에서 팀을 관리해요/)).toBeNull();
+      expect(screen.getAllByRole('button', { name: '팀 채팅' }).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('cached verified owner keeps management, member CTA, and protected queries during auth background fetching', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({
+      data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } },
+      isPending: false,
+      isFetching: true,
+      isError: false,
+    });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({
+        viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null },
+      }),
+      isError: false,
+      isPlaceholderData: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByRole('button', { name: '로그인 상태 확인 중' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: /^팀 정보 수정/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /받은 컨택/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '팀 채팅' }).length).toBeGreaterThan(0);
+    expect(teamApiMocks.useV1TeamContactSummary).toHaveBeenLastCalledWith({ enabled: true });
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(teamApiMocks.useV1MyTeams).toHaveBeenLastCalledWith(undefined, { enabled: true });
+    expect(teamApiMocks.useV1TeamUpcomingGames).toHaveBeenCalledWith('team-1');
+  });
+
   it('총원이 미리보기(8명)보다 많으면 정확한 남은 인원 수로 "+ n명 더보기" CTA가 뜨고 전체 멤버 목록으로 연결된다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({
@@ -311,18 +725,21 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     moreLinks.forEach((link) => expect(link).toHaveAttribute('href', '/teams/team-1/members'));
   });
 
-  it('총원이 미리보기 인원 이하면 더보기 CTA가 없다', () => {
+  it('작은 팀의 멤버에게도 전체 멤버 목록 진입점이 있다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({
         memberCount: 6,
         membersPreview: Array.from({ length: 6 }, (_, i) => member(i)),
+        viewer: { role: 'member', membershipId: 'mem-0', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null },
       }),
       isError: false,
     });
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.queryByText(/더보기/)).not.toBeInTheDocument();
+    const memberListLinks = screen.getAllByRole('link', { name: '멤버 목록 보기' });
+    expect(memberListLinks.length).toBeGreaterThanOrEqual(2); // 데스크톱·모바일 레이아웃 둘 다 렌더
+    memberListLinks.forEach((link) => expect(link).toHaveAttribute('href', '/teams/team-1/members'));
   });
 
   it('미리보기 멤버를 누르면 해당 멤버의 공개 프로필(/users/{userId})로 이동한다', () => {
@@ -341,7 +758,64 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
 
     const memberLinks = screen.getAllByRole('link', { name: /박서준/ });
     expect(memberLinks.length).toBeGreaterThanOrEqual(2);
-    memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42'));
+    // 뒤로가기가 이 팀 상세로 돌아오도록 `?from=`을 함께 실어 보낸다(QA 피드백 #1).
+    memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42?from=%2Fteams%2Fteam-1'));
+  });
+
+  // 데스크톱 "팀 목록으로" 헤더 링크(AppBackLink)도 모바일 셸과 마찬가지로 `?from=`을 직접 읽는다.
+  it('내 팀 목록에서 들어오면 데스크톱 뒤로가기 링크도 그 화면으로 돌아간다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/my/teams');
+  });
+
+  it('받은 출처를 하위 화면(멤버 목록·팀 전적)과 프로필 링크에 이어 싣는다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ memberCount: 2, membersPreview: [{ membershipId: 'mem-owner', userId: 'user-owner-42', displayName: '박서준', role: 'owner' }, member(1)] }),
+      isError: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const selfFrom = encodeURIComponent('/teams/team-1?from=%2Fmy%2Fteams');
+    screen.getAllByRole('link', { name: '멤버 목록 보기' }).forEach((link) =>
+      expect(link).toHaveAttribute('href', `/teams/team-1/members?from=${selfFrom}`),
+    );
+    screen.getAllByRole('link', { name: /박서준/ }).forEach((link) =>
+      expect(link).toHaveAttribute('href', `/users/user-owner-42?from=${selfFrom}`),
+    );
+    const recordLinks = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/teams/team-1/records'));
+    expect(recordLinks.length).toBeGreaterThan(0);
+    recordLinks.forEach((link) => expect(link).toHaveAttribute('href', `/teams/team-1/records?from=${selfFrom}`));
+  });
+
+  it('출처가 없으면 데스크톱 뒤로가기 링크는 전체 팀 목록으로 돌아간다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/teams');
+  });
+
+  // override store는 한 칸이라, 부모(TeamDetailPageClient)가 게시한 backHref가 자식
+  // 에러 뷰의 제목을 덮어쓰면 셸 제목이 route-chrome 기본값('팀 상세')으로 돌아간다.
+  it('상세를 못 불러오면 셸에 에러 제목과 출처 뒤로가기를 함께 게시한다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: undefined, isError: true });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamDetailPageClient teamId="team-1" /></>);
+
+    // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
+    expect(published).toEqual({ title: '팀 목록을 불러오지 못했어요' });
   });
 
   it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {
@@ -359,5 +833,1044 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
 
     expect(screen.queryByText(/더보기/)).not.toBeInTheDocument();
     expect(screen.getAllByText('멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * "내 리그" (R4) — GET /league-matches?teamId= 로 참가 테이블을 직접 읽는다.
+ *
+ * 2026-08-21 이전에는 GET /team-matches?teamId= 응답의 league 필드에서 distinct 로
+ * 역산했는데, 그러면 **대진이 생기기 전에는 아무것도 뜨지 않았다** — 운영자가 팀을 리그에
+ * 넣은 시점부터 대진을 만들 때까지 팀은 자기 참가 사실을 알 수 없었다(재감사에서 alpha 의
+ * draft 티어 리그 참가팀이 team-matches 0건인 것으로 확인). D-2 가 "참가 인지는 노출로
+ * 푼다"고 확정한 이상 이 경로는 참가 테이블을 봐야 한다.
+ */
+describe('TeamDetailPageClient — 내 리그', () => {
+  function baseTeamDetail(overrides: Record<string, unknown> = {}) {
+    return {
+      teamId: 'team-1',
+      name: '성수 풋살 크루',
+      status: 'active',
+      visibility: 'public',
+      sport: { sportId: 'sport-futsal', name: '풋살' },
+      region: { regionId: 'region-seoul', name: '서울', parentName: null },
+      joinPolicy: 'approval_required',
+      membersVisibilityEnabled: true,
+      canViewMembers: true,
+      profile: {
+        logoUrl: null,
+        coverImageUrl: null,
+        introduction: '',
+        activityAreaText: null,
+        activityDays: [],
+        activityFrequency: null,
+        activityTimeSlots: [],
+        activityTypes: [],
+        activityMemo: null,
+        activitySummary: null,
+        skillLevelText: null,
+        genderRule: '성별 무관',
+        joinPolicy: 'approval_required',
+        memberGoalCount: 20,
+      },
+      owner: { userId: 'user-owner', displayName: '김도윤', profileImageUrl: null },
+      membersPreview: [],
+      memberCount: 0,
+      managerCount: 1,
+      trust: { trustState: 'none', score: null },
+      viewer: {
+        role: 'none',
+        membershipId: null,
+        joinState: 'none',
+        canRequestJoin: true,
+        disabledReason: null,
+        manageRoute: null,
+      },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입 불가' } });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+  });
+
+  it('대진이 하나도 없는 리그도 "내 리그"에 보여준다', () => {
+    // 이게 이 변경의 핵심이다 — 예전 방식(팀매치 역산)에서는 이 케이스가 통째로 비었다.
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({
+      data: {
+        items: [{ leagueId: 'lg-1', title: '가을 리그', state: 'draft' }],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isLoading: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // 데스크톱·모바일 레이아웃당 1개씩 = 2개.
+    const leagueLinks = screen.getAllByRole('link', { name: /가을 리그/ });
+    expect(leagueLinks).toHaveLength(2);
+    // 뒤로가기가 이 팀 상세로 돌아오도록 `?from=`을 함께 실어 보낸다(QA 피드백 #1).
+    leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1?from=%2Fteams%2Fteam-1'));
+  });
+
+  it('참가 중인 리그가 없으면 "내 리그" 섹션 자체가 없다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({
+      data: { items: [], pageInfo: { nextCursor: null, hasNext: false } },
+      isLoading: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+
+  it('리그 목록을 teamId 필터로 조회한다 (팀매치 역산이 아니라)', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({
+      data: { items: [], pageInfo: { nextCursor: null, hasNext: false } },
+      isLoading: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1LeagueMatches).toHaveBeenCalledWith(
+      expect.objectContaining({ teamId: 'team-1' }),
+      { enabled: true },
+    );
+  });
+
+  // R-1 B — 신청 상태·신청 id 는 팀 내부 정보라 팀원에게만 "참가 중인 대회·리그"를 보이고, 비회원은 공개 리그 목록 그대로.
+  it('팀원(팀장)에게는 "참가 중인 대회·리그"를 보이고 공개 리그 목록은 부르지 않는다', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({ data: undefined, isLoading: false });
+    teamApiMocks.useV1TeamCompetitionEntries.mockReturnValue({ data: v1TeamCompetitionEntriesFixture, isLoading: false, isError: false, refetch: vi.fn() } as never);
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamCompetitionEntries).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(teamApiMocks.useV1LeagueMatches).toHaveBeenLastCalledWith(expect.objectContaining({ teamId: 'team-1' }), { enabled: false });
+    // 데스크톱·모바일 레이아웃당 1개씩.
+    expect(screen.getAllByText('참가 중인 대회·리그')).toHaveLength(2);
+    screen.getAllByRole('link', { name: '가을 정규 리그 참가 명단 수정' }).forEach((link) =>
+      expect(link).toHaveAttribute('href', '/tournaments/league-1/registrations/registration-league-1/roster?from=%2Fteams%2Fteam-1'),
+    );
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+
+  it('비회원에게는 참가 내역을 조회하지 않고 공개 리그 목록("내 리그")을 그대로 보인다', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'outsider', email: null, onboardingStatus: 'complete' }, profile: { displayName: '방문자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1LeagueMatches.mockReturnValue({
+      data: { items: [{ leagueId: 'lg-1', title: '가을 리그', state: 'draft' }], pageInfo: { nextCursor: null, hasNext: false } },
+      isLoading: false,
+    });
+    teamApiMocks.useV1TeamCompetitionEntries.mockReturnValue({ data: v1TeamCompetitionEntriesFixture, isLoading: false, isError: false, refetch: vi.fn() } as never);
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamCompetitionEntries).not.toHaveBeenCalledWith('team-1', { enabled: true });
+    expect(screen.queryByText('참가 중인 대회·리그')).not.toBeInTheDocument();
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+  });
+});
+
+describe('TeamDetailPageClient — 로딩 중 목업 노출 방지', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입 불가' } });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  it('팀을 아직 못 받았으면 목업 팀("성수 러너스 FC")을 실제 팀처럼 보여주지 않는다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: undefined, isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // 목업 팀(teams.view-model.ts)의 이름·지역·태그 어느 것도 화면에 닿으면 안 된다.
+    expect(screen.queryByText('성수 러너스 FC')).not.toBeInTheDocument();
+    expect(screen.queryByText('서울 성동')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의존 UI 잠금', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: undefined });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  function seededDetail() {
+    return {
+      teamId: 'team-1',
+      name: '성수 풋살 크루',
+      status: 'active',
+      visibility: 'public',
+      sport: { sportId: 'sport-futsal', name: '풋살' },
+      region: { regionId: 'region-seoul', name: '서울', parentName: null },
+      regionName: '서울 성동구',
+      joinPolicy: 'approval_required',
+      membersVisibilityEnabled: true,
+      canViewMembers: true,
+      memberCount: 4,
+      managerCount: 1,
+      profile: { logoUrl: null, coverImageUrl: null, introduction: '', activityAreaText: null, activityDays: [], activityFrequency: null, activityTimeSlots: [], ageRange: null, genderRule: null, memberGoalCount: null },
+      membersPreview: [],
+      owner: null,
+      trust: null,
+      trustState: null,
+      // 비인증 응답이 실제로 주는 모양 — 로그인한 owner 가 이 값을 그대로 보면 안 된다.
+      viewer: { role: 'none', membershipId: null, joinState: 'none', canRequestJoin: false, disabledReason: 'LOGIN_REQUIRED', manageRoute: null },
+    };
+  }
+
+  it.each([
+    ['남', '남'], ['여', '여'], ['성별 무관', '성별 무관'], ['무관', '성별 무관'],
+    ['남성', '남'], ['여성', '여'], ['혼성', '혼성'],
+    ['male', '남'], ['female', '여'], ['any', '성별 무관'], ['mixed', '혼성'],
+    [' MALE ', '남'], [' FEMALE ', '여'],
+    ['unknown-rule', ''], ['', ''], [null, ''], [undefined, ''],
+  ])('팀 성별 %s는 실제 목록 카드와 상세 client에서 같은 표시 정책을 따른다', (raw, label) => {
+    const api = {
+      id: 'team-1', teamId: 'team-1', name: '성수 풋살 크루', sportName: '풋살',
+      regionName: '서울', memberCount: 4, genderRule: raw,
+    } as unknown as V1Team;
+    const list = render(<TeamListPageView model={{ ...getTeamListViewModel(), teams: [toTeam(api)] }} />);
+    const tags = Array.from(list.container.querySelectorAll('.tm-team-tag-text')).map((el) => el.textContent);
+    if (label) expect(tags).toContain(label);
+    else expect(tags.filter((tag) => tag === raw || tag === '성별 무관')).toHaveLength(0);
+    if (raw && raw !== label) expect(tags).not.toContain(raw);
+    list.unmount();
+
+    const detail = seededDetail();
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { ...detail, profile: { ...detail.profile, genderRule: raw } },
+      isError: false, isPlaceholderData: false,
+    });
+    render(<TeamDetailPageClient teamId="team-1" />);
+    screen.getAllByText('성별 조건').forEach((el) =>
+      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미정'}`),
+    );
+    expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' }).length).toBeGreaterThan(0);
+  });
+
+  it('guest does not request protected eligibility and gets a login return CTA', async () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: seededDetail(), isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined, isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    await waitFor(() => expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: false }));
+    const cta = screen.getAllByRole('button', { name: '로그인 후 가입 신청' })[0];
+    fireEvent.click(cta);
+    await waitFor(() => expect(routerMocks.push).toHaveBeenCalledWith('/login?redirect=%2Fteams%2Fteam-1'));
+  });
+
+  it('hydrated authenticated user keeps eligible and denied server decisions', () => {
+    const detail = seededDetail();
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: '가입 신청할 수 있어요.' }, isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(screen.getAllByRole('button', { name: '가입 신청' }).length).toBeGreaterThan(0);
+  });
+
+  it('hydrated authenticated user keeps an ineligible server decision disabled', () => {
+    const detail = seededDetail();
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입이 마감된 팀이에요.' }, isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(screen.getAllByRole('button', { name: '가입이 마감된 팀이에요.' })[0]).toBeDisabled();
+  });
+
+  describe('컨택 보내기 — 서버가 합산한 canSendContact', () => {
+    afterEach(() => {
+      teamApiMocks.useV1MyTeams.mockReturnValue({ data: undefined });
+    });
+
+    function renderAsOperator(canSendContact: boolean | undefined) {
+      const detail = seededDetail();
+      teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
+      teamApiMocks.useV1MyTeams.mockReturnValue({ data: [{ teamId: 'my-team', role: 'owner' }] } as never);
+      teamApiMocks.useV1TeamDetail.mockReturnValue({
+        data: { ...detail, ...(canSendContact === undefined ? {} : { canSendContact }), viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } },
+        isError: false,
+        isPlaceholderData: false,
+      });
+      teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: '가입 신청할 수 있어요.' }, isError: false });
+      render(<TeamDetailPageClient teamId="team-1" />);
+    }
+
+    it('보낼 수 있으면 작성 화면으로 가는 링크', () => {
+      renderAsOperator(true);
+
+      const [link] = screen.getAllByRole('link', { name: '컨택 보내기' });
+      expect(link).toHaveAttribute('href', '/teams/team-1/contact/new');
+      expect(screen.queryByText('이 팀은 지금 컨택을 받지 않고 있어요.')).toBeNull();
+    });
+
+    it('값이 없으면(구버전 응답) 링크를 그대로 둔다 — 서버가 컨택 생성 때 다시 막는다', () => {
+      renderAsOperator(undefined);
+
+      expect(screen.getAllByRole('link', { name: '컨택 보내기' }).length).toBeGreaterThan(0);
+    });
+
+    it('받지 않는 팀이면 링크 대신 이유와 함께 비활성 버튼', () => {
+      renderAsOperator(false);
+
+      expect(screen.queryByRole('link', { name: '컨택 보내기' })).toBeNull();
+      const [button] = screen.getAllByRole('button', { name: '컨택 보내기' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription('이 팀은 지금 컨택을 받지 않고 있어요.');
+      // 컨택이 막혀도 가입 신청 같은 주 CTA 는 그대로 누를 수 있다.
+      expect(screen.getAllByRole('button', { name: '가입 신청' })[0]).toBeEnabled();
+    });
+  });
+
+  it('authenticated eligibility errors do not invoke the join mutation', () => {
+    const detail = seededDetail();
+    const joinMutateAsync = vi.fn();
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined, isError: true, error: new Error('temporary failure') });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: joinMutateAsync, isPending: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(screen.queryByRole('button', { name: '가입 신청' })).toBeNull();
+    expect(joinMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('auth pending locks the CTA and both protected queries', () => {
+    const detail = seededDetail();
+    const resolveChat = vi.fn();
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: resolveChat, mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: undefined, isPending: true, isFetching: true, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, role: 'member', disabledReason: null } }, isError: false, isPlaceholderData: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getAllByRole('button', { name: '로그인 상태 확인 중' })[0]).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '처리 중' })).toBeNull();
+    expect(resolveChat).not.toHaveBeenCalled();
+    expect(teamApiMocks.useV1TeamContactSummary).toHaveBeenLastCalledWith({ enabled: false });
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: false });
+    expect(teamApiMocks.useV1MyTeams).toHaveBeenLastCalledWith(undefined, { enabled: false });
+  });
+
+  it('cold valid cookie with no local hint enables both protected queries from verified auth', async () => {
+    const detail = seededDetail();
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'cold-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '콜드 사용자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: null }, isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    await waitFor(() => {
+      expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
+      expect(teamApiMocks.useV1MyTeams).toHaveBeenLastCalledWith(undefined, { enabled: true });
+    });
+  });
+
+  it('auth 401 overrides cached auth data and stale member viewer state', () => {
+    const detail = seededDetail();
+    const resolveChat = vi.fn();
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: resolveChat, mutateAsync: vi.fn(), isPending: false });
+    const expired = new V1ApiError({ status: 'error', statusCode: 401, code: 'UNAUTHENTICATED', message: 'expired', timestamp: '' });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'cached-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '캐시 사용자' } }, isPending: false, isFetching: false, isError: true, error: expired });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, role: 'member', disabledReason: null } }, isError: false, isPlaceholderData: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' })[0]).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '팀 채팅' })).toBeNull();
+    expect(resolveChat).not.toHaveBeenCalled();
+    expect(teamApiMocks.useV1TeamContactSummary).toHaveBeenLastCalledWith({ enabled: false });
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: false });
+    expect(teamApiMocks.useV1MyTeams).toHaveBeenLastCalledWith(undefined, { enabled: false });
+  });
+
+  it('auth 500 exposes an awaited auth retry and accepts a later verified result', async () => {
+    const detail = seededDetail();
+    let authState: AuthProbeFixture = { data: undefined, isPending: false, isFetching: false, isError: true };
+    const serverError = new V1ApiError({ status: 'error', statusCode: 500, code: 'INTERNAL_SERVER_ERROR', message: 'temporary', timestamp: '' });
+    const retryAuth = vi.fn().mockImplementation(async () => {
+      authState = { data: { user: { id: 'recovered-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '복구 사용자' } }, isPending: false, isFetching: false, isError: false };
+      return { data: authState.data, error: null };
+    });
+    teamApiMocks.useV1AuthMe.mockImplementation(() => ({ ...authState, error: authState.isError ? serverError : undefined, refetch: retryAuth }));
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: null }, isError: false });
+
+    const rendered = render(<TeamDetailPageClient teamId="team-1" />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '로그인 상태 다시 확인' })[0]);
+    await waitFor(() => expect(retryAuth).toHaveBeenCalledTimes(1));
+    rendered.rerender(<TeamDetailPageClient teamId="team-1" />);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '가입 신청' }).length).toBeGreaterThan(0));
+  });
+
+  it('auth retry returning 401 stays guest without an error or join success', async () => {
+    const detail = seededDetail();
+    const expired = new V1ApiError({ status: 'error', statusCode: 401, code: 'UNAUTHENTICATED', message: 'expired', timestamp: '' });
+    const retryAuth = vi.fn().mockResolvedValue({ data: undefined, error: expired });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: undefined, isPending: false, isFetching: false, isError: true, error: new V1ApiError({ status: 'error', statusCode: 500, code: 'INTERNAL_SERVER_ERROR', message: 'temporary auth failure', timestamp: '' }), refetch: retryAuth });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null } }, isError: false, isPlaceholderData: false });
+
+    const rendered = render(<TeamDetailPageClient teamId="team-1" />);
+    fireEvent.click(screen.getAllByRole('button', { name: '로그인 상태 다시 확인' })[0]);
+    await waitFor(() => expect(retryAuth).toHaveBeenCalledTimes(1));
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: undefined, isPending: false, isFetching: false, isError: true, error: expired, refetch: retryAuth });
+    rendered.rerender(<TeamDetailPageClient teamId="team-1" />);
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' })[0]).toBeEnabled());
+    expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' })[0]).toBeInTheDocument();
+    expect(screen.queryByText('expired')).toBeNull();
+    expect(screen.queryByText('temporary auth failure')).toBeNull();
+    expect(screen.queryByText('신청을 완료했어요.')).toBeNull();
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: false });
+  });
+
+  it('auth retry returning 500 surfaces the actual error and keeps retry available', async () => {
+    const detail = seededDetail();
+    const serverError = new V1ApiError({ status: 'error', statusCode: 500, code: 'INTERNAL_SERVER_ERROR', message: 'temporary auth failure', timestamp: '' });
+    const retryAuth = vi.fn().mockResolvedValue({ data: undefined, error: serverError });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: undefined, isPending: false, isFetching: false, isError: true, error: serverError, refetch: retryAuth });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null } }, isError: false, isPlaceholderData: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+    fireEvent.click(screen.getAllByRole('button', { name: '로그인 상태 다시 확인' })[0]);
+    await waitFor(() => expect(retryAuth).toHaveBeenCalledTimes(1));
+    expect((await screen.findAllByText('temporary auth failure')).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '로그인 상태 다시 확인' })[0]).toBeEnabled();
+    expect(screen.queryByText('신청을 완료했어요.')).toBeNull();
+  });
+
+  it('cached owner with auth 401 hides management, contact, private members, chat mutation, and upcoming matches fetch', () => {
+    const detail = seededDetail();
+    const expired = new V1ApiError({ status: 'error', statusCode: 401, code: 'UNAUTHENTICATED', message: 'expired', timestamp: '' });
+    const resolveChatMutate = vi.fn();
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'cached-owner', email: null, onboardingStatus: 'complete' }, profile: { displayName: '캐시 운영자' } }, isPending: false, isFetching: false, isError: true, error: expired });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, membersVisibilityEnabled: false, membersPreview: [{ membershipId: 'm1', userId: 'u1', displayName: '비공개 멤버', role: 'member' }], viewer: { ...detail.viewer, role: 'owner', disabledReason: null } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: resolveChatMutate, mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByText('비공개 멤버')).toBeNull();
+    expect(screen.queryByRole('link', { name: '팀 정보 수정' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '컨택 보내기' })).toBeNull();
+    expect(resolveChatMutate).not.toHaveBeenCalled();
+    expect(teamApiMocks.useV1TeamUpcomingGames).not.toHaveBeenCalled();
+    // Recruiting matches are public; only the member-only upcoming-games query is blocked.
+    expect(teamApiMocks.useV1TeamMatches).toHaveBeenLastCalledWith({ teamId: 'team-1', status: 'recruiting', limit: 5 }, { enabled: true });
+  });
+
+  it('public members remain visible for a guest while private cached members stay hidden', () => {
+    const detail = seededDetail();
+    const expired = new V1ApiError({ status: 'error', statusCode: 401, code: 'UNAUTHENTICATED', message: 'expired', timestamp: '' });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: undefined, isPending: false, isFetching: false, isError: true, error: expired });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, membersVisibilityEnabled: true, membersPreview: [{ membershipId: 'm1', userId: 'u1', displayName: '공개 멤버', role: 'member' }] }, isError: false, isPlaceholderData: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getAllByText('공개 멤버').length).toBeGreaterThan(0);
+  });
+
+  it('verified member keeps chat action ahead of an eligibility error', async () => {
+    const detail = seededDetail();
+    const chatMutateAsync = vi.fn().mockResolvedValue({ roomId: 'room-1', route: 'team' });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'member-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '멤버' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, role: 'member', disabledReason: null } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined, isError: true, error: new Error('temporary') });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: chatMutateAsync, isPending: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+    fireEvent.click(screen.getAllByRole('button', { name: '팀 채팅' })[0]);
+    await waitFor(() => expect(chatMutateAsync).toHaveBeenCalledWith({ targetType: 'team', targetId: 'team-1' }));
+    expect(teamApiMocks.useV1TeamUpcomingGames).toHaveBeenCalledWith('team-1');
+  });
+
+  function renderPendingMember(eligibility: Record<string, unknown>) {
+    const detail = seededDetail();
+    const withdrawMutateAsync = vi.fn().mockResolvedValue({ status: 'withdrawn' });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'pending-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '대기 사용자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, joinState: 'requested', disabledReason: null } }, isError: false, isPlaceholderData: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue(eligibility);
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: withdrawMutateAsync, isPending: false });
+    render(<TeamDetailPageClient teamId="team-1" />);
+    return { withdrawMutateAsync };
+  }
+
+  it('verified pending member cancels with the eligibility application id', async () => {
+    const { withdrawMutateAsync } = renderPendingMember({
+      data: { eligible: false, joinState: 'requested', applicationId: 'application-7', message: '승인을 기다리고 있어요.', requestedAt: null },
+      isError: false,
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: '신청 취소' })[0]);
+    await waitFor(() => expect(withdrawMutateAsync).toHaveBeenCalledWith({ reason: 'team_join_withdrawn_from_v1_web' }));
+    expect(teamApiMocks.useV1WithdrawTeamJoinApplication).toHaveBeenLastCalledWith('team-1', 'application-7');
+  });
+
+  it('pending member with an eligibility error retries instead of withdrawing without an application id', async () => {
+    const refetch = vi.fn().mockResolvedValue({ error: null });
+    const { withdrawMutateAsync } = renderPendingMember({ data: undefined, isError: true, error: new Error('temporary'), refetch });
+
+    expect(screen.queryByRole('button', { name: '신청 취소' })).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: '다시 시도' })[0]);
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    expect(withdrawMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('pending member waits for eligibility before offering cancellation', () => {
+    const { withdrawMutateAsync } = renderPendingMember({ data: undefined, isError: false });
+
+    expect(screen.getAllByRole('button', { name: '신청 상태 확인 중' })[0]).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '신청 취소' })).toBeNull();
+    expect(withdrawMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('seed 로 그리는 동안 팀 이름은 보여주되 가입 CTA 는 잠근다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: seededDetail(),
+      isError: false,
+      isPlaceholderData: true,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // 팀 정보는 즉시 보인다.
+    expect(screen.getAllByText('성수 풋살 크루').length).toBeGreaterThan(0);
+    // 뷰어 판정은 아직 남의 것(비로그인)이므로 행동은 막고, 막힌 이유를 로딩이라고 말한다.
+    const cta = screen.getAllByRole('button', { name: '불러오는 중' })[0];
+    expect(cta).toBeTruthy();
+    expect(cta).toBeDisabled();
+    // '처리 중'(= 내 신청 처리 중)으로 새면 로딩을 잘못 설명한다.
+    expect(screen.queryByRole('button', { name: '처리 중' })).toBeNull();
+    // 비로그인 판정에서 나오던 '가입 신청'도 뜨면 안 된다.
+    expect(screen.queryByRole('button', { name: '가입 신청' })).toBeNull();
+  });
+
+  // eligibility 는 인증 API 이고 `enabled: Boolean(query.data)` 라, seed 가 있으면 곧바로
+  // 실행돼 **팀 상세 실응답보다 먼저 도착할 수 있다.** 그때 CTA 를 열어 두면 라벨은
+  // "불러오는 중"인데 누르면 진짜 가입 신청이 나가 — 라벨과 동작이 어긋난다.
+  it('eligibility 가 seed 보다 먼저 도착해도 CTA 는 눌리지 않는다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: seededDetail(),
+      isError: false,
+      isPlaceholderData: true,
+    });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({
+      data: { eligible: true, joinState: 'none', message: null },
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const cta = screen.getAllByRole('button', { name: '불러오는 중' })[0];
+    expect(cta).toBeDisabled();
+  });
+
+  it('실응답이 도착하면(placeholder 해제) 뷰어 판정에 따른 CTA 가 열린다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { ...seededDetail(), viewer: { role: 'none', membershipId: null, joinState: 'none', canRequestJoin: true, disabledReason: null, manageRoute: null } },
+      isError: false,
+      isPlaceholderData: false,
+    });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: null } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByRole('button', { name: '불러오는 중' })).toBeNull();
+  });
+});
+
+describe('TeamMembersPageClient 초대 폼', () => {
+  const inviteMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 초대 폼은 canManageInvitations(운영진 이상) 뒤에 가려 있다 — owner 로 렌더해야 나온다.
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: {
+        name: '성수 풋살 크루',
+        canViewMembers: true,
+        viewer: { role: 'owner', membershipId: 'membership-owner' },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [],
+        summary: { ownerCount: 1, managerCount: 0, memberCount: 1 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1RejectTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1SendTeamInvitation.mockReturnValue({ isPending: false, mutate: inviteMutate });
+    teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  function rejectWithValidationError(field: string, messages: string[] = []) {
+    inviteMutate.mockImplementation((_vars, options) => {
+      options?.onError?.(new V1ApiError({
+        status: 'error',
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: '입력값을 다시 확인해 주세요.',
+        details: [{ field, messages }],
+        timestamp: '',
+      }));
+    });
+  }
+
+  function submitInvitation() {
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^초대/ }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'owner@teameet.v1' } });
+    fireEvent.click(screen.getByRole('button', { name: '초대 보내기' }));
+  }
+
+  it('이메일 필드가 거절되면 서버가 보낸 제약 안내를 그대로 보여준다', async () => {
+    rejectWithValidationError('invitedEmail', ['이메일 형식이 올바르지 않아요.']);
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식이 올바르지 않아요.');
+    });
+    expect(screen.queryByText('입력값을 다시 확인해 주세요.')).toBeNull();
+  });
+
+  it('길이 초과는 형식 오류로 바꿔 말하지 않는다', async () => {
+    rejectWithValidationError('invitedEmail', ['이메일이 너무 길어요.']);
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일이 너무 길어요.');
+    });
+    expect(screen.queryByText('이메일 형식을 확인해 주세요.')).toBeNull();
+  });
+
+  it('서버가 제약 문구를 주지 않으면 이메일 형식 안내로 떨어진다', async () => {
+    rejectWithValidationError('invitedEmail');
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식을 확인해 주세요.');
+    });
+  });
+
+  it('메시지 필드가 거절되면 이메일 탓으로 돌리지 않는다', async () => {
+    rejectWithValidationError('message');
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('초대 메시지는 200자까지 쓸 수 있어요.');
+    });
+    expect(screen.queryByText('이메일 형식을 확인해 주세요.')).toBeNull();
+  });
+});
+
+describe('TeamMembersPageClient — 결장 기간(Task 179 팀 C)', () => {
+  function member(overrides: Record<string, unknown>) {
+    return {
+      role: 'member',
+      status: 'active',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: false,
+      canRemove: false,
+      ...overrides,
+    };
+  }
+
+  function setup(viewerRole: 'owner' | 'member') {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: true, viewer: { role: viewerRole, membershipId: 'membership-me' } },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [
+          member({ membershipId: 'membership-me', userId: 'user-me', displayName: '김도윤', role: viewerRole, canEditJersey: true }),
+          member({ membershipId: 'membership-2', userId: 'user-2', displayName: '박서준', canEditJersey: true }),
+        ],
+        summary: { ownerCount: 1, managerCount: 0, memberCount: 2 },
+        viewerRole,
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
+    for (const hook of [
+      teamApiMocks.useV1ChangeTeamMembershipRole,
+      teamApiMocks.useV1RemoveTeamMembership,
+      teamApiMocks.useV1ApproveTeamJoinApplication,
+      teamApiMocks.useV1RejectTeamJoinApplication,
+      teamApiMocks.useV1SendTeamInvitation,
+      teamApiMocks.useV1CancelTeamInvitation,
+      teamApiMocks.useV1LeaveTeam,
+    ]) {
+      hook.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    }
+  }
+
+  function openSheetOf(name: string) {
+    fireEvent.click(screen.getByRole('button', { name: `${name} 관리` }));
+    return screen.getByRole('dialog', { name });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    rosterMocks.useV1MemberUnavailability.mockReturnValue({ data: undefined, isError: false });
+  });
+
+  it('팀장은 다른 멤버 행에서 결장 기간 시트를 연다 — 본인 행에는 없다(본인 등록 없음)', async () => {
+    setup('owner');
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const own = openSheetOf('김도윤');
+    expect(within(own).queryByRole('button', { name: '결장 기간 등록' })).toBeNull();
+    fireEvent.click(within(own).getByRole('button', { name: '닫기' }));
+
+    fireEvent.click(within(openSheetOf('박서준')).getByRole('button', { name: '결장 기간 등록' }));
+    expect(await screen.findByRole('dialog', { name: '결장 기간 · 박서준' })).toBeInTheDocument();
+  });
+
+  it('팀원은 결장 기간을 등록할 수 없고, 자기 결장 기간만 안내로 본다', () => {
+    rosterMocks.useV1MemberUnavailability.mockReturnValue({
+      data: {
+        teamId: 'team-1',
+        userId: 'user-me',
+        items: [
+          {
+            id: 'u-1',
+            teamId: 'team-1',
+            userId: 'user-me',
+            startsAt: '2099-10-02T15:00:00.000Z',
+            endsAt: '2099-10-12T15:00:00.000Z',
+            reason: 'INJURY',
+            actor: { userId: 'user-owner', displayName: '팀장', role: 'TEAM_MANAGER' },
+            createdAt: '2099-09-28T00:00:00.000Z',
+            revokedAt: null,
+          },
+          {
+            id: 'u-0',
+            teamId: 'team-1',
+            userId: 'user-me',
+            startsAt: '2099-09-01T15:00:00.000Z',
+            endsAt: '2099-09-05T15:00:00.000Z',
+            reason: 'PERSONAL',
+            actor: { userId: 'user-owner', displayName: '팀장', role: 'TEAM_MANAGER' },
+            createdAt: '2099-08-28T00:00:00.000Z',
+            revokedAt: '2099-08-29T00:00:00.000Z',
+          },
+        ],
+      },
+      isError: false,
+    });
+    setup('member');
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    expect(rosterMocks.useV1MemberUnavailability).toHaveBeenCalledWith('team-1', 'user-me');
+    // 취소된 기간은 빠지고 살아 있는 기간만, 사유와 함께 보인다.
+    expect(screen.getByText(/^내 결장 기간: 10\/3 \(.\)~10\/12 \(.\)\(부상\)\. /)).toBeInTheDocument();
+    expect(screen.queryByText(/개인 사정/)).toBeNull();
+    expect(within(openSheetOf('김도윤')).queryByRole('button', { name: '결장 기간 등록' })).toBeNull();
+  });
+});
+
+describe('TeamMembersPageClient — 매니저 5명 한도', () => {
+  const changeRoleMutate = vi.fn();
+
+  function setup(managerCount: number) {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: {
+        name: '성수 풋살 크루',
+        canViewMembers: true,
+        managerCount,
+        viewer: { role: 'owner', membershipId: 'membership-owner' },
+      },
+      isError: false,
+    });
+    const row = (overrides: Record<string, unknown>) => ({
+      status: 'active',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: false,
+      canRemove: false,
+      ...overrides,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [
+          row({ membershipId: 'membership-owner', userId: 'user-owner', displayName: '김도윤', role: 'owner' }),
+          row({ membershipId: 'membership-2', userId: 'user-2', displayName: '박서준', role: 'member', canChangeRole: true, canRemove: true }),
+        ],
+        summary: { ownerCount: 1, managerCount, memberCount: 2 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [], pastItems: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: changeRoleMutate });
+    for (const hook of [
+      teamApiMocks.useV1RemoveTeamMembership,
+      teamApiMocks.useV1ApproveTeamJoinApplication,
+      teamApiMocks.useV1RejectTeamJoinApplication,
+      teamApiMocks.useV1SendTeamInvitation,
+      teamApiMocks.useV1CancelTeamInvitation,
+      teamApiMocks.useV1LeaveTeam,
+    ]) {
+      hook.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    }
+  }
+
+  function openSheetOf(name: string) {
+    fireEvent.click(screen.getByRole('button', { name: `${name} 관리` }));
+    return screen.getByRole('dialog', { name });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('매니저가 5명 차 있으면 "매니저로 지정"을 이유와 함께 비활성으로 둔다', () => {
+    setup(5);
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const sheet = openSheetOf('박서준');
+
+    const promote = within(sheet).getByRole('button', { name: /^매니저로 지정/ });
+    expect(promote).toBeDisabled();
+    expect(promote).toHaveTextContent('매니저는 최대 5명이에요.');
+    // 내보내기 등 나머지 관리 동작은 그대로 누를 수 있다.
+    expect(within(sheet).getByRole('button', { name: '팀에서 내보내기' })).toBeEnabled();
+  });
+
+  it('행 배지는 역할 라벨 단일 소스를 따른다 — manager·옛 admin 은 "매니저", 멤버는 배지 없이', () => {
+    setup(1);
+    const row = (membershipId: string, displayName: string, role: string) => ({
+      membershipId, userId: `u-${membershipId}`, displayName, role, status: 'active', joinedAt: '2026-01-01T00:00:00.000Z', canChangeRole: false, canRemove: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [row('m-1', '김도윤', 'owner'), row('m-2', '최매니', 'manager'), row('m-3', '옛관리', 'admin'), row('m-4', '박서준', 'member')],
+        summary: { ownerCount: 1, managerCount: 2, memberCount: 4 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const badges = Array.from(document.querySelectorAll('.tm-member-row .tm-badge')).map((badge) => badge.textContent);
+    expect(badges).toEqual(['팀장', '매니저', '매니저']);
+    expect(screen.getByText('팀장·매니저')).toBeInTheDocument();
+  });
+
+  it('4명이면 아직 지정할 수 있다', () => {
+    setup(4);
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const sheet = openSheetOf('박서준');
+
+    expect(within(sheet).getByRole('button', { name: /^매니저로 지정/ })).toBeEnabled();
+    expect(screen.queryByText('매니저는 최대 5명이에요.')).not.toBeInTheDocument();
+  });
+
+  it('화면이 낡아 서버가 409 MANAGER_LIMIT_EXCEEDED 로 거절해도 이유를 화면에 올린다', async () => {
+    setup(4);
+    changeRoleMutate.mockImplementation((_vars, options) => {
+      options?.onError?.(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 409,
+          code: 'MANAGER_LIMIT_EXCEEDED',
+          message: 'Manager count cannot exceed 5',
+          timestamp: '2026-09-30T00:00:00.000Z',
+        }),
+      );
+    });
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(within(openSheetOf('박서준')).getByRole('button', { name: /^매니저로 지정/ }));
+    const dialog = await screen.findByRole('dialog', { name: '매니저로 지정' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '매니저로 지정' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('매니저는 최대 5명이에요');
+    expect(screen.queryByText(/Manager count/)).not.toBeInTheDocument();
+    // 거절은 확인 창이 히스토리를 걷은 뒤(act 밖 promise)에 그려진다 — 안내가 DOM 에 붙은 순간과
+    // 포커스를 옮기는 effect 사이에 틈이 있어, 안내가 보였다고 포커스까지 옮겨졌다고 볼 수 없다.
+    await waitFor(() => expect(alert.parentElement).toHaveFocus());
+  });
+});
+
+describe('TeamMembersPageClient — 확인 강도 (H2)', () => {
+  const changeRoleMutate = vi.fn();
+  const removeMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: true, managerCount: 1, viewer: { role: 'owner', membershipId: 'membership-owner' } },
+      isError: false,
+    });
+    const row = (membershipId: string, displayName: string, role: string) => ({
+      membershipId, userId: `u-${membershipId}`, displayName, role, status: 'active', joinedAt: '2026-01-01T00:00:00.000Z',
+      canChangeRole: role !== 'owner', canRemove: role !== 'owner',
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [row('membership-owner', '김도윤', 'owner'), row('membership-manager', '박매니', 'manager'), row('membership-member', '이멤버', 'member')],
+        summary: { ownerCount: 1, managerCount: 1, memberCount: 3 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: changeRoleMutate });
+    teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: removeMutate });
+    for (const hook of [
+      teamApiMocks.useV1ApproveTeamJoinApplication,
+      teamApiMocks.useV1RejectTeamJoinApplication,
+      teamApiMocks.useV1SendTeamInvitation,
+      teamApiMocks.useV1CancelTeamInvitation,
+      teamApiMocks.useV1LeaveTeam,
+    ]) {
+      hook.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    }
+  });
+
+  function chooseFromSheet(name: string, action: string) {
+    fireEvent.click(screen.getByRole('button', { name: `${name} 관리` }));
+    fireEvent.click(within(screen.getByRole('dialog', { name })).getByRole('button', { name: new RegExp(`^${action}`) }));
+  }
+
+  it('팀장 넘기기는 결과 문장을 읽고 "이해했어요"를 체크해야 버튼이 켜진다', async () => {
+    render(<TeamMembersPageClient teamId="team-1" />);
+    chooseFromSheet('박매니', '팀장 넘기기');
+
+    const dialog = await screen.findByRole('dialog', { name: '팀장 넘기기' });
+    expect(dialog).toHaveTextContent('박매니님이 새 팀장이 되고, 나는 매니저가 돼요.');
+    const confirmButton = within(dialog).getByRole('button', { name: '팀장 넘기기' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+    expect(changeRoleMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '이해했어요' }));
+    fireEvent.click(confirmButton);
+    await waitFor(() => expect(changeRoleMutate).toHaveBeenCalledWith({ membershipId: 'membership-manager', role: 'owner' }, expect.anything()));
+  });
+
+  it('내보내기는 글자 입력 없이 결과 한 줄을 읽고 바로 확인한다', async () => {
+    render(<TeamMembersPageClient teamId="team-1" />);
+    chooseFromSheet('이멤버', '팀에서 내보내기');
+
+    const dialog = await screen.findByRole('dialog', { name: '팀에서 내보내기' });
+    expect(dialog).toHaveTextContent('이멤버님이 팀에서 빠져요.');
+    expect(within(dialog).queryByRole('textbox')).toBeNull();
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: '내보내기' }));
+    await waitFor(() => expect(removeMutate).toHaveBeenCalledWith(expect.objectContaining({ membershipId: 'membership-member' }), expect.anything()));
+  });
+
+  describe('완료 안내 (A-3)', () => {
+    const rowOf = (name: string) => screen.getByRole('button', { name: `${name} 관리` }).closest('.tm-member-row');
+
+    it('역할을 바꾸면 토스트로 알리고 바뀐 행만 3초 강조한다', async () => {
+      changeRoleMutate.mockImplementation((_vars, options) => options?.onSuccess?.());
+      render(<TeamMembersPageClient teamId="team-1" />);
+      chooseFromSheet('이멤버', '매니저로 지정');
+      const dialog = await screen.findByRole('dialog', { name: '매니저로 지정' });
+      vi.useFakeTimers();
+      try {
+        fireEvent.click(within(dialog).getByRole('button', { name: '매니저로 지정' }));
+        await act(async () => {
+          await Promise.resolve();
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(screen.getByText('이멤버님을 매니저로 지정했어요').closest('[role="status"]')).toHaveAttribute('aria-live', 'polite');
+        expect(rowOf('이멤버')).toHaveClass('tm-member-row-highlight');
+        expect(rowOf('박매니')).not.toHaveClass('tm-member-row-highlight');
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+        expect(screen.queryByText('이멤버님을 매니저로 지정했어요')).toBeNull();
+        expect(rowOf('이멤버')).not.toHaveClass('tm-member-row-highlight');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('서버가 거절하면 완료 안내 없이 이유만 보인다', async () => {
+      removeMutate.mockImplementation((_vars, options) => options?.onError?.(new Error('이미 팀을 나간 멤버예요.')));
+      render(<TeamMembersPageClient teamId="team-1" />);
+      chooseFromSheet('이멤버', '팀에서 내보내기');
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '팀에서 내보내기' })).getByRole('button', { name: '내보내기' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('이미 팀을 나간 멤버예요.');
+      expect(screen.queryByText('이멤버님을 팀에서 내보냈어요')).toBeNull();
+    });
+
+    it('내보내기가 끝나면 누구를 내보냈는지 알린다', async () => {
+      removeMutate.mockImplementation((_vars, options) => options?.onSuccess?.());
+      render(<TeamMembersPageClient teamId="team-1" />);
+      chooseFromSheet('이멤버', '팀에서 내보내기');
+      fireEvent.click(within(await screen.findByRole('dialog', { name: '팀에서 내보내기' })).getByRole('button', { name: '내보내기' }));
+
+      expect(await screen.findByText('이멤버님을 팀에서 내보냈어요')).toBeInTheDocument();
+    });
   });
 });

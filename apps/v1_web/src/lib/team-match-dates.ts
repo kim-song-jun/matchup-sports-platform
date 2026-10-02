@@ -1,0 +1,34 @@
+import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+
+/**
+ * Shared form rules for ordinary and platform team-match recruitment.
+ * 시각 입력은 `datetime-local` 원문(KST 벽시계 `YYYY-MM-DDTHH:mm`)이다. 비어 있으면(`''`/null) "입력 안 함"이고,
+ * 값이 있는데 해석되지 않으면 해당 필드 오류다. `existingDeadlineAt` 만 저장된 ISO 다.
+ */
+export function teamMatchDateErrors(input: {
+  startsAt: string;
+  endsAt?: string | null;
+  deadlineAt?: string | null;
+  existingDeadlineAt?: string | null;
+}): Partial<Record<'startsAt' | 'endsAt' | 'deadlineAt', string>> {
+  const errors: Partial<Record<'startsAt' | 'endsAt' | 'deadlineAt', string>> = {};
+  const toMs = (value: string | null | undefined) => {
+    if (!value) return null;
+    const iso = kstDatetimeLocalToIso(value);
+    return iso ? Date.parse(iso) : Number.NaN;
+  };
+  const start = toMs(input.startsAt) ?? Number.NaN;
+  const end = toMs(input.endsAt);
+  const deadline = toMs(input.deadlineAt);
+  const now = Date.now();
+  if (input.startsAt && (!Number.isFinite(start) || start <= now)) errors.startsAt = '시작 시간은 지금 이후로 설정해 주세요';
+  if (end !== null && (!Number.isFinite(end) || end <= start)) errors.endsAt = '종료 시간은 시작 시간보다 늦어야 해요';
+  if (deadline !== null) {
+    if (!Number.isFinite(deadline)) errors.deadlineAt = '신청 마감일과 시간을 확인해 주세요';
+    else if (deadline >= start) errors.deadlineAt = '신청 마감은 시작 시간보다 빨라야 해요';
+    else if (deadline <= now && deadline !== (input.existingDeadlineAt ? new Date(input.existingDeadlineAt).getTime() : null)) {
+      errors.deadlineAt = '신청 마감은 지금 이후로 설정해 주세요';
+    }
+  }
+  return errors;
+}

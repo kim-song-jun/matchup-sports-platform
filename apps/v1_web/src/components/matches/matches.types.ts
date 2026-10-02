@@ -1,3 +1,5 @@
+import type { V1MatchApiStatus } from '@/types/api';
+
 export type MatchCardModel = {
   id: string;
   title: string;
@@ -10,12 +12,18 @@ export type MatchCardModel = {
   current: number;
   capacity: number;
   actionLabel: string;
+  lifecycleLabel?: '보류' | '진행 확정' | '진행 중';
   level: string;
   gender: string;
   host: string;
-  image: string;
+  /** 업로드된 대표 사진. 없으면 null — 목업 사진으로 메우지 않는다(2026-09-04 감사). */
+  image: string | null;
+  /** 참가비 자유 입력. 호스트가 안 적었으면 null — 화면에서 행 자체를 감춘다. */
+  costNote: string | null;
   deadline: string;
   deadlineDetail?: string;
+  /** 서버가 현재 시각과 종료 시각을 조합해 계산한 공개 목록 생명주기 상태. */
+  lifecycleStatus?: V1MatchApiStatus;
   status: 'open' | 'pending' | 'approved' | 'full' | 'mine';
 };
 
@@ -45,9 +53,11 @@ export type MatchListViewModel = {
     view: 'card' | 'compact';
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
+    regionId: string;
     sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
+    regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
   };
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
   summary: {
@@ -57,15 +67,44 @@ export type MatchListViewModel = {
     urgent: number;
   };
   matches: MatchCardModel[];
+  /** 결과가 1~2건뿐인 "희소" 상태에서 목록 아래를 채우는 인접 매치 (디자인 검수 W-3, B안).
+   * 0건은 EmptyState 가 받지만 1건은 그 경로를 타지 않아 카드 한 장 아래로 화면 끝까지
+   * 비어 있었다(390 실측: 약 500px). 조건 밖이지만 지금 모집 중인 매치를 채워
+   * DESIGN.md §15("한 화면에 3-5개 카드")에 근접시킨다.
+   * 비었으면 아무것도 그리지 않는다 — 빈 레일을 남기지 않는다. */
+  nearbyMatches?: MatchCardModel[];
+  /** team-matches.types.ts의 #5와 같은 목적 — true일 때 EmptyState 대신 PageSkeleton 렌더.
+   * 로딩 중(items === undefined)에 matches: []를 EmptyState로 그대로 그리면 "조건에 맞는
+   * 매치가 없어요"가 실제로는 아직 응답을 못 받은 상태에서도 뜬다. */
+  isLoading?: boolean;
+  /** 서버 커서 페이지네이션(20건/페이지)에 다음 페이지가 더 있는지. true면 "더 보기" 노출. */
+  hasNext?: boolean;
+  onLoadMore?: () => void;
+  loadMorePending?: boolean;
 };
 
 export type MatchStateViewModel = MatchListViewModel & {
   state: 'empty' | 'error' | 'joined';
+  /** error 상태의 재시도(쿼리 refetch). 없으면 재시도 버튼을 그리지 않는다. */
+  retry?: () => void;
   title: string;
   description: string;
+  /** 뒤로가기 목적지(`?from=`). 없으면 '/matches'로 고정(MatchDetailViewModel.backHref와 동일 패턴). */
+  backHref?: string;
 };
 
 export type MatchDetailViewModel = {
+  completed?: boolean;
+  /** 완료된 매치에서 호스트가 이 뷰어를 불참으로 확인했다. */
+  noShow?: boolean;
+  canComplete?: boolean;
+  withdrawApplicationId?: string | null;
+  /**
+   * 뒤로가기 목적지. `/matches/:id`는 topBar:false라 셸 뒤로가기가 없고 페이지가 직접
+   * 모바일·데스크톱 링크를 그린다 — 계산 위치: `MatchDetailPageClient`(matches-client.tsx).
+   * 없으면 '/matches'로 고정.
+   */
+  backHref?: string;
   match: MatchCardModel & {
     description: string;
     address: string;
@@ -89,6 +128,7 @@ export type MatchDetailViewModel = {
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
+  chatError?: string | null;
   /** 경기 종료 후 후기 작성 화면(/my/reviews/match/:id) 링크. 참가자·호스트일 때만 설정된다.
    * 이 링크가 없던 동안 매치 상세에는 후기로 가는 길이 아예 없었다(완료 알림도 이 화면으로
    * 보냈지만 여기서 더 갈 곳이 없어 막다른 길이었다). */
@@ -97,10 +137,11 @@ export type MatchDetailViewModel = {
   onShare?: () => void | string | null | Promise<void | string | null>;
 };
 
-export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'complete' | 'edit';
+export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'edit';
 
 export type MatchCreateViewModel = {
   step: MatchCreateStep;
+  mode?: 'create' | 'edit';
   /** 생성 완료 또는 수정 중인 매치의 실제 ID. backHref·상세보기 링크에 사용. */
   matchId?: string;
   selectedSport: string;
@@ -111,11 +152,13 @@ export type MatchCreateViewModel = {
     description: string;
     image: string;
     capacity: number;
+    hostParticipates: boolean;
     actionLabel: string;
     minLevel: string;
     maxLevel: string;
     gender: string;
     rules: string;
+    costNote: string;
     venue: string;
     address: string;
     date: string;
@@ -129,12 +172,23 @@ export type MatchCreateViewModel = {
     regionId: string;
     regions: Array<{ id: string; name: string }>;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number) => void;
+    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number | boolean) => void;
     onRegionChange: (regionId: string) => void;
     onBack: () => void;
     onNext: () => void;
     onSubmit: () => void;
     onCancel?: () => void;
+    /**
+     * 모집 마감 / 다시 열기 토글 (호스트 전용, 수정 화면 하단).
+     * 취소(onCancel)와 달리 **되돌릴 수 있는** 동작이라 danger 가 아니라 neutral 로 두고
+     * 취소 버튼 위에 놓는다 — 마감하려다 취소를 누르는 사고를 막는다.
+     */
+    recruitingToggle?: {
+      label: string;
+      hint: string;
+      pending?: boolean;
+      onClick: () => void;
+    };
     uploadImage?: (file: File) => Promise<string>;
     submitLabel?: string;
     submitting?: boolean;

@@ -1,5 +1,14 @@
-import type { ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewSourcePageModel, ReviewTargetViewModel } from './reviews.types';
+import type {
+  ReviewMetricDraft,
+  ReviewsPageModel,
+  ReviewsReceivedPageModel,
+  ReviewsTab,
+  ReviewSourcePageModel,
+  ReviewTargetDraft,
+  ReviewTargetViewModel,
+} from './reviews.types';
 import type { V1ReceivedReviewDetail, V1ReviewListResponse, V1ReviewReceivedResponse, V1ReviewSourceResponse, V1ReviewSourceType, V1ReviewTarget } from '@/types/api';
+import { displayInitials } from '@/lib/display-initials';
 
 export const REVIEW_TAG_OPTIONS = [
   { code: 'manner', label: '매너가 좋아요' },
@@ -34,8 +43,6 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
       href: `/my/reviews/${item.sourceType}/${item.sourceId}`,
       badgeLabel: item.state === 'done' ? '완료' : isTeamReviewSource(item.sourceType) ? '상대팀' : '작성 전',
       kindLabel: sourceTypeLabel(item.sourceType),
-      // 작성된 리뷰는 한 경기에서 여러 명에게 쓸 수 있어 대상자 없이는 행이 서로 구분되지 않는다.
-      targetLabel: item.targetTeam?.name ?? item.targetUser?.nickname ?? null,
       meta: buildListMeta(item.completedAt, item.reviewedCount, item.targetCount, item.remainingCount),
       ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어서 작성' : '리뷰',
     })),
@@ -45,20 +52,132 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
 }
 
 export function toReviewSourcePageModel(data: V1ReviewSourceResponse): ReviewSourcePageModel {
-  const reviewed = data.targets.filter((target) => target.alreadySubmitted || target.review).length;
-  const total = data.targets.length;
-  const remaining = Math.max(0, total - reviewed);
+  return { ...data, sourceMeta: formatDateTime(data.source.completedAt) };
+}
 
-  return {
-    ...data,
-    sourceMeta: formatDateTime(data.source.completedAt),
-    progressLabel: `작성 ${reviewed}명 · 남은 대상 ${remaining}명`,
-    progressStats: [
-      { label: '대상', value: `${total}명` },
-      { label: '작성 완료', value: `${reviewed}명` },
-      { label: '남은 리뷰', value: `${remaining}명` },
-    ],
+type TargetIdentity = Pick<V1ReviewTarget, 'targetType' | 'targetUserId' | 'targetTeamId'>;
+
+export function reviewTargetKey(target: TargetIdentity) {
+  return target.targetType === 'team' ? `team:${target.targetTeamId ?? 'unknown'}` : `user:${target.targetUserId ?? 'unknown'}`;
+}
+
+/** 서버가 이미 받았거나 잠겨서 더는 쓸 수 없는 대상이 아닌, 지금 쓸 수 있는 대상. */
+export function isReviewTargetPending(target: V1ReviewTarget) {
+  return !target.locked && !target.alreadySubmitted && !target.review;
+}
+
+/** 사용자가 손댄 draft 가 없으면 서버에 저장된 후기(있다면)를 그대로 보여 준다. */
+export function draftForTarget(target: V1ReviewTarget, drafts: Record<string, ReviewTargetDraft>): ReviewTargetDraft {
+  return drafts[reviewTargetKey(target)] ?? {
+    rating: target.review?.rating ?? null,
+    tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [],
   };
+}
+
+/** 서버 계약(별점 + 태그 1개 이상)에 비춘 입력 상태. 하나만 채운 것은 보낼 수 없는 부분 입력이다. */
+export type ReviewDraftStatus = 'empty' | 'needsRating' | 'needsTags' | 'ready';
+
+export function reviewDraftStatus(draft: Pick<ReviewTargetDraft, 'rating' | 'tagCodes'>): ReviewDraftStatus {
+  const hasRating = draft.rating !== null;
+  const hasTags = draft.tagCodes.length > 0;
+  if (hasRating && hasTags) return 'ready';
+  if (hasRating) return 'needsTags';
+  return hasTags ? 'needsRating' : 'empty';
+}
+
+export type ReviewSubmission = {
+  target: V1ReviewTarget;
+  rating: number;
+  tagCodes: string[];
+  /** 사람 대상에만. 직접 바꾸지 않은 항목은 종합 별점을 따른다. */
+  metricScores?: ReviewMetricDraft;
+};
+
+export type ReviewIncomplete = { target: V1ReviewTarget; missing: 'rating' | 'tags' };
+
+export type ReviewProgress = {
+  submitted: number;
+  inProgress: number;
+  remaining: number;
+  ready: ReviewSubmission[];
+  incomplete: ReviewIncomplete[];
+};
+
+/**
+ * 보내기 버튼·현황 문구·제출이 모두 이 한 곳의 판정을 쓴다. 화면과 제출이 각자 계산하면
+ * 화면은 "다 했다"인데 제출에서 조용히 빠지는 대상이 생긴다.
+ */
+export function getReviewProgress(targets: V1ReviewTarget[], drafts: Record<string, ReviewTargetDraft>): ReviewProgress {
+  const progress: ReviewProgress = { submitted: 0, inProgress: 0, remaining: 0, ready: [], incomplete: [] };
+  for (const target of targets) {
+    if (target.alreadySubmitted || target.review) {
+      progress.submitted += 1;
+      continue;
+    }
+    if (!isReviewTargetPending(target)) continue;
+
+    const draft = draftForTarget(target, drafts);
+    const status = reviewDraftStatus(draft);
+    if (status === 'empty') {
+      progress.remaining += 1;
+    } else if (status === 'ready' && draft.rating !== null) {
+      progress.inProgress += 1;
+      const overrides = draft.metricOverrides ?? {};
+      progress.ready.push({
+        target,
+        rating: draft.rating,
+        tagCodes: draft.tagCodes,
+        ...(target.targetType === 'user'
+          ? {
+              metricScores: {
+                skill: overrides.skill ?? draft.rating,
+                manner: overrides.manner ?? draft.rating,
+                punctuality: overrides.punctuality ?? draft.rating,
+                safety: overrides.safety ?? draft.rating,
+              },
+            }
+          : {}),
+      });
+    } else {
+      progress.inProgress += 1;
+      progress.incomplete.push({ target, missing: status === 'needsRating' ? 'rating' : 'tags' });
+    }
+  }
+  return progress;
+}
+
+export function formatReviewProgress({ submitted, inProgress, remaining }: ReviewProgress) {
+  return [submitted > 0 ? `작성 완료 ${submitted}명` : null, `작성 중 ${inProgress}명`, `남은 대상 ${remaining}명`]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** 보내기 버튼 위 안내 — 덜 끝난 대상이 누구인지 이름으로 짚는다. */
+export function incompleteHint(incomplete: ReviewIncomplete[]) {
+  const [first] = incomplete;
+  if (!first) return null;
+  if (incomplete.length > 1) return `${first.target.name} 외 ${incomplete.length - 1}건의 별점·태그가 비어 있어요`;
+  return first.missing === 'rating'
+    ? `${first.target.name}의 별점을 골라 주세요`
+    : `${first.target.name}의 태그를 하나 이상 골라 주세요`;
+}
+
+/** 작성 현황 카드의 보조 문장. */
+export function incompleteNote(incomplete: ReviewIncomplete[]) {
+  if (incomplete.length === 0) return null;
+  const missing = new Set(incomplete.map((item) => item.missing));
+  const what = missing.size > 1 ? '별점이나 태그가' : missing.has('rating') ? '별점이' : '태그가';
+  return `${what} 빠진 ${incomplete.length}건은 아직 보낼 수 없어요`;
+}
+
+export function selectedTagLabels(tagCodes: string[]) {
+  return REVIEW_TAG_OPTIONS.filter((tag) => tagCodes.includes(tag.code)).map((tag) => tag.label);
+}
+
+export function formatTagSummary(labels: string[]) {
+  const [first] = labels;
+  if (!first) return null;
+  return labels.length === 1 ? first : `${first} 외 ${labels.length - 1}개`;
 }
 
 /**
@@ -84,7 +203,7 @@ function lockReasonLabel(lockReason: string | null) {
 export function toTargetViewModel(target: V1ReviewTarget, showReviewerTeam = false): ReviewTargetViewModel {
   return {
     ...target,
-    initials: initials(target.name),
+    initials: displayInitials(target.name, { fallback: '리뷰', count: 2 }),
     statusLabel: target.alreadySubmitted || target.review ? '작성됨' : target.locked ? '잠김' : '대기',
     reviewerTeamLabel: showReviewerTeam && target.reviewerTeam ? `${target.reviewerTeam.name} 대표로 작성` : null,
     lockReasonLabel: lockReasonLabel(target.lockReason),
@@ -100,7 +219,7 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
   return {
     stats: [
       { label: '받은 리뷰', value: `${items.length}건` },
-      { label: '평균', value: averageRating(items) },
+      { label: '참가자 평균', value: averageRating(items.filter((review) => review.sourceType !== 'platform_team_match')) },
       { label: '태그', value: `${tagCount}개` },
     ],
     userGroups: groupReceivedReviews(userReviews),
@@ -114,6 +233,8 @@ export function sourceTypeLabel(sourceType: V1ReviewSourceType) {
       return '개인 매치';
     case 'team_match':
       return '팀매치';
+    case 'platform_team_match':
+      return '운영 평가 · 참가자 평점과 별도';
     case 'tournament_fixture':
       return '대회 경기';
   }
@@ -168,10 +289,6 @@ function averageRating(reviews: V1ReceivedReviewDetail[]) {
   if (reviews.length === 0) return '-';
   const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
   return average.toFixed(average % 1 === 0 ? 0 : 1);
-}
-
-function initials(name: string) {
-  return name.trim().slice(0, 2) || '리뷰';
 }
 
 function isTeamReviewSource(sourceType: V1ReviewSourceType) {

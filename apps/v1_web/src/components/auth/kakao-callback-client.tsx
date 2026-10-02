@@ -9,8 +9,9 @@ import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
-import { AuthFrame } from './auth-page';
+import { AUTH_NOTICE_STAGE, AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
+import { extractErrorMessage } from '@/lib/error-message';
 
 function getKakaoRedirectUri() {
   return process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
@@ -45,6 +46,10 @@ export function KakaoCallbackClient() {
 
     const code = searchParams.get('code');
     const providerError = searchParams.get('error');
+    const returnedState = searchParams.get('state');
+    // Analytics reports document.location with every hit, so the OAuth code and state
+    // must leave the address bar before gtag.js loads and reads it.
+    window.history.replaceState(window.history.state, '', window.location.pathname);
 
     if (providerError || !code) {
       trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
@@ -52,7 +57,6 @@ export function KakaoCallbackClient() {
       return;
     }
 
-    const returnedState = searchParams.get('state');
     const storedState = getStoredKakaoOAuthState();
 
     if (!returnedState || !storedState || returnedState !== storedState) {
@@ -103,13 +107,13 @@ export function KakaoCallbackClient() {
           }
         }
 
-        setError(nextError instanceof Error ? nextError.message : '카카오 로그인에 실패했어요.');
+        setError(extractErrorMessage(nextError, '카카오 로그인에 실패했어요.'));
       });
   }, [router, searchParams]);
 
   if (error) {
     return (
-      <AuthFrame topTitle="카카오 로그인" backHref="/login">
+      <AuthFrame topTitle="카카오 로그인" backHref="/login" stage={AUTH_NOTICE_STAGE}>
         <div className="tm-auth-body">
           <span className="tm-badge tm-badge-orange">로그인 오류</span>
           <h1 className="tm-text-heading tm-auth-heading">로그인을 완료하지 못했어요</h1>
@@ -123,7 +127,7 @@ export function KakaoCallbackClient() {
   }
 
   return (
-    <AuthFrame>
+    <AuthFrame stage={AUTH_WELCOME_STAGE}>
       <div className="tm-auth-body tm-auth-center">
         <h1 className="tm-text-heading tm-auth-heading">카카오 로그인을 확인하고 있어요</h1>
         <p className="tm-text-body tm-auth-sub">잠시만 기다려 주세요.</p>

@@ -19,12 +19,12 @@ import type { PublicScore, PublicScoreStatus } from './types';
 export function PenaltyScoreline({
   score,
   scoreStatus,
-  fontSize = 11,
+  fontSize = 'var(--font-size-micro)',
 }: {
   score: PublicScore | null;
   scoreStatus: PublicScoreStatus;
   /** 일정 카드(11)보다 경기 상세 헤더(12)가 한 단계 크다 — 본 스코어의 크기 차이를 그대로 따른다. */
-  fontSize?: number;
+  fontSize?: number | string;
 }) {
   const label = formatPenaltyScoreline(score, scoreStatus);
   if (label === null) return null;

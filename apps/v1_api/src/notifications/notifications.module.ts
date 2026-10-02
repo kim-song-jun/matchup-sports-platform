@@ -9,6 +9,7 @@ import { ResultEscalationValidationInterceptor } from '../game-operations/result
 import { NotificationsController } from './notifications.controller';
 import { NotificationsServiceModule } from './notifications-service.module';
 import { WebPushController } from './web-push.controller';
+import { PushDeviceController } from './push-device.controller';
 
 // NotificationsService/WebPushService are declared here (imported + re-exported from
 // NotificationsServiceModule) rather than directly in this module's own providers, so that this
@@ -21,7 +22,13 @@ import { WebPushController } from './web-push.controller';
 // dependency. See notifications-service.module.ts's docblock for why that split is required.
 @Module({
   imports: [NotificationsServiceModule],
-  controllers: [NotificationsController, WebPushController, ResultEscalationController, PlatformResultEscalationController],
+  controllers: [
+    NotificationsController,
+    WebPushController,
+    PushDeviceController,
+    ResultEscalationController,
+    PlatformResultEscalationController,
+  ],
   providers: [
     ResultEscalationAccessService,
     ResultEscalationMutationService,

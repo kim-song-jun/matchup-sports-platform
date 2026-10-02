@@ -1,21 +1,31 @@
-import type { V1GameState, V1TournamentFixtureStatus, V1VisibilityMode } from '@prisma/client';
+import type { V1GameState, V1VisibilityMode } from '@prisma/client';
 import type { PublicGameVisibilityMode } from '../games.types';
 
 /**
  * Task 24 -- server-enforced "Public visibility output matrix" (frozen in
- * the plan and mirrored in `docs/api/domains/public-records.md`). This is a
- * deliberately separate, purpose-built serializer from
- * `games/core/visibility-serializer.ts` (Task 6's `serializeGameVisibility`,
- * used by the authenticated-or-anonymous single-game `/games/:id/visibility`
- * probe): that helper's output shape has no room for bracket/status,
- * corrected-revision history, MVP, standings, or next-match, which this
- * lane's public schedule/match DTOs need. Both independently implement the
- * same `hidden -> status_only -> live(gated by PUBLIC_LIVE) -> official_only`
- * precedence from D-06, so they cannot drift on the core rule even though
- * they are separate files.
+ * the plan and mirrored in `docs/api/domains/public-records.md`).
+ *
+ * `effectivePublicVisibilityMode` below resolves the D-06 precedence
+ * `hidden -> status_only -> live(gated by PUBLIC_LIVE) -> official_only`. Every
+ * caller routes through it: this lane and the `/games/:id/visibility` probe.
+ *
+ * `games/core/visibility-serializer.ts` keeps a defensive copy of the kill-switch
+ * demotion. It cannot fire while its only caller hands it an already-resolved
+ * mode, but it is deliberately left in place for a future caller that passes a
+ * raw policy mode -- so treat THIS function as the rule and that one as a guard,
+ * not as a second source. That file stays separate because its OUTPUT SHAPE
+ * differs (no bracket/status, corrected-revision history, MVP, standings or
+ * next-match, which this lane's public DTOs need), not because it owns the rule.
  */
 
-/** D-06: `PUBLIC_LIVE=off` can only ever demote `live` to `status_only`; it can never promote or hide. */
+/**
+ * D-06: `PUBLIC_LIVE=off` demotes `live` to `official_only`; it can never promote or hide.
+ *
+ * 킬스위치가 막는 것은 **진행 중 노출**이다 — 확정된 공식 결과까지 회수하지 않는다.
+ * 플래그 row 가 없는 환경(새로 띄운 DB 가 전부 그렇다)이 fail-closed 로 off 이므로,
+ * `status_only` 로 강등하면 그런 환경에서는 확정된 리그 결과가 통째로 사라진다.
+ * 전면 비공개가 필요하면 대회별 가시성 정책(`STATUS_ONLY`/`HIDDEN`)으로 지정한다.
+ */
 export function effectivePublicVisibilityMode(
   policyMode: V1VisibilityMode,
   publicLiveEnabled: boolean,
@@ -28,7 +38,7 @@ export function effectivePublicVisibilityMode(
     case 'STATUS_ONLY':
       return 'status_only';
     case 'LIVE':
-      return publicLiveEnabled ? 'live' : 'status_only';
+      return publicLiveEnabled ? 'live' : 'official_only';
     default:
       // Fail closed on any future/unknown enum value rather than leaking a
       // live/official view of an unrecognized policy state.
@@ -74,14 +84,29 @@ export function resolveResultState(input: {
   return input.supersedesId === null ? 'official' : 'corrected';
 }
 
-const FIXTURE_STATUS_TO_PUBLIC_STATUS: Record<V1TournamentFixtureStatus, string> = {
+/**
+ * 공개 화면이 쓰는 진행 상태 어휘. 저장소의 legacy fixture status와 이름이
+ * 겹치지 않게 별도 어휘를 쓰는 이유는 둘의 authoritative 소스가 다르기 때문이다 —
+ * 이 값은 `V1Game.state` 우선으로 파생되고, 컬럼은 결과 확정 시점에만 움직인다.
+ */
+export type PublicFixtureStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+
+/**
+ * Canonical public-records callers normalize both tournament and TeamMatch
+ * lifecycle rows into this stable wire vocabulary before reaching this mapper.
+ * Keep the input contract local so the public read lane does not depend on the
+ * retired tournament-fixture Prisma enum.
+ */
+type FixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+const FIXTURE_STATUS_TO_PUBLIC_STATUS: Record<FixtureStatus, PublicFixtureStatus> = {
   scheduled: 'scheduled',
   in_progress: 'live',
   completed: 'ended',
   cancelled: 'cancelled',
 };
 
-const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, string> = {
+const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, PublicFixtureStatus> = {
   SCHEDULED: 'scheduled',
   LIVE: 'live',
   PAUSED: 'live',
@@ -98,8 +123,8 @@ const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, string> = {
  */
 export function publicFixtureStatus(input: {
   readonly gameState: V1GameState | null;
-  readonly fixtureStatus: V1TournamentFixtureStatus;
-}): string {
+  readonly fixtureStatus: FixtureStatus;
+}): PublicFixtureStatus {
   if (input.gameState !== null) return GAME_STATE_TO_PUBLIC_STATUS[input.gameState];
   return FIXTURE_STATUS_TO_PUBLIC_STATUS[input.fixtureStatus];
 }

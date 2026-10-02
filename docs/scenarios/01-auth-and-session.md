@@ -111,5 +111,5 @@
 ## Notes
 
 - 실제 자동화 시 `loginViaApi`, `injectTokens`, `setupAuthState`를 재사용한다.
-- 2026-04-07: `e2e/tests/auth-session-matrix.spec.ts`가 `Desktop Chrome 7/7`, `Mobile Chrome 7/7`로 통과했다.
+- 2026-04-07: `e2e/tests/auth-session-matrix.spec.ts`가 `Desktop Chrome 7/7`, `Mobile Chrome 7/7`로 통과했다. (레거시·삭제됨 — legacy-v0-final)
 - 2026-07-14~15: AUTH-004/005는 현재 v1 API/Web focused tests와 live signup viewport evidence로 추가 검증했다. 전체 저장소 typecheck/test/build는 사용자 결정에 따라 최종 통합 게이트에서 한 번 실행한다.

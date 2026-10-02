@@ -32,7 +32,7 @@ function renderReceived(overrides: Partial<Parameters<typeof ReviewsPageView>[0]
       onTeamPeriodChange={vi.fn()}
       period={null}
       receivedModel={emptyReceived}
-      summary={{ bySport: [], availableMonths: [] }}
+      summary={{ bySport: [], availableMonths: [], highlight: null }}
       summaryLoading={false}
       teamPeriod={null}
       teamSummary={undefined}

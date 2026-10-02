@@ -38,6 +38,16 @@ export function toDistrictRegionOptions(regions: V1Region[] = []): V1RegionOptio
     });
 }
 
+/**
+ * 시/도 전체를 가리키는 표기. DB 의 시/도 이름은 짧은 이름('경기')이라 그대로 "경기 전체"로 쓰면
+ * 종목 앱에서 "경기(시합) 전체"로 읽힌다 — 그 한 곳만 정식 이름으로 풀어 쓴다.
+ */
+const PROVINCE_WIDE_NAMES: Record<string, string> = { 경기: '경기도' };
+
+export function formatProvinceWide(name: string): string {
+  return `${PROVINCE_WIDE_NAMES[name] ?? name} 전체`;
+}
+
 export function toTeamRegionOptions(regions: V1Region[] = []): V1RegionOption[] {
   const parentById = new Map(regions.filter((region) => region.level === 1).map((region) => [region.id, region]));
   const nestedDistricts = regions.flatMap((parent) =>
@@ -61,7 +71,7 @@ export function toTeamRegionOptions(regions: V1Region[] = []): V1RegionOption[] 
       if (region.level === 1) {
         return {
           id: region.id,
-          name: `${region.name} 전체`,
+          name: formatProvinceWide(region.name),
           shortName: '전체',
           parentName: region.name,
         };

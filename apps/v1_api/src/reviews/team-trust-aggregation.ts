@@ -1,5 +1,6 @@
+import { Prisma, V1PostEventReviewSourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { isReviewRevealed } from './review-visibility';
+import { isReviewRevealed, reviewRevealScope } from './review-visibility';
 
 export type RevealedTeamTrust = {
   trustState: 'verified' | 'estimated' | 'sample' | 'none';
@@ -8,6 +9,115 @@ export type RevealedTeamTrust = {
 };
 
 type PrismaLike = Pick<PrismaService, 'v1PostEventReview'>;
+
+export type PublicTeamRating = {
+  ratingScore: number | null;
+  ratingCount: number;
+};
+
+type PublicRatingCandidate = {
+  sourceType: V1PostEventReviewSourceType;
+  sourceId: string;
+  sourceGroupId: string | null;
+  sportId: string | null;
+  targetTeamId: string | null;
+  reviewerTeamId: string | null;
+  rating: number;
+  submittedAt: Date;
+};
+
+/**
+ * 공개 팀 상세(GET /teams/:id/reviews)의 전체 평점과 같은 값을 팀 목록/카드에서도 쓸 수
+ * 있도록 N+1 없이 계산한다. 팀 평점은 특정 매치 유형의 "매너" 점수가 아니라, 공개 게이트를
+ * 통과한 모든 team-target 후기의 일반 별점이다. 종목 × 평가팀별 평균을 한 표로 접은 뒤 전체
+ * 평균을 내므로 공개 팀 상세의 종목별 ratingAvg/ratingCount 가중 평균과 정확히 같다.
+ */
+export async function computePublicTeamRatingBatch(
+  prisma: PrismaLike,
+  teamIds: string[],
+): Promise<Map<string, PublicTeamRating>> {
+  const result = new Map<string, PublicTeamRating>();
+  if (teamIds.length === 0) return result;
+  for (const teamId of teamIds) result.set(teamId, { ratingScore: null, ratingCount: 0 });
+
+  const candidates: PublicRatingCandidate[] = await prisma.v1PostEventReview.findMany({
+    where: {
+      targetTeamId: { in: teamIds },
+      targetType: 'team',
+      status: 'submitted',
+      sportId: { not: null },
+      reviewerTeamId: { not: null },
+    },
+    select: {
+      sourceType: true,
+      sourceId: true,
+      sourceGroupId: true,
+      sportId: true,
+      targetTeamId: true,
+      reviewerTeamId: true,
+      rating: true,
+      submittedAt: true,
+    },
+  });
+  if (candidates.length === 0) return result;
+
+  const reverseReviews = (
+    await prisma.v1PostEventReview.findMany({
+      where: {
+        reviewerTeamId: { in: teamIds },
+        status: 'submitted',
+        OR: revealScopeFilters(candidates),
+      },
+      select: {
+        sourceType: true,
+        sourceId: true,
+        sourceGroupId: true,
+        reviewerTeamId: true,
+        targetTeamId: true,
+      },
+    })
+  ).map((review) => ({
+    sourceId: reviewRevealScope(review),
+    reviewerUserId: review.reviewerTeamId ?? '',
+    targetUserId: review.targetTeamId,
+  }));
+
+  const now = new Date();
+  const ratingsByTeam = new Map<string, Map<string, number[]>>();
+  for (const review of candidates) {
+    if (!review.targetTeamId || !review.reviewerTeamId || !review.sportId) continue;
+    if (!isReviewRevealed({
+      sourceId: reviewRevealScope(review),
+      reviewerUserId: review.reviewerTeamId,
+      targetUserId: review.targetTeamId,
+      submittedAt: review.submittedAt,
+    }, reverseReviews, now)) continue;
+
+    const groupedRatings = ratingsByTeam.get(review.targetTeamId) ?? new Map<string, number[]>();
+    const groupKey = `${review.sportId}:${review.reviewerTeamId}`;
+    const ratings = groupedRatings.get(groupKey) ?? [];
+    ratings.push(review.rating);
+    groupedRatings.set(groupKey, ratings);
+    ratingsByTeam.set(review.targetTeamId, groupedRatings);
+  }
+
+  for (const teamId of teamIds) {
+    const groupAverages = [...(ratingsByTeam.get(teamId)?.values() ?? [])].map(average);
+    result.set(teamId, {
+      ratingScore: decimalScore(groupAverages.length ? average(groupAverages) : null),
+      ratingCount: groupAverages.length,
+    });
+  }
+  return result;
+}
+
+function revealScopeFilters(candidates: PublicRatingCandidate[]): Prisma.V1PostEventReviewWhereInput[] {
+  const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+  const sourceGroupIds = [...new Set(candidates.map((review) => review.sourceGroupId).filter((id): id is string => Boolean(id)))];
+  const filters: Prisma.V1PostEventReviewWhereInput[] = [{ sourceId: { in: sourceIds } }];
+  if (sourceGroupIds.length) filters.push({ sourceGroupId: { in: sourceGroupIds } });
+  return filters;
+}
 
 /**
  * 여러 팀의 공개(reveal)된 팀 신뢰점수를 N+1 없이 배치로 live 재계산한다.

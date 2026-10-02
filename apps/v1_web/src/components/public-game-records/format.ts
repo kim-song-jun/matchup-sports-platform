@@ -1,3 +1,4 @@
+import { matchPhaseLabel, type MatchPhase } from '@/lib/v1-status-labels';
 import type { PublicResultState, PublicScore, PublicScoreStatus } from './types';
 
 /**
@@ -40,15 +41,17 @@ export function isCorrectedOrVoid(state: PublicResultState): boolean {
   return state === 'corrected' || state === 'void';
 }
 
-const FIXTURE_STATUS_LABEL: Record<string, string> = {
-  scheduled: '예정',
-  live: '진행 중',
-  ended: '종료',
-  cancelled: '취소',
+/** 공개 경기 status 는 경기 단계의 부분집합이다 — 문구는 경기 단계 라벨을 그대로 쓴다. */
+const FIXTURE_STATUS_PHASE: Record<string, MatchPhase> = {
+  scheduled: 'scheduled',
+  live: 'live',
+  ended: 'ended',
+  cancelled: 'cancelled',
 };
 
 export function fixtureStatusLabel(status: string): string {
-  return FIXTURE_STATUS_LABEL[status] ?? status;
+  const phase = FIXTURE_STATUS_PHASE[status];
+  return phase === undefined ? status : matchPhaseLabel(phase);
 }
 
 /**
@@ -92,9 +95,9 @@ export function formatPenaltyScoreline(
  * 렌더하지 않는다.
  */
 export function formatTeamRecordPenaltyScoreline(
-  penalties: { readonly for: number; readonly against: number } | null | undefined,
+  penalties: { readonly for: number; readonly against: number } | null,
 ): string | null {
-  if (penalties == null) return null;
+  if (penalties === null) return null;
   return `승부차기 ${penalties.for}-${penalties.against}`;
 }
 

@@ -7,7 +7,8 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 
 /**
  * Task 24 -- `GET /tournaments/:id/schedule` and
- * `GET /tournaments/:id/matches/:fixtureId` (public, no auth required).
+ * `GET /tournaments/:id/matches/:fixtureId` (public, no auth required),
+ * plus retro STATS-1's `GET /tournaments/:id/player-records`.
  * Registered as a sibling `@Controller('tournaments')` alongside
  * `TournamentsModule`'s own controllers (different route suffixes, so
  * there is no path collision) rather than folded into that module's file,
@@ -26,6 +27,15 @@ export class PublicTournamentRecordsController {
     @CurrentUser() user: V1AuthUser | undefined,
   ) {
     return this.tournamentRecords.getSchedule(tournamentId, query, user);
+  }
+
+  /**
+   * 회고 STATS-1 -- 대회 단위 개인 득점·도움 랭킹(공개, 동의 게이팅).
+   * 리그의 `GET /league-matches/:leagueId/player-records`와 같은 계약.
+   */
+  @Get(':tournamentId/player-records')
+  getPlayerRecords(@Param('tournamentId') tournamentId: string) {
+    return this.tournamentRecords.getPlayerRecords(tournamentId);
   }
 
   @Get(':tournamentId/matches/:fixtureId')

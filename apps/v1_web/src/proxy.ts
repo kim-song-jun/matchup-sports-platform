@@ -1,9 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { NOTICES_FEED_PATH } from '@/lib/seo';
 
 const CAMPAIGN_PATH_PREFIX = '/tournaments/campaigns/';
 const PUBLIC_DETAIL_PATH =
-  /^\/(matches|teams|team-matches|tournaments|notices)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
+  /^\/(matches|teams|team-matches|tournaments|notices|league-matches)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
 const UUID_PATH_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
@@ -19,6 +20,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       ? NextResponse.next({ status: 404 })
       : NextResponse.next();
   }
+
+  // `/notices/:id` 매처에 같이 걸리는 정적 라우트 — UUID 가 아니라고 404 로 찍으면 안 된다.
+  if (pathname === NOTICES_FEED_PATH) return NextResponse.next();
 
   const detailMatch = pathname.match(PUBLIC_DETAIL_PATH);
   if (!detailMatch) return NextResponse.next();
@@ -51,6 +55,7 @@ export const config = {
     '/tournaments/:id/reviews',
     '/tournaments/campaigns/:slug',
     '/notices/:id',
+    '/league-matches/:id',
   ],
 };
 

@@ -49,19 +49,19 @@ function TeamStagingPicker({
   return (
     <div className="flex flex-col gap-3">
       {suggestedTeams.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <p className="text-xs text-[var(--text-muted)]">
             예선 상위 진출팀이에요. 목록에 없으면 직접 검색해서 담아 보세요.
           </p>
           {availableSuggested.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {availableSuggested.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => addStaged(t.id)}
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-1 h-[44px] px-3 rounded-full text-[13px] font-medium text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex items-center gap-1 h-[44px] px-3 rounded-full text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <Plus size={12} aria-hidden="true" />
                   {t.label}
@@ -75,7 +75,7 @@ function TeamStagingPicker({
       {manualSearchOpen ? (
         <div className="flex flex-col gap-1">
           {suggestedTeams.length > 0 && (
-            <label htmlFor={pickerId} className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor={pickerId} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               다른 팀 검색
             </label>
           )}
@@ -102,18 +102,18 @@ function TeamStagingPicker({
       )}
 
       {stagedIds.length > 0 && (
-        <div className="flex flex-wrap gap-1.5" aria-label="담은 팀">
+        <div className="flex flex-wrap gap-2" aria-label="담은 팀">
           {stagedIds.map((id) => (
             <span
               key={id}
-              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
+              className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
             >
               {labelById.get(id) ?? id}
               <button
                 type="button"
                 onClick={() => removeStaged(id)}
                 aria-label={`${labelById.get(id) ?? '팀'} 담기 취소`}
-                className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
+                className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
               >
                 <X size={11} aria-hidden="true" />
               </button>
@@ -199,7 +199,7 @@ export function BracketGroupCard({
   const teamCount = group.groupTeams.length;
   const fixtureCount = groupFixtures.length;
   const ready = teamCount > 0 && fixtureCount > 0;
-  const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}명 배정됨`;
+  const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}팀 배정됨`;
   const fixtureLabel = fixtureCount === 0 ? '대진 미생성' : `대진 ${fixtureCount}경기`;
 
   const assignedIds = new Set(group.groupTeams.map((gt) => gt.registrationId));
@@ -288,7 +288,10 @@ export function BracketGroupCard({
     { key: 'goalsAgainst', header: '실점', align: 'center', width: 'w-[60px]', render: (s) => <span className="tabular-nums">{s.goalsAgainst}</span> },
     { key: 'points', header: '승점', align: 'right', width: 'w-[64px]', render: (s) => <span className="tabular-nums font-semibold text-[var(--text-strong)]">{s.points}</span> },
   ];
-  const knockoutEmpty = isKnockout && standings.length === 0;
+  // 결선 조는 순위를 계산하지 않는다 — 순위만 보면 팀을 배정한 뒤에도 계속 0이라
+  // "아직 배정된 팀이 없어요" 가 남았다(alpha 실측: 2팀 배정 후에도 잔존). 이 문장이
+  // 말하는 것은 배정이므로 배정을 본다.
+  const knockoutEmpty = isKnockout && standings.length === 0 && group.groupTeams.length === 0;
   const bodyId = `bracket-group-${group.id}-body`;
 
   return (
@@ -304,13 +307,13 @@ export function BracketGroupCard({
           <ChevronRight
             size={18}
             aria-hidden="true"
-            className={`shrink-0 mt-0.5 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            className={`shrink-0 mt-0.5 text-[var(--text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
           />
           <span className="flex-1 min-w-0">
-            <span className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[15px] font-bold text-[var(--text-strong)]">{group.name}</span>
+            <span className="flex items-center gap-2 flex-wrap">
+              <span className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">{group.name}</span>
               {ready && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[var(--font-size-caption)] font-semibold bg-blue-500 text-white shrink-0">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-caption)] font-semibold bg-blue-500 text-white shrink-0">
                   <Check size={11} aria-hidden="true" />
                   준비완료
                 </span>
@@ -327,7 +330,7 @@ export function BracketGroupCard({
             type="button"
             onClick={() => onEditGroup(group)}
             aria-label={`${group.name} 수정`}
-            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Pencil size={14} aria-hidden="true" />
           </button>
@@ -335,7 +338,7 @@ export function BracketGroupCard({
             type="button"
             onClick={() => onDeleteGroup(group)}
             aria-label={`${group.name} 삭제`}
-            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Trash2 size={14} aria-hidden="true" />
           </button>
@@ -347,18 +350,18 @@ export function BracketGroupCard({
           {/* ── 배정된 팀 + 순위표 ── */}
           <div className="flex flex-col gap-2">
             {group.groupTeams.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {group.groupTeams.map((gt) => (
                   <span
                     key={gt.id}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
+                    className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
                   >
                     {gt.teamName ?? gt.registrationId}
                     <button
                       type="button"
                       onClick={() => onRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
                       aria-label={`${gt.teamName ?? '팀'} 배정 해제`}
-                      className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
+                      className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
                     >
                       <X size={11} aria-hidden="true" />
                     </button>
@@ -367,7 +370,7 @@ export function BracketGroupCard({
               </div>
             )}
             {knockoutEmpty ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--surface-soft)] border border-dashed border-[var(--border)]">
+              <div className="tm-on-tint flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--surface-soft)] border border-dashed border-[var(--border)]">
                 <span className="text-xs text-[var(--text-muted)]">아직 배정된 팀이 없어요</span>
               </div>
             ) : standings.length > 0 || group.groupTeams.length > 0 ? (
@@ -421,7 +424,7 @@ export function BracketGroupCard({
             {manualFixtureOpen && (
               <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor={`fixture-round-${group.id}`} className="text-[13px] text-[var(--text-strong)]">라운드</label>
+                  <label htmlFor={`fixture-round-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">라운드</label>
                   <select
                     id={`fixture-round-${group.id}`}
                     value={fixtureRound}
@@ -436,7 +439,7 @@ export function BracketGroupCard({
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor={`fixture-number-${group.id}`} className="text-[13px] text-[var(--text-strong)]">번호</label>
+                  <label htmlFor={`fixture-number-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">번호</label>
                   <input
                     id={`fixture-number-${group.id}`}
                     type="number"
@@ -449,7 +452,7 @@ export function BracketGroupCard({
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor={`fixture-home-${group.id}`} className="text-[13px] text-[var(--text-strong)]">
+                  <label htmlFor={`fixture-home-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                     홈 팀 (선택)
                     {homeBooked && <span className="ml-1 text-xs text-[var(--orange700)]" aria-live="polite">이미 해당 라운드에 배정됨</span>}
                   </label>
@@ -464,7 +467,7 @@ export function BracketGroupCard({
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor={`fixture-away-${group.id}`} className="text-[13px] text-[var(--text-strong)]">
+                  <label htmlFor={`fixture-away-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                     어웨이 팀 (선택)
                     {awayBooked && <span className="ml-1 text-xs text-[var(--orange700)]" aria-live="polite">이미 해당 라운드에 배정됨</span>}
                   </label>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { publicAssetPath } from '@/lib/assets';
 
 export type TeamAvatarSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -159,7 +160,7 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
         )}
       </svg>
       {logoUrl ? (
-        <img
+        <Image
           src={publicAssetPath(logoUrl)}
           alt=""
           width={px}

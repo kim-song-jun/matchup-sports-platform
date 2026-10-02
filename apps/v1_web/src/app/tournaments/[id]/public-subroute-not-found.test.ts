@@ -10,6 +10,9 @@ vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND');
   }),
+  permanentRedirect: vi.fn((to: string) => {
+    throw new Error(`NEXT_REDIRECT:${to}`);
+  }),
 }));
 
 vi.mock('@/lib/seo', async (importOriginal) => {
@@ -36,10 +39,6 @@ vi.mock('./reviews/reviews-page-client', () => ({
   TournamentReviewsPageClient: () => null,
 }));
 
-vi.mock('./schedule/schedule-page-client', () => ({
-  SchedulePageClient: () => null,
-}));
-
 const MISSING_TOURNAMENT_ID = '00000000-0000-4000-8000-ffffffffffff';
 
 describe('public tournament subroutes', () => {
@@ -52,13 +51,32 @@ describe('public tournament subroutes', () => {
     ['results', TournamentResultsPage],
     ['awards', TournamentAwardsPage],
     ['reviews', TournamentReviewsPage],
-    // schedule 은 형제와 같은 base-tournament 게이트를 쓰므로(force-dynamic·generateMetadata 내
-    // notFound throw 는 제거해 형제와 구조 통일) 여기 포함해 페이지 컴포넌트의 notFound() 호출을
-    // 계약으로 박제한다. (없는 대회의 실제 HTTP 200→404 확정은 프로덕션 런타임 동작이라 alpha 재측정 몫.)
-    ['schedule', TournamentSchedulePage],
   ])('returns a true 404 when the tournament is missing on %s', async (_route, page) => {
     await expect(page({
       params: Promise.resolve({ id: MISSING_TOURNAMENT_ID }),
     })).rejects.toThrow('NEXT_NOT_FOUND');
+  });
+
+  /**
+   * schedule 은 더 이상 자기 화면을 그리지 않는다 — 통합 허브 `/bracket` 으로 접혔다.
+   * 그래서 여기서 404 를 내지 않고 **조건 없이 리다이렉트**한다. 없는 대회는 그 다음
+   * 홉인 `/bracket` 이 404 로 받는다(위 표가 그걸 지킨다).
+   */
+  it('schedule 은 대회 존재 여부와 무관하게 bracket 으로 접힌다', async () => {
+    await expect(
+      TournamentSchedulePage({
+        params: Promise.resolve({ id: MISSING_TOURNAMENT_ID }),
+        searchParams: Promise.resolve({}),
+      }),
+    ).rejects.toThrow(`NEXT_REDIRECT:/tournaments/${MISSING_TOURNAMENT_ID}/bracket`);
+  });
+
+  it('딥링크 쿼리는 그대로 넘긴다', async () => {
+    await expect(
+      TournamentSchedulePage({
+        params: Promise.resolve({ id: 't-1' }),
+        searchParams: Promise.resolve({ round: '결승', group: ['A', 'B'] }),
+      }),
+    ).rejects.toThrow('NEXT_REDIRECT:/tournaments/t-1/bracket?round=%EA%B2%B0%EC%8A%B9&group=A&group=B');
   });
 });

@@ -293,6 +293,35 @@ describe('ScheduleReminderService', () => {
       },
     );
 
+    // 2026-08-27 감사 41/44: 워커의 outbox 트랜잭션이 롤백되면 이미 나간 웹 푸시는
+    // 되돌릴 수 없다 — claim.afterCommit이 있으면 deliverDurableReminder가 그 안에
+    // push만 하고 커밋 전에는 절대 sendToUser를 직접 부르지 않아야 한다.
+    it('claim.afterCommit이 주어지면 push를 즉시 보내지 않고 커밋 후 실행할 effect로만 담는다', async () => {
+      const webPush = fakeWebPush();
+      const service = new ScheduleReminderService(fakeNotifications() as never, webPush as never);
+      const tx = txWith({
+        lockRows: [{ id: 's1', teamId: 't1', state: 'SCHEDULED' }],
+        memberRows: [{ userId: 'u1' }],
+      });
+      const afterCommit: Array<() => void | Promise<void>> = [];
+      const claimWithAfterCommit = { ...claim('s1', 'outbox-99'), afterCommit };
+
+      await service.rsvpDeadlineReminderHandler(claimWithAfterCommit as never, tx as never);
+
+      // 알림 row는 이미 durable하게 만들어졌지만, 아직 워커 트랜잭션이 커밋되지
+      // 않았다고 가정하는 시점이라 푸시는 나가면 안 된다.
+      expect(tx.v1Notification.createMany).toHaveBeenCalled();
+      expect(webPush.sendToUser).not.toHaveBeenCalled();
+      expect(afterCommit).toHaveLength(1);
+
+      // 워커가 커밋 확정 뒤 afterCommit을 실행하는 시점을 흉내낸다.
+      await afterCommit[0]();
+      expect(webPush.sendToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: '참석 여부를 알려주세요' }),
+      );
+    });
+
     it('is safe to construct without a webPush dependency (main.ts backward compatibility) and still persists durably', async () => {
       const service = new ScheduleReminderService(fakeNotifications() as never);
       const tx = txWith({
@@ -395,9 +424,13 @@ describe('ScheduleReminderService', () => {
     function txForGuestApplication(overrides: {
       managerRows?: Array<{ userId: string }>;
       preferenceRows?: Array<{ userId: string; teamEnabled: boolean }>;
+      scheduleStartAt?: Date;
     }) {
       return {
         $queryRaw: jest.fn().mockResolvedValueOnce(overrides.managerRows ?? []),
+        v1TeamSchedule: {
+          findUnique: jest.fn().mockResolvedValue({ startAt: overrides.scheduleStartAt ?? new Date('2026-06-20T10:00:00Z') }),
+        },
         v1NotificationPreference: {
           findMany: jest.fn().mockResolvedValue(overrides.preferenceRows ?? []),
         },
@@ -449,6 +482,24 @@ describe('ScheduleReminderService', () => {
       });
     });
 
+    it('밤(KST 21~9시)에는 알림함 행만 남기고, 그 밤이 끝나기 전에 시작하는 일정일 때만 푸시한다(H1-night)', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-14T14:00:00Z') }); // KST 23:00
+      try {
+        const later = fakeWebPush();
+        const laterTx = txForGuestApplication({ managerRows: [{ userId: 'owner-u1' }], scheduleStartAt: new Date('2026-06-15T01:00:00Z') }); // 다음 날 10:00
+        await new ScheduleReminderService(fakeNotifications() as never, later as never).guestApplicationManagerNotificationHandler(guestApplicationClaim() as never, laterTx as never);
+        expect(laterTx.v1Notification.createMany).toHaveBeenCalledTimes(1);
+        expect(later.sendToUser).not.toHaveBeenCalled();
+
+        const early = fakeWebPush();
+        const earlyTx = txForGuestApplication({ managerRows: [{ userId: 'owner-u1' }], scheduleStartAt: new Date('2026-06-14T22:00:00Z') }); // 다음 날 07:00
+        await new ScheduleReminderService(fakeNotifications() as never, early as never).guestApplicationManagerNotificationHandler(guestApplicationClaim() as never, earlyTx as never);
+        expect(early.sendToUser).toHaveBeenCalledWith('owner-u1', expect.objectContaining({ url: '/teams/t1/schedules/s1' }));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('is a no-op when the team has no active owner/manager', async () => {
       const service = new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never);
       const tx = txForGuestApplication({ managerRows: [] });
@@ -467,6 +518,169 @@ describe('ScheduleReminderService', () => {
       await expect(service.guestApplicationManagerNotificationHandler(badClaim as never, tx as never)).rejects.toThrow(
         'Guest application notification payload requires teamId, scheduleId, and displayName',
       );
+    });
+  });
+
+  describe('Task 180 H1: 일정 생성·취소 알림', () => {
+    // KST 6/14 12:00 — 낮. 일정은 KST 6/16 (화) 19:00.
+    const baseSchedule = {
+      id: 's1',
+      teamId: 't1',
+      title: '화요일 정기 훈련',
+      startAt: new Date('2026-06-16T10:00:00Z'),
+      state: 'SCHEDULED',
+      visibility: 'TEAM',
+      cancelReason: null as string | null,
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: new Date('2026-06-14T03:00:00Z') });
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function noticeTx(options: {
+      schedule?: Partial<typeof baseSchedule>;
+      members?: string[];
+      notGoing?: string[];
+      approvedGuests?: string[];
+      activeAccounts?: string[];
+    }) {
+      const activeAccounts = options.activeAccounts ?? options.approvedGuests ?? [];
+      return {
+        $queryRaw: jest.fn().mockResolvedValue((options.members ?? []).map((userId) => ({ userId }))),
+        v1TeamSchedule: { findUnique: jest.fn().mockResolvedValue({ ...baseSchedule, ...options.schedule }) },
+        v1Team: { findUnique: jest.fn().mockResolvedValue({ name: '마포 FC' }) },
+        v1ScheduleAttendance: {
+          findMany: jest.fn(({ where }: { where: { status: string } }) =>
+            Promise.resolve(where.status === 'NOT_GOING' ? (options.notGoing ?? []).map((userId) => ({ userId })) : []),
+          ),
+        },
+        v1ScheduleGuestApplication: {
+          findMany: jest.fn().mockResolvedValue((options.approvedGuests ?? []).map((userId) => ({ userId }))),
+        },
+        v1User: {
+          findMany: jest.fn(({ where }: { where: { id: { in: string[] } } }) =>
+            Promise.resolve(where.id.in.filter((id) => activeAccounts.includes(id)).map((id) => ({ id }))),
+          ),
+        },
+        v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
+        v1Notification: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      };
+    }
+
+    const noticeClaim = (type: string, actorUserId = 'owner') => ({
+      id: 'outbox-n1',
+      businessKey: `schedule:s1:${type}`,
+      aggregateType: 'V1_TEAM_SCHEDULE',
+      aggregateId: 's1',
+      revisionId: null,
+      type,
+      payload: { scheduleId: 's1', actorUserId },
+      attempts: 0,
+      retryGeneration: 0,
+      version: 0,
+      leaseOwner: 'owner-1',
+      leaseUntil: new Date(),
+    });
+
+    const sentRows = (tx: ReturnType<typeof noticeTx>) =>
+      tx.v1Notification.createMany.mock.calls.flatMap(([arg]) => arg.data) as Array<Record<string, string>>;
+
+    it('새 일정은 만든 사람을 뺀 활성 멤버 전원에게 "참석 여부를 알려 주세요"로 가고 일정 상세로 착지한다', async () => {
+      const webPush = fakeWebPush();
+      const tx = noticeTx({ members: ['owner', 'm1', 'm2'] });
+      await new ScheduleReminderService(fakeNotifications() as never, webPush as never).scheduleCreatedNotificationHandler(
+        noticeClaim('SCHEDULE_CREATED_NOTIFICATION') as never,
+        tx as never,
+      );
+
+      expect(sentRows(tx).map((row) => row.recipientUserId)).toEqual(['m1', 'm2']);
+      expect(sentRows(tx)[0]).toMatchObject({
+        targetType: 'team',
+        targetId: 't1:s1',
+        title: '새 일정이 올라왔어요',
+        body: '"마포 FC" · 화요일 정기 훈련 · 6/16 (화) 19:00. 참석 여부를 알려 주세요.',
+        deepLink: '/teams/t1/schedules/s1',
+      });
+      expect(webPush.sendToUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('워커가 받기 전에 취소된 일정이면 새 일정 알림을 보내지 않는다', async () => {
+      const tx = noticeTx({ members: ['owner', 'm1'], schedule: { state: 'CANCELLED', cancelReason: '우천' } });
+      await new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never).scheduleCreatedNotificationHandler(
+        noticeClaim('SCHEDULE_CREATED_NOTIFICATION') as never,
+        tx as never,
+      );
+
+      expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+    });
+
+    it('밤에 만든 일정은 알림함에만 남기고, 그 밤이 끝나기 전에 시작하는 일정만 푸시한다', async () => {
+      jest.setSystemTime(new Date('2026-06-14T14:00:00Z')); // KST 23:00
+      const later = fakeWebPush();
+      const laterTx = noticeTx({ members: ['owner', 'm1'] }); // 6/16 19:00
+      await new ScheduleReminderService(fakeNotifications() as never, later as never).scheduleCreatedNotificationHandler(
+        noticeClaim('SCHEDULE_CREATED_NOTIFICATION') as never,
+        laterTx as never,
+      );
+      expect(sentRows(laterTx).map((row) => row.recipientUserId)).toEqual(['m1']);
+      expect(later.sendToUser).not.toHaveBeenCalled();
+
+      const early = fakeWebPush();
+      const earlyTx = noticeTx({ members: ['owner', 'm1'], schedule: { startAt: new Date('2026-06-14T22:00:00Z') } }); // 다음 날 07:00
+      await new ScheduleReminderService(fakeNotifications() as never, early as never).scheduleCreatedNotificationHandler(
+        noticeClaim('SCHEDULE_CREATED_NOTIFICATION') as never,
+        earlyTx as never,
+      );
+      expect(early.sendToUser).toHaveBeenCalledWith('m1', expect.objectContaining({ title: '새 일정이 올라왔어요' }));
+    });
+
+    it('취소는 "불참"이라고 답한 사람과 취소한 본인을 빼고, 응답하지 않은 사람에게도 사유를 그대로 싣는다', async () => {
+      const tx = noticeTx({
+        members: ['owner', 'going', 'no-answer', 'not-going'],
+        notGoing: ['not-going'],
+        schedule: { state: 'CANCELLED', cancelReason: '우천으로 취소해요.' },
+      });
+      await new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never).scheduleCancelledNotificationHandler(
+        noticeClaim('SCHEDULE_CANCELLED_NOTIFICATION') as never,
+        tx as never,
+      );
+
+      expect(sentRows(tx).map((row) => row.recipientUserId)).toEqual(['going', 'no-answer']);
+      expect(sentRows(tx)[0]).toMatchObject({
+        title: '일정이 취소됐어요',
+        body: '"마포 FC" · 화요일 정기 훈련(6/16 (화) 19:00) · 우천으로 취소해요.',
+        deepLink: '/teams/t1/schedules/s1',
+      });
+    });
+
+    it('승인된 용병은 공개 일정일 때만 받는다 — 비공개 일정 상세는 비멤버에게 열리지 않는다', async () => {
+      const cancelled = { state: 'CANCELLED', cancelReason: '구장 사정' };
+      const publicTx = noticeTx({
+        members: ['owner', 'm1'],
+        approvedGuests: ['guest-active', 'guest-suspended'],
+        activeAccounts: ['guest-active'],
+        schedule: { ...cancelled, visibility: 'PUBLIC' },
+      });
+      const service = new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never);
+      await service.scheduleCancelledNotificationHandler(noticeClaim('SCHEDULE_CANCELLED_NOTIFICATION') as never, publicTx as never);
+      expect(sentRows(publicTx).map((row) => row.recipientUserId)).toEqual(['m1', 'guest-active']);
+
+      const teamOnlyTx = noticeTx({ members: ['owner', 'm1'], approvedGuests: ['guest-active'], schedule: cancelled });
+      await service.scheduleCancelledNotificationHandler(noticeClaim('SCHEDULE_CANCELLED_NOTIFICATION') as never, teamOnlyTx as never);
+      expect(sentRows(teamOnlyTx).map((row) => row.recipientUserId)).toEqual(['m1']);
+    });
+
+    it('아직 취소되지 않은 일정이면 취소 알림을 보내지 않는다', async () => {
+      const tx = noticeTx({ members: ['owner', 'm1'] });
+      await new ScheduleReminderService(fakeNotifications() as never, fakeWebPush() as never).scheduleCancelledNotificationHandler(
+        noticeClaim('SCHEDULE_CANCELLED_NOTIFICATION') as never,
+        tx as never,
+      );
+
+      expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
     });
   });
 });

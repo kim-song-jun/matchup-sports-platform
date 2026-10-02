@@ -1,0 +1,316 @@
+/**
+ * 모달 a11y 공용 훅 계약 — 4개 모달(admin-reason, league 3종)이 각자 들고 있던
+ * 스캐폴딩을 이 훅으로 모으면서, 각 파일에 흩어져 있던(그리고 어디서도 테스트로
+ * 고정돼 있지 않던) 동작을 여기서 고정한다.
+ */
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode, useState } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { useModalA11y } from './use-modal-a11y';
+
+function TestModal({
+  open,
+  onClose,
+  pending = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  pending?: boolean;
+}) {
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLInputElement>({
+    open,
+    onClose,
+    pending,
+  });
+  if (!open) return null;
+  return (
+    <div data-testid="backdrop" onClick={onBackdropClick}>
+      <div ref={dialogRef} role="dialog" aria-modal="true">
+        <input ref={initialFocusRef} aria-label="첫 입력" />
+        <button type="button">확인</button>
+      </div>
+    </div>
+  );
+}
+
+/** 훅이 의도한 사용법 — `mounted` 로 렌더를 붙잡아 퇴장 애니메이션을 재생한다.
+ *  위 TestModal(조건부 언마운트)과는 계약이 다르므로 따로 둔다. */
+function MountedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<
+    HTMLInputElement,
+    HTMLDivElement
+  >({ open, onClose });
+  if (!mounted) return null;
+  return (
+    <div data-testid="backdrop" className={closing ? 'is-closing' : ''} onClick={onBackdropClick}>
+      <div ref={dialogRef} role="dialog" aria-modal="true">
+        <input ref={initialFocusRef} aria-label="첫 입력" />
+      </div>
+    </div>
+  );
+}
+
+describe('useModalA11y', () => {
+  it('ESC로 닫힌다 — 단 pending 중엔 잠긴다', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<TestModal open onClose={onClose} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<TestModal open onClose={onClose} pending />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('backdrop 클릭은 닫지만 패널 클릭은 닫지 않는다', () => {
+    const onClose = vi.fn();
+    render(<TestModal open onClose={onClose} />);
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('조건부 언마운트형은 닫는 즉시 스크롤 잠금을 푼다', () => {
+    // 이 호출자는 open=false 면 DOM 을 바로 걷어낸다 — 재생할 퇴장 UI 가 없다.
+    // 여기서 잠금을 지연시키면 화면에 아무것도 없는데 뒤 화면만 안 움직인다.
+    const { rerender } = render(<TestModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<TestModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('mounted 기반 렌더는 퇴장 애니메이션 동안 잠금을 유지한다', async () => {
+    const { rerender } = render(<MountedModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<MountedModal open={false} onClose={() => {}} />);
+    // 패널이 아직 화면에 있다. 여기서 풀면 시트가 떠 있는데 뒤 화면이 스크롤된다.
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(document.body.style.overflow).toBe('hidden');
+    // 사라진 뒤에 풀린다
+    await waitFor(() => expect(document.body.style.overflow).toBe(''));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('닫힌 모달은 다른 오버레이의 스크롤 잠금을 건드리지 않는다', () => {
+    // 어드민 drawer 처럼 이 훅과 무관한 오버레이가 이미 잠가 둔 상태
+    document.body.style.overflow = 'hidden';
+    // 훅을 쓰는 모달이 화면에 계속 마운트돼 있지만 닫혀 있다
+    const { rerender } = render(<MountedModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<MountedModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    document.body.style.overflow = '';
+  });
+
+  it('모달이 겹쳐 열리면 안쪽이 닫혀도 바깥쪽 잠금이 남는다', async () => {
+    const outer = render(<MountedModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    const inner = render(<MountedModal open onClose={() => {}} />);
+    inner.rerender(<MountedModal open={false} onClose={() => {}} />);
+    // queryByRole 은 document 전체를 보므로 바깥 모달까지 잡는다 — 이 render 의
+    // 컨테이너로 좁혀야 안쪽만 본다
+    await waitFor(() =>
+      expect(inner.container.querySelector('[role="dialog"]')).toBeNull(),
+    );
+    // DOM 이 걷힌 뒤에 오는 안쪽 잠금 해제까지 흘려보낸 다음 본다 — 해제 전에 보면 단언이 비어 있다
+    await act(async () => {});
+    // 안쪽이 사라져도 바깥 모달은 아직 열려 있다 — 여기서 풀리면 뒤 화면이 스크롤된다
+    expect(document.body.style.overflow).toBe('hidden');
+    outer.unmount();
+    inner.unmount();
+  });
+
+  it('시트에서 다른 시트로 넘어가도 잠금이 이어지고, 둘 다 닫히면 원래 값으로 돌아온다', async () => {
+    // 팀 멤버 ⋯ 시트 → 결장 기간 시트와 같은 모양: 앞 시트는 open=false 로 DOM 을 걷고(잠금 해제는
+    // 다음 커밋), 뒤 시트는 open=true 로 마운트돼 첫 커밋에서 잠근다 — 해제가 잠금보다 늦게 온다.
+    function Flow() {
+      const [step, setStep] = useState<'first' | 'second' | 'done'>('first');
+      return (
+        <>
+          <TestModal open={step === 'first'} onClose={() => {}} />
+          {step === 'first' ? (
+            <button type="button" onClick={() => setStep('second')}>다음 시트</button>
+          ) : null}
+          {step !== 'first' ? <MountedModal open={step === 'second'} onClose={() => setStep('done')} /> : null}
+        </>
+      );
+    }
+    render(<Flow />);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 시트' }));
+    // 앞 시트만 닫혔다 — 뒤 시트가 떠 있으니 아직 잠겨 있어야 한다
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    // 해제는 패널을 걷는 커밋 뒤 별도 작업(useEffect cleanup)으로 온다 — 패널이 사라진 것을 기다리면
+    // 해제 전에 단언할 수 있다(CI 간헐 실패). 해제 자체를 기다리고, 새면 시간 초과로 실패한다.
+    await waitFor(() => expect(document.body.style.overflow).toBe(''));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('잠그기 전에 있던 인라인 값은 마지막 오버레이가 닫힐 때 그대로 돌아온다', () => {
+    document.body.style.overflow = 'clip';
+    const { rerender } = render(<TestModal open onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<TestModal open={false} onClose={() => {}} />);
+    expect(document.body.style.overflow).toBe('clip');
+    document.body.style.overflow = '';
+  });
+
+  it('라디오 그룹이 있어도 Tab 이 다이얼로그 밖으로 새지 않는다', () => {
+    // 라디오 그룹의 tab stop 은 하나뿐이다 — 체크된 것이 있으면 그것, 없으면 첫 번째.
+    // querySelectorAll 결과를 그대로 쓰면 트랩의 last 가 영원히 포커스를 못 받는
+    // 라디오가 되어 되감기가 발동하지 않는다.
+    function RadioModal() {
+      const { dialogRef } = useModalA11y<HTMLElement, HTMLDivElement>({
+        open: true,
+        onClose: () => {},
+      });
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true">
+          <button type="button">확인</button>
+          <input type="radio" name="g" aria-label="가" />
+          <input type="radio" name="g" aria-label="나" />
+          <input type="radio" name="g" aria-label="다" />
+        </div>
+      );
+    }
+    render(<RadioModal />);
+    const confirm = screen.getByRole('button', { name: '확인' });
+    const first = screen.getByRole('radio', { name: '가' });
+    // 아무것도 체크되지 않았으므로 마지막 tab stop 은 '가' 다 ('다' 가 아니다)
+    first.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(confirm);
+  });
+
+  it('disabled 컨트롤이 마지막에 있어도 Tab 이 밖으로 새지 않는다', () => {
+    // disabled 요소는 포커스를 받지 못하므로 트랩의 last 가 될 수 없다.
+    // 선택자에서 걸러 내지 않으면 되감기가 영원히 발동하지 않는다.
+    function DisabledTailModal() {
+      const { dialogRef } = useModalA11y<HTMLElement, HTMLDivElement>({
+        open: true,
+        onClose: () => {},
+      });
+      return (
+        <div ref={dialogRef} role="dialog" aria-modal="true">
+          <button type="button">확인</button>
+          <input aria-label="메모" />
+          <textarea aria-label="사유" disabled />
+        </div>
+      );
+    }
+    render(<DisabledTailModal />);
+    const confirm = screen.getByRole('button', { name: '확인' });
+    const memo = screen.getByLabelText('메모');
+    memo.focus(); // disabled textarea 를 빼면 이게 마지막 tab stop 이다
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(confirm);
+  });
+
+  it('닫힐 때 이전 포커스를 복원한다 (WCAG 2.4.3)', () => {
+    const outside = document.createElement('button');
+    outside.textContent = '열기';
+    document.body.appendChild(outside);
+    outside.focus();
+
+    const { rerender } = render(<TestModal open onClose={() => {}} />);
+    // 첫 컨트롤 포커스는 60ms 지연 — 여기선 복원 경로만 본다
+    rerender(<TestModal open={false} onClose={() => {}} />);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it('열린 채 언마운트돼도 이전 포커스를 복원한다 — 조건부 마운트형(LogDetailModal 류) 경로', () => {
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+
+    const { unmount } = render(<TestModal open onClose={() => {}} />);
+    unmount();
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it('열리면 지정한 첫 컨트롤로 포커스가 이동한다', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<TestModal open onClose={() => {}} />);
+      vi.advanceTimersByTime(80);
+      expect(document.activeElement).toBe(screen.getByLabelText('첫 입력'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  describe.each([['일반', undefined], ['StrictMode', StrictMode]] as const)('%s 렌더', (_label, wrapper) => {
+  it('시트 안 입력이 autoFocus 여도 Escape 로 닫으면 트리거 버튼으로 돌아온다', async () => {
+    // autoFocus 는 마운트 커밋에서 이미 적용된다 — 그 뒤에 이전 포커스를 읽으면 입력이 잡힌다.
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            등번호
+          </button>
+          {open ? <AutoFocusSheet onClose={() => setOpen(false)} /> : null}
+        </>
+      );
+    }
+    function AutoFocusSheet({ onClose }: { onClose: () => void }) {
+      const { dialogRef, mounted } = useModalA11y<HTMLElement, HTMLElement>({ open: true, onClose });
+      if (!mounted) return null;
+      return (
+        <section ref={dialogRef} role="dialog" aria-modal="true">
+          <input aria-label="번호" autoFocus />
+        </section>
+      );
+    }
+    render(<Host />, { wrapper });
+    const trigger = screen.getByRole('button', { name: '등번호' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(document.activeElement).toBe(screen.getByLabelText('번호'));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('open 토글형 모달도 autoFocus 입력이 아니라 트리거로 복원하고, 다른 트리거로 다시 열면 그쪽으로 복원한다', async () => {
+    function Host() {
+      const [open, setOpen] = useState(false);
+      const { dialogRef, mounted } = useModalA11y<HTMLElement, HTMLElement>({ open, onClose: () => setOpen(false) });
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            첫째
+          </button>
+          <button type="button" onClick={() => setOpen(true)}>
+            둘째
+          </button>
+          {mounted ? (
+            <section ref={dialogRef} role="dialog" aria-modal="true">
+              <input aria-label="번호" autoFocus />
+            </section>
+          ) : null}
+        </>
+      );
+    }
+    render(<Host />, { wrapper });
+    for (const name of ['첫째', '둘째']) {
+      const trigger = screen.getByRole('button', { name });
+      trigger.focus();
+      fireEvent.click(trigger);
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(document.activeElement).toBe(screen.getByLabelText('번호'));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(document.activeElement).toBe(trigger);
+    }
+  });
+  });
+});

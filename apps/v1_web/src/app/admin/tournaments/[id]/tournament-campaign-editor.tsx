@@ -12,7 +12,7 @@ import { validateTournamentCampaignForm } from './tournament-campaign-admin-mode
 import { TournamentCampaignEditorCollections } from './tournament-campaign-editor-collections';
 
 const INPUT_CLASS = [
-  'min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)]',
+  'min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm text-[var(--text-strong)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)] disabled:text-[var(--text-muted)]',
 ].join(' ');
 
@@ -177,7 +177,7 @@ function EditorField({
   readonly onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-[var(--text-body)]">
+    <label className="grid gap-2 text-xs font-semibold text-[var(--text-body)]">
       {label}
       {multiline ? (
         <textarea className={INPUT_CLASS} rows={5} maxLength={maxLength} disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} />

@@ -1,24 +1,49 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useV1ApplyGuestRecruitment,
+  useV1AuthMe,
   useV1CancelTeamSchedule,
   useV1CompleteTeamSchedule,
   useV1CreateGuestRecruitment,
   useV1CreateTeamSchedule,
   useV1MySchedule,
   useV1SetMyScheduleAttendance,
+  useV1SetScheduleAttendanceOnBehalf,
   useV1TeamDetail,
+  useV1TeamMatch,
+  useV1TeamMatchLineup,
   useV1TeamSchedule,
   useV1TeamSchedules,
   useV1TriggerScheduleReminder,
   useV1UpdateGuestRecruitment,
   useV1UpdateTeamSchedule,
 } from '@/hooks/use-v1-api';
+// guest-recruitment applications 목록·승인/거절 전용 훅은 아직 hooks/use-v1-api.ts에 없다(이
+// 배치의 ownedFiles가 그 파일을 포함하지 않아 새 훅을 그쪽에 추가할 수 없음) — 같은 파일이
+// 이미 쓰는 저수준 클라이언트(v1Get/v1Patch)를 이 컴포넌트 안에서 직접 useQuery/useMutation과
+// 조합해 동일한 패턴(성공 시 teamSchedule invalidate)을 재현한다.
+import { v1Get, v1Patch } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
+import { randomUuid } from '@/lib/uuid';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { extractErrorCode } from '@/lib/error-message';
+import { isHiddenFromViewerError } from '@/lib/access-denied-error';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
-import type { V1CreateScheduleDto, V1UpdateScheduleDto } from '@/types/api';
+import { hydrateLineupEditorState } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
+import { teamGameDetailHref } from '@/lib/team-game-links';
+import type {
+  V1CreateScheduleDto,
+  V1GuestApplicationListItem,
+  V1GuestRecruitmentVisibility,
+  V1ReviewGuestApplicationDto,
+  V1ReviewGuestApplicationResult,
+  V1UpdateScheduleDto,
+} from '@/types/api';
 import {
   ScheduleDetailPageView,
   ScheduleFormPageView,
@@ -36,10 +61,11 @@ import type {
   ScheduleTypeFilter,
 } from './team-schedules.types';
 import {
+  attendanceLockedReason,
   attendanceStatusLabel,
   buildScheduleCalendarMonth,
   dateKeyOf,
-  fromDatetimeLocalValue,
+  kstMonthStart,
   guestRecruitmentStateLabel,
   isDeadlinePassed,
   isScheduleManagerRole,
@@ -47,19 +73,47 @@ import {
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  scheduleCancelNoticeLine,
   scheduleCreatableTypeOptions,
+  scheduleLinkedMatchKind,
+  scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
   scheduleTypeFilterOptions,
+  scheduleTournamentOpponentTeamName,
   scheduleTypeLabel,
   scheduleVisibilityLabel,
   scheduleVisibilityOptions,
-  toDatetimeLocalValue,
   toScheduleListItemModel,
 } from './team-schedules.view-model';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+const GUEST_APPLICATION_STATE_LABELS: Record<string, string> = {
+  PENDING: '대기 중',
+  APPROVED: '승인됨',
+  REJECTED: '거절됨',
+  WITHDRAWN: '취소됨',
+};
+
+const GUEST_RECRUITMENT_VISIBILITY_LABELS: Record<V1GuestRecruitmentVisibility, string> = {
+  PUBLIC: '전체 공개',
+  MEMBERS: '팀원 전용',
+};
+
+// team-schedules.view-model.ts의 mapScheduleErrorMessage/SCHEDULE_ERROR_MESSAGES는 이 배치의
+// ownedFiles 밖이라 새 도메인 코드를 그쪽에 등록할 수 없다 — 등록하지 않으면 서버가 던진 영문
+// message가 그대로 화면에 새어(에러 어조 규칙 위반) 나가므로, 신청 승인/거절 전용 코드 3개만
+// 이 파일 안에서 얹어 감싼다(다른 모든 코드는 그대로 mapScheduleErrorMessage에 위임).
+const GUEST_APPLICATION_REVIEW_ERROR_MESSAGES: Record<string, string> = {
+  GUEST_APPLICATION_NOT_FOUND: '신청 정보를 찾을 수 없어요.',
+  GUEST_APPLICATION_NOT_PENDING: '이미 처리된 신청이에요. 새로고침 후 다시 확인해 주세요.',
+  GUEST_RECRUITMENT_FULL: '모집 인원이 이미 다 찼어요.',
+};
+
+function mapReviewApplicationErrorMessage(err: unknown, fallback: string): string {
+  const code = extractErrorCode(err);
+  if (code && GUEST_APPLICATION_REVIEW_ERROR_MESSAGES[code]) return GUEST_APPLICATION_REVIEW_ERROR_MESSAGES[code];
+  return mapScheduleErrorMessage(err, fallback);
 }
 
 // ── 목록 ──────────────────────────────────────────────────────────────────────
@@ -69,7 +123,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [typeFilter, setTypeFilter] = useState<ScheduleTypeFilter>('all');
   const [stateFilter, setStateFilter] = useState<ScheduleStateFilter>('all');
-  const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
+  const [monthDate, setMonthDate] = useState(() => kstMonthStart(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
   // 서버 캡(최대 100)을 그대로 사용 — 캘린더가 한 달 치를 필터 없이 훑어보려면
@@ -116,7 +170,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     emptyTitle: '아직 등록된 일정이 없어요',
     emptySub: canManage
       ? '팀원과 함께할 첫 일정을 만들어 보세요.'
-      : '팀 운영진이 일정을 등록하면 여기서 확인할 수 있어요.',
+      : '팀장·매니저가 일정을 등록하면 여기서 확인할 수 있어요.',
   };
 
   return <ScheduleListPageView model={model} />;
@@ -125,8 +179,21 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
 // ── 상세 ──────────────────────────────────────────────────────────────────────
 
 export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: string; scheduleId: string }) {
+  const queryClient = useQueryClient();
+  // 내 일정·알림처럼 팀 일정 목록이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const team = useV1TeamDetail(teamId);
   const detail = useV1TeamSchedule(teamId, scheduleId);
+  // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 그 상대팀 이름·
+  // 장소가 없었다. 확정된 매치일 때만(그 전엔 상대가 비어 헛수고다) 경기 상세를 한 번 더
+  // 불러 요약을 보여준다. 친선·리그는 팀 매치 상세, 대회 경기는 그 조회가 404 라 공개 경기
+  // 상세를 쓴다(대진표 공개 전이면 그것도 404 — 요약을 숨긴다).
+  const confirmedLinkedMatch = detail.data?.matchConfirmed === true ? (detail.data.linkedMatch ?? null) : null;
+  const linkedTeamMatchId = confirmedLinkedMatch?.teamMatchId ?? '';
+  const linkedMatchKind = confirmedLinkedMatch ? scheduleLinkedMatchKind(confirmedLinkedMatch) : null;
+  const linkedTournamentId = linkedMatchKind === 'TOURNAMENT' ? (confirmedLinkedMatch?.tournamentId ?? '') : '';
+  const opponentMatch = useV1TeamMatch(linkedTournamentId ? '' : linkedTeamMatchId);
+  const opponentTournamentMatch = usePublicMatch(linkedTournamentId, linkedTournamentId ? linkedTeamMatchId : '');
   const setAttendance = useV1SetMyScheduleAttendance(teamId, scheduleId);
   const cancelSchedule = useV1CancelTeamSchedule(teamId, scheduleId);
   const completeSchedule = useV1CompleteTeamSchedule(teamId, scheduleId);
@@ -146,6 +213,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const [recruitmentSlots, setRecruitmentSlots] = useState('1');
   const [recruitmentClosesAt, setRecruitmentClosesAt] = useState('');
   const [recruitmentNote, setRecruitmentNote] = useState('');
+  const [recruitmentVisibility, setRecruitmentVisibility] = useState<V1GuestRecruitmentVisibility>('PUBLIC');
   const [recruitmentEditError, setRecruitmentEditError] = useState<string | null>(null);
 
   const [applicantName, setApplicantName] = useState('');
@@ -154,11 +222,58 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const [applicationSuccess, setApplicationSuccess] = useState<string | null>(null);
   const [applicationSubmitted, setApplicationSubmitted] = useState(false);
 
+  const [applicationActionError, setApplicationActionError] = useState<string | null>(null);
+  const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
+
   const schedule = detail.data;
+  // 데스크톱 뒤로가기(AppBackLink)의 fallback — `?from=`이 있으면 AppBackLink가 직접 읽는다.
   const backHref = `/teams/${teamId}/schedules`;
   const viewerRole = team.data?.viewer.role;
   const canManage = isScheduleManagerRole(viewerRole);
   const canRsvp = isScheduleMemberRole(viewerRole);
+  const friendlyTeamMatchId =
+    linkedTeamMatchId && schedule?.linkedMatch?.tournamentId === null && schedule.linkedMatch.leagueId === null
+      ? linkedTeamMatchId
+      : '';
+  // 명단 조회(GET /team-matches/:id/lineup)는 팀장·매니저만 된다 — 멤버는 부르지 않는다(403).
+  const friendlyLineup = useV1TeamMatchLineup(friendlyTeamMatchId, { enabled: canManage });
+
+  // 신청자 목록 + 승인/거절 — Task 12(guest-recruitment)에 없던 lane. 전용 훅이 아직
+  // hooks/use-v1-api.ts에 없어(이 배치의 ownedFiles 밖) 같은 저수준 클라이언트를 여기서
+  // 직접 조합한다. manager+만, 그리고 모집이 실제로 열려 있을 때만 불러온다.
+  const guestApplicationsQueryKey = ['v1', 'guest-recruitment-applications', teamId, scheduleId] as const;
+  const guestApplicationsQuery = useQuery({
+    queryKey: guestApplicationsQueryKey,
+    queryFn: () =>
+      v1Get<{ items: V1GuestApplicationListItem[] }>(`/teams/${teamId}/schedules/${scheduleId}/guest-recruitment/applications`),
+    enabled: canManage && Boolean(schedule?.guestRecruitment),
+  });
+  const reviewApplication = useMutation({
+    mutationFn: ({ applicationId, state }: { applicationId: string; state: 'approved' | 'rejected' }) =>
+      v1Patch<V1ReviewGuestApplicationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment/applications/${applicationId}`,
+        { state } satisfies V1ReviewGuestApplicationDto,
+        { headers: { 'Idempotency-Key': randomUuid() } },
+      ),
+    onSuccess: () => {
+      // 승인은 recruitment.approvedCount/state(FILLED 도달 여부)도 함께 바꾸므로 둘 다 갱신한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      void queryClient.invalidateQueries({ queryKey: guestApplicationsQueryKey });
+    },
+  });
+
+  function onReviewApplication(applicationId: string, state: 'approved' | 'rejected') {
+    setApplicationActionError(null);
+    setPendingApplicationId(applicationId);
+    reviewApplication.mutate(
+      { applicationId, state },
+      {
+        onSettled: () => setPendingApplicationId(null),
+        onError: (err) =>
+          setApplicationActionError(mapReviewApplicationErrorMessage(err, state === 'approved' ? '승인하지 못했어요.' : '거절하지 못했어요.')),
+      },
+    );
+  }
 
   function reportPossibleConflict(err: unknown, fallback: string): string {
     const message = mapScheduleErrorMessage(err, fallback);
@@ -204,8 +319,12 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   function onCreateRecruitment() {
     if (!schedule) return;
     const closesAt = schedule.rsvpDeadlineAt ?? schedule.startAt;
+    // 용병 모집은 정의상 팀 밖 사람을 구하는 기능이다 — visibility를 생략하면 서버가
+    // MEMBERS로 기본값을 매겨, 신청 폼을 볼 수 있는 유일한 대상(비멤버)에게 영원히 보이지
+    // 않는 모집이 만들어진다(신규 결함). 새로 여는 모집은 항상 PUBLIC으로 시작하고,
+    // 필요하면 아래 "모집 정보 수정" 패널에서 팀원 전용으로 바꿀 수 있다.
     createRecruitment.mutate(
-      { slots: 1, closesAt },
+      { slots: 1, closesAt, visibility: 'PUBLIC' },
       { onError: (err) => setConflictBanner(reportPossibleConflict(err, '용병 모집을 열지 못했어요.')) },
     );
   }
@@ -223,8 +342,9 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     const recruitment = schedule?.guestRecruitment;
     if (!recruitment) return;
     setRecruitmentSlots(String(recruitment.slots));
-    setRecruitmentClosesAt(toDatetimeLocalValue(recruitment.closesAt));
+    setRecruitmentClosesAt(isoToKstDatetimeLocal(recruitment.closesAt));
     setRecruitmentNote(recruitment.note ?? '');
+    setRecruitmentVisibility(recruitment.visibility);
     setRecruitmentEditError(null);
     setRecruitmentEditOpen(true);
   }
@@ -232,7 +352,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   function onSaveRecruitmentEdit() {
     const recruitment = schedule?.guestRecruitment;
     if (!recruitment) return;
-    const closesAtIso = fromDatetimeLocalValue(recruitmentClosesAt);
+    const closesAtIso = kstDatetimeLocalToIso(recruitmentClosesAt);
     const slotsNum = Number(recruitmentSlots);
     if (!closesAtIso || !Number.isFinite(slotsNum) || slotsNum < 1) {
       setRecruitmentEditError('모집 인원과 마감 시각을 다시 확인해 주세요.');
@@ -245,6 +365,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
         slots: slotsNum,
         closesAt: closesAtIso,
         note: recruitmentNote.trim() || undefined,
+        visibility: recruitmentVisibility,
       },
       {
         onSuccess: () => setRecruitmentEditOpen(false),
@@ -269,6 +390,25 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
 
   const recruitment = schedule?.guestRecruitment ?? null;
   const rsvpDeadlinePassed = isDeadlinePassed(schedule?.rsvpDeadlineAt ?? null);
+  // 본인 응답과 대리 표시가 **같은 제약**을 따르도록 판정을 한 곳에서 만든다 —
+  // 마감이 지났거나 일정이 SCHEDULED 가 아니면 대리로도 바꿀 수 없다. 둘이 갈리면
+  // "팀장은 마감 후에도 바꿀 수 있나?"가 화면마다 다르게 답해진다.
+  const attendanceDisabled = !schedule || schedule.state !== 'SCHEDULED' || rsvpDeadlinePassed;
+  const [proxyPendingUserId, setProxyPendingUserId] = useState<string | null>(null);
+  const { data: me } = useV1AuthMe();
+  const [proxyError, setProxyError] = useState<string | null>(null);
+  const setAttendanceOnBehalf = useV1SetScheduleAttendanceOnBehalf(teamId, scheduleId);
+  function onProxyGoing(userId: string) {
+    setProxyError(null);
+    setProxyPendingUserId(userId);
+    setAttendanceOnBehalf.mutate(
+      { userId, status: 'GOING', expectedVersion: 0 },
+      {
+        onError: (err) => setProxyError(reportPossibleConflict(err, '참석을 대신 표시하지 못했어요.')),
+        onSettled: () => setProxyPendingUserId(null),
+      },
+    );
+  }
   const recruitmentDeadlinePassed = isDeadlinePassed(recruitment?.closesAt ?? null);
 
   const history: ScheduleDetailViewModel['history'] = [];
@@ -280,6 +420,44 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   }
 
   const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
+
+  const opponentTeamName = linkedTournamentId
+    ? scheduleTournamentOpponentTeamName(opponentTournamentMatch.data, teamId)
+    : scheduleOpponentTeamName(opponentMatch.data, teamId);
+  const opponentHref = confirmedLinkedMatch && linkedMatchKind
+    ? teamGameDetailHref(
+        {
+          competitionKind: linkedMatchKind,
+          competitionId: confirmedLinkedMatch.leagueId ?? confirmedLinkedMatch.tournamentId,
+          teamMatchId: confirmedLinkedMatch.teamMatchId,
+        },
+        withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath),
+      )
+    : null;
+  const opponent: ScheduleDetailViewModel['opponent'] =
+    opponentHref && opponentTeamName
+      ? {
+          teamName: opponentTeamName,
+          placeName: linkedTournamentId ? (opponentTournamentMatch.data?.venue ?? null) : (opponentMatch.data?.place?.name ?? null),
+          teamMatchHref: opponentHref,
+        }
+      : null;
+
+  const rosterEntries = friendlyLineup.data ? hydrateLineupEditorState(friendlyLineup.data).participants : null;
+  const rosterViewerId = me?.user.id ?? null;
+  const roster: ScheduleDetailViewModel['roster'] =
+    friendlyTeamMatchId && schedule?.state !== 'CANCELLED'
+      ? {
+          count: rosterEntries ? rosterEntries.length : null,
+          viewerIncluded:
+            rosterEntries && rosterEntries.length > 0 && rosterViewerId
+              ? rosterEntries.some((entry) => entry.userId === rosterViewerId)
+              : null,
+          href: canManage
+            ? withFromPath(`/team-matches/${friendlyTeamMatchId}/lineup`, withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath))
+            : null,
+        }
+      : null;
 
   const model: ScheduleDetailViewModel = {
     teamId,
@@ -293,6 +471,8 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     dateTimeLabel: schedule ? formatTournamentDateRangeWithTime(schedule.startAt, schedule.endAt) ?? '일정 미정' : '',
     visibilityLabel: schedule ? scheduleVisibilityLabel(schedule.visibility) : '',
     capacityLabel: schedule?.capacity != null ? `정원 ${schedule.goingCount}/${schedule.capacity}명` : null,
+    opponent,
+    roster,
     version: schedule?.version ?? 0,
     conflictBanner,
     onDismissConflict: () => setConflictBanner(null),
@@ -305,16 +485,11 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       deadlineLabel: scheduleRsvpDeadlineLabel(schedule?.rsvpDeadlineAt ?? null),
       deadlinePassed: rsvpDeadlinePassed,
       disabled: !schedule || schedule.state !== 'SCHEDULED' || rsvpDeadlinePassed || setAttendance.isPending,
-      disabledReason: !schedule
-        ? null
-        : schedule.state !== 'SCHEDULED'
-          ? '이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.'
-          : rsvpDeadlinePassed
-            ? '참석 신청 마감 시간이 지났어요.'
-            : null,
+      disabledReason: schedule ? attendanceLockedReason(schedule.state, rsvpDeadlinePassed) : null,
       pending: setAttendance.isPending,
       error: attendanceError,
       onSetStatus,
+      friendlyMatch: Boolean(schedule?.linkedMatch) && schedule?.linkedMatch?.tournamentId === null && schedule.linkedMatch.leagueId === null,
     },
     attendees: {
       visible: Boolean(schedule?.attendees),
@@ -329,6 +504,17 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
         going: schedule?.attendees?.filter((attendee) => attendee.status === 'GOING').length ?? 0,
         noResponse: schedule?.attendees?.filter((attendee) => attendee.status === 'NO_RESPONSE').length ?? 0,
       },
+      // 대리 표시는 팀장·매니저만 — 서버도 403 으로 막지만 누를 수 없는 버튼을
+      // 보여주고 눌러서 실패하게 두지 않는다. 마감·상태 제약은 본인 응답과 같은
+      // 판정을 쓴다(attendance.disabled) — 마감이 지났으면 대리로도 못 바꾼다.
+      canProxy: canManage && !attendanceDisabled,
+      // 자기 줄에는 대리 버튼을 내지 않는다 — 위쪽 "내 참석"이 같은 일을 한다.
+      // 아직 /auth/me 가 안 왔으면 null 이고, 그동안은 어느 줄에도 버튼이 안 뜬다:
+      // 잠깐 안 보이는 쪽이, 자기 줄에 잘못 떴다가 사라지는 쪽보다 낫다.
+      viewerUserId: me?.user.id ?? null,
+      proxyPendingUserId: proxyPendingUserId,
+      proxyError: proxyError,
+      onProxyGoing: onProxyGoing,
     },
     guestRecruitment: {
       visible: Boolean(recruitment),
@@ -338,6 +524,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       closesAtLabel: recruitment ? `${formatTournamentDateTimeLong(recruitment.closesAt)} 마감` : '',
       note: recruitment?.note ?? null,
       stateLabel: recruitment ? guestRecruitmentStateLabel(recruitment.state) : '',
+      visibilityLabel: recruitment ? GUEST_RECRUITMENT_VISIBILITY_LABELS[recruitment.visibility] : '',
       isOpen: recruitment?.state === 'OPEN',
       manage: canManage
         ? {
@@ -346,21 +533,40 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
             onEdit: onOpenRecruitmentEdit,
             pending: createRecruitment.isPending || updateRecruitment.isPending,
             exists: Boolean(recruitment),
+            scheduleActive: schedule?.state === 'SCHEDULED',
             editPanel: recruitmentEditOpen
               ? {
                   open: true,
                   slots: recruitmentSlots,
                   closesAt: recruitmentClosesAt,
                   note: recruitmentNote,
+                  visibility: recruitmentVisibility,
                   onSlotsChange: setRecruitmentSlots,
                   onClosesAtChange: setRecruitmentClosesAt,
                   onNoteChange: setRecruitmentNote,
+                  onVisibilityChange: setRecruitmentVisibility,
                   onSave: onSaveRecruitmentEdit,
                   onDismiss: () => setRecruitmentEditOpen(false),
                   pending: updateRecruitment.isPending,
                   error: recruitmentEditError,
                 }
               : undefined,
+            applications: {
+              items: (guestApplicationsQuery.data?.items ?? []).map((item) => ({
+                applicationId: item.applicationId,
+                displayName: item.displayName,
+                note: item.note,
+                state: item.state,
+                stateLabel: GUEST_APPLICATION_STATE_LABELS[item.state] ?? item.state,
+              })),
+              loading: guestApplicationsQuery.isLoading,
+              error: guestApplicationsQuery.isError
+                ? mapScheduleErrorMessage(guestApplicationsQuery.error, '신청자 목록을 불러오지 못했어요.')
+                : applicationActionError,
+              onApprove: (applicationId: string) => onReviewApplication(applicationId, 'approved'),
+              onReject: (applicationId: string) => onReviewApplication(applicationId, 'rejected'),
+              pendingApplicationId,
+            },
           }
         : undefined,
       applicationForm:
@@ -416,6 +622,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     },
     cancelModal: {
       open: cancelOpen,
+      noticeLine: schedule ? scheduleCancelNoticeLine(schedule.visibility, recruitment?.approvedCount ?? 0) : '',
       reason: cancelReason,
       onReasonChange: setCancelReason,
       onConfirm: onCancelConfirm,
@@ -428,6 +635,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     },
     loading: detail.isLoading,
     error: detail.isError,
+    inaccessible: detail.isError && isHiddenFromViewerError(detail.error),
     onRetry: () => void detail.refetch(),
   };
 
@@ -467,10 +675,10 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
     setDraft({
       title: detail.data.title,
       type: detail.data.type,
-      startAt: toDatetimeLocalValue(detail.data.startAt),
-      endAt: toDatetimeLocalValue(detail.data.endAt),
+      startAt: isoToKstDatetimeLocal(detail.data.startAt),
+      endAt: isoToKstDatetimeLocal(detail.data.endAt),
       capacity: detail.data.capacity != null ? String(detail.data.capacity) : '',
-      rsvpDeadlineAt: toDatetimeLocalValue(detail.data.rsvpDeadlineAt),
+      rsvpDeadlineAt: isoToKstDatetimeLocal(detail.data.rsvpDeadlineAt),
       // MEMBERS는 폼 선택지에서 뺐다(TEAM과 백엔드 동작이 동일 — scheduleVisibilityOptions()
       // 주석 참고). 레거시로 MEMBERS가 저장된 일정을 열면 TEAM으로 정규화해 토글에 항상
       // 선택된 버튼이 보이게 한다. 실제 접근 범위는 바뀌지 않는다.
@@ -484,15 +692,15 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
   }
 
   function onSubmit() {
-    const startAtIso = fromDatetimeLocalValue(draft.startAt);
-    const endAtIso = fromDatetimeLocalValue(draft.endAt);
+    const startAtIso = kstDatetimeLocalToIso(draft.startAt);
+    const endAtIso = kstDatetimeLocalToIso(draft.endAt);
     if (!draft.title.trim() || !startAtIso || !endAtIso) {
       setError('제목과 시작·종료 시각을 모두 입력해 주세요.');
       return;
     }
     setError(null);
     const capacityNum = draft.capacity.trim() ? Number(draft.capacity) : undefined;
-    const rsvpDeadlineIso = fromDatetimeLocalValue(draft.rsvpDeadlineAt);
+    const rsvpDeadlineIso = kstDatetimeLocalToIso(draft.rsvpDeadlineAt) ?? undefined;
 
     if (mode === 'create') {
       // MATCH 일정은 팀매치가 시스템으로만 만든다(서버가 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY 로 거부).
@@ -607,7 +815,7 @@ export function MySchedulePageClient() {
         isTentative: display.isTentative,
         dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
         myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
-        href: `/teams/${item.teamId}/schedules/${item.id}`,
+        href: withFromPath(`/teams/${item.teamId}/schedules/${item.id}`, '/my/schedule'),
       };
     }),
     loading: query.isLoading,

@@ -11,8 +11,8 @@ Status: Roadmap — pending user confirmation per task
 Task 69 (미구현 기능 보완), Task 70 (마켓플레이스 결제 라이프사이클 — **현재 진행 중**), Task 71 (AI 팀 밸런싱 — **완료, main 배포됨 2026-04-18**)이 직전 사이클에서 처리되었다. 이 문서는 **Task 70/71이 끝난 직후 진입할 다음 사이클의 3개 task(72·73·74)**와 그 뒤를 이을 장기 로드맵(75·76)을 정의한다.
 
 입력 소스:
-- `.github/tasks/71-completion-report.md` Known Minor Issues + Deferred items
-- `.github/tasks/69-completion-report.md` Known minor issues
+- `.github/tasks/archive/71-completion-report.md` Known Minor Issues + Deferred items
+- `.github/tasks/archive/69-completion-report.md` Known minor issues
 - `CLAUDE.md` Known Blockers 섹션
 - Task 71 리뷰/QA 피드백 (3 라운드 종합)
 
@@ -150,7 +150,7 @@ Task 69 (미구현 기능 보완), Task 70 (마켓플레이스 결제 라이프�
 
 ## References
 
-- Task 69 완료 리포트: `.github/tasks/69-completion-report.md`
-- Task 71 완료 리포트: `.github/tasks/71-completion-report.md`
+- Task 69 완료 리포트: `.github/tasks/archive/69-completion-report.md`
+- Task 71 완료 리포트: `.github/tasks/archive/71-completion-report.md`
 - Task 71 설계 문서: `docs/design/task-71-team-balancing.md`
 - 프로젝트 지침: `CLAUDE.md`

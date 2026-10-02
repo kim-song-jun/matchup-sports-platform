@@ -406,15 +406,24 @@ test('Changesets keeps a changelog generator so the release action can build its
   assert.ok(config.changelog, 'a changelog generator must be configured');
 });
 
-test('release PR workflow refuses to run when there is nothing to release', () => {
-  // 리졸버가 0개를 허용하게 됐으므로, 빈 릴리스 PR 이 열리지 않도록 워크플로가 직접 막아야 한다.
-  const releaseWorkflow = readFileSync(join(repoRoot, '.github/workflows/release-main.yml'), 'utf8');
+test('promote-to-main workflow only dispatches from dev and skips (not fails) an empty release', () => {
+  // release-main.yml 을 대체한 promote-main.yml/promote-main.sh 는 리졸버가 0개를 허용하는
+  // 것과 자기모순을 일으키지 않는다 — 소비할 changeset 이 없으면 버전 단계를 건너뛰고
+  // (실패시키지 않고) 승격 게이트 사전 검증과 PR 링크 생성으로 그대로 진행한다.
+  const promoteWorkflow = readFileSync(join(repoRoot, '.github/workflows/promote-main.yml'), 'utf8');
+  const promoteScript = readFileSync(join(repoRoot, 'scripts/release/promote-main.sh'), 'utf8');
 
-  assert.match(releaseWorkflow, /\.changesets \| length > 0/);
-  assert.match(releaseWorkflow, /nothing to release/i);
-  // 통합·배포 브랜치가 dev 하나이므로 릴리스 PR 도 dev 를 base 로 만든다.
-  assert.match(releaseWorkflow, /github\.ref == 'refs\/heads\/dev'/);
-  assert.doesNotMatch(releaseWorkflow, /github\.ref == 'refs\/heads\/main'/);
+  // 통합·배포 브랜치가 dev 하나이므로 승격 워크플로도 dev 에서만 돈다.
+  assert.match(promoteWorkflow, /github\.ref == 'refs\/heads\/dev'/);
+  assert.doesNotMatch(promoteWorkflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.ok(
+    promoteScript.includes('changesets_count") -gt 0') || promoteScript.includes('"${changesets_count}" -gt 0'),
+    'promote-main.sh must branch on the pending changeset count',
+  );
+  assert.ok(
+    promoteScript.includes('버전 단계를 건너뛴다'),
+    'promote-main.sh must skip (not fail) the version-bump step when there is nothing to release',
+  );
 });
 
 test('resolver rejects a release when the fixed app versions have drifted', () => {
@@ -463,32 +472,57 @@ test('alpha deploy recreates nginx after replacing the release metadata bind mou
   assert.ok(nginxRecreate > metadataReplacement);
 });
 
-test('alpha deploy only recovers the reviewed nullable-goalkeeper migration failure before deploy', () => {
+test('Stage A recovers reviewed signatures only after its sealed prerequisites', () => {
   const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
-  const recovery = deployScript.indexOf('recover_known_records_profile_migration_failure');
-  const deploy = deployScript.indexOf("./node_modules/.bin/prisma migrate deploy");
+  const stageA = readFileSync(join(repoRoot, 'deploy/task168-stage-a-migrate.sh'), 'utf8');
+  const manifestAuthorization = stageA.indexOf('manifest is not Stage A');
+  const immutableSchema = stageA.indexOf('active schema is not r5');
+  const imageVerification = stageA.indexOf('verify_images');
+  const writerQuiesce = stageA.indexOf('stop v1_api v1_game_operations_worker');
+  const durableBackup = stageA.lastIndexOf('receipt "$quiesce" quiesce "$API_IMAGE"; receipt "$backup" backup "$API_IMAGE"');
+  const recordsValidation = stageA.lastIndexOf('\nvalidate_known_records_profile_migration_failure\n');
+  const playedAtValidation = stageA.lastIndexOf('\nvalidate_known_played_at_migration_failure\n');
+  const applyValidatedRecovery = stageA.lastIndexOf('\napply_validated_migration_recoveries\n');
+  const migratePre = stageA.indexOf('run_migrations pre;');
 
-  assert.notEqual(recovery, -1);
-  assert.ok(recovery < deploy);
-  assert.match(deployScript, /20260819090000_v1_records_profile_integration_repair/);
-  assert.match(deployScript, /to_regclass\('public\.\\"_prisma_migrations\\"'\)/);
-  assert.match(deployScript, /null value in column \"goalkeeper\"/);
-  assert.match(deployScript, /v1_game_result_participants/);
-  assert.match(deployScript, /23502/);
-  assert.match(deployScript, /prisma migrate resolve --rolled-back \$\{RECORDS_PROFILE_REPAIR_MIGRATION\}/);
-  assert.match(deployScript, /Refusing to auto-recover an unrecognized/);
+  assert.doesNotMatch(deployScript, /recover_known_(records_profile|played_at)_migration_failure/);
+  assert.ok(immutableSchema > manifestAuthorization);
+  assert.ok(imageVerification > immutableSchema);
+  assert.ok(writerQuiesce > imageVerification);
+  assert.ok(durableBackup > writerQuiesce);
+  assert.ok(recordsValidation > durableBackup, 'a guard failure before backup cannot mutate the Prisma ledger');
+  assert.ok(playedAtValidation > recordsValidation);
+  assert.ok(applyValidatedRecovery > playedAtValidation);
+  assert.ok(migratePre > applyValidatedRecovery);
+
+  assert.match(stageA, /20260819090000_v1_records_profile_integration_repair/);
+  assert.match(stageA, /20260821120000_v1_team_record_facts_played_at/);
+  assert.match(stageA, /to_regclass\('public\.\\"_prisma_migrations\\"'\)/);
+  assert.match(stageA, /null value in column \"goalkeeper\"/);
+  assert.match(stageA, /v1_game_result_participants/);
+  assert.match(stageA, /team record facts are append-only/);
+  assert.match(stageA, /v1_block_team_record_fact_mutation/);
+  assert.match(stageA, /23502/);
+  assert.match(stageA, /55000/);
+  assert.match(stageA, /\[\[ "\$failed_count" == 1 \]\] \|\| fail/);
+  assert.match(stageA, /prisma migrate resolve --rolled-back \$migration/);
 });
 
-test('alpha deploy only recovers the reviewed played-at append-only failure before deploy', () => {
-  const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
-  const recovery = deployScript.indexOf('recover_known_played_at_migration_failure');
-  const deploy = deployScript.indexOf('./node_modules/.bin/prisma migrate deploy');
+test('a mixed recognized and unrecognized recovery state validates both targets before any ledger write', () => {
+  const stageA = readFileSync(join(repoRoot, 'deploy/task168-stage-a-migrate.sh'), 'utf8');
+  const validateStart = stageA.indexOf('validate_reviewed_migration_failure(){');
+  const applyStart = stageA.indexOf('apply_validated_migration_recoveries(){');
+  const mainRecordsValidation = stageA.lastIndexOf('\nvalidate_known_records_profile_migration_failure\n');
+  const mainPlayedAtValidation = stageA.lastIndexOf('\nvalidate_known_played_at_migration_failure\n');
+  const mainApply = stageA.lastIndexOf('\napply_validated_migration_recoveries\n');
+  const validationBlock = stageA.slice(validateStart, applyStart);
+  const applyBlock = stageA.slice(applyStart, stageA.indexOf('\ninitial_rows=', applyStart));
 
-  assert.notEqual(recovery, -1);
-  assert.ok(recovery < deploy);
-  assert.match(deployScript, /20260821120000_v1_team_record_facts_played_at/);
-  assert.match(deployScript, /team record facts are append-only/);
-  assert.match(deployScript, /v1_block_team_record_fact_mutation/);
-  assert.match(deployScript, /55000/);
-  assert.match(deployScript, /prisma migrate resolve --rolled-back \$\{PLAYED_AT_MIGRATION\}/);
+  assert.ok(validateStart !== -1 && applyStart > validateStart);
+  assert.doesNotMatch(validationBlock, /prisma migrate resolve --rolled-back/);
+  assert.match(validationBlock, /recovery_pending\+=\("\$migration"\)/);
+  assert.match(applyBlock, /for migration in "\$\{recovery_pending\[@\]\}"/);
+  assert.match(applyBlock, /prisma migrate resolve --rolled-back \$migration/);
+  assert.ok(mainRecordsValidation < mainPlayedAtValidation);
+  assert.ok(mainPlayedAtValidation < mainApply, 'an unrecognized second target exits before apply_validated_migration_recoveries');
 });

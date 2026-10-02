@@ -1,0 +1,135 @@
+import { Prisma } from '@prisma/client';
+import { Logger } from '@nestjs/common';
+import type { WebPushService } from '../notifications/web-push.service';
+import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
+import type { OfficialRevisionRow } from './game-result-official-projection.types';
+import { loadOfficialResultRecipients, loadResultTeamNames, officialResultNoticeBody } from './official-result-notice';
+import { parseOfficialScore } from './parse-official-score';
+import { notificationCopyFor } from '../notifications/notifications.service';
+import { competitionMatchLabel } from '../tournaments/tournament-round-label';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
+
+/**
+ * 1차 대회 회고 REACH-4: 대회 알림은 등록·대기·취소·결제·공지·후기요청·수상까지
+ * 실제로 발송되고, '경기 임박'도 lineup-reminder 워커가 커버하는데 — 정작
+ * **"경기 결과가 확정됐어요"만 비어 있었다.** `TeamMatchCompletionNotificationService`
+ * (리그 감사 R1)가 일반 팀매치를 담당하고, 이 서비스는 Details가 있는 대회 TeamMatch를
+ * 담당한다. 참가팀 운영진은 확정
+ * 여부를 앱을 스스로 열어 확인하는 것 외엔 알 방법이 없었다.
+ *
+ * 설계는 그 sibling 을 그대로 따른다(다른 점만 기록):
+ * - 수신자: 양 참가팀의 owner/manager active 멤버십 + 그 공식 결과의 출전자(Task 180 G7).
+ *   본문(스코어·받는 사람 팀 기준 승패·출전자 개인 기록)은 리그와 같은 `official-result-notice.ts` 가 만든다.
+ * - 선호도: 대회 알림 7종+수상과 같은 `activityEnabled` 축
+ *   (`preferenceFieldForEvent`의 tournament 그룹). 팀매치의 `teamMatchEnabled`가 아니다.
+ * - businessKey는 (픽스처, 수신자) 쌍마다 한 번 — CORRECTION 리비전이 같은 픽스처를
+ *   다시 OFFICIAL로 만들어도(오심 정정) 재알림하지 않는다. sibling과 같은 판단이다.
+ * - 알림 row는 outbox 트랜잭션(`tx`)으로 직접 쓴다. `NotificationsService.emit*`는
+ *   별도 커넥션 fire-and-forget이라 outbox 커밋과 원자성이 없다
+ *   (sibling 헤더의 W1 관례 설명 참조). Web Push는 커밋 밖 best-effort.
+ * - `parseOfficialScore`는 핸들러 선두에서 같은 리비전으로 이미 성공한 뒤라 여기서 다시 던질 수 없다.
+ * - 제목·딥링크는 `notificationCopyFor('tournament_match_completed')`, targetId 는 "${tournamentId}:${fixtureId}".
+ *
+ * **afterCommit 경계 (2026-08-27 감사 41/44)**: sibling(`TeamMatchCompletionNotificationService`)과
+ * 같은 이유로 웹 푸시를 `claim.afterCommit`에 담아 커밋 확정 뒤에만 보낸다 — 자세한
+ * 근거는 그 클래스의 docblock 참조. `claim`도 같은 이유로 옵셔널이다(유닛 스펙 폴백).
+ */
+export class TournamentFixtureCompletionNotificationService {
+  private readonly logger = new Logger(TournamentFixtureCompletionNotificationService.name);
+
+  constructor(private readonly webPush?: WebPushService) {}
+
+  async project(
+    tx: Prisma.TransactionClient,
+    revision: OfficialRevisionRow,
+    claim?: GameOperationClaim,
+  ): Promise<void> {
+    if (revision.sourceType !== 'TEAM_MATCH' || revision.tournamentTeamMatchId === null) return;
+    const tournamentId = revision.tournamentId;
+    const fixtureId = revision.tournamentTeamMatchId;
+    if (tournamentId === null || revision.teamMatchTournamentId !== tournamentId || revision.teamMatchId !== fixtureId || revision.leagueId !== null) {
+      throw new Error('Tournament completion notification requires matching canonical Details ownership');
+    }
+
+    const recipients = await loadOfficialResultRecipients(tx, {
+      revisionId: revision.revisionId,
+      gameId: revision.gameId,
+      homeTeamId: revision.homeTeamId,
+      awayTeamId: revision.awayTeamId,
+    });
+    if (recipients.length === 0) return;
+
+    const preferences = await tx.v1NotificationPreference.findMany({
+      where: { userId: { in: recipients.map((recipient) => recipient.userId) } },
+      select: { userId: true, activityEnabled: true },
+    });
+    const optedOut = new Set(preferences.filter((p) => p.activityEnabled === false).map((p) => p.userId));
+    const enabledRecipients = recipients.filter((recipient) => !optedOut.has(recipient.userId));
+    if (enabledRecipients.length === 0) return;
+
+    const [tournament, details, names] = await Promise.all([
+      findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        where: { id: tournamentId },
+        select: { title: true },
+      }),
+      tx.v1TournamentMatchDetails.findUnique({
+        where: { teamMatchId: fixtureId },
+        select: { round: true, legNumber: true, group: { select: { name: true } } },
+      }),
+      loadResultTeamNames(tx, revision.homeTeamId, revision.awayTeamId),
+    ]);
+    if (tournament === null || details === null) {
+      throw new Error('Tournament completion notification requires a tournament-kind competition and its match details');
+    }
+
+    const copy = notificationCopyFor('tournament_match_completed', 'tournament', `${tournamentId}:${fixtureId}`);
+    const label = `${tournament.title} · ${competitionMatchLabel({ groupName: details.group?.name, round: details.round, legNumber: details.legNumber })}`;
+    const score = parseOfficialScore(revision.score);
+    const businessKeyFor = (userId: string) =>
+      `tournament-fixture-completed:${fixtureId}:${userId}`;
+    const rows = enabledRecipients.map((recipient) => ({
+      userId: recipient.userId,
+      body: officialResultNoticeBody({ label, ...names, score, side: recipient.side, record: recipient.record }),
+    }));
+
+    const alreadyDelivered = await tx.v1Notification.findMany({
+      where: { businessKey: { in: rows.map((row) => businessKeyFor(row.userId)) } },
+      select: { businessKey: true },
+    });
+    const alreadyDeliveredKeys = new Set(alreadyDelivered.map((n) => n.businessKey));
+
+    await tx.v1Notification.createMany({
+      data: rows.map((row) => ({
+        recipientUserId: row.userId,
+        targetType: 'tournament' as const,
+        targetId: `${tournamentId}:${fixtureId}`,
+        title: copy.title,
+        body: row.body,
+        deepLink: copy.deepLink,
+        businessKey: businessKeyFor(row.userId),
+      })),
+      skipDuplicates: true,
+    });
+
+    for (const row of rows.filter((candidate) => !alreadyDeliveredKeys.has(businessKeyFor(candidate.userId)))) {
+      const send = () =>
+        void this.webPush
+          ?.sendToUser(row.userId, { title: copy.title, body: row.body, url: copy.deepLink ?? undefined })
+          .catch((error: unknown) => {
+            // Best-effort — 실패해도 이미 커밋된 알림 row는 그대로 유지되지만,
+            // 조용히 삼키면 sendToUser 내부 실패(조회·전송)를 추적할 수 없다
+            // (이 저장소의 silent-catch 안티패턴 규칙). warn 한 줄은 남긴다.
+            this.logger.warn(
+              `web push failed for tournament fixture completion (fixture=${fixtureId}): ${String(error)}`,
+            );
+          });
+      // 커밋 확정 뒤에만 보낸다(위 클래스 docblock 참조). claim이 없거나
+      // afterCommit 훅이 없는 호출부(유닛 스펙)는 즉시 실행으로 폴백한다.
+      if (claim?.afterCommit === undefined) {
+        send();
+      } else {
+        claim.afterCommit.push(send);
+      }
+    }
+  }
+}

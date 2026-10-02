@@ -5,14 +5,9 @@
  * Mobile (<768) is NEVER modified here.
  * ============================================================ */
 
-/* ─── 모바일 진입점 위계 — summary-bar를 heading으로 승격 ─────────────────────
- * .tm-team-mobile-heading: tm-hide-desktop을 통해 모바일(<1024)에서만 렌더.
- * desktop에서는 .tm-team-desktop-header-title이 동일 역할을 담당.
- */
-.tm-team-mobile-heading {
-  margin: 0 0 4px;
-  padding: 12px 0 0;
-}
+/* .tm-team-mobile-heading 은 2026-09-07 에 제거했다 — 별도 줄에 있던 모바일 전용 제목을
+ * 요약 바 안(.tm-list-scope-heading)으로 흡수해 /matches·/team-matches 와 같은 처리로
+ * 모았기 때문이다. 소비처가 사라진 규칙이라 함께 지운다. */
 
 /* ─── 카드 footer '팀 보기' ghost 링크 스타일 보강 ──────────────────────────
  * tm-btn-ghost는 globals.css에서 배경 없는 텍스트 링크로 정의됨.
@@ -50,7 +45,7 @@
   .tm-team-list ~ .tm-list-searchbar,
   .tm-team-list .tm-list-searchbar,
   .tm-list-searchbar {
-    gap: 10px;
+    gap: 12px;
     padding: 0;
     margin-bottom: 4px;
     position: static;
@@ -60,14 +55,14 @@
 
   .tm-list-search-input {
     height: 48px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
 
   /* Summary bar: keep single row */
   .tm-team-summary-bar {
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 0 12px;
     margin-top: 4px;
   }
@@ -82,10 +77,11 @@
   }
 
   .tm-team-desktop-header-title {
-    font-size: 26px;
-    font-weight: 800;
-    color: var(--grey900);
-    letter-spacing: -0.5px;
+    /* 크기·굵기·색은 공유 .tm-text-heading 이 준다(DESIGN.md: 페이지 제목 24px/700).
+       예전엔 이 자리에 26px/800 이 세 파일에 각각 복붙돼 있었다 — 8단계 스케일
+       (11/12/13/14/15/17/20/24)에 26 은 없고, 형제 화면 tournaments 는 같은 역할에
+       공유 셸의 tm-text-heading 을 그대로 써서 24/700 을 얻고 있었다.
+       여기는 레이아웃(마진)만 남긴다. */
     margin: 0;
   }
 
@@ -93,10 +89,10 @@
   .tm-team-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
-    border-radius: 10px;
+    padding: 0 20px;
+    border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
     font-size: 15px;
@@ -114,7 +110,7 @@
   .tm-team-desktop-create-btn:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
   }
 
   /* Convert vertical card stack → 2-up grid */
@@ -147,7 +143,7 @@
   .tm-team-card-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-top: 16px;
   }
 }
@@ -175,35 +171,6 @@
     margin-left: auto;
     margin-right: auto;
     margin-top: 24px;
-  }
-}
-
-/* ─── Filter page /teams/filter ────────────────────────────────────────────────
- * Center the filter form content at ~600px.
- * Sport chips wrap; filter overlay sheet becomes a centered modal
- * (handled by _shell.css already, no extra override needed here).
- */
-
-@media (min-width: 1024px) {
-  /* Scope to teams filter via .tm-team-filter-shell */
-  .tm-team-filter-shell {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-bottom: 120px;
-  }
-
-  .tm-team-filter-shell .tm-sport-chip-row {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  /* Fixed CTA inside teams filter: stay in the centered 600px column */
-  .tm-team-filter-shell ~ .tm-fixed-cta,
-  .tm-team-filter-cta {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
   }
 }
 
@@ -237,7 +204,7 @@
 
   /* Hero card: keep dark background, constrain to column */
   .tm-team-detail-hero-card {
-    border-radius: 20px;
+    border-radius: var(--radius-hero);
   }
 
   /* Info rows: wider label column on desktop */
@@ -252,9 +219,9 @@
     top: 80px; /* 64px nav + 16px breathing room */
     background: var(--bg);
     border: 1px solid var(--grey150);
-    border-radius: 20px;
+    border-radius: var(--radius-hero);
     padding: 24px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -311,14 +278,14 @@
   .tm-team-members-desktop-layout {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-top: 12px;
   }
 }
 
 @media (min-width: 1440px) {
   .tm-team-members-desktop-layout {
-    gap: 18px;
+    gap: 20px;
   }
 }
 
@@ -362,7 +329,7 @@
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .tm-region-select-grid .tm-create-input {
@@ -400,7 +367,7 @@
     overflow-x: visible;
   }
   .tm-team-form-main .tm-create-two-col {
-    gap: 14px;
+    gap: 16px;
   }
 
   /* Right rail: sticky live team-card preview + CTA. */
@@ -426,5 +393,5 @@
  * 이 규칙은 사실상 모바일(<1024)에서만 유효하다.
  */
 .tm-team-form-main {
-  padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(124px + var(--v1-shell-safe-bottom));
 }

@@ -27,6 +27,9 @@ export class ResultEscalationMutationService {
       let role: 'PLATFORM_OPS' | 'REVIEWER' | undefined;
       return this.mutateInTransaction(tx, target, userId, escalationId, dto, idempotencyKey, async (lock) => {
         role ??= await this.access.role(tx, userId, tournamentId);
+        if (target === 'ACKNOWLEDGED') {
+          await this.access.requireTournamentDirector(tx, userId, tournamentId);
+        }
         if (target === 'RESOLVED' && role !== 'PLATFORM_OPS') this.access.deny();
         return this.access.row(tx, tournamentId, escalationId, role, lock);
       });

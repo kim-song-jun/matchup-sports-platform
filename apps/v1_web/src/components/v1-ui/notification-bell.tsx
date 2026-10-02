@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ComponentProps } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { BellIcon } from './icons';
 
 type NotificationBellProps = {
@@ -29,6 +30,10 @@ type NotificationBellProps = {
   forceUnread?: boolean;
   iconSize?: number;
   onClick?: () => void;
+  /** `next/link`의 `prefetch`를 그대로 전달 — 이미 다른 곳에서 "/notifications"를
+   * 프리페치하는 셸(예: shell.tsx의 DesktopNav)과 같은 페이지에 이 컴포넌트가 또
+   * 마운트될 때 중복 프리페치를 끄는 용도. 생략하면 next/link 기본값(자동)을 따른다. */
+  prefetch?: boolean;
 };
 
 const MAX_DISPLAY_COUNT = 99;
@@ -89,6 +94,13 @@ function UnreadIndicator({
   );
 }
 
+function NotificationBellOriginLink(props: Omit<ComponentProps<typeof Link>, 'href'>) {
+  const pathname = usePathname();
+  const query = useSearchParams()?.toString() ?? '';
+  const source = `${pathname ?? '/home'}${query ? `?${query}` : ''}`;
+  return <Link {...props} href={withFromPath('/notifications', source)} />;
+}
+
 export function NotificationBellLink({
   className,
   ariaLabel = '알림',
@@ -97,10 +109,11 @@ export function NotificationBellLink({
   unknownDotClassName,
   forceUnread = false,
   iconSize = 21,
+  prefetch,
 }: NotificationBellProps) {
   const { count, unknown } = useUnreadState(forceUnread);
-  return (
-    <Link className={className} href="/notifications" aria-label={buildAriaLabel(ariaLabel, count, unknown)}>
+  const content = (
+    <>
       <BellIcon size={iconSize} strokeWidth={2} />
       <UnreadIndicator
         unreadCount={count}
@@ -109,7 +122,13 @@ export function NotificationBellLink({
         dotClassName={dotClassName}
         unknownDotClassName={unknownDotClassName}
       />
-    </Link>
+    </>
+  );
+  const linkProps = { className, 'aria-label': buildAriaLabel(ariaLabel, count, unknown), prefetch };
+  return (
+    <Suspense fallback={<Link {...linkProps} href="/notifications">{content}</Link>}>
+      <NotificationBellOriginLink {...linkProps}>{content}</NotificationBellOriginLink>
+    </Suspense>
   );
 }
 

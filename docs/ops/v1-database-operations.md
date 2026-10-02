@@ -1,5 +1,15 @@
 # V1 Database Operations
 
+
+## Task 168 Phase 3 retirement operator addendum (candidate)
+
+- The complete ordered migration chain must replay on an empty database and reach zero Prisma schema drift before any post-DROP runtime is promoted.
+- `cleanup-demo-data.ts` is a canonical TeamMatch/Game operator path: it discovers seeded graphs, protects official facts, non-draft/current revisions, result lineage, identity/consent history, audits, and connected users/teams, then requires residual-target zero after execution.
+- The final retirement migration is destructive and requires an explicit maintenance-window decision, preservation comparison, and post-cutover readback. These notes do not claim Alpha or production DROP completion and do not define automatic rollback.
+
+- The selected Alpha rollout has two releases. Stage A retains the five legacy fixture tables physically while a short writer quiescence covers backup, the reviewed migration/cutover sequence, and canonical runtime promotion. Committed-runtime and Alpha readback are required before Stage B.
+- Stage B alone applies `20260911090000_retire_tournament_fixture_tables`, removing `v1_tournament_fixture_goals`, `v1_tournament_fixture_results`, `v1_tournament_fixture_videos`, `v1_tournament_fixture_advancement_edges`, and `v1_tournament_fixtures`. Its separate hash-bound release artifact must identify the verified canonical intermediate predecessor as the compatible recovery target. The pre-cutover app is not a valid post-cutover recovery target.
+
 Last updated: 2026-07-06
 
 This document is the operating standard for Teameet v1 database work. It covers the current state, ownership rules, seed policy, cleanup policy, migration policy, and the minimum evidence required before touching a deployed database.

@@ -1,0 +1,205 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { UserRecordsContent } from './user-records-content';
+import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
+
+// 개인 탭 자체의 데이터 조회(useV1MyMatchesInfinite)는 personal-match-records-section.test.tsx가
+// 전담한다 — 여기서는 탭 노출 조건과 탭 전환만 검증하므로 내용은 자리표시자로 대체한다.
+vi.mock('./personal-match-records-section', () => ({
+  PersonalMatchRecordsSection: ({ fromHref }: { fromHref: string }) => (
+    <div data-testid="personal-match-records-section">개인매치 기록: {fromHref}</div>
+  ),
+}));
+
+function item(overrides: Partial<PublicUserRecordItem> = {}): PublicUserRecordItem {
+  return {
+    id: 'record-1',
+    gameId: 'game-1',
+    teamMatchId: 'team-match-1',
+    type: 'tournament',
+    matchType: 'tournament',
+    tournamentId: 'tournament-1',
+    tournamentTitle: '여름 챔피언십',
+    leagueId: null,
+    leagueTitle: null,
+    round: '결승',
+    teamId: 'team-home',
+    teamName: '서울 유나이티드',
+    opponentTeamId: 'team-away',
+    opponentTeamName: '부산 FC',
+    result: 'WON',
+    goals: 1,
+    assists: 0,
+    cards: { yellow: 0, red: 0 },
+    minutesPlayed: 90,
+    started: true,
+    goalkeeper: false,
+    mvp: false,
+    officialAt: '2026-08-10T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function data(items: readonly PublicUserRecordItem[]): PublicUserRecordsResponse {
+  return {
+    userId: 'user-1',
+    nickname: '테스트 유저',
+    viewerIsOwner: false,
+    consentGranted: true,
+    summary: {
+      appearances: items.length,
+      goals: items.reduce((sum, record) => sum + record.goals, 0),
+      assists: 0,
+      yellowCards: 0,
+      redCards: 0,
+      mvpCount: 0,
+      matchMvpCount: 0,
+      tournamentAwardCount: 0,
+      byType: {
+        league: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        tournament: { appearances: items.length, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        friendly: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+      },
+    },
+    tournamentAwards: [],
+    items,
+    nextCursor: null,
+  };
+}
+
+describe('UserRecordsContent match links', () => {
+  it('canonical records link to the category-specific exact match while records without an ID keep the tournament route', () => {
+    render(
+      <UserRecordsContent
+        data={data([
+          item(),
+          item({
+            id: 'record-league',
+            gameId: 'game-league',
+            teamMatchId: 'team-match-league',
+            type: 'league',
+            matchType: 'team_match',
+            tournamentId: null,
+            tournamentTitle: null,
+            leagueId: 'league-1',
+            leagueTitle: '2026 가을 정규 리그',
+          }),
+          item({
+            id: 'record-friendly',
+            gameId: 'game-friendly',
+            teamMatchId: 'team-match-friendly',
+            type: 'friendly',
+            matchType: 'team_match',
+            tournamentId: null,
+            tournamentTitle: null,
+          }),
+          item({ id: 'record-legacy', gameId: 'game-legacy', teamMatchId: null }),
+        ])}
+      />,
+    );
+
+    // 뒤로가기가 이 활동 기록으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/tournaments/tournament-1/matches/team-match-1?from=%2Fusers%2Fuser-1%2Frecords',
+      '/league-matches/league-1/fixtures/team-match-league?from=%2Fusers%2Fuser-1%2Frecords',
+      '/team-matches/team-match-friendly/record?from=%2Fusers%2Fuser-1%2Frecords',
+      '/tournaments/tournament-1?from=%2Fusers%2Fuser-1%2Frecords',
+    ]);
+  });
+
+  it('대회 수상 링크도 뒤로가기가 이 활동 기록으로 돌아오도록 출처를 함께 싣는다', () => {
+    render(
+      <UserRecordsContent
+        data={{
+          ...data([]),
+          tournamentAwards: [
+            { id: 'award-1', tournamentId: 'tournament-9', tournamentTitle: '겨울 리그컵', awardType: 'mvp', awardLabel: 'MVP', iconKey: 'trophy', teamName: null, note: null, awardedAt: '2026-08-10T00:00:00.000Z' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: /MVP/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-9?from=%2Fusers%2Fuser-1%2Frecords',
+    );
+  });
+
+  // D2: withFromPath 로 바꾼 뒤에만 드러나는 차이 — 받은 출처가 지금 누르는 행과 같은
+  // 화면을 가리키면 다시 감싸지 않고 그 값을 그대로 재사용한다.
+  it('받은 출처가 지금 누르는 경기 화면 자신이면 다시 감싸지 않고 그대로 재사용한다', () => {
+    const selfHref = '/team-matches/team-match-9/record?from=%2Fusers%2Fuser-1%2Frecords';
+    render(
+      <UserRecordsContent
+        selfHref={selfHref}
+        data={data([item({ id: 'record-friendly', gameId: 'game-friendly', teamMatchId: 'team-match-9', type: 'friendly', matchType: 'team_match', tournamentId: null, tournamentTitle: null })])}
+      />,
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute('href', selfHref);
+  });
+});
+
+describe('UserRecordsContent — "개인" 탭(본인 전용)', () => {
+  it('본인 페이지에서만 개인 탭이 보이고, 고르면 개인매치 기록 패널로 바뀐다', () => {
+    const onChangeType = vi.fn();
+    const { rerender } = render(
+      <UserRecordsContent
+        data={{ ...data([]), viewerIsOwner: true }}
+        activeType="all"
+        onChangeType={onChangeType}
+      />,
+    );
+
+    const personalTab = screen.getByRole('tab', { name: '개인' });
+    fireEvent.click(personalTab);
+    expect(onChangeType).toHaveBeenCalledWith('personal');
+
+    rerender(
+      <UserRecordsContent
+        data={{ ...data([]), viewerIsOwner: true }}
+        activeType="personal"
+        onChangeType={onChangeType}
+      />,
+    );
+    expect(screen.getByTestId('personal-match-records-section')).toHaveTextContent('/users/user-1/records');
+    // 개인 탭에서는 팀 전적용 엔트리/골 KPI를 보여주지 않는다.
+    expect(screen.queryByText('엔트리')).not.toBeInTheDocument();
+  });
+
+  it('타인이 보는 페이지에는 개인 탭 자체가 없다', () => {
+    render(
+      <UserRecordsContent
+        data={{ ...data([]), viewerIsOwner: false }}
+        activeType="all"
+        onChangeType={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('tab', { name: '개인' })).not.toBeInTheDocument();
+  });
+});
+
+describe('UserRecordsContent — 도움 표시', () => {
+  it('KPI 의 도움은 지금 탭의 합계이고, 각 행은 그 경기의 도움 수를 보인다', () => {
+    const base = data([item({ assists: 2 }), item({ id: 'record-2', assists: 0 })]);
+    const withAssists = {
+      ...base,
+      summary: {
+        ...base.summary,
+        assists: 5,
+        byType: { ...base.summary.byType, league: { ...base.summary.byType.league, assists: 3 } },
+      },
+    };
+
+    const { rerender } = render(<UserRecordsContent data={withAssists} activeType="all" onChangeType={vi.fn()} />);
+
+    expect(screen.getByText('도움').nextElementSibling).toHaveTextContent('5회');
+    // 행: 도움이 0 인 경기도 "0도움" 으로 정직하게 보인다(칸을 숨기지 않는다).
+    expect(screen.getByText(/1골 · 2도움/)).toBeInTheDocument();
+    expect(screen.getByText(/1골 · 0도움/)).toBeInTheDocument();
+
+    rerender(<UserRecordsContent data={withAssists} activeType="league" onChangeType={vi.fn()} />);
+    expect(screen.getByText('도움').nextElementSibling).toHaveTextContent('3회');
+  });
+});

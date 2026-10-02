@@ -98,4 +98,32 @@ export class GameTakeoverService {
   revoke(gameId: string): void {
     this.grants.delete(gameId);
   }
+
+  /**
+   * Backlog fix (realtime-takeover-and-eviction-protocol): distinguishes
+   * "this presented token was actively SUPERSEDED by a different, still-live
+   * grant" from "this token simply expired naturally (nothing else holds the
+   * game)". Both cases make `renew()` return `null` -- from that alone a
+   * caller cannot tell them apart, which is exactly what caused two
+   * consoles for the same game (two operators, or one operator with two
+   * tabs -- `clientInstanceId` is per-tab) to fight over the token forever:
+   * whichever side's renew failed treated ANY failure as "my token just
+   * expired, grab a fresh one" and grant() unconditionally overwrites
+   * whatever the other side is holding, so the other side's next renew then
+   * fails the same way and re-grabs back, at the ~20s renew-interval cadence,
+   * indefinitely.
+   *
+   * A caller (the realtime gateway) uses this to pick the client-facing
+   * denial code: `TAKEOVER_SUPERSEDED` when true (a legitimate holder has
+   * the game right now -- the client must NOT auto-reacquire, or it just
+   * re-triggers the fight) vs. the existing `TAKEOVER_TOKEN_EXPIRED` when
+   * false (nothing currently holds the game -- the client's own token
+   * merely lapsed, e.g. a backgrounded tab missing its 20s renew cadence
+   * for 90s+; auto-reacquiring here is exactly the intended alpha-incident
+   * regression fix from 2026-08-10 and must keep working).
+   */
+  isSuperseded(gameId: string, presentedToken: string): boolean {
+    const current = this.grants.get(gameId);
+    return current !== undefined && current.expiresAt > Date.now() && current.token !== presentedToken;
+  }
 }

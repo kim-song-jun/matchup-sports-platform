@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Captures the App Store listing screenshots at the size Apple requires.
+#
+# 6.9" display, portrait. App Store Connect accepts either 1290x2796 or 1320x2868 at that
+# size, and the iPhone 16 Pro Max simulator's screen is exactly the second one — so the
+# frames are the real thing rather than something scaled. It takes 1 to 10 of them, PNG or
+# JPEG, and **refuses any image with an alpha channel**.
+#
+# The last step checks for that rather than claiming to fix it. A simulator screenshot is
+# opaque RGB already (measured: PNG colour type 2), so a flatten here would be a no-op that
+# reads like a safeguard — and the day something upstream starts producing RGBA, a comment
+# is not going to catch it. The check names the file and fails the run instead.
+#
+# Credentials come from the environment. This repository is public; do not paste them here.
+# xcodebuild records build settings, so the result bundle under the output directory contains
+# the password in clear text — hence the umask.
+#
+#   TEAMEET_SHOT_EMAIL=…  TEAMEET_SHOT_PASSWORD=…     the account the shots are taken as
+#   TEAMEET_SHOT_SCHEME=…                             default TeameetAlphaUITests
+#   TEAMEET_SHOT_OUTPUT=…                             where the PNGs land
+#
+# Usage: scripts/ios/capture-store-screenshots.sh
+set -euo pipefail
+umask 077
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+IOS_DIR="$ROOT/apps/v1_ios"
+SCHEME="${TEAMEET_SHOT_SCHEME:-TeameetAlphaUITests}"
+OUTPUT="${TEAMEET_SHOT_OUTPUT:-${TMPDIR:-/tmp}/teameet-store-screenshots}"
+DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max"
+SIM_NAME="Teameet-store-shots"
+
+for required in TEAMEET_SHOT_EMAIL TEAMEET_SHOT_PASSWORD; do
+  if [ -z "${!required:-}" ]; then
+    echo "$required is not set. See the header of this script." >&2
+    exit 2
+  fi
+done
+
+RUNTIME="$(xcrun simctl list runtimes -j \
+  | python3 -c 'import json,sys; rs=[r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and "iOS" in r["name"]]; print(rs[-1] if rs else "")')"
+[ -n "$RUNTIME" ] || { echo "No available iOS simulator runtime." >&2; exit 1; }
+
+# A dedicated simulator, created and destroyed here. Other sessions boot their own, and an
+# all-device command would take theirs down with it.
+DEVICE="$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME")"
+cleanup() {
+  xcrun simctl shutdown "$DEVICE" >/dev/null 2>&1 || true
+  xcrun simctl delete "$DEVICE" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+xcrun simctl bootstatus "$DEVICE" -b >/dev/null
+
+( cd "$IOS_DIR" && xcodegen generate >/dev/null )
+
+mkdir -p "$OUTPUT"
+rm -rf "$OUTPUT/shots.xcresult" "$OUTPUT/attachments" "$OUTPUT"/*.png
+
+# Ad-hoc signed for the same reason as the push harness: an unsigned build has no
+# aps-environment and stalls on the notification prompt path.
+status=0
+xcodebuild test \
+  -project "$IOS_DIR/Teameet.xcodeproj" -scheme "$SCHEME" \
+  -destination "platform=iOS Simulator,id=$DEVICE" \
+  -derivedDataPath "$OUTPUT/derived" -resultBundlePath "$OUTPUT/shots.xcresult" \
+  -only-testing:"TeameetUITests/StoreScreenshotUITests" \
+  CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES \
+  TEAMEET_UITEST_EMAIL="$TEAMEET_SHOT_EMAIL" \
+  TEAMEET_UITEST_PASSWORD="$TEAMEET_SHOT_PASSWORD" > "$OUTPUT/capture.log" 2>&1 || status=$?
+
+mkdir -p "$OUTPUT/attachments"
+if [ -d "$OUTPUT/shots.xcresult" ]; then
+  xcrun xcresulttool export attachments \
+    --path "$OUTPUT/shots.xcresult" --output-path "$OUTPUT/attachments" >/dev/null || true
+fi
+
+# The manifest is the only place an attachment's readable name survives; on disk they are
+# UUIDs. Copy the named ones out, then flatten.
+python3 - "$OUTPUT" <<'PY'
+import json, os, shutil, struct, sys
+output = sys.argv[1]
+manifest = os.path.join(output, 'attachments', 'manifest.json')
+if not os.path.exists(manifest):
+    # xcodebuild can report success while the export step produced nothing — a renamed test,
+    # a changed bundle. Reporting success here too would hand the operator an empty directory
+    # and let a submission pipeline carry on with no screenshots.
+    print('no attachments were produced — see capture.log', file=sys.stderr)
+    raise SystemExit(1)
+
+saved = []
+for test in json.load(open(manifest)):
+    for attachment in test.get('attachments', []):
+        name = attachment.get('suggestedHumanReadableName', '')
+        # Only the listing shots. The harness attaches its own debug screenshots on the way
+        # through sign-in, and those must not end up on the store page.
+        if not name.startswith('store-'):
+            continue
+        source = os.path.join(output, 'attachments', attachment['exportedFileName'])
+        target = os.path.join(output, f"{name.split('_')[0].removeprefix('store-')}.png")
+        shutil.copy(source, target)
+        saved.append(target)
+
+# Width, height and colour type all live in the PNG's first chunk, so reading 26 bytes
+# answers every question below without shelling out to anything.
+COLOR_TYPES = {0: 'grey', 2: 'rgb', 3: 'palette', 4: 'grey+alpha', 6: 'rgba'}
+# The two portrait sizes App Store Connect accepts for a 6.9" display. Anything else is
+# refused on upload, so a simulator that is not the one this script picks must not pass
+# quietly as a set of unusable images.
+ACCEPTED_SIZES = {(1290, 2796), (1320, 2868)}
+
+if not saved:
+    print('the run produced no store screenshots — see capture.log', file=sys.stderr)
+    raise SystemExit(1)
+
+rejected = []
+for path in sorted(set(saved)):
+    with open(path, 'rb') as handle:
+        width, height, _depth, color = struct.unpack('>IIBB', handle.read(26)[16:26])
+    print(f'{os.path.basename(path)}  {width} {height}  {COLOR_TYPES.get(color, color)}')
+    if color in (4, 6):
+        rejected.append(f'{os.path.basename(path)} (alpha channel)')
+    if (width, height) not in ACCEPTED_SIZES:
+        rejected.append(f'{os.path.basename(path)} ({width}x{height} is not a 6.9" size)')
+
+if rejected:
+    print('\nApp Store Connect will refuse these:\n  ' + '\n  '.join(rejected), file=sys.stderr)
+    raise SystemExit(1)
+
+print(f'\n{len(set(saved))} screenshots in {output}')
+PY
+
+exit "$status"

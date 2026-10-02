@@ -17,8 +17,6 @@ export type ReviewListCardModel = V1ReviewListItem & {
   href: string;
   badgeLabel: string;
   kindLabel: string;
-  /** 누구에게 쓴 리뷰인지(팀명 또는 닉네임). 대상이 없으면 null. */
-  targetLabel: string | null;
   meta: string;
   ctaLabel: string;
 };
@@ -31,15 +29,25 @@ export type ReviewsPageModel = {
   emptySub: string;
 };
 
+export type ReviewMetricDraft = { skill: number; manner: number; punctuality: number; safety: number };
+
 export type ReviewTargetDraft = {
-  rating: number;
+  /** null = 아직 별을 고르지 않음. 기본 점수가 없어서 눌러야만 값이 생긴다. */
+  rating: number | null;
   tagCodes: string[];
+  /** 사람 대상에서 사용자가 직접 바꾼 세부 항목만. 없는 항목은 제출할 때 종합 별점을 따른다. */
+  metricOverrides?: Partial<ReviewMetricDraft>;
 };
+
+export const REVIEW_METRIC_FIELDS = [
+  { key: 'skill', label: '실력' },
+  { key: 'manner', label: '매너' },
+  { key: 'punctuality', label: '시간약속' },
+  { key: 'safety', label: '안전' },
+] as const;
 
 export type ReviewSourcePageModel = V1ReviewSourceResponse & {
   sourceMeta: string;
-  progressLabel: string;
-  progressStats: ReviewStat[];
 };
 
 export type ReviewTargetViewModel = V1ReviewTarget & {

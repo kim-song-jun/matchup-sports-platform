@@ -9,6 +9,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 
 // Task T1-1: resolveActor's TEAM_MATCH branch used to forbid event_append/
 // event_reverse unconditionally for every team actor (games.service.ts).
@@ -161,6 +162,7 @@ describe('Task T1-1 team-match event_append/event_reverse authority', () => {
         where: { gameId, displayNameSnapshot: 'T1-1 Host One' },
       })
     ).id;
+    await submitFriendlyTeamMatchLineups(prisma, gameId);
     // T1-0 made "a LIVE period exists" a precondition of appendEvent
     // (assertEventReferences, games.service.ts). A team match cannot yet
     // reach LIVE through the command layer -- executeCommand's

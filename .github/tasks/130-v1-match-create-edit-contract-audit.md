@@ -78,3 +78,220 @@ upload persistence, and the absence of hard-coded production form values.
 - 2026-08-07: Host detail now separates `매치 수정` from `신청자 관리`, and edit exposes
   sport, region, content, image, capacity, level/gender/rules, place/address, match time,
   and application deadline. Focused release verification passed before the dev push.
+- 2026-09-22: Team-match follow-up fixed an upload race that allowed navigation/create
+  before the selected cover image finished uploading, which persisted `imageUrl=null` and
+  made the image disappear on detail. The create/edit primary action now stays locked
+  through upload completion. Friendly lineup guidance now states that the host may prepare
+  attendance before opponent approval and links directly to the team schedule where member
+  attendance is confirmed.
+- 2026-09-22: Alpha follow-up removed the approved-opponent prerequisite from the host's
+  lineup context, allowing HOME lineup saves while AWAY remains a placeholder. Detail heroes
+  now center uploaded images with cover sizing instead of exposing only the source image's
+  top-left area.
+- 2026-09-22: Attendance-roster follow-up removed the team-schedule RSVP gate. Owners and
+  managers can now add any active team member directly, including before opponent approval;
+  no attendance invitation or member response is required.
+
+## 2026-09-18 개인 매치 참여 중심 기능 확장
+
+- 사용자 승인 범위: 개인 매치 완료·참여 횟수, 후기 진입, 신청 관리 redirect 수정,
+  확정 명단, 호스트 채팅, 내 매치 페이지네이션, 시작 전 승인 참가 취소. 득점/승패 기록 제외.
+- 기준 `origin/dev` 82698757d, 격리 worktree `/tmp/teameet-personal-match`,
+  branch `feat/personal-match-participation` (기존 공유 트리 WIP는 보존).
+- 기존 모델/컬럼을 사용하며 migration은 필요하지 않다.
+- 완료 기준: endAt이 있으면 종료 이후, 없으면 시작 이후 호스트가 실제 종료를 확인한다.
+  취소/보관 매치는 완료 불가. 완료를 반복해도 참여 횟수는 중복되지 않는다.
+- [x] Phase 1: 최신 코드 재점검·범위 확정
+- [x] Phase 2: API·UI 구현 (7개 항목)
+- [x] Phase 3: 단위/실DB/브라우저 검증과 390/768/1440 스크린샷
+- [x] Phase 4: 계약 문서·changeset·PR·리뷰 — PR #1223 (`dev` 대상)
+
+### Progress Snapshot
+
+실제 Prisma 참가자 완료 전환과 승인 후 철회가 같은 매치 행 잠금으로 직렬화된다.
+완료된 참가자는 채팅 권한을 유지하며, 철회된 참가자는 권한에서 빠진다.
+UI에는 완료 확인 모달, 참가 취소 확인 모달, 확정 명단/전체 이력 탭과 내 매치 더 보기를 연결했다.
+API 집중 단위 테스트 52건, Web 집중 테스트 53건, API 실DB 통합 테스트 5건과
+양쪽 typecheck를 통과했다. 실DB 최초 RED에서 필수 약관 fixture 누락을 확인해
+테스트·QA fixture에 실제 동의 절차를 추가한 뒤 GREEN을 확인했다.
+headed Chromium으로 390/768/1440px 21개 화면과 완료·채팅·철회·후기·페이지네이션
+7개 액션을 검증했으며 console/network 오류는 0건이다. 모바일 고정 CTA가 완료 버튼을
+가리던 문제와 완료 상태의 영문 노출도 이 과정에서 수정했다.
+PR용 대표 증거는 `docs/screenshots/personal-match-participation/`의 모바일 완료·철회·이력,
+태블릿 신청자 관리, 데스크톱 참여 완료 화면 5장으로 승격했다.
+
+## 개인 매치 누락 보완 — 2026-09-19
+
+- [x] Phase 1: 호스트 승인 취소·불참 API와 실제 참가자/신청 상태 및 감사 로그 계약 구현
+- [x] Phase 2: 신청자 관리의 처리 액션, 확인·실패 처리와 명단/전체 이력 동기화
+- [x] Phase 3: 실제 DB 권한·경합 검증, headed 브라우저 390/768/1440 및 오류 수집 보강
+- [ ] Phase 4: canonical API/시나리오/PR 증거 갱신, CI 확인 후 dev 머지
+- 승인 취소는 시작 전 active 참가자를 removed로, 불참 처리는 시작 후 완료 확정 전
+  active 참가자를 no_show로 전환한다. 호스트 자신의 참가·완료된 참가 이력은 변경하지 않는다.
+- 두 액션 모두 호스트 권한, 필수 사유, 매치 행 잠금, 신청 cancelled_by_host 전이,
+  참가자·신청 상태 변경 로그를 요구한다. 정원·채팅·후기·활동 횟수에서 제외한다.
+- UI는 사용자 선택 A안: 확정 명단의 기존 참가자 관리 메뉴 + 사유 입력 + 기존 확인 모달 재사용.
+- 이전 전수 보고의 25/25는 실측 목록이 없으므로 완료 근거로 사용하지 않는다.
+  314건 단위 테스트 통과와 이전 21개 캡처/7개 액션은 각각 해당 범위의 증거다.
+  기존 QA 보고의 consoleErrors는 pageerror만 측정했으므로 console.error 0건을 뜻하지 않는다.
+
+### Progress Snapshot — host actions
+
+- 추가한 호스트 액션 2/2 구현. Web 집중 테스트 8/8, 실제 PostgreSQL API 통합 테스트 9/9 통과.
+- API/Web `tsc --noEmit` 각 1회 통과. `git diff --check` 통과, touched code 신규 TODO/FIXME 없음.
+- QA runner PID 88896 종료 및 자체 browser.close 완료. 이번 전용 API/Web 프로세스 종료,
+  임시 PostgreSQL만 종료 후 fixture 파일은 재현용으로 보존한다. 다른 작업의 서버·브라우저는 건드리지 않는다.
+- headed Chromium `host-actions` 실행: 390/768/1440px 3/3 viewport, 캡처 14/14,
+  확인 취소 6건 + 실제 저장 액션 2건 = 8/8 통과. 콘솔 error, pageerror,
+  requestfailed, API HTTP 오류 각각 0건. raw report: `output/playwright/visual-audit/personal-participation/host-actions-report.json`.
+- Persona: 호스트 이서준 / 참가자 김민준, 새 격리 DB fixture. 운영/alpha 데이터 변경 없음.
+- 판정: 390px 버튼/사유/하단 확인 모달 가림 없음, 768px 카드/폼 정렬 정상,
+  1440px 기존 shell/카드 폭 유지, 모든 캡처 가로 overflow 없음. 기존 카드·메뉴·확인 모달 재사용.
+- 이 두 신규 메뉴의 변경 전 전용 캡처는 없다(기존 화면에 기능 자체가 없었음).
+  이전 명단 baseline은 앞선 참여 흐름 QA 증거로만 유지하며 신규 메뉴의 before로 오인하지 않는다.
+- 이번 변경은 승인 취소·불참 처리 누락 보완이며 개인 매치 모든 기능에 대한 전수 완료 선언은 아니다.
+  당시 후속 항목이었던 `reopen` stale-read 경합은 아래 최종 점검에서 재현·수정했다.
+
+### 호스트 액션 대표 증거
+
+### 최종 점검 재개
+
+- [x] 모집 재개 stale-read 경합 RED/GREEN 및 실제 DB 검증
+- [x] 개인 매치 17개 계약 코드/테스트 점검표와 채팅/후기 연계 확인 (배포 E2E 완료와 구분)
+- [ ] PR CI와 리뷰 게이트, dev 머지, alpha 배포 검증. alpha 인증 QA는 유효 세션 필요.
+- 이번 구현 범위는 backend/docs 중심이며 기존 A안 UI 디자인은 변경하지 않는다.
+
+재개가 cancelled/completed를 recruiting으로 되돌리는 단위 회귀 2건 RED를 먼저 확인한 뒤,
+매치 행 잠금 + 최신 상태/시간 재검사로 수정했다. 수정 API도 같은 잠금에서 버전과 참가 인원을
+재검사하도록 보완했다. 서비스 단위 34/34, 실DB 기존+추가 13/13 및 시작된 closed 편집 1/1 통과.
+이번 backend `tsc --noEmit` 1회 통과, diff check 통과. 재시작한 QA DB는 검증 후 다시 종료했다.
+DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
+`V1StatusChangeLog`/`v1_status_change_logs`; 기존 컬럼 사용, migration 없음.
+
+| # | 계약 | 점검 증거 / 남은 한계 |
+|---|---|---|
+| 1 | 탐색·필터·정렬 | list/query DTO, matches-client/validation 및 이전 Web CI 성공; alpha 재확인 전 |
+| 2 | 상세 CTA·권한 | detail/getViewer/eligibility, 서비스·화면 테스트와 이전 headed 상세 캡처 |
+| 3 | 생성·입력·이미지 | create/DTO/form 계약, 기존 create tests와 실DB 모든 시나리오의 실제 생성; 이번 업로드 E2E 재실행 안 함 |
+| 4 | 수정·실제 엔티티 | 실DB edit 403, 현재 폼 조회, 동시 동일 버전 200/409, 정원 경합 검증 |
+| 5 | 신청 | 실DB requested 생성, 닫힘/취소 후 거절 확인 |
+| 6 | 재신청 | expired/rejected/withdrawn/removed 뒤 신청/승인 실DB 확인 |
+| 7 | 승인·정원 | 실DB active 전환, 정원 축소와 경합 시 초과 인원 없음 |
+| 8 | 거절 | 실DB rejected, 재신청 경로, 상태 로그 코드 확인 |
+| 9 | 대기 신청 철회 | 실DB withdrawn, expected-status 조건 확인 |
+| 10 | 승인 후 본인 취소 | 실DB cancelled/인원/채팅, 이전 headed 철회 확인 |
+| 11 | 호스트 승인 취소 | 실DB removed/권한/감사 로그 + 3폭 메뉴와 실제 처리 |
+| 12 | 불참 | 실DB no_show/완료 경합/후기 차단 + 3폭 메뉴와 실제 처리 |
+| 13 | 모집 마감 | 실DB closed와 requested→expired, 비호스트 403 |
+| 14 | 모집 재개 | stale terminal 상태 회귀 RED→GREEN, 실DB 중복 재개/취소 경합 |
+| 15 | 매치 취소 | 실DB cancelled 및 재개/신청 차단, 서비스 권한 테스트 |
+| 16 | 경기 완료·활동·후기·채팅 | 완료 실DB/재시도/권한 및 이전 headed 완료·채팅·후기 진입 |
+| 17 | 내 매치 이력 | myMatches cursor/관계 조건 및 화면 더 보기 테스트, 이전 headed 51번째 기록 |
+
+코드/계약 점검 17/17이며, 이것을 alpha 전수 E2E 17/17로 해석하지 않는다.
+이번 변경의 잔여 외부 게이트: Copilot 요청 CLI와 정식 GraphQL botLogins API가 모두
+빈 reviewRequests를 반환한다. 리뷰 clean 판정 불가이므로 사용자 확인 없이 dev 머지하지 않는다.
+
+## Follow-up — 개인 매치 주최자 참가 선택 (2026-09-24)
+
+- [x] 생성·수정 DTO에 `hostParticipates`를 추가하고 미전달은 기존 호환을 위해 `true`로 처리
+- [x] 생성 화면에 `나도 참가해요` 스위치와 확인 단계의 용병 모집 문구 추가
+- [x] 제외 시 host participant를 만들지 않거나 기존 active 이력을 `cancelled`로 전환
+- [x] 재참가 시 같은 참가 이력을 `active`로 복구하고 정원 계산을 수정 후 상태 기준으로 검증
+- [x] 목록·상세·수정 응답에 `hostParticipates`를 노출하고 완료 처리에서 제외 호스트를 재생성하지 않음
+- [x] Prisma 스키마 변경 없이 기존 participant status를 사용하고 API 문서·시나리오 동기화
+- [ ] 집중 테스트, 타입 검사, PR CI, dev 머지와 alpha 배포 확인
+
+호스트 권한은 `V1Match.hostUserId`, 참가 인원은 active/completed participant로 분리한다.
+따라서 주최자가 뛰지 않아도 신청자 관리·마감·완료 같은 운영 권한은 유지되며, 정원과 완료 인원에는
+실제 참가자만 포함된다. 사용자가 이번 follow-up의 배포를 명시적으로 요청했으므로 기존 리뷰 대기
+메모와 별개로 CI 통과 후 `dev`에 병합해 alpha에 반영한다.
+
+## Follow-up — 주최자 채팅과 모바일 하단 액션 (2026-09-28)
+
+- [x] 참가자가 없는 주최자의 채팅 클릭을 클라이언트에서 차단하고 실제 안내 표시
+- [x] API에서도 빈 개인매치 채팅방 생성을 `409 MATCH_CHAT_PARTICIPANTS_REQUIRED`로 차단
+- [x] `hostParticipates=false` 주최자가 승인 참가자와 채팅할 수 있도록 현재/수신자 권한 보강
+- [x] 모바일 하단 주요 액션을 `채팅`·`신청자 관리` 2개로 고정하고 `매치 수정`은 상태 행 링크로 분리
+- [x] 작은 화면 전역 grid stacking과 충돌하지 않는 전용 class 및 safe-area 포함 본문 여백 적용
+- [x] API 집중 테스트 33/33, Web 집중 테스트 74/74, 양쪽 `tsc --noEmit` 통과
+- [ ] PR CI, dev 병합, alpha 배포 및 실제 모바일 viewport 확인
+
+기존 중단된 cherry-pick이 있는 공유 작업 트리는 수정·stage하지 않고, 최신 `origin/dev` 기반
+격리 worktree/브랜치 `fix/personal-match-host-chat-footer`에서 배포 범위를 분리한다.
+
+![모바일 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-390.png)
+![모바일 불참 확인](../../docs/screenshots/personal-match-participation/host-actions-no_show-confirm-390.png)
+![태블릿 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-768.png)
+![데스크톱 불참 메뉴](../../docs/screenshots/personal-match-participation/host-actions-no_show-menu-1440.png)
+![불참 저장 이력](../../docs/screenshots/personal-match-participation/host-actions-no_show-persisted-390.png)
+
+## Follow-up — 개인매치 수정 하단 스크롤 겹침 (2026-09-28)
+
+- [x] 개인매치 수정 shell에 고정 CTA 높이와 safe-area를 포함한 하단 여백 적용
+- [x] 고정 CTA를 `변경 취소`·`변경사항 저장` 두 동작으로 제한
+- [x] 모집 마감/재오픈과 매치 취소를 스크롤 가능한 `매치 관리` 영역으로 이동
+- [x] 작은 화면에서도 저장 CTA가 불필요하게 2행으로 늘어나지 않는 전용 grid class 적용
+- [x] Web 집중 테스트 47/47 통과
+- [ ] 실제 모바일 viewport 시각 확인
+
+Alpha URL에서 보고된 문제는 개인매치 수정 화면만 `tm-create-shell-edit`가 누락된 상태에서
+가변 높이의 운영 버튼까지 fixed footer에 포함되어 발생했다. 저장 CTA와 운영 동작의 레이아웃
+책임을 분리해 마지막 폼 필드와 관리 동작이 footer 아래로 가려지지 않도록 고정한다.
+
+## Follow-up — 개인매치 1명 정원 (2026-09-28)
+
+- [x] 개인매치 생성·수정 DTO의 정원 범위를 `1~100명`으로 확장
+- [x] 생성·수정 폼의 선택 목록과 감소 버튼 최솟값을 1명으로 변경
+- [x] 프론트 payload 변환이 1명을 2명으로 올리지 않고 그대로 보존
+- [x] API 계약 문서와 프론트·백엔드 회귀 테스트 동기화
+
+팀매치 정원 계약은 변경하지 않는다. 개인매치 수정 시에는 기존 활성 참가자 수보다 낮은 정원으로
+줄일 수 없다는 서비스 계층의 동시성·정원 보호 규칙을 그대로 유지한다.
+
+## Follow-up — 개인매치 생성·수정 폼 일치 (2026-09-28)
+
+- [x] 개인매치 수정도 생성과 동일한 `종목 → 매치 정보 → 장소·시간 → 확인` 4단계로 구성
+- [x] 수정 종목 선택을 별도 드롭다운 대신 생성 화면과 같은 종목 카드로 통일
+- [x] 기존 매치 값을 각 단계에 유지하고 단계별 필수값 검증·첫 오류 포커스 적용
+- [x] 마지막 확인 단계에서만 `변경사항 저장`과 모집 상태·매치 취소 관리 노출
+- [x] Web 집중 테스트 65/65 및 `tsc --noEmit` 통과
+- [ ] 실제 모바일·데스크톱 viewport 시각 확인
+
+수정 화면만 모든 필드를 한 페이지에 합친 별도 폼을 사용하던 차이를 제거했다. 생성과 수정은
+동일한 입력 순서, 진행 표시, 카드/필드 컴포넌트를 공유하고 저장 API와 운영 동작만 수정 모드에서
+유지한다.
+
+로컬 Next.js 서버는 기동했지만 Windows 브라우저 자동화 helper가
+`helper_unknown_error: setup refresh had errors`로 종료되어 이번 실행에서는 headed viewport 캡처를
+완료하지 못했다. 해당 검증은 코드·테스트 실패가 아닌 로컬 CUA 런타임 blocker로 남긴다.
+로컬 production build도 Windows worktree의 pnpm junction 대상이 생성되지 않아 기존
+`react-query-persist-client`·TipTap 패키지를 resolve하지 못했다. 변경 범위의 테스트·타입·패턴
+검사는 통과했으며 Linux CI build 결과를 배포 게이트로 사용한다.
+
+## Follow-up — 개인매치 경기 시작 후 공개 수명주기 (2026-09-28)
+
+- [x] 기본 공개 목록에서 경기 시작 즉시 사라지던 `startAt >= now` 제한을 최근 7일 보존 계약으로 변경
+- [x] `진행중`·`종료 확인 필요`·`종료` display state와 목록 정렬·상태 배지 추가
+- [x] 종료 확인이 필요한 주최자에게 상세의 `참여 여부 확인` CTA 제공
+- [x] 완료 CTA 진입 시 신청자 관리의 `확정 명단` 탭을 바로 열도록 연결
+- [x] 7일 뒤 공개 목록에서만 제외하고 `/me/matches` 이력은 계속 유지
+- [x] API 49개·Web 74개 집중 테스트 및 양쪽 `tsc --noEmit` 통과
+- [ ] alpha 390/768/1440 시각 확인 (배포 전이므로 미실행)
+
+raw `recruiting|closed` 상태는 기존 수정·신청·취소 권한 가드에 사용하므로 바꾸지 않는다. 현재
+시각과 `startAt/endAt`을 조합한 `displayState`만 공개 화면 생명주기로 확장한다. 종료 시각이 없는
+매치는 기존 완료 가능 계약과 동일하게 시작 시각부터 `completion_pending`으로 본다.
+
+## Follow-up — PR #1338 리뷰 보완 (2026-09-29)
+
+- [x] 수정 API에도 `hostParticipates=true`이면 정원 2명 이상이라는 생성 API 불변조건 적용
+- [x] `/me/matches?mode=joined`가 본인의 `no_show` 참가 이력을 조회하고 `viewer.participantStatus`로 반환
+- [x] 신청자 프로필에서 현재 신청 관리 탭과 그 이전 진입점까지 순서대로 돌아가는 `from` 체인 보존
+- [x] 공개 목록·상세의 참가자 집계에는 `no_show`를 포함하지 않도록 조회 범위 분리
+- [x] 참여·주최 이력의 커서를 함께 잇는 `더 보기`로 mode당 50건 잘림 제거
+- [x] API 집중 테스트 53건·Web 집중 테스트 25건, 양쪽 `tsc --noEmit`, surface/pattern 검사 통과
+- [ ] PR CI 통과
+
+이 보완은 새 UI를 추가하지 않는다. PR #1338의 기존 화면이 실제 API 계약을 사용하도록 만들고,
+생성·수정의 서버 검증을 일치시키며, 프로필 이동 뒤 신청 관리 문맥을 잃지 않게 하는 회귀 수정이다.

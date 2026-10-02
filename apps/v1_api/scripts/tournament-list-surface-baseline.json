@@ -1,0 +1,7 @@
+{
+  "_comment": "`COMPETITION_LIST_SURFACE` 를 참조해 **이 목록이 어느 종류를 담을지 고르는** 자리. 단건 조회 쪽 카운터(ALL_COMPETITION_KINDS)는 목록·집계를 못 본다 — 목록은 where 에 상수를 펴 넣는 방식이라 토큰이 안 생긴다. 그래서 따로 센다. 늘리려면 why 를 함께 적어라. 어드민 목록·상태 탭·대시보드 KPI 는 앞으로도 리그를 빼야 하는 자리다. (2026-09-01 KST: 공개 목록 1곳)",
+  "src/tournaments/tournaments-read.service.ts": {
+    "allowed": 1,
+    "why": "공개 대회 목록(list) — `kind` 쿼리로 담을 종류를 고른다. **기본값은 `tournament` 라 지금은 리그가 안 나온다**(현행 동작 유지). 화면이 두 종류를 그릴 수 있게 된 뒤 기본값을 `all` 로 뒤집는 것은 별도 변경이고, 그때 이 why 를 고친다."
+  }
+}

@@ -31,6 +31,8 @@ const ids = {
   hostTeam: '67000000-0000-4000-8000-000000000020',
   awayTeam: '67000000-0000-4000-8000-000000000021',
   tournament: '67000000-0000-4000-8000-000000000030',
+  hostRegistration: '67000000-0000-4000-8000-000000000050',
+  awayRegistration: '67000000-0000-4000-8000-000000000051',
   fixtureA: '67000000-0000-4000-8000-000000000031',
   fixtureB: '67000000-0000-4000-8000-000000000032',
   fixtureC: '67000000-0000-4000-8000-000000000033',
@@ -100,13 +102,28 @@ beforeAll(async () => {
   });
   const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
   await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, title: 'Task Assist Assign Tournament', competitionConfigVersionId: config.id } });
-  await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+      ],
+    });
+  await prisma.v1TeamMatch.createMany({
     data: [
-      { id: ids.fixtureA, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-      { id: ids.fixtureB, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
-      { id: ids.fixtureC, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: config.id },
-      { id: ids.fixtureD, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: config.id },
-      { id: ids.fixtureE, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, competitionConfigVersionId: config.id },
+      { id: ids.fixtureA, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist assign A', status: 'matched', competitionConfigVersionId: config.id },
+      { id: ids.fixtureB, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist assign B', status: 'matched', competitionConfigVersionId: config.id },
+      { id: ids.fixtureC, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist assign C', status: 'matched', competitionConfigVersionId: config.id },
+      { id: ids.fixtureD, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist assign D', status: 'matched', competitionConfigVersionId: config.id },
+      { id: ids.fixtureE, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist assign E', status: 'matched', competitionConfigVersionId: config.id },
+    ],
+  });
+  await prisma.v1TournamentMatchDetails.createMany({
+    data: [
+      { teamMatchId: ids.fixtureA, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+      { teamMatchId: ids.fixtureB, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+      { teamMatchId: ids.fixtureC, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+      { teamMatchId: ids.fixtureD, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+      { teamMatchId: ids.fixtureE, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
     ],
   });
   await prisma.v1TournamentStaffAssignment.create({
@@ -149,7 +166,7 @@ describe('GamesService.assignGoalAssist — atomic in-place assist (issue #376)'
   beforeAll(async () => {
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureA,
       competitionConfigVersionId: config.id,
       sides: [
@@ -301,7 +318,7 @@ describe('deriveTournamentRevision — excludes reversed goals/assists from the 
   beforeAll(async () => {
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureB,
       competitionConfigVersionId: config.id,
       sides: [
@@ -408,7 +425,7 @@ describe('assignGoalAssist supersedes a SUBMITTED revision with an assist-synced
   beforeAll(async () => {
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureC,
       competitionConfigVersionId: config.id,
       sides: [
@@ -632,7 +649,7 @@ describe('officializeResultRevision refuses a SUBMITTED revision that ASSIST_SYN
   beforeAll(async () => {
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureE,
       competitionConfigVersionId: config.id,
       sides: [
@@ -759,7 +776,7 @@ describe('assignGoalAssist rejects when the game already has an OFFICIAL revisio
   beforeAll(async () => {
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureD,
       competitionConfigVersionId: config.id,
       sides: [

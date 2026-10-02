@@ -7,7 +7,7 @@
 
 - [ ] CHAT-001 두 사용자 간 채팅 송수신
 - [ ] CHAT-002 같은 사용자의 다중 탭 unread/read 동기화
-- [x] NOTI-001 이벤트 기반 알림 생성과 영속성 - `match_created`, `player_joined`, `payment_confirmed/refunded` producer 연결 완료, `e2e/tests/notification-center.spec.ts` `Desktop Chrome 3/3` 통과
+- [x] NOTI-001 이벤트 기반 알림 생성과 영속성 - `match_created`, `player_joined`, `payment_confirmed/refunded` producer 연결 완료, `e2e/tests/notification-center.spec.ts` `Desktop Chrome 3/3` 통과 (레거시·삭제됨 — legacy-v0-final)
 
 ## CHAT-001 두 사용자 간 채팅 송수신
 
@@ -80,8 +80,9 @@
 
 - 이 파일은 Playwright 다중 컨텍스트와 MCP 수동 검증을 같이 써야 가치가 크다.
 - 2026-04-07: `/chat` 페이지 진입, 메시지 입력창, 두 사용자 동일 채팅방 진입 Desktop Chrome 스모크는 통과했다. 실제 실시간 송수신 assert, unread/read 다중 탭 동기화, 이벤트 기반 알림 생성은 후속 자동화 대상이다.
-- 2026-04-07: `e2e/tests/chat-realtime.spec.ts` Desktop Chrome smoke와 auth/chat focused rerun이 모두 통과했다. 현재 범위는 채팅방 진입/입력/2-context 구조 검증까지이며, unread-read sync와 notification coupling은 아직 미완료다.
-- 2026-04-08: `e2e/tests/notification-center.spec.ts`로 `match_created` same-user multi-tab delivery, `player_joined` multi-tab read sync, `payment_confirmed` deep-link를 `Desktop Chrome 3/3`로 최종 검증했다.
+- 2026-04-07: `e2e/tests/chat-realtime.spec.ts` Desktop Chrome smoke와 auth/chat focused rerun이 모두 통과했다. 현재 범위는 채팅방 진입/입력/2-context 구조 검증까지이며, unread-read sync와 notification coupling은 아직 미완료다. (레거시·삭제됨 — legacy-v0-final)
+- 2026-04-08: `e2e/tests/notification-center.spec.ts`로 `match_created` same-user multi-tab delivery, `player_joined` multi-tab read sync, `payment_confirmed` deep-link를 `Desktop Chrome 3/3`로 최종 검증했다. (레거시·삭제됨 — legacy-v0-final)
 - 2026-04-08: 알림 센터는 explicit in-app navigation, socket connect-time backfill, focus/visibility backfill을 같이 둬서 hidden tab recovery까지 보장하도록 정리했다.
 - 2026-04-08: `global-setup`의 `teams` seed drift는 여전히 best-effort warning으로 남지만, notification suite 자체는 더 이상 그 이슈에 막히지 않는다.
 - 2026-04-11: `/settings/notifications`의 category persistence는 이 파일의 verified 범위가 아니다. 현재 페이지는 persistence unsupported 상태로 보고, server sync는 task 39에서 다룬다.
+- 2026-09-09: Task 169에서 `chatEnabled=false`가 푸시뿐 아니라 알림함 row와 `notification:new` 배지 이벤트도 억제하도록 계약을 통일했다. 열린 채팅방의 `chat:message` 실시간 전달은 유지하며 API 단위 테스트로 검증했다.

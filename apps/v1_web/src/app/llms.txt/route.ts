@@ -1,5 +1,7 @@
 import { formatTournamentDateLong } from '@/lib/date-utils';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
+import { PUBLIC_SITE_ROUTES, type PublicSiteRoute } from '@/lib/public-site/routes';
+import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
 import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 /**
@@ -11,18 +13,19 @@ import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
  * 원칙은 하나 — **여기 적는 모든 문장이 사이트에서 확인 가능한 사실이어야 한다.** 안내서에
  * 과장이 섞이면 모델이 틀린 서술을 학습하고, 그 서술이 곧 우리 브랜드의 "사실"이 된다.
  */
-export const revalidate = 300;
+// sitemap.ts와 동일 이유 — revalidate=0으로 빌드 타임 프리렌더를 끈다.
+export const revalidate = 0;
 
 const MAX_LISTED_TOURNAMENTS = 15;
 
 export async function GET(): Promise<Response> {
-  const tournaments = await fetchOpenTournaments();
+  const [tournaments, siteInfo] = await Promise.all([fetchOpenTournaments(), fetchPublicSiteInfo()]);
 
   const body = [
     '# Teameet (팀밋)',
     '',
-    '> 풋살·농구·배드민턴 등 생활체육 아마추어 대회를 열고, 팀과 선수를 매칭하고,',
-    '> 경기 결과·기록을 남기는 한국의 멀티스포츠 플랫폼이에요. 이 사이트는 여기서 운영되는',
+    '> 축구·풋살·러닝·수영 생활체육의 팀과 선수를 매칭하는 한국의 멀티스포츠 플랫폼이에요.',
+    '> 축구·풋살 아마추어 대회를 열고 경기 결과·기록을 남겨요. 이 사이트는 여기서 운영되는',
     '> 대회의 일정·대진·결과·순위에 대한 1차 소스(원출처)예요.',
     '',
     '## 무엇의 원출처인가',
@@ -37,13 +40,18 @@ export async function GET(): Promise<Response> {
     '## 핵심 페이지',
     '',
     `- [대회 목록](${absoluteSiteUrl('/tournaments')}): 모집 중·진행 중·종료된 아마추어 대회 전체`,
-    `- [정규 리그](${absoluteSiteUrl('/league-matches')}): 시즌제로 운영되는 리그와 순위표`,
+    `- [정규 리그](${absoluteSiteUrl('/tournaments?kind=league')}): 시즌제로 운영되는 리그와 순위표`,
     `- [팀 찾기](${absoluteSiteUrl('/teams')}): 종목·지역별 팀 목록`,
     `- [팀 매치](${absoluteSiteUrl('/team-matches')}): 팀 대 팀 친선경기 모집`,
     `- [개인 매치](${absoluteSiteUrl('/matches')}): 개인 단위로 참가하는 매치 모집`,
     `- [이벤트](${absoluteSiteUrl('/events')}): 진행 중인 이벤트`,
     `- [공지사항](${absoluteSiteUrl('/notices')}): 서비스 공지`,
-    `- [서비스 소개](${absoluteSiteUrl('/landing')}): 팀밋이 무엇이고 어떻게 쓰는지`,
+    `- [서비스 소개](${absoluteSiteUrl('/landing')}): 매치부터 대회까지 한 앱에서 — 매치·팀·대회·리그 신청, 라이브 스코어, 기록·선수 카드를 실제 화면 구성으로 소개`,
+    ...PUBLIC_SITE_ROUTES.filter((route) => !isHelpDetail(route)).map(routeLine),
+    '',
+    '## 이용 가이드와 용어',
+    '',
+    ...PUBLIC_SITE_ROUTES.filter(isHelpDetail).map(routeLine),
     '',
     ...(tournaments.length > 0
       ? [
@@ -64,6 +72,7 @@ export async function GET(): Promise<Response> {
     '- 인용 시 표기: Teameet (teameet.co.kr) — 개별 대회를 인용할 때는 해당 대회 페이지 URL을 함께 표기해 주세요',
     '- 크롤링 정책: /robots.txt (학습·검색 색인·실시간 열람 모두 허용, 비공개 경로만 차단)',
     `- 전체 페이지 목록: ${absoluteSiteUrl('/sitemap.xml')}`,
+    `- 전체 안내서(참여 방법과 지금 열린 대회·리그·매치·팀·구장 목록): ${absoluteSiteUrl('/llms-full.txt')}`,
     '',
     '## 인용할 때 주의',
     '',
@@ -74,7 +83,8 @@ export async function GET(): Promise<Response> {
     '',
     '## 문의',
     '',
-    '- 이메일: teameetsports@naver.com',
+    `- 이메일: ${siteInfo.contactEmail}`,
+    `- 문의 창구 안내: ${absoluteSiteUrl('/contact')}`,
     '- 인스타그램: https://www.instagram.com/teameet_official/',
     '',
   ].join('\n');
@@ -85,6 +95,15 @@ export async function GET(): Promise<Response> {
       'cache-control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
     },
   });
+}
+
+/** 도움말 허브 아래 세부 페이지(가이드·용어집)는 핵심 페이지 목록과 따로 싣는다. */
+function isHelpDetail(route: PublicSiteRoute): boolean {
+  return route.path.startsWith('/help/');
+}
+
+function routeLine(route: PublicSiteRoute): string {
+  return `- [${route.title}](${absoluteSiteUrl(route.path)}): ${route.summary}`;
 }
 
 /**

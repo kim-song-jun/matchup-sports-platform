@@ -13,7 +13,7 @@
      상태 배지(모집중/내 매치)는 tm-badge-blue로 별도 적용 — 블루는 상태 전용. */
   background: var(--overlay-white-18);
   color: var(--overlay-white-92);
-  gap: 5px;
+  gap: 4px;
 }
 
 /* dot: 8×8 원형 인디케이터 */
@@ -21,7 +21,7 @@
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   flex-shrink: 0;
 }
 
@@ -81,10 +81,11 @@
   }
 
   .tm-match-desktop-header-title {
-    font-size: 26px;
-    font-weight: 800;
-    color: var(--grey900);
-    letter-spacing: -0.5px;
+    /* 크기·굵기·색은 공유 .tm-text-heading 이 준다(DESIGN.md: 페이지 제목 24px/700).
+       예전엔 이 자리에 26px/800 이 세 파일에 각각 복붙돼 있었다 — 8단계 스케일
+       (11/12/13/14/15/17/20/24)에 26 은 없고, 형제 화면 tournaments 는 같은 역할에
+       공유 셸의 tm-text-heading 을 그대로 써서 24/700 을 얻고 있었다.
+       여기는 레이아웃(마진)만 남긴다. */
     margin: 0;
   }
 
@@ -92,10 +93,10 @@
   .tm-match-desktop-create-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     height: 44px;
-    padding: 0 18px;
-    border-radius: 10px;
+    padding: 0 20px;
+    border-radius: var(--radius-control);
     background: var(--blue500);
     color: var(--static-white);
     font-size: 15px;
@@ -113,19 +114,19 @@
   .tm-match-desktop-create-btn:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-control);
   }
 
   /* Search bar: full width on desktop with max-width to prevent over-stretch. */
   .tm-list-searchbar {
-    gap: 10px;
+    gap: 12px;
     padding: 0;
     margin-bottom: 16px;
   }
 
   .tm-list-search-input {
     height: 48px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
 
   /* Convert the vertical card stack → 2-up grid. */
@@ -152,22 +153,25 @@
   }
 }
 
-/* ─── 태블릿 (768–1023): 2-up 그리드 전환 ───────────────────────────────────
- * 600px 프레임 폭에서 모바일 단일 컬럼 → 2-up 으로 전환해 공간 활용 개선.
+/* ─── 태블릿 (768–1023): 한 줄에 한 장 유지 ─────────────────────────────────
+ * 배너 카드 시절엔 이 구간을 2-up 으로 바꿔 공간을 더 썼다. 행 카드는 96px 썸네일이 폭을
+ * 먼저 가져가므로 2-up 이면 본문이 130px 만 남아(alpha 실측 2026-09-07) 제목이 한 줄에서
+ * 잘린다 — 이 구간은 모바일과 같이 1-up 으로 둔다.
  */
 @media (min-width: 768px) and (max-width: 1023px) {
   .tm-match-card-stack {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
     margin-top: 16px;
   }
 }
 
+/* ≥1440 에서도 2-up 을 유지한다. 배너형 카드였을 땐 3-up 이 맞았지만, 행 카드는 3-up 이면
+   카드 333px 중 본문이 191px 뿐이라(alpha 실측 2026-09-07) 제목이 잘린다. 2-up 이면 본문이
+   ~500px 로 늘어 제목·조건·비용이 한 줄씩 온전히 들어간다. */
 @media (min-width: 1440px) {
-  /* 3-up grid at ≥1440. */
   .tm-match-card-stack {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 20px;
   }
 }
@@ -203,7 +207,7 @@
   /* Constrain the hero to the content column width; add rounded top corners. */
   .tm-match-detail-hero {
     height: 280px;
-    border-radius: 16px 16px 0 0;
+    border-radius: var(--radius-container) var(--radius-container) 0 0;
     overflow: hidden;
   }
 
@@ -234,9 +238,9 @@
     top: 80px; /* 64px nav + 16px breathing */
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 20px;
-    box-shadow: var(--shadow-1);
+    box-shadow: var(--shadow-card);
   }
 
   .tm-match-detail-desktop-cta-label {
@@ -244,7 +248,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--grey100);
   }
@@ -308,7 +312,7 @@
     background: transparent;
     box-shadow: none;
     border-top: none;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--v1-shell-safe-bottom);
   }
 
   /* Sport grid: 3-up on desktop so all sports fit in fewer rows. */
@@ -319,7 +323,7 @@
 
   /* Two-col layout inside match forms. */
   .tm-match-create-shell .tm-create-two-col {
-    gap: 14px;
+    gap: 16px;
   }
 
   /* Progress bars look better with a bit more top padding. */

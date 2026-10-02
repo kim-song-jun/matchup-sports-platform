@@ -20,7 +20,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { ChatService } from './chat.service';
+import { ChatService, parseShareCard } from './chat.service';
 
 // ─── shared test fixtures ──────────────────────────────────────────────────────
 
@@ -127,9 +127,13 @@ describe('ChatService', () => {
     v1Notification: { createMany: jest.Mock };
     v1NotificationPreference: { findMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
+    v1Match: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock };
-    v1TeamMatch: { findFirst: jest.Mock };
+    v1TeamMatch: { findFirst: jest.Mock; findMany: jest.Mock };
+    v1UploadAsset: { findFirst: jest.Mock };
+    v1TeamSchedule: { findFirst: jest.Mock };
+    v1Team: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
   const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
@@ -161,13 +165,22 @@ describe('ChatService', () => {
       v1Notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
+      v1Match: {
+        // 열람 시작(matchChatHistory) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
+        findUnique: jest.fn().mockResolvedValue({ hostUserId: 'host-user', participants: [] }),
+        findFirst: jest.fn().mockResolvedValue({
+          hostUserId: 'host-user',
+          participants: [{ userId: userA.id, role: 'participant' }],
+        }),
+      },
       v1MatchParticipant: { findFirst: jest.fn() },
       v1TeamMembership: { findFirst: jest.fn() },
-      v1TeamMatch: { findFirst: jest.fn() },
+      v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn() },
+      v1UploadAsset: { findFirst: jest.fn() },
+      v1TeamSchedule: { findFirst: jest.fn() },
+      v1Team: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     };
-    prisma.v1MatchParticipant.findFirst.mockResolvedValue({ id: 'active-match-participant' });
-
     // Default $transaction: pass-through (runs the callback with the same prisma stub)
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
@@ -215,7 +228,7 @@ describe('ChatService', () => {
 
   it('sendMessage: 채팅 참가 행이 active여도 현재 매치 참가 자격이 없으면 403', async () => {
     prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoomForParticipant(userA.id));
-    prisma.v1MatchParticipant.findFirst.mockResolvedValue(null);
+    prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: 'host-user', participants: [] });
 
     await expect(service.sendMessage(userA, 'room-1', { content: '권한이 끝난 뒤 메시지' })).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
@@ -285,6 +298,216 @@ describe('ChatService', () => {
     );
   });
 
+  describe('sendMessage: 사진 (Task 181)', () => {
+    const roomWithRecipient = () => ({
+      ...makeRoom(),
+      participants: [
+        { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
+      ],
+    });
+
+    it('자기 이미지 업로드면 image 메시지로 저장하고, 미리보기 body 는 "사진"·알림은 "사진을 보냈어요"', async () => {
+      const sentAt = new Date('2026-06-21T10:00:00Z');
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithRecipient());
+      prisma.v1UploadAsset.findFirst.mockResolvedValue({ id: 'asset-1', url: '/uploads/2026/10/a.jpg' });
+      prisma.v1ChatMessage.create.mockResolvedValue({ id: 'msg-img', chatRoomId: 'room-1', senderUserId: userA.id, body: '사진', status: 'sent', messageType: 'image', sentAt });
+      prisma.v1ChatRoom.update.mockResolvedValue({});
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: userB.id }]);
+
+      const result = await service.sendMessage(userA, 'room-1', { imageUrl: '/uploads/2026/10/a.jpg' });
+
+      // 소유자·종류까지 걸어 찾는다 — 남의 업로드·영상은 못 싣는다.
+      expect(prisma.v1UploadAsset.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { url: '/uploads/2026/10/a.jpg', ownerUserId: userA.id, kind: 'image' } }),
+      );
+      expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ body: '사진', messageType: 'image', attachmentAssetId: 'asset-1' }),
+      });
+      expect(result).toMatchObject({ messageId: 'msg-img', messageType: 'image', content: '사진', imageUrl: '/uploads/2026/10/a.jpg' });
+      expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [expect.objectContaining({ recipientUserId: userB.id, body: '사진을 보냈어요' })] }),
+      );
+    });
+
+    it('남의 업로드·없는 URL 이면 400 이고 메시지를 만들지 않는다', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithRecipient());
+      prisma.v1UploadAsset.findFirst.mockResolvedValue(null);
+
+      await expect(service.sendMessage(userA, 'room-1', { imageUrl: '/uploads/2026/10/other.jpg' })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'imageUrl' } },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('content 와 imageUrl 을 함께 보내거나 둘 다 없으면 400', async () => {
+      await expect(service.sendMessage(userA, 'room-1', { content: '안녕', imageUrl: '/uploads/a.jpg' })).rejects.toThrow(BadRequestException);
+      await expect(service.sendMessage(userA, 'room-1', {})).rejects.toThrow(BadRequestException);
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sendMessage: 일정·매치 공유 (Task 181 ②)', () => {
+    const sentAt = new Date('2026-10-01T10:00:00Z');
+    const arrangeSend = () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom());
+      prisma.v1ChatMessage.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'msg-share', sentAt, status: 'sent', ...data }));
+      prisma.v1ChatRoom.update.mockResolvedValue({});
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: userB.id }]);
+    };
+
+    it('팀원이 팀 매치 일정을 공유하면 상대 팀도 열 수 있는 팀 매치 화면 카드로 저장한다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-1', teamId: 'team-1', teamMatchId: 'tm-1', title: '토요일 친선', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm-1', placeName: '잠실 풋살장', leagueId: null, tournamentId: null });
+
+      const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-1' } });
+
+      const card = { kind: 'team_schedule', targetId: 'sch-1', title: '토요일 친선', startAt: '2026-10-04T10:00:00.000Z', place: '잠실 풋살장', sub: '번개 FC', route: '/team-matches/tm-1' };
+      expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith({ data: expect.objectContaining({ messageType: 'share', body: '[일정] 토요일 친선', shareCard: card }) });
+      expect(result).toMatchObject({ messageType: 'share', content: '[일정] 토요일 친선', shareCard: card });
+      expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [expect.objectContaining({ body: '일정을 공유했어요 · 토요일 친선' })] }),
+      );
+    });
+
+    it('대회·리그 경기 일정은 팀 매치 화면(대회 경기면 404)이 아니라 공개 경기 상세로 연다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-c', teamId: 'team-1', teamMatchId: 'tm-c', title: '공식 경기', startAt: new Date('2026-10-04T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+      // 리그 대진은 tournamentId 도 리그 id 로 채워져 있다(league-fixture-creation.ts).
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm-c', placeName: '잠실', leagueId: 'league-1', tournamentId: 'league-1' });
+      const league = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-c' } });
+      expect(league.shareCard).toMatchObject({ route: '/league-matches/league-1/fixtures/tm-c', place: '잠실' });
+
+      prisma.v1TeamMatch.findFirst.mockResolvedValue({ id: 'tm-c', placeName: '잠실', leagueId: null, tournamentId: 'cup-1' });
+      const tournament = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-c' } });
+      expect(tournament.shareCard).toMatchObject({ route: '/tournaments/cup-1/matches/tm-c' });
+      expect(prisma.v1ChatMessage.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ shareCard: expect.objectContaining({ route: '/tournaments/cup-1/matches/tm-c' }) }),
+      });
+    });
+
+    it('이미 /team-matches/:id 로 보낸 대회·리그 일정 카드는 읽을 때 경기 상세로 열린다 · 친선·다른 카드는 그대로', async () => {
+      prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom());
+      prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([]);
+      const card = (id: string, kind: string, route: string) => ({
+        id,
+        chatRoomId: 'room-1',
+        senderUserId: userB.id,
+        senderUser: { id: userB.id, profile: { nickname: 'B', displayName: null, profileImageUrl: null } },
+        body: '[일정] 경기',
+        status: 'sent',
+        messageType: 'share',
+        systemEventType: null,
+        attachmentAsset: null,
+        sentAt: new Date('2026-10-01T10:00:00Z'),
+        shareCard: { kind, targetId: `sch-${id}`, title: '경기', startAt: null, place: null, sub: null, route },
+      });
+      prisma.v1ChatMessage.findMany.mockResolvedValue([
+        card('friendly', 'team_schedule', '/team-matches/tm-friendly'),
+        card('league', 'team_schedule', '/team-matches/tm-league'),
+        card('cup', 'team_schedule', '/team-matches/tm-cup'),
+        card('plain', 'team_schedule', '/teams/team-1/schedules/sch-plain'),
+        card('match', 'match', '/matches/m-1'),
+      ]);
+      const rows = [
+        { id: 'tm-friendly', leagueId: null, tournamentId: null },
+        { id: 'tm-league', leagueId: 'league-1', tournamentId: 'league-1' },
+        { id: 'tm-cup', leagueId: null, tournamentId: 'cup-1' },
+      ];
+      prisma.v1TeamMatch.findMany.mockImplementation(async ({ where }: { where: { id: { in: string[] } } }) =>
+        rows.filter((row) => where.id.in.includes(row.id)),
+      );
+
+      const result = await service.messages(userA, 'room-1', { limit: 30 });
+
+      expect(result.items.map((item) => item.shareCard?.route)).toEqual([
+        '/team-matches/tm-friendly',
+        '/league-matches/league-1/fixtures/tm-league',
+        '/tournaments/cup-1/matches/tm-cup',
+        '/teams/team-1/schedules/sch-plain',
+        '/matches/m-1',
+      ]);
+      expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: { in: ['tm-friendly', 'tm-league', 'tm-cup'] } }) }),
+      );
+    });
+
+    it('팀원이 아니면 비공개 팀 일정을 공유할 수 없다(400, 존재를 드러내지 않음) · 공개 일정은 된다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '팀 훈련', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'TEAM', state: 'SCHEDULED' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '천둥 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+
+      await expect(service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-2' } })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'share' } },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-2', teamId: 'team-2', teamMatchId: null, title: '공개 연습', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'PUBLIC', state: 'SCHEDULED' });
+      const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-2' } });
+      expect(result.shareCard).toMatchObject({ route: '/teams/team-2/schedules/sch-2', place: null, sub: '천둥 FC' });
+    });
+
+    it('매치 공유는 매치 화면 카드 · 알림은 "매치를 공유했어요"', async () => {
+      arrangeSend();
+      const entitlement = await prisma.v1Match.findFirst();
+      prisma.v1Match.findFirst.mockImplementation(async (args?: { select?: { placeName?: boolean } }) =>
+        args?.select?.placeName ? { id: 'match-9', title: '수요일 저녁 풋살', startAt: new Date('2026-10-08T11:00:00Z'), placeName: '성수 풋살파크', status: 'recruiting' } : entitlement,
+      );
+
+      const result = await service.sendMessage(userA, 'room-1', { share: { kind: 'match', targetId: 'match-9' } });
+
+      expect(result.shareCard).toEqual({ kind: 'match', targetId: 'match-9', title: '수요일 저녁 풋살', startAt: '2026-10-08T11:00:00.000Z', place: '성수 풋살파크', sub: null, route: '/matches/match-9' });
+      expect(prisma.v1Notification.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: [expect.objectContaining({ body: '매치를 공유했어요 · 수요일 저녁 풋살' })] }),
+      );
+    });
+
+    it('취소·끝난 일정, 취소·보관된 매치는 공유할 수 없다 — 카드는 스냅숏이라 받는 사람이 진행되는 줄 안다', async () => {
+      arrangeSend();
+      prisma.v1TeamSchedule.findFirst.mockResolvedValue({ id: 'sch-3', teamId: 'team-1', teamMatchId: null, title: '취소된 훈련', startAt: new Date('2026-10-05T10:00:00Z'), visibility: 'TEAM', state: 'CANCELLED' });
+      prisma.v1Team.findFirst.mockResolvedValue({ name: '번개 FC' });
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+      await expect(service.sendMessage(userA, 'room-1', { share: { kind: 'team_schedule', targetId: 'sch-3' } })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'share' } },
+      });
+
+      const entitlement = await prisma.v1Match.findFirst();
+      prisma.v1Match.findFirst.mockImplementation(async (args?: { select?: { placeName?: boolean } }) =>
+        args?.select?.placeName ? { id: 'match-x', title: '취소된 매치', startAt: new Date('2026-10-08T11:00:00Z'), placeName: '성수', status: 'cancelled' } : entitlement,
+      );
+      await expect(service.sendMessage(userA, 'room-1', { share: { kind: 'match', targetId: 'match-x' } })).rejects.toMatchObject({
+        response: { code: 'VALIDATION_FAILED', details: { field: 'share' } },
+      });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('검증을 빠져나온 이상한 종류는 매치 분기로 떨어지지 않고 400 — 아무 매치나 카드가 되지 않게', async () => {
+      arrangeSend();
+      await expect(
+        service.sendMessage(userA, 'room-1', { share: {} as unknown as { kind: 'match'; targetId: string } }),
+      ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED', details: { field: 'share' } } });
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('공유와 텍스트·사진을 함께 보내면 400', async () => {
+      await expect(service.sendMessage(userA, 'room-1', { content: '이거 봐', share: { kind: 'match', targetId: 'match-9' } })).rejects.toThrow(BadRequestException);
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('parseShareCard: 모양이 어긋나거나 경로가 / 로 시작하지 않으면 카드 없이(null)', () => {
+      expect(parseShareCard({ kind: 'match', targetId: 'm', title: 't', route: 'https://evil.example' })).toBeNull();
+      expect(parseShareCard({ kind: 'nope', targetId: 'm', title: 't', route: '/matches/m' })).toBeNull();
+      expect(parseShareCard(null)).toBeNull();
+      expect(parseShareCard({ kind: 'match', targetId: 'm', title: 't', route: '/matches/m' })).toEqual({ kind: 'match', targetId: 'm', title: 't', startAt: null, place: null, sub: null, route: '/matches/m' });
+    });
+  });
+
   it('sendMessage: muted active participants are excluded from chat notifications', async () => {
     const sentAt = new Date('2026-06-21T10:00:00Z');
     const createdMessage = { id: 'msg-muted', chatRoomId: 'room-1', senderUserId: userA.id, body: 'ping', status: 'sent', sentAt };
@@ -305,9 +528,22 @@ describe('ChatService', () => {
           AND: [
             {
               user: {
-                matchParticipants: {
-                  some: { matchId: 'match-1', status: 'active', match: { deletedAt: null } },
-                },
+                OR: [
+                  {
+                    matchParticipants: {
+                      some: { matchId: 'match-1', status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
+                    },
+                  },
+                  {
+                    hostedMatches: {
+                      some: {
+                        id: 'match-1',
+                        deletedAt: null,
+                        participants: { some: { role: 'participant', status: { in: ['active', 'completed'] } } },
+                      },
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -447,39 +683,46 @@ describe('ChatService', () => {
     prisma.v1ChatRoom.update.mockResolvedValue({});
     prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
     prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
-    // The message/notifications are already committed above by the time this runs —
-    // a rejection here must not turn an already-successful send into a 500.
+    // The message is already committed by the time this runs — a rejection here
+    // must not turn an already-successful send into a 500.
     prisma.v1NotificationPreference.findMany.mockRejectedValueOnce(new Error('db unavailable'));
 
     await expect(service.sendMessage(userA, 'room-1', { content: 'ping' })).resolves.toMatchObject({
       messageId: 'msg-pref-lookup-fail',
     });
+    expect(prisma.v1Notification.createMany).not.toHaveBeenCalled();
     expect(webPushService.sendToUser).not.toHaveBeenCalled();
   });
 
-  it('sendMessage: skips WebPushService.sendToUser for recipients with chatEnabled=false', async () => {
+  it('sendMessage: chatEnabled=false 수신자는 채팅 메시지만 받고 알림함·배지·푸시는 받지 않는다', async () => {
     const sentAt = new Date('2026-06-21T10:00:00Z');
     const createdMessage = { id: 'msg-muted-pref', chatRoomId: 'room-1', senderUserId: userA.id, body: 'quiet', status: 'sent', sentAt };
     prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
     prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
     prisma.v1ChatRoom.update.mockResolvedValue({});
     prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
-    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
-    // user-2 disabled chat push; user-3 has no preference row (default enabled)
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 1 });
+    // user-2 disabled chat notifications; user-3 has no preference row (default enabled)
     prisma.v1NotificationPreference.findMany.mockResolvedValue([{ userId: 'user-2', chatEnabled: false }]);
 
     await service.sendMessage(userA, 'room-1', { content: 'quiet' });
 
     expect(webPushService.sendToUser).not.toHaveBeenCalledWith('user-2', expect.anything());
     expect(webPushService.sendToUser).toHaveBeenCalledWith('user-3', expect.anything());
-    // Realtime in-app notification must still fire for the pref-disabled recipient (push-only gate)
     expect(realtimeGateway.emitToUser).toHaveBeenCalledWith('user-2', 'chat:message', expect.anything());
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith('user-2', 'notification:new', expect.anything());
+    expect(prisma.v1Notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recipientUserId: 'user-3',
+          targetType: 'chat',
+          targetId: 'room-1',
+        }),
+      ],
+    });
   });
 
   it('resolve(match): 첫 호출 시 created=true, 두 번째 호출 시 created=false (멱등성)', async () => {
-    // Simulate user being an active match participant
-    prisma.v1MatchParticipant.findFirst.mockResolvedValue({ id: 'match-part-1' });
-
     // First call: no existing room → create
     const newRoom = { id: 'room-new', matchId: 'match-1', status: 'active', createdAt: new Date(), updatedAt: new Date() };
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
@@ -489,6 +732,16 @@ describe('ChatService', () => {
 
     const first = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
     expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true, route: '/chat/room-new' });
+    expect(prisma.v1Match.findFirst).toHaveBeenCalledWith({
+      where: { id: 'match-1', deletedAt: null },
+      select: {
+        hostUserId: true,
+        participants: {
+          where: { status: { in: ['active', 'completed'] } },
+          select: { userId: true, role: true },
+        },
+      },
+    });
 
     // Second call: room already exists → return existing, created=false
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(newRoom);
@@ -521,11 +774,43 @@ describe('ChatService', () => {
     });
   });
 
+  // 감사 결함 회귀 방지(2026-08-27): 결과 제출로 V1TeamMatch.status가 matched→completed로
+  // 넘어간 뒤에도 팀 owner/manager는 채팅을 계속 열 수 있어야 한다. 예전엔
+  // assertCanUseTeamMatchChat이 status:'matched'로 exact-match 해서, completed가 된 팀매치의
+  // resolve/detail/sendMessage 전부가 409 STATE_CONFLICT('Team match chat is available after
+  // matching')로 죽었다 — 버튼은 여전히 활성인데 눌러도 반응이 없는 증상의 원인.
+  it('resolve(team_match): completed 상태에서도 팀 owner/manager 는 채팅을 연다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      hostTeamId: 'team-host', approvedApplicantTeamId: 'team-guest',
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'membership-1' });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoom.create.mockResolvedValueOnce({ id: 'tm-room-1', teamMatchId: 'tm-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoomParticipant.create.mockResolvedValueOnce({});
+
+    const result = await service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' });
+
+    expect(result).toMatchObject({ roomId: 'tm-room-1', roomType: 'team_match', created: true, route: '/chat/tm-room-1' });
+    // status가 matched/completed 둘 다 통과하도록 findFirst where에 in 조건이 전달됐는지도
+    // 함께 고정한다 — 이 단언 없이는 하드코딩된 'matched'로 되돌아가도 이 테스트는 여전히
+    // 통과한다(위 mockResolvedValue가 무조건 값을 돌려주므로).
+    const where = prisma.v1TeamMatch.findFirst.mock.calls[0][0].where;
+    expect(where.status).toEqual({ in: ['matched', 'completed'] });
+  });
+
+  it('resolve(team_match): 매칭 전(승인된 상대팀 없음) 이면 409 STATE_CONFLICT', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(null);
+
+    await expect(service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' })).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+  });
+
   // ─── 8. resolve(match): 비-참가자 → 403 PERMISSION_DENIED ──────────────────
 
   it('resolve(match): 매치 비-참가자 사용자 → 403 PERMISSION_DENIED', async () => {
-    // No active match participation found
-    prisma.v1MatchParticipant.findFirst.mockResolvedValue(null);
+    prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: 'host-user', participants: [] });
 
     await expect(service.resolve(userB, { targetType: 'match', targetId: 'match-1' })).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
@@ -535,6 +820,38 @@ describe('ChatService', () => {
     // No room should be resolved/created
     expect(prisma.v1ChatRoom.findUnique).not.toHaveBeenCalled();
     expect(prisma.v1ChatRoom.create).not.toHaveBeenCalled();
+  });
+
+  it('resolve(match): 참가자가 없는 주최자에게 안내 가능한 409를 반환하고 방을 만들지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue({ hostUserId: userA.id, participants: [] });
+
+    await expect(service.resolve(userA, { targetType: 'match', targetId: 'match-1' })).rejects.toMatchObject({
+      response: {
+        code: 'MATCH_CHAT_PARTICIPANTS_REQUIRED',
+        message: '아직 참여자가 없어 채팅을 시작할 수 없어요. 신청자를 승인한 뒤 이용해 주세요.',
+      },
+    });
+    expect(prisma.v1ChatRoom.findUnique).not.toHaveBeenCalled();
+    expect(prisma.v1ChatRoom.create).not.toHaveBeenCalled();
+  });
+
+  it('resolve(match): 본인이 참가하지 않는 주최자도 승인 참가자가 있으면 채팅방에 입장한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue({
+      hostUserId: userA.id,
+      participants: [{ userId: userB.id, role: 'participant' }],
+    });
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({ id: 'room-1', matchId: 'match-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue(null);
+    prisma.v1ChatRoomParticipant.create.mockResolvedValue({});
+
+    await expect(service.resolve(userA, { targetType: 'match', targetId: 'match-1' })).resolves.toMatchObject({
+      roomId: 'room-1',
+      roomType: 'match',
+      created: false,
+    });
+    expect(prisma.v1ChatRoomParticipant.create).toHaveBeenCalledWith({
+      data: { chatRoomId: 'room-1', userId: userA.id, status: 'active', visibleFromAt: null },
+    });
   });
 
   // ─── 9. detail: 존재하지 않는 방 → 404 NOT_FOUND ───────────────────────────

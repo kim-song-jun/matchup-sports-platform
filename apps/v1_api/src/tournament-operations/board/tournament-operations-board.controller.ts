@@ -40,7 +40,7 @@ export class TournamentOperationsBoardController {
     @Param('tournamentId', UUID_PARAM) tournamentId: string,
     @Query() query: ListTournamentOperationsQueryDto,
     @Req() request: TournamentStaffRequest,
-  ) {
+  ): ReturnType<TournamentOperationsBoardService['list']> {
     return this.board.list(tournamentId, query, undefined, request.tournamentStaff);
   }
 }

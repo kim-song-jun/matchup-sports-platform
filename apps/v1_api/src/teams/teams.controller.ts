@@ -1,10 +1,11 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
-import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
+import { CreateTeamInvitationDto, CreateTeamInvitationsBatchDto } from './dto/create-team-invitation.dto';
 import {
   ChangeTeamMembershipJerseyDto,
   ChangeTeamMembershipRoleDto,
@@ -21,7 +22,7 @@ import {
   RejectTeamJoinApplicationDto,
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
-import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+import { MyTeamsQueryDto, TeamNameAvailabilityQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 import { TeamsService } from './teams.service';
 
 @Controller()
@@ -32,6 +33,13 @@ export class TeamsController {
   @UseGuards(OptionalV1AuthGuard)
   list(@CurrentUser() user: V1AuthUser | undefined, @Query() query: TeamsQueryDto) {
     return this.teamsService.list(user ?? null, query);
+  }
+
+  // 'teams/:teamId' 보다 먼저 등록해야 'name-availability' 가 팀 id 로 잡히지 않는다.
+  @Get('teams/name-availability')
+  @UseGuards(V1AuthGuard)
+  nameAvailability(@CurrentUser() user: V1AuthUser, @Query() query: TeamNameAvailabilityQueryDto) {
+    return this.teamsService.nameAvailability(user, query);
   }
 
   @Get('teams/:teamId')
@@ -184,6 +192,17 @@ export class TeamsController {
     @Body() dto: CreateTeamInvitationDto,
   ) {
     return this.teamsService.createInvitation(user, teamId, dto);
+  }
+
+  @Post('teams/:teamId/invitations/batch')
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  createInvitationsBatch(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: CreateTeamInvitationsBatchDto,
+  ) {
+    return this.teamsService.createInvitationsBatch(user, teamId, dto);
   }
 
   @Get('teams/:teamId/invitations')

@@ -3,16 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
-import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { HomePageView } from './home-page';
-import { toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
+import { EMPTY_WEATHER, toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
 import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
+import { useRecordConsentNudge } from './use-record-consent-nudge';
+import { decideHomeBanners } from '@/lib/home-banner-policy';
+import { usePendingReviewsSummary } from '@/components/tournaments/pending-review-card';
 
 export function HomePageClient() {
   const router = useRouter();
@@ -32,38 +33,11 @@ export function HomePageClient() {
     refreshing: weatherRefreshing,
     refresh: refreshWeather,
   } = useCurrentLocationWeather();
-  const pushRegistration = useV1PushRegistration();
-  const [pushNudgeSubscribing, setPushNudgeSubscribing] = useState(false);
-  const [pushNudgeDismissed, setPushNudgeDismissed] = useState(true);
-  useEffect(() => {
-    setPushNudgeDismissed(!shouldShowPushNudge());
-  }, []);
-  const showPushNudge =
-    isAuthenticated &&
-    onboardingCompleted &&
-    !pushNudgeDismissed &&
-    pushRegistration.permission === 'default' &&
-    !pushRegistration.isSubscribed;
-  const pushNudge = showPushNudge
-    ? {
-        subscribing: pushNudgeSubscribing,
-        onSubscribe: () => {
-          setPushNudgeSubscribing(true);
-          void pushRegistration.subscribe().then((subscribed) => {
-            if (subscribed) {
-              dismissPushNudge();
-              setPushNudgeDismissed(true);
-            }
-          }).finally(() => {
-            setPushNudgeSubscribing(false);
-          });
-        },
-        onDismiss: () => {
-          dismissPushNudge();
-          setPushNudgeDismissed(true);
-        },
-      }
-    : undefined;
+  const recordConsentNudge = useRecordConsentNudge({
+    enabled: isAuthenticated && onboardingCompleted,
+    userId: authMe.data?.user.id ?? null,
+  });
+
   // 인증을 마칠 때까지 계속 보이는 상시 배너 — 닫을 수 있게 두면 한 번 닫은 사용자는
   // 왜 신청·등록이 막히는지 알 방법이 없어진다(조회는 열려 있어 화면상 정상으로 보인다).
   const phoneVerifyNudge =
@@ -72,6 +46,25 @@ export function HomePageClient() {
       : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
+  // ─── 홈 배너 표시 상한 (Task 154 P2-1) ──────────────────────────────────────
+  //
+  // 각 배너는 자기 조건만 보고 뜨므로, 조건이 겹치면 넷이 한꺼번에 쌓여 인사말·통계·
+  // 추천이 전부 접힘 아래로 밀린다. 어느 것을 이번 방문에 보여줄지 여기서 한 번에
+  // 정한다 -- 판정 자체는 순수 함수(lib/home-banner-policy.ts)라 테스트로 고정돼 있다.
+  //
+  // 후기 카드는 자기 데이터를 직접 가져와 0건이면 스스로 사라진다. 그 사실을 모르고
+  // 자리를 내주면 그 방문엔 유도 배너가 하나도 안 보이므로, 같은 훅으로 총계를 먼저
+  // 확인한다(React Query 가 dedupe 하므로 요청은 늘지 않는다).
+  const pendingReviews = usePendingReviewsSummary();
+  const teamActivity = query.data?.teamActivity ?? null;
+  const bannerDecision = decideHomeBanners({
+    phoneVerify: phoneVerifyNudge !== undefined,
+    teamInvitation: Boolean(teamActivity?.pendingInvitations),
+    joinRequests: Boolean(teamActivity?.pendingJoinRequests),
+    recordConsent: recordConsentNudge !== undefined,
+    pendingReviews: pendingReviews.total > 0,
+  });
+
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
   const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
   const nonDataFallback = withoutHomeContent(fallback);
@@ -87,7 +80,7 @@ export function HomePageClient() {
             chatUnreadCount,
             chatStatus,
             chatRooms: chatRoomSummaries,
-            weather: weather ?? fallback.weather,
+            weather: weather ?? EMPTY_WEATHER,
             weatherPermission,
             weatherRefreshing,
             refreshWeather,
@@ -112,11 +105,12 @@ export function HomePageClient() {
                 weatherPermission,
                 weatherRefreshing,
                 refreshWeather,
-                pushNudge,
+                recordConsentNudge,
+                bannerDecision,
                 phoneVerifyNudge,
                 chatRetry: () => void chatRooms.refetch(),
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
+            : { ...nonDataFallback, statsLoading: true, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? EMPTY_WEATHER, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
         }
       />
     </>

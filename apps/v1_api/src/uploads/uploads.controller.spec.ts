@@ -23,7 +23,10 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 describe('UploadsController real multer pipeline', () => {
   let app: INestApplication;
   const uploadBase = UploadsService.UPLOAD_BASE;
+  // 채팅 파일 라우트의 multer 임시 폴더 — 앱 시작 때 multer 가 만든다(Task 181 ③).
+  const privateTemp = path.join(uploadBase, UploadsService.PRIVATE_DIR);
   const storeFiles = jest.fn();
+  const storeChatFile = jest.fn();
 
   beforeAll(async () => {
     await fs.mkdir(uploadBase, { recursive: true });
@@ -43,7 +46,7 @@ describe('UploadsController real multer pipeline', () => {
 
     const moduleRef = await Test.createTestingModule({
       controllers: [UploadsController],
-      providers: [{ provide: UploadsService, useValue: { storeFiles } }],
+      providers: [{ provide: UploadsService, useValue: { storeFiles, storeChatFile } }],
     })
       .overrideGuard(V1AuthGuard)
       .useValue(stubAuthGuard)
@@ -55,9 +58,12 @@ describe('UploadsController real multer pipeline', () => {
 
   afterEach(async () => {
     storeFiles.mockReset();
-    // Best-effort sweep of anything multer wrote to the real upload dir this test.
-    const entries = await fs.readdir(uploadBase);
-    await Promise.all(entries.map((entry) => fs.rm(path.join(uploadBase, entry), { force: true })));
+    storeChatFile.mockReset();
+    // Best-effort sweep of the temp files multer wrote this test (flat files only — `.private/` stays).
+    for (const dir of [uploadBase, privateTemp]) {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      await Promise.all(entries.filter((e) => e.isFile()).map((e) => fs.rm(path.join(dir, e.name), { force: true })));
+    }
   });
 
   afterAll(async () => {
@@ -105,7 +111,7 @@ describe('UploadsController real multer pipeline', () => {
     expect(storeFiles).not.toHaveBeenCalled();
     // GHSA-3p4h-7m6x-2hcm ("incomplete cleanup of aborted uploads") was fixed in multer 2.2.0 —
     // an over-limit stream must not leave a partial temp file behind.
-    await expect(fs.readdir(uploadBase)).resolves.toEqual([]);
+    expect((await fs.readdir(uploadBase)).filter((entry) => entry !== UploadsService.PRIVATE_DIR)).toEqual([]);
   });
 
   it('rejects a 6th file in one request before the request reaches UploadsService', async () => {
@@ -120,5 +126,16 @@ describe('UploadsController real multer pipeline', () => {
     // multer's `limits.files: 5` still rejects the 6th file (LIMIT_FILE_COUNT -> 400 BadRequestException).
     expect(response.status).toBe(400);
     expect(storeFiles).not.toHaveBeenCalled();
+  });
+
+  it('writes chat-file temp uploads under the non-served .private dir, never the public upload root (Task 181 ③)', async () => {
+    storeChatFile.mockImplementation(async (file: { path: string }) => ({ tempDir: path.dirname(file.path) }));
+
+    const response = await request(app.getHttpServer())
+      .post('/uploads/files')
+      .attach('file', Buffer.from('%PDF-1.7'), { filename: 'schedule.pdf', contentType: 'application/pdf' })
+      .expect(201);
+
+    expect(response.body).toEqual({ tempDir: privateTemp });
   });
 });

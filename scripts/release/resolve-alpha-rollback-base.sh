@@ -37,9 +37,19 @@ migration_base_sha="$(awk -F= '$1 == "migration" { print $2 }' <<< "${state_outp
   exit 1
 }
 
+# Task 168 M11 converged: rollbackCompatibleWith is final<->final only
+# (item 8) — the creator needs to know whether the previous active release
+# was itself the final policy before it may bind the new manifest's
+# rollbackCompatibleWith to it. A StageA (or missing) previous release
+# leaves previous_stage=none, which create-alpha-release-manifest.sh treats
+# as "do not bind".
+previous_stage=none
 if [[ "${previous_sha}" != none ]]; then
-  aws s3api head-object --bucket "${DEPLOY_BUCKET}" --key "manifests/${previous_sha}.json" \
-    --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" >/dev/null
+  previous_manifest="$(mktemp)"
+  aws s3api get-object --bucket "${DEPLOY_BUCKET}" --key "manifests/${previous_sha}.json" \
+    --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" "${previous_manifest}" >/dev/null
+  previous_stage="$(jq -r '.database.task168.stage // "none"' "${previous_manifest}")"
+  rm -f "${previous_manifest}"
 fi
 if [[ "${migration_base_sha}" != none ]]; then
   public_sha="$(curl -fsSI https://alpha.teameet.co.kr/landing |
@@ -54,3 +64,4 @@ if [[ "${migration_base_sha}" != none ]]; then
 fi
 echo "previousSha=${previous_sha}" >> "${GITHUB_OUTPUT}"
 echo "migrationBaseSha=${migration_base_sha}" >> "${GITHUB_OUTPUT}"
+echo "previousStage=${previous_stage}" >> "${GITHUB_OUTPUT}"

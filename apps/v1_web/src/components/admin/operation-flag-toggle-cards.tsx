@@ -27,7 +27,7 @@ const TOGGLES: readonly ToggleDef[] = [
     key: 'PUBLIC_LIVE',
     label: '실시간 점수 공개',
     onEffect: '관전자 화면(비로그인 포함)에 진행 중인 경기의 점수와 경기 시계를 그대로 보여줘요.',
-    offEffect: '끄면 공개 화면의 실시간 점수가 상태만 보이는 status_only로 강등돼요 — 점수·경기 시계는 더 이상 공개되지 않아요.',
+    offEffect: '끄면 진행 중인 경기의 점수와 경기 시계가 공개 화면에서 사라져요. 이미 확정된 경기 결과는 그대로 보여요 — 결과까지 감추려면 경기별 공개 정책을 따로 지정해야 해요.',
     techNote: 'PUBLIC_LIVE',
   },
   {
@@ -82,12 +82,12 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-[16px] font-bold text-[var(--text-strong)]">{toggle.label}</h3>
+            <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">{toggle.label}</h3>
             {!flagQuery.isPending && !flagQuery.isError && (
               <span
                 className={[
-                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0',
-                  isOn ? 'bg-blue-100 text-blue-700' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-micro)] font-semibold shrink-0',
+                  isOn ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >
                 {isOn ? <ToggleRight size={12} aria-hidden="true" /> : <ToggleLeft size={12} aria-hidden="true" />}
@@ -95,14 +95,14 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
               </span>
             )}
           </div>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
+          <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-2 leading-relaxed">
             {isOn ? toggle.onEffect : toggle.offEffect}
           </p>
-          <p className="text-[11px] text-gray-400 mt-1.5 font-mono">{toggle.techNote}</p>
+          <p className="text-[length:var(--font-size-micro)] text-[var(--text-muted)] mt-2 font-mono">{toggle.techNote}</p>
         </div>
 
         {flagQuery.isError ? (
-          <span className="shrink-0 text-[12px] text-[var(--red700)]">불러오지 못함</span>
+          <span className="shrink-0 text-[length:var(--font-size-caption)] text-[var(--red700)]">불러오지 못함</span>
         ) : (
           <button
             type="button"
@@ -110,7 +110,7 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
             disabled={disabled}
             aria-label={`${toggle.label} ${ctaLabel}`}
             className={[
-              'shrink-0 inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl text-[13px] font-semibold transition-colors',
+              'shrink-0 inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
               isOn ? 'bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--grey300)]' : 'bg-blue-500 text-white hover:bg-blue-600',
             ].join(' ')}
@@ -121,17 +121,17 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
       </div>
 
       {flag && (
-        <dl className="grid grid-cols-3 gap-2 pt-3 mt-3 border-t border-[var(--border)] text-[12px]">
+        <dl className="grid grid-cols-3 gap-2 pt-3 mt-3 border-t border-[var(--border)] text-[length:var(--font-size-caption)]">
           <div>
-            <dt className="text-gray-400">버전</dt>
+            <dt className="text-[var(--text-muted)]">버전</dt>
             <dd className="text-[var(--text-body)] font-medium tabular-nums">v{flag.version}</dd>
           </div>
           <div>
-            <dt className="text-gray-400">마지막 변경자</dt>
+            <dt className="text-[var(--text-muted)]">마지막 변경자</dt>
             <dd className="text-[var(--text-body)] font-medium truncate">{flag.updatedByUserId ?? '—'}</dd>
           </div>
           <div>
-            <dt className="text-gray-400">마지막 변경 시각</dt>
+            <dt className="text-[var(--text-muted)]">마지막 변경 시각</dt>
             <dd className="text-[var(--text-body)] font-medium">
               {new Date(flag.updatedAt).toLocaleString('ko-KR', {
                 month: 'numeric',
@@ -171,7 +171,7 @@ export function OperationFlagToggleCards({ gateEnabled, showToast }: OperationFl
   return (
     <div className="flex flex-col gap-3">
       {!gateEnabled && (
-        <p className="text-[13px] text-gray-400">간소 전환 모드가 꺼져 있어 토글을 실행할 수 없어요.</p>
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">간소 전환 모드가 꺼져 있어 토글을 실행할 수 없어요.</p>
       )}
       {TOGGLES.map((toggle) => (
         <ToggleCard key={toggle.key} toggle={toggle} gateEnabled={gateEnabled} showToast={showToast} />

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -16,8 +16,13 @@ import AdminTournamentsNewPage from './page';
 import {
   INITIAL_TOURNAMENT_CREATE_STATE,
   buildTournamentCreatePayload,
+  hasPromoFactEdits,
   tournamentCreateReducer,
   validateTournamentCreateStep,
+} from './tournament-create-model';
+import type {
+  TournamentCreateAction,
+  TournamentCreateState,
 } from './tournament-create-model';
 import type { V1Tournament } from '@/types/api';
 
@@ -96,6 +101,7 @@ function previousTournament(): V1Tournament {
     genderMaxMale: null,
     genderMinFemale: null,
     genderMaxFemale: null,
+    minMatchesPerTeam: null,
     entryFee: 50000,
     prizePool: null,
     prizeSummary: null,
@@ -124,12 +130,23 @@ function previousTournament(): V1Tournament {
     bankAccount: '123-456',
     bankHolder: '티밋',
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     registrationCount: 8,
     createdAt: '2026-06-01T00:00:00.000Z',
     updatedAt: '2026-07-01T00:00:00.000Z',
   };
 }
+
+// jsdom 은 scrollIntoView 를 구현하지 않는다 — 불가피한 브라우저 API 스텁. 파일 전체에 두고 복구한다.
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 
 function renderPage() {
   return render(
@@ -179,6 +196,20 @@ function goToParticipationStep() {
 }
 
 describe('AdminTournamentsNewPage four-step wizard', () => {
+  // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
+  // 자동 제안된 신청 마감(D-3)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
+  // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
+  // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
+  // `shouldAdvanceTime` 이 있어야 testing-library 의 `findBy*`/`waitFor` 가 멈추지 않는다.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsValue = new URLSearchParams();
@@ -291,7 +322,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
   });
 
-  it('T2 proposes D-3 registration and D-7 roster deadlines without overwriting manual edits', () => {
+  it('T2 proposes a D-3 registration deadline without overwriting manual edits, and leaves the roster deadline empty', () => {
     renderPage();
     goToScheduleStep();
 
@@ -299,7 +330,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.change(start, { target: { value: '2026-08-15T09:00' } });
 
     expect(screen.getByLabelText(/신청 마감/)).toHaveValue('2026-08-12T23:59');
-    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('2026-08-08T23:59');
+    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('');
+    expect(screen.getByLabelText(/명단 제출 마감/)).not.toBeRequired();
 
     fireEvent.change(screen.getByLabelText(/신청 마감/), {
       target: { value: '2026-08-10T20:00' },
@@ -307,7 +339,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.change(start, { target: { value: '2026-08-22T09:00' } });
 
     expect(screen.getByLabelText(/신청 마감/)).toHaveValue('2026-08-10T20:00');
-    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('2026-08-15T23:59');
+    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('');
   });
 
   it('T3 preserves mixed gender quota values across step navigation', () => {
@@ -438,6 +470,48 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(rolling.maxSubstitutions).toBeUndefined();
   });
 
+  it('T6c omits minMatchesPerTeam from the payload when left blank', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      format: 'league',
+      minMatchesPerTeam: '',
+    });
+    expect(payload.minMatchesPerTeam).toBeUndefined();
+    // undefined 값은 JSON.stringify에서 키 자체가 사라진다 — 실제로 서버에 전송되지
+    // 않는다는 것을 axios가 쓰는 것과 같은 직렬화 경로로 증명한다(0/빈 문자열이 실려
+    // @IsInt @Min(1)에 422로 거절되는 걸 막는 게 이 필드의 핵심 계약이다).
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('minMatchesPerTeam');
+  });
+
+  it('T6d serializes minMatchesPerTeam as a number when set', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      format: 'league',
+      minMatchesPerTeam: '6',
+    });
+    expect(payload.minMatchesPerTeam).toBe(6);
+  });
+
+  it('T6e hydrates minMatchesPerTeam from a draft tournament in edit mode', () => {
+    const draft = fakeDraftTournament({ format: 'league', minMatchesPerTeam: 8 });
+    const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: draft,
+    });
+    expect(hydrated.minMatchesPerTeam).toBe('8');
+
+    const withoutValue = fakeDraftTournament({ format: 'league', minMatchesPerTeam: null });
+    const hydratedEmpty = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: withoutValue,
+    });
+    expect(hydratedEmpty.minMatchesPerTeam).toBe('');
+  });
+
   it('blocks moving forward and shows the current step validation error', async () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
@@ -487,11 +561,11 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
-  it('rejects promo priorities outside the API integer range', () => {
+  it('rejects promo priorities outside the API integer range on enabled cards', () => {
     const state = {
       ...INITIAL_TOURNAMENT_CREATE_STATE,
-      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, priority: '-1' },
-      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, priority: '2.5' },
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: true, priority: '-1' },
+      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, enabled: true, priority: '2.5' },
     };
 
     expect(validateTournamentCreateStep(state, 3)).toMatchObject({
@@ -499,9 +573,34 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       promoListPriority: '목록 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
     });
   });
+
+  it('꺼진 홍보 카드의 잘못된 우선순위도 서버 DTO 처럼 막고 값은 바꾸지 않는다', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, enabled: false, priority: '-1' },
+    };
+
+    expect(validateTournamentCreateStep(state, 3)).toMatchObject({
+      promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
+    });
+  });
 });
 
 describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
+  // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
+  // 자동 제안된 신청 마감(D-3)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
+  // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
+  // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
+  // `shouldAdvanceTime` 이 있어야 testing-library 의 `findBy*`/`waitFor` 가 멈추지 않는다.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsValue = new URLSearchParams();
@@ -680,5 +779,337 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     renderPage();
 
     expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/draft-1');
+  });
+  describe('홍보 카드 사실 문구 자동 채움', () => {
+    /** 날짜·팀 수·장소·총 상금을 넣은 상태 — 홍보 문구의 출처가 되는 앞 단계 값이다. */
+    function stateWithTournamentInfo() {
+      return [
+        { type: 'set-scheduled-at', value: '2026-08-29T09:00' },
+        { type: 'set-field', field: 'scheduledEndAt', value: '2026-08-29T18:00' },
+        { type: 'set-field', field: 'teamCount', value: '16' },
+        { type: 'set-field', field: 'venue', value: '서울월드컵보조경기장' },
+        { type: 'set-field', field: 'prizePool', value: '3000000' },
+      ].reduce<TournamentCreateState>(
+        (state, action) => tournamentCreateReducer(state, action as TournamentCreateAction),
+        INITIAL_TOURNAMENT_CREATE_STATE,
+      );
+    }
+
+    it('앞 단계 대회 정보를 넣으면 두 홍보 카드의 날짜·장소·상금 문구가 채워진다', () => {
+      const state = stateWithTournamentInfo();
+
+      for (const promo of [state.promoHome, state.promoList]) {
+        expect(promo).toMatchObject({
+          dateText: '8월 29일 (토)',
+          locationText: '서울월드컵보조경기장',
+          prizeText: '총 상금 3,000,000원',
+        });
+      }
+    });
+
+    it('강조 문구는 팀 수로 자동 채우지 않는다 — 운영에서 상태 문구로 쓰는 자리다', () => {
+      const state = stateWithTournamentInfo();
+
+      expect(state.promoHome.teamsText).toBe('');
+      expect(state.promoList.teamsText).toBe('');
+    });
+
+    it('관리자가 고친 문구는 앞 단계 값을 다시 바꿔도 그대로 둔다', () => {
+      const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: { ...stateWithTournamentInfo().promoHome, locationText: '수원 실내구장 A코트' },
+      });
+
+      const relocated = tournamentCreateReducer(edited, {
+        type: 'set-field',
+        field: 'venue',
+        value: '수원종합운동장',
+      });
+
+      expect(relocated.promoHome.locationText).toBe('수원 실내구장 A코트');
+      // 손대지 않은 목록 카드는 새 값을 그대로 따라간다.
+      expect(relocated.promoList.locationText).toBe('수원종합운동장');
+    });
+
+    it('관리자가 빈 칸으로 지운 문구는 다시 채우지 않는다', () => {
+      const cleared = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoList',
+        value: { ...stateWithTournamentInfo().promoList, prizeText: '' },
+      });
+
+      const repriced = tournamentCreateReducer(cleared, {
+        type: 'set-field',
+        field: 'prizePool',
+        value: '5000000',
+      });
+
+      expect(repriced.promoList.prizeText).toBe('');
+      expect(repriced.promoHome.prizeText).toBe('총 상금 5,000,000원');
+    });
+
+    it('되돌릴 파생값이 없는 칸도 다시 채우기로 비워진다 — 버튼이 무반응처럼 보이던 결함', () => {
+      // 장소·상금을 앞 단계에서 입력하지 않아 파생값이 빈 칸인 상태에서, 관리자가 문구만
+      // 직접 써 넣었다. 이때 "다시 채우기"가 그 칸을 건너뛰면 버튼이 아무 일도 안 한 것처럼
+      // 보인다(alpha 재현 확인).
+      const dated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+        type: 'set-scheduled-at',
+        value: '2026-08-29T09:00',
+      });
+      const typed = tournamentCreateReducer(dated, {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: { ...dated.promoHome, locationText: '직접 쓴 장소', prizeText: '직접 쓴 상금' },
+      });
+
+      expect(hasPromoFactEdits(typed, 'promoHome')).toBe(true);
+
+      const reset = tournamentCreateReducer(typed, {
+        type: 'reset-promo-facts',
+        slot: 'promoHome',
+      });
+
+      expect(reset.promoHome.locationText).toBe('');
+      expect(reset.promoHome.prizeText).toBe('');
+      // 파생값이 있는 날짜는 그대로 유지된다.
+      expect(reset.promoHome.dateText).toBe('8월 29일 (토)');
+      // 되돌린 뒤에는 되돌릴 것이 없다 — 버튼이 비활성으로 바뀐다.
+      expect(hasPromoFactEdits(reset, 'promoHome')).toBe(false);
+    });
+
+    it('직접 고친 문구가 없으면 되돌릴 것도 없다고 알린다', () => {
+      const state = stateWithTournamentInfo();
+
+      expect(hasPromoFactEdits(state, 'promoHome')).toBe(false);
+      expect(hasPromoFactEdits(state, 'promoList')).toBe(false);
+    });
+
+    it('초안 저장 후 새로고침해도 자동으로 채워졌던 문구는 계속 대회 정보를 따라간다', () => {
+      // 서버에는 자동 파생 문구도 그대로 저장된다 — 저장돼 있다는 이유만으로 dirty로 굳으면
+      // 새로고침 뒤 일정·장소를 고쳐도 홍보 문구가 옛 값에 멈춘다.
+      const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+        type: 'hydrate-from-draft',
+        tournament: fakeDraftTournament({
+          venue: '서울월드컵보조경기장',
+          // 관리자가 손대지 않아 파생값 그대로 저장된 문구
+          promoHomeLocationText: '서울월드컵보조경기장',
+          // 관리자가 직접 고쳐 저장한 문구
+          promoHomePrizeText: '🎁 특별 상품 증정',
+        }),
+      });
+
+      const relocated = tournamentCreateReducer(hydrated, {
+        type: 'set-field',
+        field: 'venue',
+        value: '수원종합운동장',
+      });
+
+      expect(relocated.promoHome.locationText).toBe('수원종합운동장');
+      expect(relocated.promoHome.prizeText).toBe('🎁 특별 상품 증정');
+    });
+
+    it('"대회 정보로 다시 채우기"는 해당 카드만 현재 대회 정보로 되돌린다', () => {
+      const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: {
+          ...stateWithTournamentInfo().promoHome,
+          dateText: '이번 주말 단 하루',
+          locationText: '',
+        },
+      });
+      const editedList = tournamentCreateReducer(edited, {
+        type: 'set-promo',
+        slot: 'promoList',
+        value: { ...edited.promoList, locationText: '목록 전용 장소' },
+      });
+
+      const reset = tournamentCreateReducer(editedList, {
+        type: 'reset-promo-facts',
+        slot: 'promoHome',
+      });
+
+      expect(reset.promoHome).toMatchObject({
+        dateText: '8월 29일 (토)',
+        locationText: '서울월드컵보조경기장',
+      });
+      expect(reset.promoList.locationText).toBe('목록 전용 장소');
+    });
+  });
+
+  describe('홍보 카드 켠 것만 펼치기 (#1439)', () => {
+    it('꺼진 홍보 카드는 입력 없이 한 줄 요약과 꺼진 스위치만 보인다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('노출 우선순위')).not.toBeInTheDocument();
+      for (const name of ['홈 오늘의 추천 노출', '대회 목록 상단 노출']) {
+        expect(screen.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'false');
+      }
+    });
+
+    it('스위치로 켜면 입력이 펼쳐지고 포커스가 스위치에 남으며, 껐다 켜도 값이 남고 payload 는 그대로 간다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      fireEvent.click(screen.getByRole('switch', { name: '홈 오늘의 추천 노출' }));
+      const on = screen.getByRole('switch', { name: '홈 오늘의 추천 노출' });
+      expect(on).toHaveAttribute('aria-checked', 'true');
+      expect(on.querySelector('.tm-toggle')).toHaveClass('tm-toggle-on');
+      on.focus();
+      fireEvent.change(screen.getByLabelText('카드 제목'), { target: { value: '이번 주 추천' } });
+      fireEvent.click(on);
+
+      const off = screen.getByRole('switch', { name: '홈 오늘의 추천 노출' });
+      expect(off).toHaveAttribute('aria-checked', 'false');
+      expect(off).toHaveFocus();
+      expect(screen.queryByLabelText('카드 제목')).not.toBeInTheDocument();
+      expect(screen.getByText('꺼짐 · 입력한 항목 1개 보관 중')).toBeInTheDocument();
+      // 노브 위치는 저장소 공용 스위치(.tm-toggle)가 정한다 — 손으로 만든 트랙을 쓰면 노브가 트랙을 벗어난다.
+      expect(off.querySelector('.tm-toggle')).not.toHaveClass('tm-toggle-on');
+
+      fireEvent.click(off);
+      expect(screen.getByLabelText('카드 제목')).toHaveValue('이번 주 추천');
+      fireEvent.click(screen.getByRole('switch', { name: '홈 오늘의 추천 노출' }));
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+      expect(createMutate.mock.calls[0][0]).toMatchObject({
+        promoHomeEnabled: false,
+        promoHomeTitle: '이번 주 추천',
+        promoListEnabled: false,
+      });
+    });
+
+    it('꺼진 카드에 잘못된 우선순위가 있으면 제출이 막히고 그 카드가 펼쳐져 입력에 포커스한다', () => {
+      renderPage();
+      goToPresentationStep();
+
+      fireEvent.click(screen.getByRole('switch', { name: '대회 목록 상단 노출' }));
+      fireEvent.change(screen.getByLabelText('노출 우선순위'), { target: { value: '-3' } });
+      fireEvent.click(screen.getByRole('switch', { name: '대회 목록 상단 노출' }));
+      expect(screen.queryByLabelText('노출 우선순위')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+      expect(createMutate).not.toHaveBeenCalled();
+      const input = screen.getByLabelText('노출 우선순위');
+      expect(input).toHaveValue(-3);
+      expect(input).toHaveFocus();
+      // 오류로 펼쳐졌어도 스위치는 실제 상태(꺼짐)를 말한다.
+      expect(screen.getByRole('switch', { name: '대회 목록 상단 노출' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+    });
+  });
+
+  describe('단계 전환 시 스크롤·포커스 (#1437)', () => {
+    // 모바일 셸처럼 문서가 아니라 안쪽 컨테이너가 스크롤러다(.tm-scroll-area).
+    const scrollTo = vi.fn();
+    let scroller: HTMLDivElement;
+
+    function renderInScroller() {
+      return render(
+        <Providers>
+          <AdminTournamentsNewPage />
+        </Providers>,
+        { container: scroller },
+      );
+    }
+
+    beforeEach(() => {
+      scrollTo.mockClear();
+      scroller = document.createElement('div');
+      scroller.style.overflowY = 'auto';
+      scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
+      document.body.appendChild(scroller);
+    });
+    afterEach(() => {
+      scroller.remove();
+    });
+
+    it('다음 단계로 넘어가면 스크롤을 맨 위로 올리고 새 단계 제목에 포커스를 둔다', () => {
+      renderInScroller();
+      goToScheduleStep();
+
+      const heading = screen.getByRole('heading', { level: 2, name: /일정/ });
+      expect(heading).toHaveFocus();
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+    });
+
+    it('이전 단계로 돌아가도 새 단계 제목에 포커스를 둔다', () => {
+      renderInScroller();
+      goToScheduleStep();
+      fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+
+      expect(screen.getByRole('heading', { level: 2, name: /기본 정보/ })).toHaveFocus();
+    });
+
+    it('검증에 실패하면 단계는 그대로 두고 첫 오류 필드로 포커스한다', () => {
+      renderInScroller();
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByLabelText(/종목/)).toHaveFocus();
+      expect(scrollTo).not.toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+    });
+
+    it('혼성 정원 그룹 오류는 그 그룹의 첫 입력(남성 최소)에 포커스한다', () => {
+      renderInScroller();
+      goToParticipationStep();
+      fireEvent.change(screen.getByLabelText(/최대 선수 수/), { target: { value: '10' } });
+      fireEvent.change(screen.getByLabelText('남성 최소'), { target: { value: '8' } });
+      fireEvent.change(screen.getByLabelText('여성 최소'), { target: { value: '8' } });
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByText('성별 최소 인원 합이 최대 선수 수를 넘을 수 없어요.')).toBeInTheDocument();
+      expect(screen.getByLabelText('남성 최소')).toHaveFocus();
+    });
+
+    const LIMIT_REQUIRED = '교체 횟수를 제한하려면 허용 횟수를 입력해 주세요.';
+
+    it('교체 "제한"에 횟수를 비우면 오류는 입력칸 아래 한 번만 나오고 그 입력에 포커스한다', () => {
+      renderInScroller();
+      goToParticipationStep();
+      fireEvent.click(screen.getByRole('button', { name: '제한' }));
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getAllByText(LIMIT_REQUIRED)).toHaveLength(1);
+      expect(screen.getByLabelText(/허용 교체 횟수/)).toHaveFocus();
+    });
+
+    it('교체 선택지를 못 불러온 상태에서 "제한"+빈 횟수면 바깥 항목이 오류를 한 번 보여준다', () => {
+      const view = renderInScroller();
+      goToParticipationStep();
+      fireEvent.click(screen.getByRole('button', { name: '제한' }));
+      useV1LineupSizeOptionsMock.mockReturnValue({ data: undefined, isPending: false, isError: true });
+      view.rerender(
+        <Providers>
+          <AdminTournamentsNewPage />
+        </Providers>,
+      );
+      expect(screen.queryByLabelText(/허용 교체 횟수/)).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getAllByText(LIMIT_REQUIRED)).toHaveLength(1);
+    });
+
+    it('일정 단계에서 날짜를 비우고 넘기면 화면 순서상 첫 오류인 대회 시작 입력에 포커스한다', () => {
+      renderInScroller();
+      goToScheduleStep();
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByText('대회 시작 일시를 선택해 주세요.')).toBeInTheDocument();
+      expect(screen.getByLabelText(/대회 시작/)).toHaveFocus();
+    });
+
+    it('종목만 채우고 넘기면 두 번째 오류 필드(대회명)로 포커스한다', () => {
+      renderInScroller();
+      fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
+      fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+
+      expect(screen.getByLabelText(/대회명/)).toHaveFocus();
+    });
   });
 });

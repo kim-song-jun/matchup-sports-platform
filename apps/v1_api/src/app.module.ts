@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { buildPinoHttpOptions } from './common/logging/pino-http.config';
+import { UserMutationLoggingInterceptor } from './common/logging/user-mutation-logging.interceptor';
 import { V1ThrottlerGuard } from './common/guards/v1-throttler.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './auth/auth.module';
@@ -18,6 +19,7 @@ import { PopupsModule } from './popups/popups.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
+import { TeamContactsModule } from './team-contacts/team-contacts.module';
 import { TeamLineupsModule } from './team-lineups/team-lineups.module';
 import { TeamSchedulesModule } from './team-schedules/team-schedules.module';
 import { ChatModule } from './chat/chat.module';
@@ -31,6 +33,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { VerificationModule } from './verification/verification.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { SiteInfoModule } from './site-info/site-info.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
 import { GamesModule } from './games/games.module';
@@ -40,7 +43,7 @@ import { TournamentOperationsStaffModule } from './tournament-operations/staff/t
 import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
 import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
 import { TournamentFixtureVideosModule } from './tournaments/videos/tournament-fixture-videos.module';
-import { TeamMatchSeriesModule } from './team-match-series/team-match-series.module';
+import { LeagueMatchModule } from './league-matches/league-match.module';
 
 @Module({
   imports: [
@@ -64,6 +67,7 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
     NoticesModule,
     TeamsModule,
     TeamMatchesModule,
+    TeamContactsModule,
     TeamLineupsModule,
     TeamSchedulesModule,
     GamesModule,
@@ -77,9 +81,10 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
     ReviewsModule,
     UploadsModule,
     TournamentsModule,
-    TeamMatchSeriesModule,
+    LeagueMatchModule,
     VerificationModule,
     IntegrationsModule,
+    SiteInfoModule,
     LogsModule,
     TournamentFixtureLineupModule,
     TournamentOperationsStaffModule,
@@ -90,6 +95,7 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: UserMutationLoggingInterceptor },
   ],
 })
 export class AppModule {}

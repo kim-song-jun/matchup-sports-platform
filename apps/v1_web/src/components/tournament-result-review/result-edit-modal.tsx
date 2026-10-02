@@ -11,6 +11,10 @@ import type {
 } from '@/hooks/use-tournament-result-review';
 import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
+import { periodLabel } from '@/components/tournament-live/operate/period-label';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 /**
  * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
@@ -49,6 +53,8 @@ export type ResultEditModalProps = {
     mvpParticipantId: string | null;
   };
   sides: readonly TournamentGameSide[];
+  /** Pinned period rows from GET /games/:gameId. New goals may only use these numbers. */
+  periods: readonly { number: number }[];
   /** `GET /games/:gameId/lineups`(`GamesService.listLineups()`)의 라인업 스냅샷 --
    * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
    * `participantLabel`이 알아서 처리한다). */
@@ -67,6 +73,7 @@ export type ResultEditModalProps = {
   errorMessage?: string | null;
   onConfirm: (input: ResultEditSubmitInput) => void;
   onCancel: () => void;
+  presentation?: 'modal' | 'inline';
 };
 
 type EditableParticipant = GameResultParticipantInput;
@@ -128,6 +135,9 @@ function toEditable(record: GameResultParticipantRecord): EditableParticipant {
   return {
     participantId: record.participantId,
     sideId: record.sideId,
+    // Task 163: 명단에 선발 구분이 없다(정본 §3). 화면에서 이 값을 바꿀 방법을 없앴고,
+    // 서버가 준 값을 그대로 되돌려 보낸다 — DTO 필수 필드라 빼면 저장이 400 이고, 여기서
+    // 임의로 true 를 박으면 화면이 서버 데이터를 덮어쓰게 된다.
     started: record.started,
     minutesPlayed: record.minutesPlayed ?? undefined,
     goals: record.goals,
@@ -215,7 +225,7 @@ function toStatValue(rawValue: string): number {
 /**
  * 참가자별 기록 숫자 입력 한 칸. 다섯 칸(득점·어시스트·파울·경고·퇴장)이 같은 마크업을
  * 쓰도록 한 곳에 모았다 -- 새 칸을 붙일 때 라벨 연결이나 터치 타겟을 빠뜨릴 여지를
- * 없앤다. `<label htmlFor>` + `<input id>` 명시 연결(프로젝트 폼 규칙)이고, 터치 타겟은
+ * 없앤다. 라벨은 칸 위에 둬서 라벨 길이가 칸 위치를 밀지 않게 한다(선수 카드는 3열 격자). `<label htmlFor>` + `<input id>` 명시 연결(프로젝트 폼 규칙)이고, 터치 타겟은
  * 44px 다(기존에 이 칸들이 40px 로 규칙에 미달해 있었다 -- 같은 마크업을 건드리는
  * 이번 변경에서 함께 맞춘다).
  */
@@ -227,12 +237,12 @@ function StatNumberField({
 }: {
   id: string;
   label: string;
-  value: number;
+  value: number | null | undefined;
   onValueChange: (next: number) => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <label htmlFor={id} className="tm-text-caption">
+    <div>
+      <label htmlFor={id} className="tm-text-caption" style={{ display: 'block', marginBottom: 2, color: 'var(--text-muted)' }}>
         {label}
       </label>
       <input
@@ -241,8 +251,9 @@ function StatNumberField({
         min={0}
         inputMode="numeric"
         className="tm-input"
-        style={{ width: 56, minHeight: 44 }}
-        value={value}
+        // 클래스가 아니라 인라인이다: `.tm-input` 의 font-size(15px)가 비계층 CSS 라 유틸리티 클래스를 이긴다.
+        style={{ fontSize: 'var(--font-size-input)', minHeight: 44, padding: '0 8px', textAlign: 'center' }}
+        value={value ?? ''}
         onChange={(event) => onValueChange(toStatValue(event.target.value))}
       />
     </div>
@@ -271,12 +282,14 @@ export function ResultEditModal({
   reasonLabel = '사유',
   base,
   sides,
+  periods,
   lineups,
   isKnockoutFixture = false,
   submitting = false,
   errorMessage,
   onConfirm,
   onCancel,
+  presentation = 'modal',
 }: ResultEditModalProps) {
   const idPrefix = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -322,7 +335,7 @@ export function ResultEditModal({
   const [reason, setReason] = useState('');
 
   useEffect(() => {
-    previousFocusRef.current = document.activeElement;
+    if (presentation === 'modal') previousFocusRef.current = document.activeElement;
     const id = setTimeout(() => {
       // Guard against clobbering focus the user (or the focus trap) has
       // already moved into the dialog by the time this fires -- e.g. typing
@@ -335,6 +348,7 @@ export function ResultEditModal({
     }, 60);
     return () => {
       clearTimeout(id);
+      if (presentation === 'inline') return;
       // Restore focus on unmount (WCAG 2.4.3) -- this component is always
       // conditionally rendered by its caller (see the state-initialization
       // comment above), so unmount IS the "closed" transition; there is no
@@ -347,17 +361,11 @@ export function ResultEditModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
+  useOverlayHistory({ open, onClose: onCancel, enabled: presentation !== 'inline' });
+  useTopmostEscape({ open: open && presentation !== 'inline', onEscape: onCancel });
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || presentation === 'inline') return;
     const dialog = dialogRef.current;
     if (!dialog) return;
     const FOCUSABLE =
@@ -380,14 +388,12 @@ export function ResultEditModal({
     };
     document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', trap);
-  }, [open]);
+  }, [open, presentation]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
+    if (presentation === 'inline' || !open) return;
+    return lockBodyScroll();
+  }, [open, presentation]);
 
   const participantNameMap = useMemo(() => buildParticipantNameMap(lineups), [lineups]);
 
@@ -487,7 +493,6 @@ export function ResultEditModal({
           participant.fouls !== original.fouls ||
           participant.cards.yellow !== original.cards.yellow ||
           participant.cards.red !== original.cards.red ||
-          participant.started !== original.started ||
           participant.goalkeeper !== original.goalkeeper ||
           (participant.minutesPlayed ?? null) !== (original.minutesPlayed ?? null)
         );
@@ -519,29 +524,30 @@ export function ResultEditModal({
 
   if (!open) return null;
 
+  const inline = presentation === 'inline';
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'rgba(25,31,40,0.45)' }}
-      onClick={(event) => {
+      className={inline ? 'w-full' : 'fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4'}
+      style={inline ? undefined : { background: 'rgba(25,31,40,0.45)' }}
+      onClick={inline ? undefined : (event) => {
         if (event.target === event.currentTarget) onCancel();
       }}
     >
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+        role={inline ? 'region' : 'dialog'}
+        aria-modal={inline ? undefined : true}
         aria-labelledby={`${idPrefix}-title`}
         aria-describedby={`${idPrefix}-message`}
-        className="w-full max-w-[560px] rounded-2xl overflow-hidden"
+        className={inline ? 'w-full rounded-xl overflow-hidden border border-[var(--border)]' : 'w-full max-w-[560px] rounded-2xl overflow-hidden'}
         style={{
           background: 'var(--surface, #fff)',
-          boxShadow: '0 8px 32px rgba(20,28,45,0.14)',
-          maxHeight: '90vh',
+          boxShadow: inline ? undefined : '0 8px 32px rgba(20,28,45,0.14)',
+          maxHeight: inline ? undefined : '90vh',
           display: 'flex',
           flexDirection: 'column',
         }}
-        onClick={(event) => event.stopPropagation()}
+        onClick={inline ? undefined : (event) => event.stopPropagation()}
       >
         <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
           <p id={`${idPrefix}-title`} className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 8 }}>
@@ -555,7 +561,7 @@ export function ResultEditModal({
         <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 20 }}>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`${idPrefix}-home`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+              <label htmlFor={`${idPrefix}-home`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
                 홈 점수
               </label>
               <input
@@ -572,7 +578,7 @@ export function ResultEditModal({
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label htmlFor={`${idPrefix}-away`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+              <label htmlFor={`${idPrefix}-away`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
                 원정 점수
               </label>
               <input
@@ -621,18 +627,18 @@ export function ResultEditModal({
 
           {penaltiesAllowed ? (
             <section className="tm-card" style={{ padding: 12, marginBottom: 20 }}>
-              <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 10 }}>
+              <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 12 }}>
                 승부차기 결과
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
                 <StatNumberField id={`${idPrefix}-penalty-home`} label="홈 성공" value={penaltyHome} onValueChange={setPenaltyHome} />
                 <StatNumberField id={`${idPrefix}-penalty-away`} label="원정 성공" value={penaltyAway} onValueChange={setPenaltyAway} />
               </div>
               <fieldset style={{ marginTop: 12 }}>
-                <legend className="tm-text-caption" style={{ marginBottom: 6 }}>먼저 차는 팀</legend>
+                <legend className="tm-text-caption" style={{ marginBottom: 8 }}>먼저 차는 팀</legend>
                 <div style={{ display: 'flex', gap: 16 }}>
                   {(['HOME', 'AWAY'] as const).map((sideKey) => (
-                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>
                       <input type="radio" name={`${idPrefix}-first-kick`} checked={firstKickSideKey === sideKey} onChange={() => setFirstKickSideKey(sideKey)} />
                       {sideKey === 'HOME' ? '홈' : '원정'}
                     </label>
@@ -660,7 +666,7 @@ export function ResultEditModal({
                       sideId: scoringSide.id,
                       anonymous: true,
                       minute: 0,
-                      period: 1,
+                      ...(periods[0] ? { period: periods[0].number } : {}),
                       ownGoal: false,
                     },
                   ]);
@@ -669,16 +675,19 @@ export function ResultEditModal({
                 득점 추가
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {goalEvents.map((goal, index) => (
                 <div key={goal.id} className="tm-card" style={{ padding: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(88px, 0.8fr) minmax(120px, 1.4fr) 76px 86px', gap: 8 }}>
-                    <select
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(88px,0.8fr)_minmax(120px,1.4fr)_76px_86px]">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-side`}>득점 팀</label>
+                      <select
+                      id={`${idPrefix}-goal-${index}-side`}
                       aria-label={`${index + 1}번째 득점 팀`}
-                      className="tm-input"
-                      value={goal.sideId}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                        className="tm-input"
+                        value={goal.sideId}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
@@ -687,17 +696,21 @@ export function ResultEditModal({
                                 anonymous: true,
                               }
                             : item,
-                        ))
-                      }
-                    >
-                      {sides.map((side) => <option key={side.id} value={side.id}>{sideLabel(sides, side.id)}</option>)}
-                    </select>
-                    <select
+                          ))
+                        }
+                      >
+                        {sides.map((side) => <option key={side.id} value={side.id}>{sideLabel(sides, side.id)}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-participant`}>득점 선수</label>
+                      <select
+                      id={`${idPrefix}-goal-${index}-participant`}
                       aria-label={`${index + 1}번째 득점 선수`}
-                      className="tm-input"
-                      value={goal.participantId ?? ''}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                        className="tm-input"
+                        value={goal.participantId ?? ''}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
@@ -705,22 +718,26 @@ export function ResultEditModal({
                                 anonymous: event.target.value ? undefined : true,
                               }
                             : item,
-                        ))
-                      }
-                    >
-                      <option value="">익명</option>
+                          ))
+                        }
+                      >
+                        <option value="">익명</option>
                       {participants.filter((participant) => participantFitsGoal(goal, participant)).map((participant) => (
                         <option key={participant.participantId} value={participant.participantId}>
                           {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
                         </option>
                       ))}
-                    </select>
-                    <select
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-type`}>득점 유형</label>
+                      <select
+                      id={`${idPrefix}-goal-${index}-type`}
                       aria-label={`${index + 1}번째 득점 유형`}
-                      className="tm-input"
-                      value={goal.ownGoal ? 'OWN_GOAL' : 'GOAL'}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                        className="tm-input"
+                        value={goal.ownGoal ? 'OWN_GOAL' : 'GOAL'}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
@@ -729,26 +746,59 @@ export function ResultEditModal({
                                 anonymous: true,
                               }
                             : item,
-                        ))
-                      }
-                    >
-                      <option value="GOAL">골</option>
-                      <option value="OWN_GOAL">자책골</option>
-                    </select>
-                    <input
-                      aria-label={`${index + 1}번째 득점 분`}
-                      type="number"
-                      min={0}
-                      className="tm-input"
-                      value={goal.minute ?? 0}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, minute: toStatValue(event.target.value) } : item,
-                        ))
-                      }
-                    />
+                          ))
+                        }
+                      >
+                        <option value="GOAL">골</option>
+                        <option value="OWN_GOAL">자책골</option>
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-minute`}>득점 시간(분)</label>
+                      <input
+                      id={`${idPrefix}-goal-${index}-minute`}
+                      aria-label={`${index + 1}번째 득점 시간(분)`}
+                        type="number"
+                        min={0}
+                        className="tm-input"
+                        value={goal.minute ?? 0}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, minute: toStatValue(event.target.value) } : item,
+                          ))
+                        }
+                      />
+                    </div>
+                    <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>피리어드</label>
+                      <select
+                        id={`${idPrefix}-goal-${index}-period`}
+                        aria-label={`${index + 1}번째 득점 피리어드`}
+                        className="tm-input"
+                        value={goal.period ?? ''}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  ...(event.target.value
+                                    ? { period: Number(event.target.value) }
+                                    : { period: undefined }),
+                                }
+                              : item,
+                          ))
+                        }
+                      >
+                        <option value="">선택 안 함</option>
+                        {periods.map((period) => (
+                          <option key={period.number} value={period.number}>
+                            {periodLabel(period.number)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={index === 0} onClick={() => {
                       const next = [...goalEvents];
                       [next[index - 1], next[index]] = [next[index], next[index - 1]];
@@ -759,7 +809,7 @@ export function ResultEditModal({
                       [next[index], next[index + 1]] = [next[index + 1], next[index]];
                       replaceGoalEvents(next);
                     }}>아래로</button>
-                    <button type="button" className="tm-btn tm-btn-sm tm-btn-danger" onClick={() => replaceGoalEvents(goalEvents.filter((_, itemIndex) => itemIndex !== index))}>
+                    <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" style={{ color: 'var(--red700)' }} onClick={() => replaceGoalEvents(goalEvents.filter((_, itemIndex) => itemIndex !== index))}>
                       삭제
                     </button>
                   </div>
@@ -774,13 +824,13 @@ export function ResultEditModal({
           <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 8 }}>
             참가자별 기록
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             {participants.map((participant, index) => (
-              <div key={participant.participantId} className="tm-card" style={{ padding: 12 }}>
-                <p className="tm-text-caption" style={{ fontWeight: 600, marginBottom: 8 }}>
+              <fieldset key={participant.participantId} className="tm-card" style={{ padding: 12, margin: 0, minWidth: 0 }}>
+                <legend className="tm-text-caption" style={{ fontWeight: 600, padding: '0 4px' }}>
                   {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                </legend>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px 8px' }}>
                   <StatNumberField
                     id={`${idPrefix}-p${index}-goals`}
                     label="득점"
@@ -803,6 +853,12 @@ export function ResultEditModal({
                     onValueChange={(fouls) => updateParticipant(index, { fouls })}
                   />
                   <StatNumberField
+                    id={`${idPrefix}-p${index}-minutes`}
+                    label="출전(분)"
+                    value={participant.minutesPlayed}
+                    onValueChange={(minutesPlayed) => updateParticipant(index, { minutesPlayed })}
+                  />
+                  <StatNumberField
                     id={`${idPrefix}-p${index}-yellow`}
                     label="경고"
                     value={participant.cards.yellow}
@@ -816,24 +872,16 @@ export function ResultEditModal({
                     value={participant.cards.red}
                     onValueChange={(red) => updateParticipant(index, { cards: { ...participant.cards, red } })}
                   />
-                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input
-                      type="checkbox"
-                      checked={participant.started}
-                      onChange={(event) => updateParticipant(index, { started: event.target.checked })}
-                    />
-                    선발
-                  </label>
-                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input
-                      type="checkbox"
-                      checked={participant.goalkeeper}
-                      onChange={(event) => updateParticipant(index, { goalkeeper: event.target.checked })}
-                    />
-                    골키퍼
-                  </label>
                 </div>
-              </div>
+                <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 44 }}>
+                  <input
+                    type="checkbox"
+                    checked={participant.goalkeeper}
+                    onChange={(event) => updateParticipant(index, { goalkeeper: event.target.checked })}
+                  />
+                  골키퍼
+                </label>
+              </fieldset>
             ))}
           </div>
 
@@ -844,7 +892,7 @@ export function ResultEditModal({
           ) : null}
 
           <div style={{ marginBottom: 20 }}>
-            <label htmlFor={`${idPrefix}-mvp`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+            <label htmlFor={`${idPrefix}-mvp`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
               MVP (선택)
             </label>
             <select
@@ -864,7 +912,7 @@ export function ResultEditModal({
           </div>
 
           <div>
-            <label htmlFor={`${idPrefix}-reason`} className="tm-text-label" style={{ display: 'block', marginBottom: 6 }}>
+            <label htmlFor={`${idPrefix}-reason`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
               {reasonLabel}
             </label>
             <textarea

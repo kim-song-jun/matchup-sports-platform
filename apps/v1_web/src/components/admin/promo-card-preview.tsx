@@ -9,7 +9,7 @@ import { cssUrl } from '@/lib/assets';
  * 대회 홍보 카드(홈 오늘의 추천 / 대회 목록 상단) 어드민 폼 라이브 미리보기.
  *
  * 실제 노출 위치 — `components/home/tournament-hero-card.tsx`(홈),
- * `app/tournaments/page.tsx`의 상단 배너(목록) — 와 **동일한 마크업·클래스·인라인
+ * `app/tournaments/tournaments-list-client.tsx`의 상단 배너(목록) — 와 **동일한 마크업·클래스·인라인
  * 스타일**을 그대로 재사용한다. 폼 값이 바뀌면(이미지 업로드 포함) 이 컴포넌트가
  * 그 즉시 다시 렌더되므로, 관리자가 저장 전에 실제로 어떻게 보일지 확인할 수 있다.
  * 값이 비어 있을 때의 폴백 문구(대회명/장소/종목명 등)도 프로덕션 로직과 동일하게 계산한다.
@@ -57,7 +57,7 @@ export function PromoHomePreview({ fields, fallback }: { fields: PromoPreviewFie
     <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       <div
         className="tm-featured-media"
-        style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
+        style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'var(--brand-hero-gradient)' }}
       >
         {!imageUrl ? (
           <div
@@ -95,7 +95,7 @@ export function PromoHomePreview({ fields, fallback }: { fields: PromoPreviewFie
   );
 }
 
-/** /tournaments 목록 상단 추천 배너 미리보기 — app/tournaments/page.tsx 배너와 동일 마크업 */
+/** /tournaments 목록 상단 추천 배너 미리보기 — app/tournaments/tournaments-list-client.tsx 배너와 동일 마크업 */
 export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFields; fallback: PromoPreviewFallback }) {
   const featuredTitle = trimmedOrNull(fields.title) ?? fallback.title;
   const featuredSubtitle = trimmedOrNull(fields.subtitle) ?? '';
@@ -118,9 +118,9 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
       style={{
         display: 'flex',
         flexDirection: 'column',
-        padding: '18px 20px',
-        borderRadius: 16,
-        background: imageUrl ? `${cssUrl(imageUrl)} center 62%/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+        padding: '20px 20px',
+        borderRadius: 'var(--radius-container)',
+        background: imageUrl ? `${cssUrl(imageUrl)} center 62%/cover` : 'var(--brand-hero-gradient)',
         color: 'var(--static-white)',
         position: 'relative',
         overflow: 'hidden',
@@ -129,13 +129,13 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
       {imageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 'var(--radius-pill)', background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
             <Trophy size={12} strokeWidth={2} aria-hidden="true" />
             {featuredBadge}
           </span>
           <div className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 12 }}>{featuredTitle}</div>
           {featuredSubtitle ? (
-            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 6 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 8 }}>
               {featuredSubtitle}
             </div>
           ) : null}
@@ -149,7 +149,7 @@ export function PromoListPreview({ fields, fallback }: { fields: PromoPreviewFie
           {featuredPrizeText ? (
             <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
           ) : null}
-          <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
+          <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 'var(--radius-pill)', padding: '8px 16px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
         </div>
       </div>
     </div>

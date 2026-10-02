@@ -87,6 +87,30 @@ describe('rich content contract', () => {
     });
   });
 
+  it('collapses trailing spaces and tabs before newlines the same way as before', () => {
+    const result = normalizeRichContent(undefined, '첫 줄 \t\n둘째 줄\t \t\n다음 줄');
+    expect(result.plainText).toBe('첫 줄\n둘째 줄\n다음 줄');
+  });
+
+  it('stays fast on a pathological run of tabs with no matching newline (ReDoS regression)', () => {
+    // MAX_TEXT_LENGTH caps a single text node at 10,000 chars, so a leading char + 9,998 tabs +
+    // a mismatching trailing char is the worst case a caller can actually submit; the polynomial
+    // regex this guards against previously took 1.5s+ on 50,000 tabs, so 100ms is a generous
+    // ceiling. A visible character on both ends (instead of an all-tab string) survives the
+    // final `.trim()` so the assertion below can check the tab run wasn't touched either.
+    const tabs = '\t'.repeat(9_998);
+    const pathological = `가${tabs}x`;
+    const started = performance.now();
+    const result = normalizeRichContent({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: pathological }] }],
+    });
+    const elapsedMs = performance.now() - started;
+
+    expect(result.plainText).toBe(pathological);
+    expect(elapsedMs).toBeLessThan(100);
+  });
+
   it.each(['jpg', 'jpeg', 'png', 'webp'])('accepts a managed %s image URL', (extension) => {
     const image = managedImage(1, extension);
     const result = normalizeRichContent({ type: 'doc', content: [image] });

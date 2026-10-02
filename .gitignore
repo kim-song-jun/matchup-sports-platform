@@ -56,9 +56,15 @@ redis_data/
 # Prisma (migrations tracked — required for production deploy)
 v1_before_team_chat_migration.sql
 
-# Capacitor
-apps/web/ios/
-apps/web/android/
+# iOS native shell (apps/v1_ios) — project.yml is the source of truth, the
+# Xcode project and the version xcconfig are generated build outputs.
+apps/v1_ios/*.xcodeproj/
+apps/v1_ios/*.xcworkspace/
+apps/v1_ios/Config/Version.generated.xcconfig
+apps/v1_ios/Generated-Info.plist
+apps/v1_ios/TeameetTests-Info.plist
+apps/v1_ios/DerivedData/
+apps/v1_ios/GoogleService-Info.plist
 
 # Build
 out/
@@ -69,18 +75,11 @@ coverage/
 infra/load/tokens.txt
 
 # E2E screenshot binaries and transient queue state
-e2e/scenarios/screenshots/
-e2e/scenarios/queue/
-screenshots/scenarios/**/*.png
-screenshots/scenarios/**/*.jpg
-screenshots/scenarios/**/*.jpeg
-screenshots/scenarios/**/*.webp
-ultraplan/runs/e2e-analyzer*/
 .claude/worktrees/
 
-# autoqa runtime artifacts
-.autoqa/runs/
-.autoqa/cookies/
-.autoqa/cron/*.log
-.autoqa/cron/autoqa.installed.crontab
-.autoqa/.lock.nnn
+# Capture/QA output dirs. Rooted on purpose: an unanchored "screenshots/"
+# would also hide docs/screenshots/ and apps/v1_web/public/screenshots/.
+/screenshots/
+/.screenshots/
+/docs/visual-qa/*
+!/docs/visual-qa/manual-v2/

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
+import type { GameActorRole as FullGameActorRole, GamePeriod } from '@/types/game-operations';
 import type {
   V1GameResultCards,
   V1GameResultGoalEventInput,
@@ -52,11 +53,19 @@ export type TournamentStaffActorRole =
   | 'field_operator'
   | 'support_readonly';
 
-/** `GamesService.getGame()`'s `actorRole` also covers team-match actors; a
- * tournament-fixture game (the only kind this lane ever reads) only ever
- * resolves to one of `TournamentStaffActorRole` -- see
- * `GamesService.resolveActor()`'s `TOURNAMENT_FIXTURE` branch. */
-export type GameActorRole = TournamentStaffActorRole;
+/**
+ * **이 레인은 더 이상 대회 픽스처만 읽지 않는다.**
+ *
+ * 예전 주석은 "tournament-fixture game (the only kind this lane ever reads)" 라고 적고
+ * 그래서 `TournamentStaffActorRole` 로 좁혀도 안전하다고 했다. **정본이 "리그도 같은 콘솔"
+ * 로 확정하면서 그 전제가 깨졌다** — 이제 리그 대진(팀매치 소스)도 이 화면을 지나고, 그때
+ * `actorRole` 은 `team_owner`·`team_manager`·`opponent_manager` 가 될 수 있다.
+ *
+ * 좁은 타입을 그대로 두면 **라벨 맵에 없는 키가 들어와** 화면에 `undefined` 가 찍힌다
+ * (2026-09-06 alpha 실측: "종료 · undefined"). 넓혀 두면 `Record<GameActorRole, string>`
+ * 이 **누락을 tsc 가 잡는다.**
+ */
+export type GameActorRole = FullGameActorRole;
 
 export type GameResultRevisionState = V1GameResultRevisionState;
 
@@ -122,6 +131,8 @@ export type TournamentGameDetail = {
   competitionConfigVersionId: string;
   currentOfficialRevisionId: string | null;
   sides: TournamentGameSide[];
+  /** Pinned periods returned by GET /games/:gameId; result editing must use these numbers. */
+  periods: Pick<GamePeriod, 'number'>[];
   actorRole: GameActorRole;
   /**
    * `V1TournamentGroup.phase !== 'group'` -- 서버가 `GET /games/:gameId` 응답에
@@ -136,16 +147,24 @@ export type TournamentGameDetail = {
   isKnockoutFixture: boolean;
 };
 
-export type TournamentOperationsBoardWarning =
-  | 'NO_FIELD_ASSIGNED'
-  | 'MISSING_SCORER'
-  | 'RESULT_REVIEW_OVERDUE';
+/** 안정 스냅샷에 실리는 경고. `RESULT_REVIEW_OVERDUE` 는 시계 의존이라 `liveWarnings` 로 온다. */
+export type TournamentOperationsBoardWarning = 'NO_FIELD_ASSIGNED' | 'MISSING_SCORER';
 
 export type TournamentOperationsBoardItem = {
   fixtureId: string;
   tournamentId: string;
-  round: string;
-  fixtureNumber: number;
+  /**
+   * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축의 컬럼이고 `V1TeamMatch` 에는
+   * **존재하지 않는다** — 서버가 리그 행에 명시적으로 `null` 을 넣는다. 여기를 non-null 로
+   * 두면 **타입이 거짓말을 하고**, 모든 소비처가 널 체크를 요구받지 않아 템플릿 리터럴에
+   * 그대로 들어가 화면에 `"null번 경기"` 가 찍힌다(tsc·테스트·CI 는 전부 green 이었다).
+   */
+  round: string | null;
+  fixtureNumber: number | null;
+  /** 차수(결선 2차전이면 2). 리그 행은 `null`. */
+  legNumber: number | null;
+  /** 조에 속하지 않은 경기(결선)와 리그 행은 `null`. */
+  groupName: string | null;
   gameId: string | null;
   gameState: string | null;
   fieldId: string | null;
@@ -181,6 +200,29 @@ const resultReviewKeys = {
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 /**
+ * 보드 API 한 페이지 상한(100)에서 멈추면 101번째 경기부터 검토·정정 목록과 `?fixtureId=` 딥링크에서
+ * 사라져 어드민이 그 결과를 고칠 수 없다 — 다음 커서가 없을 때까지 읽어 한 목록으로 합친다.
+ */
+async function fetchAllEndedFixtures(tournamentId: string): Promise<TournamentOperationsBoardResponse> {
+  const path = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`;
+  const items: TournamentOperationsBoardItem[] = [];
+  const liveWarnings: TournamentOperationsBoardResponse['liveWarnings'] = [];
+  let cursor: string | null = null;
+  let page: TournamentOperationsBoardResponse;
+  do {
+    page = await v1Get<TournamentOperationsBoardResponse>(path, {
+      status: 'ENDED',
+      limit: 100,
+      ...(cursor === null ? {} : { cursor }),
+    });
+    items.push(...page.items);
+    liveWarnings.push(...page.liveWarnings);
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+  return { ...page, items, liveWarnings, nextCursor: null };
+}
+
+/**
  * Ended fixtures for a tournament, via the Task 18 operations board
  * (`GET /tournament-ops/tournaments/:tournamentId/operations?status=ENDED`).
  * A "review" candidate is `gameState === 'ENDED' && revisionId === null`
@@ -192,11 +234,7 @@ const resultReviewKeys = {
 export function useTournamentEndedFixtures(tournamentId: string) {
   return useQuery({
     queryKey: resultReviewKeys.board(tournamentId, 'ENDED'),
-    queryFn: () =>
-      v1Get<TournamentOperationsBoardResponse>(
-        `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`,
-        { status: 'ENDED', limit: 100 },
-      ),
+    queryFn: () => fetchAllEndedFixtures(tournamentId),
     enabled: Boolean(tournamentId),
     staleTime: 15_000,
   });
@@ -296,32 +334,6 @@ export async function computeProjectionPreviewHash(input: {
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export type ReviewResultDecisionInput = {
-  revisionId: string;
-  expectedVersion: number;
-  decision: 'reject' | 'request_supplement';
-  reason: string;
-};
-
-/** `POST /games/:gameId/result-revisions/:revisionId/review-decision` --
- * tournament_director/platform_ops only (enforced server-side); reject and
- * request_supplement are both terminal for the target revision. */
-export function useReviewResultDecision(gameId: string, tournamentId?: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ReviewResultDecisionInput) =>
-      postGameCommand<GameRevisionMutationResult>(
-        `/games/${encodeURIComponent(gameId)}/result-revisions/${encodeURIComponent(input.revisionId)}/review-decision`,
-        {
-          expectedVersion: input.expectedVersion,
-          decision: input.decision,
-          reason: input.reason,
-        },
-      ),
-    onSuccess: () => invalidateGame(queryClient, gameId, tournamentId),
-  });
-}
-
 export type SupersedeAndSubmitInput = {
   revisionId: string;
   expectedVersion: number;
@@ -334,7 +346,7 @@ export type SupersedeAndSubmitInput = {
 };
 
 /** `POST /games/:gameId/result-revisions/:revisionId/supersede-and-submit` --
- * base revision must be `REJECTED`/`SUPPLEMENT_REQUESTED` (server-enforced,
+ * base revision must be `SUBMITTED` (server-enforced,
  * `409 RESULT_RESUBMISSION_NOT_ALLOWED` otherwise); creates+submits a fresh
  * successor atomically with a new review SLA. */
 export function useSupersedeAndSubmitResult(gameId: string, tournamentId?: string) {

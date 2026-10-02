@@ -34,6 +34,8 @@ export type TournamentStaffPrincipal = {
   readonly authorizationSubject: string;
   readonly assignmentId: string | null;
   readonly assignmentVersion: number | null;
+  /** The lease selected for this decision; null means non-expiring platform access. */
+  readonly expiresAt: Date | null;
 };
 
 export type TournamentStaffRuntimeDenialReason =
@@ -49,8 +51,16 @@ type AssignmentRecord = {
   readonly createdAt: Date;
   readonly expiresAt: Date | null;
   readonly revokedAt: Date | null;
-  readonly fixtureScopes: readonly { readonly fixtureId: string }[];
+  readonly fixtureScopes: readonly {
+    readonly teamMatchId: string | null;
+  }[];
 };
+
+function scopeIdentifier(scope: { readonly teamMatchId: string | null }): string {
+  const id = scope.teamMatchId;
+  if (id === null) throw new Error('STAFF_SCOPE_SOURCE_MISSING');
+  return id;
+}
 
 @Injectable()
 export class TournamentStaffAccessService {
@@ -124,6 +134,7 @@ export class TournamentStaffAccessService {
         authorizationSubject: `platform_ops:${input.userId}@${admin.updatedAt.getTime()}`,
         assignmentId: null,
         assignmentVersion: null,
+        expiresAt: null,
       });
     }
 
@@ -142,7 +153,7 @@ export class TournamentStaffAccessService {
           createdAt: true,
           expiresAt: true,
           revokedAt: true,
-          fixtureScopes: { select: { fixtureId: true } },
+          fixtureScopes: { select: { teamMatchId: true } },
         },
       });
 
@@ -173,7 +184,7 @@ export class TournamentStaffAccessService {
           startsAt: assignment.createdAt.toISOString(),
           expiresAt: assignment.expiresAt?.toISOString() ?? null,
           revokedAt: assignment.revokedAt?.toISOString() ?? null,
-          fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+          fixtureIds: assignment.fixtureScopes.map(scopeIdentifier),
           ...(assignment.fieldId === null ? {} : { fieldId: assignment.fieldId }),
         },
       });
@@ -183,6 +194,7 @@ export class TournamentStaffAccessService {
           authorizationSubject: `assignment:${assignment.id}@${assignment.version}`,
           assignmentId: assignment.id,
           assignmentVersion: assignment.version,
+          expiresAt: assignment.expiresAt,
         });
       }
       denialReason = decision.reason;
@@ -215,6 +227,7 @@ export class TournamentStaffAccessService {
     authority: Pick<
       TournamentStaffPrincipal,
       'role' | 'authorizationSubject' | 'assignmentId' | 'assignmentVersion'
+      | 'expiresAt'
     >,
   ): TournamentStaffPrincipal {
     return {
@@ -226,6 +239,7 @@ export class TournamentStaffAccessService {
       authorizationSubject: authority.authorizationSubject,
       assignmentId: authority.assignmentId,
       assignmentVersion: authority.assignmentVersion,
+      expiresAt: authority.expiresAt,
     };
   }
 

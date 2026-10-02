@@ -127,8 +127,14 @@ export class GameResultParticipantDto {
   @IsUUID()
   sideId!: string;
 
+  /**
+   * @deprecated **더 이상 읽지 않는다**(정본 §3). 명단 = 출전자이므로 결과 리비전은
+   * 출전자를 전부 `started: true` 로 기록한다. optional 로 남긴 이유는 옛 클라이언트가
+   * 보내도 400 을 내지 않기 위해서다 — 값은 저장 경로에서 무시된다.
+   */
+  @IsOptional()
   @IsBoolean()
-  started!: boolean;
+  started?: boolean;
 
   @IsOptional()
   @Type(() => Number)

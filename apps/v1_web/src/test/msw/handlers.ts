@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { SharedRecord } from '@/hooks/use-team-match-record';
 import {
   getSignupProfileIssue,
   SIGNUP_PROFILE_ERROR_MESSAGES,
@@ -25,6 +26,7 @@ import type {
   V1GrantTournamentStaffPayload,
   V1Inquiry,
   V1SetScheduleAttendanceDto,
+  V1MyTeamMatch,
   V1TeamMatchLineup,
   V1TeamMatchLineupSavePayload,
   V1TeamScheduleDetail,
@@ -55,17 +57,28 @@ import {
   v1ReviewsReceivedFixture,
   v1ReviewsWrittenFixture,
   v1ReviewSubmitFixture,
+  v1ReportedTeamsFixture,
+  v1ReportedTeamsWindowDays,
   v1ReviewTeamMatchSourceFixture,
   v1SettingsFixture,
   v1SportsFixture,
   v1TeamMatchesFixture,
+  v1TeamCompetitionEntriesFixture,
   v1TeamsFixture,
   v1UserFixture,
+  getReportedTeamIdForInquiry,
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
+import { v1GameRosterMswHandlers } from './game-roster-handlers';
+import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
+import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 
 const api = '*/api/v1';
+
+// `/admin/inquiries/:inquiryId/block-reported-team` 멱등 상태 — 같은 문의를 두 번 차단해도
+// 두 번째부터는 alreadyBlocked: true 로 200 이 온다(에러 아님, admin.service.ts 실측).
+const blockedInquiryIds = new Set<string>();
 
 type RegisterField = SignupProfileField | 'nickname' | 'email' | 'password' | 'requiredTermsAccepted';
 
@@ -191,6 +204,7 @@ function teamDetail(teamId: string) {
       disabledReason: null,
       manageRoute: null,
     },
+    dissolution: null,
   };
 }
 
@@ -213,6 +227,7 @@ let v1ScheduleFixture = {
   state: 'SCHEDULED' as 'SCHEDULED' | 'CANCELLED' | 'COMPLETED',
   version: 1,
   teamMatchId: null as string | null,
+  linkedMatch: null as { teamMatchId: string; tournamentId: string | null; leagueId: string | null } | null,
   matchConfirmed: null as boolean | null,
   cancelReason: null as string | null,
   cancelledAt: null as string | null,
@@ -271,6 +286,7 @@ function scheduleSummary() {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    linkedMatch: v1ScheduleFixture.linkedMatch,
     matchConfirmed: v1ScheduleFixture.matchConfirmed,
     goingCount: v1ScheduleAttendanceCounts.going,
     waitlistedCount: v1ScheduleAttendanceCounts.waitlisted,
@@ -334,7 +350,7 @@ let v1GameFixture = {
     { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },
   ],
   periods: [] as unknown[],
-  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null }[],
+  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null; invalidatedAt: string | null }[],
   actorRole: 'team_owner',
 };
 
@@ -348,14 +364,23 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   lineupId: 'lineup-1',
   revision: 1,
   state: 'DRAFT',
+  editable: true,
+  lockReason: null,
+  lateAdditionAllowed: false,
+  ownTeamName: '홈 FC',
+  opponent: { teamName: '원정 FC', submitted: false, published: false, participantCount: null },
   version: 1,
   formation: '2-2',
   publicLineupAt: null,
   starters: [
-    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
-    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+    { id: 'participant-1', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
+    { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
   ],
   bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
+  eligibleMembers: [
+    { userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, attending: true, rsvpStatus: null, alsoOpponentMember: false },
+    { userId: 'user-2', displayName: '박서준', jerseyNumber: 1, attending: true, rsvpStatus: null, alsoOpponentMember: true },
+  ],
 };
 
 // ── Tournament operations mock state (Task 18/19 backend, Task 19 frontend) ─
@@ -365,6 +390,8 @@ let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
     tournamentId: 'tournament-1',
     round: '8강',
     fixtureNumber: 1,
+    legNumber: 1,
+    groupName: null,
     gameId: 'game-1',
     gameState: 'SCHEDULED',
     fieldId: 'field-1',
@@ -373,6 +400,7 @@ let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
     awayRegistrationId: 'registration-2',
     scheduledAt: '2026-05-25T09:00:00.000Z',
     currentScore: null,
+    currentRevisionState: null,
     warnings: [],
     version: 1,
     revisionId: null,
@@ -404,6 +432,9 @@ const v1TournamentFields = [
 ];
 
 export const v1MswHandlers = [
+  ...v1GameRosterMswHandlers,
+  ...v1TeamDissolutionMswHandlers,
+  ...v1TeamInviteLinkMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {
@@ -467,6 +498,7 @@ export const v1MswHandlers = [
     const inquiry: V1Inquiry = {
       inquiryId: `inquiry-${v1InquiriesFixture.items.length + 1}`,
       category: body.category as V1Inquiry['category'],
+      reportReason: null,
       title: body.title,
       body: body.body,
       contact: body.contact ?? null,
@@ -505,7 +537,10 @@ export const v1MswHandlers = [
       : teamsBySport;
     return ok(page(teams));
   }),
+  http.get(`${api}/teams/name-availability`, () => ok({ available: true })),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
+  http.get(`${api}/teams/:teamId/competition-entries`, ({ params }) =>
+    ok({ ...v1TeamCompetitionEntriesFixture, teamId: String(params.teamId) })),
   http.get(`${api}/teams/:teamId/members`, () => ok({
     items: [
       {
@@ -545,6 +580,33 @@ export const v1MswHandlers = [
     pageInfo: { nextCursor: null, hasNext: false },
   })),
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
+  http.get(`${api}/me/team-matches`, ({ request }) => {
+    const scope = new URL(request.url).searchParams.get('scope');
+    const items = v1TeamMatchesFixture.map((item) => {
+      const teamMatchId = item.id;
+      const createdByMe = scope === 'created';
+
+      return {
+        teamMatchId,
+        title: item.title,
+        sportName: item.sport?.name ?? item.sportName ?? '종목 미정',
+        startsAt: item.startsAt,
+        deadlineAt: null,
+        status: 'recruiting',
+        displayState: 'recruiting',
+        isLive: false,
+        relation: createdByMe ? 'created_by_me' : 'approved',
+        teamId: item.hostTeamId ?? null,
+        teamName: item.hostTeam?.name ?? item.hostTeamName ?? null,
+        applicationId: createdByMe ? null : 'team-match-application-1',
+        league: item.league ?? null,
+        manageRoute: createdByMe ? `/team-matches/${teamMatchId}` : null,
+        detailRoute: `/team-matches/${teamMatchId}`,
+      } satisfies V1MyTeamMatch;
+    });
+
+    return ok(page(items));
+  }),
   http.get(`${api}/team-matches`, ({ request }) => {
     const sportId = new URL(request.url).searchParams.get('sportId');
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
@@ -566,6 +628,7 @@ export const v1MswHandlers = [
       roomType: room.roomType,
       status: room.status,
       title: room.title,
+      teamContact: room.teamContact,
       linkedTarget: room.linkedTarget,
       me: {
         participantId: 'chat-participant-1',
@@ -582,12 +645,29 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/chat/rooms/:roomId/messages`, ({ params }) => ok(v1ChatMessagesByRoomFixture[String(params.roomId)] ?? v1ChatMessagesFixture)),
   http.post(`${api}/chat/rooms/:roomId/messages`, async ({ params, request }) => {
-    const body = await request.json() as { content?: string };
+    const body = await request.json() as { content?: string; imageUrl?: string; share?: { kind: 'team_schedule' | 'match'; targetId: string }; fileId?: string };
     const sentAt = new Date().toISOString();
+    // 사진 메시지(Task 181)는 서버처럼 body '사진' + imageUrl 로 싣는다.
     const message = {
       messageId: `message-${Date.now()}`,
       sender: { userId: 'user-1', displayName: '나', profileImageUrl: null },
-      content: body.content ?? '',
+      messageType: body.imageUrl ? 'image' as const : body.share ? 'share' as const : body.fileId ? 'file' as const : 'text' as const,
+      content: body.imageUrl ? '사진' : body.share ? '[공유] 공유한 항목' : body.fileId ? '[파일] 첨부 파일' : body.content ?? '',
+      // 파일(Task 181 ③)은 서버처럼 이름·크기만 싣는다(목 서버는 업로드 내용을 모르니 고정값).
+      file: body.fileId ? { name: '첨부 파일', size: 0, mimeType: 'application/octet-stream' } : null,
+      imageUrl: body.imageUrl ?? null,
+      // 일정·매치 공유(Task 181 ②)는 서버처럼 스냅숏 카드를 싣는다(목 서버는 제목을 모르니 고정 문구).
+      shareCard: body.share
+        ? {
+            kind: body.share.kind,
+            targetId: body.share.targetId,
+            title: '공유한 항목',
+            startAt: null,
+            place: null,
+            sub: null,
+            route: body.share.kind === 'match' ? `/matches/${body.share.targetId}` : `/team-matches/${body.share.targetId}`,
+          }
+        : null,
       status: 'sent',
       sentAt,
       mine: true,
@@ -599,8 +679,10 @@ export const v1MswHandlers = [
       room.lastMessage = { messageId: message.messageId, contentPreview: `나: ${message.content}`, sentAt };
       room.unreadCount = 0;
     }
-    return ok({ messageId: message.messageId, roomId: params.roomId, content: message.content, status: 'sent', sentAt });
+    return ok({ messageId: message.messageId, roomId: params.roomId, messageType: message.messageType, content: message.content, imageUrl: message.imageUrl, shareCard: message.shareCard, file: message.file, status: 'sent', sentAt });
   }),
+  // 채팅 파일 업로드(Task 181 ③) — 공개 URL 없이 fileId 만 돌려준다.
+  http.post(`${api}/uploads/files`, () => ok({ fileId: 'chat-file-1', name: '첨부 파일', size: 0, mimeType: 'application/octet-stream' })),
   http.patch(`${api}/chat/rooms/:roomId/me`, async ({ params, request }) => {
     const body = await request.json() as { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null };
     const room = v1ChatRoomsFixture.items.find((item) => item.roomId === params.roomId);
@@ -770,29 +852,74 @@ export const v1MswHandlers = [
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
     const category = params.get('category');
+    const reportReason = params.get('reportReason');
+    const reportedTeamId = params.get('reportedTeamId');
     const q = params.get('q')?.trim().toLowerCase();
+    // reportedTeamId 는 칩이 없는 딥링크 필터라 자기 facet이 없다 — searched 단계에서 걸러
+    // 아래 세 facet(status/category/reportReason) 모두가 이미 걸러진 집합을 이어받게 한다
+    // (admin.service.ts의 statusFacetWhere/categoryFacetWhere/reportReasonFacetWhere 미러).
     const searched = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
       if (q && !`${inquiry.title} ${inquiry.requesterName ?? ''} ${inquiry.requesterEmail ?? ''}`.toLowerCase().includes(q)) return false;
+      if (reportedTeamId && getReportedTeamIdForInquiry(inquiry.inquiryId) !== reportedTeamId) return false;
       return true;
     });
+    // 각 facet 은 "자기 자신을 뺀 나머지 필터" 로 집계한다 — admin.service.ts의 실제 규칙을
+    // 그대로 미러링한다(사유 하나를 골라도 다른 사유 칩 건수는 그대로 보여야 한다).
     const statusSource = searched.filter((inquiry) => {
+      if (category && inquiry.category !== category) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const categorySource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const reportReasonSource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
       if (category && inquiry.category !== category) return false;
       return true;
     });
-    const categorySource = searched.filter((inquiry) => !status || inquiry.status === status);
     const rows = statusSource.filter((inquiry) => !status || inquiry.status === status);
     return ok({
       ...page(rows),
       summary: {
         total: statusSource.length,
         byStatus: countFacet(statusSource, ['received', 'reviewing', 'answered', 'closed'], (inquiry) => inquiry.status),
-        byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'], (inquiry) => inquiry.category),
+        byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other', 'tournament_hosting', 'partnership'], (inquiry) => inquiry.category),
+        byReportReason: countFacet(reportReasonSource, ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'], (inquiry) => inquiry.reportReason ?? ''),
+        reportReasonTotal: reportReasonSource.length,
       },
     });
   }),
   http.get(`${api}/admin/inquiries/:inquiryId`, ({ params }) => {
     const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
     return ok(toAdminInquiryDetail(inquiry));
+  }),
+  http.get(`${api}/admin/reports/teams`, ({ request }) => {
+    const limitParam = new URL(request.url).searchParams.get('limit');
+    const limit = limitParam ? Math.min(Math.max(Number(limitParam), 1), 50) : 20;
+    return ok({ items: v1ReportedTeamsFixture.slice(0, limit), windowDays: v1ReportedTeamsWindowDays });
+  }),
+  http.post(`${api}/admin/inquiries/:inquiryId/block-reported-team`, ({ params }) => {
+    const inquiryId = params.inquiryId as string;
+    const reportedTeamId = getReportedTeamIdForInquiry(inquiryId);
+    if (!reportedTeamId) {
+      return HttpResponse.json(
+        {
+          status: 'error',
+          statusCode: 409,
+          code: 'REPORT_TARGET_UNKNOWN',
+          message: '신고 대상 팀을 알 수 없어 차단할 수 없어요.',
+          timestamp: '2026-05-18T00:00:00.000Z',
+        },
+        { status: 409 },
+      );
+    }
+    // 멱등 — 두 번째 클릭도 에러가 아니라 200 + alreadyBlocked: true 여야 한다(admin.service.ts 실측, P2002 흡수).
+    const alreadyBlocked = blockedInquiryIds.has(inquiryId);
+    blockedInquiryIds.add(inquiryId);
+    return ok({ blocked: true, alreadyBlocked, teamId: 'team-1', blockedTeamId: reportedTeamId });
   }),
   http.post(`${api}/admin/inquiries/:inquiryId/replies`, async ({ params, request }) => {
     const body = await request.json() as { body: string };
@@ -1047,6 +1174,25 @@ export const v1MswHandlers = [
     nextCursor: null,
   })),
 
+  // The stock mock lineup is a draft: do not simulate successful shared writes.
+  // Interactive shared-record tests override these handlers with their own contract fixtures.
+  http.get(`${api}/team-matches/:teamMatchId/record`, ({ params }) => {
+    const match = v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId);
+    if (!match || params.teamMatchId !== 'team-match-1') return HttpResponse.json({ message: '경기를 찾을 수 없어요.' }, { status: 404 });
+    return ok({
+      teamMatchId: match.id, title: match.title, startsAt: match.startsAt ?? null,
+      phase: v1GameResultRevisions.length ? 'legacy' : 'scheduled', version: 0,
+      serverTime: new Date().toISOString(), canEdit: false, participant: false, operator: false, ownSideId: null,
+      lineupReady: false,
+      missingSides: v1GameFixture.sides.map((side) => ({ sideId: side.id, sideKey: side.sideKey, teamName: side.displayNameSnapshot })),
+      sides: v1GameFixture.sides.map((side) => ({ id: side.id, key: side.sideKey, name: side.displayNameSnapshot, score: null })),
+      participants: [], subMatches: [], goals: [], history: [], confirmations: [], officialAt: null, officialCorrected: false,
+    } satisfies SharedRecord);
+  }),
+  http.post(`${api}/team-matches/:teamMatchId/record`, () => HttpResponse.json({
+    code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자와 플랫폼 주관 경기의 운영자만 기록할 수 있어요.',
+  }, { status: 403 })),
+
   // ── Task 17: games / result revisions / team-match lineup ─────────────────
   http.get(`${api}/games/:gameId`, () => ok(v1GameFixture)),
   http.get(`${api}/games/:gameId/result-revisions`, () => ok(v1GameResultRevisions)),
@@ -1072,6 +1218,8 @@ export const v1MswHandlers = [
       missingScorer: false,
       mvpParticipantId: body.mvpParticipantId ?? null,
       reason: body.reason ?? null,
+      outcomeReason: 'NORMAL',
+      outcomeNote: null,
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
       createdBySystemActor: null,
@@ -1154,15 +1302,42 @@ export const v1MswHandlers = [
     });
   }),
   http.get(`${api}/team-matches/:teamMatchId/lineup`, () => ok(v1TeamMatchLineupFixture)),
+  // 기본 픽스처의 상대는 아직 미제출이다(opponent.submitted=false) — 서버와 같은 404 를 준다.
+  // 공개 뒤 화면을 보는 테스트는 이 핸들러를 덮어쓴다.
+  http.get(`${api}/team-matches/:teamMatchId/lineup/opponent`, () => HttpResponse.json({
+    code: 'OPPONENT_LINEUP_NOT_SUBMITTED', message: '상대 팀이 아직 참석명단을 내지 않았어요.',
+  }, { status: 404 })),
+  // 기본 픽스처는 초안이라 추가만 창이 닫혀 있다(lateAdditionAllowed=false) — 서버처럼 409.
+  http.post(`${api}/team-matches/:teamMatchId/lineup/late-additions`, () => HttpResponse.json({
+    code: 'LINEUP_NOT_LOCKED', message: '아직 경기 기록 전이라 참석명단에서 바로 넣을 수 있어요.',
+  }, { status: 409 })),
   http.put(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
     const body = await request.json() as V1TeamMatchLineupSavePayload;
     v1TeamMatchLineupFixture = {
       ...v1TeamMatchLineupFixture,
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
+      // 서버와 같다(Task 180 R-2): 이미 낸 명단의 저장은 곧바로 새 제출본, 초안의 저장은 초안.
+      state: v1TeamMatchLineupFixture.state === 'DRAFT' ? 'DRAFT' : 'SUBMITTED',
       formation: body.formation ?? null,
-      starters: body.starters.map((participant, index) => ({
-        id: participant.userId ?? `guest-participant-${index + 1}`,
+      // 서버(`rosterOf`)와 **같은 규칙**: `participants` 가 **비어 있지 않을 때만** 그것이
+      // 명단이고, 그 밖에는 옛 `starters`+`bench` 를 합친다. `??` 로 쓰면 빈 배열에서
+      // 갈린다 — 서버는 `length > 0` 을 보므로 `participants: []` 를 받으면 레거시 두
+      // 배열로 넘어가는데, mock 만 빈 명단을 만들어 화면 테스트가 서버와 다른 것을 본다.
+      // 응답은 아직 `starters`/`bench` 모양이라 전원을 `starters` 에 싣고 `bench` 는
+      // 비운다(#978 이후의 실제 서버 동작).
+      starters: (body.participants?.length
+        ? body.participants
+        : [...(body.starters ?? []), ...(body.bench ?? [])]
+      ).map((participant, index) => ({
+        // **`id` 는 `V1GameParticipant.id` 이고 `userId` 와 별개다.** 예전 mock 은 여기에
+        // `userId` 를 그대로 넣어, `participantId` 를 `userId` 로 잘못 다루는 코드가
+        // 있어도 테스트가 통과했다(결과 입력 폼의 골·카드 귀속이 그 값을 쓴다).
+        // 두 값이 절대 같지 않도록 접두어를 붙여 갈라 둔다.
+        id: `participant-${index + 1}`,
+        // 서버와 같다: 저장 요청이 실어 보낸 사람 연결을 응답이 그대로 되돌려준다.
+        // 게스트는 계정이 없으므로 null.
+        userId: participant.userId ?? null,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,
@@ -1170,11 +1345,7 @@ export const v1MswHandlers = [
         positionX: participant.positionX ?? null,
         positionY: participant.positionY ?? null,
       })),
-      bench: body.bench.map((participant, index) => ({
-        id: participant.userId ?? `guest-bench-${index + 1}`,
-        displayName: participant.displayName ?? '이름 미확인',
-        jerseyNumber: participant.jerseyNumber ?? null,
-      })),
+      bench: [],
     };
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
@@ -1188,10 +1359,13 @@ export const v1MswHandlers = [
     });
   }),
   http.post(`${api}/team-matches/:teamMatchId/lineup/submit`, () => {
-    v1TeamMatchLineupFixture.state = 'SUBMITTED';
-    v1TeamMatchLineupFixture.version += 1;
-    const publicLineupAt = new Date().toISOString();
-    v1TeamMatchLineupFixture.publicLineupAt = publicLineupAt;
+    // 서버와 같다(Task 180 R-2): 이미 낸 명단을 다시 내면 아무것도 바꾸지 않고 지금 상태로 성공한다.
+    if (v1TeamMatchLineupFixture.state === 'DRAFT') {
+      v1TeamMatchLineupFixture.state = 'SUBMITTED';
+      v1TeamMatchLineupFixture.version += 1;
+      v1TeamMatchLineupFixture.publicLineupAt = new Date().toISOString();
+    }
+    const publicLineupAt = v1TeamMatchLineupFixture.publicLineupAt;
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
       gameId: v1TeamMatchLineupFixture.gameId,

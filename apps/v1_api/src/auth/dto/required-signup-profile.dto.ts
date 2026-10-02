@@ -61,3 +61,10 @@ export function isValidBirthDateDigits(value: string): boolean {
 export function normalizeSignupDisplayName(value: string): string {
   return value.replace(/[\u200B-\u200D\uFEFF]/gu, '').trim();
 }
+
+/** UTC calendar age; birthday must have occurred, including leap-day boundaries. */
+export function isSignupAgeEligible(value: string, now = new Date()): boolean {
+  if (!isValidBirthDateDigits(value)) return false;
+  const cutoff = `${now.getUTCFullYear() - 14}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
+  return value <= cutoff;
+}

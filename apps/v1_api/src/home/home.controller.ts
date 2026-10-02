@@ -11,7 +11,7 @@ export class HomeController {
   constructor(private readonly homeService: HomeService) {}
 
   @Get()
-  getHome(@CurrentUser() user: V1AuthUser | undefined, @Query() query: HomeQueryDto) {
+  getHome(@CurrentUser() user: V1AuthUser | undefined, @Query() query: HomeQueryDto): ReturnType<HomeService['getHome']> {
     return this.homeService.getHome(user ?? null, query);
   }
 

@@ -178,8 +178,8 @@ DB evidence:
 | V1-03-004 | Withdraw application | Application becomes `withdrawn`; duplicate withdraw converges or returns processed conflict |
 | V1-03-005 | Host approves applicant | Application approved, participant active, capacity updates, status log exists |
 | V1-03-006 | Host rejects applicant | Application rejected, no participant row created, applicant sees rejected state |
-| V1-03-007 | Host cancels approval | Participant removed, application history preserved |
-| V1-03-008 | Participant cancellation handling | Host marks participant cancelled; participant no longer counted as active |
+| V1-03-007 | Host cancels approval | Before start: confirmed roster menu → required reason → confirmation; participant removed, application cancelled_by_host and actor/reason logs preserved. Non-host/self/completed/repeat rejected. |
+| V1-03-008 | Participant no-show handling | From start until completion: confirmed roster menu → required reason → confirmation; participant no_show, no active count/chat/review/activity eligibility. Completion race stays consistent. |
 
 ## 03-1. Personal Match Create And Edit
 
@@ -481,6 +481,13 @@ Reviewable completed personal matches and team matches, review target eligibilit
 star rating `1-5`, one or more predefined review tags, idempotent review submit,
 written review list, received review grouping.
 
+- `V1-14-008`: 개인매치 방장이 `hostParticipates=false`여도 완료 후 실제 참가자를 리뷰할 수 있고,
+  실제 참가자도 비참가 방장을 리뷰할 수 있다. 본인과 중복 방장 대상은 제외하며, 방장도 참가자도 아닌
+  사용자는 동일 source 조회에서 `403 NOT_SOURCE_PARTICIPANT`로 차단된다.
+- 개인 매치 리뷰 기한: 완료 후 168시간까지 조회·제출 가능하고, 초과하면 둘 다
+  `410 REVIEW_WINDOW_CLOSED`다. 만료된 매치는 pending에서 제외하고 작성 완료 리뷰는 유지한다.
+  `completedAt`이 없는 기존 완료 매치는 `startAt` 기준으로 같은 제한을 적용한다.
+
 DB evidence:
 `v1_matches`, `v1_match_participants`, `v1_team_matches`,
 `v1_team_match_applications`, `v1_team_memberships`,
@@ -489,7 +496,7 @@ DB evidence:
 
 | ID | Scenario | Expected E2E assertion |
 |---|---|---|
-| V1-14-001 | Personal match review unlocks after completion | A completed personal match where the user has `active` or `completed` participation appears in `/my/reviews?tab=pending`; self-review is excluded; submitted user-target reviews reduce remaining count |
+| V1-14-001 | Personal match review unlocks after completion | A completed personal match where the user has `active` or `completed` participation appears in `/my/reviews?tab=pending`; targets include other eligible participants and the organizer even when the organizer is non-playing; self-review and duplicate organizer targets are excluded; submitted user-target reviews reduce remaining count |
 | V1-14-002 | Team match review unlocks for representative team actor | A completed team match with host and approved applicant teams appears for a current active owner/manager of exactly one participating team; target is the opposing team and reviewer team context is shown |
 | V1-14-003 | Submit rating and predefined tags | Source page accepts rating `1-5` plus one or more predefined tag codes, posts DTO-compatible payload, creates review/tag records, and navigates to completion or written state without free-text review body |
 | V1-14-004 | Duplicate review convergence | Re-submitting the same reviewer, target, source tuple returns existing review data with `alreadySubmitted: true` and does not create duplicate review/tag records |

@@ -1,66 +1,26 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { ArrowLeft, Calendar, MapPin, Shield, Trophy, Users } from 'lucide-react';
 import {
+  AdminDetailRow,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
+  AdminSummaryItem,
   AdminTableSkeleton,
+  AdminTeamRenameModal,
+  AdminToasts,
+  useAdminToast,
 } from '@/components/admin';
-import { useV1AdminTeam } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useV1AdminTeam, useV1RenameArchivedTeam } from '@/hooks/use-v1-api';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1AdminTeamDetail } from '@/types/api';
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
-
-function formatScore(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === '') return '-';
-  return String(value);
-}
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
-    </div>
-  );
-}
-
-function SummaryItem({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="shrink-0 text-gray-400" aria-hidden="true">{icon}</span>
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
-    </div>
-  );
-}
 
 function BackLink() {
   return (
@@ -79,15 +39,15 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
 
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="최근 주최 팀매치">
-      <h2 className="text-[17px] font-bold text-[var(--text-strong)]">최근 주최 팀매치</h2>
+      <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">최근 주최 팀매치</h2>
       {matches.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {matches.map((match) => (
-            <li key={match.teamMatchId} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+            <li key={match.teamMatchId} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{match.title}</p>
-                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatDateTime(match.startAt)}</p>
+                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatAdminDateTime(match.startAt)}</p>
                 </div>
                 <AdminStatusPill status={match.status} />
               </div>
@@ -95,7 +55,7 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           최근 주최한 팀매치가 없어요.
         </div>
       )}
@@ -103,23 +63,17 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
   );
 }
 
-const MEMBER_ROLE_LABEL: Record<V1AdminTeamDetail['members'][number]['role'], string> = {
-  owner: '팀장',
-  manager: '운영진',
-  member: '멤버',
-};
-
 function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="팀원 목록">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold text-[var(--text-strong)]">팀원</h2>
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">팀원</h2>
         <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">{team.members.length}명</span>
       </div>
       {team.members.length > 0 ? (
         <ol className="mt-4 grid gap-3 sm:grid-cols-2">
           {team.members.map((member) => (
-            <li key={member.membershipId} className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+            <li key={member.membershipId} className="tm-on-tint min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Link href={`/admin/users/${member.userId}`} className="break-words text-sm font-bold text-[var(--text-strong)] hover:text-[var(--blue700)]">
@@ -128,19 +82,19 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
                   {member.name && member.nickname ? <p className="mt-1 text-xs text-[var(--text-muted)]">{member.nickname}</p> : null}
                 </div>
                 <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
-                  {MEMBER_ROLE_LABEL[member.role]}
+                  {teamRoleLabel(member.role)}
                 </span>
               </div>
-              <dl className="mt-3 grid gap-1.5 text-xs">
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">이메일</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.email ?? '미등록'}</dd></div>
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">전화번호</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.phone ?? '미등록'}</dd></div>
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">가입일</dt><dd className="min-w-0 text-[var(--text-body)]">{formatDateTime(member.joinedAt)}</dd></div>
+              <dl className="mt-3 grid gap-2 text-xs">
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-[var(--text-muted)]">이메일</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.email ?? '미등록'}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-[var(--text-muted)]">전화번호</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.phone ?? '미등록'}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-[var(--text-muted)]">가입일</dt><dd className="min-w-0 text-[var(--text-body)]">{formatAdminDateTime(member.joinedAt)}</dd></div>
               </dl>
             </li>
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">활성 팀원이 없어요.</div>
+        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">활성 팀원이 없어요.</div>
       )}
     </section>
   );
@@ -150,6 +104,11 @@ export default function AdminTeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = params.id;
   const { data: team, isPending, isError, error, refetch } = useV1AdminTeam(teamId);
+  const canWrite = useAdminCanWrite();
+  const rename = useV1RenameArchivedTeam();
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const { toasts, showToast } = useAdminToast();
 
   if (isPending) {
     return <AdminTableSkeleton rows={6} />;
@@ -158,7 +117,7 @@ export default function AdminTeamDetailPage() {
   if (isError || !team) {
     return (
       <>
-        <AdminPageHeader title="팀 상세" action={<BackLink />} />
+        <AdminPageHeader eyebrow="플랫폼 · 팀" title="팀 상세" action={<BackLink />} />
         <AdminEmpty
           title="팀 정보를 불러오지 못했어요"
           description={extractErrorMessage(error, '잠시 후 다시 시도해 주세요.')}
@@ -177,16 +136,36 @@ export default function AdminTeamDetailPage() {
   }
 
   const trust = team.trustScore;
+  // 활동 중인 팀 이름은 팀장이 고친다 — 운영팀은 보관 팀만(복구가 같은 이름 때문에 막혔을 때의 출구).
+  const canRename = canWrite && team.status === 'archived';
+  const openRename = () => {
+    setRenameError(null);
+    setRenameOpen(true);
+  };
+  const handleRename = (name: string, reason: string) => {
+    setRenameError(null);
+    rename.mutate(
+      { id: team.teamId, name, reason },
+      {
+        onSuccess: () => {
+          setRenameOpen(false);
+          showToast('팀 이름을 바꿨어요. 이제 팀 목록의 상태 변경에서 보관을 풀 수 있어요.', 'success');
+        },
+        onError: (err) => setRenameError(extractErrorMessage(err, '이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')),
+      },
+    );
+  };
 
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼 · 팀"
         title="팀 상세"
         description={team.name}
         action={<BackLink />}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="tm-content-enter grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="팀 상세 정보">
           <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -195,22 +174,36 @@ export default function AdminTeamDetailPage() {
                   <Users size={16} aria-hidden="true" />
                   팀
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{team.name}</h2>
+                <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{team.name}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{team.sportName}</p>
               </div>
-              <AdminStatusPill status={team.status} />
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminStatusPill status={team.status} />
+                {canRename ? (
+                  <button
+                    type="button"
+                    onClick={openRename}
+                    className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--blue50)] px-3 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    이름 바꾸기
+                  </button>
+                ) : null}
+              </div>
             </div>
 
+            {canRename ? (
+              <p className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
+                보관된 팀이에요. 같은 종목·지역에 같은 이름의 팀이 있어 보관을 풀 수 없다면 이름을 바꾼 뒤 팀 목록의 상태 변경에서 풀어 주세요.
+              </p>
+            ) : null}
+
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="팀 ID" value={team.teamId} />
-              <DetailRow label="종목" value={team.sportName} />
-              <DetailRow label="지역" value={team.regionName} />
-              <DetailRow label="상태" value={team.status} />
-              <DetailRow label="팀장" value={team.ownerName} />
-              <DetailRow label="팀장 ID" value={team.ownerUserId} />
-              <DetailRow label="멤버 수" value={team.memberCount} />
-              <DetailRow label="매니저 수" value={team.managerCount} />
-              <DetailRow label="생성일" value={formatDateTime(team.createdAt)} />
+              <AdminDetailRow label="팀 ID" value={team.teamId} />
+              <AdminDetailRow label="종목" value={team.sportName} />
+              <AdminDetailRow label="지역" value={team.regionName} />
+              <AdminDetailRow label="팀장" value={team.ownerName} />
+              <AdminDetailRow label="팀장 ID" value={team.ownerUserId} />
+              <AdminDetailRow label="생성일" value={formatAdminDateTime(team.createdAt)} />
             </dl>
           </article>
 
@@ -220,33 +213,43 @@ export default function AdminTeamDetailPage() {
 
         <aside className="flex flex-col gap-4" aria-label="팀 운영 요약">
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Users size={16} />} label="전체 멤버" value={team.memberCount} />
-              <SummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
-              <SummaryItem icon={<Trophy size={16} />} label="최근 주최 팀매치" value={team.recentHostedTeamMatches.length} />
-              <SummaryItem icon={<MapPin size={16} />} label="지역" value={team.regionName} />
-              <SummaryItem icon={<Calendar size={16} />} label="생성일" value={formatDateTime(team.createdAt)} />
+              <AdminSummaryItem icon={<Users size={16} />} label="전체 멤버" value={team.memberCount} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
+              <AdminSummaryItem icon={<Trophy size={16} />} label="최근 주최 팀매치" value={team.recentHostedTeamMatches.length} />
+              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={team.regionName} />
+              <AdminSummaryItem icon={<Calendar size={16} />} label="생성일" value={formatAdminDateTime(team.createdAt)} />
             </dl>
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
             {trust ? (
               <dl className="mt-4 grid gap-3">
-                <SummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
-                <SummaryItem icon={<Shield size={16} />} label="매너 점수" value={formatScore(trust.mannerScore)} />
-                <SummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
-                <SummaryItem icon={<Calendar size={16} />} label="계산일" value={formatDateTime(trust.calculatedAt)} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={trust.mannerScore} />
+                <AdminSummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
+                <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatAdminDateTime(trust.calculatedAt)} />
               </dl>
             ) : (
-              <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+              <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 아직 산정된 팀 신뢰 정보가 없어요.
               </div>
             )}
           </section>
         </aside>
       </div>
+
+      <AdminTeamRenameModal
+        open={renameOpen}
+        currentName={team.name}
+        onSubmit={handleRename}
+        onClose={() => setRenameOpen(false)}
+        pending={rename.isPending}
+        error={renameError}
+      />
+      <AdminToasts toasts={toasts} />
     </>
   );
 }

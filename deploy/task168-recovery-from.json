@@ -1,0 +1,11 @@
+{
+  "releaseSha": "0d76e6b2d077e505eb746173154f9d2df5128af4",
+  "cutoverReport": "/home/ec2-user/.teameet-alpha-releases/task168/0d76e6b2d077e505eb746173154f9d2df5128af4/report/cutover-report.json",
+  "quiesceReceipt": "/home/ec2-user/.teameet-alpha-releases/task168/0d76e6b2d077e505eb746173154f9d2df5128af4/quiesce.json",
+  "backupReceipt": "/home/ec2-user/.teameet-alpha-releases/task168/0d76e6b2d077e505eb746173154f9d2df5128af4/backup.json",
+  "backupPath": "/home/ec2-user/.teameet-alpha-releases/task168/0d76e6b2d077e505eb746173154f9d2df5128af4/backup.sql.gz",
+  "cutoverReportSha256": "ce9bab603d8ea6f8bbccf213170b22ef609c068c07086243a2f11aaebf95880f",
+  "quiesceReceiptSha256": "1a2dae378865e52c67fbcf4262b9fa5b4c1d0e500d87fda5617f6f310cf59a53",
+  "backupReceiptSha256": "039bbcb2cf826a006580a7f8138cee965a8da050ff7f9111bcd1e4a30f003272",
+  "backupSha256": "7c60db1eefbc3e104b7af13f1a6ce1a09b727c718b6bf8b167f187effa79069c"
+}

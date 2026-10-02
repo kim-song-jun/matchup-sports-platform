@@ -10,6 +10,9 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
+import { AppleLoginDto } from './dto/apple-login.dto';
+import { AppleIdentityService } from './apple-identity.service';
+import { CheckEmailQueryDto, CheckNicknameQueryDto } from './dto/check-availability.dto';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -21,7 +24,10 @@ import { V1SessionCookieInterceptor } from './v1-session.interceptor';
 @Controller('auth')
 @UseInterceptors(V1SessionCookieInterceptor)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly appleIdentity: AppleIdentityService,
+  ) {}
 
   @Get('me')
   @UseGuards(V1AuthGuard)
@@ -59,6 +65,22 @@ export class AuthController {
     return this.authService.kakaoLogin(dto);
   }
 
+  /**
+   * Issues the nonce the Apple sheet must answer. Unauthenticated by design — it is asked for
+   * before anyone has signed in — and rate limited because it is a free HMAC otherwise.
+   */
+  @Post('apple/nonce')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  appleNonce() {
+    return this.appleIdentity.issueNonce();
+  }
+
+  @Post('apple')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  appleSignIn(@Body() dto: AppleLoginDto) {
+    return this.authService.appleSignIn(dto);
+  }
+
   @Post('register')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   register(@Body() dto: RegisterDto) {
@@ -79,13 +101,13 @@ export class AuthController {
 
   @Get('check-email')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  checkEmail(@Query('email') email: string) {
-    return this.authService.checkEmail(email);
+  checkEmail(@Query() query: CheckEmailQueryDto) {
+    return this.authService.checkEmail(query.email);
   }
 
   @Get('check-nickname')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  checkNickname(@Query('nickname') nickname: string) {
-    return this.authService.checkNickname(nickname);
+  checkNickname(@Query() query: CheckNicknameQueryDto) {
+    return this.authService.checkNickname(query.nickname);
   }
 }

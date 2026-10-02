@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card } from '@/components/v1-ui/primitives';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
@@ -52,83 +51,81 @@ export function PhoneVerifyPageClient() {
   const verified = alreadyVerified || done;
 
   return (
-    <AppChrome title="휴대폰 본인인증" activeTab="my" backHref="/my" bottomNav={false} desktopHead>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
-        {verified ? (
-          <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
-            <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
-            <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue700)' }}>
-              휴대폰 본인인증이 완료됐어요.
+    <div className="tm-content-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
+      {verified ? (
+        <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
+          <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
+          <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue700)' }}>
+            휴대폰 본인인증이 완료됐어요.
+          </p>
+        </Card>
+      ) : (
+        <>
+          <Card pad={16}>
+            <p className="tm-text-body" style={{ margin: 0 }}>
+              안전한 이용을 위해 휴대폰 본인인증이 필요해요.
             </p>
           </Card>
-        ) : (
-          <>
+
+          {authLoading ? (
             <Card pad={16}>
-              <p className="tm-text-body" style={{ margin: 0 }}>
-                안전한 이용을 위해 휴대폰 본인인증이 필요해요.
+              <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+                계정 정보를 불러오는 중이에요.
               </p>
             </Card>
-
-            {authLoading ? (
-              <Card pad={16}>
-                <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
-                  계정 정보를 불러오는 중이에요.
-                </p>
-              </Card>
-            ) : !existingPhone || editingPhone ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label className="tm-auth-field">
-                  <span className="tm-text-label">휴대폰 번호</span>
-                  <input
-                    className="tm-input tm-auth-input"
-                    inputMode="numeric"
-                    onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
-                    placeholder="010-0000-0000"
-                    value={formatPhone(phoneDigits)}
-                  />
-                </label>
-                {existingPhone ? (
-                  <button
-                    type="button"
-                    className="tm-btn tm-btn-sm tm-btn-ghost"
-                    style={{ alignSelf: 'flex-start', minHeight: 44 }}
-                    onClick={() => {
-                      setPhoneDigits(existingPhone);
-                      setEditingPhone(false);
-                    }}
-                  >
-                    기존 번호로 되돌리기
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
-                    인증번호를 받을 번호
-                  </p>
-                  <p className="tm-text-label" style={{ margin: '2px 0 0', color: 'var(--text-strong)' }}>
-                    {formatPhone(phoneDigits)}
-                  </p>
-                </div>
+          ) : !existingPhone || editingPhone ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="tm-auth-field">
+                <span className="tm-text-label">휴대폰 번호</span>
+                <input
+                  className="tm-input tm-auth-input"
+                  inputMode="numeric"
+                  onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
+                  placeholder="010-0000-0000"
+                  value={formatPhone(phoneDigits)}
+                />
+              </label>
+              {existingPhone ? (
                 <button
                   type="button"
-                  className="tm-btn tm-btn-sm tm-btn-neutral"
-                  style={{ flexShrink: 0, minHeight: 44 }}
-                  onClick={() => setEditingPhone(true)}
-                  aria-label="인증받을 휴대폰 번호 수정"
+                  className="tm-btn tm-btn-sm tm-btn-ghost"
+                  style={{ alignSelf: 'flex-start', minHeight: 44 }}
+                  onClick={() => {
+                    setPhoneDigits(existingPhone);
+                    setEditingPhone(false);
+                  }}
                 >
-                  번호 수정
+                  기존 번호로 되돌리기
                 </button>
-              </Card>
-            )}
+              ) : null}
+            </div>
+          ) : (
+            <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+                  인증번호를 받을 번호
+                </p>
+                <p className="tm-text-label" style={{ margin: '2px 0 0', color: 'var(--text-strong)' }}>
+                  {formatPhone(phoneDigits)}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="tm-btn tm-btn-sm tm-btn-neutral"
+                style={{ flexShrink: 0, minHeight: 44 }}
+                onClick={() => setEditingPhone(true)}
+                aria-label="인증받을 휴대폰 번호 수정"
+              >
+                번호 수정
+              </button>
+            </Card>
+          )}
 
-            {!authLoading && phoneDigits.length === 11 ? (
-              <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />
-            ) : null}
-          </>
-        )}
-      </div>
-    </AppChrome>
+          {!authLoading && phoneDigits.length === 11 ? (
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }

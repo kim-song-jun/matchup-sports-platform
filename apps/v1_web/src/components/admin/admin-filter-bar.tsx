@@ -20,6 +20,11 @@ interface AdminFilterBarProps {
   /** 검색 입력란을 숨긴다. 백엔드가 q 파라미터를 지원하지 않는 페이지에서 사용 */
   hideSearch?: boolean;
   statusOptions?: StatusOption[];
+  /**
+   * 칩 그룹의 스크린리더 라벨. 칩이 상태가 아닌 다른 축(체계·대상 유형 등)을 거를 때
+   * 기본값 "상태 필터"가 잘못된 의미로 읽히므로 화면이 실제 의미를 지정한다.
+   */
+  statusGroupLabel?: string;
   activeStatus?: string;
   onStatusChange?: (value: string) => void;
   /** Optional content injected to the right of the chips row */
@@ -34,15 +39,20 @@ export function AdminFilterBar({
   onSearchChange,
   hideSearch = false,
   statusOptions,
+  statusGroupLabel = '상태 필터',
   activeStatus,
   onStatusChange,
   rightSlot,
 }: AdminFilterBarProps) {
   const inputId = useId();
+  // 옵션 전체에 count 가 하나도 없으면(화면이 애초에 카운트를 제공하지 않으면) 카운트
+  // span 자체를 렌더하지 않는다 — 일부만 없는 경우(로딩 중)는 '—' 플레이스홀더 유지.
+  const hasAnyChipCount = statusOptions?.some((o) => typeof o.count === 'number') ?? false;
 
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Search row — hideSearch=true인 경우(백엔드 q 미지원) 렌더 생략 */}
+    <div className="flex flex-col gap-3">
+      {/* Search row — hideSearch=true인 경우 렌더 생략. "백엔드 q 미지원"이라 적혀
+          있었으나 사실이 아니었다(대회 목록도 q 지원) — 숨김 여부는 화면이 결정한다. */}
       {!hideSearch && (
         <div className="relative">
           {/* Visually-hidden label (linked via htmlFor) */}
@@ -50,7 +60,7 @@ export function AdminFilterBar({
             {searchLabel}
           </label>
           <span
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
             aria-hidden="true"
           >
             <Search size={16} />
@@ -63,7 +73,7 @@ export function AdminFilterBar({
             placeholder={searchPlaceholder}
             className={[
               'w-full h-[44px] pl-9 pr-4 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl',
-              'placeholder:text-gray-400 text-[var(--text-strong)]',
+              'placeholder:text-[var(--text-muted)] text-[var(--text-strong)]',
               'transition-colors focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
             ].join(' ')}
           />
@@ -74,7 +84,7 @@ export function AdminFilterBar({
       {(statusOptions && statusOptions.length > 0) || rightSlot ? (
         <div className="flex items-center gap-2 flex-wrap">
           {statusOptions && statusOptions.length > 0 && onStatusChange && (
-            <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="상태 필터">
+            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label={statusGroupLabel}>
               {statusOptions.map((opt) => {
                 const active = activeStatus === opt.value;
                 return (
@@ -85,7 +95,7 @@ export function AdminFilterBar({
                     aria-pressed={active}
                     aria-label={typeof opt.count === 'number' ? `${opt.label} ${opt.count}` : opt.label}
                     className={[
-                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
+                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       active
                         ? 'bg-blue-500 text-white'
@@ -93,15 +103,21 @@ export function AdminFilterBar({
                     ].join(' ')}
                   >
                     <span>{opt.label}</span>
-                    <span
-                      className={[
-                        'ml-1.5 min-w-[1.25rem] text-center font-semibold tabular-nums',
-                        active ? 'text-white/90' : 'text-gray-400',
-                      ].join(' ')}
-                      aria-hidden="true"
-                    >
-                      {typeof opt.count === 'number' ? opt.count.toLocaleString('ko-KR') : '—'}
-                    </span>
+                    {hasAnyChipCount && (
+                      <span
+                        className={[
+                          'ml-2 min-w-[1.25rem] text-center font-semibold tabular-nums',
+                          // 활성 칩의 흰 글씨는 a11y-decisions.md 1번(solid-fill 버튼, 3.71:1)이
+                          // 현행 유지하기로 한 자리다. 여기에 /90 을 더 걸면 3.32:1 로 **그
+                          // 결정보다 나빠진다** — 결정은 3.71 기준으로 내려졌다. 옆 라벨과 같은
+                          // 흰색으로 두고, 위계는 이미 font-semibold(라벨은 medium)가 만든다.
+                          active ? 'text-white' : 'text-[var(--text-muted)]',
+                        ].join(' ')}
+                        aria-hidden="true"
+                      >
+                        {typeof opt.count === 'number' ? opt.count.toLocaleString('ko-KR') : '—'}
+                      </span>
+                    )}
                   </button>
                 );
               })}

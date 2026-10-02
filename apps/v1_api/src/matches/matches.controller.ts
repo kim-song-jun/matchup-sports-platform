@@ -1,15 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { MatchesQueryDto } from './dto/matches-query.dto';
+import { CompleteMatchDto } from './dto/complete-match.dto';
 import {
   CreateMatchApplicationDto,
   ListMatchApplicationsQueryDto,
 } from './dto/match-application.dto';
-import { CancelMatchDto, MutateMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
+import { CancelMatchDto, CloseMatchDto, MutateMatchDto, ReopenMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
 import { MatchesService } from './matches.service';
 
 @Controller('matches')
@@ -87,6 +88,18 @@ export class MatchesController {
     return this.matchesService.update(user, matchId, dto);
   }
 
+  @Post(':matchId/confirm-proceed')
+  @UseGuards(V1AuthGuard)
+  confirmProceed(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.matchesService.confirmProceed(user, matchId);
+  }
+
+  @Delete(':matchId')
+  @UseGuards(V1AuthGuard)
+  remove(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.matchesService.remove(user, matchId);
+  }
+
   @Post(':matchId/cancel')
   @UseGuards(V1AuthGuard)
   cancel(
@@ -95,5 +108,35 @@ export class MatchesController {
     @Body() dto: CancelMatchDto,
   ) {
     return this.matchesService.cancel(user, matchId, dto);
+  }
+
+  @Post(':matchId/close')
+  @UseGuards(V1AuthGuard)
+  close(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: CloseMatchDto,
+  ) {
+    return this.matchesService.close(user, matchId, dto);
+  }
+
+  @Post(':matchId/reopen')
+  @UseGuards(V1AuthGuard)
+  reopen(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: ReopenMatchDto,
+  ) {
+    return this.matchesService.reopen(user, matchId, dto);
+  }
+
+  @Post(':matchId/complete')
+  @UseGuards(V1AuthGuard)
+  complete(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: CompleteMatchDto,
+  ) {
+    return this.matchesService.complete(user, matchId, dto);
   }
 }

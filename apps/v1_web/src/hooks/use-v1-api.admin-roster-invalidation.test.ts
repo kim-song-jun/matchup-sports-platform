@@ -34,6 +34,8 @@ import {
   useV1AdminAddPlayer,
   useV1AdminRemovePlayer,
   useV1AdminRosterEligibleMembers,
+  useV1AddPlayer,
+  useV1MyRegistrations,
   useV1TournamentPlayers,
 } from './use-v1-api';
 
@@ -41,6 +43,7 @@ const REGISTRATION_ID = 'registration-1';
 const TOURNAMENT_ID = 'tournament-1';
 const ELIGIBLE_PATH = `/admin/registrations/${REGISTRATION_ID}/eligible-players`;
 const CONSUMER_ROSTER_PATH = `/tournaments/${TOURNAMENT_ID}/registrations/${REGISTRATION_ID}/players`;
+const MY_REGISTRATIONS_PATH = `/tournaments/${TOURNAMENT_ID}/registrations/my-registrations`;
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -117,5 +120,37 @@ describe('어드민 명단 변경 후 선택 목록 동기화', () => {
 
     await waitFor(() => expect(result.current.add.isSuccess).toBe(true));
     await waitFor(() => expect(consumerFetchCount()).toBe(2));
+  });
+
+  it('어드민이 선수를 추가하면 팀 운영자가 보는 대회 신청 목록도 다시 불러온다', async () => {
+    const { result } = renderHook(
+      () => ({
+        registrations: useV1MyRegistrations(TOURNAMENT_ID),
+        add: useV1AdminAddPlayer(REGISTRATION_ID),
+      }),
+      { wrapper: makeWrapper() },
+    );
+    const myRegistrationsFetchCount = () =>
+      v1Get.mock.calls.filter(([path]) => path === MY_REGISTRATIONS_PATH).length;
+    await waitFor(() => expect(myRegistrationsFetchCount()).toBe(1));
+    result.current.add.mutate({ userId: 'user-1', realName: '김명철' });
+    await waitFor(() => expect(result.current.add.isSuccess).toBe(true));
+    await waitFor(() => expect(myRegistrationsFetchCount()).toBe(2));
+  });
+
+  it('팀 운영자가 선수를 추가하면 plural 신청 목록 observer도 다시 불러온다', async () => {
+    const { result } = renderHook(
+      () => ({
+        registrations: useV1MyRegistrations(TOURNAMENT_ID),
+        add: useV1AddPlayer(TOURNAMENT_ID, REGISTRATION_ID),
+      }),
+      { wrapper: makeWrapper() },
+    );
+    const myRegistrationsFetchCount = () =>
+      v1Get.mock.calls.filter(([path]) => path === MY_REGISTRATIONS_PATH).length;
+    await waitFor(() => expect(myRegistrationsFetchCount()).toBe(1));
+    result.current.add.mutate({ userId: 'user-1', realName: '김명철', birthDate: '1990-01-01' });
+    await waitFor(() => expect(result.current.add.isSuccess).toBe(true));
+    await waitFor(() => expect(myRegistrationsFetchCount()).toBe(2));
   });
 });

@@ -24,7 +24,14 @@ import type { ReactNode } from 'react';
 type SocketHandler = (payload: unknown) => void;
 const handlers = new Map<string, SocketHandler>();
 
-const OCCURRED_AT = '2026-08-09T00:00:00.000Z';
+// 실제 벌어진 시각 그 자체(값)는 이 테스트와 무관하다 — 검증 대상은
+// clockMs 소수 보정이다. 다만 고정된 과거 날짜를 쓰면, 오프라인 큐 첫
+// 전송의 CLOCK_DRIFT 오탐을 막는 수정(sendQueuedItem의 isClockDrifted
+// 게이트)이 이 fixture를 "30초 넘게 지연된 이벤트"로 오인해 첫 시도부터
+// game.event.retry로 보내 버린다 — 그러면 이 파일이 검증하는
+// "append가 VALIDATION_ERROR로 실패 → retryFailedEvent로 구제" 흐름
+// 자체가 재현되지 않는다. 그래서 실제 벌어진 시각을 항상 "지금"으로 고정한다.
+const OCCURRED_AT = new Date().toISOString();
 
 const retryPayloads: Array<{ clientEventId: string; payloadHash: string; event: Record<string, unknown> }> = [];
 

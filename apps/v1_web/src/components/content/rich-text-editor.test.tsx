@@ -113,3 +113,26 @@ describe('RichTextEditor managed images', () => {
     expect(latest ? imageNodes(latest) : []).toHaveLength(0);
   });
 });
+
+describe('RichTextEditor 접근성 — 편집 영역에 이름이 붙는다', () => {
+  // alpha 실측(2026-09-07): 툴바 버튼 18개는 전부 aria-label 이 있는데 정작 글을 쓰는
+  // contenteditable 만 이름이 없어, 접근성 트리에 role=textbox·name="" 로 올라와 있었다.
+  // 보이는 "본문" 라벨은 그냥 <span> 이라 연결돼 있지 않았다.
+  const noop = { onChange: () => {}, onUploadImage: async () => firstAsset };
+
+  // immediatelyRender: false 라 편집 영역은 마운트 직후가 아니라 이펙트 뒤에 붙는다.
+  it('편집 영역의 접근 이름이 보이는 라벨과 같다', async () => {
+    render(<RichTextEditor value={EMPTY_RICH_CONTENT} {...noop} />);
+
+    // 이름으로 찾을 수 있다는 것 자체가 계약이다 — 못 찾으면 스크린리더도 못 읽는다.
+    expect(await screen.findByRole('textbox', { name: '본문' })).toBeInTheDocument();
+  });
+
+  it('라벨을 바꾸면 편집 영역과 툴바 이름이 함께 따라간다', async () => {
+    render(<RichTextEditor value={EMPTY_RICH_CONTENT} label="공지 내용" {...noop} />);
+
+    expect(await screen.findByRole('textbox', { name: '공지 내용' })).toBeInTheDocument();
+    // 툴바는 "본문 서식" 으로 고정돼 있어 label 을 바꿔도 따라오지 않았다.
+    expect(screen.getByRole('toolbar', { name: '공지 내용 서식' })).toBeInTheDocument();
+  });
+});

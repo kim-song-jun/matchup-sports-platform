@@ -16,15 +16,12 @@ import { RequireAuth } from '@/components/auth/require-auth';
  * `apps/v1_web/src/app/admin/layout.tsx`'s `<RequireAuth>` wrap) to the whole
  * `/tournament-ops/**` tree, closing that concrete gap.
  *
- * It deliberately does NOT add tournament/fixture-scoped role gating
- * (assignment-aware "is this user actually staffed on this tournament/field"
- * authorization, matching `admin/_gate.tsx`'s `AdminGate`) -- that belongs to
- * Task 19's scoped operations shell, whose assignment-aware navigation and
- * `/staff` + `/operations` routes carry the staff-assignment data source such
- * a gate needs. Task 19 and Task 21 both landed on the integration branch and
- * both produced this same bare `RequireAuth` layout, so the scoped gate is
- * still open work: it should nest a `TournamentOpsGate`-equivalent inside this
- * `RequireAuth`, exactly as `admin/layout.tsx` nests `AdminGate` inside it.
+ * It deliberately does NOT add tournament/fixture-scoped role gating here.
+ * That gate is no longer open work: `tournament-ops/tournaments/[id]/layout.tsx`
+ * nests `TournamentLiveGate` (assignment-aware role check plus `AccessDenied`)
+ * inside this `RequireAuth`, which is the same shape as `admin/layout.tsx`
+ * nesting `AdminGate`. Scoped authorization belongs there because only the
+ * `[id]` segment knows which tournament to check assignments against.
  */
 export default function TournamentOpsLayout({ children }: { children: ReactNode }) {
   return <RequireAuth>{children}</RequireAuth>;

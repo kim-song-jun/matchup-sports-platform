@@ -8,7 +8,7 @@
  * `row.user.profile` / `row.user.email`.
  */
 
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -173,7 +173,7 @@ describe('AdminService — replyInquiry notifies the asker', () => {
     $transaction: jest.Mock;
   };
   let tx: {
-    v1Inquiry: { findUnique: jest.Mock; update: jest.Mock };
+    v1Inquiry: { findUnique: jest.Mock; updateMany: jest.Mock };
     v1InquiryReply: { create: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -181,7 +181,7 @@ describe('AdminService — replyInquiry notifies the asker', () => {
 
   beforeEach(async () => {
     tx = {
-      v1Inquiry: { findUnique: jest.fn(), update: jest.fn() },
+      v1Inquiry: { findUnique: jest.fn(), updateMany: jest.fn() },
       v1InquiryReply: { create: jest.fn() },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
@@ -203,7 +203,7 @@ describe('AdminService — replyInquiry notifies the asker', () => {
 
     service = module.get(AdminService);
     prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
-    tx.v1Inquiry.update.mockResolvedValue({ status: 'answered' });
+    tx.v1Inquiry.updateMany.mockResolvedValue({ count: 1 });
     // replyInquiry 마지막의 getInquiry 재조회
     prisma.v1Inquiry.findUnique.mockResolvedValue({
       ...makeGuestInquiryRow({ id: 'inquiry-1' }),
@@ -246,6 +246,21 @@ describe('AdminService — replyInquiry notifies the asker', () => {
     expect(notifications.emitNotification).not.toHaveBeenCalled();
   });
 
+  it('refuses to answer a purged inquiry — a new reply there would never be purged again', async () => {
+    tx.v1Inquiry.findUnique.mockResolvedValue({ id: 'inquiry-1', userId: null, title: '파기', status: 'closed', purgedAt: new Date() });
+
+    await expect(service.replyInquiry(adminAuthUser, 'inquiry-1', { body: '홍길동님 답변' })).rejects.toThrow(ConflictException);
+    expect(tx.v1InquiryReply.create).not.toHaveBeenCalled();
+  });
+
+  it('rolls the reply back when a purge committed between the read and the status write', async () => {
+    tx.v1Inquiry.findUnique.mockResolvedValue({ id: 'inquiry-1', userId: null, title: '비회원', status: 'closed', purgedAt: null });
+    tx.v1Inquiry.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.replyInquiry(adminAuthUser, 'inquiry-1', { body: '답변' })).rejects.toThrow(ConflictException);
+    expect(tx.v1Inquiry.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'inquiry-1', purgedAt: null } }));
+  });
+
   it('does not notify when the inquiry does not exist (transaction throws before commit)', async () => {
     tx.v1Inquiry.findUnique.mockResolvedValue(null);
 
@@ -257,6 +272,7 @@ describe('AdminService — replyInquiry notifies the asker', () => {
 });
 
 describe('AdminService — updateInquiryReply', () => {
+  const replyUpdatedAt = new Date('2026-07-15T00:00:00.000Z');
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
@@ -264,13 +280,13 @@ describe('AdminService — updateInquiryReply', () => {
     $transaction: jest.Mock;
   };
   let tx: {
-    v1InquiryReply: { findUnique: jest.Mock; update: jest.Mock };
+    v1InquiryReply: { findUnique: jest.Mock; updateMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
   };
 
   beforeEach(async () => {
     tx = {
-      v1InquiryReply: { findUnique: jest.fn(), update: jest.fn() },
+      v1InquiryReply: { findUnique: jest.fn(), updateMany: jest.fn() },
       v1AdminActionLog: { create: jest.fn() },
     };
     prisma = {
@@ -294,8 +310,10 @@ describe('AdminService — updateInquiryReply', () => {
       id: 'reply-1',
       inquiryId: 'inquiry-1',
       body: '기존 답변',
+      updatedAt: replyUpdatedAt,
+      inquiry: { purgedAt: null },
     });
-    tx.v1InquiryReply.update.mockResolvedValue({ id: 'reply-1', body: '수정된 답변' });
+    tx.v1InquiryReply.updateMany.mockResolvedValue({ count: 1 });
     prisma.v1Inquiry.findUnique.mockResolvedValue({
       ...makeGuestInquiryRow({ id: 'inquiry-1' }),
       body: '문의 본문',
@@ -305,12 +323,43 @@ describe('AdminService — updateInquiryReply', () => {
 
     const result = await service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'reply-1', { body: '수정된 답변' });
 
-    expect(tx.v1InquiryReply.update).toHaveBeenCalledWith({
-      where: { id: 'reply-1' },
+    expect(tx.v1InquiryReply.updateMany).toHaveBeenCalledWith({
+      where: { id: 'reply-1', updatedAt: replyUpdatedAt },
       data: { body: '수정된 답변' },
     });
     expect(tx.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ inquiryId: 'inquiry-1' });
+  });
+
+  it('refuses to edit a reply on a purged inquiry — it would overwrite the purge placeholder', async () => {
+    tx.v1InquiryReply.findUnique.mockResolvedValue({
+      id: 'reply-1',
+      inquiryId: 'inquiry-1',
+      body: '[보관 기간이 지나 파기된 답변]',
+      updatedAt: replyUpdatedAt,
+      inquiry: { purgedAt: new Date() },
+    });
+
+    await expect(
+      service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'reply-1', { body: '홍길동님 답변 복원' }),
+    ).rejects.toThrow(ConflictException);
+    expect(tx.v1InquiryReply.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the reply changed after it was read (a purge landed in between)', async () => {
+    tx.v1InquiryReply.findUnique.mockResolvedValue({
+      id: 'reply-1',
+      inquiryId: 'inquiry-1',
+      body: '기존 답변',
+      updatedAt: replyUpdatedAt,
+      inquiry: { purgedAt: null },
+    });
+    tx.v1InquiryReply.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'reply-1', { body: '수정된 답변' }),
+    ).rejects.toThrow(ConflictException);
+    expect(tx.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
   it('throws NOT_FOUND when the reply does not exist', async () => {
@@ -319,7 +368,7 @@ describe('AdminService — updateInquiryReply', () => {
     await expect(
       service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'missing-reply', { body: '수정된 답변' }),
     ).rejects.toThrow(NotFoundException);
-    expect(tx.v1InquiryReply.update).not.toHaveBeenCalled();
+    expect(tx.v1InquiryReply.updateMany).not.toHaveBeenCalled();
   });
 
   it('throws NOT_FOUND when the reply belongs to a different inquiry (prevents cross-inquiry edits)', async () => {
@@ -332,6 +381,24 @@ describe('AdminService — updateInquiryReply', () => {
     await expect(
       service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'reply-1', { body: '수정된 답변' }),
     ).rejects.toThrow(NotFoundException);
-    expect(tx.v1InquiryReply.update).not.toHaveBeenCalled();
+    expect(tx.v1InquiryReply.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdminService — changeInquiryStatus on a purged inquiry', () => {
+  it('refuses with 409 before opening a transaction', async () => {
+    const prisma = {
+      v1AdminUser: { findUnique: jest.fn().mockResolvedValue(activeAdminRecord) },
+      v1Inquiry: { findUnique: jest.fn().mockResolvedValue({ id: 'inquiry-1', status: 'closed', purgedAt: new Date() }) },
+      $transaction: jest.fn(),
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [AdminService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    await expect(
+      module.get(AdminService).changeInquiryStatus(adminAuthUser, 'inquiry-1', { status: 'reviewing' }),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

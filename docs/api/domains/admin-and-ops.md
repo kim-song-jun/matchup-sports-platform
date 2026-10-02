@@ -22,6 +22,7 @@
 | Method | Path | DTO / Query | 권한 | 용도 |
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |
+| `GET` | `/api/v1/admin/hub/inbox` | - | active admin | 처리할 대회 신청·결과 검토·문의·진행 중 대회 집계 |
 | `GET` | `/api/v1/admin/overview` | `AdminOverviewQueryDto` | active admin | 운영 현황 요약 |
 | `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
 | `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |
@@ -35,7 +36,13 @@
 | `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
-| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
+| `POST` | `/api/v1/admin/teams/:teamId/name` | `RenameArchivedTeamDto` `{ name(≤50), reason(≤500) }` | owner/ops | **보관된 팀만** 이름 변경 → `{ teamId, previousName, name, actionLogId }`. 새 이름은 팀 만들기·수정과 같은 규칙(정규화·같은 종목·지역 중복·팀장 해체 팀의 복구 기간 예약, 자기 자신 제외)이라 겹치면 `409 TEAM_NAME_TAKEN`. 보관 팀이 아니면 `409 TEAM_RENAME_NOT_ARCHIVED`, 앞뒤 공백을 뺀 이름이 비면 `400 TEAM_NAME_REQUIRED`, 지금 이름과 같으면 `400 TEAM_NAME_UNCHANGED`, support 는 `403 PERMISSION_DENIED`. 감사 로그 `team.rename`(before/after `{ name }`)만 남기고 상태 변경 기록은 남기지 않는다 |
+| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록. 각 행에 `platformManaged`, HOME/승인 팀 ID·이름, `pendingApplicationCount` 포함. 플랫폼 모집은 첫 팀만 승인된 단계에서도 그 팀을 승인 팀 필드에 반환하며, 검색은 제목과 참가·승인 팀명에 적용 |
+| `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·대표 이미지·실력·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
+| `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | `ApproveAdminTeamMatchApplicationDto` | owner/ops | 신청 팀을 한 팀씩 승인. 두 번째 승인에서 경기 확정 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/reject` | `RejectAdminTeamMatchApplicationDto` | owner/ops | 대기 신청을 필수 사유와 함께 거절하고 감사 로그·팀 알림 기록 |
+| `PATCH` | `/api/v1/admin/team-matches/:teamMatchId` | `UpdateAdminTeamMatchRecruitmentDto` | owner/ops | 모집 중인 플랫폼 단발 팀매치를 버전 검사 후 수정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
 | `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
 | `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |
@@ -79,12 +86,16 @@ type AdminListSummary = {
   byStatus: Record<string, number>;
   byCategory?: Record<string, number>;
   byAudience?: Record<string, number>;
+  byReportReason?: Record<string, number>; // inquiries 전용
+  reportReasonTotal?: number; // inquiries 전용
 };
 ```
 
 적용 엔드포인트는 `GET /api/v1/admin/users`, `matches`, `teams`, `team-matches`, `tournaments`, `inquiries`, `notices`, `popups`, `admins`다. `summary`는 cursor와 limit의 영향을 받지 않으므로 첫 페이지와 추가 로드 응답에서 같은 필터 조건이면 동일하다. 검색어나 종목 같은 비상태 조건은 집계에 반영하지만, `byStatus`는 현재 선택한 status를 제외하고 계산하여 모든 상태 칩의 전환 가능 건수를 유지한다.
 
 문의 `byCategory`는 현재 category를 제외하고 검색어와 status를 반영한다. 공지 `byAudience`는 현재 audience를 제외하고 검색어, status, category를 반영한다. 따라서 보조 필터의 `전체` 숫자는 해당 facet map 값의 합으로 계산한다. 알려진 상태·분류·대상 키는 결과가 없어도 `0`을 반환한다.
+
+`byReportReason`과 `reportReasonTotal`은 `GET /api/v1/admin/inquiries`에만 오며, 현재 reportReason을 제외하고 status·category·reportedTeamId·검색어를 반영한다. `byReportReason`은 지정된 사유 5개만 센다. `reportReasonTotal`은 같은 조건의 총 건수로 사유 미지정(null) 신고를 포함하므로 '전체 사유' 숫자는 이 값을 쓴다. 따라서 사유별 건수의 합보다 클 수 있다(사유 없이 접수된 신고, 분류 필터가 없으면 신고가 아닌 문의까지).
 
 ## 요청/응답 핵심 계약
 
@@ -102,7 +113,7 @@ type AdminListSummary = {
   - v1에서는 `accountStatus=deleted`, `deletedAt` 기록, 이메일/전화번호/프로필 마스킹, auth identity unlink, provider key 마스킹, 감사 로그 기록으로 처리한다. 이미 연결된 실시간 소켓도 강제 종료한다.
   - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
   - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
-  - 팀 정보는 생성/소유 팀, 팀장/운영진/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다.
+  - 팀 정보는 소유 팀(`ownerUserId` 기준, 보관 팀 포함·최근 5건 목록과 전체 개수), 팀장/매니저/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다. 소유 팀은 소속 팀의 owner(팀장) 역할과 같은 개념이다.
 
 아래 "사용자·운영자 접근 불변식" 절은 같은 사용자 상태 변경/삭제 계약을 DTO 레벨(`ChangeUserStatusDto`/`DeleteAdminUserDto`)에서 상세히 다룬다.
 
@@ -169,7 +180,21 @@ type AdminListSummary = {
 ## 상태 변경 DTO
 
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
-- 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
+- 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`
+  참가자도 `completed` 처리한다. 완료된 매치는 `archived` 외의 비종료 상태로 되돌릴 수 없다.
+- 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500). `archived` 로 바꾸면 팀장의
+  해체와 같은 경로다.
+  - 진행 중 경기·상대가 정해진 친선 팀매치·끝나지 않은 대회/리그 참가 신청이 있으면 **의도적으로** 거절한다(보관이
+    대진·상대 팀 일정을 깨지 않게) — `409 TEAM_DISSOLVE_BLOCKED`, `details.blockers` 는 팀장 해체 미리보기와 같은
+    `[{ kind, items[{ id, title, opponentName, startAt, placeName, registrationStatus, route }] }]`. 이때 상태·정리·감사
+    로그는 하나도 바뀌지 않는다. 어드민 팀 관리 화면은 이 목록을 상태 변경 모달 안에 항목별로 보여 준다.
+  - 막는 조건이 없으면 예정 팀매치·신청·초대·일정·채팅을 정리하고 `deletedAt` 에 해체 시각을 남기며 팀원 전원에게
+    `team_dissolved` 를 보낸다. 팀 전이 status log 는 `actorType=admin` 한 벌이고, 이렇게 보관한 팀은 팀장이 30일 안에도
+    직접 복구할 수 없다(`403 TEAM_RESTORE_ADMIN_ONLY`).
+  - `archived` 에서 벗어나면 `deletedAt` 을 지우고 팀 채팅방을 다시 연다(취소된 것은 되살리지 않음). 운영팀 보관은
+    이름을 바로 풀어 주므로, 그 사이 같은 종목·지역에 같은 이름의 활동 중·예약 팀이 생겼으면 팀장 셀프 복구와 같은
+    `409 TEAM_RESTORE_NAME_TAKEN`("같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.")이고 상태·감사 로그를
+    바꾸지 않는다(화면은 이 문구를 토스트로 보여 준다). 자세한 계약은 [Teams](./teams.md) "팀 해체(보관)·복구".
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.
 
@@ -250,3 +275,11 @@ type AdminListSummary = {
 - `apps/v1_api/src/admin/dto/admin-terms.dto.ts`
 - `apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
+
+## 대시보드 신청 집계
+
+`GET /api/v1/admin/hub/inbox`의 `pendingRegistrations`는 삭제되지 않은 대회(`regular_tournament` 또는 기존 `kind=null`)의 `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested` 신청만 포함한다. 정규 리그 시즌은 `/admin/tournaments/:id/registrations`에서 조회할 수 없으므로 이 대회 전용 집계에 포함하지 않는다. 리그 신청은 `/admin/league-matches/:leagueId/registrations`에서 관리한다. 응답 필드와 관리자 권한 계약은 유지한다.
+
+#### Task 149 — 팀매치 모집 조건 일치
+
+`POST /admin/team-matches`는 일반 생성과 같은 미래 시작/선택 종료/선택 마감 검증을 사용한다. 경기 스타일은 직접 입력을 포함해 최대 3개다. 신청 마감 뒤에도 접수된 두 팀은 경기 시작 전까지 확정할 수 있다(raw `recruiting`에 한함). 자세한 계약은 [팀매치](team-matches.md#일반관리자-날짜확정-공통-계약-task-149)를 따른다.

@@ -1,6 +1,12 @@
 # Task 74 — Production Push Notifications Activation
 
 Owners: project-director + tech-planner
+
+> **Android scope superseded by Task 156 (2026-08-28).** Task 156 is the canonical Android
+> architecture decision. Its dedicated WebView shell uses native FCM; this document's earlier
+> claim that Android WebView could reuse browser Web Push without FCM is not a valid v1 runtime
+> contract. Keep this file only for its historical browser Web Push context and do not implement
+> Android work from it.
 Drafted: 2026-04-19
 Status: Draft — awaiting iOS APNs availability confirmation (Firebase 미사용 정책)
 

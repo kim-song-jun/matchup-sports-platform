@@ -11,7 +11,7 @@ import type { TournamentGameDetail } from '@/hooks/use-tournament-result-review'
  * `useGameResultRevisions`/`useTournamentGame`이 최근 30초 내 한 번이라도
  * 불러온 적이 있으면 리마운트 없이는 재요청하지 않는다는 점이다.
  *
- * 이 테스트는 "결과 승인(확정)"을 눌렀을 때 훅의 캐시값을 그대로 믿지 않고
+ * 이 테스트는 "확인"을 눌렀을 때 훅의 캐시값을 그대로 믿지 않고
  * 반드시 `refetch()`로 최신값을 받아와, 그 값을 확인 문구와 실제 제출
  * payload 양쪽에 쓰는지를 검증한다 — 구현을 되읊는 게 아니라 "사용자가
  * 보는 숫자"와 "서버에 실제로 제출되는 숫자"가 최신값과 일치하는지를
@@ -21,7 +21,6 @@ import type { TournamentGameDetail } from '@/hooks/use-tournament-result-review'
 const mocks = vi.hoisted(() => ({
   useTournamentGame: vi.fn(),
   useGameResultRevisions: vi.fn(),
-  useReviewResultDecision: vi.fn(),
   useSupersedeAndSubmitResult: vi.fn(),
   useOfficializeResultRevision: vi.fn(),
 }));
@@ -29,7 +28,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-tournament-result-review', () => ({
   useTournamentGame: (...args: unknown[]) => mocks.useTournamentGame(...args),
   useGameResultRevisions: (...args: unknown[]) => mocks.useGameResultRevisions(...args),
-  useReviewResultDecision: (...args: unknown[]) => mocks.useReviewResultDecision(...args),
   useSupersedeAndSubmitResult: (...args: unknown[]) => mocks.useSupersedeAndSubmitResult(...args),
   useOfficializeResultRevision: (...args: unknown[]) => mocks.useOfficializeResultRevision(...args),
 }));
@@ -56,6 +54,8 @@ const STALE_REVISION = {
   missingScorer: false,
   mvpParticipantId: null,
   reason: null,
+  outcomeReason: 'NORMAL' as const,
+  outcomeNote: null,
   createdByActorType: 'SYSTEM' as const,
   createdByUserId: null,
   createdBySystemActor: 'GAME_END_DERIVER',
@@ -88,6 +88,7 @@ function gameDetail(overrides: Partial<TournamentGameDetail> = {}): TournamentGa
     lastSequence: 3,
     competitionConfigVersionId: 'config-1',
     currentOfficialRevisionId: null,
+    periods: [{ number: 1 }, { number: 2 }],
     sides: [
       { id: 'side-home', gameId: GAME_ID, sideKey: 'HOME' as const, teamId: null, displayNameSnapshot: '홈' },
       { id: 'side-away', gameId: GAME_ID, sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '원정' },
@@ -109,7 +110,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     officializeMutate = vi.fn();
 
     // 렌더 시점(마운트 직후, 아직 refetch 전)엔 캐시된 STALE 값 — 여기서
-    // 사용자가 "결과 승인(확정)"을 누르는 시나리오를 재현한다.
+    // 사용자가 "확인"을 누르는 시나리오를 재현한다.
     mocks.useTournamentGame.mockReturnValue({
       data: gameDetail(),
       isPending: false,
@@ -122,7 +123,6 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
       isError: false,
       refetch: revisionsRefetch,
     });
-    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useSupersedeAndSubmitResult.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useOfficializeResultRevision.mockReturnValue({
       mutate: officializeMutate,
@@ -131,10 +131,10 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
     });
   });
 
-  it('"결과 승인(확정)"을 누르면 강제로 다시 불러온 최신 점수를 확인 문구에 보여준다', async () => {
+  it('"확인"을 누르면 강제로 다시 불러온 최신 점수를 확인 문구에 보여준다', async () => {
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
 
     await waitFor(() => expect(revisionsRefetch).toHaveBeenCalled());
     await waitFor(() => expect(gameRefetch).toHaveBeenCalled());
@@ -148,7 +148,7 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
   it('확정을 누르면 화면에 보여준 것과 같은 최신 점수/버전으로 실제 제출한다', async () => {
     render(<GameResultReviewPanel gameId={GAME_ID} />);
 
-    fireEvent.click(screen.getByRole('button', { name: '결과 승인(확정)' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
 
@@ -184,6 +184,25 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
 
     expect(screen.getByText('경기 세부 기록')).toBeInTheDocument();
     expect(screen.queryByText('세부 기록을 불러오지 못했어요')).toBeNull();
+  });
+
+  // Task 180 G6(F76) — 콘솔만 최신순이다. 검토자는 경기 흐름대로(시간순) 읽는다.
+  it('경기 세부 기록은 시간순이다 — 콘솔의 최신순이 검토 화면으로 새지 않는다', () => {
+    const event = (sequence: number, clockMs: number) => ({
+      id: `e${sequence}`, gameId: GAME_ID, sequence, clientEventId: `c${sequence}`, payloadHash: 'h', type: 'GOAL',
+      sideId: 'side-home', participantId: null, assistParticipantId: null, period: 1, clockMs,
+      occurredAt: '2026-08-11T00:05:00.000Z', receivedAt: '2026-08-11T00:05:00.000Z',
+      actorUserId: 'a', reversesEventId: null, payload: {},
+    });
+    eventsMock.state = {
+      data: { events: [event(1, 1 * 60000), event(2, 7 * 60000), event(3, 13 * 60000)], lastSequence: 3, gap: null },
+      isPending: false, isError: false, error: null, refetch: () => {},
+    };
+
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows.map((row) => /전반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['1', '7', '13']);
   });
 
   it('조회 실패를 미기록과 구분해 표시하고 재시도 경로를 준다', () => {
@@ -236,7 +255,6 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useSupersedeAndSubmitResult.mockReturnValue({
       mutate: vi.fn(),
@@ -257,13 +275,31 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
 
     expect(screen.getByText('승부차기 2:0, 선축 원정')).toBeInTheDocument();
   });
+
+  /**
+   * **공개 화면 링크는 이 화면의 것이 아니다.** 한 번 여기 뒀다가 도달 불가로 걷어냈다 —
+   * 확정 한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
+   * 콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다.
+   *
+   * **이 자리에 "링크가 없다"는 단언은 두지 않는다.** 기능을 옮기면서 그 부재를 단언하는
+   * 테스트를 남기면 영영 녹색인 줄이 되고, 어디서 그 기능을 재는지도 흐려진다 —
+   * 실제 계약은 옮겨간 화면(`corrections-page-client.test.tsx`)이 **긍정으로** 잠근다.
+   */
+  it('정정 화면으로 가는 링크는 확정된 결과에 그대로 있다', () => {
+    render(<GameResultReviewPanel gameId={GAME_ID} correctionsHref="/x/records/corrections" />);
+
+    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toHaveAttribute(
+      'href',
+      '/x/records/corrections',
+    );
+  });
 });
 
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {
   const PENALTY_REVISION = {
     ...STALE_REVISION,
-    id: 'revision-rejected',
-    state: 'REJECTED',
+    id: 'revision-resubmittable',
+    state: 'SUBMITTED',
     score: { home: 1, away: 1, penalties: { home: 4, away: 3 } },
   };
   let supersedeMutate: ReturnType<typeof vi.fn>;
@@ -283,7 +319,6 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
     mocks.useSupersedeAndSubmitResult.mockReturnValue({
       mutate: supersedeMutate,
@@ -301,7 +336,9 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
       refetch: vi.fn(),
     });
     render(<GameResultReviewPanel gameId={GAME_ID} />);
-    fireEvent.click(screen.getByRole('button', { name: '다시 제출' }));
+    // SUBMITTED 카드의 입구는 "고치고 확인" 이다 — 레거시 반려 카드("다시 제출")는
+    // contract 마이그레이션과 함께 사라졌고, 열리는 모달은 같은 재제출 모달이다.
+    fireEvent.click(screen.getByRole('button', { name: '고치고 확인' }));
     return screen.getByRole('dialog');
   }
 
@@ -329,5 +366,169 @@ describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드�
     fireEvent.click(within(dialog).getByRole('button', { name: '다시 제출' }));
 
     expect(supersedeMutate.mock.calls[0][0].score).toEqual({ home: 2, away: 1 });
+  });
+});
+
+// Task 180 G6(F78·F80·F81) — 운영 콘솔이 경기 종료 직후 끼우는 압축판.
+describe('GameResultReviewPanel — 콘솔 확정 카드(variant="console")', () => {
+  let officializeMutate: ReturnType<typeof vi.fn>;
+
+  function setup(options: {
+    actorRole?: TournamentGameDetail['actorRole'];
+    revision?: Record<string, unknown>;
+    revisions?: Array<Record<string, unknown>>;
+    currentOfficialRevisionId?: string | null;
+  } = {}) {
+    officializeMutate = vi.fn();
+    mocks.useTournamentGame.mockReturnValue({
+      data: gameDetail({
+        actorRole: options.actorRole ?? 'tournament_director',
+        currentOfficialRevisionId: options.currentOfficialRevisionId ?? null,
+      }),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(async () => ({ data: gameDetail() })),
+    });
+    const revision = { ...FRESH_REVISION, ...options.revision };
+    mocks.useGameResultRevisions.mockReturnValue({
+      data: options.revisions ?? [revision],
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(async () => ({ data: options.revisions ?? [revision] })),
+    });
+    mocks.useSupersedeAndSubmitResult.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useOfficializeResultRevision.mockReturnValue({ mutate: officializeMutate, isPending: false, isError: false });
+  }
+
+  it('감독관에게는 스코어가 맨 위인 확정 카드와 확정 버튼이 보이고, 세부 기록·처리 이력은 없다', () => {
+    setup({ actorRole: 'tournament_director' });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    const card = screen.getByRole('region', { name: '결과 확정' });
+    expect(within(card).getByText('확정 전')).toBeInTheDocument();
+    expect(within(card).getByLabelText('스코어 2 : 1')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '2 : 1 결과 확정' })).toBeEnabled();
+    expect(within(card).getByRole('button', { name: '고치고 확인' })).toBeEnabled();
+    // 콘솔은 자기 이벤트 목록이 있으므로 검토 화면의 세부 기록·처리 이력을 되풀이하지 않는다.
+    expect(screen.queryByText('경기 세부 기록')).toBeNull();
+    expect(screen.queryByText('처리 이력')).toBeNull();
+  });
+
+  it('플랫폼 운영자에게도 확정 카드가 보인다', () => {
+    setup({ actorRole: 'platform_ops' });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    expect(screen.getByRole('button', { name: '2 : 1 결과 확정' })).toBeInTheDocument();
+  });
+
+  it.each(['field_operator', 'support_readonly'] as const)(
+    '확정 권한이 없는 %s 에게는 확정 버튼 대신 제출 안내만 보인다',
+    (actorRole) => {
+      setup({ actorRole });
+      render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+      expect(screen.getByRole('status')).toHaveTextContent('운영자가 확인해요');
+      expect(screen.queryByRole('region', { name: '결과 확정' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /결과 확정/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: '고치고 확인' })).toBeNull();
+    },
+  );
+
+  it('현장 진행요원 안내는 "결과를 제출했어요"라고 말한다', () => {
+    setup({ actorRole: 'field_operator' });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('결과를 제출했어요. 운영자가 확인해요.');
+  });
+
+  it('확정 버튼은 기존 확정 흐름(확인 모달 → officialize)을 그대로 탄다', async () => {
+    setup({ actorRole: 'platform_ops' });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '2 : 1 결과 확정' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('2:1 결과를 공식 결과로 확정해요');
+    expect(officializeMutate).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
+    await waitFor(() => expect(officializeMutate).toHaveBeenCalledTimes(1));
+    expect(officializeMutate.mock.calls[0][0]).toMatchObject({ revisionId: 'revision-1', score: { home: 2, away: 1 } });
+  });
+
+  // 서버는 감독관의 확정을 `DIRECTOR_OFFICIALIZE` 플래그가 켜진 동안에만 받는다(꺼져 있으면 403).
+  // 미리 읽을 방법이 없어 화면은 그 403 을 받은 뒤에야 버튼을 숨긴다 — 결과 검토 화면과 같은 규칙이다.
+  it('감독관이 확정하다 플래그 꺼짐(403)을 만나면 확정 버튼을 숨기고 안내하며, "다시 확인"으로 되살린다', async () => {
+    setup({ actorRole: 'tournament_director' });
+    officializeMutate.mockImplementation(
+      (_input: unknown, callbacks: { onError?: (error: unknown) => void }) =>
+        callbacks.onError?.({ code: 'DIRECTOR_OFFICIALIZE_DISABLED' }),
+    );
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '2 : 1 결과 확정' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }));
+
+    expect(await screen.findByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '2 : 1 결과 확정' })).toBeNull();
+    // 고쳐서 다시 제출하는 길은 막지 않는다.
+    expect(screen.getByRole('button', { name: '고치고 확인' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 확인' }));
+    expect(screen.getByRole('button', { name: '2 : 1 결과 확정' })).toBeInTheDocument();
+    expect(screen.queryByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeNull();
+  });
+
+  it('플랫폼 운영자에게는 확정이 항상 열려 있다 — 감독관 게이트 안내를 만들지 않는다', () => {
+    setup({ actorRole: 'platform_ops' });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    expect(screen.getByRole('button', { name: '2 : 1 결과 확정' })).toBeEnabled();
+    expect(screen.queryByText(/결과 확정 기능이 아직 활성화되지 않았어요/)).toBeNull();
+  });
+
+  it('어시스트가 비면 확정에 영향 없다는 안내를 카드 안에 보여준다', () => {
+    setup({
+      revision: {
+        resultParticipants: [{ goals: 2, assists: 1 }, { goals: 1, assists: 0 }],
+      },
+    });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    expect(within(screen.getByRole('region', { name: '결과 확정' })).getByText(/어시스트 미기입 2건/)).toBeInTheDocument();
+  });
+
+  it('공식 확정된 결과는 확정 완료 줄과 이어 갈 곳(confirmedFooter)을 보여준다 — 권한과 무관하게', () => {
+    setup({
+      actorRole: 'field_operator',
+      currentOfficialRevisionId: 'revision-1',
+      revision: { state: 'OFFICIAL' },
+    });
+    render(
+      <GameResultReviewPanel
+        gameId={GAME_ID}
+        variant="console"
+        confirmedFooter={<a href="/next">다음 경기로</a>}
+      />,
+    );
+
+    expect(screen.getByText('2 : 1 공식 결과로 확정했어요.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다음 경기로' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /결과 확정/ })).toBeNull();
+  });
+
+  it('확정 전에는 confirmedFooter 를 그리지 않는다', () => {
+    setup({ actorRole: 'platform_ops' });
+    render(
+      <GameResultReviewPanel gameId={GAME_ID} variant="console" confirmedFooter={<a href="/next">다음 경기로</a>} />,
+    );
+
+    expect(screen.queryByRole('link', { name: '다음 경기로' })).toBeNull();
+  });
+
+  it('승부차기로 갈린 결과는 카드에도 승부차기 점수를 함께 보여준다', () => {
+    setup({ revision: { score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } } });
+    render(<GameResultReviewPanel gameId={GAME_ID} variant="console" />);
+
+    expect(within(screen.getByRole('region', { name: '결과 확정' })).getByText(/승부차기/)).toBeInTheDocument();
   });
 });

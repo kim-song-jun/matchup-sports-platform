@@ -52,6 +52,22 @@ previous_checksum="$(jq -er '.previousManifestSha256' "${ALPHA_RELEASE_STATE_FIL
 validate_stored_alpha_manifest "${active_tmp}" "${ALPHA_ECR_REGISTRY}" "${active_checksum}"
 validate_stored_alpha_manifest "${PREVIOUS_MANIFEST}" "${ALPHA_ECR_REGISTRY}" "${previous_checksum}"
 
+case "$(jq -r '.database.task168.stage // "none"' "${active_tmp}")" in
+  stageAIntermediate)
+    echo "[alpha-rollback] Stage A has sealed the canonical intermediate; restoring a pre-cutover runtime is forbidden" >&2
+    exit 1
+    ;;
+  stageBFinal)
+    # D-4. The active database has had M11 (an irreversible DROP) applied — this
+    # script's image-swap rollback cannot undo that, and a schema-mismatched
+    # previous image would run against a database it does not understand. The
+    # only valid path back is the manual backup-restore procedure, never an
+    # automated image rollback.
+    echo "[alpha-rollback] Active release is Task168 StageB final; automated image rollback is forbidden — the only path back is the manual backup-only restore procedure (docs/ops/task168-stage-b-runbook.md, Rollback section)" >&2
+    exit 1
+    ;;
+esac
+
 previous_sha="$(jq -er '.release.sha' "${PREVIOUS_MANIFEST}")"
 if [[ "$(jq -r '.database.rollbackCompatibleWith // ""' "${active_tmp}")" != "${previous_sha}" ]]; then
   echo "[alpha-rollback] Active manifest is not proven compatible with the previous release" >&2
@@ -80,7 +96,8 @@ trap 'restore_current_on_failure' ERR
 
 load_alpha_release_manifest "${PREVIOUS_MANIFEST}"
 pull_release_images
-activate_alpha_release_source "${previous_sha}"
+previous_source_key="$(alpha_release_source_key "${PREVIOUS_MANIFEST}")"
+activate_alpha_release_source "${previous_source_key}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
 
 "${compose[@]}" up -d --force-recreate --no-deps \

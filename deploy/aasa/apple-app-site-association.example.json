@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.kr.co.teameet.alpha", "TEAMID.kr.co.teameet"],
+        "components": [
+          { "/": "/callback/*", "comment": "Kakao sign-in redirect" }
+        ]
+      }
+    ]
+  }
+}

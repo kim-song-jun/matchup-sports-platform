@@ -23,9 +23,16 @@ import {
   type TakeoverState,
 } from '@/lib/game-operations-queue';
 import { canonicalGameEventPayloadHash } from '@/lib/game-operations-hash';
-import { medianOffsetMs, pushClockSample, type ClockPingPong } from '@/lib/game-operations-clock';
+import {
+  isClockDrifted,
+  medianOffsetMs,
+  pushClockSample,
+  serverAlignedNowMs,
+  type ClockPingPong,
+} from '@/lib/game-operations-clock';
 import { getV1GameOperationsSocket, setGameOperationsAuthorizationSubjectVersion } from '@/lib/v1-game-operations-socket';
 import { randomUuid } from '@/lib/uuid';
+import { reportClientError } from '@/lib/client-error-reporter';
 import { v1Keys } from '@/lib/query-keys';
 import type { V1MyTournamentStaffResponse } from '@/types/api';
 import { myAssignmentVersion } from '@/hooks/use-v1-my-staff-assignments';
@@ -53,7 +60,15 @@ type GameTakeoverAck =
   | { status: 'denied'; code?: string };
 
 const CLOCK_PING_INTERVAL_MS = 15_000;
-const TAKEOVER_RENEW_INTERVAL_MS = 20_000; // < the 30s server-enforced minimum renewal spacing
+/**
+ * 서버 토큰 TTL(`GAME_TAKEOVER_TOKEN_TTL_MS` = 90초, `game-takeover.service.ts`)
+ * 보다 충분히 짧게 잡아, 갱신이 몇 번 실패해도(네트워크 끊김 등) 만료 전에
+ * 회복할 여지를 남긴다. 예전 주석은 "30초 최소 갱신 간격을 서버가 강제한다"고
+ * 적혀 있었는데 그런 코드는 서버에 존재하지 않는다 — `GameTakeoverService.renew`
+ * 에는 스로틀이 없다. 실재하지 않는 제약을 근거로 남겨 두면 다음 사람이 이 값을
+ * 못 건드린다.
+ */
+const TAKEOVER_RENEW_INTERVAL_MS = 20_000;
 const TAKEOVER_EXPIRY_CHECK_INTERVAL_MS = 2_000;
 /**
  * UX audit item 1 (CRITICAL, 2026-08): `socket.emit(event, payload, ackHandler)`
@@ -70,6 +85,40 @@ const TAKEOVER_EXPIRY_CHECK_INTERVAL_MS = 2_000;
  * `QueueStatusPanel` retry affordance instead of a silent, permanent stall.
  */
 export const SEND_ACK_TIMEOUT_MS = 10_000;
+/**
+ * `game.subscribe`도 같은 위험을 진다 — 게이트웨이의 `subscribeToGame`은
+ * `ForbiddenException`만 `{ status: 'denied' }`로 ack하고 나머지(게임 조회 실패,
+ * 일시적 Prisma 오류 등)는 그대로 rethrow하는데, NestJS WS 예외 경로는 `exception`
+ * 이벤트만 쏘고 **ack 콜백을 부르지 않는다**. 소켓은 끊기지 않으므로 `disconnect`
+ * 리셋도 발화하지 않는다. 아래 재진입 가드가 그대로 래치되면 이후 갭 복구·재구독이
+ * 전부 무음 no-op이 되어 콘솔이 새로고침 전까지 아무 것도 기록하지 못한다 —
+ * 이 픽스가 없애려던 증상 그 자체다. 그래서 send 경로(`SEND_ACK_TIMEOUT_MS`)와
+ * 같은 방식의 탈출구를 둔다.
+ */
+export const SUBSCRIBE_ACK_TIMEOUT_MS = 10_000;
+
+const QUEUE_PERSIST_FAILED_MESSAGE =
+  '이 기기에 기록을 임시 저장하지 못했어요. 지금 기록은 계속 전송되지만, 새로고침하면 아직 전송되지 않은 기록이 사라질 수 있어요.';
+
+/**
+ * 전체 이력 스냅숏 안의 첫 시퀀스 구멍. 서버
+ * `GamesService.listEvents`(`afterSequence`=0)의 갭 계산과 **같은 규칙**이다 —
+ * 1부터 시작해 연속인지만 보고, 꼬리(마지막 이벤트와 `lastSequence` 사이)는 갭으로
+ * 치지 않는다(그 구간은 아직 커밋 중인 이벤트일 수 있다). 두 곳이 갈라지면 서버가
+ * 보고한 갭과 클라이언트 판정이 어긋나므로 규칙을 바꿀 땐 반드시 함께 바꾼다.
+ */
+function firstSequenceHole(
+  events: readonly GameEventRecord[],
+): { expectedSequence: number; availableFrom: number } | null {
+  let expected = 1;
+  for (const event of events) {
+    if (event.sequence > expected) {
+      return { expectedSequence: expected, availableFrom: event.sequence };
+    }
+    expected = event.sequence + 1;
+  }
+  return null;
+}
 
 function queueStorageKey(gameId: string): string {
   return `teameet.v1.gameOps.queue.${gameId}`;
@@ -81,9 +130,40 @@ function loadPersistedQueue(gameId: string): GameOperationsQueueState {
   return hydrateAfterReload(deserializeQueueState(raw).items);
 }
 
-function persistQueue(gameId: string, state: GameOperationsQueueState): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(queueStorageKey(gameId), serializeQueueState(state));
+/**
+ * 큐를 localStorage에 박제한다. 실패(대부분 `QuotaExceededError`, 사파리
+ * 프라이빗 모드에서는 setItem 자체가 던진다)를 삼키지 않고 호출자에게 알린다 —
+ * 예전에는 try/catch가 아예 없어서 이 예외가 **렌더 중 effect에서 그대로 튀어
+ * 올라 콘솔 컴포넌트 트리 전체가 언마운트**됐다(경기 도중 화면이 통째로
+ * 사라진다). 그렇다고 조용히 삼키면 안 된다: 저장에 실패했다는 건 "새로고침하면
+ * 아직 못 보낸 기록이 사라진다"는 뜻이라 운영자가 반드시 알아야 한다. 그래서
+ * 여기서는 실패 여부만 돌려주고, 사용자 통지·원격 리포트는 호출한 effect가 한다.
+ */
+function persistQueue(gameId: string, state: GameOperationsQueueState): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    // 확정(acked)된 항목은 저장하지 않는다. 저장의 목적은 오직 "새로고침/탭
+    // 종료 뒤 아직 못 끝낸 전송을 다시 시도하는 것"이고(`hydrateAfterReload`의
+    // 문서 주석), 확정된 이벤트는 서버 스냅숏(`liveEvents` → RecordedEventList)이
+    // 다시 알려준다 — 저장해 둘 이유가 없다. 예전에는 acked까지 그대로 박제해
+    // gameId별 키가 그 경기의 전체 이벤트 크기로 부풀었고, 키는 지워지는 일이
+    // 없으니 이 기기에서 운영한 경기 수만큼 무한 누적됐다(위 catch가 잡는
+    // QuotaExceeded의 실제 원인). 화면(`QueueStatusPanel`)에는 세션 동안 acked
+    // 항목이 "기록 완료"로 계속 보인다 — 메모리 큐는 그대로 두고 저장분만
+    // 줄인다.
+    const durable: GameOperationsQueueState = {
+      items: state.items.filter((item) => item.status !== 'acked'),
+    };
+    window.localStorage.setItem(queueStorageKey(gameId), serializeQueueState(durable));
+    return true;
+  } catch (error) {
+    reportClientError({
+      message: error instanceof Error ? error.message : '경기 기록 큐를 저장하지 못했어요.',
+      level: 'warn',
+      context: { flow: 'v1-game-operations-console', event: 'persistQueue', gameId },
+    });
+    return false;
+  }
 }
 
 /** Resolves the CURRENT actor's own tournament-staff assignment version, so
@@ -127,6 +207,8 @@ export interface SubmitEventInput {
 }
 
 export interface UseV1GameOperationsConsoleOptions {
+  /** Read-only staff may subscribe and receive live updates, but never acquire a write lease. */
+  readonly takeoverEnabled?: boolean;
   // T3 추가: 팀매치는 tournamentId/스태프 배정 개념이 없다 — null이면 아래
   // useMyTournamentStaffAssignmentVersion 쿼리가 스킵되고 버전은 항상 0으로
   // 고정된다(팀매치는 배정 handshake가 필요 없어 언제나 self-consistent하다).
@@ -140,12 +222,17 @@ export interface UseV1GameOperationsConsoleOptions {
    * 기록된 이벤트가 있어도(예: 5건) 클라이언트는 그 이벤트를 한 번도 받은
    * 적이 없는데 "거기까지는 이미 안다"고 서버에 알리는 셈이라 서버가 빈
    * 배열을 돌려줬다("아직 기록된 이벤트가 없어요"로 보임, 스코어도 0:0
-   * 고정). 최초 구독은 항상 `afterSequence: 0`으로 전체 이력을 받는다(아래
-   * 소켓 라이프사이클 effect 참고) — 재연결/갭 복구에서만 `lastSequenceRef`를
-   * 쓴다. 이 값이 실제로 쓰이는 곳은 두 군데뿐이다: (1) 마운트 시
-   * `sync.lastSequence`의 초기값(첫 스냅숏이 도착하기 전 화면에 잠깐 보일 수
-   * 있는 값), (2) `requestTakeover`가 서버에 보내는 `lastSequence` 필드
-   * (참고용 — 서버가 게이팅에 쓰지 않는다, `GamesService.requestTakeover`).
+   * 고정). **모든** `game.subscribe`는 최초 구독이든 재연결/갭 복구든 항상
+   * `afterSequence: 0`으로 전체 이력을 받는다(아래 소켓 라이프사이클 effect의
+   * `resyncFromServer` 참고). 이 값이 실제로 쓰이는 곳은 두 군데뿐이다:
+   * (1) `sync.lastSequence`를 서버가 알고 있는 최신값으로 올려 두는 것
+   * (이미 받은 이벤트보다 앞설 때만 반영한다), (2) `requestTakeover`가 서버에
+   * 보내는 `lastSequence` 필드(참고용 — 서버가 게이팅에 쓰지 않는다,
+   * `GamesService.requestTakeover`).
+   *
+   * 이 값은 브로드캐스트 중복 판정 기준으로는 **절대** 쓰이지 않는다 — 그 기준은
+   * 이벤트 본문을 실제로 받은 시퀀스(`receivedSequenceRef`)다. 숫자를 아는 것과
+   * 본문을 받은 것은 다르다.
    */
   readonly initialLastSequence: number;
 }
@@ -206,7 +293,7 @@ export interface UseV1GameOperationsConsoleResult {
 export function useV1GameOperationsConsole(
   options: UseV1GameOperationsConsoleOptions,
 ): UseV1GameOperationsConsoleResult {
-  const { tournamentId, gameId, myUserId, initialLastSequence } = options;
+  const { tournamentId, gameId, myUserId, initialLastSequence, takeoverEnabled = true } = options;
   const queryClient = useQueryClient();
 
   const [connectionStatus, setConnectionStatus] = useState<GameOperationsConnectionStatus>('connecting');
@@ -217,6 +304,15 @@ export function useV1GameOperationsConsole(
   const [liveEvents, setLiveEvents] = useState<readonly GameEventRecord[]>([]);
   const [clockSamples, setClockSamples] = useState<readonly ClockPingPong[]>([]);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
+  const takeoverEnabledRef = useRef(takeoverEnabled);
+  takeoverEnabledRef.current = takeoverEnabled;
+  // Renew ACKs can arrive after an API restart/reconnect has already issued a
+  // fresh grant. A late denial for the superseded token must not overwrite the
+  // newer held state and show a false TAKEOVER_SUPERSEDED banner.
+  const takeoverStatusRef = useRef(takeover.status);
+  const takeoverTokenRef = useRef<string | null>(null);
+  takeoverStatusRef.current = takeover.status;
+  takeoverTokenRef.current = takeover.status === 'held' ? takeover.token : null;
 
   const clockOffsetMs = useMemo(() => medianOffsetMs(clockSamples), [clockSamples]);
 
@@ -238,21 +334,46 @@ export function useV1GameOperationsConsole(
     dispatchQueue({ type: 'HYDRATE', items: loadPersistedQueue(gameId).items });
   }, [gameId]);
 
+  // 저장 실패 배너는 **상태가 바뀌는 순간에만** 세우고 지운다. 이 effect의 deps는
+  // `[gameId, queue]`라 큐가 바뀔 때마다 다시 도는데, 저장이 계속 실패하는 기기에서
+  // 매번 setBannerMessage를 부르면 단일 배너 슬롯(`operate-console.tsx`)을 큐 변경마다
+  // 덮어써 '운영 권한이 해제됐어요' 같은 더 급한 공지가 화면에서 사라진다. 반대로
+  // 저장이 다시 성공했을 때 지우지 않으면 이미 해소된 경고가 경기 내내 남는다.
+  const persistFailedRef = useRef(false);
   useEffect(() => {
     if (!gameId) return;
-    persistQueue(gameId, queue);
+    if (persistQueue(gameId, queue)) {
+      if (!persistFailedRef.current) return;
+      persistFailedRef.current = false;
+      // 다른 사유로 바뀐 배너까지 지우지 않는다 — 내가 세운 문구일 때만 걷는다.
+      setBannerMessage((current) => (current === QUEUE_PERSIST_FAILED_MESSAGE ? null : current));
+      return;
+    }
+    if (persistFailedRef.current) return;
+    persistFailedRef.current = true;
+    // 저장 실패는 곧 "새로고침하면 아직 못 보낸 기록이 사라진다"는 뜻이다 —
+    // 전송 자체는 메모리 큐로 계속되므로 지금 기록을 막지는 않지만, 운영자가
+    // 이 사실을 모른 채 새로고침하는 일은 막아야 한다.
+    setBannerMessage(QUEUE_PERSIST_FAILED_MESSAGE);
   }, [gameId, queue]);
 
+  // 서버가 확정한 이벤트 시퀀스 중 이 클라이언트가 **본문까지 실제로 받은** 마지막
+  // 값. 예전에는 `sync.lastSequence`를 그대로 미러링했는데, 그 값은 REST로 읽어온
+  // `initialLastSequence`(아래 effect)로도 올라간다 — 즉 "숫자만 아는" 시퀀스까지
+  // 포함됐다. 그래서 REST가 소켓보다 앞서면(`providers.tsx`의
+  // `refetchOnWindowFocus: true`로 창 포커스 복귀마다 재발화) 뒤늦게 도착한 그
+  // 이벤트의 브로드캐스트가 `onCommitted`에서 "이미 아는 중복"으로 조용히 버려져
+  // 화면에 영영 나타나지 않았다. 이 ref는 스냅숏 백필과 브로드캐스트 append —
+  // 이벤트 본문이 실제로 손에 들어온 순간 — 에서만 올라간다.
+  const receivedSequenceRef = useRef(0);
+
   useEffect(() => {
+    // REST가 알려준 시퀀스는 **이미 받은 이벤트보다 앞설 때만** 반영한다. 뒤처진
+    // REST 읽기가 소켓이 이미 확인한 시퀀스를 되돌리면, 그 뒤 도착하는 정상
+    // 브로드캐스트가 비연속으로 보여 불필요한 전체 리싱크를 유발한다.
+    if (initialLastSequence <= receivedSequenceRef.current) return;
     dispatchSync({ type: 'SNAPSHOT', lastSequence: initialLastSequence });
   }, [initialLastSequence]);
-
-  // Always mirrors the latest `sync.lastSequence` for handlers registered by
-  // the gameId-only socket effect below (see that effect's own comment).
-  const lastSequenceRef = useRef(sync.lastSequence);
-  useEffect(() => {
-    lastSequenceRef.current = sync.lastSequence;
-  }, [sync.lastSequence]);
 
   // `reverseEvent` (T3, REST-only, no offline queue — see that function's own
   // comment) has no realtime broadcast counterpart: `GamesService.
@@ -278,77 +399,141 @@ export function useV1GameOperationsConsole(
 
     const socket = getV1GameOperationsSocket();
     let cancelled = false;
-    // 이 소켓 구독 세션(=이 gameId의 effect 인스턴스) 안에서 서버로부터 진짜
-    // 스냅숏을 한 번이라도 받았는지 — 받기 전까지는 이 클라이언트가 실제로
-    // "아는" 이벤트가 하나도 없다는 뜻이다(REST로 미리 읽은
-    // `initialLastSequence`가 있어도 마찬가지 — 그건 숫자만 알 뿐 이벤트
-    // 본문을 받은 적이 없다). ack 콜백 안에서 성공한 경우에만 true로
-    // 올린다 — emit 시점에 미리 올려두면 최초 구독이 denied 등으로 실패한
-    // 뒤 재연결이 왔을 때도 "이미 안다"고 착각해 여전히 빈 배열을 받는
-    // 문제가 재현된다.
-    let hasReceivedSnapshot = false;
+    // 새 경기의 구독을 시작하는 지점이다 — 이전 경기에서 올려 둔 시퀀스를 그대로
+    // 들고 가면, 이벤트가 적은 경기로 옮겼을 때 그 경기의 초기 시퀀스가
+    // "이미 아는 값"으로 보여 아래 중복 판정이 정상 브로드캐스트를 버린다.
+    receivedSequenceRef.current = 0;
 
     type SubscribeAck = {
       status: string;
+      code?: string;
       snapshot?: { version: number; state: GameState; lastSequence: number; events: readonly GameEventRecord[] };
     };
 
     // This effect intentionally depends only on `[gameId]` (resubscribing on
     // every sync/queue change would thrash the connection), so every handler
-    // below reads the LATEST `lastSequence` through `lastSequenceRef` instead
-    // of closing over the `sync` state value from whichever render created
-    // this effect — a stale closure here would resubscribe/backfill from a
-    // sequence far behind reality after the first snapshot.
+    // below reads the LATEST received sequence through `receivedSequenceRef`
+    // instead of closing over the `sync` state value from whichever render
+    // created this effect — a stale closure here would judge contiguity
+    // against a sequence far behind reality after the first snapshot.
     const applySnapshot = (snapshot: { version: number; state: GameState; lastSequence: number; events: readonly GameEventRecord[] }) => {
+      // 뒤늦게 도착한 **오래된** 스냅숏은 버린다. 재연결과 갭 복구가 겹쳐 구독이 두 번
+      // 나가면 서버는 각각 push(`game.snapshot`)와 ack으로 같은 스냅숏을 돌려주므로 한
+      // 라운드에 최대 4번이 배달되고, 그 사이 `onCommitted`가 append한 최신 이벤트가
+      // 있을 수 있다. 순서 보장이 없으므로 단조성을 여기서 직접 지킨다 — 이게 없으면
+      // liveEvents가 과거로 되감기고(그 골이 화면에서 사라진다) `gameSnapshot.version`도
+      // 함께 내려가 다음 append가 VERSION_CONFLICT로 튄다.
+      if (snapshot.lastSequence < receivedSequenceRef.current) return;
       setGameSnapshot({ version: snapshot.version, state: snapshot.state });
       setLiveEvents(snapshot.events);
+      // 스냅숏은 언제나 전체 이력이므로(아래 `resyncFromServer` 참고) 여기서
+      // 받은 `lastSequence`까지는 이벤트 본문을 실제로 손에 넣은 것이다.
+      receivedSequenceRef.current = snapshot.lastSequence;
+      // 동기 상태는 **이 스냅숏 자체**로 판정한다. 서버도 같은 구독 응답에서
+      // `game.gap`을 따로 쏘지만(`realtime.gateway.ts`), 그건 같은 스냅숏을 실어 오는
+      // ack과 순서 경쟁을 한다 — 나중에 도착한 쪽이 상태를 결정하면 갭이 조용히
+      // 풀린다. 스냅숏이 언제나 전체 이력이 된 지금은 클라이언트가 완결성을 직접
+      // 판정할 수 있고, 판정 방식은 서버 `GamesService.listEvents`의 갭 계산
+      // (afterSequence=0)과 동일하다.
+      const hole = firstSequenceHole(snapshot.events);
+      if (hole !== null) {
+        dispatchSync({ type: 'GAP', expectedSequence: hole.expectedSequence, availableFrom: hole.availableFrom });
+        return;
+      }
       dispatchSync({ type: 'BACKFILLED', lastSequence: snapshot.lastSequence });
     };
 
-    const resubscribeFromLastKnownSequence = () => {
-      // 최초 구독은 항상 0부터(전체 이력) — 재연결/갭 복구에서만
-      // `lastSequenceRef`를 써 이미 받은 이벤트를 다시 받지 않는다. 서버
-      // `GamesService.listEvents`는 페이징이 없어(games.service.ts) 전체
-      // 이력을 한 번에 돌려주는데, 대회 경기 하나의 이벤트 수는 골/카드/
-      // 파울/교체 합쳐 수십 건 규모라 이 규모에서는 안전하다 — 수천 건
-      // 단위가 되면 페이징이 필요하지만 지금 범위는 아니다.
-      const afterSequence = hasReceivedSnapshot ? lastSequenceRef.current : 0;
-      socket.emit(
-        'game.subscribe',
-        { gameId, afterSequence },
-        (result: SubscribeAck) => {
-          if (cancelled) return;
-          if (result.status === 'subscribed' && result.snapshot) {
-            hasReceivedSnapshot = true;
-            applySnapshot(result.snapshot);
-          } else if (result.status === 'denied') {
-            setBannerMessage('운영 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
-          }
-        },
-      );
+    /**
+     * 구독은 **언제나 전체 이력**(`afterSequence: 0`)을 받아온다 — 최초 구독도,
+     * 재연결/갭 복구도, REST-only 커맨드 뒤의 강제 재동기화도 전부 같은 경로다.
+     *
+     * 예전에는 재연결/갭 복구만 "내가 아는 마지막 시퀀스 이후"를 요청하는 별도
+     * 경로(`resubscribeFromLastKnownSequence`)를 탔는데, 서버
+     * `GamesService.listEvents`는 `sequence > afterSequence`인 **델타만** 주고
+     * 클라이언트 `applySnapshot`은 `setLiveEvents(...)`로 **통째 교체**한다 —
+     * 즉 재연결 1회마다 이벤트 목록이 통째로 비워졌다(소켓은 모듈 싱글턴이고
+     * socket.io v4 기본값이 무한 재연결이라, 콘솔을 오래 켜 두면 반드시 발생).
+     * 그러면 `liveEvents`에서만 파생되는 헤더 스코어·누적 파울·교체 잔여·"지금
+     * 피치 위"가 전부 무너지고, 그 상태에서 교체를 기록하면 서버가
+     * `SUBSTITUTION_OUT_NOT_ON_PITCH` / `SUBSTITUTION_IN_ALREADY_ON_PITCH`로
+     * 거부하는데 두 코드 모두 NON_RETRYABLE이라 '다시 시도' 버튼조차 없다
+     * (= 새로고침 말고는 복구 수단이 없었다).
+     *
+     * 전체 전송이 무해한 근거: `listEvents`는 페이징이 없지만 대회 경기 하나의
+     * 이벤트는 골/카드/파울/교체 합쳐 수십 건 규모다. 수천 건 단위가 되면
+     * 서버에 페이징이 필요하고, 그때는 여기도 함께 바뀌어야 한다.
+     *
+     * 게이트웨이 `game.subscribe`는 payload에 `afterSequence`가 반드시 있어야
+     * 하므로(`realtime.gateway.ts`의 parse 가드) 필드는 그대로 보내되 값은 항상
+     * 0이다.
+     */
+    // 재진입 가드 — connect / game.gap / 비연속 committed 세 트리거가 겹쳐
+    // 도착할 수 있고(재연결 직후 밀린 브로드캐스트가 한꺼번에 들어오는 경우가
+    // 전형적이다), 이제 매 구독이 전체 이력을 실어 오므로 중복 발사는 그냥
+    // 낭비가 아니라 위험하다: 늦게 도착한 오래된 스냅숏이 최신 스냅숏을 덮어써
+    // `liveEvents`를 과거로 되돌릴 수 있다. 응답이 올 때까지 추가 emit을 막되,
+    // 그 사이 들어온 요청은 버리지 않고 한 번으로 합쳐 뒤이어 재발사한다 —
+    // `reverseEvent`/`assignAssist`의 "되돌린 결과를 즉시 반영한다" 계약이
+    // 조용히 깨지면 안 되기 때문이다.
+    let resyncInFlight = false;
+    let resyncCoalesced = false;
+    let resyncTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    // 시도마다 번호를 붙여 "늦게 도착한 이전 시도의 ack"을 식별한다. 타임아웃
+    // 탈출구가 다음 시도를 이미 재발사한 뒤 옛 ack이 도착하면, 그 ack이
+    // `releaseResyncGuard()`를 불러 **최신 시도의** 타임아웃을 지우고 가드까지
+    // 풀어버린다 — 그때부터 구독이 중첩 발사되고(가드 무력화) 그 중첩 시도의
+    // ack이 다시 다음 타임아웃을 지우는 연쇄가 된다. 자기 시도가 여전히 최신일
+    // 때만 가드를 건드리게 해서 이 연쇄를 끊는다.
+    let resyncAttemptId = 0;
+    const releaseResyncGuard = () => {
+      if (resyncTimeoutId !== null) {
+        clearTimeout(resyncTimeoutId);
+        resyncTimeoutId = null;
+      }
+      resyncInFlight = false;
     };
-
-    // Always fetches the COMPLETE event history (afterSequence: 0) — unlike
-    // `resubscribeFromLastKnownSequence` (used for connect/gap-recovery,
-    // which asks only for what's missing since `lastSequenceRef.current`),
-    // this must never assume the client's current `liveEvents` are still a
-    // valid base to build on: it exists specifically so `reverseEvent`
-    // (below, outside this effect) can force `liveEvents` back in sync with
-    // the server after a REST-only reversal that has no realtime broadcast
-    // counterpart. A full resubscribe, exactly like the very first mount
-    // performs, is the only response guaranteed self-consistent regardless
-    // of what this client did or didn't already know.
     const resyncFromServer = () => {
+      if (resyncInFlight) {
+        resyncCoalesced = true;
+        return;
+      }
+      resyncInFlight = true;
+      const attemptId = ++resyncAttemptId;
+      // ack이 끝내 오지 않아도 가드가 영구 래치되지 않게 하는 탈출구
+      // (`SUBSCRIBE_ACK_TIMEOUT_MS` 주석 참고). 합쳐 둔 요청이 있으면 그때 한 번
+      // 재발사한다 — 없으면 가드만 풀고 다음 트리거를 기다린다(재시도 폭주 방지).
+      resyncTimeoutId = setTimeout(() => {
+        resyncTimeoutId = null;
+        resyncInFlight = false;
+        if (cancelled || !resyncCoalesced) return;
+        resyncCoalesced = false;
+        resyncFromServer();
+      }, SUBSCRIBE_ACK_TIMEOUT_MS);
       socket.emit(
         'game.subscribe',
         { gameId, afterSequence: 0 },
         (result: SubscribeAck) => {
+          // 이미 다음 시도가 나갔다면 이 ack은 낡았다 — 가드도 스냅숏도 건드리지
+          // 않고 버린다. 최신 시도가 더 새로운 스냅숏을 가져오고, 서버가 함께
+          // push하는 `game.snapshot`은 `onSnapshot`의 단조성 가드가 거른다.
+          if (attemptId !== resyncAttemptId) return;
+          releaseResyncGuard();
           if (cancelled) return;
           if (result.status === 'subscribed' && result.snapshot) {
-            hasReceivedSnapshot = true;
             applySnapshot(result.snapshot);
           } else if (result.status === 'denied') {
+            if (result.code === 'STAFF_SCOPE_DENIED') {
+              // A resync denial is an authoritative loss of this game's read scope,
+              // just like the explicit permission-revoked event. Drop the held
+              // takeover so every write control is disabled, while leaving the
+              // durable queue untouched for a later explicit recovery.
+              dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+            }
             setBannerMessage('운영 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
+          }
+          if (resyncCoalesced) {
+            resyncCoalesced = false;
+            resyncFromServer();
           }
         },
       );
@@ -357,28 +542,45 @@ export function useV1GameOperationsConsole(
 
     const onConnect = () => {
       setConnectionStatus('connected');
-      resubscribeFromLastKnownSequence();
+      resyncFromServer();
     };
-    const onDisconnect = () => setConnectionStatus('disconnected');
+    const onDisconnect = () => {
+      setConnectionStatus('disconnected');
+      // ack가 영영 오지 않는 경우(끊긴 소켓)에도 가드가 래치되지 않게 푼다 —
+      // 다음 connect가 반드시 다시 구독할 수 있어야 한다.
+      releaseResyncGuard();
+      resyncCoalesced = false;
+    };
     const onSnapshot = (snapshot: { version: number; state: GameState; lastSequence: number; events: readonly GameEventRecord[] }) => {
       if (cancelled) return;
       // 서버는 구독 처리 중 이 이벤트도 함께 쏘고(`subscribeToGame`,
-      // realtime.gateway.ts) 그 응답을 ack 콜백으로도 돌려준다 — 어느 쪽이
-      // 먼저 도착해도 `hasReceivedSnapshot`이 올라가도록 여기서도 표시한다.
-      hasReceivedSnapshot = true;
+      // realtime.gateway.ts) 그 응답을 ack 콜백으로도 돌려준다 — 둘 다 같은
+      // 전체 스냅숏이라 어느 쪽이 먼저 와도 결과가 같다.
       applySnapshot(snapshot);
     };
+    // 서버가 보고한 갭에 대해 **같은 갭이면 재구독을 한 번만** 시도한다.
+    // `game.gap`은 오직 `game.subscribe` 응답의 일부로만 발행되는데
+    // (`realtime.gateway.ts`의 유일한 emit 지점), 이제 모든 구독이 전체 이력을
+    // 실어 오므로 같은 요청을 다시 보내면 서버는 **같은 결과를 그대로 돌려준다** —
+    // 조건 없이 재구독하면 갭 → 재구독 → 갭 … 으로 끝나지 않는다(경기 하나가
+    // 서버 트랜잭션을 무한히 두들기고, 그 콘솔은 갭이 안 풀려 끝까지 사용 불가).
+    // 한 번은 시도한다: 서버 스냅숏 읽기 자체가 순간적으로 어긋났을 가능성을
+    // 배제하지는 않되, 같은 갭이 다시 오면 그건 서버 이벤트 테이블의 실제 구멍이라
+    // 클라이언트가 할 수 있는 일이 없으므로 프리즈를 유지한다(불완전한 타임라인
+    // 위에 새 이벤트를 커밋시키지 않는다).
+    let resyncedGapSignature: string | null = null;
     const onGap = (gap: { expectedSequence: number; availableFrom: number }) => {
       if (cancelled) return;
       dispatchSync({ type: 'GAP', expectedSequence: gap.expectedSequence, availableFrom: gap.availableFrom });
-      // Recover by re-subscribing from the last KNOWN-good sequence — the
-      // server replays every event from there, closing the gap in order.
-      resubscribeFromLastKnownSequence();
+      const signature = `${gap.expectedSequence}:${gap.availableFrom}`;
+      if (resyncedGapSignature === signature) return;
+      resyncedGapSignature = signature;
+      resyncFromServer();
     };
     const onCommitted = (committed: { gameId: string; sequence: number; version: number; event: GameEventRecord }) => {
       if (cancelled || committed.gameId !== gameId) return;
       setGameSnapshot((current) => (current ? { ...current, version: committed.version } : current));
-      if (committed.sequence === lastSequenceRef.current + 1) {
+      if (committed.sequence === receivedSequenceRef.current + 1) {
         // Contiguous. The gateway emits `game.event.committed` to the
         // sender's OWN socket too (not only the room broadcast, which
         // explicitly excludes the sender) — so this fires for every
@@ -386,31 +588,79 @@ export function useV1GameOperationsConsole(
         // operator, exactly once each. This is the single place liveEvents
         // is appended; the ack handler in `sendQueuedItem` only updates
         // queue/sync/version state for this device's own sends.
-        dispatchSync({ type: 'BACKFILLED', lastSequence: committed.sequence });
+        receivedSequenceRef.current = committed.sequence;
+        // `BACKFILLED`가 아니라 `EVENT_ARRIVED`인 이유는 그 액션의 주석 참고 —
+        // 이 브로드캐스트는 꼬리에 한 건을 붙일 뿐 이미 난 구멍을 채우지 않는다.
+        // (스냅숏 자체에 구멍이 있으면 `applySnapshot`이 GAP을 걸어 두는데,
+        // 거기서 `receivedSequenceRef`는 이미 `snapshot.lastSequence`까지 올라가
+        // 있으므로 그 다음 이벤트는 여기서 "연속"으로 판정된다.)
+        dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: committed.sequence });
         setLiveEvents((current) => [...current, committed.event]);
-      } else if (committed.sequence > lastSequenceRef.current + 1) {
-        // Non-contiguous broadcast: something between our last known
-        // sequence and this one was missed — recover exactly like an
+      } else if (committed.sequence > receivedSequenceRef.current + 1) {
+        // Non-contiguous broadcast: something between the last event we
+        // actually received and this one was missed — recover exactly like an
         // explicit `game.gap`, via a full re-subscribe/backfill rather
         // than silently appending a event list with a hole in it.
-        dispatchSync({ type: 'GAP', expectedSequence: lastSequenceRef.current + 1, availableFrom: committed.sequence });
-        resubscribeFromLastKnownSequence();
+        dispatchSync({ type: 'GAP', expectedSequence: receivedSequenceRef.current + 1, availableFrom: committed.sequence });
+        resyncFromServer();
       }
-      // committed.sequence <= lastSequenceRef.current: already-known/ordering-
-      // duplicate broadcast, ignored.
+      // committed.sequence <= receivedSequenceRef.current: 이 본문을 이미 받은
+      // 중복/역순 브로드캐스트라 무시한다. 비교 기준이 `sync.lastSequence`가
+      // 아니라 "본문을 받은 시퀀스"라는 점이 핵심이다 — REST가 먼저 알려준
+      // 숫자로 이 기준을 올려 버리면, 정작 그 이벤트의 브로드캐스트가 중복으로
+      // 취급돼 화면에서 영영 사라진다(receivedSequenceRef 선언부 주석 참고).
     };
+    // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 서버의
+    // `evictUserFromScopedGameRooms`는 **대회 단위**로 축출한다 — 이 사용자가
+    // 같은 대회에서 배정을 둘 이상(예: 필드 A·B 담당) 갖고 있으면, 그중 하나
+    // (필드 A)만 해제돼도 서버가 그 대회의 구독 중인 게임 전부에
+    // `game.permission.revoked`를 보낸다. 이건 실수가 아니라 명세이자 스펙으로
+    // 박제된 동작이다(realtime.gateway.task8-protocol.spec.ts) — 그래서 이
+    // 소켓 프로토콜 자체를 배정 단위로 좁히는 대신, 이 통지를 곧바로 "영구
+    // 박탈"로 취급하지 않고 **재검증 트리거**로 다룬다: 이 게임 자체를 다시
+    // 구독해 본다. 서버 `subscribeToGame`은 구독마다 이 특정 fixture/field에
+    // 대한 스태프 스코프를 처음부터 다시 검사하므로(해제된 배정과 무관하게),
+    // 해제된 게 다른 배정(필드 A)이고 이 게임(필드 B)을 지키는 배정이 여전히
+    // 유효하면 재구독이 그대로 통과해 room 재가입 + 최신 스냅숏 적용까지
+    // 한 번에 끝난다 — 배너 한 번 깜빡이지 않고 조용히 복구된다(진짜 오탐이던
+    // 경우). 재구독마저 거부되면 그때 비로소 실제로 이 게임에 대한 접근이
+    // 없다는 뜻이므로 기존과 같이 revoked로 전환한다 — 어떤 경로로도 지금보다
+    // 나빠지지 않는다(재검증 실패 시의 동작은 이 픽스 이전과 동일하다).
     const onPermissionRevoked = () => {
       if (cancelled) return;
-      dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
-      setBannerMessage('운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.');
+      socket.emit(
+        'game.subscribe',
+        { gameId, afterSequence: 0 },
+        (result: SubscribeAck) => {
+          if (cancelled) return;
+          if (result.status === 'subscribed' && result.snapshot) {
+            applySnapshot(result.snapshot);
+            return;
+          }
+          dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+          // 서버 리스(GameTakeoverService)는 이 축출 경로에서 전혀 바뀌지
+          // 않는다 — revoke()는 여기서 호출되지 않으므로 아무도 실제로
+          // 인수하지 않았다. "다른 운영자가 담당하고 있어요"는 재검증까지
+          // 실패한 이 상태에서도 근거 없는 단정이라, 실제로 확인된 사실(재검증
+          // 실패)만 말한다.
+          setBannerMessage('이 경기의 운영 권한을 다시 확인하지 못했어요. 새로고침 후 다시 시도해주세요.');
+        },
+      );
     };
-    const onGameError = (error: { code: string; clientEventId?: string }) => {
+    // **큐가 실제로 가장 많이 만나는 실패가 이 경로다**(`game.event.append`/`retry`).
+    // `reason` 을 여기서 안 받으면 재시도 판정이 값을 못 받아, 타입은 통과하고 화면만
+    // 안 되는 상태가 된다 — 구독·takeover 에만 싣는 것은 **배선이 반쪽**이다.
+    const onGameError = (error: { code: string; clientEventId?: string; reason?: string }) => {
       if (cancelled) return;
       if (error.clientEventId) {
         dispatchQueue({
           type: 'FAIL',
           clientEventId: error.clientEventId,
-          error: { code: error.code, message: gameOperationsErrorMessage(error.code) },
+          error: {
+            code: error.code,
+            message: gameOperationsErrorMessage(error.code),
+            ...(typeof error.reason === 'string' ? { reason: error.reason } : {}),
+          },
         });
       } else {
         setBannerMessage(gameOperationsErrorMessage(error.code));
@@ -429,6 +679,7 @@ export function useV1GameOperationsConsole(
 
     return () => {
       cancelled = true;
+      releaseResyncGuard();
       if (resyncEventsRef.current === resyncFromServer) resyncEventsRef.current = null;
       socket.emit('game.unsubscribe', { gameId });
       socket.off('connect', onConnect);
@@ -470,6 +721,7 @@ export function useV1GameOperationsConsole(
 
   // ── Takeover: request once, renew on a timer, expire on a timer ────────────
   const requestTakeover = useCallback(() => {
+    if (!takeoverEnabledRef.current) return;
     if (!gameId || (myAssignment.data === undefined && myAssignment.isLoading)) return;
     const socket = getV1GameOperationsSocket();
     clientInstanceIdRef.current = clientInstanceIdRef.current ?? randomUuid();
@@ -483,6 +735,10 @@ export function useV1GameOperationsConsole(
         lastSequence: sync.lastSequence,
       },
       (result: GameTakeoverAck) => {
+        if (!takeoverEnabledRef.current) {
+          dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+          return;
+        }
         // 서버가 코드를 주지 않은 경우까지 STAFF_SCOPE_DENIED 로 뭉뚱그리면 안 된다.
         // 운영자가 실제 원인이 아니라 권한 요청이라는 엉뚱한 경로로 가기 때문이다.
         // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
@@ -502,14 +758,20 @@ export function useV1GameOperationsConsole(
         });
       },
     );
-  }, [gameId, myAssignment.data, myAssignment.isLoading, sync.lastSequence]);
+  }, [gameId, myAssignment.data, myAssignment.isLoading, sync.lastSequence, takeoverEnabled]);
 
   useEffect(() => {
-    if (takeover.status === 'none') requestTakeover();
-  }, [takeover.status, requestTakeover]);
+    if (!takeoverEnabled && takeover.status !== 'none') {
+      dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+    }
+  }, [takeoverEnabled, takeover.status]);
 
   useEffect(() => {
-    if (takeover.status !== 'held') return undefined;
+    if (takeoverEnabled && takeover.status === 'none') requestTakeover();
+  }, [takeover.status, requestTakeover, takeoverEnabled]);
+
+  useEffect(() => {
+    if (!takeoverEnabled || takeover.status !== 'held') return undefined;
     const interval = setInterval(() => {
       const socket = getV1GameOperationsSocket();
       if (!clientInstanceIdRef.current) return;
@@ -517,6 +779,16 @@ export function useV1GameOperationsConsole(
         'game.takeover.renew',
         { gameId, takeoverToken: takeover.token, clientInstanceId: clientInstanceIdRef.current },
         (result: GameTakeoverAck) => {
+          if (
+            takeoverStatusRef.current !== 'held' ||
+            takeoverTokenRef.current !== takeover.token
+          ) {
+            return;
+          }
+          if (!takeoverEnabledRef.current) {
+            dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+            return;
+          }
           if (result.status !== 'granted') {
             dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_TOKEN_EXPIRED' });
             return;
@@ -536,7 +808,7 @@ export function useV1GameOperationsConsole(
     }, TAKEOVER_RENEW_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [takeover.status, gameId]);
+  }, [takeover.status, takeover.status === 'held' ? takeover.token : null, gameId, takeoverEnabled]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -547,31 +819,41 @@ export function useV1GameOperationsConsole(
 
   // UX 감사 — 주기적 renew(위 effect)가 실패하면 'denied'로 떨어지는데,
   // renew가 실패하는 흔한 이유는 (진짜 권한 상실이 아니라) 토큰 자체가
-  // 서버에서 만료돼 renew 창을 놓친 경우다(게이트웨이가 `renewTakeover`
-  // 실패를 거의 항상 `TAKEOVER_TOKEN_EXPIRED`로 매핑한다 —
-  // `RealtimeGateway.renewGameTakeover`, `PERMISSION_DENIED`가 아닌 모든
-  // ForbiddenException이 이 코드로 온다). 배너 문구
+  // 서버에서 만료돼 renew 창을 놓친 경우다. 배너 문구
   // (`gameOperationsErrorMessage('TAKEOVER_TOKEN_EXPIRED')`)는 이미
   // "다시 가져오는 중이에요"라고 말하지만, 이전엔 자동 재요청 effect가
   // `status === 'expired'`(자연 만료, `CHECK_EXPIRY`)만 지켜봐서 실제로는
   // 아무것도 다시 가져오지 않았다 — alpha 실측(2026-08): 배너가 뜬 채 8초를
-  // 기다려도 회복되지 않고 새로고침해야 풀렸다. `game.takeover.request`(재요청,
-  // renew가 아니다)는 이 코드를 절대 돌려주지 않으므로(요청 경로는
-  // STAFF_SCOPE_DENIED/VALIDATION_ERROR/granted만 가능) 이 재시도가 같은
-  // 이유로 계속 실패하며 도는 tight loop이 될 수 없다. STAFF_SCOPE_DENIED 등
-  // 진짜 권한 거부는 그대로 'denied'에 남아 재시도하지 않는다(D-10 취지 —
-  // 같은 이유로 확실히 또 실패할 요청을 자동으로 반복하지 않는다).
+  // 기다려도 회복되지 않고 새로고침해야 풀렸다.
+  //
+  // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 그 회귀 픽스가
+  // `TAKEOVER_TOKEN_EXPIRED`(renew 실패는 PERMISSION_DENIED가 아닌 한 전부 이
+  // 코드로 왔다)를 전부 자동 재요청 대상으로 삼으면서, 정당하게 다른 콘솔이
+  // 넘겨받은 경우("다른 운영자가 방금 이 경기를 가져감" — 예: 같은 fixture를
+  // 담당자 두 명이 동시에 열었거나, 한 사람이 탭 두 개를 열었을 때)까지 같이
+  // 잡아 버렸다. 그 경우 서버는 grant()가 무조건 덮어쓰기라 상대의 재요청도
+  // 항상 성공하므로, 여기서 무조건 재요청하면 두 콘솔이 20초 renew 주기로
+  // 서로 토큰을 영원히 뺏는다. 서버(`RealtimeGateway.renewGameTakeover`)는
+  // 이제 그 둘을 구분해서 보낸다 — 자연 만료는 여전히 `TAKEOVER_TOKEN_EXPIRED`
+  // (재요청 안전, 아래에서 그대로 자동 재획득), 다른 콘솔에 뺏긴 경우는
+  // `TAKEOVER_SUPERSEDED`(자동 재요청 금지 — 상대도 정당한 보유자이므로 여기서
+  // 다시 뺏으면 핑퐁이 재현된다. 새로고침 전까지는 이 상태로 남는다. 상대가
+  // 놓으면 — 탭을 닫거나 자기 토큰이 자연 만료되면 — 그 시점부터는 이 세션도
+  // 다시 정상적으로 요청·보유할 수 있지만, 자동으로 되찾으러 가지는 않는다).
   const deniedCode = takeover.status === 'denied' ? takeover.code : null;
   useEffect(() => {
-    if (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED')) {
+    if (
+      takeoverEnabled &&
+      (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED'))
+    ) {
       requestTakeover();
     }
-  }, [takeover.status, deniedCode, requestTakeover]);
+  }, [takeover.status, deniedCode, requestTakeover, takeoverEnabled]);
 
   // ── Event send / durable-queue flush ────────────────────────────────────────
   const sendQueuedItem = useCallback(
     (item: QueuedGameEvent) => {
-      if (!gameId || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
+      if (!takeoverEnabledRef.current || !gameId || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
       if (Date.now() >= takeover.expiresAtMs) return; // CHECK_EXPIRY's poll will flip status to 'expired' shortly; do not send meanwhile.
       const socket = getV1GameOperationsSocket();
       dispatchQueue({ type: 'MARK_SENDING', clientEventId: item.clientEventId });
@@ -587,7 +869,26 @@ export function useV1GameOperationsConsole(
       // guaranteed to fail again with the exact same VERSION_CONFLICT /
       // OFFLINE_EVENT_REBASE_CONFLICT it failed with the first time, since
       // nothing ever advanced the version the retry presented.
-      const isRetry = item.attempts > 0;
+      //
+      // A SECOND, independent reason to take the retry path even on the
+      // very first attempt (`attempts === 0`): the item was captured while
+      // offline (or while the operator was mid-selection) and its frozen
+      // `occurredAt` is now more than `CLOCK_DRIFT_TOLERANCE_MS` stale.
+      // `game.event.append`'s server-side `assertClockNotDrifted()`
+      // (games.service.ts) rejects that with `422 CLOCK_DRIFT` — deterministically,
+      // on every reconnect-triggered flush, since the queue only ever holds
+      // this back while offline and then sends it as the first thing on
+      // reconnect. `game.event.retry` intentionally has NO such check (its
+      // own comment: "a retry is historical by design and is legitimately
+      // allowed to arrive minutes after occurredAt (offline recovery)") —
+      // that is exactly this item's situation even though it has never
+      // actually been retried yet. Routing it there directly avoids a
+      // guaranteed-to-fail round trip (with a misleading "device clock is
+      // off" banner) that would otherwise require the operator to manually
+      // tap "다시 시도" once per queued item before it can ever succeed.
+      const isRetry =
+        item.attempts > 0 ||
+        isClockDrifted(item.event.occurredAt, serverAlignedNowMs(Date.now(), clockOffsetMs));
       // 이 emit의 ack가 SEND_ACK_TIMEOUT_MS 안에 오지 않으면(소켓이 응답 없이
       // 끊기면 콜백 자체가 영영 안 온다) 'sending'에 갇히지 않도록 FAIL로
       // 전환한다. ackHandler가 먼저 불리면 이 타이머는 취소된다 — 반대로
@@ -601,7 +902,14 @@ export function useV1GameOperationsConsole(
           error: { code: 'SEND_TIMEOUT', message: gameOperationsErrorMessage('SEND_TIMEOUT') },
         });
       }, SEND_ACK_TIMEOUT_MS);
-      const ackHandler = (result: { status: string; sequence?: number; version?: number; code?: string }) => {
+      // `reason` 은 같은 코드의 서로 다른 원인을 가른다(서버가 additive 로 함께 보낸다).
+      const ackHandler = (result: {
+        status: string;
+        sequence?: number;
+        version?: number;
+        code?: string;
+        reason?: string;
+      }) => {
         clearTimeout(ackTimeoutId);
         if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
           dispatchQueue({
@@ -610,18 +918,27 @@ export function useV1GameOperationsConsole(
             sequence: result.sequence,
             version: result.version,
           });
-          // Advances local sync state for THIS device's own committed
-          // event — `onCommitted` only fires for OTHER clients' broadcasts
-          // (see that handler's own comment), so this device's own sends
-          // must independently keep `lastSequenceRef`/`sync` current.
-          dispatchSync({ type: 'BACKFILLED', lastSequence: result.sequence });
+          // Advances local sync state for THIS device's own committed event.
+          // `receivedSequenceRef`는 **일부러 건드리지 않는다**: 게이트웨이는
+          // 같은 커밋을 보낸 소켓에도 `game.event.committed`를 쏘므로
+          // (`acknowledgeGameEvent`의 `client.emit`), 그 본문을 받아 append하는
+          // 쪽은 `onCommitted`다. 여기서 미리 올리면 뒤이어 도착한 자기 이벤트가
+          // "이미 아는 중복"으로 버려져 자기가 기록한 이벤트가 화면에서 사라진다.
+          // `BACKFILLED`가 아니라 `EVENT_ARRIVED`인 이유는 그 액션의 주석 참고 —
+          // ack은 빠진 구간의 이벤트 본문을 하나도 실어 오지 않으므로 갭 프리즈를 풀 수 없다.
+          dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: result.sequence });
           setGameSnapshot((current) => (current ? { ...current, version: result.version! } : current));
           void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
         } else {
           dispatchQueue({
             type: 'FAIL',
             clientEventId: item.clientEventId,
-            error: { code: result.code ?? 'INTERNAL_ERROR', message: gameOperationsErrorMessage(result.code ?? 'INTERNAL_ERROR') },
+            error: {
+              code: result.code ?? 'INTERNAL_ERROR',
+              message: gameOperationsErrorMessage(result.code ?? 'INTERNAL_ERROR'),
+              // 서버가 같은 코드의 원인을 구분해 보낸다 — 재시도 가능 여부가 여기서 갈린다.
+              ...(typeof result.reason === 'string' ? { reason: result.reason } : {}),
+            },
           });
         }
       };
@@ -656,12 +973,13 @@ export function useV1GameOperationsConsole(
         );
       }
     },
-    [gameId, takeover, sync, queryClient, gameSnapshot],
+    [gameId, takeover, sync, queryClient, gameSnapshot, clockOffsetMs],
   );
 
   useEffect(() => {
     if (
       connectionStatus !== 'connected' ||
+      !takeoverEnabled ||
       !isTakeoverHeld(takeover) ||
       Date.now() >= takeover.expiresAtMs ||
       !canAppendWhileSyncing(sync)
@@ -670,11 +988,11 @@ export function useV1GameOperationsConsole(
     }
     const next = nextQueuedItem(queue);
     if (next) sendQueuedItem(next);
-  }, [connectionStatus, takeover, sync, queue, sendQueuedItem]);
+  }, [connectionStatus, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
 
   const submitEvent = useCallback(
     async (input: SubmitEventInput) => {
-      if (!gameSnapshot) return;
+      if (!takeoverEnabledRef.current || !gameSnapshot) return;
       // D-10 (frozen decision table): this is the ONLY thing that may ever
       // enter the durable offline queue. Asserting it here — even though
       // every current caller already only constructs an append_event —
@@ -693,6 +1011,7 @@ export function useV1GameOperationsConsole(
         occurredAt: input.occurredAt,
         payload: input.payload,
       });
+      if (!takeoverEnabledRef.current) return;
       const item: QueuedGameEvent = {
         clientEventId,
         gameId: gameId ?? '',
@@ -722,6 +1041,7 @@ export function useV1GameOperationsConsole(
 
   const retryFailedEvent = useCallback(
     async (clientEventId: string) => {
+      if (!takeoverEnabledRef.current) return;
       // alpha 실사고(2026-08) 구제: `medianOffsetMs()`를 고치기 전에 이미
       // 캡처된 항목은 `event.clockMs`가 소수(.5 등)일 수 있다 — 그대로
       // 재전송하면 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)에
@@ -745,6 +1065,7 @@ export function useV1GameOperationsConsole(
             occurredAt: repairedEvent.occurredAt,
             payload: repairedEvent.payload,
           });
+          if (!takeoverEnabledRef.current) return;
           dispatchQueue({
             type: 'RETRY',
             clientEventId,
@@ -766,7 +1087,7 @@ export function useV1GameOperationsConsole(
   // 때만 호출 가능"을 문서화한다.
   const reverseEvent = useCallback(
     async (input: { eventId: string; reason: string }) => {
-      if (!gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+      if (!takeoverEnabledRef.current || !gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
         throw new Error('경기 운영 권한이 없어 되돌릴 수 없어요.');
       }
       const clientEventId = randomUuid();
@@ -802,7 +1123,7 @@ export function useV1GameOperationsConsole(
   // 새 version으로 갱신할 때까지 다른 커맨드가 끼어들 여지가 없다.
   const assignAssist = useCallback(
     async (input: { eventId: string; assistParticipantId: string | null }) => {
-      if (!gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+      if (!takeoverEnabledRef.current || !gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
         throw new Error('경기 운영 권한이 없어 어시스트를 기록할 수 없어요.');
       }
       const clientEventId = randomUuid();
@@ -858,6 +1179,14 @@ export function gameOperationsErrorMessage(code: string): string {
   switch (code) {
     case 'TAKEOVER_TOKEN_EXPIRED':
       return '운영 권한 토큰이 만료됐어요. 다시 가져오는 중이에요.';
+    // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): renew 실패
+    // 중 "다른 콘솔이 방금 이 경기를 가져감"만 이 코드로 온다(자연 만료는
+    // 여전히 TAKEOVER_TOKEN_EXPIRED). 이 경우엔 자동 재요청하지 않으므로
+    // (바로 위 effect 참고) 문구도 "다시 가져오는 중"이라고 하지 않는다 —
+    // 실제로 아무것도 다시 시도하지 않는데 그렇게 말하면 운영자가 기다리기만
+    // 하다 골을 놓친다.
+    case 'TAKEOVER_SUPERSEDED':
+      return '다른 화면에서 이 경기 운영 권한을 가져갔어요. 새로고침 후 다시 시도해주세요.';
     case 'STAFF_SCOPE_DENIED':
       return '이 경기를 운영할 권한이 없어요.';
     case 'TAKEOVER_UNAVAILABLE':
@@ -932,6 +1261,12 @@ export function gameOperationsErrorMessage(code: string): string {
       return '들어오는 선수가 이미 피치 위에 있어요. 새로고침 후 다시 확인해주세요.';
     case 'SUBSTITUTION_LIMIT_REACHED':
       return '이 대회의 교체 횟수를 모두 사용했어요.';
+    // 롤링(자유) 교체 종목은 교체를 기록하지 않는다(정본 §3). 콘솔은 그 종목에서 교체
+    // 버튼 자체를 숨기지만, **대기열에 남아 있던 재전송**과 **옛 클라이언트**는 여전히
+    // 이 커맨드를 보낸다 — 그때 여기 없으면 기본 문구가 뜨고, 아래 non-retryable 목록에도
+    // 없으면 영영 성공하지 않을 요청을 계속 재전송한다.
+    case 'SUBSTITUTION_NOT_TRACKED':
+      return '이 대회는 교체를 따로 기록하지 않아요. 교체 없이 진행해주세요.';
     case 'COMMAND_IDEMPOTENCY_KEY_MISMATCH':
     case 'IDEMPOTENCY_PAYLOAD_CONFLICT':
       return '같은 요청 번호로 다른 내용이 이미 처리됐어요. 새로고침 후 다시 기록해주세요.';
@@ -977,10 +1312,29 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'SUBSTITUTION_OUT_NOT_ON_PITCH',
   'SUBSTITUTION_IN_ALREADY_ON_PITCH',
   'SUBSTITUTION_LIMIT_REACHED',
+  'SUBSTITUTION_NOT_TRACKED',
   'COMMAND_IDEMPOTENCY_KEY_MISMATCH',
   'IDEMPOTENCY_PAYLOAD_CONFLICT',
 ]);
 
-export function isRetryableGameOperationsErrorCode(code: string): boolean {
+/**
+ * **같은 코드라도 원인이 다르면 답이 다르다.**
+ *
+ * `STAFF_SCOPE_DENIED` 는 구조적으로 다른 원인 넷에 함께 쓰인다. 그중 **인가 주체 버전
+ * 불일치**(`AUTHORIZATION_SUBJECT_STALE`)는 **재접속하면 풀린다** — 권한이 없어진 것이
+ * 아니다. 그런데 코드만 보고 non-retryable 로 묶으면 **재시도 버튼이 숨어** 운영자가
+ * 할 수 있는 유일한 행동을 못 한다(그리고 문구는 버전 불일치 쪽 설명이라 **진짜 권한
+ * 거부에는 틀린 안내**가 나간다).
+ *
+ * 서버가 ack 에 `reason` 을 함께 보내므로(코드는 그대로 — 계약을 안 깬다) 그 값으로 가른다.
+ */
+const RETRYABLE_STAFF_DENIAL_REASONS = new Set<string>(['AUTHORIZATION_SUBJECT_STALE']);
+
+export function isRetryableGameOperationsErrorCode(code: string, reason?: string | null): boolean {
+  // **예외는 `STAFF_SCOPE_DENIED` 안에서만 연다.** 이 reason 집합은 그 코드의 원인 구분이라,
+  // 다른 코드에 같은 값이 실려 오면(오배선·미래 변경) 엉뚱한 코드가 재시도 가능으로 분류된다.
+  if (code === 'STAFF_SCOPE_DENIED' && reason != null && RETRYABLE_STAFF_DENIAL_REASONS.has(reason)) {
+    return true;
+  }
   return !NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES.has(code);
 }

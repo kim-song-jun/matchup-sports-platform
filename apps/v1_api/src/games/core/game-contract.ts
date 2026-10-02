@@ -28,6 +28,11 @@ export type GameContractErrorCode =
   | 'SUBSTITUTION_OUT_NOT_ON_PITCH'
   | 'SUBSTITUTION_IN_ALREADY_ON_PITCH'
   | 'SUBSTITUTION_LIMIT_REACHED'
+  // Task 166 BE-3: 롤링 교체 종목은 교체를 기록하지 않는다(정본 §3). 위 네 코드와 같은
+  // **422** 로 매핑된다 — 뜻은 조금 다르지만("이 요청 내용이 틀렸다" 가 아니라 "이
+  // 경기엔 그 명령이 없다") 교체 실패 하나만 상태 코드가 갈리면 클라이언트가 두 매핑을
+  // 갖게 된다. 구분은 이 `code` 값이 한다.
+  | 'SUBSTITUTION_NOT_TRACKED'
   | 'TERMINAL_REVISION_IMMUTABLE'
   | 'VERSION_CONFLICT';
 
@@ -121,13 +126,36 @@ function assertKnownSource(sourceType: string): asserts sourceType is V1GameSour
 
 export function assertGameLifecycleTransition(input: GameLifecycleTransitionInput): void {
   assertKnownSource(input.sourceType);
+  // TOURNAMENT_FIXTURE remains in the Prisma enum for immutable historical
+  // rows, but it is no longer an operational game source. Historical
+  // backfill/import code must not enter the live lifecycle state machine.
+  if (input.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+    throw new GameContractError(
+      'INVALID_GAME_SOURCE',
+      'Historical tournament fixture games cannot receive operational lifecycle commands',
+    );
+  }
   assertKnownState(input.from);
   assertKnownState(input.to);
 
   let allowed = false;
   if (input.trigger === 'TOURNAMENT_COMMAND') {
+    // **팀 매치 출처도 콘솔로 진행한다.** 리그 대진의 게임은 `TEAM_MATCH` 소스로 만들어진다
+    // (`league-fixture-creation.ts`). Historical `TOURNAMENT_FIXTURE` rows are
+    // rejected before reaching this operational transition table.
+    //
+    // 정본이 이미 정한 사안이다: "리그도 대회와 **같은 경기 운영 콘솔**을 쓴다(Task 165)."
+    // 그리고 §6 결정 이력이 대가까지 적어 뒀다 — **"잃는 것: 콘솔이 팀 매치 출처를 알아야
+    // 한다"**. 이 줄이 그 대가를 실제로 치르는 자리다.
+    //
+    // **전이 표는 그대로 공유한다.** 소스가 달라도 경기 진행의 단계(SCHEDULED→LIVE→…)는
+    // 같은 것이라, 표를 갈라 두면 두 벌이 어긋난다.
+    //
+    // **친선 팀매치 동작은 안 바뀐다.** `TOURNAMENT_COMMAND` 는 콘솔 경로만 발행하고,
+    // 누가 발행할 수 있는지는 인가 층(`resolveActor`)이 이미 막는다. 친선은 여전히
+    // `TEAM_RESULT_SUBMISSION` 으로 `→ ENDED` 만 한다(아래 분기).
     allowed =
-      input.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE &&
+      input.sourceType === V1GameSourceType.TEAM_MATCH &&
       TOURNAMENT_GAME_TRANSITIONS[input.from].includes(input.to);
   } else if (input.trigger === 'TEAM_RESULT_SUBMISSION') {
     allowed =
@@ -225,6 +253,12 @@ export function assertGameCommandContext(input: GameCommandContextInput): GameCo
 
 export function assertGameSourceCreationInput(input: GameSourceCreationInput): void {
   assertKnownSource(input.sourceType);
+  if (input.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+    throw new GameContractError(
+      'INVALID_GAME_SOURCE',
+      'Historical tournament fixture games cannot be created through the operational game source contract',
+    );
+  }
   if (input.sourceId.trim().length === 0) {
     throw new GameContractError('INVALID_GAME_SOURCE', 'Source ID is required');
   }

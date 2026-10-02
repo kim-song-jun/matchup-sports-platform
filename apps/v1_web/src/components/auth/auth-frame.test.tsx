@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { AuthFrame } from './auth-page';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
@@ -36,5 +36,82 @@ describe('AuthFrame 뒤로가기 컨트롤', () => {
     render(<AuthFrame topTitle="약관 동의">본문</AuthFrame>);
     expect(screen.queryByRole('button', { name: /뒤로가기|그만두기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /뒤로가기/ })).not.toBeInTheDocument();
+  });
+});
+
+// 데스크톱 2단(B안, 2026-09-04): stage 가 있으면 왼쪽 스테이지(슬로건·그래픽)를 그리고
+// 프레임에 staged 클래스가 붙어 desktop/auth.css §11 이 2단으로 놓는다. 없으면 예전 폰 카드 그대로.
+describe('AuthFrame 데스크톱 스테이지', () => {
+  it('stage 를 주면 슬로건·부제·그래픽을 가진 aside 와 staged 프레임 클래스를 렌더한다', () => {
+    const { container } = render(
+      <AuthFrame stage={{ eyebrow: '로그인 확인', slogan: '다른 방법으로\n계속할 수 있어요', sub: '정보는 안전해요.', illustration: 'auth-notice' }}>본문</AuthFrame>,
+    );
+    expect(container.querySelector('.tm-auth-frame')).toHaveClass('tm-auth-frame-staged');
+    const aside = container.querySelector('aside.tm-auth-stage');
+    expect(aside).not.toBeNull();
+    expect(aside).toHaveTextContent('다른 방법으로');
+    expect(aside).toHaveTextContent('정보는 안전해요.');
+    const img = aside!.querySelector('img.tm-auth-stage-illustration');
+    expect(img).not.toBeNull();
+    expect(decodeURIComponent(img!.getAttribute('src') ?? '')).toContain('/illustrations/auth-notice-640.webp');
+  });
+
+  it('eyebrow 를 생략하면 브랜드 줄 하나만 남고, 주면 브랜드 줄 아래에 한 번 더 그린다', () => {
+    const base = { slogan: '슬로건', sub: '부제', illustration: 'auth-welcome' };
+    const { container, rerender } = render(<AuthFrame stage={base}>본문</AuthFrame>);
+    expect(container.querySelectorAll('.tm-auth-stage-brand')).toHaveLength(1);
+    expect(container.querySelector('.tm-auth-stage-eyebrow')).toBeNull();
+    rerender(<AuthFrame stage={{ ...base, eyebrow: '준비 완료' }}>본문</AuthFrame>);
+    expect(container.querySelector('.tm-auth-stage-eyebrow')).toHaveTextContent('준비 완료');
+  });
+
+  it('환영 스테이지는 브랜드명과 같은 글자의 eyebrow 를 두지 않는다', () => {
+    expect(AUTH_WELCOME_STAGE.eyebrow).toBeUndefined();
+  });
+
+  it('stage 가 없으면 aside 도 staged 클래스도 없다 — 약관·계정 삭제 안내는 폰 카드를 유지한다', () => {
+    const { container } = render(<AuthFrame topTitle="약관 동의">본문</AuthFrame>);
+    expect(container.querySelector('aside.tm-auth-stage')).toBeNull();
+    expect(container.querySelector('.tm-auth-frame')).not.toHaveClass('tm-auth-frame-staged');
+  });
+});
+
+// 안내 줄이 붙어 하단 버튼 영역이 커지면 스크롤 영역이 그 위에서 끝나야 마지막 입력칸이 안 가려진다.
+// jsdom 에는 레이아웃이 없어 높이와 ResizeObserver 만 대신한다(브라우저 API).
+describe('AuthFrame 하단 고정 버튼 높이', () => {
+  const CTA_HEIGHT_VAR = '--tm-auth-cta-height';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('버튼 영역의 실제 높이를 프레임에 알리고, 크기가 바뀌면 갱신하고, 떠나면 지운다', () => {
+    let height = 91;
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => height);
+    const resizeCallbacks: Array<() => void> = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resizeCallbacks.push(callback); }
+      observe() {}
+      disconnect() {}
+    });
+
+    const { container, unmount } = render(<AuthFrame fixedAction={<button type="button">계속</button>}>본문</AuthFrame>);
+    const frame = container.querySelector<HTMLElement>('.tm-auth-frame')!;
+    expect(frame.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('91px');
+
+    // 안내 줄이 붙어 영역이 커진다.
+    height = 119;
+    act(() => resizeCallbacks.forEach((callback) => callback()));
+    expect(frame.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('119px');
+
+    unmount();
+    expect(frame.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('');
+  });
+
+  it('고정 버튼이 없는 화면은 높이 변수를 만들지 않는다', () => {
+    const { container } = render(<AuthFrame topTitle="약관">본문</AuthFrame>);
+
+    expect(container.querySelector<HTMLElement>('.tm-auth-frame')!.style.getPropertyValue(CTA_HEIGHT_VAR)).toBe('');
   });
 });

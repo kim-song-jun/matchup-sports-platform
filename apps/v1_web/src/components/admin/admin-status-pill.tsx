@@ -9,8 +9,11 @@ import {
   UserX,
   FileText,
   Loader2,
+  PauseCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import type { PreResultMatchPhase } from '@/lib/competition-status';
+import { leagueStateLabel, matchPhaseLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
 
 // ── Tone → classes ────────────────────────────────────────────────────────
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
@@ -23,7 +26,8 @@ const TONE_CLASSES: Record<Tone, string> = {
   red: 'bg-[var(--red50)] text-[var(--red700)]',
   // --surface-soft 배경만으로는 흰색 카드/행(--card-surface)과 대비가 거의 없어(~1.10:1)
   // border-strong 테두리를 더해 컨테이너와 무관하게 경계가 보이도록 함 (기존 P1 패턴 재사용)
-  gray: 'bg-[var(--surface-soft)] text-[var(--text-muted)] border border-[var(--border-strong)]',
+  // tm-on-tint: grey600-on-grey100 은 4.19:1 로 AA 미달 — 이 톤에서만 캡션색을 grey700 으로 올린다
+  gray: 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)] border border-[var(--border-strong)]',
 };
 
 // ── Status meta map ───────────────────────────────────────────────────────
@@ -171,6 +175,59 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'amber',
     icon: <AlertCircle size={12} aria-hidden="true" />,
   },
+
+  // ── 리그 대진의 결과 진행 단계 ────────────────────────────────────────
+  // 팀매치 status(matched/cancelled)와는 **다른 축**이라 어드민 표에서 별도 열로 쓴다.
+  // 키에 result_ 접두를 붙인 이유: 'draft'·'submitted' 는 이미 다른 도메인(대회 공고·
+  // 신청서)이 쓰고 있어서, 같은 단어를 재사용하면 라벨이 조용히 서로 바뀐다.
+  result_not_entered: {
+    label: '결과 미입력',
+    tone: 'amber',
+    icon: <AlertCircle size={12} aria-hidden="true" />,
+  },
+  result_draft: {
+    label: '작성 중',
+    tone: 'gray',
+    icon: <FileText size={12} aria-hidden="true" />,
+  },
+  result_awaiting_approval: {
+    label: '승인 대기',
+    tone: 'amber',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  result_change_requested: {
+    label: '정정 요청',
+    tone: 'red',
+    icon: <AlertCircle size={12} aria-hidden="true" />,
+  },
+  result_official: {
+    label: '확정',
+    tone: 'green',
+    icon: <CheckCircle2 size={12} aria-hidden="true" />,
+  },
+  result_voided: {
+    label: '무효',
+    tone: 'gray',
+    icon: <XCircle size={12} aria-hidden="true" />,
+  },
+
+  // ── 리그 대진의 경기 단계(결과 전) — 말은 matchPhaseLabel, 톤·아이콘은 공개 화면 경기 칩과 같은 뜻 ──
+  match_scheduled: {
+    label: matchPhaseLabel('scheduled'),
+    tone: 'gray',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  match_live: {
+    label: matchPhaseLabel('live'),
+    tone: 'blue',
+    icon: <CircleDot size={12} aria-hidden="true" />,
+  },
+  match_paused: {
+    label: matchPhaseLabel('paused'),
+    tone: 'amber',
+    icon: <PauseCircle size={12} aria-hidden="true" />,
+  },
+
 };
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -188,7 +245,7 @@ export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
   return (
     <span
       className={[
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-medium whitespace-nowrap',
         TONE_CLASSES[tone],
       ].join(' ')}
     >
@@ -196,4 +253,31 @@ export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
       {displayLabel}
     </span>
   );
+}
+
+/**
+ * 리그 상태 알약. 말은 G13 상태 모델(`leagueStateLabel` — 준비 중·진행 중·종료)을 쓰고, 모양은 같은
+ * 사실의 대회 상태 알약을 빌린다 — 대회·리그가 한 표에 섞이는 현장 운영 목록에서 "진행 중" 리그가
+ * 계정 상태 말("활성")로 읽혔다(G6-V1).
+ */
+const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
+  draft: 'draft',
+  active: 'in_progress',
+  completed: 'completed',
+};
+
+export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {
+  return <AdminStatusPill status={LEAGUE_STATE_PILL_KEY[state]} label={leagueStateLabel(state)} />;
+}
+
+const MATCH_PHASE_PILL_KEY: Record<PreResultMatchPhase, string> = {
+  scheduled: 'match_scheduled',
+  live: 'match_live',
+  paused: 'match_paused',
+  cancelled: 'cancelled',
+};
+
+/** 리그 대진의 결과 전 경기 단계 알약 — 단계는 `leagueFixtureResultCell` 이 정한다. */
+export function AdminMatchPhasePill({ phase }: { phase: PreResultMatchPhase }) {
+  return <AdminStatusPill status={MATCH_PHASE_PILL_KEY[phase]} label={matchPhaseLabel(phase)} />;
 }

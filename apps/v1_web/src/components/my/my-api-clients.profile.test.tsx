@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileEditPageClient } from './my-api-clients';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
+  search: '',
 }));
 
 const hooks = vi.hoisted(() => ({
@@ -19,7 +20,10 @@ const hooks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(router.search),
+  // U37: useShellOverride(shell-override.ts)가 usePathname을 쓴다 — 셸 승격 전엔 이 화면이
+  // 직접 AppChrome을 렌더해 필요 없었지만, 이제 desktopHead override 배관에 필요하다.
+  usePathname: () => '/my/profile/edit',
 }));
 
 // 실제 인증 카드는 발급/검증 API를 호출한다. 여기서 검증할 계약은 "번호를 바꾸면 증명 없이는
@@ -59,6 +63,7 @@ function renderWithClient(ui: ReactElement) {
 describe('ProfileEditPageClient query states', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    router.search = '';
     hooks.updateProfile.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     hooks.checkEmail.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
@@ -102,6 +107,7 @@ describe('ProfileEditPageClient 번호 변경 본인인증 게이트', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    router.search = '';
     mutateAsync.mockResolvedValue({});
     hooks.updateProfile.mockReturnValue({ mutateAsync, isPending: false });
     hooks.uploadImages.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
@@ -125,6 +131,41 @@ describe('ProfileEditPageClient 번호 변경 본인인증 게이트', () => {
       isError: false,
       refetch: vi.fn(),
     });
+  });
+
+  it('구분자가 있는 기존 생년월일을 정상 표시하고 숫자 8자리로 저장한다', async () => {
+    const current = hooks.profile();
+    hooks.profile.mockReturnValue({ ...current, data: {
+      ...current.data, profile: { ...current.data.profile, birthDate: '1995-01-15' },
+    } });
+    renderWithClient(<ProfileEditPageClient />);
+    expect(screen.getByRole('textbox', { name: '생년월일' })).toHaveValue('1995-01-15');
+    fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ birthDate: '19950115' })));
+    expect(router.replace).toHaveBeenCalledWith('/my');
+  });
+
+  it('구분자를 제거한 뒤에도 존재하지 않는 날짜는 서버로 보내지 않는다', () => {
+    const current = hooks.profile();
+    hooks.profile.mockReturnValue({ ...current, data: {
+      ...current.data, profile: { ...current.data.profile, birthDate: '1995-02-30' },
+    } });
+    renderWithClient(<ProfileEditPageClient />);
+    fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
+    expect(screen.getByText(/올바른 생년월일/)).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['from=%2Fmy%2Fsettings%2Fplayer-card%3Ffrom%3D%252Fmy', '/my/settings/player-card?from=%2Fmy'],
+    ['returnTo=%2Fmy%2Fsettings%2Fplayer-card', '/my/settings/player-card'],
+    ['from=%2F%5Cevil.example&returnTo=%2F%5Cevil.example', '/my'],
+  ])('저장과 뒤로가기의 안전한 복귀 경로를 통일한다 (%s)', async (search, destination) => {
+    router.search = search;
+    renderWithClient(<ProfileEditPageClient />);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', destination);
+    fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(destination));
   });
 
   function changePhoneTo(value: string) {

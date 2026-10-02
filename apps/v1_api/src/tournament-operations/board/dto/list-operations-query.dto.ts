@@ -45,9 +45,27 @@ const GAME_STATES: readonly V1GameState[] = [
  * filter client-side using the separate `liveWarnings` array, which was always documented as
  * clock-dependent and outside the stable snapshot.
  */
-export const STABLE_WARNING_CODES = ['NO_FIELD_ASSIGNED', 'MISSING_SCORER', 'RESULT_REVIEW_OVERDUE'] as const;
+export const STABLE_WARNING_CODES = ['NO_FIELD_ASSIGNED', 'MISSING_SCORER'] as const;
 
-export const TIME_RELATIVE_WARNING_CODES = ['NO_STAFF_ASSIGNED', 'LINEUP_NOT_SUBMITTED'] as const;
+/**
+ * `RESULT_REVIEW_OVERDUE` 가 여기 있는 이유(2026-09-06):
+ *
+ * 예전엔 stable 이었는데 **판정에 시간 비교가 아예 없었다** — "열린 에스컬레이션 행이
+ * 존재하는가" 만 봤다. 그런데 그 행은 **결과 제출 즉시** `PENDING` 으로 만들어지고
+ * (`due_at` 은 미래), `PENDING → ACKNOWLEDGED` 전이는 없으며 확정·승계 때 `CLOSED` 로만
+ * 간다. 그래서 **제출되는 순간 "검토 기한 초과" 가 참**이 됐다(alpha 실측: 종료 수 초 뒤,
+ * 예정일이 미래인 경기에도 표시).
+ *
+ * 거짓 지표는 **진짜 급한 것과 구분을 없애** 그 화면 전체의 신뢰를 깎는다. 이름이 주장하는
+ * 것을 재려면 `due_at <= now()` 가 필요하고, 그건 **정의상 시계 의존**이라 stable 일 수 없다
+ * (stable 은 "지속 컬럼만의 순수 함수" 여야 하고 `stableRevision`·워터마크가 그 성질에 기댄다).
+ * 그래서 `NO_STAFF_ASSIGNED`·`LINEUP_NOT_SUBMITTED` 와 **같은 자리**로 옮긴다.
+ */
+export const TIME_RELATIVE_WARNING_CODES = [
+  'NO_STAFF_ASSIGNED',
+  'LINEUP_NOT_SUBMITTED',
+  'RESULT_REVIEW_OVERDUE',
+] as const;
 
 export const OPERATIONS_BOARD_WARNING_CODES = [
   ...STABLE_WARNING_CODES,

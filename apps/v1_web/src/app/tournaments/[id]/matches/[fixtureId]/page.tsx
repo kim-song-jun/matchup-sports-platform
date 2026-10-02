@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchPageClient } from './match-page-client';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildBreadcrumbLd } from '@/lib/structured-data';
+import { buildFixtureEventLd } from '@/lib/structured-data-competition';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 
 async function loadMatch(tournamentId: string, fixtureId: string) {
@@ -25,7 +29,7 @@ export async function generateMetadata({
   const awayLabel = match.away?.teamName ?? '미정';
   return buildPublicMetadata({
     title: `${homeLabel} vs ${awayLabel} | ${match.tournamentTitle}`,
-    description: `${match.tournamentTitle} ${match.round} 경기 기록을 확인하세요.`,
+    description: `${match.tournamentTitle} ${competitionMatchLabel(match)} 경기 기록을 확인하세요.`,
     path: `/tournaments/${id}/matches/${fixtureId}`,
   });
 }
@@ -36,12 +40,28 @@ export default async function TournamentMatchPage({
   params: Promise<{ id: string; fixtureId: string }>;
 }) {
   const { id, fixtureId } = await params;
-  // 히든 픽스처와 실제로 존재하지 않는 픽스처가 동일한 404를 내려야 한다는
-  // 계약(존재 여부를 캐는 오라클 방지, public-game-records.test.tsx가 고정)이라
-  // 이 서버 게이트는 되돌린다 — 참가팀이 공개 시점 전에 라인업을 준비하는 경로는
-  // /tournaments/:id/matches/:fixtureId/lineup 을 이 route와 별개로 뒀다(이
-  // 페이지의 notFound()를 거치지 않는다). 이 경로에서는 공개된 이후에만
-  // 라인업 CTA가 보인다 — 사전 준비 진입점은 후속 작업(대회 "내 경기" 목록 등).
-  if (!(await loadMatch(id, fixtureId))) notFound();
-  return <MatchPageClient tournamentId={id} fixtureId={fixtureId} />;
+  // 히든 픽스처와 실제로 존재하지 않는 픽스처가 **동일한 404**를 내려야 한다는
+  // 계약이다(존재 여부를 캐는 오라클 방지 — public-game-records.test.tsx 가 고정).
+  //
+  // [P1-d] 예전 주석은 "참가팀이 공개 전에 라인업을 준비하는 경로를 이 route 와 별개로
+  // 뒀다"고 설명했는데, 그 경로(/tournaments/:id/matches/:fixtureId/lineup)는 사라졌다.
+  // 경기 전 준비는 이제 **팀 전술보드**에서 하고, 그 진입점은 이 공개 페이지가 아니라
+  // 팀 상세의 「다가오는 경기」다. 즉 이 route 는 **공개 기록 전용**이고, 404 계약만
+  // 지키면 된다 — 팀장의 사전 준비 동선과 더 이상 얽히지 않는다.
+  const match = await loadMatch(id, fixtureId);
+  if (!match) notFound();
+  const eventLd = buildFixtureEventLd(match);
+  return (
+    <>
+      {eventLd ? <JsonLd data={eventLd} /> : null}
+      <JsonLd
+        data={buildBreadcrumbLd([
+          { name: '대회', path: '/tournaments' },
+          { name: match.tournamentTitle, path: `/tournaments/${id}` },
+          { name: `${match.home?.teamName ?? '미정'} vs ${match.away?.teamName ?? '미정'}`, path: `/tournaments/${id}/matches/${fixtureId}` },
+        ])}
+      />
+      <MatchPageClient tournamentId={id} fixtureId={fixtureId} seed={match} />
+    </>
+  );
 }

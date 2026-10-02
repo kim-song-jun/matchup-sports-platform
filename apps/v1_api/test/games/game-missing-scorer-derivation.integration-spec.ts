@@ -50,6 +50,8 @@ const ids = {
   awayTeam: '68000000-0000-4000-8000-000000000021',
   competitionConfigVersion: '68000000-0000-4000-8000-000000000031',
   tournament: '68000000-0000-4000-8000-000000000030',
+  hostRegistration: '68000000-0000-4000-8000-000000000035',
+  awayRegistration: '68000000-0000-4000-8000-000000000036',
   fixtureReversedExcluded: '68000000-0000-4000-8000-000000000033',
   fixtureUnreversedRemains: '68000000-0000-4000-8000-000000000034',
   assignment: '68000000-0000-4000-8000-000000000040',
@@ -123,10 +125,22 @@ beforeAll(async () => {
   await prisma.v1Tournament.create({
     data: { id: ids.tournament, sportId: ids.sport, title: 'Task Missing Scorer Tournament', competitionConfigVersionId: config.id },
   });
-  await prisma.v1TournamentFixture.createMany({
+  await prisma.v1TournamentRegistration.createMany({
     data: [
-      { id: ids.fixtureReversedExcluded, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-      { id: ids.fixtureUnreversedRemains, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
+      { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+      { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+    ],
+  });
+  await prisma.v1TeamMatch.createMany({
+    data: [
+      { id: ids.fixtureReversedExcluded, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, title: 'Missing scorer reversed', status: 'matched', startAt: new Date(Date.now() - 60_000), competitionConfigVersionId: config.id },
+      { id: ids.fixtureUnreversedRemains, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, title: 'Missing scorer remains', status: 'matched', startAt: new Date(Date.now() - 60_000), competitionConfigVersionId: config.id },
+    ],
+  });
+  await prisma.v1TournamentMatchDetails.createMany({
+    data: [
+      { teamMatchId: ids.fixtureReversedExcluded, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+      { teamMatchId: ids.fixtureUnreversedRemains, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
     ],
   });
   await prisma.v1TournamentStaffAssignment.create({
@@ -149,7 +163,7 @@ describe('deriveTournamentRevision — missingScorer excludes reversed goals (is
 
   beforeAll(async () => {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureReversedExcluded,
       competitionConfigVersionId: ids.competitionConfigVersion,
       sides: [
@@ -234,7 +248,7 @@ describe('deriveTournamentRevision — missingScorer stays true for an un-revers
 
   beforeAll(async () => {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureUnreversedRemains,
       competitionConfigVersionId: ids.competitionConfigVersion,
       sides: [

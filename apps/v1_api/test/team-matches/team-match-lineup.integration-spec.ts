@@ -23,6 +23,8 @@ const ids = {
   futureMatch: '69000000-0000-4000-8000-000000000030',
   pastMatch: '69000000-0000-4000-8000-000000000031',
   futureSchedule: '69000000-0000-4000-8000-000000000040',
+  // 재생(idempotent replay) 계약을 다른 라인업 상태 전이와 격리해서 검증하는 전용 팀매치.
+  replayMatch: '69000000-0000-4000-8000-000000000050',
 } as const;
 
 const prisma = new PrismaService();
@@ -171,7 +173,22 @@ describe('Task 14 team-match lineup builder', () => {
       },
     });
 
-    for (const teamMatchId of [ids.futureMatch, ids.pastMatch]) {
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.replayMatch,
+        hostTeamId: ids.hostTeam,
+        createdByUserId: ids.hostOwner,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 14 replay lineup match',
+        placeName: 'Task 14 futsal court',
+        startAt: futureStartAt,
+        approvedApplicantTeamId: ids.opponentTeam,
+        competitionConfigVersionId: configId,
+      },
+    });
+
+    for (const teamMatchId of [ids.futureMatch, ids.pastMatch, ids.replayMatch]) {
       const input: GameSourceCreationInput = {
         sourceType: V1GameSourceType.TEAM_MATCH,
         sourceId: teamMatchId,
@@ -213,20 +230,21 @@ describe('Task 14 team-match lineup builder', () => {
     await prisma.$disconnect();
   });
 
-  it('rejects a below-minimum roster, duplicate jerseys, and a missing goalkeeper before touching eligibility', async () => {
+  /**
+   * 예전 이 테스트는 **최소 인원**(`LINEUP_SIZE_INVALID`)과 **골키퍼 필수**
+   * (`LINEUP_GOALKEEPER_INVALID`)도 함께 쟀는데, 두 규칙은 정본 §3 으로 사라졌다
+   * (`src` 에 throw 지점 0곳 — "인원이 안 맞아도 경기는 시작하고 운영 콘솔에서
+   * 조정한다"가 사용자 확정이다). 폐기된 계약을 단언하고 있었으므로 그 두 블록만
+   * 걷어냈다.
+   *
+   * **중복 등번호는 폐기되지 않았다** — 같은 번호 두 명은 기록 귀속을 망가뜨리므로
+   * 그대로 막는다. 여기 남은 것이 그 계약이다.
+   */
+  it('rejects duplicate jersey numbers before touching eligibility', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
-    const tooFew = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
-        expectedVersion: version,
-        starters: validHostStarters.slice(0, 2),
-        bench: [],
-      }),
-    );
-    expectHttpCode(tooFew, 422, 'LINEUP_SIZE_INVALID');
-
     const duplicateJersey = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
+      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-dup-jersey', {
         expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
@@ -238,32 +256,24 @@ describe('Task 14 team-match lineup builder', () => {
     );
     expectHttpCode(duplicateJersey, 422, 'LINEUP_DUPLICATE_JERSEY_NUMBER');
 
-    const noGoalkeeper = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
-        expectedVersion: version,
-        starters: [
-          { userId: ids.hostOwner, jerseyNumber: 1 },
-          { userId: ids.hostP2, jerseyNumber: 2 },
-          { userId: ids.hostP3, jerseyNumber: 3 },
-        ],
-        bench: [],
-      }),
-    );
-    expectHttpCode(noGoalkeeper, 422, 'LINEUP_GOALKEEPER_INVALID');
-
-    // None of the rejected attempts should have created a new revision.
+    // The rejected attempt should not have created a new revision.
     expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(version);
   });
 
-  // 라인업 상한이 하드코딩이 아니라 pin된 V1CompetitionConfigVersion.lineup(여기서는
-  // 실제 futsal-v1 프리셋: minPlayers 3 / maxPlayers 6 — 6:6 경기방식 프리셋과 맞춘 값,
-  // team-match-conditions.constants.ts 참고)을 그대로 따르는지 두 경계 모두에서
-  // 검증한다 — 이 값이 다른 곳(예: football의 7~11)으로 하드코딩돼 있었다면 상한에서
-  // 통과해야 할 6명 로스터가 거부되거나, 상한을 넘는 7명 로스터가 통과하거나, 에러
-  // 메시지의 숫자가 달라져 이 테스트가 깨진다. 부족한 실 팀원 수를 보충하려고
-  // 게스트(unlinked, userId 없음)를 섞어 채운다 — 게스트는 팀 소속·참석 여부 검사를
-  // 타지 않으므로 인원 상한 검증만 격리해서 확인할 수 있다.
-  it('accepts a roster exactly at the pinned maxPlayers and rejects one more (futsal-v1: 6)', async () => {
+  /**
+   * **인원 상한이 사라진 것을 못박는다.** 예전 이 테스트는 프리셋 상한(futsal-v1: 6)에서
+   * 한 명 더 넣으면 422 `LINEUP_SIZE_INVALID` 가 나는 것을 쟀는데, 그 규칙은 정본 §3 으로
+   * 폐기됐다 — "인원이 안 맞아도 경기는 시작하고 운영 콘솔에서 조정한다"가 사용자 확정이고
+   * `src` 에 그 throw 지점은 0곳이다.
+   *
+   * 단언을 지우기만 하면 이 자리는 아무것도 안 재는 껍데기가 된다. 그래서 **반대 방향을
+   * 잰다**: 옛 상한을 넘는 7명도 저장되고 화면 응답에 7명이 그대로 나온다. 상한을
+   * 되살리면(= 규칙을 되돌리면) 이 테스트가 red 가 된다.
+   *
+   * 부족한 실 팀원 수는 게스트(unlinked, userId 없음)로 채운다 — 게스트는 팀 소속·참석
+   * 검사를 타지 않으므로 인원 규칙만 격리해서 볼 수 있다.
+   */
+  it('인원 상한이 없다 — 옛 프리셋 상한(futsal-v1: 6)을 넘는 7명도 그대로 저장된다', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const atCap = [
@@ -285,20 +295,15 @@ describe('Task 14 team-match lineup builder', () => {
     const atCapView = await service.getLineup(authUser(ids.hostOwner), ids.futureMatch);
     expect(atCapView.starters).toHaveLength(6);
 
-    const tooMany = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-over-cap', {
-        expectedVersion: saved.version,
-        starters: [...atCap, { displayName: 'Task 14 guest 7', jerseyNumber: 7 }],
-        bench: [],
-      }),
-    );
-    expectHttpCode(tooMany, 422, 'LINEUP_SIZE_INVALID');
-    expect((tooMany as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ message: expect.stringContaining('6명 이하') }),
-    );
+    const overCap = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-over-cap', {
+      expectedVersion: saved.version,
+      starters: [...atCap, { displayName: 'Task 14 guest 7', jerseyNumber: 7 }],
+      bench: [],
+    });
+    expect(overCap.version).toBe(saved.version + 1);
 
-    // The rejected attempt must not have created a new revision beyond the at-cap save.
-    expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(saved.version);
+    const overCapView = await service.getLineup(authUser(ids.hostOwner), ids.futureMatch);
+    expect(overCapView.starters).toHaveLength(7);
   });
 
   // Task 15 blocker-1 regression: the client used to lose a placed roster member's userId on
@@ -309,7 +314,7 @@ describe('Task 14 team-match lineup builder', () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const duplicateParticipant = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
+      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-dup-participant', {
         expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
@@ -325,11 +330,11 @@ describe('Task 14 team-match lineup builder', () => {
     expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(version);
   });
 
-  it('rejects a non-member and a non-attending member, but allows an unlinked guest', async () => {
+  it('rejects a non-member, but allows an active member without RSVP and an unlinked guest', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const nonMember = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
+      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-non-member', {
         expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
@@ -341,8 +346,11 @@ describe('Task 14 team-match lineup builder', () => {
     );
     expectHttpCode(nonMember, 422, 'LINEUP_PARTICIPANT_INELIGIBLE');
 
-    const notAttending = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
+    const notAttending = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.futureMatch,
+      'idem-host-not-attending',
+      {
         expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
@@ -350,12 +358,13 @@ describe('Task 14 team-match lineup builder', () => {
           { userId: ids.hostNotAttending, jerseyNumber: 3 },
         ],
         bench: [],
-      }),
+      },
     );
-    expectHttpCode(notAttending, 422, 'LINEUP_PARTICIPANT_INELIGIBLE');
+    expect(notAttending.state).toBe('DRAFT');
+    expect(notAttending.version).toBe(version + 1);
 
     const withGuest = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-guest-draft', {
-      expectedVersion: version,
+      expectedVersion: notAttending.version,
       starters: [
         { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
         { userId: ids.hostP2, jerseyNumber: 2 },
@@ -364,13 +373,13 @@ describe('Task 14 team-match lineup builder', () => {
       bench: [],
     });
     expect(withGuest.state).toBe('DRAFT');
-    expect(withGuest.version).toBe(version + 1);
+    expect(withGuest.version).toBe(version + 2);
 
     const view = await service.getLineup(authUser(ids.hostOwner), ids.futureMatch);
     expect(view.starters.map((starter) => starter.displayName)).toContain('용병 게스트');
   });
 
-  it('saves a valid draft, rejects a stale-version resave, submits it, and blocks direct re-edit afterward', async () => {
+  it('saves a valid draft, rejects a stale-version resave, submits it, and turns a re-edit before kickoff into a new submission', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const saved = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-draft-1', {
@@ -404,7 +413,10 @@ describe('Task 14 team-match lineup builder', () => {
 
     // Two concurrent submits racing against the SAME still-DRAFT revision,
     // each with its own Idempotency-Key (so neither is an idempotent replay
-    // of the other) — SERIALIZABLE isolation must let exactly one win.
+    // of the other) — SERIALIZABLE isolation must let exactly one write win.
+    // Task 180 R-2: re-submitting an already-submitted revision is a no-op
+    // success, so the loser either fails the serialization check or (if it
+    // started after the winner committed) succeeds without writing anything.
     const race = await Promise.allSettled([
       service.submitLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-submit-race-a', {
         expectedVersion: saved.version,
@@ -417,10 +429,18 @@ describe('Task 14 team-match lineup builder', () => {
       (outcome): outcome is PromiseFulfilledResult<Awaited<ReturnType<typeof service.submitLineup>>> =>
         outcome.status === 'fulfilled',
     );
-    expect(fulfilled).toHaveLength(1);
-    expect(race.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
+    expect(fulfilled.length).toBeGreaterThanOrEqual(1);
+    for (const outcome of race) {
+      if (outcome.status === 'rejected') expectHttpCode(outcome.reason, 409, 'COMMAND_CONCURRENCY_CONFLICT');
+    }
+    expect(new Set(fulfilled.map((outcome) => outcome.value.lineupId)).size).toBe(1);
 
     const submitted = fulfilled[0].value;
+    const submittedRow = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: submitted.lineupId } });
+    expect(submittedRow.version).toBe(1);
+    expect(
+      await prisma.v1OutboxEvent.count({ where: { aggregateId: submitted.lineupId, type: 'TEAM_MATCH_LINEUP_INCLUDED_NOTIFICATION' } }),
+    ).toBe(1);
     expect(submitted.state).toBe('SUBMITTED');
     expect(submitted.publicLineupAt).not.toBeNull();
 
@@ -428,16 +448,28 @@ describe('Task 14 team-match lineup builder', () => {
       where: { gameId: submitted.gameId },
     });
     const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.futureMatch } });
+    if (teamMatch.startAt === null) throw new Error('lineup visibility test requires persisted startAt');
     expect(policy.lineupAt?.getTime()).toBe(teamMatch.startAt.getTime() - 60 * 60 * 1000);
 
-    const editAfterSubmit = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-draft-after-submit', {
+    const editAfterSubmit = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.futureMatch,
+      'idem-host-draft-after-submit',
+      {
         expectedVersion: submitted.version,
         starters: validHostStarters,
         bench: [],
-      }),
+      },
     );
-    expectHttpCode(editAfterSubmit, 409, 'LINEUP_LOCKED_FOR_DIRECT_EDIT');
+    // Task 180 R-2: 이미 낸 명단의 저장은 초안으로 내려가지 않고 곧바로 새 제출본이 된다.
+    expect(editAfterSubmit).toEqual(
+      expect.objectContaining({ state: 'SUBMITTED', version: submitted.version + 1 }),
+    );
+    const resubmitted = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: editAfterSubmit.lineupId } });
+    expect(resubmitted).toEqual(expect.objectContaining({ state: 'SUBMITTED', supersedesId: submitted.lineupId, submittedAt: expect.any(Date) }));
+    // 공개 시각은 첫 제출 때 박힌 값 그대로다.
+    const policyAfterResubmit = await prisma.v1GameVisibilityPolicy.findUniqueOrThrow({ where: { gameId: submitted.gameId } });
+    expect(policyAfterResubmit.lineupAt?.getTime()).toBe(policy.lineupAt?.getTime());
   });
 
   it('lets the opponent manager request a change on the other side before lock, but not on their own side', async () => {
@@ -477,11 +509,9 @@ describe('Task 14 team-match lineup builder', () => {
     expectHttpCode(nothingToChallenge, 404, 'LINEUP_SUBMISSION_NOT_FOUND');
   });
 
-  it('denies change-request once the match deadline has locked the lineup, and denies a non-participant caller entirely', async () => {
-    // `saveLineup`/`submitLineup` both reject once the match has already
-    // started (see the separate LINEUP_DEADLINE_PASSED assertion below), so
-    // a SUBMITTED-before-deadline lineup for this already-started match is
-    // seeded directly rather than through the service.
+  it('keeps a SCHEDULED match editable after startAt while denying a non-participant caller', async () => {
+    // startAt은 지났지만 실제 Game 상태는 SCHEDULED다. 현장 지연 복구를 위해 저장·제출·
+    // 상대 명단 정정 요청을 시간만으로 막지 않는다.
     const pastGame = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: ids.pastMatch } });
     const pastOpponentSide = await prisma.v1GameSide.findFirstOrThrow({
       where: { gameId: pastGame.id, sideKey: 'AWAY' },
@@ -504,41 +534,48 @@ describe('Task 14 team-match lineup builder', () => {
       data: { state: 'SUBMITTED', submittedAt: new Date() },
     });
 
-    const lockedChangeRequest = await captureFailure(() =>
-      service.requestChange(authUser(ids.hostOwner), ids.pastMatch, 'idem-change-past', {
+    const reopened = await service.requestChange(
+      authUser(ids.hostOwner),
+      ids.pastMatch,
+      'idem-change-past',
+      {
         expectedVersion: pastLineup.revision,
-        reason: '너무 늦었어요',
-      }),
+        reason: '현장에서 명단을 다시 확인해 주세요',
+      },
     );
-    expectHttpCode(lockedChangeRequest, 409, 'LINEUP_LOCKED');
-
-    const lockedRow = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: pastLineup.id } });
-    expect(lockedRow.state).toBe('LOCKED');
+    expect(reopened).toEqual(expect.objectContaining({ state: 'change_requested' }));
 
     const nonParticipant = await captureFailure(() =>
       service.getLineup(authUser(ids.strangerUser), ids.pastMatch),
     );
     expectHttpCode(nonParticipant, 403, 'PERMISSION_DENIED');
 
-    const submitPastDeadline = await captureFailure(() =>
-      service.submitLineup(authUser(ids.hostOwner), ids.pastMatch, 'idem-host-past-submit', {
-        expectedVersion: 1,
-      }),
+    const hostVersion = await currentVersion(ids.hostOwner, ids.pastMatch);
+    const saved = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.pastMatch,
+      'idem-host-past-save',
+      { expectedVersion: hostVersion, starters: validHostStarters, bench: [] },
     );
-    expectHttpCode(submitPastDeadline, 409, 'LINEUP_DEADLINE_PASSED');
+    await expect(
+      service.submitLineup(authUser(ids.hostOwner), ids.pastMatch, 'idem-host-past-submit', {
+        expectedVersion: saved.version,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ state: 'SUBMITTED' }));
   });
 
+  /** 재생 계약을 다른 테스트의 라인업 revision과 격리하기 위해 전용 팀매치를 쓴다. */
   it('replays an identical idempotent save exactly once instead of creating a second revision', async () => {
-    const version = await currentVersion(ids.hostOwner, ids.futureMatch);
+    const version = await currentVersion(ids.hostOwner, ids.replayMatch);
     const dto = { expectedVersion: version, starters: validHostStarters, bench: [] };
 
-    const first = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-replay-key', dto);
-    const replay = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-replay-key', dto);
+    const first = await service.saveLineup(authUser(ids.hostOwner), ids.replayMatch, 'idem-host-replay-key', dto);
+    const replay = await service.saveLineup(authUser(ids.hostOwner), ids.replayMatch, 'idem-host-replay-key', dto);
     expect(replay).toEqual({ ...first, replayed: true });
-    expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(first.version);
+    expect(await currentVersion(ids.hostOwner, ids.replayMatch)).toBe(first.version);
 
     const conflictingPayload = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-replay-key', {
+      service.saveLineup(authUser(ids.hostOwner), ids.replayMatch, 'idem-host-replay-key', {
         ...dto,
         starters: [...validHostStarters].reverse(),
       }),

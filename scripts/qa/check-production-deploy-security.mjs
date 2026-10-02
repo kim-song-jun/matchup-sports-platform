@@ -149,6 +149,20 @@ for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
         '(guard belongs in load_prod_release_manifest instead)',
     );
   }
+  for (const variable of [
+    'V1_PUSH_ENVIRONMENT',
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_CLIENT_EMAIL',
+    'FIREBASE_PRIVATE_KEY',
+  ]) {
+    const runtimeMapping = new RegExp(
+      `\\b${variable}:\\s*\\$\\{${variable}(?::-production|:-)?\\}`,
+      'g',
+    );
+    if ([...compose.matchAll(runtimeMapping)].length < 2) {
+      errors.push(`${composePath}: ${variable} must be passed to both API and worker runtime environments`);
+    }
+  }
   const manifestCommon = (() => {
     try { return readFileSync('deploy/prod-manifest-common.sh', 'utf8'); } catch { return ''; }
   })();
@@ -317,6 +331,18 @@ const requiredPatterns = [
     // 섞이면 프로덕션 백업이 배포 아티팩트로 흘러나간다.
     pattern: /--exclude=\.\/backups/,
     message: 'production release tarball must exclude the operator backup directory',
+  },
+  {
+    pattern: /SECRET_FIREBASE_PROJECT_ID:\s*\$\{\{ secrets\.FIREBASE_PROJECT_ID \}\}/,
+    message: 'Firebase project id must be wired into the protected runtime env sync',
+  },
+  {
+    pattern: /SECRET_FIREBASE_CLIENT_EMAIL:\s*\$\{\{ secrets\.FIREBASE_CLIENT_EMAIL \}\}/,
+    message: 'Firebase client email must be wired into the protected runtime env sync',
+  },
+  {
+    pattern: /SECRET_FIREBASE_PRIVATE_KEY:\s*\$\{\{ secrets\.FIREBASE_PRIVATE_KEY \}\}/,
+    message: 'Firebase private key must be wired into the protected runtime env sync',
   },
   {
     // S3 객체는 반드시 버킷 소유자를 확인하고 받는다(계정 혼동 공격 방지).

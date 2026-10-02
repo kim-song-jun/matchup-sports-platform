@@ -48,11 +48,20 @@ async function collectCandidates(
     JOIN v1_games game
       ON game.id = revision.game_id
      AND game.current_official_revision_id = revision.id
-    JOIN v1_tournament_fixtures fixture
-      ON fixture.id = game.tournament_fixture_id
+     AND game.source_type = 'TEAM_MATCH'
+    JOIN v1_team_matches team_match
+      ON team_match.id = game.team_match_id
+     AND team_match.tournament_id = ${tournamentId}
+     AND team_match.league_id IS NULL
+     AND team_match.deleted_at IS NULL
+    JOIN v1_tournament_match_details tournament_details
+      ON tournament_details.team_match_id = team_match.id
+     AND tournament_details.tournament_id = team_match.tournament_id
     JOIN v1_game_participants participant
       ON participant.id = result_participant.participant_id
-    WHERE fixture.tournament_id = ${tournamentId}
+     AND participant.game_id = revision.game_id
+     AND result_participant.side_id = participant.side_id
+    WHERE team_match.tournament_id = ${tournamentId}
       AND revision.state = 'OFFICIAL'
       AND revision.official_at IS NOT NULL
       AND participant.user_id IS NOT NULL

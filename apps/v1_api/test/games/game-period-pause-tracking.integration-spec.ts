@@ -26,6 +26,8 @@ const ids = {
   hostTeam: '66000000-0000-4000-8000-000000000020',
   opponentTeam: '66000000-0000-4000-8000-000000000021',
   tournament: '66000000-0000-4000-8000-000000000030',
+  hostRegistration: '66000000-0000-4000-8000-000000000050',
+  awayRegistration: '66000000-0000-4000-8000-000000000051',
   fixture: '66000000-0000-4000-8000-000000000040',
 } as const;
 
@@ -99,13 +101,34 @@ describe('game period pause tracking — pausedTotalMs/pausedAt survive multiple
     await prisma.v1Tournament.create({
       data: { id: ids.tournament, sportId: ids.sport, title: 'Pause tournament', competitionConfigVersionId: configId },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.director, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.director, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        title: 'Pause match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: configId,
+        legNumber: 1,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.awayRegistration,
       },
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -118,7 +141,7 @@ describe('game period pause tracking — pausedTotalMs/pausedAt survive multiple
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [

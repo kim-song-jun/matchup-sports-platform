@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
@@ -50,6 +50,15 @@ describe('useV1NotificationSocket', () => {
 });
 
 describe('useV1ChatRoomSocket', () => {
+  it('clears cached messages when a remote participant changes a block, without the global bridge', async () => {
+    const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(v1Keys.chatMessages('room-1'), { items: [{ content: 'previously visible' }] });
+    const { unmount } = renderHook(() => useV1ChatRoomSocket('room-1'), { wrapper: createWrapper(queryClient) });
+    listeners['chat:safety-changed']({});
+    await waitFor(() => expect(queryClient.getQueryData(v1Keys.chatMessages('room-1'))).toBeUndefined());
+    unmount();
+  });
   it('invalidates chat room queries for the given room when chat:message fires', async () => {
     const { useV1ChatRoomSocket } = await import('./use-v1-realtime-socket');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

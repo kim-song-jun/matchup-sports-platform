@@ -1,4 +1,4 @@
-import { BadRequestException, Logger, ValidationError, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -6,6 +6,7 @@ import { Logger as PinoNestLogger } from 'nestjs-pino';
 import * as compression from 'compression';
 import * as path from 'path';
 import { AppModule } from './app.module';
+import { createGlobalValidationPipe } from './common/global-validation-pipe';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { UploadsService } from './uploads/uploads.service';
 import {
@@ -41,33 +42,15 @@ async function bootstrap() {
   // would point to the external host instead.
   app.useStaticAssets(path.resolve(UploadsService.UPLOAD_BASE), {
     prefix: UploadsService.SERVE_PREFIX,
+    // 채팅 파일은 같은 볼륨의 `.private/` 에 있다 — 점 경로를 공개 서빙에서 명시적으로 막는다(Task 181 ③).
+    ...UploadsService.STATIC_OPTIONS,
   });
   app.setGlobalPrefix('api/v1');
   app.enableCors({
     origin: frontendOrigin ?? true,
     credentials: true,
   });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-      // 검증 실패를 일관된 코드/한글 메시지로 — class-validator 의 raw 영어 메시지가
-      // 그대로 프론트에 노출되던 문제 해결. 필드별 상세는 details 로 전달.
-      exceptionFactory: (errors: ValidationError[]) => {
-        const details = errors.map((error) => ({
-          field: error.property,
-          messages: error.constraints ? Object.values(error.constraints) : [],
-        }));
-        return new BadRequestException({
-          code: 'VALIDATION_ERROR',
-          message: '입력값을 다시 확인해 주세요.',
-          details,
-        });
-      },
-    }),
-  );
+  app.useGlobalPipes(createGlobalValidationPipe());
   app.useGlobalInterceptors(new TransformInterceptor());
 
   const config = new DocumentBuilder()

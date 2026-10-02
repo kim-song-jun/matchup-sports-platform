@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getV1ApiBaseUrl } from '@/lib/api-client';
+import { clearChunkReloadMark, requestReleaseReload } from '@/lib/release-reload';
 import { BrandMark } from './brand-logo';
 
 const CHECK_INTERVAL_MS = 3 * 60 * 1000;
-const RELOAD_DELAY_MS = 1500;
 const RELEASE_HEADER = 'x-teameet-release';
 
 /**
@@ -22,6 +22,9 @@ export function ReleaseVersionWatcher() {
 
   useEffect(() => {
     let cancelled = false;
+    // 이 컴포넌트가 떴다 = 화면이 정상으로 그려졌다. 청크 복구 표식을 지워 다음 배포 때
+    // 자동 복구가 다시 한 번 열리게 한다.
+    clearChunkReloadMark();
 
     const checkVersion = async () => {
       if (reloadingRef.current) return;
@@ -43,7 +46,8 @@ export function ReleaseVersionWatcher() {
       if (release !== baselineRef.current) {
         reloadingRef.current = true;
         setUpdating(true);
-        window.setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+        // 리로드는 global-error 의 청크 복구와 같은 경로를 쓴다(SW 정적 캐시 무효화 포함).
+        requestReleaseReload();
       }
     };
 
@@ -54,12 +58,19 @@ export function ReleaseVersionWatcher() {
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('focus', checkVersion);
+    // bfcache 복귀(뒤로가기 등) 시에도 버전을 재확인한다 — persisted 페이지는
+    // 새로고침 없이 되살아나므로 focus/visibilitychange만으론 놓칠 수 있다.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) checkVersion();
+    };
+    window.addEventListener('pageshow', onPageShow);
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', checkVersion);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 

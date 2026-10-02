@@ -7,10 +7,13 @@ import {
   resolveV1RequestIdentity,
   V1_SESSION_COOKIE_NAME,
 } from '../auth/v1-session';
+import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
+import { GameTakeoverService } from '../games/game-takeover.service';
 import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import { RealtimeGateway } from './realtime.gateway';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 
 const SESSION_SECRET = 'task-8-session-secret-at-least-32-bytes';
 const GAME_ID = '60000000-0000-4000-8000-000000000008';
@@ -34,6 +37,7 @@ type SocketAdapter = {
   readonly data: {
     userId?: string;
     authUser?: TestSocketUser;
+    clientInstanceId?: string;
     authorizationSubjectVersion?: number;
   };
   readonly join: jest.Mock<Promise<void>, [string]>;
@@ -65,14 +69,14 @@ type Task8ProtocolGateway = {
     readonly userId: string;
     readonly tournamentId: string;
     readonly assignmentVersion: number;
-  }): void;
+  }): Promise<void>;
 };
 
 function socket(overrides: Partial<SocketAdapter> = {}): SocketAdapter {
   return {
     id: 'socket-task-8',
     handshake: { headers: {}, auth: {} },
-    data: { userId: USER.id, authUser: USER },
+    data: { userId: USER.id, authUser: USER, clientInstanceId: 'client-task-8', authorizationSubjectVersion: 0 },
     join: jest.fn().mockResolvedValue(undefined),
     leave: jest.fn().mockResolvedValue(undefined),
     emit: jest.fn(),
@@ -104,6 +108,7 @@ describe('Task 8 game-operations realtime protocol', () => {
     v1User: { findFirst: jest.fn() },
   };
   const gamesService = {
+    assertReadAccess: jest.fn().mockResolvedValue(undefined),
     listEvents: jest.fn(),
     appendEvent: jest.fn(),
     retryEvent: jest.fn(),
@@ -118,16 +123,21 @@ describe('Task 8 game-operations realtime protocol', () => {
       state: 'LIVE',
       version: 4,
       lastSequence: 3,
-      tournamentFixture: null,
     });
-    gamesService.listEvents.mockResolvedValue({ events: [], lastSequence: 3, gap: null });
+    gamesService.listEvents.mockResolvedValue({ events: [], lastSequence: 3, version: 4, state: 'LIVE', gap: null });
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
+        // 핸드셰이크가 REST 와 같은 기준으로 약관 재동의를 본다. 이 스위트들의 관심사는
+        // 약관이 아니므로 "동의 완료" 로 고정한 더블을 넣는다 — 재동의 차단 자체는
+        // 전용 테스트가 따로 덮는다.
+        { provide: ManagedTermsRuntimeService, useValue: { signupCompliance: async () => ({ compliant: true }) } },
         { provide: PrismaService, useValue: prisma },
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameTakeoverService, useValue: { isSuperseded: jest.fn().mockReturnValue(false) } },
       ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);
@@ -152,8 +162,9 @@ describe('Task 8 game-operations realtime protocol', () => {
   it('Task 8 PIN returns the GamesService reconnect snapshot ordered after the requested sequence', async () => {
     const client = socket();
     const events = [{ sequence: 2 }, { sequence: 3 }];
-    gamesService.listEvents.mockResolvedValue({ events, lastSequence: 3, gap: null });
+    gamesService.listEvents.mockResolvedValue({ events, lastSequence: 3, version: 4, state: 'LIVE', gap: null });
 
+    await task8Gateway(gateway).handleConnection(client);
     await expect(task8Gateway(gateway).subscribeToGame(client, { gameId: GAME_ID, afterSequence: 1 })).resolves.toEqual({
       status: 'subscribed',
       room: `game:${GAME_ID}`,
@@ -223,6 +234,51 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(gamesService.appendEvent).toHaveBeenCalledWith(USER, GAME_ID, 'event-1', expect.objectContaining({ takeoverToken: 'nonempty-takeover-token' }));
     expect(client.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ clientEventId: 'event-1', sequence: 4, version: 5 }));
     expect(client.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ gameId: GAME_ID, sequence: 4, version: 5 }));
+  });
+
+  /**
+   * **큐가 실제로 가장 많이 만나는 실패가 이 경로다.**
+   *
+   * 원인(`reason`)을 구독·takeover ack 에만 실으면, 웹의 재시도 판정이 **이 경로에서
+   * 값을 못 받는다** — 타입은 통과하고 화면만 안 된다. 그 자리를 못 박는다.
+   */
+  it('game.event.append 가 거부될 때도 원인을 함께 보낸다 (부분 배선 방지)', async () => {
+    const client = socket({ data: {} as SocketAdapter['data'] });
+
+    const result = await task8Gateway(gateway).appendGameEvent(client, {
+      gameId: GAME_ID,
+      expectedVersion: 4,
+      clientEventId: 'event-denied',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      event: { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'error',
+        code: 'STAFF_SCOPE_DENIED',
+        reason: 'SESSION_NOT_AUTHENTICATED',
+      }),
+    );
+
+    // 재시도 경로도 같은 계약이다 — 큐는 거부당한 항목을 이쪽으로 다시 밀어 넣는다.
+    const retryResult = await task8Gateway(gateway).retryGameEvent(client, {
+      gameId: GAME_ID,
+      rebasedExpectedVersion: 4,
+      clientEventId: 'event-denied',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      event: { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} },
+    });
+
+    expect(retryResult).toEqual(
+      expect.objectContaining({
+        status: 'error',
+        code: 'STAFF_SCOPE_DENIED',
+        reason: 'SESSION_NOT_AUTHENTICATED',
+      }),
+    );
   });
 
   /**
@@ -386,9 +442,12 @@ describe('Task 8 game-operations realtime protocol', () => {
     gamesService.listEvents.mockResolvedValue({
       events: [{ sequence: 3 }],
       lastSequence: 3,
+      version: 4,
+      state: 'LIVE',
       gap: { expectedSequence: 2, availableFrom: 3 },
     });
 
+    await task8Gateway(gateway).handleConnection(client);
     await task8Gateway(gateway).subscribeToGame(client, { gameId: GAME_ID, afterSequence: 1 });
 
     expect(client.emit).toHaveBeenCalledWith('game.gap', { expectedSequence: 2, availableFrom: 3 });
@@ -459,25 +518,21 @@ describe('Task 8 game-operations realtime protocol', () => {
       | { readonly kind: 'emit'; readonly room: string; readonly event: string; readonly payload: unknown }
       | { readonly kind: 'leave'; readonly room: string; readonly gameRoom: string }
     > = [];
-    const server = {
-      to: jest.fn((room: string) => ({
-        emit: jest.fn((event: string, payload: unknown) => {
-          serverActions.push({ kind: 'emit', room, event, payload });
-        }),
-      })),
-      in: jest.fn((room: string) => ({
-        socketsLeave: jest.fn((gameRoom: string) => {
-          serverActions.push({ kind: 'leave', room, gameRoom });
-        }),
-      })),
-    };
-    Object.defineProperty(gateway, 'server', { value: server, writable: true });
+    const joinedRooms = new Set<string>();
     const game = (gameId: string, scopedTournamentId: string, fixtureId: string) => ({
       id: gameId,
       state: 'LIVE',
       version: 4,
       lastSequence: 3,
-      tournamentFixture: { id: fixtureId, tournamentId: scopedTournamentId, fieldId: null },
+      teamMatch: {
+        id: fixtureId,
+        tournamentId: scopedTournamentId,
+        leagueId: null,
+        fieldId: null,
+        tournament: { kind: 'regular_tournament' },
+        league: null,
+        tournamentDetails: { teamMatchId: fixtureId, tournamentId: scopedTournamentId },
+      },
     });
     prisma.v1Game.findUnique.mockImplementation(({ where }: { where: { id: string } }) => {
       if (where.id === GAME_ID) return Promise.resolve(game(GAME_ID, tournamentId, 'fixture-task-8-1'));
@@ -490,14 +545,34 @@ describe('Task 8 game-operations realtime protocol', () => {
       tournamentId,
       assignmentId: 'assignment-task-8',
       assignmentVersion: 0,
+      expiresAt: null,
     });
-    const client = socket({ data: { userId: USER.id, authUser: USER, authorizationSubjectVersion: 0 } });
+    const client = socket({ data: { userId: USER.id, authUser: USER, clientInstanceId: 'client-task-8-scope', authorizationSubjectVersion: 0 } });
+    client.join.mockImplementation(async (room: string) => { joinedRooms.add(room); });
+    client.leave.mockImplementation(async (room: string) => {
+      joinedRooms.delete(room);
+      serverActions.push({ kind: 'leave', room: client.id, gameRoom: room });
+    });
+    client.emit.mockImplementation((event: string, payload: unknown) => {
+      serverActions.push({ kind: 'emit', room: client.id, event, payload });
+    });
+    Object.defineProperty(gateway, 'server', {
+      value: {
+        to: (socketId: string) => ({
+          emit: (event: string, payload: unknown) => {
+            serverActions.push({ kind: 'emit', room: socketId, event, payload });
+          },
+        }),
+      },
+      writable: true,
+    });
 
+    await task8Gateway(gateway).handleConnection(client);
     await task8Gateway(gateway).subscribeToGame(client, { gameId: GAME_ID, afterSequence: 0 });
     await task8Gateway(gateway).subscribeToGame(client, { gameId: matchingGameId, afterSequence: 0 });
     await task8Gateway(gateway).subscribeToGame(client, { gameId: otherTournamentGameId, afterSequence: 0 });
 
-    task8Gateway(gateway).evictUserFromScopedGameRooms({
+    await task8Gateway(gateway).evictUserFromScopedGameRooms({
       userId: USER.id,
       tournamentId,
       assignmentVersion: 1,
@@ -515,11 +590,9 @@ describe('Task 8 game-operations realtime protocol', () => {
           action.payload.gameId === room.slice('game:'.length) &&
           action.event === 'game.permission.revoked',
       );
-      const leaveIndex = serverActions.findIndex(
-        (action) => action.kind === 'leave' && action.gameRoom === room,
-      );
+      const leaveIndex = serverActions.findIndex((action) => action.kind === 'leave' && action.gameRoom === room);
       expect(eventIndex).toBeGreaterThanOrEqual(0);
-      expect(leaveIndex).toBeGreaterThan(eventIndex);
+      expect(leaveIndex).toBeLessThan(eventIndex);
       expect(serverActions[eventIndex]).toEqual({
         kind: 'emit',
         room: client.id,
@@ -537,6 +610,7 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(serverActions).not.toContainEqual(
       expect.objectContaining({ kind: 'leave', gameRoom: `game:${otherTournamentGameId}` }),
     );
+    expect(joinedRooms).toEqual(new Set([`user:${USER.id}`, `game:${otherTournamentGameId}`]));
   });
 
   it('Task 8 permission revoked targets only the revoked user when two users share the same game room', async () => {
@@ -549,22 +623,23 @@ describe('Task 8 game-operations realtime protocol', () => {
       onboardingStatus: 'completed',
     };
     const emitted: Array<{ readonly target: string; readonly event: string; readonly payload: unknown }> = [];
+    const serverEmitted: Array<{ readonly target: string; readonly event: string; readonly payload: unknown }> = [];
+    const serverActions: Array<{ readonly kind: 'emit' | 'leave'; readonly target: string; readonly gameRoom?: string }> = [];
     const leaves: Array<{ readonly userRoom: string; readonly gameRoom: string }> = [];
-    const server = {
-      to: jest.fn((target: string) => ({
-        emit: jest.fn((event: string, payload: unknown) => emitted.push({ target, event, payload })),
-      })),
-      in: jest.fn((userRoom: string) => ({
-        socketsLeave: jest.fn((gameRoom: string) => leaves.push({ userRoom, gameRoom })),
-      })),
-    };
-    Object.defineProperty(gateway, 'server', { value: server, writable: true });
     prisma.v1Game.findUnique.mockResolvedValue({
       id: GAME_ID,
       state: 'LIVE',
       version: 4,
       lastSequence: 3,
-      tournamentFixture: { id: 'fixture-task-8-shared', tournamentId, fieldId: null },
+      teamMatch: {
+        id: 'fixture-task-8-shared',
+        tournamentId,
+        leagueId: null,
+        fieldId: null,
+        tournament: { kind: 'regular_tournament' },
+        league: null,
+        tournamentDetails: { teamMatchId: 'fixture-task-8-shared', tournamentId },
+      },
     });
     staffAccess.assertAccess.mockImplementation(({ userId }: { readonly userId: string }) =>
       Promise.resolve({
@@ -573,42 +648,79 @@ describe('Task 8 game-operations realtime protocol', () => {
         tournamentId,
         assignmentId: 'assignment-task-8-shared',
         assignmentVersion: 0,
+        expiresAt: null,
       }),
     );
     const revokedSocket = socket({
       id: 'socket-revoked',
-      data: { userId: userA.id, authUser: userA, authorizationSubjectVersion: 0 },
+      data: { userId: userA.id, authUser: userA, clientInstanceId: 'client-revoked', authorizationSubjectVersion: 0 },
     });
     const unaffectedSocket = socket({
       id: 'socket-unaffected',
-      data: { userId: userB.id, authUser: userB, authorizationSubjectVersion: 0 },
+      data: { userId: userB.id, authUser: userB, clientInstanceId: 'client-unaffected', authorizationSubjectVersion: 0 },
+    });
+    const revokedRooms = new Set<string>();
+    const unaffectedRooms = new Set<string>();
+    revokedSocket.join.mockImplementation(async (room: string) => { revokedRooms.add(room); });
+    revokedSocket.leave.mockImplementation(async (room: string) => {
+      revokedRooms.delete(room);
+      leaves.push({ userRoom: `user:${userA.id}`, gameRoom: room });
+      serverActions.push({ kind: 'leave', target: revokedSocket.id, gameRoom: room });
+    });
+    revokedSocket.emit.mockImplementation((event: string, payload: unknown) => {
+      emitted.push({ target: revokedSocket.id, event, payload });
+    });
+    unaffectedSocket.join.mockImplementation(async (room: string) => { unaffectedRooms.add(room); });
+    unaffectedSocket.leave.mockImplementation(async (room: string) => { unaffectedRooms.delete(room); });
+    Object.defineProperty(gateway, 'server', {
+      value: {
+        to: (socketId: string) => ({
+          emit: (event: string, payload: unknown) => {
+            serverEmitted.push({ target: socketId, event, payload });
+            serverActions.push({ kind: 'emit', target: socketId });
+          },
+        }),
+      },
+      writable: true,
     });
 
+    await task8Gateway(gateway).handleConnection(revokedSocket);
+    await task8Gateway(gateway).handleConnection(unaffectedSocket);
     await task8Gateway(gateway).subscribeToGame(revokedSocket, { gameId: GAME_ID, afterSequence: 0 });
     await task8Gateway(gateway).subscribeToGame(unaffectedSocket, { gameId: GAME_ID, afterSequence: 0 });
-    task8Gateway(gateway).evictUserFromScopedGameRooms({
+    await task8Gateway(gateway).evictUserFromScopedGameRooms({
       userId: userA.id,
       tournamentId,
       assignmentVersion: 7,
     });
 
-    expect(emitted).toEqual([
+    expect(serverEmitted).toEqual([
       {
         target: revokedSocket.id,
         event: 'game.permission.revoked',
         payload: { gameId: GAME_ID, assignmentVersion: 7 },
       },
     ]);
+    expect(serverActions).toEqual([
+      { kind: 'leave', target: revokedSocket.id, gameRoom: `game:${GAME_ID}` },
+      { kind: 'emit', target: revokedSocket.id },
+    ]);
     expect(leaves).toEqual([{ userRoom: `user:${userA.id}`, gameRoom: `game:${GAME_ID}` }]);
+    expect(revokedRooms).toEqual(new Set([`user:${userA.id}`]));
+    expect(unaffectedRooms).toEqual(new Set([`user:${userB.id}`, `game:${GAME_ID}`]));
 
     emitted.length = 0;
+    serverEmitted.length = 0;
+    serverActions.length = 0;
     leaves.length = 0;
-    task8Gateway(gateway).evictUserFromScopedGameRooms({
+    await task8Gateway(gateway).evictUserFromScopedGameRooms({
       userId: userA.id,
       tournamentId,
       assignmentVersion: 7,
     });
     expect(emitted).toEqual([]);
+    expect(serverEmitted).toEqual([]);
+    expect(serverActions).toEqual([]);
     expect(leaves).toEqual([]);
   });
 

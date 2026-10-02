@@ -30,18 +30,18 @@
 
 ## SET-001 알림 설정 토글 저장
 
-> 현재 상태: Partial. `/settings/notifications`는 `match/team/chat/payment` 4개 category를 서버와 동기화하고, 브라우저 권한/DND는 device-local 섹션으로 분리했다. 다만 live protected-route browser smoke는 현재 dev runtime instability 때문에 아직 재실행하지 못했다.
+> 현재 상태: Partial. `/my/settings/notifications`는 경기·대회/팀 활동/채팅/서비스 공지 4개 category를 서버와 동기화한다. Task 169에서 실제 화면의 모바일·태블릿·데스크톱 렌더와 Android 차단/복구 상태는 검증했으며, 실제 DB reload/재로그인 persistence와 물리 기기 FCM 전달은 follow-up이다.
 
 ### Steps
 
-- [ ] `/settings/notifications`에서 설정을 변경한다.
+- [x] `/my/settings/notifications`에서 네 category 중 하나를 변경한다. (Task 169 unit/UI interaction)
 - [ ] 페이지를 벗어났다가 다시 들어온다.
 
 ### Expected
 
-- [ ] 매치/팀/채팅/결제 category는 reload / 재로그인 후에도 유지된다.
-- [ ] 브라우저 권한과 방해금지 시간은 device-local 항목으로 분리돼 보인다.
-- [ ] 이메일/마케팅/전체 마스터 토글은 서버 저장인 것처럼 보이지 않는다.
+- [ ] 경기·대회/팀 활동/채팅/서비스 공지 category는 reload / 재로그인 후에도 유지된다.
+- [x] 단말 푸시 상태는 category와 분리된 단일 제어로 보인다.
+- [x] 실제 producer/동의 계약이 없는 마케팅 토글은 노출되지 않는다.
 
 ## ONBOARD-001 첫 로그인 사용자 온보딩 완료
 
@@ -85,3 +85,4 @@
 - 2026-04-11: Task 39에서 `/settings/notifications`를 server-synced category와 device-local 항목으로 분리했고, `useNotificationPreferences()`는 mount/focus 시점 refetch로 freshness를 보강했다.
 - 2026-04-11: live browser smoke는 stale API process의 `dev-login` `500`과 이후 web restart의 `@swc/helpers` 누락이 연속으로 겹치며 차단됐다. `SET-001` 최종 검증은 dev runtime 안정화 후 재실행이 필요하다.
 - 2026-04-11: Task 37로 `admin/payments`, `admin/reviews`, `admin/mercenary`, `admin/statistics`, `admin/teams/[id]`, `admin/venues/[id]`의 mock/sample fallback을 제거했다. browser smoke는 `/admin/dashboard`, `/admin/users/:id`, `/admin/reviews`, `/admin/payments`까지 확인했고, Docker dev API restart smoke에서 `warn -> suspend -> api restart -> detail refetch -> reactivate`도 통과했다. payments/reviews/user moderation을 포함한 별도 Playwright spec은 follow-up이다.
+- 2026-09-09: Task 169에서 온보딩 알림 opt-in은 유지하고 홈 중복 CTA를 제거했다. 설정 화면은 단말 제어 1개와 category 4개로 정리했고, headed QA 4상태에서 가로 넘침·화면/API 오류 0을 확인했다. 증거는 `output/playwright/visual-audit/task169-notification-settings/`에 있다.

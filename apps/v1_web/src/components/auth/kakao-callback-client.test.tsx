@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { V1ApiError } from '@/lib/api-client';
@@ -40,6 +40,28 @@ function primeValidOAuthState() {
   window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, 'state-123');
   searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'state-123' });
 }
+
+describe('KakaoCallbackClient address bar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+  });
+
+  it('removes the OAuth code and state from the URL before analytics can read it', async () => {
+    // Given the kauth redirect landed with the one-time code in the address bar
+    window.history.replaceState(null, '', '/callback/kakao?code=auth-code&state=state-123');
+    primeValidOAuthState();
+    api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
+
+    // When
+    render(<KakaoCallbackClient />);
+
+    // Then the exchange still gets the code, but the address bar no longer carries it
+    await waitFor(() => expect(api.v1Post).toHaveBeenCalledWith('/auth/kakao', expect.objectContaining({ code: 'auth-code' })));
+    expect(window.location.pathname).toBe('/callback/kakao');
+    expect(window.location.search).toBe('');
+  });
+});
 
 describe('KakaoCallbackClient GA events', () => {
   beforeEach(() => {
@@ -113,5 +135,26 @@ describe('KakaoCallbackClient GA events', () => {
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'invalid_state' }));
     expect(api.v1Post).not.toHaveBeenCalled();
+  });
+});
+
+// V7: 응답 없는 실패의 원문("Failed to fetch")은 화면 문구가 아니다.
+describe('KakaoCallbackClient 응답 없는 실패', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('fetch 가 응답 없이 실패하면 영어 원문 대신 해요체 안내를 보여 준다', async () => {
+    const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+    api.v1Post.mockImplementation(actual.v1Post);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    primeValidOAuthState();
+
+    render(<KakaoCallbackClient />);
+
+    expect(await screen.findByText('카카오 로그인에 실패했어요.')).toBeInTheDocument();
+    expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
   });
 });

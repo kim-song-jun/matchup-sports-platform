@@ -1,4 +1,9 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { AppleIdentityService } from '../auth/apple-identity.service';
+import { sealAppleToken } from '../auth/apple-token-cipher';
+import { APPLE_REVOKE_URL, APPLE_TOKEN_ENV, AppleTokenService } from '../auth/apple-token.service';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,6 +30,9 @@ describe('ProfileController', () => {
   };
 
   let controller: ProfileController;
+  const prisma = {
+    v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -32,7 +40,10 @@ describe('ProfileController', () => {
       controllers: [ProfileController],
       providers: [
         { provide: ProfileService, useValue: profileService },
-        { provide: PrismaService, useValue: {} },
+        AppleTokenService,
+        // Only sign-in verifies Apple tokens; withdrawal never reaches it.
+        { provide: AppleIdentityService, useValue: {} },
+        { provide: PrismaService, useValue: prisma },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
         { provide: OptionalV1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
       ],
@@ -93,10 +104,16 @@ describe('ProfileController', () => {
     });
   });
 
-  it('logs out', async () => {
-    profileService.logout.mockReturnValue({ ok: true });
-    expect(controller.logout()).toEqual({ ok: true });
-    expect(profileService.logout).toHaveBeenCalledWith();
+  it('logs out an authenticated user and passes it through so subscriptions can be cleaned up', async () => {
+    profileService.logout.mockResolvedValue({ ok: true });
+    await expect(controller.logout(user)).resolves.toEqual({ ok: true });
+    expect(profileService.logout).toHaveBeenCalledWith(user);
+  });
+
+  it('logs out even when the session is already invalid (OptionalV1AuthGuard yields no user)', async () => {
+    profileService.logout.mockResolvedValue({ ok: true });
+    await expect(controller.logout(undefined)).resolves.toEqual({ ok: true });
+    expect(profileService.logout).toHaveBeenCalledWith(undefined);
   });
 
   it('requests withdrawal', async () => {
@@ -107,6 +124,66 @@ describe('ProfileController', () => {
     await expect(controller.withdrawalRequest(user, { reason: '그만 사용' })).resolves.toEqual({
       userId: 'user-1',
       accountStatus: 'withdrawal_pending',
+    });
+  });
+
+  describe('Apple token revoke on withdrawal', () => {
+    const encryptionKey = randomBytes(32);
+    const savedEnv = { ...process.env };
+    let fetchSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+      process.env[APPLE_TOKEN_ENV.keyId] = 'ABC123DEFG';
+      process.env[APPLE_TOKEN_ENV.teamId] = 'TEAM123456';
+      process.env[APPLE_TOKEN_ENV.privateKey] = privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+      process.env[APPLE_TOKEN_ENV.encryptionKey] = encryptionKey.toString('base64');
+      prisma.v1AuthIdentity.findMany.mockResolvedValue([{
+        id: 'identity-1',
+        providerRefreshTokenCiphertext: sealAppleToken(encryptionKey, 'identity-1', {
+          clientId: 'kr.co.teameet',
+          refreshToken: 'refresh-1',
+        }),
+      }]);
+      profileService.withdrawalRequest.mockResolvedValue({ userId: 'user-1', accountStatus: 'withdrawal_pending' });
+      fetchSpy = jest.spyOn(globalThis, 'fetch');
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+      process.env = { ...savedEnv };
+    });
+
+    it('revokes the Apple token once the withdrawal is recorded', async () => {
+      fetchSpy.mockResolvedValue(new Response(null, { status: 200 }));
+
+      await controller.withdrawalRequest(user, {});
+
+      expect(fetchSpy).toHaveBeenCalledWith(APPLE_REVOKE_URL, expect.anything());
+      expect(profileService.withdrawalRequest.mock.invocationCallOrder[0])
+        .toBeLessThan(fetchSpy.mock.invocationCallOrder[0]);
+      expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith({
+        where: { id: 'identity-1' },
+        data: { providerRefreshTokenCiphertext: null },
+      });
+    });
+
+    it('still completes the withdrawal when Apple cannot be reached', async () => {
+      fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
+
+      await expect(controller.withdrawalRequest(user, {})).resolves.toEqual({
+        userId: 'user-1',
+        accountStatus: 'withdrawal_pending',
+      });
+      expect(Logger.prototype.error).toHaveBeenCalled();
+    });
+
+    it('does not revoke anything when the withdrawal itself is refused', async () => {
+      profileService.withdrawalRequest.mockRejectedValue(new Error('ADMIN_WITHDRAWAL_FORBIDDEN'));
+
+      await expect(controller.withdrawalRequest(user, {})).rejects.toThrow('ADMIN_WITHDRAWAL_FORBIDDEN');
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 });

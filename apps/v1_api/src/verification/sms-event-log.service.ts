@@ -16,6 +16,12 @@ export const SMS_EVENT_TYPE = {
   TOO_MANY_ATTEMPTS: 'VERIFICATION_TOO_MANY_ATTEMPTS',
   /** 재발송 쿨다운 위반 */
   RESEND_COOLDOWN: 'VERIFICATION_RESEND_COOLDOWN',
+  /**
+   * 24시간 발송 총량 상한 도달 — 쿨다운과 구분한다.
+   * 쿨다운은 "너무 빨리 눌렀다"(정상 사용자도 흔히 겪는다)이고 상한은 "너무 많이
+   * 보냈다"(남용 신호에 가깝다)라, 같은 타입으로 남기면 알람·관측에서 둘이 섞인다.
+   */
+  SEND_QUOTA_EXCEEDED: 'VERIFICATION_SEND_QUOTA_EXCEEDED',
 } as const;
 
 export type SmsEventType = (typeof SMS_EVENT_TYPE)[keyof typeof SMS_EVENT_TYPE];

@@ -1,5 +1,7 @@
 # Auth And Session
 
+> **v0 기준 서술 — v1 확인 필요.** 이 문서의 엔드포인트·에러 코드·상세 계약은 레거시 `apps/api`/`apps/web` 시절에 작성됐다. 파일 경로는 v1(`apps/v1_api`/`apps/v1_web`)로 갱신했지만, 계약 내용 자체가 v1 실제 동작과 일치하는지는 이번 변경에서 검증하지 않았다(2026-09-27, docs/api 레거시 분리 작업).
+
 ## 목적
 
 프론트가 인증 토큰 발급/갱신/만료 처리 흐름을 추측 없이 구현하도록 하는 문서.
@@ -56,7 +58,7 @@
 
 ## 프론트 interceptor 동작
 
-`apps/web/src/lib/api.ts` 기준:
+`apps/v1_web/src/lib/api-client.ts` 기준:
 
 1. API 응답 `401` 수신
 2. `_retry`가 아니면 `/auth/refresh` 호출
@@ -87,10 +89,12 @@
 
 ## Source References
 
-- `apps/api/src/auth/auth.controller.ts`
-- `apps/api/src/auth/dto/auth.dto.ts`
-- `apps/api/src/auth/auth.service.ts`
-- `apps/api/test/integration/auth.e2e-spec.ts`
-- `apps/web/src/lib/api.ts`
-- `apps/web/src/hooks/use-api.ts`
+- `apps/v1_api/src/auth/auth.controller.ts`
+- `apps/v1_api/src/auth/dto/` (여러 DTO로 분리됨 — `login.dto.ts`, `register.dto.ts`,
+  `kakao-login.dto.ts`, `apple-login.dto.ts`, `social-profile.dto.ts` 등)
+- `apps/v1_api/src/auth/auth.service.ts`
+- `apps/v1_api/src/auth/auth.controller.spec.ts` + `auth.service.spec.ts` (v1엔 전용
+  auth 통합 스펙 파일이 없어 유닛 스펙으로 대체)
+- `apps/v1_web/src/lib/api-client.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
 

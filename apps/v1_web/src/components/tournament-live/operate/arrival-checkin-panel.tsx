@@ -1,0 +1,204 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
+import { jerseyText } from './player-label';
+import { latestLineupForDisplay } from './lineup-grid';
+
+/**
+ * 명단 검인(체크인) — 킥오프 전 "누가 실제로 왔는지"를 스태프가 확정하는 자리.
+ *
+ * 1차 대회(2026-08-15~16) 회고: "명단 검인 과정에서 오지 않거나, 하지 않은 사람들에
+ * 대한 확인이 어려움". 지금까지 스태프는 제출된 명단을 들고 육안·구두로만 확인했고,
+ * 그 결과가 어디에도 남지 않아 나중에 "그 선수 왔었나"를 되짚을 수 없었다.
+ *
+ * **`LineupGrid` 에 얹지 않고 별도 컴포넌트로 둔 이유.** LineupGrid 는 "선수를 한 번
+ * 탭하면 그 선수로 이벤트를 기록한다"는 계약을 가진 컴포넌트다(경기 시계를 그 탭 순간에
+ * 얼려야 하므로 부모가 탭을 그대로 받아 쓴다). 같은 카드에 체크인 토글을 얹으면 한
+ * 화면에서 탭의 의미가 둘이 되고, 경기 중 득점자를 고르다 체크인을 잘못 건드리는
+ * 오조작이 생긴다. 검인은 킥오프 전 한 번, 이벤트 기록은 경기 내내 — 시점도 목적도
+ * 달라 화면을 나눈다.
+ *
+ * **선발/후보 축은 없다(정본 §3).** 예전엔 `started` 를 "팀이 제출한 계획(선발/후보)" 으로
+ * 읽어 배지로 그렸는데, 정본이 **"명단 = 출전자, 선후발 없음"** 으로 확정하면서 그 축이
+ * 사라졌다. 지금은 명단에 오른 사람이 곧 출전자이고 `started` 는 **전원 true** 라, 그 배지는
+ * 모두에게 "선발" 을 찍는 **정보 없는 라벨**이었다(2026-09-06 alpha 실측).
+ *
+ * 남는 축은 하나다 — `arrivedAt` = 현장에서 **확인한 사실**(도착/미확인). 회고가 지목한
+ * 사람은 "명단에 있는데 안 온 사람" 이고, 그건 이 축 하나로 표현된다.
+ */
+
+/**
+ * 검인 대상과 도착 수 — 패널과 "킥오프 준비" 체크리스트가 같은 수를 말해야 하므로 한 곳에서 센다.
+ * 폴백(제출본이 없으면 초안)을 쓰는 이유는 패널 안 주석을 따른다.
+ */
+export function arrivalProgress(sides: readonly GameSide[], lineups: readonly GameLineup[]) {
+  const sections = sides.map((side) => ({
+    side,
+    participants: latestLineupForDisplay(lineups, side.id)?.participants ?? [],
+  }));
+  const total = sections.reduce((sum, section) => sum + section.participants.length, 0);
+  const arrived = sections.reduce(
+    (sum, section) => sum + section.participants.filter((p) => p.arrivedAt !== null).length,
+    0,
+  );
+  return { sections, total, arrived };
+}
+
+export interface ArrivalCheckinPanelProps {
+  /** 제목. 킥오프 준비 체크리스트 안에서는 "킥오프 준비"로 바꿔 쓴다. */
+  readonly title?: string;
+  /** 팀 이름 줄 아래에 붙는 부가 정보(예: 그 팀의 명단 요약). */
+  readonly sideAccessory?: (side: GameSide) => ReactNode;
+  readonly sides: readonly GameSide[];
+  readonly lineups: readonly GameLineup[];
+  readonly onToggleArrival: (input: { participantId: string; arrived: boolean }) => void;
+  /**
+   * 한 팀을 통째로 도착 처리한다("전원 도착"). 기본값이 전원 미확인인 이유는 검인이 "확인한
+   * 것"이어야 하기 때문이다 — 그래서 기본을 뒤집지 않고, 다 온 팀만 한 번에 채우는 버튼을 준다.
+   * 개별 탭은 그대로 남는다(안 온 사람 예외 처리용).
+   */
+  readonly onConfirmSide?: (sideId: string) => void;
+  readonly disabled?: boolean;
+  /** 낙관적 표시 없이 서버 응답을 기다리는 동안 그 행만 잠근다. */
+  readonly pendingParticipantId?: string | null;
+  /** "전원 도착"을 서버에 보낸 팀 — 응답 전까지 그 버튼만 잠근다. */
+  readonly pendingSideId?: string | null;
+}
+
+export function ArrivalCheckinPanel({
+  title = '명단 검인',
+  sideAccessory,
+  sides,
+  lineups,
+  onToggleArrival,
+  onConfirmSide,
+  disabled = false,
+  pendingParticipantId = null,
+  pendingSideId = null,
+}: ArrivalCheckinPanelProps) {
+  // 폴백을 써야 한다 -- 제출본만 보면 미제출 상태로 시작한 경기에서 **검인할 대상이
+  // 통째로 비고**, 그러면 P1-b 가 지킨 `arrivedAt` 을 애초에 만들 수가 없다.
+  const { sections, total, arrived } = arrivalProgress(sides, lineups);
+
+  if (total === 0) {
+    return (
+      <div className="px-4">
+        <p className="text-sm text-[var(--text-muted)]">
+          제출된 명단이 없어 검인할 대상이 없어요.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="flex flex-col gap-3 px-4" aria-label={title}>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {/* 진행 상황을 숫자로 먼저 보여준다 — 스태프가 알고 싶은 건 개별 이름이 아니라
+            "몇 명 남았나"이고, 그게 다음 행동(더 기다릴지 시작할지)을 결정한다. */}
+        <p className="text-xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
+          도착 확인 {arrived}/{total}명
+        </p>
+      </div>
+
+      {sections.map(({ side, participants }) => (
+        <div key={side.id} className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 truncate text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
+            {onConfirmSide && participants.length > 0 ? (
+              participants.every((participant) => participant.arrivedAt !== null) ? (
+                <p className="shrink-0 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">전원 도착 확인됨</p>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={`${side.displayNameSnapshot} 전원 도착 확인`}
+                  disabled={disabled || pendingSideId === side.id}
+                  onClick={() => onConfirmSide(side.id)}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-[var(--border)] px-3 text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  전원 도착
+                </button>
+              )
+            ) : null}
+          </div>
+          {sideAccessory ? sideAccessory(side) : null}
+          {participants.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">제출된 명단이 없어요.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {participants.map((participant) => (
+                <ArrivalRow
+                  key={participant.id}
+                  participant={participant}
+                  disabled={disabled || pendingParticipantId === participant.id}
+                  onToggle={() =>
+                    onToggleArrival({
+                      participantId: participant.id,
+                      arrived: participant.arrivedAt === null,
+                    })
+                  }
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ArrivalRow({
+  participant,
+  disabled,
+  onToggle,
+}: {
+  participant: GameLineupParticipant;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  const checked = participant.arrivedAt !== null;
+  const jersey = jerseyText(participant.jerseyNumber);
+  return (
+    <li>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        // 컬러만으로 상태를 전달하지 않는다(프로젝트 접근성 규칙) — aria-label 에 상태를
+        // 말로 담고, 화면에도 체크 표시와 "도착"/"미확인" 텍스트를 함께 둔다.
+        aria-label={`${participant.displayNameSnapshot} — ${checked ? '도착 확인됨, 누르면 취소' : '아직 미확인, 누르면 도착 확인'}`}
+        disabled={disabled}
+        onClick={onToggle}
+        className={[
+          'flex min-h-[44px] w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors',
+          checked
+            ? 'border-[var(--blue500)] bg-[var(--blue50)]'
+            : 'border-[var(--border)] bg-[var(--surface)]',
+          disabled ? 'opacity-50' : '',
+        ].join(' ')}
+      >
+        <span
+          aria-hidden="true"
+          className={[
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] font-bold',
+            checked
+              ? 'border-[var(--blue500)] bg-[var(--blue500)] text-white'
+              : 'border-[var(--border)] text-transparent',
+          ].join(' ')}
+        >
+          ✓
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">
+            {jersey ? `${jersey} ` : ''}
+            {participant.displayNameSnapshot}
+          </span>
+          <span className="block text-xs text-[var(--text-muted)]">
+            {checked ? '도착' : '미확인'}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}

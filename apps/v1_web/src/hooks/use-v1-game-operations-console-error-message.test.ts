@@ -68,6 +68,25 @@ describe('gameOperationsErrorMessage — 미매핑 코드', () => {
 });
 
 describe('isRetryableGameOperationsErrorCode — 문구와의 정합성', () => {
+  it('버전 불일치는 재시도 가능이다 — 재접속하면 풀리는 원인이라 버튼을 숨기면 안 된다', () => {
+    // `STAFF_SCOPE_DENIED` 하나에 구조적으로 다른 원인이 겹쳐 있다. 코드만 보면
+    // **재접속하면 풀리는 것**과 **진짜 권한 거부**가 구분되지 않아, 운영자가 할 수 있는
+    // 유일한 행동(다시 시도)이 막혔다.
+    expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED', 'AUTHORIZATION_SUBJECT_STALE')).toBe(true);
+  });
+
+  it('다른 코드에 같은 reason 이 실려도 재시도 가능이 되지 않는다 — 예외는 그 코드 안에서만', () => {
+    // 이 reason 집합은 `STAFF_SCOPE_DENIED` 의 원인 구분이다. 코드를 안 보면 오배선 하나로
+    // 엉뚱한 실패가 재시도 가능으로 분류된다.
+    expect(isRetryableGameOperationsErrorCode('TERMINAL_GAME_IMMUTABLE', 'AUTHORIZATION_SUBJECT_STALE')).toBe(false);
+  });
+
+  it('진짜 권한 거부는 그대로 재시도 불가다 (회귀)', () => {
+    expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED', 'ASSIGNMENT_REQUIRED')).toBe(false);
+    // reason 이 없던 옛 호출도 그대로 동작해야 한다.
+    expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED')).toBe(false);
+  });
+
   it('비재시도 코드 목록과 실제 판정이 일치한다', () => {
     for (const code of NON_RETRYABLE_CODES) {
       expect(isRetryableGameOperationsErrorCode(code)).toBe(false);
@@ -87,5 +106,26 @@ describe('isRetryableGameOperationsErrorCode — 문구와의 정합성', () => 
     ]) {
       expect(isRetryableGameOperationsErrorCode(code)).toBe(true);
     }
+  });
+});
+
+describe('SUBSTITUTION_NOT_TRACKED — 롤링 교체 종목의 교체 커맨드', () => {
+  // 콘솔은 롤링 종목에서 교체 버튼을 숨기지만, **대기열에 남아 있던 재전송**과
+  // **옛 클라이언트**는 여전히 이 커맨드를 보낸다. 그때 매핑이 없으면 기본 문구가 뜨고
+  // (운영자는 왜 안 되는지 모른다), 재시도 분류에도 없으면 영영 성공하지 않을 요청을
+  // 계속 재전송한다 — 형제 코드 4개(SUBSTITUTION_INVALID·OUT_NOT_ON_PITCH·
+  // IN_ALREADY_ON_PITCH·LIMIT_REACHED)는 이미 둘 다 갖고 있었다.
+  it('자기 문구를 갖고, 그 문구가 이유를 말한다', () => {
+    const message = gameOperationsErrorMessage('SUBSTITUTION_NOT_TRACKED');
+    expect(message).not.toBe(gameOperationsErrorMessage('__NOT_A_REAL_CODE__'));
+    expect(message).toContain('교체');
+  });
+
+  it('재시도해도 항상 같은 이유로 거부되므로 비재시도로 분류된다', () => {
+    expect(isRetryableGameOperationsErrorCode('SUBSTITUTION_NOT_TRACKED')).toBe(false);
+  });
+
+  it('비재시도이므로 "다시 시도" 를 권하지 않는다', () => {
+    expect(gameOperationsErrorMessage('SUBSTITUTION_NOT_TRACKED')).not.toContain('다시 시도');
   });
 });

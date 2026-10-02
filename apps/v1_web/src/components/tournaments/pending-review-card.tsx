@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import { Star } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { hasStoredV1Session } from '@/lib/session-storage';
@@ -19,19 +22,41 @@ const PENDING_SCAN_LIMIT = 50;
  * 예전에는 이 카드가 대회 후기만 알려줘서, 경기 후기는 마이 메뉴의 서브텍스트 한 줄
  * 말고는 유도 수단이 없었다. 총계를 한 번에 보여주고 소스별로 갈 곳을 나눠 준다.
  */
-export function PendingReviewsCard() {
+/**
+ * 남은 후기 총계와 첫 대회를 함께 돌려준다.
+ *
+ * 카드가 자기 데이터를 직접 가져와 0건이면 스스로 사라지는 구조였는데, 홈 배너 상한
+ * 정책(Task 154 P2-1)이 생기면서 **부모가 "이 카드가 뜰 것인가"를 미리 알아야** 하게
+ * 됐다 -- 안 뜰 카드에 자리를 내주면 그 방문에는 유도 배너가 하나도 안 보인다.
+ *
+ * 훅으로 떼어 부모와 카드가 같은 값을 쓰게 한다. React Query 가 같은 키를 dedupe 하므로
+ * 두 곳에서 불러도 요청은 한 번이다.
+ */
+export function usePendingReviewsSummary() {
   const hasSession = hasStoredV1Session();
   const { data: tournamentPending } = useV1PendingTournamentReviews(hasSession);
   const { data: eventPending } = useV1Reviews(
     { tab: 'pending', limit: PENDING_SCAN_LIMIT },
     { enabled: hasSession },
   );
-
   const tournamentItems = tournamentPending ?? [];
   // 경기 후기는 "경기 수"가 아니라 아직 남은 "대상 수"를 센다 — 한 경기에 상대 팀 1 +
   // 상대 선수 여러 명이 걸리므로, 경기 수로 세면 실제 할 일보다 훨씬 적게 보인다.
   const eventRemaining = (eventPending?.items ?? []).reduce((sum, item) => sum + item.remainingCount, 0);
-  const total = eventRemaining + tournamentItems.length;
+  return {
+    total: eventRemaining + tournamentItems.length,
+    eventRemaining,
+    tournamentItems,
+  };
+}
+
+export function PendingReviewsCard() {
+  const { total, eventRemaining, tournamentItems } = usePendingReviewsSummary();
+  // 홈·마이·시상 어디에 놓여도 도착 화면의 뒤로가기가 이 화면(받은 출처 포함)으로 돌아오게 한다.
+  const pathname = usePathname();
+  const here = useCurrentHref();
+  // 지금 보고 있는 화면으로 가는 링크는 받은 출처를 잃지 않도록 현재 URL 그대로 둔다.
+  const linkFrom = (target: string) => (target === pathname ? here ?? target : withFromPath(target, here));
   if (total === 0) return null;
 
   const firstTournament = tournamentItems[0];
@@ -39,6 +64,8 @@ export function PendingReviewsCard() {
   return (
     <Card
       pad={16}
+      // 지면에 색을 까므로 그 위 보조 텍스트를 함께 올린다(globals.css .tm-on-tint).
+      className="tm-on-tint"
       style={{ background: 'var(--tint-blue)', border: '1px solid var(--tint-blue-border)', marginBottom: 16, minWidth: 0 }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -70,7 +97,7 @@ export function PendingReviewsCard() {
       <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
         {eventRemaining > 0 ? (
           <Link
-            href="/my/reviews"
+            href={linkFrom('/my/reviews')}
             className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
             style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
@@ -79,7 +106,7 @@ export function PendingReviewsCard() {
         ) : null}
         {firstTournament ? (
           <Link
-            href={`/tournaments/${firstTournament.tournamentId}/awards`}
+            href={linkFrom(`/tournaments/${firstTournament.tournamentId}/awards`)}
             // 배너 배경이 blue500 8% 라 tm-btn-neutral(grey100)은 배경에 묻혀 버튼으로 안 읽힌다.
             // 두 번째 CTA 는 위계를 낮추되 형태는 남아야 하므로 흰 배경 + 테두리로 분리한다.
             className={`tm-btn tm-btn-sm tm-btn-block ${eventRemaining > 0 ? 'tm-btn-outline' : 'tm-btn-primary'}`}

@@ -48,15 +48,74 @@ export class ScheduleAttendanceService {
     dto: SetAttendanceDto,
     idempotencyKey: string,
   ): Promise<SetAttendanceResponse> {
-    return this.prisma.$transaction(async (tx) => {
-      await this.lockIdempotencyScope(tx, user.id, scheduleId, idempotencyKey);
+    return this.setAttendanceFor(user, user.id, teamId, scheduleId, dto, idempotencyKey);
+  }
 
+  /**
+   * 팀장·매니저가 팀원의 참석을 **대신** 표시한다.
+   *
+   * 리그 대진 생성이 팀일정을 함께 만들면서 라인업 저장에 출석 게이트가 걸리는데
+   * (team-match-lineup.service.ts, "참석으로 응답한 팀원만"), 출석은 본인만 설정할 수
+   * 있어서 선수 한 명이 앱을 안 열면 팀장이 명단을 못 짠다. 리그 대진은 운영자가 일방
+   * 배정하는 의무 경기라 그 대기가 특히 비싸다.
+   *
+   * **정원 규칙은 본인 응답과 동일하다**(사용자 확정) — 정원이 찼으면 대리로 눌러도
+   * 자동으로 대기자가 된다. 팀장에게 정원을 넘길 권한을 주면 먼저 응답해 대기자가 된
+   * 사람과의 형평성이 깨진다.
+   */
+  async setAttendanceOnBehalf(
+    actor: V1AuthUser,
+    targetUserId: string,
+    teamId: string,
+    scheduleId: string,
+    dto: SetAttendanceDto,
+    idempotencyKey: string,
+  ): Promise<SetAttendanceResponse> {
+    // 본인 것을 이 경로로 부르는 것은 막지 않는다 — 결과가 같고, 화면이 자기 자신을
+    // 목록에서 고르는 것을 특별취급하지 않아도 되게 한다.
+    //
+    // 권한 확인은 **트랜잭션 안에서** 한다(아래 setAttendanceFor). 같은 모듈의
+    // guest-recruitment.service.ts 가 P1-7/P1-8 로 정확히 이 실수를 고쳤다: 트랜잭션
+    // 밖에서 확인하면 그 사이에 커밋된 권한 회수가 이 요청을 막지 못한다.
+    return this.setAttendanceFor(actor, targetUserId, teamId, scheduleId, dto, idempotencyKey);
+  }
+
+  /**
+   * 출석 설정의 공통 본체. **행위자(actor)와 대상자(targetUserId)를 분리한다** —
+   * 대리 응답에서 둘이 갈리기 때문이다:
+   * - 행위자: 멱등키 범위·감사 로그의 actorUserId (누가 눌렀나)
+   * - 대상자: 출석 행·정원 집계·멤버십 검증 (누구의 참석인가)
+   * 이 둘을 한 값으로 두면 대리 응답의 감사 로그에 팀원이 행위자로 남는 등 조용히 틀린다.
+   */
+  private async setAttendanceFor(
+    actor: V1AuthUser,
+    targetUserId: string,
+    teamId: string,
+    scheduleId: string,
+    dto: SetAttendanceDto,
+    idempotencyKey: string,
+  ): Promise<SetAttendanceResponse> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockIdempotencyScope(tx, actor.id, scheduleId, idempotencyKey);
+
+      // 대리 응답이 생기면서 같은 actor 가 같은 스케줄에 대해 **서로 다른 대상자**로
+      // 요청할 수 있게 됐다. idempotency identity 는 (actor, action, schedule, key) 라
+      // 대상자를 구분하지 않으므로, 대상자를 payloadHash 에 넣지 않으면 클라이언트가
+      // 키를 잘못 재사용했을 때 두 번째 대상자의 출석이 기록되지 않은 채 첫 번째
+      // 응답이 그대로 replay 된다 -- 호출부는 성공으로 읽는 조용한 오동작이다.
+      //
+      // 본인 응답(targetUserId === actor.id)일 때는 해시를 예전 그대로 둔다. 이미
+      // 발급돼 있는 기록들의 해시가 배포 경계에서 통째로 어긋나 재시도가 409 가 되는
+      // 것을 피하기 위해서다 -- 본인 경로는 대상자가 늘 자기 자신이라 애초에 모호하지
+      // 않다. 대상자가 다른 요청은 해시가 달라지므로 조용한 replay 대신
+      // IDEMPOTENCY_PAYLOAD_CONFLICT 로 드러난다.
       const payloadHash = canonicalGameCommandPayloadHash({
         status: dto.status,
         expectedVersion: dto.expectedVersion,
+        ...(targetUserId === actor.id ? {} : { targetUserId }),
       });
       const idempotencyIdentity = {
-        actorUserId: user.id,
+        actorUserId: actor.id,
         action: ACTION,
         resourceType: RESOURCE_TYPE,
         resourceId: scheduleId,
@@ -111,8 +170,16 @@ export class ScheduleAttendanceService {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
       }
 
+      // 대리 응답이면 **행위자의 팀장 권한**을 같은 트랜잭션에서, 대상자 멤버십보다
+      // 먼저 확인한다(팀 -> 행위자 멤버십 -> 대상자 멤버십 순 — 이 파일과 형제 레인이
+      // 쓰는 잠금 순서 그대로). 트랜잭션 밖에서 확인하면 그 사이 커밋된 권한 회수가
+      // 이 요청을 못 막는다 — guest-recruitment.service.ts 의 P1-7/P1-8 이 같은 실수였다.
+      if (targetUserId !== actor.id) {
+        await this.assertActiveManagerLocked(tx, actor.id, teamId);
+      }
+
       const membershipRows = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM v1_team_memberships WHERE team_id = ${teamId} AND user_id = ${user.id} AND status = 'active' FOR SHARE
+        SELECT id FROM v1_team_memberships WHERE team_id = ${teamId} AND user_id = ${targetUserId} AND status = 'active' FOR SHARE
       `;
       if (membershipRows.length === 0) {
         throw new ForbiddenException({
@@ -146,8 +213,31 @@ export class ScheduleAttendanceService {
       }
 
       const existing = await tx.v1ScheduleAttendance.findUnique({
-        where: { scheduleId_userId: { scheduleId, userId: user.id } },
+        where: { scheduleId_userId: { scheduleId, userId: targetUserId } },
       });
+
+      // 대리 응답은 "아직 답하지 않은 팀원을 대신 참석으로 표시한다"까지다 -- 이미 답한
+      // 사람의 의사를 팀장이 번복하는 것은 승인된 범위가 아니다. 화면은 미응답 줄에만
+      // 버튼을 내지만 화면만으로 지키면 반쪽이다: 출석은 라인업 자격을 결정하므로
+      // (team-match-lineup.service.ts 의 출석 게이트) 서버가 직접 막아야 한다.
+      //
+      // 재시도로 이 분기에 걸리는 일은 없다 -- 같은 키의 재시도는 위 replay 분기에서
+      // 이미 돌아갔고, 여기까지 온 것은 그 키로 처음 들어온 요청이다.
+      if (targetUserId !== actor.id) {
+        if (dto.status !== 'GOING') {
+          throw new ConflictException({
+            code: 'PROXY_ATTENDANCE_STATUS_NOT_ALLOWED',
+            message: 'Only GOING can be set on behalf of another member',
+          });
+        }
+        if (existing !== null) {
+          throw new ConflictException({
+            code: 'PROXY_ATTENDANCE_ALREADY_ANSWERED',
+            message: 'Member already answered; their response cannot be overwritten',
+            details: { currentStatus: existing.status },
+          });
+        }
+      }
 
       if (existing) {
         if (existing.version !== dto.expectedVersion) {
@@ -176,9 +266,22 @@ export class ScheduleAttendanceService {
       let waitlistPosition: number | null = previousWaitlistPosition;
 
       if (dto.status === 'GOING' && schedule.capacity !== null) {
-        const goingCount = await tx.v1ScheduleAttendance.count({
-          where: { scheduleId, status: 'GOING', userId: { not: user.id } },
-        });
+        // 정원 산정 일원화 (M-F-team-schedule-attendance-orphan-cleanup fix): 팀을 나가거나
+        // 추방된 멤버의 GOING 행은 v1_schedule_attendance에서 지워지지 않는다 — 이탈 경로가
+        // teams.service.ts(leaveTeam/removeMembership)·profile.service.ts(회원탈퇴)·
+        // admin.service.ts(관리자 비활성화) 4곳으로 흩어져 있어 매 경로마다 정리 훅을 심으면
+        // 새 경로가 생길 때마다 또 빠뜨리기 쉽다. 대신 "누가 정원을 차지하는가"를 active
+        // 멤버십으로 정의해 원시 행은 그대로 두고(백필 불필요) 판정 시점에만 걸러낸다 — 이
+        // 팀의 attendees 목록(team-schedules.service.ts detail())이 이미 쓰는 것과 동일한
+        // 조건이라, 화면에 뜨는 참석자 수와 정원 판정이 항상 같은 정의를 쓰게 된다.
+        const goingCountRows = await tx.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM v1_schedule_attendance a
+          INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+          INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+          WHERE a.schedule_id = ${scheduleId} AND a.status = 'GOING'::"V1AttendanceStatus" AND a.user_id != ${targetUserId}
+        `;
+        const goingCount = Number(goingCountRows[0]?.count ?? 0);
         if (goingCount >= schedule.capacity) {
           nextStatus = 'WAITLISTED';
         }
@@ -228,7 +331,7 @@ export class ScheduleAttendanceService {
         await tx.v1ScheduleAttendance.create({
           data: {
             scheduleId,
-            userId: user.id,
+            userId: targetUserId,
             status: nextStatus,
             waitlistPosition,
             version: 0,
@@ -273,10 +376,21 @@ export class ScheduleAttendanceService {
       // GOING and compact the remaining WAITLISTED positions down by one, so a freed slot is
       // never permanently stranded behind a waitlisted user.
       if (previousStatus === 'GOING' && nextStatus !== 'GOING' && schedule.capacity !== null) {
-        const nextInLine = await tx.v1ScheduleAttendance.findFirst({
-          where: { scheduleId, status: 'WAITLISTED' },
-          orderBy: { waitlistPosition: 'asc' },
-        });
+        // 승격 대상도 정원 산정과 **같은 정의**를 써야 한다: 위 goingCount 는 active
+        // 멤버십으로 자리를 세는데, 승격만 맨 findFirst 로 고르면 이미 팀을 나갔거나
+        // 추방된 사람(대기 행은 남아 있다)이 GOING 으로 올라와 자리를 차지한다 —
+        // 그 사람은 정원 계산에서는 안 세어지므로 정원이 조용히 한 자리 새는 셈이고,
+        // 정작 대기 중인 활성 멤버는 계속 밀린다. 이 배치가 고치려던 바로 그 결함이다.
+        const nextInLineRows = await tx.$queryRaw<Array<{ id: string; waitlistPosition: number | null }>>`
+          SELECT a.id, a.waitlist_position AS "waitlistPosition"
+          FROM v1_schedule_attendance a
+          INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+          INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+          WHERE a.schedule_id = ${scheduleId} AND a.status = 'WAITLISTED'::"V1AttendanceStatus"
+          ORDER BY a.waitlist_position ASC
+          LIMIT 1
+        `;
+        const nextInLine = nextInLineRows[0] ?? null;
         if (nextInLine) {
           await tx.v1ScheduleAttendance.update({
             where: { id: nextInLine.id },
@@ -298,7 +412,7 @@ export class ScheduleAttendanceService {
         }
       }
 
-      const counts = await this.computeCounts(tx, scheduleId);
+      const counts = await this.computeCounts(tx, teamId, scheduleId);
       const response: SetAttendanceResponse = {
         status: nextStatus,
         version: newVersion,
@@ -309,7 +423,7 @@ export class ScheduleAttendanceService {
 
       await tx.v1IdempotencyRecord.create({
         data: {
-          actorUserId: user.id,
+          actorUserId: actor.id,
           action: ACTION,
           resourceType: RESOURCE_TYPE,
           resourceId: scheduleId,
@@ -325,18 +439,25 @@ export class ScheduleAttendanceService {
     });
   }
 
-  private async computeCounts(tx: Prisma.TransactionClient, scheduleId: string): Promise<AttendanceCounts> {
-    const grouped = await tx.v1ScheduleAttendance.groupBy({
-      by: ['status'],
-      where: { scheduleId },
-      _count: { _all: true },
-    });
+  // 정원 산정 일원화: 이 응답의 counts도 팀을 나가거나 추방된 멤버의 유령 행을 제외해야
+  // capacity 판정(위 setMyAttendance)·team-schedules.service.ts의 goingCount/waitlistedCount·
+  // attendees 목록과 같은 숫자를 가리킨다. active 멤버십으로 조인하는 동일한 정의를 쓴다.
+  private async computeCounts(tx: Prisma.TransactionClient, teamId: string, scheduleId: string): Promise<AttendanceCounts> {
+    const grouped = await tx.$queryRaw<Array<{ status: string; count: bigint }>>`
+      SELECT a.status::text AS status, COUNT(*)::bigint AS count
+      FROM v1_schedule_attendance a
+      INNER JOIN v1_team_memberships m ON m.team_id = ${teamId} AND m.user_id = a.user_id AND m.status = 'active'
+      INNER JOIN v1_users u ON u.id = a.user_id AND u.account_status = 'active'
+      WHERE a.schedule_id = ${scheduleId}
+      GROUP BY a.status
+    `;
     const counts: AttendanceCounts = { going: 0, maybe: 0, notGoing: 0, waitlisted: 0 };
     for (const row of grouped) {
-      if (row.status === 'GOING') counts.going = row._count._all;
-      else if (row.status === 'MAYBE') counts.maybe = row._count._all;
-      else if (row.status === 'NOT_GOING') counts.notGoing = row._count._all;
-      else if (row.status === 'WAITLISTED') counts.waitlisted = row._count._all;
+      const n = Number(row.count);
+      if (row.status === 'GOING') counts.going = n;
+      else if (row.status === 'MAYBE') counts.maybe = n;
+      else if (row.status === 'NOT_GOING') counts.notGoing = n;
+      else if (row.status === 'WAITLISTED') counts.waitlisted = n;
     }
     return counts;
   }
@@ -350,4 +471,33 @@ export class ScheduleAttendanceService {
     const scope = JSON.stringify([userId, ACTION, RESOURCE_TYPE, scheduleId, idempotencyKey]);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
   }
+
+  /**
+   * 대리 출석 응답의 행위자 권한 확인 — **트랜잭션 안에서 `FOR SHARE` 로 잠근 채** 본다.
+   * 형제 레인(guest-recruitment.service.ts `assertActiveManagerLocked`)과 같은 이유·같은
+   * 순서다: 보관처리된 팀은 더 읽기 전에 404 로 끊고, 동시에 커밋되는 권한 회수는
+   * Postgres MVCC 락 대기로 직렬화시켜 "이미 권한이 회수된 행위자의 쓰기"가 끼어들지
+   * 못하게 한다.
+   */
+  private async assertActiveManagerLocked(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    teamId: string,
+  ): Promise<void> {
+    // 팀 row 의 존재·active 여부는 호출부(`setAttendanceFor`)가 같은 트랜잭션에서 이미
+    // FOR SHARE 로 잠그고 검증한 뒤에 여기로 들어온다 -- 여기서 다시 조회하면 대리 응답
+    // 한 번마다 같은 row 를 두 번 읽게 되고, 그 분기는 도달할 수도 없다.
+    const managerRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_team_memberships
+      WHERE team_id = ${teamId} AND user_id = ${userId} AND status = 'active' AND role IN ('owner', 'manager')
+      FOR SHARE
+    `;
+    if (managerRows.length === 0) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Only team owners or managers can set attendance for others',
+      });
+    }
+  }
+
 }

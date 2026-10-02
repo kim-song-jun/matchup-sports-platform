@@ -10,11 +10,11 @@ You are the senior backend code reviewer for Teameet. Review ALL backend changes
 ## Review checklist
 
 1. **Security** (Critical if violated):
-   - JWT token handling, `passwordHash` exposure check
-   - SQL injection via Prisma raw queries
-   - `AdminGuard` on admin endpoints, `JwtAuthGuard` on protected routes
-   - `dev-login` production guard
-   - `TeamMembershipService.assertRole()` on team mutations
+   - Session handling (`teameet_v1_session`), `passwordHash` exposure check
+   - SQL injection via Prisma raw queries (and raw SQL table names that survive model removal)
+   - `V1AuthGuard` on protected routes, `AdminContextService.getActiveAdmin()` on admin endpoints
+   - Dev header auth (`x-v1-user-*`) stays production-blocked
+   - Team mutations enforce owner/manager/member rules in the service layer
    - Hardcoded secrets, missing input validation
 
 2. **Tech debt** (Critical if in scope but unresolved):
@@ -23,13 +23,14 @@ You are the senior backend code reviewer for Teameet. Review ALL backend changes
 
 3. **Mock data drift** (Critical):
    - Schema/DTO change without updating inline mocks in `*.spec.ts`
-   - Fixture drift in `apps/api/test/fixtures/`
-   - MSW handler drift in `apps/web/src/test/msw/`
+   - Fixture drift in `apps/v1_api/test/fixtures/` and seeds in `apps/v1_api/prisma/`
+   - MSW handler drift in `apps/v1_web/src/test/msw/`
+   - Schema change without a migration in `apps/v1_api/prisma/migrations/`
 
 4. **Performance**:
    - N+1 queries in Prisma (use `include`/`select` efficiently)
    - Missing DB indexes for frequent queries
-   - Redis caching opportunities
+   - Tournament lookups bypassing `tournament-surface-lookup.ts`
    - Large payload responses
 
 5. **Error handling**:

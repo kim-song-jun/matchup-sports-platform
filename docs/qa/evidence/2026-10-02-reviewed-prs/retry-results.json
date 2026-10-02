@@ -1,0 +1,57 @@
+{
+  "expectedSha": "9a35d05abd32afd16c1becc1e00a5fd4ced2fc99",
+  "startedAt": "2026-10-02T07:58:27.661Z",
+  "persona": "guest",
+  "pages": [
+    {
+      "key": "team-gender-list",
+      "pr": 1526,
+      "width": 1440,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "team-gender-list-1440-0.png"
+    },
+    {
+      "key": "team-gender-list",
+      "pr": 1526,
+      "width": 1440,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "team-gender-list-1440-1.png"
+    },
+    {
+      "key": "team-gender-list",
+      "pr": 1526,
+      "width": 1440,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "team-gender-list-1440-2.png"
+    }
+  ],
+  "api": [
+    {
+      "endpoint": "/auth/check-email",
+      "status": 400,
+      "code": "VALIDATION_ERROR"
+    },
+    {
+      "endpoint": "/auth/check-nickname",
+      "status": 400,
+      "code": "VALIDATION_ERROR"
+    }
+  ],
+  "ownedProcesses": [],
+  "finishedAt": "2026-10-02T07:58:51.593Z"
+}

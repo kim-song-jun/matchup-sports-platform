@@ -18,10 +18,9 @@ import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup
  * TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` instead of quietly accepting an
  * invariant-violating payload.
  *
- * On revert of that fix, the first `it` below would actually persist a new
- * lineup with two players sharing jersey number 1 (and the second would
- * flip a real DRAFT to SUBMITTED) - proving the bypass is real, not merely a
- * documentation gap.
+ * Task 179 retired the generic write routes entirely (`GamesService.rejectLineupWrite`): a
+ * friendly TEAM_MATCH game still answers `TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN`, and a real
+ * DRAFT built through the team-match path stays untouched.
  *
  * Row-count baseline note: `GamesService.createFromSourceInTransaction`
  * unconditionally seeds one empty (0-participant) revision-1 `v1GameLineup`
@@ -170,20 +169,7 @@ describe('Task 14 generic Game lineup routes refuse TEAM_MATCH-sourced games', (
     const lineupCountBefore = await prisma.v1GameLineup.count({ where: { gameId } });
     const participantCountBefore = await prisma.v1GameParticipant.count({ where: { gameId } });
 
-    // Two starters sharing jersey number 1 violates Task 14's
-    // LINEUP_DUPLICATE_JERSEY_NUMBER invariant. The generic route has no such
-    // check at all, so if it were still reachable for a TEAM_MATCH game this
-    // payload would be silently accepted and persisted.
-    const error = await captureFailure(() =>
-      games.saveLineup(authUser(ids.hostUser), gameId, hostSideId, 'lineup-bypass-save-1', {
-        expectedVersion: 0,
-        clientCommandId: 'lineup-bypass-save-1',
-        participants: [
-          { displayNameSnapshot: 'Player A', jerseyNumber: 1, started: true },
-          { displayNameSnapshot: 'Player B', jerseyNumber: 1, started: true },
-        ],
-      }),
-    );
+    const error = await captureFailure(() => games.rejectLineupWrite(authUser(ids.hostUser), gameId));
     expectHttpCode(error, 409, 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN');
 
     // No lineup/participant rows were created by the refused call - counts
@@ -200,9 +186,11 @@ describe('Task 14 generic Game lineup routes refuse TEAM_MATCH-sourced games', (
     // seed lineup from game creation), so it must be read fresh rather than
     // assumed to be 0 for "the first save". futsal-v1 also requires a
     // minimum of 3 starters, so a single-player roster (which the seeded
-    // version-conflict masked from ever actually running) would fail
-    // LINEUP_SIZE_INVALID here too - pad out with unlinked guests, which
-    // resolveEntry allows without any extra membership/attendance fixtures.
+    // version-conflict masked from ever actually running) used to fail
+    // LINEUP_SIZE_INVALID here too. **Task 163 removed that gate** — roster
+    // size no longer blocks a save. The padding stays because this spec is
+    // about the team-match source being forbidden on this route, and shrinking
+    // the roster would only add an unrelated variable.
     const priorLineup = await prisma.v1GameLineup.findFirst({
       where: { gameId, sideId: hostSideId },
       orderBy: { revision: 'desc' },
@@ -218,18 +206,7 @@ describe('Task 14 generic Game lineup routes refuse TEAM_MATCH-sourced games', (
     });
     expect(saved.state).toBe('DRAFT');
 
-    // The generic route's `expectedVersion` is the Game aggregate's own
-    // optimistic-concurrency `version` column - a separate counter from the
-    // team-match lineup chain's `revision` that TeamMatchLineupService.
-    // saveLineup above never touches - so it must be read fresh from the
-    // Game row, not assumed to equal `saved.revision`.
-    const currentGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    const error = await captureFailure(() =>
-      games.submitLineup(authUser(ids.hostUser), gameId, saved.lineupId, 'lineup-bypass-submit-1', {
-        expectedVersion: currentGame.version,
-        clientCommandId: 'lineup-bypass-submit-1',
-      }),
-    );
+    const error = await captureFailure(() => games.rejectLineupWrite(authUser(ids.hostUser), gameId));
     expectHttpCode(error, 409, 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN');
 
     const row = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: saved.lineupId } });

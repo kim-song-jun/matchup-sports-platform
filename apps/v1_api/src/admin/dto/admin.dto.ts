@@ -18,6 +18,13 @@ import { POPUP_TARGET_SCREENS, PopupTargetScreen } from '../../popups/popup-scre
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
+/** GET /admin/search — 커맨드 팔레트 전역 검색. 회원/팀/매치 3도메인 동시 조회 */
+export class AdminGlobalSearchQueryDto {
+  @IsString()
+  @MaxLength(100)
+  q!: string;
+}
+
 export class AdminUserListQueryDto {
   @IsOptional()
   @IsIn(['active', 'suspended', 'blocked', 'withdrawal_pending', 'deleted'])
@@ -117,6 +124,13 @@ export class AdminTeamMatchListQueryDto {
   @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
   status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
+  // 다른 어드민 목록(users/matches/teams)과 동일한 q 검색 계약 — 팀매치만 빠져 있어
+  // 특정 경기를 찾을 방법이 없었다(어드민 재정비 M2).
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
   @IsOptional()
   @IsString()
   cursor?: string;
@@ -181,8 +195,26 @@ export class AdminInquiryListQueryDto {
   status?: 'received' | 'reviewing' | 'answered' | 'closed';
 
   @IsOptional()
-  @IsIn(['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'])
-  category?: 'account' | 'match' | 'team' | 'tournament' | 'payment_refund' | 'report' | 'other';
+  @IsIn(['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other', 'tournament_hosting', 'partnership'])
+  category?:
+    | 'account'
+    | 'match'
+    | 'team'
+    | 'tournament'
+    | 'payment_refund'
+    | 'report'
+    | 'other'
+    | 'tournament_hosting'
+    | 'partnership';
+
+  @IsOptional()
+  @IsIn(['spam', 'harassment', 'impersonation', 'inappropriate', 'other'])
+  reportReason?: 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
+
+  // 신고 롤업 목록(GET /admin/reports/teams)에서 "이 팀 신고만" 딥링크할 때 쓴다.
+  @IsOptional()
+  @IsString()
+  reportedTeamId?: string;
 
   @IsOptional()
   @IsString()
@@ -201,6 +233,16 @@ export class AdminInquiryListQueryDto {
   @Min(1)
   page?: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+/** 신고 누적 팀 롤업 목록(GET /admin/reports/teams) 쿼리 — 팀 단위 상위 N 랭킹이라 커서 페이지네이션은 없다. */
+export class AdminReportedTeamListQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -371,6 +413,17 @@ export class ChangeMatchStatusDto {
 export class ChangeTeamStatusDto {
   @IsIn(['active', 'suspended', 'archived'])
   status!: 'active' | 'suspended' | 'archived';
+
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+/** 보관된 팀의 이름 변경(운영팀). 길이 상한은 팀 만들기·수정과 같다. */
+export class RenameArchivedTeamDto {
+  @IsString()
+  @MaxLength(50)
+  name!: string;
 
   @IsString()
   @MaxLength(500)

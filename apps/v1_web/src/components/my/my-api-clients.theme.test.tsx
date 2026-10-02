@@ -100,4 +100,21 @@ describe('ThemeSettingsPageClient', () => {
     expect(screen.getByRole('radio', { name: /라이트/ })).toBeDisabled();
     expect(screen.getByRole('radio', { name: /기기 설정/ })).toBeDisabled();
   });
+
+  it('설명 전용 카드 없이 분류 라벨 + 조작 카드 하나 + 각주로 보여준다 (P1 C안)', () => {
+    hooks.useTheme.mockReturnValue({
+      preference: 'light',
+      effectiveTheme: 'light',
+      setPreference: vi.fn(),
+      isSaving: false,
+      saveError: false,
+    });
+
+    const { container } = renderWithClient(<ThemeSettingsPageClient />);
+
+    // 예전 설명 전용 카드 제목("화면 밝기 고르기")은 사라지고 분류 라벨로 대체됐다.
+    expect(screen.queryByText('화면 밝기 고르기')).not.toBeInTheDocument();
+    expect(screen.getByText('화면 밝기')).toBeInTheDocument();
+    expect(container.querySelectorAll('.tm-card').length).toBe(1);
+  });
 });

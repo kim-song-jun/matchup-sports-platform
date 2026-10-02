@@ -1,0 +1,203 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MatchApplicationsPageClient } from './client';
+const mocks = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), query: vi.fn(), applications: vi.fn(), changeParticipant: vi.fn(), completeMatch: vi.fn() }));
+const navigation = vi.hoisted(() => ({ search: '' }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1Match: mocks.query,
+  useV1MatchApplicationEligibility: () => ({ data: { requiresApproval: true } }),
+  useV1MatchApplicationsInfinite: mocks.applications,
+  useV1ApproveMatchApplication: () => ({ isPending: false }),
+  useV1RejectMatchApplication: () => ({ isPending: false }),
+  useV1ChangeMatchParticipant: () => ({ isPending: false, mutate: mocks.changeParticipant }),
+  useV1CompleteMatch: () => ({ isPending: false, mutate: mocks.completeMatch }),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  navigation.search = '';
+  mocks.applications.mockReturnValue({ data: { pages: [{ items: [] }] } });
+});
+describe('개인 매치 신청 관리', () => {
+  // 상세가 받은 출처까지 담아 넘긴 from 을 데스크톱 뒤로가기도 따라야 상세 → 뒤로가 처음 출처로 이어진다.
+  it('데스크톱 뒤로가기가 상세가 넘긴 출처를 따른다', () => {
+    navigation.search = `from=${encodeURIComponent('/matches/m1?from=%2Fmy%2Fmatches%2Fcreated')}`;
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    navigation.search = '';
+  });
+
+  it('출처가 없으면 매치 상세로 돌아간다', () => {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/matches/m1');
+  });
+
+  // EmptyState CTA도 상세가 받은 출처를 이어 실어야 상세 → 뒤로가 처음 출처로 이어진다.
+  it('받은 출처가 이 매치 상세를 가리키면 매치 상세 보기 CTA가 그 출처까지 그대로 쓴다', () => {
+    navigation.search = `from=${encodeURIComponent('/matches/m1?from=%2Fmy%2Fmatches%2Fcreated')}`;
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    navigation.search = '';
+  });
+
+  it('받은 출처가 다른 화면이면 매치 상세로 가면서 그 출처를 잇는다', () => {
+    navigation.search = `from=${encodeURIComponent('/my/matches/created')}`;
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    navigation.search = '';
+  });
+
+  it('출처가 없으면 매치 상세 보기 CTA도 매치 상세 기본 경로로 간다', () => {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m1');
+  });
+
+  function confirmedApplication(overrides = {}) {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    mocks.applications.mockReturnValue({ data: { pages: [{ items: [{
+      applicationId: 'a1', participantId: 'p1', applicantUserId: 'u1', displayName: '참가자', status: 'approved',
+      participantStatus: 'active', mannerScore: null, reviewCount: 0,
+      canCancelApproval: true, canMarkCancelled: false, ...overrides,
+    }] }] } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+  }
+
+  it('확정 명단의 호스트 안내는 호스트 참가 여부를 따른다', () => {
+    mocks.applications.mockReturnValue({ data: { pages: [{ items: [] }] } });
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, host: { displayName: '방장' }, hostParticipates: false } });
+    const { unmount } = render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+    expect(screen.getByText('호스트 · 운영만 해요 (참가 인원 제외)')).toBeInTheDocument();
+    expect(screen.queryByText('호스트 · 참가 인원에 포함')).toBeNull();
+    unmount();
+
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, host: { displayName: '방장' }, hostParticipates: true } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+    expect(screen.getByText('호스트 · 참가 인원에 포함')).toBeInTheDocument();
+  });
+
+  it('신청자 프로필을 클릭하면 개인 프로필 페이지로 이동한다', () => {
+    confirmedApplication({ applicantUserId: 'user-77' });
+    expect(screen.getByRole('link', { name: '참가자 프로필 보기' })).toHaveAttribute(
+      'href',
+      '/users/user-77?from=%2Fmatches%2Fm1%2Fapplications%3Ftab%3Dapproved',
+    );
+  });
+
+  it('신청자 프로필 링크가 신청자 목록이 받은 원래 출처까지 이어서 보존한다', () => {
+    navigation.search = `from=${encodeURIComponent('/matches/m1?from=%2Fmy%2Fmatches%2Fcreated')}`;
+    confirmedApplication({ applicantUserId: 'user-77' });
+    const profileHref = screen.getByRole('link', { name: '참가자 프로필 보기' }).getAttribute('href');
+    expect(profileHref).not.toBeNull();
+    const applicationsFrom = new URL(profileHref!, 'https://teameet.test').searchParams.get('from');
+    expect(applicationsFrom).toBe(
+      '/matches/m1/applications?tab=approved&from=%2Fmatches%2Fm1%3Ffrom%3D%252Fmy%252Fmatches%252Fcreated',
+    );
+    expect(new URL(applicationsFrom!, 'https://teameet.test').searchParams.get('from')).toBe(
+      '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated',
+    );
+  });
+
+  function pendingApplication(match: Record<string, unknown>) {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, ...match } });
+    mocks.applications.mockReturnValue({ data: { pages: [{ items: [{
+      applicationId: 'a2', participantId: null, applicantUserId: 'u2', displayName: '대기자', status: 'requested',
+      participantStatus: null, mannerScore: null, reviewCount: 0, canCancelApproval: false, canMarkCancelled: false,
+    }] }] } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '대기자 신청 관리' }));
+  }
+
+  it('정원이 차면 남은 신청의 승인을 막고, 승인 취소로 자리를 비우면 된다고 알려 준다', () => {
+    pendingApplication({ participantCount: 2, capacity: 2 });
+    const approve = screen.getByRole('button', { name: '대기자 승인' });
+    expect(approve).toBeDisabled();
+    expect(approve).toHaveAccessibleDescription('정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.');
+    expect(screen.getByRole('button', { name: '대기자 거절' })).toBeEnabled();
+  });
+
+  it('자리가 남으면 승인할 수 있고 정원 안내는 없다', () => {
+    pendingApplication({ participantCount: 1, capacity: 2 });
+    expect(screen.getByRole('button', { name: '대기자 승인' })).toBeEnabled();
+    expect(screen.queryByText(/정원이 모두 찼어요/)).toBeNull();
+  });
+
+  it('승인 취소는 사유와 확인을 거쳐 실제 참가자 ID로 요청한다', async () => {
+    confirmedApplication();
+    fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));
+    expect(screen.getByRole('button', { name: '승인 취소' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('처리 사유 (필수)'), { target: { value: '  참가자 요청  ' } });
+    fireEvent.click(screen.getByRole('button', { name: '승인 취소' }));
+    expect(mocks.changeParticipant).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '승인 취소' }));
+    await waitFor(() => expect(mocks.changeParticipant).toHaveBeenCalledWith(
+      { participantId: 'p1', action: 'cancel-approval', reason: '참가자 요청' }, expect.any(Object),
+    ));
+  });
+
+  it('시작 후 불참 처리를 취소하면 요청을 보내지 않는다', async () => {
+    confirmedApplication({ canCancelApproval: false, canMarkCancelled: true });
+    fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));
+    expect(screen.queryByRole('button', { name: '승인 취소' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('처리 사유 (필수)'), { target: { value: '현장 불참' } });
+    fireEvent.click(screen.getByRole('button', { name: '불참 처리' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mocks.changeParticipant).not.toHaveBeenCalled();
+  });
+
+  it('처리 실패를 노출하고 입력 사유를 보존한다', async () => {
+    mocks.changeParticipant.mockImplementation((_body, options) => options.onError(new Error('매치가 이미 완료됐어요')));
+    confirmedApplication({ canCancelApproval: false, canMarkCancelled: true });
+    fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));
+    fireEvent.change(screen.getByLabelText('처리 사유 (필수)'), { target: { value: '현장 불참' } });
+    fireEvent.click(screen.getByRole('button', { name: '불참 처리' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '불참 처리' }));
+    await waitFor(() => expect(screen.getByText('매치가 이미 완료됐어요')).toBeInTheDocument());
+    expect(screen.getByLabelText('처리 사유 (필수)')).toHaveValue('현장 불참');
+  });
+
+  it.each([['no_show', '불참'], ['removed', '승인 취소'], ['completed', '참여 완료']])('처리 이력 %s와 비활성 관리를 표시한다', (participantStatus, label) => {
+    confirmedApplication({ participantStatus, canCancelApproval: false, canMarkCancelled: false });
+    expect(screen.getByLabelText(`상태: ${label}`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '참가자 참가자 관리' })).not.toBeInTheDocument();
+  });
+  it('placeholder로 호스트 권한을 판정하거나 상세로 돌려보내지 않는다', () => {
+    mocks.query.mockReturnValue({ data: { matchId: 'm1', title: '매치' }, isPlaceholderData: true });
+    const { rerender } = render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(mocks.replace).not.toHaveBeenCalled();
+    mocks.query.mockReturnValue({ data: { matchId: 'm1', title: '매치', viewer: { state: 'host' } }, isPlaceholderData: false });
+    rerender(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('button', { name: '확정 명단' })).toBeInTheDocument();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+  it('확정 명단과 전체 이력은 각각 실제 API 필터를 바꾼다', () => {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+    expect(mocks.applications).toHaveBeenLastCalledWith('m1', { status: 'approved', limit: 50 }, { enabled: true });
+    fireEvent.click(screen.getByRole('button', { name: '전체 이력' }));
+    expect(mocks.applications).toHaveBeenLastCalledWith('m1', { limit: 50 }, { enabled: true });
+  });
+
+  it('종료 확인 CTA에서 들어오면 확정 명단을 바로 연다', () => {
+    navigation.search = 'tab=approved';
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' }, canComplete: true } });
+
+    render(<MatchApplicationsPageClient matchId="m1" />);
+
+    expect(screen.getByRole('button', { name: '확정 명단' })).toHaveAttribute('aria-pressed', 'true');
+    expect(mocks.applications).toHaveBeenLastCalledWith('m1', { status: 'approved', limit: 50 }, { enabled: true });
+  });
+});

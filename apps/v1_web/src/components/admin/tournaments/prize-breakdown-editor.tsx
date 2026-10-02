@@ -43,7 +43,7 @@ export function PrizeBreakdownEditor({
 
   return (
     <div className="grid gap-4">
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         <label htmlFor="tournament-prize-pool" className="text-sm font-semibold text-[var(--text-body)]">
           총상금
         </label>
@@ -114,7 +114,7 @@ export function PrizeBreakdownEditor({
               onChange([...rows, { id: createPrizeRowId(), label, value: '' }]);
             }}
             disabled={disabled || rows.length >= 12}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-blue-100 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue100)] disabled:opacity-50"
           >
             <Plus size={16} aria-hidden="true" />
             항목 추가
@@ -137,7 +137,7 @@ export function PrizeBreakdownEditor({
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--grey50)] p-4">
+      <div className="tm-on-tint rounded-xl border border-[var(--border)] bg-[var(--grey50)] p-4">
         <p className="text-xs font-semibold text-[var(--text-caption)]">공개 페이지 미리보기</p>
         <div className="mt-2 grid gap-2">
           {rows.some((row) => row.label.trim() && row.value.trim()) ? (

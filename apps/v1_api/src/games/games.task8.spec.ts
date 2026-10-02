@@ -53,8 +53,48 @@ function eventInput(clientEventId: string, payload: Record<string, unknown>): Ap
   };
 }
 
-async function createTask8Service(initialSequences: readonly number[], lastSequence: number) {
+type Task8Ownership = 'friendly' | 'tournament';
+
+async function createTask8Service(
+  initialSequences: readonly number[],
+  lastSequence: number,
+  ownership: Task8Ownership = 'friendly',
+) {
+  const teamMatchId = '80000000-0000-4000-8000-000000000002';
+  const teamMatch = ownership === 'tournament'
+    ? {
+        id: teamMatchId,
+        tournamentId: '80000000-0000-4000-8000-000000000001',
+        leagueId: null,
+        deletedAt: null,
+        fieldId: null,
+        status: 'matched',
+        hostTeamId: 'task8-team',
+        approvedApplicantTeamId: 'task8-away-team',
+        tournament: { kind: 'regular_tournament' },
+        league: null,
+        tournamentDetails: {
+          teamMatchId,
+          tournamentId: '80000000-0000-4000-8000-000000000001',
+          homeRegistration: { id: 'task8-home-registration', teamId: 'task8-team' },
+          awayRegistration: { id: 'task8-away-registration', teamId: 'task8-away-team' },
+        },
+      }
+    : {
+        id: teamMatchId,
+        tournamentId: null,
+        leagueId: null,
+        deletedAt: null,
+        fieldId: null,
+        status: 'matched',
+        hostTeamId: 'task8-team',
+        approvedApplicantTeamId: 'task8-away-team',
+        tournament: null,
+        league: null,
+        tournamentDetails: null,
+      };
   const state = {
+    configLookupCount: 0,
     events: initialSequences.map((sequence) => ({
       id: `event-${sequence}`,
       gameId: 'task8-game',
@@ -64,9 +104,8 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
     })),
     game: {
       id: 'task8-game',
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-      teamMatchId: null,
-      tournamentFixtureId: '80000000-0000-4000-8000-000000000002',
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      teamMatchId,
       state: V1GameState.LIVE,
       version: 0,
       lastSequence,
@@ -93,21 +132,7 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
         if (select.teamMatch !== undefined) {
           return {
             sourceType: state.game.sourceType,
-            teamMatch: null,
-            tournamentFixture: {
-              id: '80000000-0000-4000-8000-000000000002',
-              tournamentId: '80000000-0000-4000-8000-000000000001',
-              fieldId: null,
-            },
-          };
-        }
-        if (select.tournamentFixture !== undefined) {
-          return {
-            tournamentFixture: {
-              id: '80000000-0000-4000-8000-000000000002',
-              tournamentId: '80000000-0000-4000-8000-000000000001',
-              fieldId: null,
-            },
+            teamMatch,
           };
         }
         return { ...state.game };
@@ -116,6 +141,11 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
         state.game.lastSequence = data.lastSequence;
         state.game.version += data.version.increment;
         return { ...state.game };
+      },
+    },
+    v1TeamMatch: {
+      async findUnique() {
+        return teamMatch;
       },
     },
     v1GameEvent: {
@@ -182,6 +212,7 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
     },
     v1CompetitionConfigVersion: {
       async findUnique() {
+        state.configLookupCount += 1;
         return { result: { tournamentScorerPolicy: 'required' } };
       },
     },
@@ -245,7 +276,7 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
 
 describe('Task 8 HTTP event backfill PIN and RED', () => {
   it('accepts an explicitly anonymous goal even when tournament scorer policy is required', async () => {
-    const fixture = await createTask8Service([], 0);
+    const fixture = await createTask8Service([], 0, 'tournament');
     const takeover = await fixture.service.requestTakeover(reader, 'task8-game', {
       clientInstanceId: 'task8-client',
       lastSequence: 0,
@@ -255,8 +286,26 @@ describe('Task 8 HTTP event backfill PIN and RED', () => {
       takeoverToken: takeover.takeoverToken,
       type: V1GameEventType.GOAL,
     };
+    const nonAnonymousGoal = {
+      ...eventInput('scored-goal-without-participant', { source: 'named' }),
+      takeoverToken: takeover.takeoverToken,
+      type: V1GameEventType.GOAL,
+    };
 
     try {
+      await expect(
+        fixture.service.appendEvent(
+          reader,
+          'task8-game',
+          nonAnonymousGoal.clientEventId,
+          nonAnonymousGoal,
+        ),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: { code: 'SCORER_REQUIRED' },
+      });
+      expect(fixture.state.configLookupCount).toBeGreaterThan(0);
+
       const result = await fixture.service.appendEvent(
         reader,
         'task8-game',
@@ -273,6 +322,7 @@ describe('Task 8 HTTP event backfill PIN and RED', () => {
       expect(fixture.state.events[0]).toEqual(
         expect.objectContaining({ payload: { anonymous: true } }),
       );
+      expect(fixture.state.events).toHaveLength(1);
     } finally {
       await fixture.close();
     }

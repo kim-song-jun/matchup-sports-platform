@@ -1,5 +1,12 @@
-import { absoluteSiteUrl, getSiteOrigin } from '@/lib/seo';
-import type { V1TeamDetail, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
+import { absoluteSiteUrl, DEFAULT_SOCIAL_IMAGE, getSiteOrigin } from '@/lib/seo';
+import type {
+  V1Match,
+  V1Notice,
+  V1TeamDetail,
+  V1TeamMatch,
+  V1TournamentDetail,
+  V1TournamentStatus,
+} from '@/types/api';
 
 /**
  * JSON-LD(schema.org 구조화 데이터) 빌더.
@@ -8,7 +15,8 @@ import type { V1TeamDetail, V1TournamentDetail, V1TournamentStatus } from '@/typ
  *
  * 1. **가시 텍스트와 100% 일치.** 화면에 없는 사실을 LD에만 넣으면 검색엔진이 스팸으로
  *    판정한다. 여기 들어가는 필드는 전부 해당 화면이 실제로 렌더하는 값이다
- *    (대회 상세: 종목·일정·장소·참가비·참가 팀 / 팀 상세: 종목·지역·소개).
+ *    (대회 상세: 종목·일정·장소·참가비·참가 팀 / 팀 상세: 종목·지역·소개 /
+ *    매치·팀매치: 종목·일정·구장·구 단위 지역·상태·팀 / 공지: 제목·날짜).
  * 2. **엔티티는 전역에서 하나의 `@id`.** 페이지마다 Organization을 새로 선언하면
  *    검색엔진·LLM 안에서 같은 실체가 여러 개로 쪼개진다. 조직·사이트는 루트 레이아웃에서
  *    한 번만 선언하고, 개별 페이지는 `@id`로 참조만 한다.
@@ -19,7 +27,6 @@ export const ORGANIZATION_ALTERNATE_NAME = '팀밋';
 
 /** 실제로 운영 중인 공식 표면만 넣는다 — 없는 계정을 적으면 엔티티 신뢰가 깨진다. */
 const OFFICIAL_SURFACES = ['https://www.instagram.com/teameet_official/'] as const;
-const CONTACT_EMAIL = 'teameetsports@naver.com';
 
 export function organizationId(): string {
   return `${getSiteOrigin()}/#organization`;
@@ -47,8 +54,9 @@ function absoluteImageUrl(value: string): string {
 /**
  * 루트 레이아웃에서 1회만 렌더한다. Organization과 WebSite를 `@graph`로 묶어
  * "이 사이트를 운영하는 조직"과 "사이트" 사이의 관계를 명시한다.
+ * 연락 이메일은 공개 페이지 푸터·문의 페이지와 같은 어드민 설정(`fetchPublicSiteInfo`)에서 받는다.
  */
-export function buildSiteIdentityLd(): JsonLdNode {
+export function buildSiteIdentityLd({ contactEmail }: { readonly contactEmail: string }): JsonLdNode {
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -60,12 +68,12 @@ export function buildSiteIdentityLd(): JsonLdNode {
         url: absoluteSiteUrl('/'),
         logo: absoluteSiteUrl('/brand/icon-512.png'),
         description:
-          '풋살·농구·배드민턴 등 생활체육 종목의 아마추어 대회와 팀·매치를 운영하는 멀티스포츠 매칭 플랫폼.',
+          '축구·풋살·러닝·수영 생활체육의 팀·매치를 잇는 멀티스포츠 매칭 플랫폼. 축구·풋살 아마추어 대회도 함께 운영.',
         sameAs: [...OFFICIAL_SURFACES],
         contactPoint: {
           '@type': 'ContactPoint',
           contactType: 'customer support',
-          email: CONTACT_EMAIL,
+          email: contactEmail,
           availableLanguage: ['ko'],
         },
       },
@@ -166,6 +174,132 @@ export function buildSportsEventLd(
 }
 
 /**
+ * 매치·팀매치 상태 → eventStatus. 모집 실패로 열리지 않은 경기(`expired`)는 schema.org 에
+ * 맞는 값이 없어 필드를 비운다 — "예정대로"라고 단정하면 틀린 사실이 된다.
+ * 끝난 경기(`completed`)도 EventScheduled 다: EventStatusType 에 "완료" 값은 없고(EventCompleted 는
+ * 존재하지 않는 값), 예정대로 열렸다는 뜻이라 맞다. 종료 여부는 endDate 가 전한다.
+ */
+function matchEventStatusOf(status: string): string | null {
+  if (status === 'cancelled') return 'https://schema.org/EventCancelled';
+  if (status === 'expired') return null;
+  return 'https://schema.org/EventScheduled';
+}
+
+/**
+ * 장소는 구장 이름과 구 단위 지역까지만 싣는다. 상세 주소(`place.addressText`)는 화면에
+ * 보이더라도 호스트가 적은 집·직장 주소일 수 있어 기계가 긁어 가는 필드로 내보내지 않는다.
+ * 지역 표기는 상세 화면과 같은 우선순위(`region.name` → `regionName`)를 쓴다.
+ */
+function matchPlaceNode(match: V1Match): JsonLdNode | null {
+  const venue = (match.place?.name ?? match.placeName)?.trim();
+  const region = (match.region?.name ?? match.regionName)?.trim();
+  if (!venue && !region) return null;
+  return {
+    '@type': 'Place',
+    name: venue || region,
+    address: { '@type': 'PostalAddress', addressCountry: 'KR', ...(region ? { addressLocality: region } : {}) },
+  };
+}
+
+/**
+ * 호스트·참가자 이름과 설명·규칙·비용 메모는 싣지 않는다. 전부 사용자가 직접 적는 자유
+ * 입력이라 실명·연락처가 섞일 수 있고, 개인 호스트는 공개 프로필(`/users/*`)도 색인 밖이다.
+ */
+function buildMatchEventBase(match: V1Match, path: string): JsonLdNode | null {
+  if (!match.startsAt) return null;
+  const url = absoluteSiteUrl(path);
+  const node: JsonLdNode = {
+    '@context': 'https://schema.org',
+    '@type': 'SportsEvent',
+    '@id': `${url}#event`,
+    name: match.title,
+    url,
+    sport: match.sport?.name ?? match.sportName,
+    startDate: match.startsAt,
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    inLanguage: 'ko-KR',
+  };
+  if (match.endsAt) node.endDate = match.endsAt;
+  const status = matchEventStatusOf(match.displayState ?? match.status);
+  if (status) node.eventStatus = status;
+  const place = matchPlaceNode(match);
+  if (place) node.location = place;
+  if (match.imageUrl) node.image = absoluteImageUrl(match.imageUrl);
+  return node;
+}
+
+/** 팀 상세의 SportsTeam 과 같은 `@id` 로 이어 붙인다 — 팀 엔티티가 둘로 쪼개지지 않게. */
+export function teamReference(teamId: string | null | undefined, name: string | null | undefined): JsonLdNode | null {
+  const teamName = name?.trim();
+  if (!teamName) return null;
+  if (!teamId) return { '@type': 'SportsTeam', name: teamName };
+  const url = absoluteSiteUrl(`/teams/${teamId}`);
+  return { '@type': 'SportsTeam', '@id': `${url}#team`, name: teamName, url };
+}
+
+/**
+ * 개인 매치. 주최자는 운영자가 연 모집(`platformManaged`)일 때만 조직으로 적는다 —
+ * 사용자가 연 매치를 Teameet 이 주최했다고 쓰면 틀린 사실이다.
+ */
+export function buildMatchEventLd(match: V1Match, id: string): JsonLdNode | null {
+  const node = buildMatchEventBase(match, `/matches/${id}`);
+  if (!node) return null;
+  if (match.platformManaged) node.organizer = { '@id': organizationId() };
+  return node;
+}
+
+/**
+ * 팀매치. 주최 팀 = homeTeam, 확정된 상대 팀 = awayTeam(화면의 "상대팀" 자리와 같다).
+ * 플랫폼 모집(`platformManaged`)의 hostTeam 은 HOME 사이드로 배정된 팀일 뿐 주최자가 아니다 —
+ * 화면도 "플랫폼 주관"으로 표시하므로 organizer 는 조직이다.
+ */
+export function buildTeamMatchEventLd(
+  teamMatch: V1TeamMatch,
+  id: string,
+  // 리그 대진은 `/league-matches/:leagueId/fixtures/:id` 가 canonical 이라 경로와 상위 리그를 받는다.
+  options: { readonly path?: string; readonly superEventPath?: string } = {},
+): JsonLdNode | null {
+  const node = buildMatchEventBase(teamMatch, options.path ?? `/team-matches/${id}`);
+  if (!node) return null;
+  if (options.superEventPath) node.superEvent = { '@id': `${absoluteSiteUrl(options.superEventPath)}#event` };
+  const host = teamReference(teamMatch.hostTeam?.teamId ?? teamMatch.hostTeamId, teamMatch.hostTeam?.name ?? teamMatch.hostTeamName);
+  if (host) node.homeTeam = host;
+  if (teamMatch.platformManaged) node.organizer = { '@id': organizationId() };
+  else if (host) node.organizer = host;
+  const opponent = teamReference(teamMatch.approvedOpponentTeam?.teamId, teamMatch.approvedOpponentTeam?.name);
+  if (opponent) node.awayTeam = opponent;
+  return node;
+}
+
+/**
+ * 공지 상세. 작성·발행 주체는 운영 조직이므로 전역 `#organization` 을 참조한다.
+ * 수정 시각이 없거나 발행 시각보다 이르면(예약 발행) 발행 시각을 쓴다 — dateModified 가
+ * datePublished 보다 앞서면 검색엔진이 날짜 전체를 불신한다.
+ */
+export function buildNoticeArticleLd(notice: V1Notice, id: string): JsonLdNode | null {
+  if (!notice.publishedAt) return null;
+  const url = absoluteSiteUrl(`/notices/${id}`);
+  const modified =
+    notice.updatedAt && Date.parse(notice.updatedAt) > Date.parse(notice.publishedAt)
+      ? notice.updatedAt
+      : notice.publishedAt;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    '@id': `${url}#article`,
+    headline: notice.title,
+    url,
+    mainEntityOfPage: url,
+    datePublished: notice.publishedAt,
+    dateModified: modified,
+    inLanguage: 'ko-KR',
+    author: { '@id': organizationId() },
+    publisher: { '@id': organizationId() },
+    image: absoluteSiteUrl(DEFAULT_SOCIAL_IMAGE.path),
+  };
+}
+
+/**
  * 화면에 보이는 지역 표기를 그대로 쓴다.
  *
  * 실측: 상세 응답은 `regionName` 에 표시용 전체 이름("서울 송파구" · "서울 전체")을 주고,
@@ -236,6 +370,28 @@ export function buildBreadcrumbLd(items: readonly BreadcrumbItem[]): JsonLdNode 
       position: index + 1,
       name: item.name,
       item: absoluteSiteUrl(item.path),
+    })),
+  };
+}
+
+export type ItemListEntry = { readonly name: string; readonly path: string };
+
+/**
+ * 목록 페이지의 ItemList. 항목은 **서버 첫 화면에 실제로 그려진 카드와 같은 순서·같은 이름**
+ * 이어야 한다(규약 1) — 전체 건수가 아니라 화면에 보이는 항목 수를 `numberOfItems` 로 쓴다.
+ */
+export function buildItemListLd(name: string, path: string, items: readonly ItemListEntry[]): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    url: absoluteSiteUrl(path),
+    numberOfItems: items.length,
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      url: absoluteSiteUrl(item.path),
     })),
   };
 }

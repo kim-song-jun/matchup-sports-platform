@@ -53,6 +53,7 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
     title: '테스트 대회',
     status: 'completed',
     format: 'knockout',
+    kind: 'regular_tournament',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: null,
@@ -97,17 +98,20 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],
+    reviewsTotalCount: 0,
     awards: [],
-    popup: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -182,5 +186,27 @@ describe('AwardsPageClient — 다중 팀 겸임 사용자의 리뷰 팀 선택'
 
     expect(mutateMock).toHaveBeenCalledTimes(2);
     expect(mutateMock.mock.calls[1][0].teamId).toBe('team-2');
+  });
+
+  it('후기 입력란과 별점이 접근성 트리에 이름·선택 상태로 노출되고 방향키로 점수를 바꾼다', () => {
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '+ 후기 쓰기' }));
+
+    expect(screen.getByRole('textbox', { name: '후기 내용' })).toBeInTheDocument();
+
+    expect(screen.getByRole('radiogroup', { name: '별점 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '5점' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '4점' })).toHaveAttribute('aria-checked', 'false');
+
+    // 표준 키보드 포커스 링(.tm-pressable:focus-visible)을 받는 클래스
+    expect(screen.getByRole('radio', { name: '4점' })).toHaveClass('tm-pressable');
+
+    fireEvent.click(screen.getByRole('radio', { name: '4점' }));
+    expect(screen.getByRole('radio', { name: '4점' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '5점' })).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.keyDown(screen.getByRole('radio', { name: '4점' }), { key: 'ArrowLeft' });
+    expect(screen.getByRole('radio', { name: '3점' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '3점' })).toHaveFocus();
   });
 });

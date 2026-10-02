@@ -38,7 +38,13 @@ function resolveCommitRange() {
   const baseRef = process.env.GITHUB_BASE_REF;
   if (baseRef) {
     try {
-      git(['fetch', '--no-tags', '--depth=1', 'origin', baseRef], { allowFailure: true });
+      // ⚠️ depth 를 주지 않는다. Gates job 의 checkout 은 fetch-depth: 0(전체)인데, 여기서 base 를
+      // `--depth=1` 로 받으면 그 tip 이 shallow 경계로 grafting 되어 저장소 전체가 shallow 가 된다
+      // (실측 2026-09-03: 전체 clone 에서 count(dev)=4863 → 1, is-shallow-repository=true). 뒤에 도는
+      // expand-contract 게이트가 PR base 와의 공통 조상을 못 찾아("shallow=true · base에서닿는커밋=1")
+      // 마이그레이션과 무관한 PR 이 dev 가 전진할 때마다 죽었다(#979·#991·#993). 전체 clone 위의
+      // 일반 fetch 는 이미 있는 이력을 다시 받지 않으므로 비용 차이도 없다.
+      git(['fetch', '--no-tags', 'origin', baseRef], { allowFailure: true });
       git(['rev-parse', '--verify', `origin/${baseRef}`]);
       return { base: `origin/${baseRef}`, head, mergeBase: true };
     } catch {

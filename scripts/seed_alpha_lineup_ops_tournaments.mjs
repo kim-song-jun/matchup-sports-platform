@@ -1,10 +1,10 @@
-// alpha QA 시드: "라인업 확정 → 실시간 경기 기록 → 종료(승부차기 포함)" 를 반복 테스트할
+// alpha QA 시드: "경기 명단 확인·조정 → 실시간 경기 기록 → 종료(승부차기 포함)" 를 반복 테스트할
 // 대회를 만든다. 각 대회는 조별리그·4강·결승·3·4위전 네 단계(phase)를 모두 갖는다 —
 // 조별은 무승부로 끝낼 수 있고(승부차기 버튼이 뜨면 안 되는 경로), knockout 세 단계는
 // 승부차기 입력이 열리는 경로다.
 //
-// 경기별 라인업은 **일부러 비워 둔다**(요청: "라인업 확정부터 테스트"). 대회 선수 명단
-// (로스터)까지만 채워서, 화면에서 라인업 제출부터 바로 시작할 수 있게 한다.
+// 대회 선수 명단(로스터)까지만 채운다. 경기 명단은 대진 생성 때 참가 명단에서 계산된 제출본으로
+// 서고(Task 179 — 라인업 저장·제출 단계 없음), 빠질 선수는 경기별 조정으로 뺀다.
 //
 // 사용법:
 //   ALPHA_ADMIN_EMAIL=... ALPHA_CAPTAIN_A_EMAIL=... ALPHA_CAPTAIN_B_EMAIL=... \
@@ -286,8 +286,9 @@ async function createOne(index, cookies, termsDocumentIds, entrants) {
   must('status→closed', await call('POST', `/admin/tournaments/${tid}/status`, admin, { status: 'closed' }));
   must('status→in_progress', await call('POST', `/admin/tournaments/${tid}/status`, admin, { status: 'in_progress' }));
 
-  // 라인업 진입이 실제로 열렸는지 확인한다 — 이 시드의 목적 자체가 "라인업 확정부터
-  // 테스트"이므로, 경기만 만들어두고 접근이 막혀 있으면 만든 의미가 없다.
+  // 참가팀 매니저의 경기 진입(lineup-access)이 실제로 열렸는지 확인한다 — 경기만 만들어두고
+  // 접근이 막혀 있으면 만든 의미가 없다. 대회 경기 명단은 참가 명단에서 계산되므로(Task 179) 라인업
+  // 저장 단계는 없고, 빠질 선수는 /games/:gameId/sides/:sideId/roster-adjustments 로 조정한다.
   const access = await call(
     'GET',
     `/tournaments/${tid}/fixtures/${fixtures[0].fixtureId}/lineup-access`,

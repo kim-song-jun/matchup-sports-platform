@@ -25,9 +25,10 @@ type FakeEvent = {
 
 type FakeGameSelect = {
   lastSequence?: boolean;
+  version?: boolean;
+  state?: boolean;
   sourceType?: unknown;
   teamMatch?: unknown;
-  tournamentFixture?: unknown;
 };
 
 type FakeEventWhere = {
@@ -38,11 +39,21 @@ type FakeEventWhere = {
 type FakeDatabase = {
   v1Game: {
     findUnique(input: { select: FakeGameSelect }): Promise<
-      | { lastSequence: number }
+      | { lastSequence: number; version: number; state: 'LIVE' | 'PAUSED' }
       | {
           sourceType: V1GameSourceType;
-          teamMatch: null;
-          tournamentFixture: { id: string; tournamentId: string; fieldId: null };
+          teamMatch: {
+            id: string;
+            deletedAt: null;
+            hostTeamId: string;
+            approvedApplicantTeamId: string;
+            tournamentId: null;
+            leagueId: null;
+            fieldId: null;
+            tournament: null;
+            league: null;
+            tournamentDetails: null;
+          };
         }
     >;
   };
@@ -78,6 +89,8 @@ async function createSnapshotFixture(race: boolean): Promise<SnapshotFixture> {
       sequence,
     })),
     lastSequence: 3,
+    version: 7,
+    state: 'LIVE' as 'LIVE' | 'PAUSED',
     appendCommitted: false,
   };
   const readOrder: string[] = [];
@@ -93,28 +106,38 @@ async function createSnapshotFixture(race: boolean): Promise<SnapshotFixture> {
       sequence: 4,
     });
     state.lastSequence = 4;
+    state.version = 8;
+    state.state = 'PAUSED';
     readOrder.push('append-commit');
   };
 
   const createView = (
     events: () => readonly FakeEvent[],
     watermark: () => number,
+    version: () => number,
+    stateValue: () => 'LIVE' | 'PAUSED',
   ): FakeDatabase => ({
     v1Game: {
       async findUnique({ select }: { select: FakeGameSelect }) {
-        if (select.lastSequence === true && Object.keys(select).length === 1) {
+        if (select.lastSequence === true && select.version === true && select.state === true) {
           readOrder.push('watermark-read');
-          return { lastSequence: watermark() };
+          return { lastSequence: watermark(), version: version(), state: stateValue() };
         }
 
         readOrder.push('authorization-read');
         return {
-          sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-          teamMatch: null,
-          tournamentFixture: {
+          sourceType: V1GameSourceType.TEAM_MATCH,
+          teamMatch: {
             id: '80000000-0000-4000-8000-000000000002',
-            tournamentId: '80000000-0000-4000-8000-000000000001',
+            deletedAt: null,
+            hostTeamId: '80000000-0000-4000-8000-000000000010',
+            approvedApplicantTeamId: '80000000-0000-4000-8000-000000000011',
+            tournamentId: null,
+            leagueId: null,
             fieldId: null,
+            tournament: null,
+            league: null,
+            tournamentDetails: null,
           },
         };
       },
@@ -148,11 +171,25 @@ async function createSnapshotFixture(race: boolean): Promise<SnapshotFixture> {
     async $transaction<T>(callback: (transaction: FakeDatabase) => Promise<T>) {
       const transactionEvents = state.events.map((event) => ({ ...event }));
       const transactionWatermark = state.lastSequence;
-      return callback(createView(() => transactionEvents, () => transactionWatermark));
+      const transactionVersion = state.version;
+      const transactionState = state.state;
+      return callback(
+        createView(
+          () => transactionEvents,
+          () => transactionWatermark,
+          () => transactionVersion,
+          () => transactionState,
+        ),
+      );
     },
   });
 
-  const database = createView(() => state.events, () => state.lastSequence);
+  const database = createView(
+    () => state.events,
+    () => state.lastSequence,
+    () => state.version,
+    () => state.state,
+  );
 
   const moduleRef = await Test.createTestingModule({
     providers: [
@@ -179,6 +216,8 @@ describe('Task 8 HTTP event backfill snapshot coherence', () => {
 
       expect(result.events.map((event) => event.sequence)).toEqual([2, 3]);
       expect(result.lastSequence).toBe(3);
+      expect(result.version).toBe(7);
+      expect(result.state).toBe('LIVE');
     } finally {
       await fixture.close();
     }
@@ -197,6 +236,8 @@ describe('Task 8 HTTP event backfill snapshot coherence', () => {
       expect(fixture.readOrder).toEqual(
         expect.arrayContaining(['events-snapshot', 'append-commit', 'watermark-read']),
       );
+      expect(result.version).toBe(7);
+      expect(result.state).toBe('LIVE');
       if (!coherentWithAppend && !coherentlyBounded) {
         throw new Error(
           `Incoherent backfill response: eventSequences=${JSON.stringify(eventSequences)} lastSequence=${result.lastSequence}`,

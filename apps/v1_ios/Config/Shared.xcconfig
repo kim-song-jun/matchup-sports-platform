@@ -1,0 +1,32 @@
+// Settings every Teameet configuration shares. Alpha.xcconfig and Production.xcconfig
+// include this file and then override only what differs between the two environments,
+// mirroring how apps/v1_android/app/build.gradle.kts layers product flavors over
+// defaultConfig.
+
+// MARKETING_VERSION and CURRENT_PROJECT_VERSION come from apps/v1_ios/version.properties,
+// the single source of truth for the iOS version. It is deliberately independent of
+// Android's version.properties: the two stores accept releases on their own schedules.
+//
+// scripts/release/generate-ios-version-xcconfig.sh writes the file this line includes, and
+// .gitignore keeps it out of the tree. The include is required, not optional (`#include?`),
+// so a project generated without running that script fails loudly instead of quietly
+// shipping a stale or default version number.
+#include "Version.generated.xcconfig"
+
+IPHONEOS_DEPLOYMENT_TARGET = 16.0
+
+// iPhone only. iPad layout is out of scope for this task, and shipping an unreviewed
+// iPad build would put an untested layout in front of users.
+TARGETED_DEVICE_FAMILY = 1
+
+// Swift 6 language mode. The push lifecycle is modelled as an actor, so having the
+// compiler enforce isolation rather than merely warn about it is the point.
+SWIFT_VERSION = 6.0
+
+SWIFT_EMIT_LOC_STRINGS = NO
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+CLANG_ENABLE_MODULES = YES
+
+// App Transport Security stays at its defaults — no exception dictionary anywhere in this
+// project. That is the counterpart to Android's usesCleartextTraffic="false" plus
+// network_security_config.xml.

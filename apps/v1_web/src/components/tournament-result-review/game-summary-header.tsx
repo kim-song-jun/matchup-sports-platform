@@ -68,7 +68,7 @@ export function GameSummaryHeader({
       className="tm-card"
       style={{
         position: 'sticky',
-        top: 0,
+        top: 'var(--tournament-ops-mobile-header-offset, 0px)',
         zIndex: 5,
         padding: 16,
         display: 'flex',
@@ -84,7 +84,9 @@ export function GameSummaryHeader({
         </p>
         <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 4 }}>
           {GAME_STATE_LABELS[game.state]}
-          {roleLabel ? ` · ${ACTOR_ROLE_LABELS[roleLabel]}` : ''}
+          {/* 맵에 없는 역할이 와도 **`undefined` 를 찍지 않는다** — 타입이 다 덮지만,
+              서버가 새 역할을 먼저 내보내는 순간을 화면이 감당해야 한다. */}
+          {roleLabel && ACTOR_ROLE_LABELS[roleLabel] ? ` · ${ACTOR_ROLE_LABELS[roleLabel]}` : ''}
         </p>
       </div>
       {confirmedScoreLabel ? (

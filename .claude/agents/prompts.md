@@ -32,28 +32,28 @@
 
 ## Shared QA Contract
 
-All compatibility agents inherit `.codex/qa-rules.md`. Required anchors include No useless fallback, No fake tests, Minimal validation load, Host load preflight, Visual verification before completion, Before/after screenshot evidence, Layout rebalance, No scope retreat, Tech-Debt Grep, Committed-tree verification, Shared-tree pathspec safety, and No left accent rail. Run the narrowest changed-contract test once; run typecheck/build/full test/lint only once immediately before commit and only after checking host CPU/load, memory/swap, Node/browser counts, Docker, and target-service health. Use serial minimum-worker execution and leave repeated repository-wide validation to CI. For UI/design/admin work, tests pass is not completion; collect Playwright screenshot evidence plus console/network checks. In this shared dirty tree, never use `git add -A`; commit only with explicit pathspecs such as `git commit -- <pathspec>` when the root task explicitly asks for a commit.
+All compatibility agents inherit `.codex/qa-rules.md`. Required anchors include No useless fallback, No fake tests, Minimal validation load, Host load preflight, Visual verification before completion, Before/after screenshot evidence, Layout rebalance, No scope retreat, Tech-Debt Grep, Committed-tree verification, Shared-tree pathspec safety, and No left accent rail. Run the narrowest changed-contract test once; run typecheck/build/full test/lint only once immediately before commit and only after checking host CPU/load, memory/swap, Node/browser counts, Docker, and target-service health. Use serial minimum-worker execution and leave repeated repository-wide validation to CI. For UI/design/admin work, tests pass is not completion; collect screenshot evidence on alpha (`ego-browser`) plus console/network checks. In this shared dirty tree, never use `git add -A`; commit only with explicit pathspecs such as `git commit -- <pathspec>` when the root task explicitly asks for a commit.
 
 ## Production Team
 
 ### `backend-dev`
 - 상세 문서: `.codex/agents/backend-dev.md`
 - 범위: NestJS controller/service/module/DTO, Prisma schema/seed, fixtures, integration tests.
-- 필수 계약: `/api/v1`, `TransformInterceptor`, strict `ValidationPipe`, `JwtAuthGuard`, `AdminGuard`, `TeamMembershipService.assertRole(...)`.
+- 필수 계약: `/api/v1`, `TransformInterceptor`, strict `ValidationPipe`, `V1AuthGuard`, `AdminContextService.getActiveAdmin()`, 서비스 계층 팀 역할 검증(owner > manager > member), 스키마 변경 = migration 동반.
 - Windows DB 작업에서 한글 SQL을 PowerShell 문자열 파이프로 psql에 넘기지 않는다. UTF-8 migration runner 또는 parameterized Prisma script를 사용하고 DB/API 한글 round-trip을 확인한다.
-- sync 대상: `apps/v1_api/test/fixtures/`, `apps/v1_web/src/test/msw/`, `e2e/fixtures/`, inline mocks.
+- sync 대상: `apps/v1_api/test/fixtures/`, `apps/v1_api/prisma/` 시드, `apps/v1_web/src/test/msw/`, inline mocks.
 
 ### `frontend-dev`
 - 상세 문서: `.codex/agents/frontend-dev.md`
-- 범위: Next.js App Router UI, hooks/stores/types, React Query/Zustand, MSW, i18n, mock images.
-- 필수 계약: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html` 우선. 단, 사용자가 명시적으로 Open Design recovery/remake source를 pinned한 task에서는 해당 Open Design reference를 read-only visual target으로 함께 사용한다. Tailwind token-first, shared UI reuse, `useRequireAuth()` 적용.
-- sync 대상: `apps/v1_web/src/test/msw/`, `apps/v1_web/public/mock/`, `e2e/fixtures/`, 관련 타입과 inline test mock.
+- 범위: Next.js App Router UI, hooks/types, React Query, MSW, mock images.
+- 필수 계약: 디자인 규칙은 `DESIGN.md`(§1 우선순위), 시각 레퍼런스는 `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`. 단, 사용자가 명시적으로 Open Design recovery/remake source를 pinned한 task에서는 해당 Open Design reference를 read-only visual target으로 함께 사용한다. 토큰 우선(`globals.css`·`tokens.css`), `components/v1-ui/` 재사용, `docs/guides/v1-coding-patterns.md` 준수. UI 변경은 착수 전 A·B·C 3안 선택.
+- sync 대상: `apps/v1_web/src/test/msw/`, `apps/v1_web/public/mock/`, 관련 타입과 inline test mock.
 
 ### `infra-dev`
 - 상세 문서: `.codex/agents/infra-dev.md`
 - 범위: compose/deploy/Makefile/workflows, runtime healthcheck, auth/config safety.
 - 필수 계약: v1 dev `3013/8121`, destructive seed 금지, `.env*` 미접근.
-- 추가 계약: production deploy는 DB/JWT 같은 truly required env만 fail-fast 검증하고, Toss 결제 시크릿은 없으면 mock mode로 둔다. GitHub repo secrets를 쓰는 경우 EC2 `deploy/.env`도 그 값으로 수렴시켜 stale host secret을 남기지 않는다. readiness는 process liveness가 아니라 `/api/v1/health` 기준으로 본다. Next.js production image는 `NEXT_PUBLIC_API_URL`과 `INTERNAL_API_ORIGIN` build-time 주입을 명시적으로 처리한다.
+- 추가 계약: production deploy는 DB·세션 시크릿 같은 truly required env만 fail-fast 검증한다. 프로덕션 시크릿은 GitHub Secrets → Parameter Store → 호스트 `.env`로 수렴시켜 stale host secret을 남기지 않는다. readiness는 process liveness가 아니라 `/api/v1/health` 기준으로 본다. Next.js production image는 `NEXT_PUBLIC_API_URL`과 `INTERNAL_API_ORIGIN` build-time 주입을 명시적으로 처리한다.
 
 ## Review Team
 
@@ -128,9 +128,9 @@ The sections below fill project-specific gaps while preserving curated content a
 - output: changed backend files, tests run, runtime contract verification, residual risks
 
 #### `frontend-dev`
-- owned surfaces: `apps/v1_web/src/**`, `apps/v1_web/public/mock/**`, `apps/v1_web/messages/**`
-- stack context: v1 Next.js App Router, React, Tailwind, TanStack Query, Zustand, dev server `localhost:3013`
-- mandatory checks: Teameet Design HTML, shared UI reuse, dark pair completeness, truthful trust signals, no false affordance
+- owned surfaces: `apps/v1_web/src/**`, `apps/v1_web/public/mock/**`
+- stack context: v1 Next.js 16 App Router, React 19, Tailwind v4, TanStack Query, dev server `localhost:3013` (browser verification on alpha)
+- mandatory checks: `DESIGN.md` + Teameet Design HTML, shared UI reuse, dark pair completeness, truthful trust signals, no false affordance
 - output: changed routes/components/hooks, tests and typecheck, mock/image sync, UX regressions if any
 
 #### `infra-dev`
@@ -145,7 +145,7 @@ The sections below fill project-specific gaps while preserving curated content a
 - output: `🔴/🟡/🟢/💡` review with file references and concrete fix direction
 
 #### `frontend-review`
-- owned scope: App Router UI, hooks/stores/types, MSW, responsive behavior, a11y
+- owned scope: App Router UI, hooks/types, MSW, responsive behavior, a11y
 - mandatory checks: token usage, loading/error/empty states, dark mode parity, motion/accessibility, API/UI contract drift
 - output: `🔴/🟡/🟢/💡` review with file references and user-visible regression framing
 
@@ -185,7 +185,7 @@ The sections below fill project-specific gaps while preserving curated content a
 - output: pass/fail scenarios, reproduction, confusion points
 
 #### `qa-regular`
-- owned scope: repeat-user workflows across match, team, lesson, marketplace, chat
+- owned scope: repeat-user workflows across match, team, team match, tournament/league, chat
 - mandatory checks: filter/create/detail/history continuity, transaction recovery, notification/navigation reliability
 - output: pass/fail scenarios, regressions, practical improvements
 
@@ -205,3 +205,11 @@ The sections below fill project-specific gaps while preserving curated content a
 - output: updated file list, guidance summary, remaining drift or deferred follow-up
 
 <!-- /codex-init:delta -->
+
+# Production release preparation
+
+When `promote-main.yml` is absent from the default branch, prepare locally on an isolated feature branch:
+`CONFIRMATION=PROMOTE bash scripts/release/promote-main.sh --prepare-only`.
+This mode changes only the local release files and runs the promotion gate; it never stages, commits,
+pushes or dispatches. Deliver the diff through a PR to dev, recheck CI and alpha on the resulting SHA,
+and follow `docs/ops/prod-task168-transition-runbook.md`. Only the user promotes main and approves production.

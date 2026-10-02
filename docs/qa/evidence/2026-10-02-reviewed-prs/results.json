@@ -1,0 +1,197 @@
+{
+  "expectedSha": "9a35d05abd32afd16c1becc1e00a5fd4ced2fc99",
+  "startedAt": "2026-10-02T07:57:08.899Z",
+  "persona": "guest",
+  "pages": [
+    {
+      "key": "tournaments-empty",
+      "pr": 1519,
+      "width": 390,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "tournaments-empty-390.png"
+    },
+    {
+      "key": "official-team-match",
+      "pr": 1525,
+      "width": 390,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "official-team-match-390.png"
+    },
+    {
+      "key": "team-gender-detail",
+      "pr": 1526,
+      "width": 390,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [
+        {
+          "type": "error",
+          "location": "https://alpha.teameet.co.kr/api/v1/auth/me"
+        }
+      ],
+      "pageErrors": [],
+      "failures": [
+        {
+          "status": 401,
+          "path": "/api/v1/auth/me"
+        }
+      ],
+      "screenshot": "team-gender-detail-390.png"
+    },
+    {
+      "key": "team-gender-list",
+      "pr": 1526,
+      "width": 390,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "team-gender-list-390.png"
+    },
+    {
+      "key": "tournaments-empty",
+      "pr": 1519,
+      "width": 768,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "tournaments-empty-768.png"
+    },
+    {
+      "key": "official-team-match",
+      "pr": 1525,
+      "width": 768,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "official-team-match-768.png"
+    },
+    {
+      "key": "team-gender-detail",
+      "pr": 1526,
+      "width": 768,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [
+        {
+          "type": "error",
+          "location": "https://alpha.teameet.co.kr/api/v1/auth/me"
+        }
+      ],
+      "pageErrors": [],
+      "failures": [
+        {
+          "status": 401,
+          "path": "/api/v1/auth/me"
+        }
+      ],
+      "screenshot": "team-gender-detail-768.png"
+    },
+    {
+      "key": "team-gender-list",
+      "pr": 1526,
+      "width": 768,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "team-gender-list-768.png"
+    },
+    {
+      "key": "tournaments-empty",
+      "pr": 1519,
+      "width": 1440,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "tournaments-empty-1440.png"
+    },
+    {
+      "key": "official-team-match",
+      "pr": 1525,
+      "width": 1440,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failures": [],
+      "screenshot": "official-team-match-1440.png"
+    },
+    {
+      "key": "team-gender-detail",
+      "pr": 1526,
+      "width": 1440,
+      "verdict": "PASS",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [
+        {
+          "type": "error",
+          "location": "https://alpha.teameet.co.kr/api/v1/auth/me"
+        }
+      ],
+      "pageErrors": [],
+      "failures": [
+        {
+          "status": 401,
+          "path": "/api/v1/auth/me"
+        }
+      ],
+      "screenshot": "team-gender-detail-1440.png"
+    },
+    {
+      "key": "team-gender-list",
+      "pr": 1526,
+      "width": 1440,
+      "verdict": "FAIL",
+      "error": null,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "failures": [],
+      "screenshot": "team-gender-list-1440.png"
+    }
+  ],
+  "api": [
+    {
+      "endpoint": "/auth/check-email",
+      "status": 400,
+      "code": "VALIDATION_ERROR"
+    },
+    {
+      "endpoint": "/auth/check-nickname",
+      "status": 400,
+      "code": "VALIDATION_ERROR"
+    }
+  ],
+  "ownedProcesses": [],
+  "finishedAt": "2026-10-02T07:57:44.690Z"
+}

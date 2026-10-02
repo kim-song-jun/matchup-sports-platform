@@ -1,10 +1,15 @@
+'use client';
+
 import Link from 'next/link';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type { ReactNode } from 'react';
-import { Trophy, LayoutGrid, Star, ChevronRight, Video, Gift, Search } from 'lucide-react';
+import { Trophy, LayoutGrid, Star, ChevronRight, ClipboardList, Video, Gift, Search } from 'lucide-react';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { withFromPath } from '@/lib/session-storage';
 import type {
   V1ReviewListItem,
   V1TournamentFixture,
+  V1TournamentGroup,
   V1TournamentStatus,
 } from '@/types/api';
 import {
@@ -17,6 +22,7 @@ import {
 } from './tournament-venue-retention-model';
 import { TournamentVenueMap } from './tournament-venue-map';
 import { TournamentVenueNavigationButton } from './tournament-venue-navigation-button';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
 export {
   getTournamentPostEventCards,
@@ -195,9 +201,11 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
 
 export function TournamentFixtureReviewEntrySection({
   fixtures,
+  groups,
   state,
 }: {
   fixtures: V1TournamentFixture[];
+  groups: readonly Pick<V1TournamentGroup, 'id' | 'name'>[];
   state: TournamentFixtureReviewState;
 }) {
   if (state.status === 'guest') return null;
@@ -239,7 +247,8 @@ export function TournamentFixtureReviewEntrySection({
     if (item.sourceType !== 'tournament_fixture' || item.remainingCount <= 0) return [];
     const fixture = fixtureById.get(item.sourceId);
     if (!fixture || fixture.status !== 'completed' || fixture.result === null) return [];
-    return [{ fixture, remainingCount: item.remainingCount }];
+    const groupName = groups.find((group) => group.id === fixture.groupId)?.name ?? null;
+    return [{ fixture, groupName, remainingCount: item.remainingCount }];
   });
 
   if (entries.length === 0) return null;
@@ -249,8 +258,10 @@ export function TournamentFixtureReviewEntrySection({
 function TournamentFixtureReviewEntryList({
   entries,
 }: {
-  entries: Array<{ fixture: V1TournamentFixture; remainingCount: number }>;
+  entries: Array<{ fixture: V1TournamentFixture; groupName: string | null; remainingCount: number }>;
 }) {
+  // 리뷰 작성 화면에서 뒤로가면 이 대회 화면(받은 출처 포함)으로 돌아온다.
+  const from = useCurrentHref();
   return (
     <section aria-labelledby="fixture-review-heading" style={{ marginTop: 24 }}>
       <div id="fixture-review-heading" className="tm-text-body-lg" style={{ marginBottom: 4 }}>
@@ -260,18 +271,20 @@ function TournamentFixtureReviewEntryList({
         경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.
       </p>
       <Card pad={0} style={{ overflow: 'hidden' }}>
-        {entries.map(({ fixture, remainingCount }, index) => {
+        {entries.map(({ fixture, groupName, remainingCount }, index) => {
           const homeTeamName = getFixtureTeamLabel(fixture.homeTeamName);
           const awayTeamName = getFixtureTeamLabel(fixture.awayTeamName);
           const result = fixture.result!;
-          const roundLabel = fixture.round || `${fixture.fixtureNumber}경기`;
+          const roundLabel = fixture.round
+            ? competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })
+            : `${fixture.fixtureNumber}경기`;
           const hasPenaltyResult =
             result.hasPenalty && result.homePenaltyScore !== null && result.awayPenaltyScore !== null;
 
           return (
             <Link
               key={fixture.id}
-              href={`/my/reviews/tournament_fixture/${fixture.id}`}
+              href={withFromPath(`/my/reviews/tournament_fixture/${fixture.id}`, from)}
               className="tm-list-row-interactive tm-pressable"
               aria-label={`${homeTeamName} 대 ${awayTeamName} 경기 남은 리뷰 ${remainingCount}개 작성`}
               style={{
@@ -357,10 +370,15 @@ type CompletedActionItem = {
 };
 
 /**
- * completed 전용 Toss식 컴팩트 액션 리스트 — 결과·시상 / 대진표·조별 순위 / 후기·매너 평가
- * 3개 행을 하나의 Card에 hairline 구분선으로 묶는다. 각 row 전체가 링크(44px+ 터치 타겟).
- * 하이라이트 영상 "준비 중"·협찬 "공지 대기" 같은 빈 placeholder는 제거하고, "다음 대회" 링크도
- * Toss 절제 원칙에 따라 생략했다(핵심 3개 행만 유지).
+ * completed 전용 Toss식 컴팩트 액션 리스트 — 최종 결과·시상 / 대진표·조별 순위 /
+ * 경기별 결과·기록 / 대회 후기 4개 행을 하나의 Card에 hairline 구분선으로 묶는다.
+ * 각 row 전체가 링크(44px+ 터치 타겟). 하이라이트 영상 "준비 중"·협찬 "공지 대기" 같은
+ * 빈 placeholder는 제거하고, "다음 대회" 링크도 Toss 절제 원칙에 따라 생략했다.
+ *
+ * **행마다 라벨과 도착지가 일치해야 한다.** 한때 "최종 결과·시상"이 `/results`(경기별
+ * 결과)로, "대회 후기"가 `/awards`(시상·리뷰)로 가면서 두 행이 서로의 화면을 가리키고
+ * 있었다 — 라벨을 읽고 누른 사람이 매번 한 화면 건너뛴 곳에 떨어졌다. 이 리스트에 행을
+ * 더하거나 고칠 때는 라벨이 약속하는 화면과 `href`가 같은 곳인지 먼저 확인한다.
  */
 function TournamentCompletedActionList({ tournamentId }: { tournamentId: string }) {
   const items: CompletedActionItem[] = [
@@ -368,8 +386,17 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
       key: 'results',
       label: '최종 결과·시상',
       caption: '최종 순위와 시상 내역을 확인해요',
-      href: `/tournaments/${tournamentId}/results`,
+      // 이 라벨이 약속하는 화면(시상대·상금·개인 어워드)은 `/awards`다 — `/results`는
+      // 경기별 결과·기록 페이지라, 시상을 보러 누른 사람이 경기 목록에 떨어졌다.
+      href: `/tournaments/${tournamentId}/awards`,
       icon: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
+    },
+    {
+      key: 'results_by_match',
+      label: '경기별 결과·기록',
+      caption: '경기 하나하나의 결과를 확인해요',
+      href: `/tournaments/${tournamentId}/results`,
+      icon: <ClipboardList size={18} strokeWidth={2} aria-hidden="true" />,
     },
     {
       key: 'bracket',
@@ -381,10 +408,12 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
     {
       key: 'reviews',
       label: '대회 후기',
-      caption: '이 대회의 참가팀 후기를 보고 남겨요',
-      // 예전엔 '/my/reviews'로 보내 대회 컨텍스트가 통째로 사라졌다 — 어떤 대회의 후기를
-      // 쓰려던 건지 화면이 알 수 없어 사용자가 목록에서 다시 찾아야 했다.
-      href: `/tournaments/${tournamentId}/awards`,
+      caption: '참가팀이 남긴 후기를 보고 나도 남겨요',
+      // 예전엔 '/my/reviews'로 보내 대회 컨텍스트가 통째로 사라졌고, 그 다음엔
+      // '/awards'(시상·리뷰)로 보냈다 — "대회 후기"를 눌렀는데 시상대·상금이 먼저 나오고
+      // 후기는 스크롤 아래에 있어서, 라벨이 약속한 것과 도착지가 어긋났다(오너 지적).
+      // 이제 후기 목록 그 자체로 보낸다.
+      href: `/tournaments/${tournamentId}/reviews`,
       icon: <Star size={18} strokeWidth={2} aria-hidden="true" />,
     },
   ];
@@ -452,7 +481,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
       style={{
         display: 'grid',
         gridTemplateColumns: hasBadge ? '72px 1fr auto' : '72px 1fr',
-        gap: 10,
+        gap: 12,
         alignItems: 'start',
       }}
     >
@@ -489,7 +518,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           )
         ) : null}
         {item.notice ? (
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {item.notice.summary}
             </div>

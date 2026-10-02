@@ -35,6 +35,7 @@ describe('recalculateTournamentUserReputation', () => {
           ])
           .mockResolvedValueOnce([]),
       },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: upsertMock },
     };
 
@@ -63,6 +64,7 @@ describe('recalculateTournamentUserReputation', () => {
           ])
           .mockResolvedValueOnce([]),
       },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: upsertMock },
     };
 
@@ -79,6 +81,7 @@ describe('recalculateTournamentUserReputation', () => {
     const upsertMock = jest.fn().mockResolvedValue({});
     const tx = {
       v1PostEventReview: { findMany: findManyMock },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: upsertMock },
     };
 
@@ -114,6 +117,7 @@ describe('recalculateTournamentUserReputation', () => {
           ])
           .mockResolvedValueOnce([]),
       },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: upsertMock },
     };
 
@@ -144,6 +148,7 @@ describe('recalculateTournamentUserReputation', () => {
             },
           ]),
       },
+      v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserReputationSummary: { upsert: upsertMock },
     };
 

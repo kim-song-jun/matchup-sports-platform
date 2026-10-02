@@ -110,7 +110,17 @@ export type V1AdminTournamentCampaignPreview = Omit<
     confirmedCount: number;
     pendingPaymentCount: number;
     registrationAvailability: V1TournamentRegistrationAvailability;
-    participantTeams: V1TournamentParticipantTeam[];
+    /**
+     * **캠페인 응답에는 명단이 없다.** BE 캠페인 직렬화는 팀 식별 정보와 상태까지만 내고
+     * `players` 를 보내지 않는다 — 캠페인은 명단을 보여주는 화면이 아니다. 그래서
+     * `V1TournamentParticipantTeam` 을 그대로 쓰면 **타입이 거짓말을 한다**: 누가 캠페인
+     * 화면에 명단 컴포넌트를 재사용하면 TS 는 통과시키고 런타임에 `players.length` 가
+     * `undefined.length` 로 터진다. 없는 것을 없다고 적는다.
+     *
+     * (반대로 응답에 `players: []` 를 싣는 방향은 **안 쓰는 필드를 응답에 싣는 것**이라
+     * 공개 명단을 조건부로 바꾼 이유와 정면으로 어긋난다.)
+     */
+    participantTeams: Omit<V1TournamentParticipantTeam, 'players'>[];
   };
 };
 

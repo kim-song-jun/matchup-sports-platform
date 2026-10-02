@@ -2,14 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import { trackEvent } from '@/lib/analytics';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import {
+  useV1AuthMe,
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
   useV1MasterRegions,
@@ -19,7 +18,8 @@ import {
   useV1SaveOnboardingPreferences,
 } from '@/hooks/use-v1-api';
 import type { V1OnboardingPreferencePayload, V1OnboardingStep, V1Region } from '@/types/api';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame, AuthIllustration, JOURNEY_DONE_STAGE } from './auth-page';
+import { extractErrorMessage } from '@/lib/error-message';
 
 type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
 
@@ -51,7 +51,20 @@ type OnboardingRegionGroup = {
   options: OnboardingRegionOption[];
 };
 
-const draftKey = 'teameet.v1.onboardingDraft';
+/**
+ * 온보딩 초안은 **계정별로** 나눠 담는다.
+ *
+ * 예전에는 키가 하나뿐이라, 같은 탭에서 로그아웃하고 다른 계정으로 들어오면 앞사람이
+ * 고른 종목·지역이 그대로 복원됐다(로그아웃이 이 키를 지우지도 않았다). 본인이 고르지
+ * 않은 값으로 매칭 추천을 받게 되는데, 화면상으로는 자기가 고른 것처럼 보인다.
+ */
+const DRAFT_KEY_PREFIX = 'teameet.v1.onboardingDraft';
+/** 계정 구분이 없던 시절의 키. 남아 있으면 남의 선택이므로 눈에 띄는 대로 지운다. */
+const LEGACY_DRAFT_KEY = DRAFT_KEY_PREFIX;
+
+function draftKeyFor(userId: string) {
+  return `${DRAFT_KEY_PREFIX}:${userId}`;
+}
 
 const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub: string }> = {
   resume: {
@@ -72,12 +85,12 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
   region: {
     stepNo: 3,
     title: '주 활동 지역을 선택해 주세요',
-    sub: '위치 권한 없어도 괜찮아요. 아래에서 지역을 직접 고르거나 건너뛸 수 있어요.',
+    sub: '위치 권한 없어도 괜찮아요. 지역을 직접 고르면 다음으로 넘어가요. 지금 정하지 않으면 "나중에 설정하기"를 눌러 주세요.',
   },
   confirm: {
     stepNo: 4,
     title: '준비가 끝났어요',
-    sub: '선택한 종목, 실력, 지역을 기준으로 홈 추천과 필터가 시작돼요.',
+    sub: '홈 추천과 필터가 시작돼요. 마이 탭에서 언제든 바꿀 수 있어요.',
   },
 };
 
@@ -98,9 +111,15 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const [selectedRegionGroupId, setSelectedRegionGroupId] = useState<string | null>(null);
   const [pushRequesting, setPushRequesting] = useState(false);
 
+  // 초안을 계정별로 나누려면 누구인지 알아야 한다. /auth/me 는 앱 전역 캐시라 온보딩
+  // 시점에는 이미 들어와 있는 것이 보통이고, 아직이면 초안을 읽지도 쓰지도 않는다 --
+  // 잠깐 복원이 늦는 쪽이, 남의 선택을 복원하는 쪽보다 낫다.
+  const { data: me } = useV1AuthMe();
+  const viewerId = me?.user.id ?? null;
+
   useEffect(() => {
-    if (hydrated || !onboarding.data) return;
-    const stored = readDraft();
+    if (hydrated || !onboarding.data || !viewerId) return;
+    const stored = readDraft(viewerId);
     const initial = stored ?? {
       sports: onboarding.data.sports.map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })),
       regions: onboarding.data.regions.map((region) => ({ regionId: region.regionId, primary: region.primary })),
@@ -108,11 +127,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     };
     setDraft(initial);
     setHydrated(true);
-  }, [hydrated, onboarding.data]);
+  }, [hydrated, onboarding.data, viewerId]);
 
   useEffect(() => {
-    if (hydrated) writeDraft(draft);
-  }, [draft, hydrated]);
+    if (hydrated && viewerId) writeDraft(viewerId, draft);
+  }, [draft, hydrated, viewerId]);
 
   // 마스터 데이터 3쿼리 중 하나라도 실패하면 빈 draft 저장 위험이 있으므로 에러 상태 분리.
   const masterError = onboarding.isError || sportsQuery.isError || regionsQuery.isError;
@@ -127,7 +146,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const selectedRegionGroup =
     regionGroups.find((group) => group.id === selectedRegionGroupId) ??
     regionGroups.find((group) => draft.regions.some((region) => group.options.some((option) => option.id === region.regionId))) ??
-    regionGroups[0] ??
     null;
   const regionOptions = regionGroups.flatMap((group) => group.options);
   const selectedSportIds = new Set(draft.sports.map((sport) => sport.sportId));
@@ -206,7 +224,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {
         trackEvent('onboarding_complete', {});
-        clearDraft();
+        if (viewerId) clearDraft(viewerId);
         router.replace(result.next?.route ?? '/home');
       },
       onError: (nextError) => setError(getErrorMessage(nextError)),
@@ -282,6 +300,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         pending ||
         (step === 'sport' && emptySports) ||
         (step === 'level' && (emptySports || missingLevels)) ||
+        (step === 'region' && draft.regions.length === 0) ||
         (step === 'confirm' && emptySports)
       }
       pending={pending}
@@ -290,7 +309,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     />
   );
 
-  const skipAction = step === 'region' ? defer : undefined;
   const meta = stepMeta[step];
 
   const backHref = getBackHref(step);
@@ -302,17 +320,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       backHref={backHref}
       fixedAction={fixedAction}
       className="tm-onboarding-frame"
+      /* 1~3단계와 이어하기는 "같이 뛸 사람" 스테이지, 마지막 확인 단계만 "준비 완료" 스테이지. */
+      stage={step === 'confirm' ? JOURNEY_DONE_STAGE : AUTH_WELCOME_STAGE}
     >
-      {/* Desktop back-nav: replaces the hidden mobile topbar for wizard navigation.
-          .tm-show-desktop is display:none on mobile, display:block at ≥1024 (see _shell.css). */}
-      <div className="tm-onboarding-desktop-nav tm-show-desktop">
-        {backHref ? (
-          <Link className="tm-onboarding-desktop-back" href={backHref} aria-label="뒤로가기">
-            <ChevronLeftIcon size={22} strokeWidth={2.2} />
-          </Link>
-        ) : null}
-        <span className="tm-onboarding-desktop-nav-title">{topTitle}</span>
-      </div>
+      {/* 데스크톱 뒤로가기는 AuthFrame 이 backHref 로 한 벌 그린다 — 여기서 따로 그리면
+          데스크톱에서 화살표가 둘 생겼다(감사 실측). */}
       <div className="tm-auth-body">
         {/* 단계 전환 시 스크린리더에 현재 단계를 공지 */}
         <span
@@ -322,10 +334,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         >
           {meta.stepNo > 0 ? `4단계 중 ${meta.stepNo}단계, ${meta.title}` : meta.title}
         </span>
-        <ProgressHeader stepNo={meta.stepNo} total={4} />
+        {/* 이어하기(stepNo 0)는 아직 시작 전이라 회색 빈 막대 4칸만 남았다 — 진행 정보가 없으니 숨긴다. */}
+        {meta.stepNo > 0 ? <ProgressHeader stepNo={meta.stepNo} total={4} /> : null}
+        {step === 'confirm' ? <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop" /> : null}
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
-        {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
         {onboarding.isLoading || sportsQuery.isLoading || regionsQuery.isLoading ? <Notice title="불러오는 중" body="저장된 정보를 불러오고 있어요." /> : null}
         {/* 마스터 데이터 실패 시 빈 draft로 저장 방지 — 재시도 유도 후 저장 CTA도 disable됨 */}
         {masterError ? <ErrorState message="운동 설정 정보를 불러오지 못했어요. 다시 시도해 주세요." onRetry={retryMasterData} /> : null}
@@ -353,9 +366,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
           <div className="tm-auth-stack">
             {selectedSports.length === 0 ? <Notice title="종목 선택 필요" body="먼저 관심 종목을 선택해야 실력을 입력할 수 있어요." tone="orange" /> : null}
             {selectedSports.map(({ sportId, levelId, sport }) => (
-              <Card key={sportId} pad={15}>
+              <Card key={sportId} pad={16}>
                 <div className="tm-text-body-lg">{sport?.name}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {(sport?.levels ?? []).map((level) => (
                     <button
                       className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`}
@@ -378,14 +391,13 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
               {locationStatus === 'requesting' ? '현재 위치 확인 중' : '현재 위치로 찾기'}
             </button>
             <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
-              버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
-              좌표 자체는 저장하지 않아요.
+              누르면 현재 좌표를 지역 확인용으로 팀밋 서버와 카카오에 한 번 보내요. 좌표는 저장하지 않아요.
             </p>
             <LocationNotice detectedRegion={draft.detectedRegion ?? null} status={locationStatus} />
             <div className="tm-auth-stack">
-              <Card pad={15}>
+              <Card pad={16}>
                 <div className="tm-text-label">시/도</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
                   {regionGroups.map((group) => (
                     <button
                       className={`tm-chip ${selectedRegionGroup?.id === group.id ? 'tm-chip-active' : ''}`}
@@ -399,43 +411,39 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   ))}
                 </div>
               </Card>
-              <Card pad={15}>
-                <div className="tm-text-label">{selectedRegionGroup ? `${selectedRegionGroup.name} 상세 지역` : '상세 지역'}</div>
-                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
-                  {(selectedRegionGroup?.options ?? []).map((region) => (
-                    <button
-                      className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}
-                      key={region.id}
-                      onClick={() => setDraft((current) => toggleRegion(current, region))}
-                      type="button"
-                      aria-pressed={selectedRegionIds.has(region.id)}
-                    >
-                      {region.shortName}
-                    </button>
-                  ))}
-                </div>
-              </Card>
+              {/* 시/도를 고르기 전에는 상세 지역을 열지 않는다 — 미리 서울을 골라 둔 것처럼 보이지 않게. */}
+              {selectedRegionGroup ? (
+                <Card pad={16}>
+                  <div className="tm-text-label">{`${selectedRegionGroup.name} 상세 지역`}</div>
+                  <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
+                    {selectedRegionGroup.options.map((region) => (
+                      <button
+                        className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}
+                        key={region.id}
+                        onClick={() => setDraft((current) => toggleRegion(current, region))}
+                        type="button"
+                        aria-pressed={selectedRegionIds.has(region.id)}
+                      >
+                        {region.shortName}
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
             </div>
           </>
         ) : null}
         {step === 'confirm' ? (
           <>
-            {/* 위치 권한과 동일한 패턴: 사전 안내 후 명시적 버튼 클릭이 실제 user gesture로
-                pushRegistration.subscribe()를 트리거한다 — complete() 성공 시 자동 호출 금지. */}
-            <button
-              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-              disabled={pushRequesting || pushRegistration.isSubscribed}
-              onClick={() => void requestPush()}
-              type="button"
-            >
-              {pushRequesting ? '알림 권한 확인 중' : pushRegistration.isSubscribed ? '알림 받기 완료' : '알림 받기'}
-            </button>
-            <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
-              매칭 성사, 채팅, 경기 결과 같은 소식을 놓치지 않도록 브라우저 알림을 받을 수 있어요.
-              언제든 설정에서 끌 수 있어요.
-            </p>
-            <PushNotice isSubscribed={pushRegistration.isSubscribed} permission={pushRegistration.permission} requesting={pushRequesting} />
             <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} />
+            {/* 위치 권한과 동일한 패턴: 명시적 버튼 클릭이 실제 user gesture로 pushRegistration.subscribe()를
+                트리거한다 — complete() 성공 시 자동 호출 금지. */}
+            <PushRow
+              isSubscribed={pushRegistration.isSubscribed}
+              onRequest={() => void requestPush()}
+              permission={pushRegistration.permission}
+              requesting={pushRequesting}
+            />
           </>
         ) : null}
       </div>
@@ -482,7 +490,7 @@ function OnboardingFixedAction({
   if (step === 'level') {
     return (
       <>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('region', '/onboarding/region')} type="button">{pending ? '저장 중' : '지역 선택하기'}</button>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('level', '/onboarding/region')} type="button">{pending ? '저장 중' : '지역 선택하기'}</button>
         <div className="tm-auth-fixed-skip-row">
           <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
         </div>
@@ -491,12 +499,13 @@ function OnboardingFixedAction({
   }
 
   if (step === 'region') {
-    /* #22: 픽셀 스페이서 div → gap으로 교체 */
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '지역 선택 완료'}</button>
-        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
-      </div>
+      <>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '지역 선택 완료'}</button>
+        <div className="tm-auth-fixed-skip-row">
+          <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
+        </div>
+      </>
     );
   }
 
@@ -552,8 +561,6 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
           </div>
         </Card>
       ) : null}
-      {/* 종목이 설정된 경우에만 완료 안내 노출 */}
-      {!emptySports ? <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" /> : null}
     </div>
   );
 }
@@ -579,35 +586,49 @@ function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRe
     return <Notice title="현재 위치 확인 완료" body={`${detectedRegion.regionName}을 활동 지역으로 선택했어요. 허용 상태는 브라우저에 유지되지만 좌표는 저장하지 않아요.`} tone="green" />;
   }
 
-  return <Notice title="현재 위치로 지역 찾기" body="한 번 허용하면 브라우저가 권한을 기억해요. 좌표는 가까운 지역을 찾을 때만 1회 사용하고 저장하지 않아요." />;
+  return null;
 }
 
-function PushNotice({
+function PushRow({
   isSubscribed,
+  onRequest,
   permission,
   requesting,
 }: {
   isSubscribed: boolean;
+  onRequest: () => void;
   permission: NotificationPermission | 'unsupported';
   requesting: boolean;
 }) {
-  if (requesting) {
-    return <Notice title="알림 권한 확인 중" body="브라우저의 알림 권한을 확인하고 있어요." />;
-  }
+  const blocked = permission === 'unsupported' || permission === 'denied';
+  const caption = permission === 'unsupported'
+    ? '이 브라우저에서는 알림을 지원하지 않아요.'
+    : permission === 'denied'
+      ? '브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요.'
+      : isSubscribed
+        ? '매칭, 채팅, 경기 결과 소식을 보내드릴게요.'
+        : '매칭 성사, 채팅, 경기 결과 소식을 보내드려요. 설정에서 언제든 끌 수 있어요.';
+  // 보이는 글자(켜기·켜짐)를 이름에 포함해, 옆 문구 없이도 무엇을 켜는지 읽히게 한다.
+  const action = requesting ? '확인 중' : isSubscribed ? '켜짐' : '켜기';
 
-  if (permission === 'unsupported') {
-    return <Notice title="알림 사용 불가" body="이 브라우저에서는 알림을 지원하지 않아요. 다른 브라우저에서 다시 시도해 주세요." tone="orange" />;
-  }
-
-  if (permission === 'denied') {
-    return <Notice title="알림 권한이 꺼져 있어요" body="브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요." tone="orange" />;
-  }
-
-  if (isSubscribed) {
-    return <Notice title="알림 받기 완료" body="매칭, 채팅, 경기 결과 소식을 보내드릴게요." tone="green" />;
-  }
-
-  return <Notice title="알림 받기" body="버튼을 누르면 브라우저가 알림 권한을 물어봐요. 언제든 설정에서 끌 수 있어요." />;
+  return (
+    <Card pad={16} className="tm-onboarding-push-row">
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="tm-text-label">알림 받기</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>{caption}</div>
+      </div>
+      <button
+        aria-label={`알림 ${action}`}
+        className="tm-btn tm-btn-md tm-btn-neutral"
+        disabled={requesting || isSubscribed || blocked}
+        onClick={onRequest}
+        style={{ flex: 'none' }}
+        type="button"
+      >
+        {action}
+      </button>
+    </Card>
+  );
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
@@ -669,28 +690,31 @@ function getBackHref(step: OnboardingRouteStep) {
   if (step === 'level') return '/onboarding/sport';
   if (step === 'region') return '/onboarding/level';
   if (step === 'confirm') return '/onboarding/region';
-  return undefined;
+  /* 이어하기 화면은 진입 전 화면이 정해져 있지 않다 — 홈으로 빠져나갈 길은 남긴다(실측: 뒤로가기 없음). */
+  return '/home';
 }
 
-function readDraft(): OnboardingDraft | null {
+function readDraft(userId: string): OnboardingDraft | null {
   try {
-    const raw = window.sessionStorage.getItem(draftKey);
+    // 계정 구분이 없던 키는 읽지 않고 지운다 — 그 값은 이 계정의 것이라는 보장이 없다.
+    window.sessionStorage.removeItem(LEGACY_DRAFT_KEY);
+    const raw = window.sessionStorage.getItem(draftKeyFor(userId));
     return raw ? sanitizeDraft(JSON.parse(raw) as Partial<OnboardingDraft>) : null;
   } catch {
     return null;
   }
 }
 
-function writeDraft(draft: OnboardingDraft) {
-  window.sessionStorage.setItem(draftKey, JSON.stringify(sanitizeDraft(draft)));
+function writeDraft(userId: string, draft: OnboardingDraft) {
+  window.sessionStorage.setItem(draftKeyFor(userId), JSON.stringify(sanitizeDraft(draft)));
 }
 
-function clearDraft() {
-  window.sessionStorage.removeItem(draftKey);
+function clearDraft(userId: string) {
+  window.sessionStorage.removeItem(draftKeyFor(userId));
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '요청을 처리하지 못했어요.';
+  return extractErrorMessage(error, '요청을 처리하지 못했어요.');
 }
 
 function sanitizeDraft(raw: Partial<OnboardingDraft> | null | undefined): OnboardingDraft {

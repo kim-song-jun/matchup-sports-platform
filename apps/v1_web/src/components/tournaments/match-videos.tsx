@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Clapperboard, ExternalLink, Play, X } from 'lucide-react';
 import {
   extractYoutubeVideoId,
@@ -9,6 +9,7 @@ import {
   youtubeWatchUrl,
   videoKind,
 } from '@/lib/video-utils';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 
 export interface MatchVideo {
   id: string;
@@ -38,19 +39,12 @@ export function MatchVideos({
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (openIndex === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenIndex(null);
-    };
-    document.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [openIndex]);
+  // ESC 닫기·focus trap·focus 복원·body 스크롤 잠금을 공용 훅에 위임 —
+  // 퇴장 애니메이션이 없는 조건부 마운트형이라 mounted/closing 은 쓰지 않는다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open: openIndex !== null,
+    onClose: () => setOpenIndex(null),
+  });
 
   if (videos.length === 0) return null;
 
@@ -66,55 +60,55 @@ export function MatchVideos({
             const title = displayTitle(v, i);
             if (kind === 'external') {
               return (
-                <a
-                  key={v.id}
-                  href={v.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="tm-video-strip-item"
-                  role="listitem"
-                  aria-label={`${title} 보기 (새 창)`}
-                >
-                  <span className="tm-video-strip-thumb is-file">
-                    <ExternalLink size={22} aria-hidden="true" />
-                  </span>
-                  <span className="tm-video-strip-title">{title}</span>
-                </a>
+                <div key={v.id} role="listitem" className="tm-video-strip-cell">
+                  <a
+                    href={v.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="tm-video-strip-item"
+                    aria-label={`${title} 보기 (새 창)`}
+                  >
+                    <span className="tm-video-strip-thumb is-file">
+                      <ExternalLink size={22} aria-hidden="true" />
+                    </span>
+                    <span className="tm-video-strip-title">{title}</span>
+                  </a>
+                </div>
               );
             }
             return (
-              <button
-                key={v.id}
-                type="button"
-                className="tm-video-strip-item"
-                role="listitem"
-                onClick={() => setOpenIndex(i)}
-                aria-label={`${title} 재생`}
-                aria-haspopup="dialog"
-              >
-                {kind === 'youtube' ? (
-                  <span className="tm-video-strip-thumb">
-                    <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" loading="lazy" />
-                    <span className="tm-video-strip-overlay" aria-hidden="true">
-                      <span className="tm-video-strip-play">
-                        <Play size={16} fill="currentColor" strokeWidth={0} />
+              <div key={v.id} role="listitem" className="tm-video-strip-cell">
+                <button
+                  type="button"
+                  className="tm-video-strip-item"
+                  onClick={() => setOpenIndex(i)}
+                  aria-label={`${title} 재생`}
+                  aria-haspopup="dialog"
+                >
+                  {kind === 'youtube' ? (
+                    <span className="tm-video-strip-thumb">
+                      <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" loading="lazy" />
+                      <span className="tm-video-strip-overlay" aria-hidden="true">
+                        <span className="tm-video-strip-play">
+                          <Play size={16} fill="currentColor" strokeWidth={0} />
+                        </span>
                       </span>
                     </span>
-                  </span>
-                ) : (
-                  <span className="tm-video-strip-thumb is-file">
-                    <Clapperboard size={22} aria-hidden="true" />
-                    {/* 첫 프레임을 썸네일로 — 로드 실패 시 뒤의 그라디언트+아이콘이 그대로 보인다 */}
-                    <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" />
-                    <span className="tm-video-strip-overlay" aria-hidden="true">
-                      <span className="tm-video-strip-play">
-                        <Play size={16} fill="currentColor" strokeWidth={0} />
+                  ) : (
+                    <span className="tm-video-strip-thumb is-file">
+                      <Clapperboard size={22} aria-hidden="true" />
+                      {/* 첫 프레임을 썸네일로 — 로드 실패 시 뒤의 그라디언트+아이콘이 그대로 보인다 */}
+                      <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" />
+                      <span className="tm-video-strip-overlay" aria-hidden="true">
+                        <span className="tm-video-strip-play">
+                          <Play size={16} fill="currentColor" strokeWidth={0} />
+                        </span>
                       </span>
                     </span>
-                  </span>
-                )}
-                <span className="tm-video-strip-title">{title}</span>
-              </button>
+                  )}
+                  <span className="tm-video-strip-title">{title}</span>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -156,13 +150,12 @@ export function MatchVideos({
 
       {active && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={`${matchLabel} 경기 영상`}
           className="tm-video-modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setOpenIndex(null);
-          }}
+          onClick={onBackdropClick}
         >
           <div className="tm-video-modal-body">
             <div className="tm-video-modal-head">

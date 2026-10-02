@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -19,6 +19,7 @@ import {
   WithdrawTeamMatchApplicationDto,
 } from './dto/team-match-application.dto';
 import {
+  AddLateTeamMatchLineupParticipantDto,
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
   SubmitTeamMatchLineupDto,
@@ -82,6 +83,12 @@ export class TeamMatchesController {
     @Body() dto: UpdateTeamMatchDto,
   ) {
     return this.teamMatchesService.update(user, teamMatchId, dto);
+  }
+
+  @Delete('team-matches/:teamMatchId')
+  @UseGuards(V1AuthGuard)
+  remove(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
+    return this.teamMatchesService.remove(user, teamMatchId);
   }
 
   @Post('team-matches/:teamMatchId/cancel')
@@ -174,6 +181,23 @@ export class TeamMatchesController {
   @UseGuards(V1AuthGuard)
   lineup(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
     return this.teamMatchLineupService.getLineup(user, teamMatchId);
+  }
+
+  @Get('team-matches/:teamMatchId/lineup/opponent')
+  @UseGuards(V1AuthGuard)
+  opponentLineup(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
+    return this.teamMatchLineupService.getOpponentLineup(user, teamMatchId);
+  }
+
+  @Post('team-matches/:teamMatchId/lineup/late-additions')
+  @UseGuards(V1AuthGuard)
+  addLateLineupParticipant(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamMatchId') teamMatchId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: AddLateTeamMatchLineupParticipantDto,
+  ) {
+    return this.teamMatchLineupService.addLateParticipant(user, teamMatchId, idempotencyKey, dto);
   }
 
   @Put('team-matches/:teamMatchId/lineup')

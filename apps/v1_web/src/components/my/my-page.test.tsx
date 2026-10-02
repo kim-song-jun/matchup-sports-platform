@@ -2,8 +2,15 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyInvitationsPageView, MyJoinApplicationsPageView } from './my-page';
-import type { MyInvitationsViewModel, MyJoinApplicationItem, MyJoinApplicationsViewModel } from './my.types';
+import { settingsModel } from './my.view-model';
+import { SettingsPageView, LegalPageView, MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView, MyTeamsPageView } from './my-page';
+import type {
+  MyInvitationsViewModel,
+  MyJoinApplicationItem,
+  MyJoinApplicationsViewModel,
+  MyMatchesViewModel,
+  MyTeam,
+} from './my.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/my/invitations',
@@ -84,8 +91,10 @@ describe('MyInvitationsPageView — 받은 초대 아이템별 처리 상태', (
 
     render(<MyInvitationsPageView model={model} />);
 
-    expect(screen.getByText('초대 목록을 불러오지 못했어요')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('다시 시도'));
+    // 2026-09-04 감사: 오류를 EmptyState(회색 인박스, role 없음)로 그리던 것을 ErrorState 로 바꿨다 —
+    // 스크린리더가 오류로 읽도록 role="alert" 를 함께 못박는다.
+    expect(screen.getByRole('alert')).toHaveTextContent('초대 목록을 불러오지 못했어요');
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
@@ -100,7 +109,7 @@ describe('MyJoinApplicationsPageView — 보낸 가입 신청 상태 표시', ()
       status: 'requested',
       statusLabel: '승인 대기',
       statusTone: 'pending',
-      statusHint: '관리자가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
+      statusHint: '팀장·매니저가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
       message: null,
       dateLabel: '7월 1일',
       actionPending: false,
@@ -165,5 +174,138 @@ describe('MyJoinApplicationsPageView — 보낸 가입 신청 상태 표시', ()
 
     expect(screen.getByRole('button', { name: '성수 러너스 FC 가입 신청 취소' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '마포 농구 클럽 가입 신청 취소' })).not.toBeDisabled();
+  });
+
+  it('팀 링크에 뒤로가기 출처(from=/my/join-applications)를 담는다', () => {
+    const model = applicationsModel({ applications: [joinApplication()] });
+
+    render(<MyJoinApplicationsPageView model={model} />);
+
+    expect(screen.getByRole('link', { name: '성수 러너스 FC' })).toHaveAttribute(
+      'href',
+      '/teams/team-a?from=%2Fmy%2Fjoin-applications',
+    );
+  });
+});
+
+describe('MyMatchesPageView — 빈 상태 CTA 출처', () => {
+  function matchesModel(overrides: Partial<MyMatchesViewModel> = {}): MyMatchesViewModel {
+    return {
+      mode: 'created',
+      typeFilter: 'all',
+      filters: [
+        { key: 'all', label: '전체', href: '/my/matches/created' },
+        { key: 'personal', label: '개인 매치', href: '/my/matches/created?type=personal' },
+        { key: 'team', label: '팀 매치', href: '/my/matches/created?type=team' },
+      ],
+      summary: [],
+      matches: [],
+      emptyState: {
+        title: '만든 매치가 없어요',
+        sub: '개인 또는 팀 매치를 만들면 여기에 표시돼요.',
+        cta: '개인 매치 만들기',
+        ctaHref: '/matches/new/sport?from=%2Fmy%2Fmatches%2Fcreated',
+      },
+      loading: false,
+      error: false,
+      onRetry: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('생성한 매치가 없으면 "매치 만들기" CTA에 from=/my/matches/created 를 담는다', () => {
+    render(<MyMatchesPageView model={matchesModel({ mode: 'created' })} />);
+
+    expect(screen.getByRole('link', { name: '개인 매치 만들기' })).toHaveAttribute(
+      'href',
+      '/matches/new/sport?from=%2Fmy%2Fmatches%2Fcreated',
+    );
+  });
+
+  it('회귀 방지: 참여 매치 빈 상태의 "매치 둘러보기" CTA는 from 없이 /matches 그대로다', () => {
+    render(<MyMatchesPageView model={matchesModel({
+      mode: 'joined',
+      emptyState: {
+        title: '신청·참여한 매치가 없어요',
+        sub: '개인 매치나 소속 팀의 팀매치에 참여하면 여기에 표시돼요.',
+        cta: '매치 둘러보기',
+        ctaHref: '/matches',
+      },
+    })} />);
+
+    expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
+  });
+
+  it('긴 팀명과 매치명에 모바일 폭 축소용 구조를 유지한다', () => {
+    const title = '성수동우리동네오래된축구회최강연합팀정기토요일저녁팀매치';
+    const contextLabel = '성수동우리동네오래된축구회최강연합팀';
+    const { container } = render(<MyMatchesPageView model={matchesModel({
+      mode: 'joined',
+      matches: [{
+        id: 'team-match-long-copy',
+        kind: 'team',
+        kindLabel: '팀 매치',
+        contextLabel,
+        startsAt: '2026-10-03T20:00:00.000Z',
+        title,
+        meta: '2026. 10. 03. 토요일 오후 8:00 · 서울특별시성동구성수이로긴주소축구장',
+        status: 'approved',
+        statusLabel: '상대팀 확정',
+        note: '완료된 팀 경기예요.',
+        href: '/team-matches/team-match-long-copy',
+      }],
+    })} />);
+
+    expect(container.querySelector('.tm-my-matches-desktop')).not.toBeNull();
+    expect(screen.getByText(title)).toHaveClass('tm-my-card-title');
+    expect(screen.getByText(contextLabel)).toHaveClass('tm-my-card-context-label');
+    expect(container.querySelector('.tm-my-card-copy')).not.toBeNull();
+    expect(container.querySelector('.tm-my-card-status')).not.toBeNull();
+  });
+});
+
+describe('MyTeamsPageView — 팀 카드 출처', () => {
+  function team(overrides: Partial<MyTeam> = {}): MyTeam {
+    return {
+      id: 'team-1',
+      name: '성수 FC',
+      logoUrl: null,
+      sport: '풋살',
+      region: '성동구',
+      role: 'member',
+      roleLabel: '멤버',
+      members: 12,
+      manner: '4.5',
+      next: '다음 경기 없음',
+      description: '',
+      ...overrides,
+    };
+  }
+
+  it('팀 카드는 뒤로가기가 내 팀 목록으로 돌아오도록 출처를 담는다', () => {
+    render(<MyTeamsPageView model={{ teams: [team()], summary: [] }} />);
+
+    expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute('href', '/teams/team-1?from=%2Fmy%2Fteams');
+  });
+});
+
+
+describe('설정의 비밀번호·약관 진입 경로', () => {
+  it('비밀번호 변경은 본인인증 재설정 화면과 설정 복귀 경로에 연결한다', () => {
+    render(<SettingsPageView model={{ ...settingsModel, account: {
+      loginMethod: '이메일', email: 'fixture@teameet.test', phone: '01012345678',
+      phoneVerified: true, password: '설정됨', canRequestPasswordChange: true,
+    } }} />);
+    expect(screen.getByRole('link', { name: '비밀번호 변경' })).toHaveAttribute(
+      'href', '/auth/find-account?mode=reset-password&from=%2Fmy%2Fsettings',
+    );
+  });
+  it('약관 3종은 각각 약관 목록을 복귀 경로로 전달한다', () => {
+    render(<LegalPageView model={settingsModel} />);
+    [['terms', '이용약관'], ['privacy', '개인정보 처리방침'], ['location', '위치기반 서비스 약관']].forEach(([document, label]) => {
+      expect(screen.getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute(
+        'href', `/terms?document=${document}&from=%2Fmy%2Fsettings%2Flegal`,
+      );
+    });
   });
 });

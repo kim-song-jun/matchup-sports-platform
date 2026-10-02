@@ -1,0 +1,42 @@
+# Task 176 — Personal Match Host Review Eligibility
+
+## Scope
+
+- Backend: `apps/v1_api/src/reviews/reviews.service.ts`
+- Contract tests: `apps/v1_api/src/reviews/reviews.service.spec.ts`
+- API/scenario docs: `docs/api/domains/supporting-domains.md`, `docs/scenarios/12-v1-sm-new-e2e-scenarios.md`
+
+## Problem
+
+Completed personal matches expose a review CTA to the host. When the host created the match with
+`hostParticipates=false`, `GET /reviews/sources/match/:id` rejected the host with
+`403 NOT_SOURCE_PARTICIPANT`, even though the host remains the event operator and has real participants
+to review.
+
+## Acceptance Criteria
+
+- [x] A personal-match host can load and submit reviews for eligible actual participants even when the
+  host did not participate.
+- [x] A non-participating host is added to eligible participants' review target list, while self-review and duplicate host targets remain excluded.
+- [x] A user who is neither host nor eligible participant remains forbidden.
+- [x] Pending review lookup uses the same host-or-participant eligibility rule.
+- [x] Targeted API tests pass.
+- [x] Typecheck passes.
+
+## Progress Snapshot
+
+- 2026-09-30 follow-up: personal reviews now expire after a fixed 168 hours from `completedAt`
+  (`startAt` for old completed rows without a completion timestamp). Source/submit return 410
+  `REVIEW_WINDOW_CLOSED`; pending excludes expired rows before its query limit. Existing reviews remain.
+  Exact boundary, timestamp fallback, host eligibility and submission rejection are covered by service tests.
+  Validation: focused Jest run passed (2 suites, 81 tests); API `tsc --noEmit` passed after refreshing
+  the isolated worktree's stale Prisma client. No database changes. No live browser/API QA or deployment
+  performed for this follow-up; changes remain in `hotfix-worktrees/review-host-target-deploy`.
+
+- 2026-09-28: Alpha match `59b656d9-a963-4f23-9aca-0b8ac75abcdf` reproduced the contract mismatch:
+  completed, `hostParticipates=false`, one actual participant, review-source request returned 403.
+- 2026-09-28: Implemented host reviewer eligibility while keeping targets restricted to actual eligible
+  participants.
+- 2026-09-28: Review-focused unit run passed (3 suites, 128 tests). `v1_api` TypeScript check passed.
+- 2026-09-29: Product follow-up made the organizer relationship bidirectional: eligible participants can
+  now review a non-playing host, and pending target counts include the host exactly once.

@@ -5,7 +5,6 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import {
   CreateGameResultCorrectionDto,
   OfficializeGameResultRevisionDto,
-  ReviewDecisionGameResultRevisionDto,
   SupersedeAndSubmitGameResultRevisionDto,
   VoidGameResultRevisionDto,
 } from './tournament-result-review.dto';
@@ -22,18 +21,6 @@ import { TournamentResultReviewService } from './tournament-result-review.servic
 @Controller('games')
 export class TournamentResultReviewController {
   constructor(private readonly resultReview: TournamentResultReviewService) {}
-
-  @Post(':gameId/result-revisions/:revisionId/review-decision')
-  @UseGuards(V1AuthGuard)
-  reviewDecision(
-    @CurrentUser() user: V1AuthUser,
-    @Param('gameId') gameId: string,
-    @Param('revisionId') revisionId: string,
-    @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() dto: ReviewDecisionGameResultRevisionDto,
-  ) {
-    return this.resultReview.reviewDecision(user, gameId, revisionId, idempotencyKey, dto);
-  }
 
   @Post(':gameId/result-revisions/:revisionId/supersede-and-submit')
   @UseGuards(V1AuthGuard)

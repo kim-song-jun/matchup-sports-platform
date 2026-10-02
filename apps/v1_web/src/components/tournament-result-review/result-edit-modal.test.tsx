@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ResultEditModal } from './result-edit-modal';
 import type {
@@ -40,6 +40,7 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
     formation: null,
     createdAt: '2026-08-04T00:00:00.000Z',
     updatedAt: '2026-08-04T00:00:00.000Z',
+    invalidatedAt: null,
     participants: participants.map((p) => ({
       id: p.id,
       gameId: 'game-1',
@@ -52,6 +53,7 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
       positionX: null,
       positionY: null,
       started: true,
+      arrivedAt: null,
       createdAt: '2026-08-04T00:00:00.000Z',
       updatedAt: '2026-08-04T00:00:00.000Z',
     })),
@@ -103,6 +105,7 @@ function baseProps() {
       mvpParticipantId: null,
     },
     sides: SIDES,
+    periods: [{ number: 1 }, { number: 2 }],
     // 조별(비결선) 픽스처가 기본값 -- 결선을 다루는 테스트만 `isKnockoutFixture` 를 켠다.
     isKnockoutFixture: false,
     onConfirm: vi.fn(),
@@ -172,6 +175,24 @@ describe('ResultEditModal participant naming', () => {
     expect(screen.getAllByText('원정 · #7 강아라')).toHaveLength(2);
     expect(screen.queryByText(/참가자 dc52c8/)).not.toBeInTheDocument();
     expect(screen.queryByText(/참가자 701eb3/)).not.toBeInTheDocument();
+  });
+
+  it('선수별 칸 여섯 개를 선수 이름의 그룹으로 묶고, 각 칸은 숫자 키패드·16px 로 뜬다', () => {
+    const lineups: GameLineup[] = [
+      lineup(HOME_SIDE_ID, [{ id: HOME_PARTICIPANT_ID, name: '김골키', jersey: 1 }]),
+      lineup(AWAY_SIDE_ID, [{ id: AWAY_PARTICIPANT_ID, name: '강아라', jersey: 7 }]),
+    ];
+    render(<ResultEditModal {...baseProps()} lineups={lineups} />);
+
+    // 칸 이름이 "득점" 뿐이라 선수 12명이면 어느 선수 칸인지 알 수 없었다 — 그룹 이름이 선수다.
+    const group = screen.getByRole('group', { name: '홈 · #1 김골키' });
+    for (const label of ['득점', '어시스트', '파울', '출전(분)', '경고', '퇴장']) {
+      const input = within(group).getByLabelText(label);
+      expect(input).toHaveAttribute('inputmode', 'numeric');
+      expect(input).toHaveStyle({ fontSize: 'var(--font-size-input)' });
+    }
+    expect(within(group).getByRole('checkbox', { name: '골키퍼' })).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '원정 · #7 강아라' })).getAllByRole('spinbutton')).toHaveLength(6);
   });
 
   it('falls back to an explicit "라인업에 없음" label (not a blank) when no lineup data is available', () => {
@@ -437,6 +458,30 @@ describe('ResultEditModal — 참가자 어시스트·파울 보존/입력 (2-A)
     expect(onConfirm.mock.calls[0][0].actualParticipants[0]).toMatchObject({ assists: 3, fouls: 2 });
   });
 
+  it('출전 시간(분)을 편집해 결과 participant payload에 반영하고, null 값은 임의로 0으로 만들지 않는다', () => {
+    const { onConfirm } = submitEdit(
+      {
+        participants: [
+          resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID, { minutesPlayed: 12 }),
+          resultParticipant(AWAY_PARTICIPANT_ID, AWAY_SIDE_ID, { minutesPlayed: null }),
+        ],
+      },
+      ({ confirmLabel }) => {
+        const minutesInputs = screen.getAllByLabelText('출전(분)');
+        expect(minutesInputs).toHaveLength(2);
+        expect((minutesInputs[0] as HTMLInputElement).value).toBe('12');
+        expect((minutesInputs[1] as HTMLInputElement).value).toBe('');
+        fireEvent.change(minutesInputs[0], { target: { value: '45' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '출전 시간 정정' } });
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      },
+    );
+
+    const submitted = onConfirm.mock.calls[0][0].actualParticipants;
+    expect(submitted[0]).toMatchObject({ participantId: HOME_PARTICIPANT_ID, minutesPlayed: 45 });
+    expect(submitted[1].minutesPlayed).toBeUndefined();
+  });
+
   // 하네스 정상 동작 증명(통과하는 짝): 위 두 테스트와 완전히 같은 경로·같은 단언
   // 방식인데 `goals`(이미 폼에 있는 필드)만 다루므로 지금도 초록이다 -- 위 실패가
   // 하네스(렌더/제출 시퀀스) 탓이 아니라 assists/fouls 누락 탓임을 가른다.
@@ -698,6 +743,28 @@ describe('ResultEditModal — 숫자 입력은 정수로 정규화된다', () =>
 });
 
 describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
+  it('실제 pinned period만 선택하고 변경한 period를 payload에 보존한다', () => {
+    const { onConfirm } = submitEdit(
+      {
+        goalEvents: [
+          { id: 'goal-period', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, minute: 1, period: 2, ownGoal: false },
+        ],
+      },
+      ({ confirmLabel }) => {
+        const period = screen.getByLabelText('1번째 득점 피리어드');
+        expect(screen.getByRole('option', { name: '전반' })).toBeInTheDocument();
+        expect(screen.getByRole('option', { name: '후반' })).toBeInTheDocument();
+        fireEvent.change(period, { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 피리어드 정정' } });
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      },
+    );
+
+    expect(onConfirm.mock.calls[0][0].goalEvents).toEqual([
+      expect.objectContaining({ id: 'goal-period', period: 1 }),
+    ]);
+  });
+
   it('득점 순서와 자책골 유형을 수정해 제출한다', () => {
     const { onConfirm } = submitEdit(
       {

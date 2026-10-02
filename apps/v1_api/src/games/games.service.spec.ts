@@ -4,17 +4,18 @@ import { V1GameState, type V1GameParticipant } from '@prisma/client';
 import { validate } from 'class-validator';
 import { GameContractError } from './core';
 import { GameCommandDto } from './dto/game-command.dto';
+import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndOutcome,
   extractEndPenalties,
   gameAuthorizationAction,
   gameCommandAuditAction,
   gameOperationAuditActor,
   groupParticipantsByLineupId,
   latestLineupStateBySideId,
-  resolveLineupRosterRegistration,
-  staffLineupSubmitRequiresTakeover,
   toGameHttpException,
+  GamesService,
 } from './games.service';
 
 function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
@@ -30,6 +31,7 @@ function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
     positionX: null,
     positionY: null,
     started: true,
+    arrivedAt: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
@@ -124,8 +126,6 @@ describe('GamesService command boundary', () => {
     ['game_cancel', 'cancel'],
     ['event_append', 'event_append'],
     ['event_reverse', 'event_reverse'],
-    ['lineup_save', 'lineup_mutate'],
-    ['lineup_submit', 'lineup_mutate'],
     ['result_revision_create', 'team_result_submit'],
     ['result_revision_submit', 'team_result_submit'],
     ['result_revision_approve', 'opponent_result_decide'],
@@ -193,24 +193,6 @@ describe('GamesService command boundary', () => {
     ).toEqual({ type: 'SYSTEM', id: 'PROJECTION_REPAIR' });
   });
 
-  describe('staffLineupSubmitRequiresTakeover (알파 2026-08-11: 스태프 라인업 제출이 TAKEOVER_TOKEN_EXPIRED로 막히던 사고)', () => {
-    it('경기가 아직 시작되지 않았으면(SCHEDULED) 스태프도 토큰 없이 제출할 수 있다', () => {
-      expect(staffLineupSubmitRequiresTakeover(V1GameState.SCHEDULED)).toBe(false);
-    });
-
-    it.each([
-      ['LIVE', V1GameState.LIVE],
-      ['PAUSED', V1GameState.PAUSED],
-      ['ENDED', V1GameState.ENDED],
-      ['CANCELLED', V1GameState.CANCELLED],
-    ] as const)(
-      '경기가 SCHEDULED를 벗어났으면(%s) 스태프도 기존대로 인계 토큰이 필요하다',
-      (_label, state) => {
-        expect(staffLineupSubmitRequiresTakeover(state)).toBe(true);
-      },
-    );
-  });
-
   describe('groupParticipantsByLineupId (Task 21: listLineups() participants roster)', () => {
     it('buckets participants under their own lineupId and preserves each bucket\'s row order', () => {
       const homeOne = participant({ id: 'p1', lineupId: 'lineup-home', jerseyNumber: 7 });
@@ -239,6 +221,68 @@ describe('GamesService command boundary', () => {
 
       expect(grouped.get('lineup-1')?.map((row) => row.id)).toEqual(['a', 'c']);
       expect(grouped.get('lineup-2')?.map((row) => row.id)).toEqual(['b']);
+    });
+  });
+
+  // 1차 대회 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는 몰수를 임의 점수로
+  // 수기 입력하는 수밖에 없어 정상 종료와 구분되지 않았고, "왜 그 점수인지" 근거가
+  // 남지 않았다. 2026-08-23 사용자 결정(Q3)은 표준 스코어 자동 부여가 아니라
+  // **운영자 입력 + 사유 필수**다 — 이 파서의 존재 이유가 그 "필수"이므로,
+  // 사유 없는 몰수가 실제로 막히는지가 이 스위트의 핵심 계약이다.
+  describe('extractEndOutcome (몰수·중단 종결 사유 파싱)', () => {
+    it('사유가 없으면 정상 종료다 — 기존 end 호출은 그대로 통과해야 한다', () => {
+      expect(extractEndOutcome({})).toEqual({ outcomeReason: 'NORMAL', note: null });
+      expect(extractEndOutcome({ outcomeReason: 'NORMAL' })).toEqual({
+        outcomeReason: 'NORMAL',
+        note: null,
+      });
+    });
+
+    it('몰수·중단은 사유 본문과 함께 통과한다', () => {
+      expect(extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석' })).toEqual({
+        outcomeReason: 'FORFEIT',
+        note: '원정팀 미출석',
+      });
+      expect(extractEndOutcome({ outcomeReason: 'ABANDONED', outcomeNote: '낙뢰로 중단' })).toEqual({
+        outcomeReason: 'ABANDONED',
+        note: '낙뢰로 중단',
+      });
+    });
+
+    // 이 스위트에서 가장 중요한 계약 — 사유를 안 적고 몰수로 끝낼 수 있으면
+    // 이 기능은 회고가 지적한 문제를 하나도 해결하지 못한다(점수의 임의성은
+    // 그대로인데 근거만 없는 상태가 된다).
+    it('사유 없는 몰수·중단은 막는다', () => {
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT' })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndOutcome({ outcomeReason: 'ABANDONED', outcomeNote: '' })).toThrow(
+        UnprocessableEntityException,
+      );
+      // 공백만 적은 것도 사유가 아니다.
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '   ' })).toThrow(
+        UnprocessableEntityException,
+      );
+      // 문자열이 아닌 값도 사유로 인정하지 않는다.
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: 123 })).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('앞뒤 공백은 다듬어 저장한다', () => {
+      expect(extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '  원정팀 미출석  ' })).toEqual({
+        outcomeReason: 'FORFEIT',
+        note: '원정팀 미출석',
+      });
+    });
+
+    it('알 수 없는 사유 값은 막는다 (오타가 조용히 정상 종료로 읽히면 안 된다)', () => {
+      expect(() => extractEndOutcome({ outcomeReason: 'forfeit' })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndOutcome({ outcomeReason: 'WALKOVER' })).toThrow(
+        UnprocessableEntityException,
+      );
     });
   });
 
@@ -360,6 +404,7 @@ describe('GamesService command boundary', () => {
       },
     );
   });
+
 });
 
 /**
@@ -367,75 +412,6 @@ describe('GamesService command boundary', () => {
  * 두 판정 지점. 응답에 선수 실명이 들어가므로 "누가 어느 팀 명단을 볼 수 있는가"는
  * PII 경계 그 자체다.
  */
-describe('resolveLineupRosterRegistration', () => {
-  const home = { id: 'reg-home', teamId: 'team-home' };
-  const away = { id: 'reg-away', teamId: 'team-away' };
-
-  it('참가팀 매니저는 자기 팀 사이드의 등록 명단을 읽는다', () => {
-    expect(
-      resolveLineupRosterRegistration({
-        actorRole: 'team_manager',
-        actorTeamId: 'team-home',
-        sideTeamId: 'team-home',
-        homeRegistration: home,
-        awayRegistration: away,
-      }),
-    ).toEqual({ registrationId: 'reg-home' });
-  });
-
-  // 이 분기가 무너지면 상대팀 선수 실명이 그대로 넘어간다.
-  it('참가팀 매니저가 상대팀 사이드를 요청하면 거부한다', () => {
-    expect(
-      resolveLineupRosterRegistration({
-        actorRole: 'team_manager',
-        actorTeamId: 'team-home',
-        sideTeamId: 'team-away',
-        homeRegistration: home,
-        awayRegistration: away,
-      }),
-    ).toEqual({ denied: 'forbidden' });
-  });
-
-  it('팀 오너도 같은 제한을 받는다', () => {
-    expect(
-      resolveLineupRosterRegistration({
-        actorRole: 'team_owner',
-        actorTeamId: 'team-home',
-        sideTeamId: 'team-away',
-        homeRegistration: home,
-        awayRegistration: away,
-      }),
-    ).toEqual({ denied: 'forbidden' });
-  });
-
-  // 팀 매니저가 자리를 비운 대회 당일에 운영진이 대신 명단을 짜야 한다.
-  it('대회 스태프는 양 팀 어느 쪽이든 읽을 수 있다', () => {
-    for (const role of ['tournament_director', 'field_operator', 'platform_ops']) {
-      expect(
-        resolveLineupRosterRegistration({
-          actorRole: role,
-          actorTeamId: null,
-          sideTeamId: 'team-away',
-          homeRegistration: home,
-          awayRegistration: away,
-        }),
-      ).toEqual({ registrationId: 'reg-away' });
-    }
-  });
-
-  it('사이드에 대응하는 대회 등록이 없으면 빈 명단이 아니라 없음으로 구분한다', () => {
-    expect(
-      resolveLineupRosterRegistration({
-        actorRole: 'platform_ops',
-        actorTeamId: null,
-        sideTeamId: 'team-ghost',
-        homeRegistration: home,
-        awayRegistration: away,
-      }),
-    ).toEqual({ denied: 'registration_not_found' });
-  });
-});
-
 describe('latestLineupStateBySideId', () => {
   // 라인업은 저장할 때마다 행이 쌓인다 — 옛 리비전을 집으면 이미 제출한 라인업이
   // 일정 화면에서 "미작성"으로 표시된다.
@@ -452,5 +428,409 @@ describe('latestLineupStateBySideId', () => {
 
   it('라인업이 하나도 없으면 빈 맵이다 — 화면은 이걸 "미작성"으로 읽는다', () => {
     expect(latestLineupStateBySideId([]).size).toBe(0);
+  });
+});
+
+describe('GamesService.listMyTournamentFixtures canonical source', () => {
+  it.each([false, true])('lists canonical matches by time then ID, ignoring fixture number (same time: %s)', async (sameTime) => {
+    const startedAt = new Date('2026-09-09T09:00:00.000Z');
+    const laterAt = sameTime ? startedAt : new Date('2026-09-09T10:00:00.000Z');
+    const prisma = {
+      v1TeamMembership: {
+        findMany: jest.fn().mockResolvedValue([{ teamId: 'team-home' }]),
+      },
+      v1TournamentRegistration: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'registration-home', teamId: 'team-home', team: { name: 'Home' } },
+        ]),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'match-later',
+            startAt: laterAt,
+            status: 'matched',
+            game: { id: 'game-team-match', sourceType: 'TEAM_MATCH' },
+            tournamentDetails: {
+              round: '2',
+              legNumber: 1,
+              fixtureNumber: 2,
+              group: { name: 'Group A' },
+              homeRegistrationId: 'registration-home',
+              awayRegistrationId: 'registration-away',
+              homeRegistration: { teamId: 'team-home', team: { name: 'Home' } },
+              awayRegistration: { teamId: 'team-away', team: { name: 'Away' } },
+            },
+          },
+          {
+            id: 'match-first',
+            startAt: startedAt,
+            status: 'matched',
+            game: null,
+            tournamentDetails: {
+              round: '1',
+              legNumber: 1,
+              fixtureNumber: 99,
+              group: { name: 'Group A' },
+              homeRegistrationId: 'registration-home',
+              awayRegistrationId: 'registration-away',
+              homeRegistration: { teamId: 'team-home', team: { name: 'Home' } },
+              awayRegistration: { teamId: 'team-away', team: { name: 'Away' } },
+            },
+          },
+        ]),
+      },
+      v1GameSide: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'side-home', gameId: 'game-team-match', teamId: 'team-home' },
+        ]),
+      },
+      v1GameLineup: {
+        findMany: jest.fn().mockResolvedValue([
+          { sideId: 'side-home', state: 'SUBMITTED', revision: 2 },
+        ]),
+      },
+    };
+    const service = new GamesService(
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
+    ).resolves.toEqual({
+      teams: [
+        {
+          registrationId: 'registration-home',
+          teamId: 'team-home',
+          teamName: 'Home',
+          fixtures: [
+            expect.objectContaining({ fixtureId: 'match-first', gameId: null, round: '1' }),
+            expect.objectContaining({
+              fixtureId: 'match-later',
+              gameId: 'game-team-match',
+              lineupState: 'SUBMITTED',
+              round: '2',
+            }),
+          ],
+        },
+      ],
+    });
+    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { teamId: true },
+    });
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tournamentId: 'tournament-1', teamId: { in: ['team-home'] } },
+    }));
+    expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tournamentId: 'tournament-1', deletedAt: null,
+        OR: [
+          { tournamentDetails: { is: { OR: [
+            { homeRegistrationId: { in: ['registration-home'] } },
+            { awayRegistrationId: { in: ['registration-home'] } },
+          ] } } },
+          { tournamentDetails: null, OR: [
+            { hostTeamId: { in: ['team-home'] } },
+            { approvedApplicantTeamId: { in: ['team-home'] } },
+          ] },
+        ],
+      },
+    }));
+  });
+
+  it('fails closed when a canonical match still points at a legacy game source', async () => {
+    const prisma = {
+      v1TeamMembership: {
+        findMany: jest.fn().mockResolvedValue([{ teamId: 'team-home' }]),
+      },
+      v1TournamentRegistration: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'registration-home', teamId: 'team-home', team: { name: 'Home' } },
+        ]),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'match-legacy-source',
+            startAt: new Date('2026-09-09T09:00:00.000Z'),
+            status: 'matched',
+            game: { id: 'game-legacy', sourceType: 'TOURNAMENT_FIXTURE' },
+            tournamentDetails: {
+              round: '1',
+              legNumber: 1,
+              fixtureNumber: 1,
+              group: { name: 'Group A' },
+              homeRegistrationId: 'registration-home',
+              awayRegistrationId: 'registration-away',
+              homeRegistration: { teamId: 'team-home', team: { name: 'Home' } },
+              awayRegistration: { teamId: 'team-away', team: { name: 'Away' } },
+            },
+          },
+        ]),
+      },
+    };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+
+    await expect(
+      service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_MIGRATION_REQUIRED' }),
+    });
+  });
+
+  it('fails closed when a tournament-owned match has no bracket details', async () => {
+    const prisma = {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-home' }]) },
+      v1TournamentRegistration: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'registration-home', teamId: 'team-home', team: { name: 'Home' } },
+        ]),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'match-missing-details',
+            hostTeamId: 'team-home',
+            approvedApplicantTeamId: null,
+            tournament: { kind: 'regular_tournament' },
+            startAt: new Date('2026-09-09T09:00:00.000Z'),
+            status: 'matched',
+            game: null,
+            tournamentDetails: null,
+          },
+        ]),
+      },
+    };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+
+    await expect(
+      service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_MIGRATION_REQUIRED' }),
+    });
+  });
+});
+
+// Task 180 G6(F56) — "전원 도착": 팀 한 곳의 명단 검인을 한 번에 채우는 일괄 경로.
+describe('GamesService.confirmSideArrival', () => {
+  const USER = { id: 'user-1' } as V1AuthUser;
+
+  type Actor = { role: string; teamId: string | null };
+
+  function build(options: {
+    actor?: Actor;
+    side?: { id: string; teamId: string | null } | null;
+    lineups?: Array<{ id: string; sideId: string; revision: number; state: string }>;
+    participants?: Array<{ id: string; sideId: string; lineupId: string; arrivedAt: Date | null }>;
+    /** 갱신 결과 count 를 강제한다. 기본은 넘긴 id 수 그대로(경합 없음). */
+    updatedCount?: number;
+  } = {}) {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      v1GameSide: {
+        findFirst: jest.fn().mockResolvedValue(
+          options.side === undefined ? { id: 'side-home', teamId: 'team-home' } : options.side,
+        ),
+      },
+      v1GameLineup: { findMany: jest.fn().mockResolvedValue(options.lineups ?? []) },
+      v1GameParticipant: {
+        findMany: jest.fn().mockResolvedValue(options.participants ?? []),
+        updateMany: jest.fn(async (args: { where: { id: { in: string[] } } }) => ({
+          count: options.updatedCount ?? args.where.id.in.length,
+        })),
+      },
+    };
+    const prisma = { $transaction: jest.fn(async (callback: (client: unknown) => unknown) => callback(tx)) };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const resolveActor = jest
+      .spyOn(service as never, 'resolveActor' as never)
+      .mockResolvedValue((options.actor ?? { role: 'platform_ops', teamId: null }) as never);
+    return { service, tx, resolveActor };
+  }
+
+  const ARRIVED_AT = new Date('2026-09-30T00:55:00.000Z');
+  const LINEUP_SUBMITTED = { id: 'lineup-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' };
+  const LINEUP_DRAFT = { id: 'lineup-2', sideId: 'side-home', revision: 2, state: 'DRAFT' };
+
+  it('화면이 보여 주는 리비전에서 아직 검인 안 된 참가자만 채우고, 이미 검인한 사람의 시각은 건드리지 않는다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [
+        { id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: ARRIVED_AT },
+        { id: 'p-2', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-3', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+      ],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toEqual({
+      sideId: 'side-home',
+      participantCount: 3,
+      newlyArrivedCount: 2,
+    });
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p-2', 'p-3'] }, arrivedAt: null },
+      data: { arrivedAt: expect.any(Date) },
+    });
+  });
+
+  // 좁히는 쿼리라 `gameId`·`sideId`·`invalidatedAt` 하나만 빠져도 다른 경기·다른 팀·대체된 리비전의 참가자를
+  // 도착으로 표시한다. 가짜 tx 는 조건을 무시하고 고정 데이터를 돌려주므로 인자를 직접 잰다.
+  it('사이드·라인업·참가자 조회는 이 경기와 이 사이드로 좁히고, 대체된 리비전은 제외한다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(tx.v1GameSide.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'side-home', gameId: 'game-1' } }),
+    );
+    expect(tx.v1GameLineup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gameId: 'game-1', sideId: 'side-home', invalidatedAt: null } }),
+    );
+    expect(tx.v1GameParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { gameId: 'game-1', sideId: 'side-home' } }),
+    );
+    // 경기 행을 잡아(FOR SHARE) 명단 재계산과 엇갈리지 않게 한다 — 잠금 대상이 이 경기인지까지 본다.
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw.mock.calls[0].slice(1)).toEqual(['game-1']);
+  });
+
+  it('이번에 새로 채운 수는 조회한 미검인 수가 아니라 갱신이 실제로 바꾼 행 수다 — 그 사이 개별 검인이 끼어든 경우', async () => {
+    const { service } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [
+        { id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-2', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+      ],
+      updatedCount: 1,
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      participantCount: 2,
+      newlyArrivedCount: 1,
+    });
+  });
+
+  it('제출본이 있으면 그 위에 얹힌 초안 리비전의 참가자는 건드리지 않는다 (대조군: 초안 쪽에도 미검인 참가자가 있다)', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED, LINEUP_DRAFT],
+      participants: [
+        { id: 'p-shown', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null },
+        { id: 'p-draft', sideId: 'side-home', lineupId: 'lineup-2', arrivedAt: null },
+      ],
+    });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['p-shown'] }, arrivedAt: null } }),
+    );
+  });
+
+  it('전원이 이미 검인된 상태면 아무것도 쓰지 않는다', async () => {
+    const { service, tx } = build({
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: ARRIVED_AT }],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      participantCount: 1,
+      newlyArrivedCount: 0,
+    });
+    expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('개별 검인과 같은 권한(lineup_mutate)으로 인가하고, 경기 행을 잠근 뒤 판정한다', async () => {
+    const { service, tx, resolveActor } = build({ lineups: [LINEUP_SUBMITTED] });
+
+    await service.confirmSideArrival(USER, 'game-1', 'side-home');
+
+    expect(resolveActor).toHaveBeenCalledWith(expect.anything(), 'game-1', 'user-1', 'lineup_mutate');
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('팀 액터는 자기 팀 사이드만 채울 수 있다 — 다른 팀 사이드는 403 이고 아무것도 쓰지 않는다', async () => {
+    const { service, tx } = build({
+      actor: { role: 'team_manager', teamId: 'team-away' },
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+    });
+    expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('팀 액터가 자기 팀 사이드를 채우는 것은 허용된다', async () => {
+    const { service, tx } = build({
+      actor: { role: 'team_owner', teamId: 'team-home' },
+      lineups: [LINEUP_SUBMITTED],
+      participants: [{ id: 'p-1', sideId: 'side-home', lineupId: 'lineup-1', arrivedAt: null }],
+    });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-home')).resolves.toMatchObject({
+      newlyArrivedCount: 1,
+    });
+    expect(tx.v1GameParticipant.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('이 경기의 사이드가 아니면 404 GAME_SIDE_NOT_FOUND', async () => {
+    const { service, tx } = build({ side: null });
+
+    await expect(service.confirmSideArrival(USER, 'game-1', 'side-other')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'GAME_SIDE_NOT_FOUND' }),
+    });
+    expect(tx.v1GameParticipant.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+// W4-V14 — 대진 취소는 게임을 건드리지 않는다. 열어 둔 콘솔이 취소된 대진의 경기를 시작하면 결과 없이
+// 진행 중으로 남으므로 시작에서 막는다.
+describe('GamesService start — 취소된 대진의 경기', () => {
+  function makeTx(teamMatchStatus: string) {
+    return {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tm-1',
+          tournamentId: 'league-1',
+          leagueId: 'league-1',
+          status: teamMatchStatus,
+          tournament: { kind: 'regular_league' },
+          league: { kind: 'regular_league' },
+          tournamentDetails: null,
+        }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-a' }),
+      },
+      v1GameSide: {
+        findMany: jest.fn().mockResolvedValue([
+          { sideKey: 'HOME', teamId: 'team-h' },
+          { sideKey: 'AWAY', teamId: 'team-a' },
+        ]),
+      },
+    };
+  }
+
+  function assertStartable(tx: ReturnType<typeof makeTx>) {
+    const service = new GamesService({} as never, {} as never, {} as never) as unknown as {
+      assertTournamentMatchStartable(tx: unknown, game: { id: string; sourceType: string; teamMatchId: string }): Promise<void>;
+    };
+    return service.assertTournamentMatchStartable(tx, { id: 'game-1', sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' });
+  }
+
+  it('취소된 대진이면 409 로 막는다', async () => {
+    await expect(assertStartable(makeTx('cancelled'))).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_CANCELLED' }),
+    });
+  });
+
+  it('양 팀이 확정된 매칭 대진은 그대로 시작할 수 있다', async () => {
+    await expect(assertStartable(makeTx('matched'))).resolves.toBeUndefined();
   });
 });

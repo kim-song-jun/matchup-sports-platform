@@ -3,6 +3,7 @@ import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { trackEvent } from '@/lib/analytics';
+import { isNativePushAvailable, requestNativePush, type NativePushRevokeReason } from '@/lib/native-push';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -11,9 +12,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+export interface UnsubscribeOptions {
+  /** `'sign-out'` from the logout button — the app shell keeps the reader's opt-in. */
+  reason?: NativePushRevokeReason;
+}
+
 export interface V1PushRegistration {
   subscribe: () => Promise<boolean>;
-  unsubscribe: () => Promise<void>;
+  unsubscribe: (options?: UnsubscribeOptions) => Promise<boolean>;
   permission: NotificationPermission | 'unsupported';
   isSubscribed: boolean;
   /**
@@ -28,20 +34,58 @@ export interface V1PushRegistration {
 export function useV1PushRegistration(): V1PushRegistration {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPending, setIsPending] = useState(false);
-  const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+  const nativeSupported = isNativePushAvailable();
+  const browserSupported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   // 권한은 state로 들고 requestPermission 결과로 갱신한다. 렌더 중 Notification.permission을
   // 직접 읽으면 사용자가 권한 팝업에서 '차단'을 눌러도 리렌더가 없어 UI가 계속 '허용 가능'으로
   // 남는다(구독 실패 → 상태 변화 없음 → 리렌더 없음).
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
 
-  useEffect(() => {
-    setPermission(supported ? Notification.permission : 'unsupported');
-  }, [supported]);
+  const refreshNativeState = useCallback(() => {
+    if (!nativeSupported) return;
+    void requestNativePush('get-push-state')
+      .then((result) => {
+        setPermission(result.permission);
+        setIsSubscribed(result.subscribed);
+      })
+      .catch((err) => {
+        reportClientError({
+          message: extractErrorMessage(err, '앱 알림 상태를 확인하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'native-push-state-check' },
+        });
+      });
+  }, [nativeSupported]);
 
   useEffect(() => {
-    if (!supported) return;
-    navigator.serviceWorker.ready
-      .then((registration) => registration.pushManager.getSubscription())
+    if (nativeSupported) {
+      refreshNativeState();
+      return;
+    }
+    setPermission(browserSupported ? Notification.permission : 'unsupported');
+  }, [browserSupported, nativeSupported, refreshNativeState]);
+
+  useEffect(() => {
+    if (!nativeSupported) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshNativeState();
+    };
+    window.addEventListener('focus', refreshNativeState);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshNativeState);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [nativeSupported, refreshNativeState]);
+
+  useEffect(() => {
+    if (!browserSupported || nativeSupported) return;
+    // `ready` 가 아니라 `getRegistration()` 이어야 한다 — 아래 unsubscribe 의 주석 참고.
+    // 이 자리에서는 매달린 프로미스라 화면이 멈추진 않지만, 등록이 없는 브라우저에서
+    // 상태 확인이 조용히 영원히 보류되는 것은 같다.
+    navigator.serviceWorker
+      .getRegistration()
+      .then((registration) => registration?.pushManager.getSubscription() ?? null)
       .then((subscription) => setIsSubscribed(subscription !== null))
       .catch((err) => {
         reportClientError({
@@ -50,10 +94,29 @@ export function useV1PushRegistration(): V1PushRegistration {
           context: { flow: 'push-subscription-check' },
         });
       });
-  }, [supported]);
+  }, [browserSupported, nativeSupported]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
-    if (!supported || Notification.permission === 'denied') return false;
+    if (nativeSupported) {
+      setIsPending(true);
+      try {
+        const result = await requestNativePush('request-notification-permission');
+        setPermission(result.permission);
+        setIsSubscribed(result.subscribed);
+        if (result.subscribed) trackEvent('push_subscribe_complete', { channel: 'native_fcm' });
+        return result.subscribed;
+      } catch (err) {
+        reportClientError({
+          message: extractErrorMessage(err, '앱 알림 등록에 실패했어요.'),
+          level: 'warn',
+          context: { flow: 'native-push-subscribe' },
+        });
+        return false;
+      } finally {
+        setIsPending(false);
+      }
+    }
+    if (!browserSupported || Notification.permission === 'denied') return false;
 
     setIsPending(true);
     try {
@@ -68,7 +131,9 @@ export function useV1PushRegistration(): V1PushRegistration {
       // registration the worker is still installing, and pushManager.subscribe()
       // throws "no active Service Worker" if called before it activates. Wait for
       // navigator.serviceWorker.ready (resolves once *this page* has an active
-      // controller), matching the pattern already used in unsubscribe() below.
+      // controller). 여기서는 바로 위에서 register() 를 부른 뒤라 등록이 반드시
+      // 존재하므로 ready 가 안전하다 — 등록이 없을 수 있는 unsubscribe() 쪽은
+      // getRegistration() 을 쓴다(그 주석 참고).
       await navigator.serviceWorker.register('/sw-push.js');
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
@@ -91,18 +156,46 @@ export function useV1PushRegistration(): V1PushRegistration {
     } finally {
       setIsPending(false);
     }
-  }, [supported]);
+  }, [browserSupported, nativeSupported]);
 
-  const unsubscribe = useCallback(async () => {
-    if (!supported) return;
+  const unsubscribe = useCallback(async (options: UnsubscribeOptions = {}): Promise<boolean> => {
+    if (nativeSupported) {
+      setIsPending(true);
+      try {
+        const result = await requestNativePush('revoke-push-device', { reason: options.reason });
+        setPermission(result.permission);
+        setIsSubscribed(result.subscribed);
+        if (result.subscribed || result.errorCode === 'revocation-failed') {
+          throw new Error('Native push device revocation was not confirmed by the server.');
+        }
+        return true;
+      } catch (err) {
+        reportClientError({
+          message: extractErrorMessage(err, '앱 알림 해제에 실패했어요.'),
+          level: 'warn',
+          context: { flow: 'native-push-unsubscribe' },
+        });
+        return false;
+      } finally {
+        setIsPending(false);
+      }
+    }
+    if (!browserSupported) return false;
 
     setIsPending(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      // `navigator.serviceWorker.ready` 를 쓰면 안 된다: 이 앱은 서비스워커를
+      // subscribe() 안에서만 등록하므로(이 파일의 register 호출이 유일하다), 푸시를
+      // 켠 적 없는 브라우저에는 등록 자체가 없다. 그때 `ready` 는 reject 하는 게
+      // 아니라 **영원히 미결**로 남는다 — 호출부의 .catch 로도 못 잡는다. 로그아웃이
+      // 이 프로미스를 기다린 뒤 리다이렉트하므로(logout-button.tsx), 푸시를 안 쓴
+      // 대다수 사용자의 로그아웃이 그대로 멈춰 선다.
+      // `getRegistration()` 은 등록이 없으면 undefined 로 **항상 결정**된다.
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
       if (!subscription) {
         setIsSubscribed(false);
-        return;
+        return true;
       }
 
       try {
@@ -118,16 +211,18 @@ export function useV1PushRegistration(): V1PushRegistration {
 
       await subscription.unsubscribe();
       setIsSubscribed(false);
+      return true;
     } catch (err) {
       reportClientError({
         message: extractErrorMessage(err, '푸시 알림 구독 해지에 실패했어요.'),
         level: 'warn',
         context: { flow: 'push-unsubscribe' },
       });
+      return false;
     } finally {
       setIsPending(false);
     }
-  }, [supported]);
+  }, [browserSupported, nativeSupported]);
 
   return { subscribe, unsubscribe, permission, isSubscribed, isPending };
 }

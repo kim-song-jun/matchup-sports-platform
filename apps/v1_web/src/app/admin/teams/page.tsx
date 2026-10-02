@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useV1AdminTeams,
-  useV1AdminMe,
   useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
-import type { V1AdminTeamRow } from '@/types/api';
-import { extractErrorMessage } from '@/lib/error-message';
-import { User, Users, Calendar } from 'lucide-react';
+import type { V1AdminTeamRow, V1TeamDissolutionBlocker } from '@/types/api';
+import { formatAdminDate } from '@/lib/date-utils';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import {
+  dissolutionBlockerItemSummary,
+  dissolutionBlockerTitle,
+  dissolutionBlockersFromError,
+} from '@/lib/team-dissolution-blockers';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -21,20 +28,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 // ── Status filter options ─────────────────────────────────────────────────
 
@@ -53,49 +46,73 @@ const REASON_MODAL_STATUS_OPTIONS = [
 
 const PAGE_SIZE = 20;
 
+type ArchiveBlocked = { message: string; blockers: V1TeamDissolutionBlocker[] };
+type RestoreNameTaken = { message: string; teamId: string };
+type ModalNotice = ({ kind: 'archive_blocked' } & ArchiveBlocked) | ({ kind: 'restore_name_taken' } & RestoreNameTaken);
+
+/** 보관(archived)을 막는 항목 — 토스트로는 다 못 읽어 상태 변경 모달 안에 남긴다. */
+function ArchiveBlockedNotice({ message, blockers }: ArchiveBlocked) {
+  return (
+    <>
+      <p className="font-semibold">{message}</p>
+      <ul className="mt-2 flex flex-col gap-2" aria-label="보관을 막는 항목">
+        {blockers.map((blocker) => (
+          <li key={blocker.kind}>
+            <p className="font-semibold">{dissolutionBlockerTitle(blocker.kind, blocker.items.length)}</p>
+            <ul className="mt-1 list-disc pl-4">
+              {blocker.items.map((item) => (
+                <li key={item.id} className="break-words">{dissolutionBlockerItemSummary(item)}</li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** 보관 해제가 같은 이름의 팀 때문에 막혔을 때 — 이름을 바꾸는 곳(팀 상세)으로 잇는다. */
+function RestoreNameTakenNotice({ message, teamId }: RestoreNameTaken) {
+  return (
+    <>
+      <p className="font-semibold">{message}</p>
+      <p className="mt-1">보관 팀의 이름을 바꾼 뒤 다시 보관을 풀어 주세요.</p>
+      <Link
+        href={`/admin/teams/${encodeURIComponent(teamId)}`}
+        className="mt-1 inline-flex min-h-[44px] items-center font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      >
+        팀 상세에서 이름 바꾸기
+      </Link>
+    </>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamsPage() {
+  const router = useRouter();
   // ── Admin capabilities ─────────────────────────────────────────────
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
 
-  // ── Filter state ───────────────────────────────────────────────────
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
+  // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ pageSize: PAGE_SIZE });
 
-  // ── Cursor pagination ──────────────────────────────────────────────
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
-
-  // URL searchParam pre-selection on mount
+  // URL searchParam pre-selection on mount (`?status=`, `?q=`)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, []);
-
-  // Debounce search input ~300ms
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(searchInput), 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
-
-  // Reset pagination whenever an applied filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedQ, activeStatus]);
-
-  const handleSearchChange = (value: string) => setSearchInput(value);
-  const handleStatusChange = (value: string) => setActiveStatus(value);
-
-  const filters = {
-    ...(debouncedQ ? { q: debouncedQ } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
+    const q = params.get('q')?.trim() ?? '';
+    if (q) setSearch(q);
+  }, [setActiveStatus, setSearch]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
   const rows = data?.items ?? [];
@@ -108,22 +125,38 @@ export default function AdminTeamsPage() {
 
   // ── Moderation modal ───────────────────────────────────────────────
   const [modalRow, setModalRow] = useState<V1AdminTeamRow | null>(null);
+  const [modalNotice, setModalNotice] = useState<ModalNotice | null>(null);
   const mutation = useV1ChangeTeamStatus();
+  const setModalTarget = (row: V1AdminTeamRow | null) => {
+    setModalNotice(null);
+    setModalRow(row);
+  };
 
   // ── Toast ──────────────────────────────────────────────────────────
   const { toasts, showToast } = useAdminToast();
 
   const handleModalSubmit = (status: string, reason: string) => {
     if (!modalRow) return;
+    const teamId = modalRow.teamId;
+    setModalNotice(null);
     mutation.mutate(
-      { id: modalRow.teamId, status, reason },
+      { id: teamId, status, reason },
       {
         onSuccess: () => {
-          setModalRow(null);
+          setModalTarget(null);
           showToast('팀 상태를 변경했어요.', 'success');
-          setPage(1);
+          resetToFirstPage();
         },
         onError: (err) => {
+          const blockers = dissolutionBlockersFromError(err);
+          if (blockers) {
+            setModalNotice({ kind: 'archive_blocked', message: extractErrorMessage(err, '보관을 막는 항목이 있어요. 먼저 정리해 주세요.'), blockers });
+            return;
+          }
+          if (extractErrorCode(err) === 'TEAM_RESTORE_NAME_TAKEN') {
+            setModalNotice({ kind: 'restore_name_taken', message: extractErrorMessage(err, '같은 종목·지역에 같은 이름의 팀이 있어 복구할 수 없어요.'), teamId });
+            return;
+          }
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
         },
       },
@@ -140,27 +173,31 @@ export default function AdminTeamsPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="플랫폼 관리"
+        eyebrow="플랫폼"
         title="팀 관리"
         description="플랫폼 내 모든 팀의 상태를 검색하고 관리해요."
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="tm-content-enter flex flex-col gap-4">
         {/* Filter bar */}
         <AdminFilterBar
           searchLabel="팀명 검색"
           searchPlaceholder="팀명 검색"
-          searchValue={searchInput}
-          onSearchChange={handleSearchChange}
+          searchValue={search}
+          onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
+          onStatusChange={setActiveStatus}
         />
 
         {/* Card list */}
         <AdminDataTable<V1AdminTeamRow>
           rows={rows}
           keyExtractor={(r) => r.teamId}
+          // 자매 목록(matches·team-matches)과 같은 행 진입 계약 — "상세 보기" 버튼으로만
+          // 진입 가능하던 유일한 목록 2개(users·teams) 중 하나였다.
+          onRowClick={(row) => router.push(`/admin/teams/${encodeURIComponent(row.teamId)}`)}
+          rowClickLabel={(row) => `${row.name} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.status === 'suspended' || row.status === 'archived' ? 'warning' : undefined
@@ -211,7 +248,7 @@ export default function AdminTeamsPage() {
               header: '생성',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDate(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatAdminDate(row.createdAt)}</span>
               ),
             },
           ]}
@@ -221,7 +258,7 @@ export default function AdminTeamsPage() {
                 href={`/admin/teams/${row.teamId}`}
                 aria-label={`${row.name} 상세 보기`}
                 className={[
-                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                   'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
@@ -231,11 +268,11 @@ export default function AdminTeamsPage() {
               {canWrite ? (
                   <button
                     type="button"
-                    onClick={() => setModalRow(row)}
+                    onClick={() => setModalTarget(row)}
                     aria-label={`${row.name} 상태 변경`}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                      'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
+                      'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
                   >
@@ -254,18 +291,7 @@ export default function AdminTeamsPage() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
 
         {/* Load more */}
@@ -280,8 +306,15 @@ export default function AdminTeamsPage() {
         currentStatus={modalRow?.status}
         statusOptions={REASON_MODAL_STATUS_OPTIONS}
         onSubmit={handleModalSubmit}
-        onClose={() => setModalRow(null)}
+        onClose={() => setModalTarget(null)}
         pending={mutation.isPending}
+        error={
+          modalNotice?.kind === 'archive_blocked' ? (
+            <ArchiveBlockedNotice {...modalNotice} />
+          ) : modalNotice?.kind === 'restore_name_taken' ? (
+            <RestoreNameTakenNotice {...modalNotice} />
+          ) : null
+        }
       />
 
       {/* Toasts */}

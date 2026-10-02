@@ -1,0 +1,52 @@
+# dev 에서 검증된 상태를 main 으로 승격하는 "버튼 하나" 워크플로.
+#
+# 저장소 설정이 "Actions 의 PR 생성/승인"을 허용하지 않으므로(이전 release-main.yml 이 그
+# 제약으로 매번 실패했다) 이 워크플로는 PR 을 직접 만들지 않는다 — alpha 검증 + 필요하면
+# 버전 커밋을 dev 에 push + 승격 게이트 사전 검증까지 하고, 사람이 누를 dev→main PR 링크를
+# job summary 에 남긴다. 실제 로직은 scripts/release/promote-main.sh 에 있다(로컬 테스트 가능).
+name: Promote to main
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PROMOTE to confirm
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: promote-to-main
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # 워크플로 트리거로 체크아웃한 것은 dev 뿐이다 — 승격 게이트가 main 과 비교하려면
+      # origin/main 도 로컬에 있어야 한다.
+      - name: Fetch main
+        run: git fetch --no-tags origin main
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Promote dev to main
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release/promote-main.sh

@@ -48,7 +48,7 @@ export function LiveBadge({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 5,
+        gap: 4,
         background: 'var(--red50)',
         borderRadius: 20,
         padding: '2px 8px',
@@ -63,7 +63,7 @@ export function LiveBadge({
           style={{
             width: 6,
             height: 6,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             background: clock?.isPaused ? 'var(--grey400)' : 'var(--red500)',
             flexShrink: 0,
             boxShadow: clock?.isPaused ? 'none' : '0 0 0 2px color-mix(in srgb, var(--red500) 25%, transparent)',

@@ -10,7 +10,10 @@ import {
   FUTSAL_V1_CONFIG,
   validateCompetitionConfig,
 } from '../../src/tournaments/competition-config/competition-config';
-import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
+import {
+  backfillCompetitionConfigVersionIds,
+  seedCompetitionConfigVersions,
+} from '../../src/tournaments/competition-config/competition-config-backfill';
 import {
   baselineStandingExpectation,
   competitionConfigFixture,
@@ -218,6 +221,30 @@ describe('Task 11 competition configuration', () => {
     );
   });
 
+  // Task 168 M11 retired v1_tournament_fixtures outright, so this can no
+  // longer probe non-reads by renaming the table away and back (there is
+  // nothing left to rename). It instead asserts the table's actual absence
+  // — the migration's own regression target — alongside the original
+  // "backfill never references it" contract.
+  it('canonical config backfill does not read the retired fixture table', async () => {
+    const tableExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT to_regclass('public.v1_tournament_fixtures') IS NOT NULL AS exists
+    `;
+    expect(tableExists[0]?.exists).toBe(false);
+
+    const executeRaw = jest.spyOn(prisma, '$executeRaw');
+    try {
+      await backfillCompetitionConfigVersionIds(prisma);
+      const sql = executeRaw.mock.calls
+        .map(([query]) => Array.isArray(query) ? query.join(' ') : String(query))
+        .join('\n')
+        .toLowerCase();
+      expect(sql).not.toContain('v1_tournament_fixtures');
+    } finally {
+      executeRaw.mockRestore();
+    }
+  });
+
   // Skipped (the raw-create half only would need to change, but the whole
   // case shares one `it`): rejecting a raw v1TeamMatch.create() for an
   // unsupported sport is the v1_pin_sport_competition_config trigger's job,
@@ -278,7 +305,11 @@ describe('Task 11 competition configuration', () => {
   it('creates a new version and requires impact confirmation before config-driven recalculation', async () => {
     const result = await exerciseCompetitionConfigChange(prisma, bracketService, authUser);
     expect(result.createdVersion).toBe(2);
-    expect(result.preview).toMatchObject({
+    const preview = result.preview;
+    if (preview.confirmationRequired !== true || !('requestedCompetitionConfigVersionId' in preview)) {
+      throw new Error('Expected the config change preview to require recalculation confirmation.');
+    }
+    expect(preview).toMatchObject({
       changed: false,
       confirmationRequired: true,
       requestedCompetitionConfigVersionId: result.changed.currentCompetitionConfigVersionId,
@@ -288,7 +319,7 @@ describe('Task 11 competition configuration', () => {
     expect(result.changed).toMatchObject({
       changed: true,
       confirmationRequired: false,
-      currentCompetitionConfigVersionId: result.preview.requestedCompetitionConfigVersionId,
+      currentCompetitionConfigVersionId: preview.requestedCompetitionConfigVersionId,
     });
     expect(result.topPoints).toEqual([5, 5]);
   });

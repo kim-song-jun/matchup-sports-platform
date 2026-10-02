@@ -1,0 +1,131 @@
+// apps/v1_web/src/lib/route-chrome/fragments/teams.ts
+// U29 — teams: 목록/생성/상세/수정/멤버 관리/전적/전술/컨택설정/컨택보내기 9패턴.
+// app-motion-wave-plan.md §2.25~2.38 "U29 teams" 지시대로 실제 파일을 직접 열어 확인한 값으로 채웠다.
+import type { RouteChromeEntry } from '../types';
+
+export const TEAMS_ROUTES: RouteChromeEntry[] = [
+  {
+    // TeamListPageView는 단일 return이라 loading/error 분기가 없다(내부 스켈레톤으로 처리).
+    // floatingSlot("팀 만들기" FAB)만 ShellOverride에 없는 정적 JSX라 useShellOverride로
+    // 옮긴다(teams-page.tsx) — RouteChromeConfig엔 floatingSlot 필드 자체가 없다(설계 문서 §1.3).
+    pattern: '/teams',
+    chrome: { title: '팀', activeTab: 'teams', topBar: false },
+  },
+  {
+    // TeamCreatePageClient는 항상 cancelHref 기본값('/teams')을 그대로 쓴다(teams-form-client.tsx).
+    pattern: '/teams/new',
+    chrome: { title: '팀 만들기', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
+  },
+  {
+    // 기본값. `?from=` 이 있으면 TeamDetailPageClient가 ShellOverride.backHref로 덮는다.
+    pattern: '/teams/:id',
+    chrome: { title: '팀 상세', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
+  },
+  {
+    // TeamEditPageClient의 cancelHref는 항상 '/teams'다(teams-form-client.tsx). 콘텐츠
+    // 영역의 데스크톱 뒤로가기 링크(teams-page.tsx의 tm-desktop-back)는 이 값을 그대로 쓴다.
+    pattern: '/teams/:id/edit',
+    chrome: { title: '팀 수정', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
+  },
+  {
+    // TeamMembersPageClient가 항상 backHref={`/teams/${teamId}`}로 호출한다(teams-client.tsx:538).
+    pattern: '/teams/:id/members',
+    chrome: {
+      title: '멤버 관리',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+    },
+  },
+  {
+    // 로딩/에러 분기의 기본값. success 분기(team-records-page-client.tsx)가
+    // useShellOverride({ title: `${팀명} 전적` })로 덮어쓴다(§1.9 "결합 제목" 하위유형) —
+    // 계획 문서는 이 3곳을 "정적"이라 적었지만 실제 코드는 fetch된 팀명을 접두어로 붙이는
+    // 결합 제목이었다(추측 대신 파일을 직접 열어 확인, 전역 지침 5).
+    pattern: '/teams/:id/records',
+    chrome: {
+      title: '팀 전적',
+      activeTab: 'teams',
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
+  {
+    // tactics-board-client.tsx는 로딩/에러/성공 3분기 전부 동일 정적 props라 override가 필요 없다.
+    pattern: '/teams/:id/tactics/:gameId',
+    chrome: {
+      title: '우리 팀 전술',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      // 데스크톱은 상단바가 숨어 제목·뒤로가기가 사라진다 — 팀 전적·컨택 설정과 같은 페이지 머리를 쓴다.
+      desktopHead: true,
+    },
+  },
+  {
+    // Task 179 대회·리그 경기 명단. 제목은 로딩·에러·성공 모두 같고, 상대팀은 본문 첫 줄이 싣는다.
+    pattern: '/teams/:id/games/:gameId/roster',
+    chrome: {
+      title: '경기 명단',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+    },
+  },
+  {
+    // Task 179 팀 B — 선수 × 다가오는 대회·리그 경기. 저장 버튼이 하단 고정이라 탭바를 숨긴다.
+    pattern: '/teams/:id/game-rosters',
+    chrome: {
+      title: '경기 명단 관리',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+    },
+  },
+  {
+    pattern: '/teams/:id/contact/settings',
+    chrome: {
+      title: '컨택 설정',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
+  {
+    pattern: '/teams/:id/contact/new',
+    chrome: {
+      title: '컨택 보내기',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+    },
+  },
+  {
+    // Task 180 H3 — 해체 버튼이 하단 고정이라 탭바를 숨긴다. `?from=` 은 AppBackLink 가 읽는다.
+    pattern: '/teams/:id/dissolve',
+    chrome: {
+      title: '팀 해체',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
+  {
+    // Task 180 G12 — 멤버 모으기(초대 링크·여러 명 초대). "팀 홈으로" 가 하단 고정이라 탭바를 숨긴다.
+    pattern: '/teams/:id/invite',
+    chrome: {
+      title: '멤버 모으기',
+      activeTab: 'teams',
+      bottomNav: false,
+      backHref: (p) => `/teams/${p.id}`,
+      desktopHead: true,
+    },
+  },
+  {
+    // Task 180 G12 — 초대 링크 착지. 비로그인도 팀 요약을 보고, 신청은 로그인 뒤 같은 주소로 돌아와 한다.
+    pattern: '/invite/:token',
+    chrome: { title: '팀 초대', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
+  },
+];

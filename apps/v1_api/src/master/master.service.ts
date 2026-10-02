@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { canonicalCompetitionConfigForSport } from '../tournaments/competition-config/lineup-size';
+import { tryNormalizeCompetitionSportCode } from '../tournaments/competition-config/competition-config.validator';
+import { positionFormationsForSport, positionOptionsForSport } from '../users/preferred-position';
 import { ResolveLocationDto } from './dto/resolve-location.dto';
 
 type KakaoRegionDocument = {
@@ -33,7 +36,29 @@ export class MasterService {
       },
     });
 
-    return { sports };
+    /**
+     * [D14] 선택지는 **마스터가 준다.**
+     *
+     * 원칙: **"무엇을 고를 수 있는가"는 마스터 / "무엇을 골랐는가"는 프로필.**
+     * 예전엔 자리 목록을 프로필 응답에서만 줬는데, 그러면 **아직 저장 안 한 종목**에는
+     * 목록이 없어 화면이 포지션 UI 를 못 띄운다 — alpha 실측에서 "종목을 골랐는데
+     * 포지션이 안 뜬다"로 드러났다. 코드를 읽어서는 안 보인다(연결은 전부 맞았고,
+     * 데이터가 붙는 **시점**이 틀렸다).
+     *
+     * 좌표를 만들지 않는다 — 프리셋 값을 그대로 넘긴다. 프리셋이 없는 종목(러닝·수영)은
+     * 빈 배열이고, 화면은 그걸 보고 섹션을 숨긴다.
+     */
+    const deps = {
+      tryNormalize: tryNormalizeCompetitionSportCode,
+      canonicalConfig: canonicalCompetitionConfigForSport,
+    };
+    return {
+      sports: sports.map((sport) => ({
+        ...sport,
+        positionOptions: positionOptionsForSport(sport.code, deps),
+        positionFormations: positionFormationsForSport(sport.code, deps),
+      })),
+    };
   }
 
   async getRegions() {
@@ -174,16 +199,15 @@ export class MasterService {
   }
 }
 
-function normalizeRegionName(value?: string | null) {
+// Kakao 의 region_1depth_name(예: '서울특별시'·'경기도'·'제주특별자치도')을 v1_regions.level=1
+// 의 짧은 이름('서울'·'경기'·'제주')과 맞춘다. 접미사 하나만 지워도 두 지역 모두 이미 짧은
+// 이름이 되므로 별도 특수 케이스가 필요 없다.
+export function normalizeRegionName(value?: string | null) {
   if (!value) return null;
-  return value
-    .trim()
-    .replace(/특별시$|광역시$|특별자치시$|특별자치도$|자치도$|도$/u, '')
-    .replace(/^서울$/u, '서울')
-    .replace(/^경기$/u, '경기');
+  return value.trim().replace(/특별시$|광역시$|특별자치시$|특별자치도$|자치도$|도$/u, '');
 }
 
-function normalizeDistrictName(value?: string | null) {
+export function normalizeDistrictName(value?: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   const cityPart = trimmed.split(/\s+/u)[0];

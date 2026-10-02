@@ -1,4 +1,4 @@
-import { computeRevealedTeamTrustBatch } from './team-trust-aggregation';
+import { computePublicTeamRatingBatch, computeRevealedTeamTrustBatch } from './team-trust-aggregation';
 
 const teamA = '00000000-0000-4000-8000-0000000000a1';
 const teamB = '00000000-0000-4000-8000-0000000000a2';
@@ -178,5 +178,39 @@ describe('computeRevealedTeamTrustBatch', () => {
     const prisma5 = { v1PostEventReview: { findMany: findManyFor5 } };
     await computeRevealedTeamTrustBatch(prisma5 as never, [teamA, teamB, teamC, teamD, teamE]);
     expect(findManyFor5).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('computePublicTeamRatingBatch', () => {
+  it('팀매치와 대회 후기를 공개 팀 상세과 같은 종목 × 평가팀 단위로 합산한다', async () => {
+    const submittedAt = new Date('2026-07-01T00:00:00Z');
+    const candidates = [
+      {
+        sourceType: 'team_match', sourceId: 'tm-1', sourceGroupId: null, sportId: 'futsal',
+        targetTeamId: teamA, reviewerTeamId: teamB, rating: 4, submittedAt,
+      },
+      {
+        sourceType: 'tournament_fixture', sourceId: 'fixture-1', sourceGroupId: 'cup-1', sportId: 'futsal',
+        targetTeamId: teamA, reviewerTeamId: teamC, rating: 5, submittedAt,
+      },
+    ];
+    const findMany = jest.fn().mockResolvedValueOnce(candidates).mockResolvedValueOnce([]);
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-10T00:00:00Z'));
+    const result = await computePublicTeamRatingBatch({ v1PostEventReview: { findMany } } as never, [teamA]);
+    jest.useRealTimers();
+
+    expect(result.get(teamA)).toEqual({ ratingScore: 4.5, ratingCount: 2 });
+    expect(findMany.mock.calls[0][0].where).not.toHaveProperty('sourceType');
+    expect(findMany.mock.calls[1][0].where.OR).toEqual([
+      { sourceId: { in: ['tm-1', 'fixture-1'] } },
+      { sourceGroupId: { in: ['cup-1'] } },
+    ]);
+  });
+
+  it('공개된 후기가 없으면 가짜 0점 대신 null을 반환한다', async () => {
+    const findMany = jest.fn().mockResolvedValueOnce([]);
+    const result = await computePublicTeamRatingBatch({ v1PostEventReview: { findMany } } as never, [teamA]);
+    expect(result.get(teamA)).toEqual({ ratingScore: null, ratingCount: 0 });
   });
 });

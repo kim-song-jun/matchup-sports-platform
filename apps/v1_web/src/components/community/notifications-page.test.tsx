@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationsPageView } from './community-page';
 import type { NotificationModel, NotificationsViewModel } from './community.types';
@@ -22,7 +22,7 @@ const notification: NotificationModel = {
   body: LONG_BODY,
   time: '7월 26일 02:10',
   unread: true,
-  href: '/my/inquiries/inquiry-1?from=notifications',
+  href: '/my/inquiries/inquiry-1?from=%2Fnotifications',
   actionLabel: '보기',
 };
 
@@ -62,25 +62,32 @@ describe('NotificationsPageView — 상세 시트', () => {
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
-  it('시트의 CTA를 눌러야 대상 화면으로 이동한다', () => {
+  it('시트의 CTA를 눌러야 대상 화면으로 이동한다', async () => {
     const onNavigate = vi.fn();
 
     renderWithClient(<NotificationsPageView model={makeModel({ onOpen: vi.fn(), onNavigate })} />);
     fireEvent.click(screen.getByRole('button', { name: /문의에 답변이 등록됐어요/ }));
     fireEvent.click(screen.getByRole('button', { name: '보기' }));
 
-    expect(onNavigate).toHaveBeenCalledWith(notification);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 이동은 시트의 히스토리 항목을 걷은 뒤에 한다(닫기 back 과 이동 push 가 엇갈리지 않게).
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith(notification));
+    // 시트는 퇴장 애니메이션이 끝난 뒤 사라진다(useDelayedUnmount 220ms) — 닫히는
+    // 동안에는 .is-closing 으로 DOM 에 남아 있는 것이 의도된 동작이다.
+    expect(screen.getByRole('dialog')).toHaveClass('is-closing');
+    await waitForElementToBeRemoved(() => screen.queryByRole('dialog'));
   });
 
-  it('ESC로 시트를 닫으면 이동하지 않는다', () => {
+  it('ESC로 시트를 닫으면 이동하지 않는다', async () => {
     const onNavigate = vi.fn();
 
     renderWithClient(<NotificationsPageView model={makeModel({ onOpen: vi.fn(), onNavigate })} />);
     fireEvent.click(screen.getByRole('button', { name: /문의에 답변이 등록됐어요/ }));
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 위와 같은 이유로 즉시 사라지지 않는다. 이 테스트의 계약은 "ESC 로 닫으면
+    // 이동하지 않는다" 이므로, 시트가 실제로 제거되는 것까지 확인한 뒤 단언한다.
+    expect(screen.getByRole('dialog')).toHaveClass('is-closing');
+    await waitForElementToBeRemoved(() => screen.queryByRole('dialog'));
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
@@ -98,5 +105,37 @@ describe('NotificationsPageView — 상세 시트', () => {
     fireEvent.click(screen.getByRole('button', { name: /문의에 답변이 등록됐어요/ }));
 
     expect(screen.getByRole('dialog')).toHaveTextContent('추가 안내 내용이 없어요.');
+  });
+
+  it('F44: 한 리그의 대진·명단 알림은 서버 종류가 달라도 같은 아이콘·"리그 알림"이다 (대조군: 리그 아닌 팀매치·대회 알림은 그대로)', () => {
+    const make = (id: string, type: string, title: string, href: string): NotificationModel => ({
+      ...notification, id, type, title, href, body: '',
+    });
+    renderWithClient(
+      <NotificationsPageView
+        model={makeModel({
+          notifications: [
+            make('n-fixtures', 'team_match', '리그 대진이 확정됐어요', '/league-matches/l-1?from=%2Fnotifications'),
+            make('n-roster', 'tournament', '리그 명단이 자동 확정됐어요', '/leagues/l-1?from=%2Fnotifications'),
+            make('n-friendly', 'team_match', '팀매치 신청이 왔어요', '/team-matches/tm-1?from=%2Fnotifications'),
+            make('n-cup', 'tournament', '대회 참가가 승인됐어요', '/tournaments/t-1?from=%2Fnotifications'),
+          ],
+          onOpen: vi.fn(),
+          onNavigate: vi.fn(),
+        })}
+      />,
+    );
+
+    const card = (title: string) => screen.getByRole('button', { name: new RegExp(title) });
+    const icon = (title: string) => card(title).querySelector('.tm-notification-icon')?.innerHTML;
+    expect(card('리그 대진이 확정됐어요')).toHaveAccessibleName(/^리그 알림/);
+    expect(card('리그 명단이 자동 확정됐어요')).toHaveAccessibleName(/^리그 알림/);
+    expect(icon('리그 대진이 확정됐어요')).toBe(icon('리그 명단이 자동 확정됐어요'));
+    expect(card('팀매치 신청이 왔어요')).toHaveAccessibleName(/^팀매치 알림/);
+    expect(card('대회 참가가 승인됐어요')).toHaveAccessibleName(/^대회 알림/);
+    expect(icon('팀매치 신청이 왔어요')).not.toBe(icon('리그 대진이 확정됐어요'));
+
+    fireEvent.click(card('리그 명단이 자동 확정됐어요'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('리그 알림 · 7월 26일 02:10');
   });
 });

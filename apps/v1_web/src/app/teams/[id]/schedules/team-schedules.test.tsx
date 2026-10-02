@@ -4,7 +4,7 @@
 // 여기서는 그 view-model이 실제 라우트/컴포넌트에 올바르게 배선됐는지만 확인한다.
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamDetail, V1TeamScheduleDetail, V1TeamScheduleSummary } from '@/types/api';
@@ -16,6 +16,9 @@ const scheduleApiMocks = vi.hoisted(() => ({
   useV1TeamDetail: vi.fn(),
   useV1TeamSchedules: vi.fn(),
   useV1TeamSchedule: vi.fn(),
+  useV1TeamMatch: vi.fn(),
+  useV1TeamMatchLineup: vi.fn(),
+  useV1AuthMe: vi.fn(),
   useV1SetMyScheduleAttendance: vi.fn(),
   useV1CancelTeamSchedule: vi.fn(),
   useV1CompleteTeamSchedule: vi.fn(),
@@ -30,6 +33,13 @@ const scheduleApiMocks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
   ...scheduleApiMocks,
+}));
+
+const publicRecordMocks = vi.hoisted(() => ({ usePublicMatch: vi.fn() }));
+
+vi.mock('@/components/public-game-records/use-public-game-records', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/public-game-records/use-public-game-records')>()),
+  ...publicRecordMocks,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -108,6 +118,7 @@ function scheduleSummary(overrides: Partial<V1TeamScheduleSummary> = {}): V1Team
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    linkedMatch: null,
     matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 2,
@@ -144,6 +155,10 @@ beforeEach(() => {
     isError: false,
     refetch: vi.fn(),
   });
+  scheduleApiMocks.useV1TeamMatch.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+  scheduleApiMocks.useV1TeamMatchLineup.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+  publicRecordMocks.usePublicMatch.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+  scheduleApiMocks.useV1AuthMe.mockReturnValue({ data: undefined });
   scheduleApiMocks.useV1SetMyScheduleAttendance.mockReturnValue(idleMutation());
   scheduleApiMocks.useV1CancelTeamSchedule.mockReturnValue(idleMutation());
   scheduleApiMocks.useV1CompleteTeamSchedule.mockReturnValue(idleMutation());
@@ -311,6 +326,207 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     expect(screen.queryByText(/불참 ?\d+명/)).not.toBeInTheDocument();
   });
 
+  // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 상대팀 이름·
+  // 장소·매치 상세 링크가 없었다. matchConfirmed일 때만 매치 상세를 불러 요약을 보여준다.
+  it('matchConfirmed면 상대팀명·장소·매치 상세 링크를 보여준다', async () => {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({
+        type: 'MATCH',
+        teamMatchId: 'tm-1',
+        linkedMatch: { teamMatchId: 'tm-1', tournamentId: null, leagueId: null },
+        matchConfirmed: true,
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    scheduleApiMocks.useV1TeamMatch.mockReturnValue({
+      data: {
+        hostTeamId: 'team-1',
+        approvedOpponentTeam: { teamId: 'team-2', name: 'E2E 알파 B팀' },
+        place: { name: '(테스트) 알파 구장' },
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+
+    expect(screen.getByText('E2E 알파 B팀')).toBeInTheDocument();
+    expect(screen.getByText('(테스트) 알파 구장')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1');
+  });
+
+  describe('대회·리그 경기의 상대팀 요약', () => {
+    const fromQuery = '?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1';
+    function confirmedCompetitionSchedule(linkedMatch: { tournamentId: string | null; leagueId: string | null }) {
+      scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+      scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+        data: scheduleDetail({ type: 'MATCH', teamMatchId: 'tm-1', linkedMatch: { teamMatchId: 'tm-1', ...linkedMatch }, matchConfirmed: true }),
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+    }
+    async function renderDetail() {
+      const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+      render(page);
+    }
+
+    it('리그 경기는 팀 매치 상세로 상대팀을 보여주고 리그 경기 상세로 연결한다', async () => {
+      // 리그 대진은 tournamentId 도 리그 id 다.
+      confirmedCompetitionSchedule({ tournamentId: 'league-1', leagueId: 'league-1' });
+      scheduleApiMocks.useV1TeamMatch.mockReturnValue({
+        data: { hostTeamId: 'team-2', hostTeam: { teamId: 'team-2', name: '망원 FC' }, approvedOpponentTeam: { teamId: 'team-1', name: '성수 풋살 크루' }, place: { name: '망원 구장' } },
+        isLoading: false,
+        isError: false,
+      });
+
+      await renderDetail();
+
+      expect(scheduleApiMocks.useV1TeamMatch).toHaveBeenCalledWith('tm-1');
+      expect(screen.getByText('망원 FC')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', `/league-matches/league-1/fixtures/tm-1${fromQuery}`);
+    });
+
+    it('대회 경기는 팀 매치 조회(404) 대신 공개 경기 상세로 상대팀을 보여주고 대회 경기 상세로 연결한다', async () => {
+      confirmedCompetitionSchedule({ tournamentId: 'cup-1', leagueId: null });
+      publicRecordMocks.usePublicMatch.mockReturnValue({
+        data: { home: { registrationId: 'r-2', teamId: 'team-2', teamName: '천둥 FC' }, away: { registrationId: 'r-1', teamId: 'team-1', teamName: '성수 풋살 크루' }, venue: '알파 구장' },
+        isLoading: false,
+        isError: false,
+      });
+
+      await renderDetail();
+
+      expect(scheduleApiMocks.useV1TeamMatch).toHaveBeenCalledWith('');
+      expect(publicRecordMocks.usePublicMatch).toHaveBeenCalledWith('cup-1', 'tm-1');
+      expect(screen.getByText('천둥 FC')).toBeInTheDocument();
+      expect(screen.getByText('알파 구장')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', `/tournaments/cup-1/matches/tm-1${fromQuery}`);
+    });
+
+    it('대진표 공개 전(공개 상세 404)인 대회 경기는 요약을 숨기고 오류도 띄우지 않는다', async () => {
+      confirmedCompetitionSchedule({ tournamentId: 'cup-1', leagueId: null });
+      publicRecordMocks.usePublicMatch.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new V1ApiError({ status: 'error', statusCode: 404, code: 'NOT_FOUND', message: 'Not found', timestamp: new Date().toISOString() }),
+      });
+
+      await renderDetail();
+
+      expect(screen.getAllByText(scheduleDetail().title).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('link', { name: /경기 상세 보기/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  // H5 결정 6 — 친선 경기 일정만 응답 이름을 나눈다. 리그·대회 경기로 이어진 일정은 그대로다.
+  it.each([
+    ['친선 경기 일정', { teamMatchId: 'tm-1', tournamentId: null, leagueId: null }, '올 수 있어요'],
+    ['리그 경기 일정', { teamMatchId: 'tm-1', tournamentId: null, leagueId: 'league-1' }, '참석'],
+    ['대회 경기 일정', { teamMatchId: 'tm-1', tournamentId: 'tournament-1', leagueId: null }, '참석'],
+    ['경기와 이어지지 않은 일정', null, '참석'],
+  ])('%s의 응답 버튼 이름', async (_label, linkedMatch, goingLabel) => {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({ type: 'MATCH', linkedMatch, matchConfirmed: false }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+
+    expect(screen.getByRole('button', { name: goingLabel })).toBeInTheDocument();
+    expect(screen.queryByText('(팀장 참고용)') !== null).toBe(goingLabel === '올 수 있어요');
+  });
+
+  describe('참석명단 요약 (H9 D-1)', () => {
+    function confirmedMatchSchedule(linkedMatch: { tournamentId: string | null; leagueId: string | null }) {
+      scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+        data: scheduleDetail({
+          type: 'MATCH',
+          teamMatchId: 'tm-1',
+          linkedMatch: { teamMatchId: 'tm-1', ...linkedMatch },
+          matchConfirmed: true,
+        }),
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      });
+    }
+
+    it('팀장은 친선 경기 명단을 읽어 인원·내 포함 여부와 관리 링크를 본다', async () => {
+      confirmedMatchSchedule({ tournamentId: null, leagueId: null });
+      scheduleApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-me' } } });
+      const starter = (id: string, userId: string | null) => ({
+        id, userId, displayName: id, jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null,
+      });
+      scheduleApiMocks.useV1TeamMatchLineup.mockReturnValue({
+        data: { revision: 3, formation: null, starters: [starter('p1', 'user-me'), starter('p2', 'user-2')], bench: [] },
+        isLoading: false,
+        isError: false,
+      });
+
+      const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+      render(page);
+
+      expect(scheduleApiMocks.useV1TeamMatchLineup).toHaveBeenCalledWith('tm-1', { enabled: true });
+      const link = screen.getByRole('link', { name: /2명 · 팀장·매니저가 정해요/ });
+      expect(link).toHaveTextContent('명단에 있어요');
+      expect(link).toHaveAttribute('href', '/team-matches/tm-1/lineup?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1');
+    });
+
+    it('멤버는 명단을 조회하지 않고 설명만 본다', async () => {
+      scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+      confirmedMatchSchedule({ tournamentId: null, leagueId: null });
+
+      const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+      render(page);
+
+      expect(scheduleApiMocks.useV1TeamMatchLineup).toHaveBeenCalledWith('tm-1', { enabled: false });
+      expect(screen.getByText('참석명단')).toBeInTheDocument();
+      expect(screen.getByText('팀장·매니저가 정해요')).toBeInTheDocument();
+    });
+
+    it('리그 경기 일정에는 친선 참석명단 줄을 두지 않는다', async () => {
+      confirmedMatchSchedule({ tournamentId: 'tour-1', leagueId: 'league-1' });
+
+      const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+      render(page);
+
+      expect(scheduleApiMocks.useV1TeamMatchLineup).toHaveBeenCalledWith('', { enabled: true });
+      expect(screen.queryByText('참석명단')).not.toBeInTheDocument();
+    });
+  });
+
+  it('상대팀 모집 중(matchConfirmed=false)이면 상대팀 요약을 보여주지 않는다', async () => {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({
+        type: 'MATCH',
+        teamMatchId: 'tm-1',
+        linkedMatch: { teamMatchId: 'tm-1', tournamentId: null, leagueId: null },
+        matchConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+
+    expect(screen.queryByRole('link', { name: /경기 상세 보기/ })).not.toBeInTheDocument();
+    // 확정 전이라 team-match를 조회조차 하지 않는다 — 상대가 없는데 불러오는 건 헛수고.
+    expect(scheduleApiMocks.useV1TeamMatch).toHaveBeenCalledWith('');
+  });
+
   it('상세 조회 실패 시 재시도 가능한 에러 상태를 보여준다', async () => {
     const refetch = vi.fn();
     scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('owner'), isError: false });
@@ -391,12 +607,13 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     render(page);
 
     fireEvent.click(screen.getByRole('button', { name: '일정 취소' }));
-    fireEvent.change(screen.getByLabelText('취소 사유'), { target: { value: '우천으로 취소' } });
-    fireEvent.click(screen.getByRole('button', { name: '취소 확정' }));
+    const dialog = screen.getByRole('dialog', { name: '일정을 취소할까요?' });
+    fireEvent.change(within(dialog).getByLabelText('취소 사유'), { target: { value: '우천으로 취소' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '일정 취소' }));
 
-    // 상단 배너와 취소 모달의 필드 에러 두 곳에 같은 메시지가 렌더링된다.
-    const conflictMessages = await screen.findAllByText(/새로고침/);
-    expect(conflictMessages.length).toBeGreaterThan(0);
+    // 상단 배너와 취소 확인 창(연 채로 남는다) 두 곳에 같은 메시지가 렌더링된다.
+    expect(await within(dialog).findByText(/새로고침/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('취소 사유')).toHaveValue('우천으로 취소');
     expect(detailRefetch).toHaveBeenCalledOnce();
   });
 });

@@ -80,7 +80,7 @@ wait_for_scan_registration() {
 assert_no_critical_image_findings() {
   local label="$1"
   shift
-  local repository status findings critical high
+  local repository status findings critical high critical_details
 
   for repository in "$@"; do
     wait_for_scan_registration "${repository}"
@@ -128,6 +128,14 @@ assert_no_critical_image_findings() {
 
     echo "[${label}] ${repository} critical=${critical} high=${high}"
     if (( critical != 0 )); then
+      critical_details="$(scan_aws_retry aws ecr describe-image-scan-findings \
+        --repository-name "${repository}" --image-id "imageTag=${IMAGE_TAG}" \
+        --query "imageScanFindings.findings[?severity=='CRITICAL'].{name:name,uri:uri,attributes:attributes}" \
+        --output json)" || {
+        echo "[${label}] ${repository}: could not read Critical finding details; deployment remains blocked" >&2
+        return 1
+      }
+      echo "[${label}] ${repository} critical-findings=$(jq -c '.' <<< "${critical_details}")" >&2
       echo "Critical ECR findings block ${label%-scan} deployment" >&2
       return 1
     fi

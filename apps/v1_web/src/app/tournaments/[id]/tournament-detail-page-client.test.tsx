@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './tournament-detail-client';
@@ -21,7 +21,11 @@ const tournamentApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
   useV1MyRegistrations: vi.fn(),
   useV1Reviews: vi.fn(),
+  useV1MyTeams: vi.fn(() => ({ data: undefined, isPending: true })),
 }));
+
+// 기본값은 빈 파라미터라 기존 테스트 동작은 그대로다 — `?from=` 테스트만 갈아끼운다.
+const searchParamsRef = vi.hoisted(() => ({ current: new URLSearchParams() }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
@@ -38,7 +42,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsRef.current,
 }));
 
 function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {
@@ -49,6 +53,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     title: '테스트 대회',
     status: 'open',
     format: 'knockout',
+    kind: 'regular_tournament',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: null,
@@ -93,17 +98,20 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],
+    reviewsTotalCount: 0,
     awards: [],
-    popup: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -154,5 +162,197 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     expect(trackEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps the shared application contract in a regular-league rail without tournament capacity facts', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({
+        status: 'in_progress',
+        kind: 'regular_league',
+        registrationDeadlineAt: '2099-08-10T14:59:00.000Z',
+        confirmedCount: 8,
+        teamCount: 8,
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
+      'href', '/tournaments/tournament-1/my',
+    );
+    expect(within(rail).queryByText('정원')).not.toBeInTheDocument();
+    expect(within(rail).queryByText('참가비')).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '참가 신청' })).not.toBeInTheDocument();
+  });
+});
+
+// 벤치마크 감사(P0 ①): "참가 전 꼭 확인해 주세요" 체크리스트의 고정 문구("환불 불가" 등)와
+// 운영자가 대회별로 쓰는 refundPolicyText가 같은 화면에서 서로 다른 말을 했다 — 운영자
+// 정책이 있으면 그 항목들을 빼고, 없으면 고정문구가 fallback으로 남는다(2026-09-15 사용자 결정).
+describe('TournamentDetailPageClient — 참가 전 유의사항과 환불 정책의 모순 해소', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isPending: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('운영자가 환불 정책을 직접 썼으면 고정 환불 문구(환불 불가·주최 취소·대회 연기)는 빠지고 운영자 문구만 보인다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ refundPolicyText: '경기 시작 48시간 전까지 100% 환불, 24시간 전까지 50% 환불됩니다.' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByText(/경기 시작 48시간 전까지 100% 환불/)).toBeInTheDocument();
+    expect(screen.queryByText('환불 불가')).not.toBeInTheDocument();
+    expect(screen.queryByText('주최 취소')).not.toBeInTheDocument();
+    expect(screen.queryByText('대회 연기')).not.toBeInTheDocument();
+    // 환불이 아니라 자격 문제인 항목은 운영자 정책과 무관하게 그대로 남는다(모바일+데스크톱 두 사본).
+    expect(screen.getAllByText('노쇼 실격').length).toBeGreaterThan(0);
+  });
+
+  it('운영자가 환불 정책을 안 썼으면 기존 고정 문구가 그대로 fallback으로 남는다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ refundPolicyText: null }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    // 모바일 하단 카드가 데스크톱 클래스 은닉과 무관하게 jsdom에는 항상 그려지므로,
+    // 존재 자체(개수 ≥1)만 본다 — 이 테스트의 관심사는 fallback이 여전히 나오는가다.
+    expect(screen.getAllByText('환불 불가').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('주최 취소').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('대회 연기').length).toBeGreaterThan(0);
+  });
+});
+
+// alpha 실측(2026-09-24): 데스크톱 "대회 목록으로" 헤더 링크가 항상 href="/tournaments"로
+// 고정돼 있었다 — 홈/활동기록 등 어디서 들어왔든 뒤로가기가 전체 대회 목록으로만
+// 나갔다(MD-QA #15 후속).
+describe('TournamentDetailPageClient — 뒤로가기 출처(?from=)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isPending: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    searchParamsRef.current = new URLSearchParams();
+  });
+
+  it('?from=이 있으면 그 화면으로 돌아간다', async () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fhome');
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/home');
+  });
+
+  it('?from=이 없으면 전체 대회 목록으로 돌아간다', async () => {
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/tournaments');
+  });
+
+  // 상세 → 대진·결과 → 뒤로 → 상세 → 뒤로가 처음 출처(홈)까지 이어져야 한다.
+  it('받은 출처가 있으면 대진·결과 링크에 그 출처까지 담은 상세 URL 을 싣는다', async () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fhome');
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const childLinks = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => /^\/tournaments\/tournament-1\/(bracket|results|my)/.test(href));
+    expect(childLinks.length).toBeGreaterThan(0);
+    childLinks.forEach((href) => expect(href).toContain(`?from=${encodeURIComponent('/tournaments/tournament-1?from=%2Fhome')}`));
+  });
+
+  it('출처 없이 들어오면 대진·결과 링크는 기존 그대로다', async () => {
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const childLinks = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => /^\/tournaments\/tournament-1\/(bracket|results|my)/.test(href));
+    expect(childLinks.length).toBeGreaterThan(0);
+    childLinks.forEach((href) => expect(href).not.toContain('from='));
+  });
+});
+
+describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsRef.current = new URLSearchParams();
+    window.localStorage.setItem('teameet.v1.userId', 'captain');
+    tournamentApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(), isPending: false, isError: false, error: null, refetch: vi.fn() });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({ data: undefined, isError: false, isPending: false, isFetching: false, refetch: vi.fn() });
+    tournamentApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [{ teamId: 'team-a', role: 'owner', name: '마포 FC', logoUrl: null }] }, isPending: false } as never);
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('신청이 있으면 제목 아래에서 참가 명단 화면으로 바로 보낸다', async () => {
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [{ id: 'reg-1', teamId: 'team-a', teamName: '마포 FC', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null, playerCount: 7 }],
+    });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    const title = await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const heading = await screen.findByRole('heading', { level: 2, name: '우리 팀 참가' });
+    expect(title.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toHaveAttribute(
+      'href',
+      `/tournaments/tournament-1/registrations/reg-1/roster?from=${encodeURIComponent('/tournaments/tournament-1')}`,
+    );
+  });
+
+  it('신청이 없으면 카드가 없다', async () => {
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.queryByRole('heading', { name: '우리 팀 참가' })).not.toBeInTheDocument();
   });
 });

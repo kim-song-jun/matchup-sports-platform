@@ -2,7 +2,8 @@
 
 import { useCallback } from 'react';
 import { Mail } from 'lucide-react';
-import { OtpVerificationCard, type OtpIssueResult } from '@/components/auth/otp/otp-verification-card';
+import { OtpVerificationCard } from '@/components/auth/otp/otp-verification-card';
+import type { OtpIssueResult } from '@/components/auth/otp/use-otp-verification';
 import { useV1RecoveryEmailIssue, useV1RecoveryEmailVerify } from '@/hooks/use-v1-api';
 
 type Props = {

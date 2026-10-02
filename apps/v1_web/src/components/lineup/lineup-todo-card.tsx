@@ -6,7 +6,8 @@ import { useV1LineupTodos } from '@/hooks/use-v1-api';
 import { formatMonthDay } from '@/lib/date-utils';
 
 /**
- * "아직 라인업을 넣지 않은 다가오는 경기" 카드.
+ * "아직 참석명단을 제출하지 않은 다가오는 친선 경기" 카드. 대회·리그 경기는 명단이 참가 명단에서
+ * 계산돼 제출할 일이 없으므로 서버가 싣지 않는다(Task 179 R1).
  *
  * 알림(푸시·인앱)과 짝을 이루되 성격이 다르다. 알림은 한 번 지나가면 끝이고 꺼둘 수도
  * 있지만, 이 카드는 볼 때마다 서버에서 다시 계산해 온다 — 알림을 놓쳤어도, 껐어도,
@@ -14,18 +15,45 @@ import { formatMonthDay } from '@/lib/date-utils';
  *
  * 할 일이 없으면 아무것도 그리지 않는다. 빈 상태를 "지금 할 일이 없어요" 같은 카드로
  * 채우면 홈 화면에서 아무 일도 하지 않는 자리가 늘 한 칸 잡힌다.
+ *
+ * 실패는 다르다. 조회가 실패했는데 카드가 그냥 사라지면 "할 일이 없는 것"과 구별되지 않아,
+ * 경기 당일까지 참석명단을 안 낸 채로 지나갈 수 있다(웨이브 8 감사). 훅이 retry: false 라
+ * 자동 재시도도 없으므로 실패는 재시도 버튼과 함께 드러낸다.
  */
 export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
   const query = useV1LineupTodos({ enabled });
   const items = query.data?.items ?? [];
+
+  if (query.isError) {
+    return (
+      <section className="tm-home-lineup-block" aria-labelledby="lineup-todo-heading">
+        <Card pad={16}>
+          <div role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <h2 id="lineup-todo-heading" className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
+                참석명단을 기다리는 경기
+              </h2>
+              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                목록을 불러오지 못했어요. 할 일이 남아 있을 수 있어요.
+              </p>
+            </div>
+            <button className="tm-btn tm-btn-sm tm-btn-outline" type="button" onClick={() => void query.refetch()}>
+              다시 불러오기
+            </button>
+          </div>
+        </Card>
+      </section>
+    );
+  }
+
   if (items.length === 0) return null;
 
   return (
-    <section aria-labelledby="lineup-todo-heading">
+    <section className="tm-home-lineup-block" aria-labelledby="lineup-todo-heading">
       <Card pad={16}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
           <h2 id="lineup-todo-heading" className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-            라인업을 기다리는 경기
+            참석명단을 기다리는 경기
           </h2>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
             {items.length}건
@@ -42,15 +70,18 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                   alignItems: 'center',
                   gap: 12,
                   minHeight: 44,
-                  padding: '10px 12px',
-                  borderRadius: 12,
+                  padding: '12px 12px',
+                  borderRadius: 'var(--radius-control)',
                   border: '1px solid var(--border)',
                   textDecoration: 'none',
                   color: 'inherit',
                 }}
               >
                 <span style={{ flex: 1, display: 'grid', gap: 2 }}>
-                  <span className="tm-text-label" style={{ fontWeight: 700 }}>
+                  {/* 행 제목이 바로 아래 메타(tm-text-caption 12px)와 1px 차이였다 —
+                      크기로 위계를 내지 못해 굵기(700)로 때우던 자리라, 홈 카드 제목과
+                      같은 tm-text-card-title(15px/600)로 옮긴다(DESIGN.md §2.1). */}
+                  <span className="tm-text-card-title">
                     {todo.title}
                   </span>
                   <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
@@ -69,7 +100,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                   style={{
                     flexShrink: 0,
                     padding: '3px 8px',
-                    borderRadius: 999,
+                    borderRadius: 'var(--radius-pill)',
                     fontWeight: 700,
                     border: '1px solid var(--orange700)',
                     color: 'var(--orange700)',

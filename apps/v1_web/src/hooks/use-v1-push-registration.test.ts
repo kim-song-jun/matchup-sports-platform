@@ -34,7 +34,14 @@ beforeEach(() => {
   pushManager.subscribe.mockResolvedValue(subscription);
   Object.defineProperty(global.navigator, 'serviceWorker', {
     configurable: true,
-    value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.resolve(registration) },
+    value: {
+      register: vi.fn().mockResolvedValue(registration),
+      // subscribe() 는 register() 직후 활성화를 기다리므로 ready 를 계속 쓴다.
+      ready: Promise.resolve(registration),
+      // 상태 확인·구독 해지는 getRegistration() 을 쓴다 — ready 는 등록이 없으면
+      // 영원히 미결이라 로그아웃이 멈춰 서기 때문이다(use-v1-push-registration 주석).
+      getRegistration: vi.fn().mockResolvedValue(registration),
+    },
   });
   Object.defineProperty(global, 'PushManager', {
     configurable: true,
@@ -50,10 +57,149 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete window.TeameetNative;
   vi.restoreAllMocks();
 });
 
 describe('useV1PushRegistration', () => {
+  it('uses native FCM in the Android shell without invoking browser Web Push', async () => {
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission: request.type === 'get-push-state' ? 'default' : 'granted',
+            subscribed: request.type === 'request-notification-permission',
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(window.TeameetNative.postMessage).toHaveBeenCalled();
+    expect(Notification.requestPermission).not.toHaveBeenCalled();
+    expect(v1Get).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(true);
+  });
+
+  it('refreshes the native permission state after returning from Android settings', async () => {
+    let permission: NotificationPermission = 'denied';
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission,
+            subscribed: permission === 'granted',
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.permission).toBe('denied'));
+
+    permission = 'granted';
+    window.dispatchEvent(new Event('focus'));
+
+    await waitFor(() => {
+      expect(result.current.permission).toBe('granted');
+      expect(result.current.isSubscribed).toBe(true);
+    });
+  });
+
+  it('revokes the native device before logout instead of touching browser Web Push', async () => {
+    const messages: string[] = [];
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        messages.push(message);
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission: 'granted',
+            subscribed: request.type !== 'revoke-push-device',
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(messages.some((message) => JSON.parse(message).type === 'revoke-push-device')).toBe(true);
+    expect(navigator.serviceWorker.getRegistration).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
+  it('forwards the sign-out reason to the shell so it keeps the reader\'s opt-in', async () => {
+    const messages: Array<Record<string, unknown>> = [];
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        messages.push(request);
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: { requestId: request.requestId, permission: 'granted', subscribed: false },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(messages.length).toBe(1));
+
+    await act(async () => {
+      await result.current.unsubscribe({ reason: 'sign-out' });
+    });
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    const revocations = messages.filter((message) => message.type === 'revoke-push-device');
+    expect(revocations).toHaveLength(2);
+    expect(revocations[0]).toMatchObject({ reason: 'sign-out' });
+    expect(revocations[1]).not.toHaveProperty('reason');
+  });
+
+  it('does not report a native revoke as successful when the server did not confirm it', async () => {
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission: 'granted',
+            subscribed: request.type !== 'revoke-push-device',
+            ...(request.type === 'revoke-push-device' ? { errorCode: 'revocation-failed' } : {}),
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    let revoked = true;
+    await act(async () => {
+      revoked = await result.current.unsubscribe();
+    });
+
+    expect(revoked).toBe(false);
+    expect(reportClientError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'native-push-unsubscribe' }) }),
+    );
+  });
+
   it('subscribes: requests permission, registers the SW, and posts the subscription', async () => {
     const { useV1PushRegistration } = await import('./use-v1-push-registration');
     const { result } = renderHook(() => useV1PushRegistration());
@@ -130,6 +276,7 @@ describe('useV1PushRegistration', () => {
       value: {
         register: vi.fn().mockResolvedValue(installingRegistration),
         ready: Promise.resolve(registration),
+        getRegistration: vi.fn().mockResolvedValue(registration),
       },
     });
 
@@ -213,10 +360,44 @@ describe('useV1PushRegistration', () => {
     );
   });
 
+  // 회귀: 푸시를 켠 적 없는 브라우저에는 서비스워커 등록이 아예 없다(이 앱은
+  // subscribe() 안에서만 register 한다). 예전 구현은 `navigator.serviceWorker.ready`
+  // 를 기다렸는데 그건 등록이 없으면 reject 가 아니라 **영원히 미결**이라, 로그아웃이
+  // 이 프로미스를 기다리다 그대로 멈춰 섰다. `ready` 를 절대 결정되지 않게 두고도
+  // unsubscribe() 가 끝나야 한다 — 그래야 이 테스트가 실제 버그를 잡는다.
+  it('구독한 적 없는 브라우저(서비스워커 등록 없음)에서도 unsubscribe 가 멈추지 않는다', async () => {
+    Object.defineProperty(global.navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        register: vi.fn(),
+        ready: new Promise(() => {}), // 등록이 없을 때의 실제 동작: 영원히 미결
+        getRegistration: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    let settled = false;
+    await act(async () => {
+      await result.current.unsubscribe();
+      settled = true;
+    });
+
+    expect(settled).toBe(true);
+    expect(v1Delete).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
   it('reports the initial subscription-status check failure instead of swallowing it silently', async () => {
     Object.defineProperty(global.navigator, 'serviceWorker', {
       configurable: true,
-      value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.reject(new Error('sw registration lost')) },
+      value: {
+        register: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration),
+        // 초기 상태 확인은 이제 getRegistration() 을 탄다 — 실패 보고를 검증하려면
+        // 이쪽이 거부돼야 한다(ready 를 거부시키면 이 테스트가 아무것도 안 잡는다).
+        getRegistration: vi.fn().mockRejectedValue(new Error('sw registration lost')),
+      },
     });
     const { useV1PushRegistration } = await import('./use-v1-push-registration');
     renderHook(() => useV1PushRegistration());

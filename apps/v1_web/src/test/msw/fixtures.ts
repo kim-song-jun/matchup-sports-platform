@@ -6,6 +6,8 @@ import type {
   V1AdminNoticeRow,
   V1AdminPopupRow,
   V1AdminOverview,
+  V1AdminReportedTeamRow,
+  V1AdminReportedTeamSummary,
   V1ChatMessage,
   V1ChatRoom,
   V1Home,
@@ -24,6 +26,7 @@ import type {
   V1Settings,
   V1Sport,
   V1Team,
+  V1TeamCompetitionEntries,
   V1TeamMatch,
   V1User,
 } from '@/types/api';
@@ -109,6 +112,7 @@ export const v1InquiriesFixture: { items: V1Inquiry[]; pageInfo: { nextCursor: s
     {
       inquiryId: 'inquiry-1',
       category: 'account',
+      reportReason: null,
       title: '로그인 문의',
       body: '이메일 로그인 과정에서 도움이 필요해요.',
       contact: null,
@@ -120,9 +124,67 @@ export const v1InquiriesFixture: { items: V1Inquiry[]; pageInfo: { nextCursor: s
       closedAt: null,
       replies: [],
     },
+    {
+      inquiryId: 'inquiry-2',
+      category: 'report',
+      reportReason: 'spam',
+      title: '허위 팀 신고',
+      body: '스팸성 광고 컨택을 반복해서 보내는 팀이 있어요.',
+      contact: null,
+      relatedType: 'team_contact',
+      relatedId: 'team-contact-1',
+      status: 'received',
+      createdAt: '2026-07-09T00:00:00.000Z',
+      updatedAt: '2026-07-09T00:00:00.000Z',
+      closedAt: null,
+      replies: [],
+    },
   ],
   pageInfo: { nextCursor: null, hasNext: false },
 };
+
+// 신고 문의 -> 신고 대상 팀 매핑. V1Inquiry(공개 타입)엔 reportedTeamId가 없다(어드민 응답도
+// 필터 파라미터로만 받지 행에는 싣지 않는다 — admin.service.ts 실측) — 목 전용으로만 유지한다.
+const REPORTED_TEAM_BY_INQUIRY_ID: Record<string, string> = {
+  'inquiry-2': 'team-2',
+};
+
+// `GET /admin/reports/teams` — 반복 신고되는 팀 랭킹. name/status/topReason/lastReportedAt은
+// nullable(팀 삭제·사유 없음)이라 두 번째 행은 일부러 null로 채워 그 계약을 목에서도 지킨다.
+export const v1ReportedTeamsWindowDays = 30;
+export const v1ReportedTeamsFixture: V1AdminReportedTeamRow[] = [
+  {
+    teamId: 'team-2',
+    name: '문제의 FC',
+    status: 'active',
+    totalCount: 5,
+    recentCount: 3,
+    topReason: 'spam',
+    lastReportedAt: '2026-07-09T00:00:00.000Z',
+  },
+  {
+    teamId: 'team-3',
+    name: null,
+    status: null,
+    totalCount: 2,
+    recentCount: 0,
+    topReason: null,
+    lastReportedAt: null,
+  },
+];
+
+function buildReportedTeamSummaryFixture(teamId: string): V1AdminReportedTeamSummary | null {
+  const row = v1ReportedTeamsFixture.find((team) => team.teamId === teamId);
+  if (!row || row.name === null || row.status === null) return null;
+  return {
+    teamId: row.teamId,
+    name: row.name,
+    status: row.status,
+    windowDays: v1ReportedTeamsWindowDays,
+    recentReportCount: row.recentCount,
+    reasonBreakdown: row.topReason ? { [row.topReason]: row.recentCount } : {},
+  };
+}
 
 export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
   return {
@@ -138,19 +200,28 @@ export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
     status: inquiry.status,
     relatedType: inquiry.relatedType,
     relatedId: inquiry.relatedId,
+    reportReason: inquiry.reportReason,
     replyCount: inquiry.replies?.length ?? 0,
     createdAt: inquiry.createdAt,
     updatedAt: inquiry.updatedAt,
     closedAt: inquiry.closedAt,
+    purgedAt: null,
   };
 }
 
+/** 신고 문의의 신고 대상 팀 id — MSW 목 전용 헬퍼. handlers.ts의 reportedTeamId 필터·대리 차단 핸들러가 공유한다. */
+export function getReportedTeamIdForInquiry(inquiryId: string): string | null {
+  return REPORTED_TEAM_BY_INQUIRY_ID[inquiryId] ?? null;
+}
+
 export function toAdminInquiryDetail(inquiry: V1Inquiry): V1AdminInquiryDetail {
+  const reportedTeamId = getReportedTeamIdForInquiry(inquiry.inquiryId);
   return {
     ...toAdminInquiryRow(inquiry),
     body: inquiry.body,
     contact: inquiry.contact,
     replies: (inquiry.replies ?? []).map((reply) => ({ ...reply, adminUserId: 'admin-1' })),
+    reportedTeam: reportedTeamId ? buildReportedTeamSummaryFixture(reportedTeamId) : null,
   };
 }
 
@@ -244,8 +315,48 @@ export const v1MatchesFixture: V1Match[] = [
     capacityText: '7/10명',
     status: 'open',
     ctaState: 'can_apply',
+    // matches.service.ts toListItem()이 실제로 host를 내려준다(2026-08-27 수정 전엔 이
+    // 필드가 아예 빠져 있어 프론트가 항상 목업 이름으로 폴백했고, 이 픽스처도 host가 없어
+    // MSW 기반 테스트로는 그 결함을 못 잡았다) — 실제 응답 모양을 따라 여기도 채운다.
+    host: { userId: 'user-host-1', displayName: '지훈', profileImageUrl: null, trustState: 'trusted' },
   },
 ];
+
+/** 팀 상세 "참가 중인 대회·리그" — 고칠 수 있는 리그 하나와 제출 마감이 지난 대회 하나. */
+export const v1TeamCompetitionEntriesFixture: V1TeamCompetitionEntries = {
+  teamId: 'team-1',
+  viewerCanManageRoster: true,
+  items: [
+    {
+      competitionId: 'league-1',
+      competitionKind: 'regular_league',
+      title: '가을 정규 리그',
+      status: 'draft',
+      scheduledAt: '2026-10-10T01:00:00.000Z',
+      scheduledEndAt: '2026-12-20T01:00:00.000Z',
+      registrationId: 'registration-league-1',
+      registrationStatus: 'confirmed',
+      playerCount: 10,
+      rosterDeadlineAt: null,
+      rosterEditable: true,
+      rosterBlockedBy: null,
+    },
+    {
+      competitionId: 'tournament-1',
+      competitionKind: 'regular_tournament',
+      title: '성수 풋살컵',
+      status: 'in_progress',
+      scheduledAt: '2026-10-04T01:00:00.000Z',
+      scheduledEndAt: '2026-10-05T09:00:00.000Z',
+      registrationId: 'registration-1',
+      registrationStatus: 'confirmed',
+      playerCount: 7,
+      rosterDeadlineAt: '2026-09-26T14:59:00.000Z',
+      rosterEditable: false,
+      rosterBlockedBy: 'deadline',
+    },
+  ],
+};
 
 export const v1TeamsFixture: V1Team[] = [
   {
@@ -487,6 +598,7 @@ export const v1ChatRoomsFixture: CursorPage<V1ChatRoom> = {
     {
       roomId: 'chat-1',
       roomType: 'match',
+      teamContact: null,
       title: '성수 풋살장 동네 5:5',
       status: 'active',
       linkedTarget: { type: 'match', id: 'match-1', title: '성수 풋살장 동네 5:5', route: '/matches/match-1' },
@@ -522,6 +634,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-match-1',
     roomType: 'match',
+    teamContact: null,
     title: '성수 풋살 5:5',
     status: 'active',
     linkedTarget: { type: 'match', id: 'match-1', title: '성수 풋살 5:5', route: '/matches/match-1' },
@@ -534,6 +647,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-match-2',
     roomType: 'match',
+    teamContact: null,
     title: '강동 러닝 번개',
     status: 'active',
     linkedTarget: { type: 'match', id: 'match-2', title: '강동 러닝 번개', route: '/matches/match-2' },
@@ -546,6 +660,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-1',
     roomType: 'team',
+    teamContact: null,
     title: '성수 러너스 FC',
     status: 'active',
     linkedTarget: { type: 'team', id: 'team-1', title: '성수 러너스 FC', route: '/teams/team-1' },
@@ -558,6 +673,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-2',
     roomType: 'team',
+    teamContact: null,
     title: '강동 위클리 풋살',
     status: 'active',
     linkedTarget: { type: 'team', id: 'team-2', title: '강동 위클리 풋살', route: '/teams/team-2' },
@@ -570,6 +686,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-match-1',
     roomType: 'team_match',
+    teamContact: null,
     title: '마포 FC 팀매치',
     status: 'active',
     linkedTarget: { type: 'team_match', id: 'team-match-1', title: '마포 FC 팀매치', route: '/team-matches/team-match-1' },
@@ -582,6 +699,7 @@ v1ChatRoomsFixture.items = [
   {
     roomId: 'chat-team-match-2',
     roomType: 'team_match',
+    teamContact: null,
     title: '잠실 교환매치',
     status: 'active',
     linkedTarget: { type: 'team_match', id: 'team-match-2', title: '잠실 교환매치', route: '/team-matches/team-match-2' },
@@ -598,10 +716,10 @@ export const v1ChatMessagesByRoomFixture: Record<string, CursorPage<V1ChatMessag
     items: [
       {
         messageId: 'chat-match-1-join-1',
-        sender: { userId: 'user-3', displayName: 'New member', profileImageUrl: null },
+        sender: { userId: 'user-3', displayName: '새멤버', profileImageUrl: null },
         messageType: 'system',
         systemEventType: 'joined',
-        content: 'New member joined the room',
+        content: '새멤버님이 들어왔어요',
         status: 'sent',
         sentAt: '2026-05-18T09:04:00.000Z',
         mine: false,
@@ -670,8 +788,8 @@ export const v1NotificationsFixture = {
     {
       notificationId: 'notification-2',
       type: 'team_match',
-      title: '팀매치 신청 도착',
-      body: '상대팀 신청이 들어왔어요. 조건을 확인해 주세요.',
+      title: '합정 유나이티드 팀이 팀매치를 신청했어요',
+      body: '"마포 FC" · 친선 팀매치 · 5/30 (토) 19:00 · 승인하거나 거절해 주세요.',
       target: { type: 'team_match', id: 'team-match-1', route: '/team-matches/team-match-1' },
       status: 'created',
       readAt: null,
@@ -736,6 +854,7 @@ export const v1SettingsFixture: V1Settings = {
   },
   theme: 'light',
   notifications: {
+    activityEnabled: true,
     matchEnabled: true,
     teamEnabled: true,
     teamMatchEnabled: true,
@@ -756,6 +875,26 @@ export const v1HomeFixture: V1Home = {
     publishedAt: '2026-05-18T00:00:00.000Z',
   },
   notices: v1NoticesFixture,
+  teamActivity: {
+    hasTeam: true,
+    nextGame: {
+      gameId: 'game-1',
+      teamMatchId: 'team-match-1',
+      competitionKind: 'LEAGUE',
+      competitionId: 'league-1',
+      title: '마포 주말 리그 1주차',
+      opponentName: '합정 유나이티드',
+      scheduledAt: '2026-05-23T10:00:00.000Z',
+      placeName: '망원 유수지 풋살장',
+      teamId: 'team-1',
+      teamName: '성수 볼러즈',
+      viewerCanManage: false,
+      viewerParticipating: true,
+      participantCount: 10,
+    },
+    pendingInvitations: { count: 1, latestTeamName: '한강 FC' },
+    pendingJoinRequests: null,
+  },
   recommendedMatches: v1MatchesFixture,
   recommendedTeamMatches: v1TeamMatchesFixture,
   recommendedTeams: v1TeamsFixture,

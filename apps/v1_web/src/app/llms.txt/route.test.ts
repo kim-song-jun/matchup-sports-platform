@@ -4,6 +4,7 @@
  * 안내서 본문은 반드시 나가야 한다는 것이 이 라우트의 핵심 계약이다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 
 const fetchPublicV1 = vi.fn();
 
@@ -13,6 +14,7 @@ vi.mock('@/lib/seo', async () => {
 });
 
 const { GET } = await import('./route');
+const { PUBLIC_SITE_ROUTES } = await import('@/lib/public-site/routes');
 
 beforeEach(() => {
   fetchPublicV1.mockReset();
@@ -67,8 +69,25 @@ describe('GET /llms.txt', () => {
     expect(body).not.toContain('· ·');
   });
 
+  it('도움말·이용 대상·문의 페이지를 한 줄 설명과 함께 싣고, 문의 이메일은 사업자 정보 설정 값을 쓴다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) =>
+      path === '/public/site-info' ? { contactEmail: 'help@example.com' } : null,
+    );
+
+    const body = await (await GET()).text();
+
+    for (const route of PUBLIC_SITE_ROUTES) {
+      expect(body).toContain(`- [${route.title}](https://teameet.co.kr${route.path}): ${route.summary}\n`);
+    }
+    expect(body).toContain('- 이메일: help@example.com\n');
+    expect(body).not.toContain('teameetsports@naver.com');
+    // 요약(첫 절 앞)은 AI 가 가장 먼저 인용한다 — 대회 종목을 축구·풋살 밖으로 약속하지 않는다.
+    expectNoNonFootballCompetitionClaim(body.slice(0, body.indexOf('\n## ')));
+  });
+
   it('대회 목록 조회가 실패해도 200 과 안내서 본문을 내고, 실패를 로그에 남긴다', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     fetchPublicV1.mockRejectedValue(new Error('upstream down'));
 
     const response = await GET();

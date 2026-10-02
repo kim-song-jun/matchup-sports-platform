@@ -15,7 +15,7 @@ docs/reference/handoff-sm-new-direction/
 ## Source Pack
 
 ```text1
-docs/reference/handoff-2026-04-25/
+docs/archive/reference/handoff-2026-04-25/
 ```
 
 원본 `handoff-2026-04-25`는 수정하지 않는다. 새 pack은 전체 복사 후 별도 candidate로 운용한다.
@@ -38,7 +38,7 @@ Implementation status: reference only
 
 ```text
 from:
-docs/reference/handoff-2026-04-25/
+docs/archive/reference/handoff-2026-04-25/
 
 to:
 docs/reference/handoff-sm-new-direction/

@@ -2,20 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamScheduleSummary } from '@/types/api';
 import {
+  attendanceLockedReason,
   attendanceSummaryText,
   buildScheduleCalendarMonth,
   dateKeyOf,
-  fromDatetimeLocalValue,
   isDeadlinePassed,
+  kstMonthStart,
   isScheduleManagerRole,
   isScheduleMemberRole,
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
   matchScheduleDisplay,
+  scheduleCancelNoticeLine,
+  scheduleOpponentTeamName,
   scheduleRsvpDeadlineLabel,
   scheduleStateLabel,
   scheduleTypeLabel,
-  toDatetimeLocalValue,
   toScheduleListItemModel,
 } from './team-schedules.view-model';
 
@@ -33,6 +35,7 @@ function schedule(overrides: Partial<V1TeamScheduleSummary> = {}): V1TeamSchedul
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    linkedMatch: null,
     matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 0,
@@ -86,6 +89,33 @@ describe('team-schedules view-model — API failure / 409 conflict mapping', () 
     expect(isScheduleStaleConflict(err)).toBe(true);
   });
 
+  it('이미 답한 팀원 충돌은 목록을 되돌려야 하는 stale 로 다룬다', () => {
+    // 팀장이 보고 있던 "미응답" 목록이 낡아서 나는 충돌이라, 메시지만 띄우고 목록을
+    // 그대로 두면 이미 답한 사람 옆에 대리 버튼이 계속 남는다.
+    const err = new V1ApiError({
+      status: 'error',
+      statusCode: 409,
+      code: 'PROXY_ATTENDANCE_ALREADY_ANSWERED',
+      message: 'already answered',
+      timestamp: new Date().toISOString(),
+    });
+    expect(isScheduleStaleConflict(err)).toBe(true);
+    expect(mapScheduleErrorMessage(err, '실패했어요')).toBe('팀원이 이미 응답했어요. 최신 내용으로 새로고침했어요.');
+  });
+
+  it('대리로 참석 외 상태를 시도한 경우는 stale 이 아니라 그대로 알린다', () => {
+    // 목록이 낡아서 난 것이 아니므로 새로고침해도 달라지지 않는다 -- 되돌릴 것이 없다.
+    const err = new V1ApiError({
+      status: 'error',
+      statusCode: 409,
+      code: 'PROXY_ATTENDANCE_STATUS_NOT_ALLOWED',
+      message: 'only going',
+      timestamp: new Date().toISOString(),
+    });
+    expect(isScheduleStaleConflict(err)).toBe(false);
+    expect(mapScheduleErrorMessage(err, '실패했어요')).toBe('대신 표시할 수 있는 건 참석뿐이에요.');
+  });
+
   it('does not flag an unrelated domain error as a stale conflict', () => {
     const err = new V1ApiError({
       status: 'error',
@@ -115,8 +145,8 @@ describe('team-schedules view-model — API failure / 409 conflict mapping', () 
   });
 
   it('surfaces a real Error message instead of the fallback when one is present', () => {
-    const networkError = new TypeError('Failed to fetch');
-    expect(mapScheduleErrorMessage(networkError, '기본 메시지')).toBe('Failed to fetch');
+    const thrown = new Error('일정 시간이 올바르지 않아요.');
+    expect(mapScheduleErrorMessage(thrown, '기본 메시지')).toBe('일정 시간이 올바르지 않아요.');
   });
 });
 
@@ -139,6 +169,14 @@ describe('team-schedules view-model — list item / labels', () => {
     expect(attendanceSummaryText(18, 0, 20)).toBe('참석 18/20명');
     expect(attendanceSummaryText(20, 3, 20)).toBe('참석 20/20명 · 대기 3명');
     expect(attendanceSummaryText(4, 0, null)).toBe('참석 4명');
+  });
+
+  it('F67: 아무도 답하지 않은 정원 없는 일정은 "참석 0명" 대신 요약이 없다 (대조군: 1명·대기·정원이 있으면 그대로)', () => {
+    expect(attendanceSummaryText(0, 0, null)).toBeNull();
+    expect(toScheduleListItemModel(schedule({ goingCount: 0, waitlistedCount: 0, capacity: null }), 't').attendanceSummary).toBeNull();
+    expect(attendanceSummaryText(1, 0, null)).toBe('참석 1명');
+    expect(attendanceSummaryText(0, 2, null)).toBe('참석 0명 · 대기 2명');
+    expect(attendanceSummaryText(0, 0, 10)).toBe('참석 0/10명');
   });
 });
 
@@ -212,35 +250,44 @@ describe('team-schedules view-model — deadline helpers', () => {
   });
 });
 
-describe('team-schedules view-model — datetime-local round-trip', () => {
-  it('round-trips an ISO string through toDatetimeLocalValue/fromDatetimeLocalValue', () => {
-    const original = new Date(2026, 7, 10, 19, 30, 0, 0).toISOString();
-    const local = toDatetimeLocalValue(original);
-    expect(local).toBe('2026-08-10T19:30');
-    const backToIso = fromDatetimeLocalValue(local);
-    expect(backToIso).toBe(original);
+describe('team-schedules view-model — KST 날짜 기준 (브라우저 시간대 무관)', () => {
+  // vitest 는 TZ=UTC 로 돈다 — KST 자정 직후(10/4 00:30)가 UTC 로는 10/3 15:30 이라 로컬 getter 면 갈린다.
+  const KST_OCT4_0030 = '2026-10-03T15:30:00.000Z';
+  const KST_OCT3_2359 = '2026-10-03T14:59:00.000Z';
+
+  it('dateKeyOf 는 KST 달력 날짜를 돌려준다 (자정 경계 양쪽)', () => {
+    expect(dateKeyOf(KST_OCT4_0030)).toBe('2026-10-04');
+    expect(dateKeyOf(KST_OCT3_2359)).toBe('2026-10-03');
+    expect(dateKeyOf('2026-12-31T15:00:00.000Z')).toBe('2027-01-01');
+    expect(dateKeyOf('not-a-date')).toBe('');
   });
 
-  it('returns an empty string / undefined for missing or invalid input', () => {
-    expect(toDatetimeLocalValue(null)).toBe('');
-    expect(toDatetimeLocalValue(undefined)).toBe('');
-    expect(toDatetimeLocalValue('not-a-date')).toBe('');
-    expect(fromDatetimeLocalValue('')).toBeUndefined();
-    expect(fromDatetimeLocalValue('not-a-date')).toBeUndefined();
+  it('캘린더 칸의 건수는 카드에 표시되는 KST 날짜와 같은 칸에 잡힌다', () => {
+    const items = [
+      schedule({ id: 'late-night', startAt: KST_OCT4_0030, endAt: '2026-10-03T17:30:00.000Z' }),
+      schedule({ id: 'evening', startAt: KST_OCT3_2359, endAt: '2026-10-03T16:00:00.000Z' }),
+    ];
+    const days = buildScheduleCalendarMonth(items, new Date(2026, 9, 1), '2026-10-01').weeks.flat();
+    expect(days.find((day) => day.dateKey === '2026-10-03')?.scheduleCount).toBe(1);
+    expect(days.find((day) => day.dateKey === '2026-10-04')?.scheduleCount).toBe(1);
+
+    const listItems = items.map((item) => toScheduleListItemModel(item, 'team-1'));
+    expect(listItems.find((item) => item.id === 'late-night')?.dateKey).toBe('2026-10-04');
+    expect(listItems.find((item) => item.id === 'evening')?.dateKey).toBe('2026-10-03');
+  });
+
+  it('kstMonthStart 는 KST 기준 이번 달 1일을 돌려준다 (UTC 로는 아직 전달)', () => {
+    const month = kstMonthStart(new Date('2026-09-30T15:30:00.000Z'));
+    expect([month.getFullYear(), month.getMonth(), month.getDate()]).toEqual([2026, 9, 1]);
   });
 });
 
 describe('team-schedules view-model — calendar month grid', () => {
   it('builds a 6-week grid whose day-count buckets match the input schedules', () => {
-    // 로컬 Date 생성자로 만든 시각을 그대로 왕복시킨다 — 하드코딩된 UTC ISO 문자열 두 개가
-    // "같은 날"인지는 실행 환경의 타임존에 따라 갈릴 수 있어(예: UTC-8에서
-    // 2026-08-05T01:00:00Z는 전날 오후로 밀린다), 로컬 생성자를 쓰면 인코딩(테스트 데이터
-    // 준비)과 디코딩(dateKeyOf의 로컬 getter 판독)이 항상 같은 로컬 달력을 가리켜
-    // 실행 타임존과 무관하게 안정적이다.
     const items = [
-      schedule({ id: 'a', startAt: new Date(2026, 7, 5, 9, 0, 0).toISOString() }),
-      schedule({ id: 'b', startAt: new Date(2026, 7, 5, 18, 0, 0).toISOString() }),
-      schedule({ id: 'c', startAt: new Date(2026, 7, 20, 9, 0, 0).toISOString() }),
+      schedule({ id: 'a', startAt: '2026-08-05T00:00:00.000Z' }),
+      schedule({ id: 'b', startAt: '2026-08-05T09:00:00.000Z' }),
+      schedule({ id: 'c', startAt: '2026-08-20T00:00:00.000Z' }),
     ];
     const model = buildScheduleCalendarMonth(items, new Date(2026, 7, 1), '2026-08-01');
 
@@ -249,10 +296,8 @@ describe('team-schedules view-model — calendar month grid', () => {
     expect(model.weeks.every((week) => week.length === 7)).toBe(true);
 
     const allDays = model.weeks.flat();
-    const aug5 = allDays.find((day) => day.dateKey === dateKeyOf(items[0].startAt));
-    expect(aug5?.scheduleCount).toBe(2);
-    const aug20 = allDays.find((day) => day.dateKey === dateKeyOf(items[2].startAt));
-    expect(aug20?.scheduleCount).toBe(1);
+    expect(allDays.find((day) => day.dateKey === '2026-08-05')?.scheduleCount).toBe(2);
+    expect(allDays.find((day) => day.dateKey === '2026-08-20')?.scheduleCount).toBe(1);
 
     // 데이터가 없는 날짜는 0건으로 남아야 한다 (합계가 새지 않는지 확인)
     const totalCounted = allDays.reduce((sum, day) => sum + day.scheduleCount, 0);
@@ -268,5 +313,60 @@ describe('team-schedules view-model — calendar month grid', () => {
 
     const inMonthCount = allDays.filter((day) => day.inCurrentMonth).length;
     expect(inMonthCount).toBe(31); // 2026-08 has 31 days
+  });
+});
+
+describe('attendanceLockedReason', () => {
+  it('취소된 일정은 종료가 아니라 취소라고 말한다', () => {
+    expect(attendanceLockedReason('CANCELLED', false)).toBe('취소된 일정이라 참석 여부를 바꿀 수 없어요.');
+    expect(attendanceLockedReason('CANCELLED', true)).toBe('취소된 일정이라 참석 여부를 바꿀 수 없어요.');
+  });
+
+  it('완료된 일정은 종료, 예정된 일정은 마감 여부로만 갈린다', () => {
+    expect(attendanceLockedReason('COMPLETED', false)).toBe('이미 종료된 일정이라 참석 여부를 바꿀 수 없어요.');
+    expect(attendanceLockedReason('SCHEDULED', true)).toBe('참석 신청 마감 시간이 지났어요.');
+    expect(attendanceLockedReason('SCHEDULED', false)).toBeNull();
+  });
+});
+
+describe('scheduleOpponentTeamName — 일정을 가진 팀 기준의 상대 (W3-V8)', () => {
+  // 매치 상세 모양 그대로: approvedOpponentTeam 은 호스트 기준 상대다.
+  const friendly = {
+    hostTeamId: 'team-host',
+    hostTeamName: '팀관리 테스트',
+    hostTeam: { teamId: 'team-host', name: '팀관리 테스트' },
+    approvedOpponentTeam: { teamId: 'team-guest', name: '마포 FC' },
+  };
+
+  it('호스트 팀 일정에서는 신청(원정) 팀이 상대다 (대조군)', () => {
+    expect(scheduleOpponentTeamName(friendly, 'team-host')).toBe('마포 FC');
+  });
+
+  it('신청(원정) 팀 일정에서는 호스트 팀이 상대다 — 자기 팀 이름이 나오지 않는다', () => {
+    expect(scheduleOpponentTeamName(friendly, 'team-guest')).toBe('팀관리 테스트');
+  });
+
+  it('리그 대진(원정 쪽)도 같은 규칙이다 — 호스트 객체가 없으면 hostTeamName 으로', () => {
+    const league = { hostTeamId: 'team-a', hostTeamName: '성수 FC', hostTeam: null, approvedOpponentTeam: { teamId: 'team-b', name: '망원 FC' } };
+    expect(scheduleOpponentTeamName(league, 'team-b')).toBe('성수 FC');
+    expect(scheduleOpponentTeamName(league, 'team-a')).toBe('망원 FC');
+  });
+
+  it('상대가 확정되지 않았거나, 보는 팀이 어느 쪽도 아니면 null', () => {
+    expect(scheduleOpponentTeamName({ ...friendly, approvedOpponentTeam: null }, 'team-host')).toBeNull();
+    expect(scheduleOpponentTeamName(friendly, 'team-other')).toBeNull();
+    expect(scheduleOpponentTeamName(undefined, 'team-host')).toBeNull();
+  });
+});
+
+describe('scheduleCancelNoticeLine — 서버 취소 알림 수신자와 같은 말', () => {
+  it('전체 공개 일정에 승인된 용병이 있으면 용병도 알림을 받는다고 말한다', () => {
+    expect(scheduleCancelNoticeLine('PUBLIC', 2)).toBe('팀원과 승인된 용병에게 알림이 가요.');
+  });
+
+  it('승인된 용병이 없거나, 공개가 아닌 일정이면 용병을 말하지 않는다 — 비공개 일정 용병에겐 서버도 보내지 않는다', () => {
+    expect(scheduleCancelNoticeLine('PUBLIC', 0)).toBe('팀원에게 알림이 가요.');
+    expect(scheduleCancelNoticeLine('TEAM', 3)).toBe('팀원에게 알림이 가요.');
+    expect(scheduleCancelNoticeLine('MEMBERS', 3)).toBe('팀원에게 알림이 가요.');
   });
 });

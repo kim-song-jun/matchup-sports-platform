@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentSponsor } from '@/types/api';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { TournamentSponsorSection } from './tournament-sponsor-section';
 import styles from './tournament-sponsor-section.module.css';
 
@@ -14,8 +15,8 @@ describe('TournamentSponsorSection', () => {
 
     const logo = container.querySelector(`.${styles.logo}`);
     expect(logo).not.toHaveTextContent('서울');
-    expect(logo?.querySelector('img')).toHaveAttribute(
-      'src',
+    // next/image 전환(U15) 이후 실제 DOM src는 `/_next/image?url=...`로 재작성된다.
+    expect(resolveNextImageSrc(logo?.querySelector('img'))).toBe(
       '/uploads/2026/08/transparent-logo.webp',
     );
   });

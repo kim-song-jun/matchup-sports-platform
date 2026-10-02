@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
+import { displayInitials } from '@/lib/display-initials';
 import type { V1TournamentSponsor } from '@/types/api';
 import styles from './tournament-sponsor-logo-strip.module.css';
 
@@ -78,16 +79,9 @@ function SponsorLogo({ logoUrl, name }: { logoUrl: string; name: string }) {
   );
 }
 
+/** 두 단어 이상이면 단어마다 첫 글자("Alpha Partner" → "AP"), 아니면 앞 두 글자. */
 function getSponsorInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-
-  if (words.length > 1) {
-    return words
-      .slice(0, 2)
-      .map((word) => Array.from(word)[0])
-      .join('')
-      .toUpperCase();
-  }
-
-  return Array.from(words[0] ?? '후원').slice(0, 2).join('').toUpperCase();
+  const wordInitials = name.split(/\s+/).map((word) => displayInitials(word, { fallback: '' })).filter(Boolean);
+  const initials = wordInitials.length > 1 ? wordInitials.slice(0, 2).join('') : displayInitials(name, { fallback: '후원', count: 2 });
+  return initials.toUpperCase();
 }

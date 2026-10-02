@@ -1,16 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Shield,
-  Trash2,
-  UserRound,
-  Users,
-} from 'lucide-react';
+import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react';
 import {
   AdminEmpty,
   AdminPageHeader,
@@ -20,48 +13,27 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import {
-  useV1AdminMe,
   useV1AdminUser,
   useV1DeleteAdminUser,
 } from '@/hooks/use-v1-api';
+import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { formatAuthProviders, formatGender, formatOnboardingStatus, formatUserTitle } from '@/lib/format-user';
+import { mergeUserTeams } from '@/lib/admin-user-teams';
 import type { V1AdminUserDetail } from '@/types/api';
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-}
-function formatGender(gender: V1AdminUserDetail['gender']) {
-  if (gender === 'male') return '남';
-  if (gender === 'female') return '여';
-  return '성별 미등록';
-}
-
 function formatVerification(value: string | null) {
-  return value ? `인증 · ${formatDateTime(value)}` : '미인증';
+  return value ? `인증 · ${formatAdminDateTime(value)}` : '미인증';
 }
 
-
-function formatAuthProviders(providers: V1AdminUserDetail['authProviders']) {
-  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
-  const values = providers ?? [];
-  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
-}
-
+// 목록(formatUserTitle)과 다른 로직을 복제해 같은 회원이 화면마다 다른 이름으로
+// 보이던 결함 — 표기는 lib/format-user.ts 단일 소스를 쓴다.
 function userTitle(user: V1AdminUserDetail) {
-  return user.nickname ?? user.displayName ?? user.email ?? user.userId.slice(0, 8);
+  return formatUserTitle(user);
 }
 
-type TeamMembershipRole = NonNullable<V1AdminUserDetail['teamMemberships']>[number]['role'];
 
 function getTeamRoleCounts(user: V1AdminUserDetail) {
   return {
@@ -71,33 +43,32 @@ function getTeamRoleCounts(user: V1AdminUserDetail) {
   };
 }
 
-const TEAM_ROLE_LABEL: Record<TeamMembershipRole, string> = {
-  owner: '팀장',
-  manager: '운영진',
-  member: '멤버',
-};
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
-    </div>
-  );
-}
-
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const userId = params.id;
-  const { data: adminMe } = useV1AdminMe();
   const { data: user, isPending, isError, error, refetch } = useV1AdminUser(userId);
   const deleteMutation = useV1DeleteAdminUser(userId);
   const { toasts, showToast } = useAdminToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  // 어드민 모달 중 유일하게 ESC·focus trap·포커스 복원이 없던 인라인 모달 — 공용 훅으로 표준화.
+  const {
+    dialogRef: deleteDialogRef,
+    initialFocusRef: deleteReasonRef,
+    onBackdropClick: onDeleteBackdropClick,
+    // mounted/closing 을 읽지 않으면 훅이 이 컴포넌트(부모)에 살아 있는 채로
+    // 모달 DOM 만 즉시 사라진다 — 퇴장 시간 동안 화면에 아무것도 없는데
+    // 스크롤 잠금·ESC·focus trap 이 그대로 걸려 있게 된다.
+    mounted: deleteMounted,
+    closing: deleteClosing,
+  } = useModalA11y<HTMLTextAreaElement, HTMLFormElement>({
+    open: deleteOpen,
+    onClose: () => setDeleteOpen(false),
+    pending: deleteMutation.isPending,
+  });
 
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const canWrite = useAdminCanWrite();
   const canDelete = canWrite && user?.accountStatus !== 'deleted';
 
   function handleDeleteSubmit(event: FormEvent<HTMLFormElement>) {
@@ -131,6 +102,7 @@ export default function AdminUserDetailPage() {
     return (
       <>
         <AdminPageHeader
+          eyebrow="플랫폼 · 회원"
           title="회원 상세"
           action={<BackLink />}
         />
@@ -152,64 +124,55 @@ export default function AdminUserDetailPage() {
   }
 
   const teamMemberships = user.teamMemberships ?? [];
-  const leaderTeams = teamMemberships.filter((membership) => membership.role === 'owner');
+  const teams = mergeUserTeams(user.ownedTeams, teamMemberships);
   const teamRoles = getTeamRoleCounts(user);
 
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼 · 회원"
         title="회원 상세"
         description={userTitle(user)}
         action={<BackLink />}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="tm-content-enter grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="회원 상세 정보">
           <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-                  <UserRound size={16} aria-hidden="true" />
-                  회원
-                </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{userTitle(user)}</h2>
+                <h2 className="break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{userTitle(user)}</h2>
                 <p className="mt-1 break-all text-sm text-[var(--text-muted)]">{user.email ?? '이메일 없음'}</p>
               </div>
               <AdminStatusPill status={user.accountStatus} />
             </div>
 
-            <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="회원 ID" value={user.userId} />
-              <DetailRow label="이름" value={user.displayName} />
-              <DetailRow label="닉네임" value={user.nickname} />
-              <DetailRow label="이메일" value={user.email} />
-              <DetailRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
-              <DetailRow label="전화번호" value={user.phone} />
-              <DetailRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
-              <DetailRow label="성별" value={formatGender(user.gender)} />
-              <DetailRow label="생년월일" value={user.birthDate} />
-              <DetailRow label="활동 지역" value={user.displayRegion} />
-              <DetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
-              <DetailRow label="온보딩" value={user.onboardingStatus} />
-              <DetailRow label="가입일" value={formatDateTime(user.createdAt)} />
-              <DetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
-              <DetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />
-              <DetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
+            <dl className="mt-4">
+              <DefinitionRow label="회원 ID" value={user.userId} />
+              <DefinitionRow label="이름" value={user.displayName} />
+              <DefinitionRow label="닉네임" value={user.nickname} />
+              <DefinitionRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
+              <DefinitionRow label="전화번호" value={user.phone} />
+              <DefinitionRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
+              <DefinitionRow label="성별" value={formatGender(user.gender)} />
+              <DefinitionRow label="생년월일" value={user.birthDate} />
+              <DefinitionRow label="활동 지역" value={user.displayRegion} />
+              <DefinitionRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
+              <DefinitionRow label="온보딩" value={formatOnboardingStatus(user.onboardingStatus)} />
+              <DefinitionRow label="가입일" value={formatAdminDateTime(user.createdAt)} />
+              <DefinitionRow label="최근 로그인" value={formatAdminDateTime(user.lastLoginAt)} />
+              <DefinitionRow label="삭제일" value={formatAdminDateTime(user.deletedAt)} />
+              <DefinitionRow label="관리자 권한" value={user.adminRole ?? '없음'} />
+              {user.bio ? <DefinitionRow label="소개" value={<span className="whitespace-pre-wrap">{user.bio}</span>} /> : null}
             </dl>
-            {user.bio ? (
-              <div className="mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-                <p className="text-xs font-semibold text-gray-400">소개</p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">{user.bio}</p>
-              </div>
-            ) : null}
           </article>
 
           {user.withdrawalRequest ? (
             <section className="rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-5" aria-label="탈퇴 요청 메시지">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[17px] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
+                <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
                 <time className="text-xs font-semibold text-[var(--orange700)]">
-                  {formatDateTime(user.withdrawalRequest.requestedAt)}
+                  {formatAdminDateTime(user.withdrawalRequest.requestedAt)}
                 </time>
               </div>
               <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">
@@ -218,62 +181,66 @@ export default function AdminUserDetailPage() {
             </section>
           ) : null}
 
-          <section className="grid gap-4 lg:grid-cols-2">
-            <RelatedList
-              title="최근 생성 매치"
-              empty="최근 생성한 매치가 없어요."
-              items={user.hostedMatches.map((match) => ({
-                id: match.matchId,
-                title: match.title,
-                meta: `${match.status} · ${formatDateTime(match.startAt)}`,
-              }))}
-            />
-            <RelatedList
-              title="생성/소유 팀"
-              empty="생성하거나 소유한 팀이 없어요."
-              items={user.ownedTeams.map((team) => ({
-                id: team.teamId,
-                title: team.name,
-                meta: `${team.status} · 멤버 ${team.memberCount}`,
-              }))}
-            />
-            <RelatedList
-              title="팀장으로 속한 팀"
-              empty="팀장 역할의 소속팀이 없어요."
-              items={leaderTeams.map((membership) => ({
-                id: membership.membershipId,
-                title: membership.name,
-                meta: `${membership.status} · 멤버 ${membership.memberCount}`,
-              }))}
-            />
-            <RelatedList
-              title="소속팀"
-              empty="소속팀이 없어요."
-              items={teamMemberships.map((membership) => ({
-                id: membership.membershipId,
-                title: membership.name,
-                meta: `${TEAM_ROLE_LABEL[membership.role]} · ${membership.status} · 멤버 ${membership.memberCount}`,
-              }))}
-            />
-          </section>
+          <ListSection
+            title={`소속 팀 ${teams.length}개`}
+            manageHref="/admin/teams"
+            manageLabel="팀 관리"
+            empty="소속하거나 소유한 팀이 없어요."
+          >
+            {teams.map((team) => (
+              <ListRow
+                key={team.teamId}
+                href={`/admin/teams/${encodeURIComponent(team.teamId)}`}
+                title={team.name}
+                meta={
+                  <>
+                    <span>멤버 {team.memberCount}</span>
+                    <AdminStatusPill status={team.status} />
+                  </>
+                }
+                tags={team.roleLabel ? [team.roleLabel] : []}
+              />
+            ))}
+          </ListSection>
+
+          <ListSection
+            title={user.hostedMatches.length > 0 ? `최근 매치 ${user.hostedMatches.length}개` : '최근 매치'}
+            manageHref="/admin/matches"
+            manageLabel="매치 관리"
+            empty="최근 생성한 매치가 없어요."
+          >
+            {user.hostedMatches.map((match) => (
+              <ListRow
+                key={match.matchId}
+                href={`/admin/matches/${encodeURIComponent(match.matchId)}`}
+                title={match.title}
+                meta={
+                  <>
+                    <AdminStatusPill status={match.status} />
+                    <span>{formatAdminDateTime(match.startAt)}</span>
+                  </>
+                }
+              />
+            ))}
+          </ListSection>
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="회원 운영 정보">
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">활동 요약</h2>
-            <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
-              <SummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
-              <SummaryItem icon={<Shield size={16} />} label="팀장 팀" value={teamRoles.owner} />
-              <SummaryItem icon={<Shield size={16} />} label="운영진 팀" value={teamRoles.manager} />
-              <SummaryItem icon={<Users size={16} />} label="소속팀 전체" value={teamMemberships.length} />
-              <SummaryItem icon={<Users size={16} />} label="일반 멤버 팀" value={teamRoles.member} />
-              <SummaryItem icon={<Clock size={16} />} label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">활동 요약</h2>
+            <dl className="mt-2">
+              <DefinitionRow label="개설 매치" value={user.hostedMatchCount} />
+              <DefinitionRow label="소유 팀(보관 포함)" value={user.ownedTeamCount} />
+              <DefinitionRow label="팀장 팀" value={teamRoles.owner} />
+              <DefinitionRow label="매니저 팀" value={teamRoles.manager} />
+              <DefinitionRow label="소속팀 전체" value={teamMemberships.length} />
+              <DefinitionRow label="일반 멤버 팀" value={teamRoles.member} />
+              <DefinitionRow label="리뷰 수" value={user.reputationSummary?.reviewCount ?? 0} />
             </dl>
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">삭제 처리</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">삭제 처리</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
               삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남아요.
             </p>
@@ -290,23 +257,26 @@ export default function AdminUserDetailPage() {
         </aside>
       </div>
 
-      {deleteOpen ? (
+      {deleteMounted ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget && !deleteMutation.isPending) setDeleteOpen(false);
-          }}
+          className={`tm-modal-scrim fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4${
+            deleteClosing ? ' is-closing' : ''
+          }`}
+          onClick={onDeleteBackdropClick}
         >
           <form
+            ref={deleteDialogRef}
             onSubmit={handleDeleteSubmit}
             // 전수검수: bg-white가 다크에서 안 뒤집혀 안의 text-[var(--text-strong)] 등이
             // 근접색이 되던 회귀 — 다른 어드민 모달들과 동일하게 --card-surface로 교체.
-            className="w-full max-w-[440px] rounded-2xl bg-[var(--card-surface)] p-5 shadow-[var(--shadow-modal)]"
+            className={`tm-modal-panel w-full max-w-[440px] rounded-2xl bg-[var(--card-surface)] p-5 shadow-[var(--shadow-modal)]${
+              deleteClosing ? ' is-closing' : ''
+            }`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-user-title"
           >
-            <h2 id="delete-user-title" className="text-[18px] font-bold text-[var(--text-strong)]">회원 삭제</h2>
+            <h2 id="delete-user-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">회원 삭제</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
               {userTitle(user)} 회원을 삭제 처리합니다. 되돌리려면 별도 상태 변경과 계정 확인이 필요해요.
             </p>
@@ -314,6 +284,7 @@ export default function AdminUserDetailPage() {
               삭제 사유
             </label>
             <textarea
+              ref={deleteReasonRef}
               id="delete-user-reason"
               value={deleteReason}
               onChange={(event) => setDeleteReason(event.target.value)}
@@ -361,44 +332,81 @@ export default function AdminUserDetailPage() {
   }
 }
 
-function SummaryItem({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
+function DefinitionRow({ label, value }: { label: string; value: ReactNode }) {
+  const isEmpty = value === null || value === undefined || value === '';
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="text-gray-400" aria-hidden="true">{icon}</span>
-        {label}
-      </dt>
-      <dd className="text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
+    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-t border-[var(--border)] py-2.5 first:border-t-0">
+      <dt className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">{label}</dt>
+      <dd className="break-words text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{isEmpty ? '-' : value}</dd>
     </div>
   );
 }
 
-function RelatedList({
+function ListSection({
   title,
+  manageHref,
+  manageLabel,
   empty,
-  items,
+  children,
 }: {
   title: string;
+  manageHref: string;
+  manageLabel: string;
   empty: string;
-  items: Array<{ id: string; title: string; meta: string }>;
+  children: ReactNode[];
 }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
-      <h2 className="text-[17px] font-bold text-[var(--text-strong)]">{title}</h2>
-      {items.length > 0 ? (
-        <ol className="mt-4 flex flex-col gap-2">
-          {items.map((item) => (
-            <li key={item.id} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-              <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{item.title}</p>
-              <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{item.meta}</p>
-            </li>
-          ))}
-        </ol>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{title}</h2>
+        <Link
+          href={manageHref}
+          className="inline-flex min-h-[44px] items-center gap-0.5 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        >
+          {manageLabel}
+          <ChevronRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      {children.length > 0 ? (
+        <ul className="mt-1">{children}</ul>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
-          {empty}
-        </div>
+        <p className="py-6 text-center text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">{empty}</p>
       )}
     </section>
+  );
+}
+
+function ListRow({
+  href,
+  title,
+  meta,
+  tags,
+}: {
+  href: string;
+  title: string;
+  meta: ReactNode;
+  tags?: string[];
+}) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-[var(--border)] py-3 first:border-t-0">
+      <div className="min-w-0">
+        <Link
+          href={href}
+          className="break-words text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        >
+          {title}
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">{meta}</div>
+      </div>
+      {tags && tags.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <span key={tag} className="rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-bold text-[var(--blue700)]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </li>
   );
 }

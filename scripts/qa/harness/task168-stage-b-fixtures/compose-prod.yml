@@ -1,0 +1,47 @@
+# Minimal stand-in for deploy/docker-compose.prod.yml's v1_postgres/v1_api/
+# v1_game_operations_worker shape — same service names, same restart:always,
+# same ${V1_DB_HOST:-v1_postgres}-overridable DATABASE_URL host convention
+# the real runner's DB-target-authenticity check relies on.
+services:
+  v1_postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${V1_DB_USER}
+      POSTGRES_PASSWORD: ${V1_DB_PASSWORD}
+      POSTGRES_DB: ${V1_DB_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${V1_DB_USER} -d ${V1_DB_NAME}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    labels:
+      com.teameet.task168.harness: ${TEAMEET_HARNESS_RUN_ID}
+
+  v1_api:
+    image: ${V1_API_IMAGE}
+    restart: always
+    entrypoint: ["sh", "-c", "sleep infinity"]
+    environment:
+      DATABASE_URL: postgresql://${V1_DB_USER}:${V1_DB_PASSWORD}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME}
+    depends_on:
+      v1_postgres:
+        condition: service_healthy
+    labels:
+      com.teameet.task168.harness: ${TEAMEET_HARNESS_RUN_ID}
+
+  v1_game_operations_worker:
+    image: ${V1_API_IMAGE}
+    restart: always
+    entrypoint: ["sh", "-c", "sleep infinity"]
+    environment:
+      DATABASE_URL: postgresql://${V1_DB_USER}:${V1_DB_PASSWORD}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME}
+    depends_on:
+      v1_postgres:
+        condition: service_healthy
+    labels:
+      com.teameet.task168.harness: ${TEAMEET_HARNESS_RUN_ID}
+
+networks:
+  default:
+    labels:
+      com.teameet.task168.harness: ${TEAMEET_HARNESS_RUN_ID}

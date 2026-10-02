@@ -45,7 +45,8 @@ function makeRoom(visibleFromAt: Date | null = new Date('1970-01-01T00:00:00.000
 describe('ChatService room polish', () => {
   let service: ChatService;
   let prisma: {
-    v1ChatRoom: { findFirst: jest.Mock; update: jest.Mock };
+    v1ChatRoom: { findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    v1Match: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
     v1ChatMessage: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; count: jest.Mock };
     v1ChatRoomParticipant: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
@@ -54,9 +55,20 @@ describe('ChatService room polish', () => {
     $transaction: jest.Mock;
   };
 
+  let realtime: { emitToUser: jest.Mock };
+
   beforeEach(async () => {
+    realtime = { emitToUser: jest.fn() };
     prisma = {
-      v1ChatRoom: { findFirst: jest.fn(), update: jest.fn() },
+      v1ChatRoom: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+      v1Match: {
+        // 열람 시작(matchChatHistory) — 승인 시각이 없는 참가자: 예전처럼 입장 시각부터 보인다.
+        findUnique: jest.fn().mockResolvedValue({ hostUserId: 'host-user', participants: [] }),
+        findFirst: jest.fn().mockResolvedValue({
+          hostUserId: 'host-user',
+          participants: [{ userId: userA.id, role: 'participant' }],
+        }),
+      },
       v1MatchParticipant: { findFirst: jest.fn().mockResolvedValue({ id: 'match-participant-a' }) },
       v1ChatMessage: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), count: jest.fn() },
       v1ChatRoomParticipant: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -71,7 +83,7 @@ describe('ChatService room polish', () => {
       providers: [
         ChatService,
         { provide: PrismaService, useValue: prisma },
-        { provide: RealtimeGateway, useValue: { emitToUser: jest.fn() } },
+        { provide: RealtimeGateway, useValue: realtime },
         { provide: WebPushService, useValue: { sendToUser: jest.fn().mockResolvedValue(undefined) } },
         { provide: getLoggerToken(ChatService.name), useValue: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() } },
       ],
@@ -80,48 +92,61 @@ describe('ChatService room polish', () => {
     service = module.get(ChatService);
   });
 
-  it('creates a joined system notice when a participant first enters the room', async () => {
-    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom(null));
-    prisma.v1ChatMessage.create.mockResolvedValue({
-      id: 'join-1',
-      chatRoomId: 'room-1',
-      senderUserId: userA.id,
-      body: 'Alice joined',
-      status: 'sent',
-      messageType: 'system',
-      systemEventType: 'joined',
-      sentAt: new Date('2026-06-21T10:01:00Z'),
-    });
-    prisma.v1ChatRoom.update.mockResolvedValue({});
+  /** 처음 여는 개인매치 참가자(열람 경계 없음) — 승인 시각 09:00, 방 생성 08:00. */
+  function firstEntryAfterApproval(existingJoinedLines: number) {
+    const approvedAt = new Date('2026-06-21T09:00:00Z');
+    prisma.v1ChatRoom.findFirst.mockResolvedValue({ ...makeRoom(null), createdAt: new Date('2026-06-21T08:00:00Z') });
+    prisma.v1Match.findUnique.mockResolvedValue({ hostUserId: 'host-user', participants: [{ approvedAt }] });
+    prisma.v1ChatMessage.count.mockResolvedValue(existingJoinedLines);
+    prisma.v1ChatMessage.create.mockImplementation(async ({ data }: { data: { sentAt: Date } }) => ({
+      id: 'join-1', body: 'Alice님이 들어왔어요', sentAt: data.sentAt,
+    }));
     prisma.v1ChatRoomParticipant.updateMany.mockResolvedValue({ count: 1 });
-    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue({ visibleFromAt: new Date('2026-06-21T10:01:00Z') });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue({ visibleFromAt: approvedAt });
     prisma.v1ChatMessage.findMany.mockResolvedValue([]);
-    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([]);
+    prisma.v1ChatRoom.findUnique.mockResolvedValue({
+      id: 'room-1', matchId: 'match-1', teamId: null, teamMatchId: null, teamMatch: null, teamContactId: null, teamContact: null,
+    });
+    // 입장 줄 전달 대상 조회(보낸 사람 제외)에는 B 가 남아 있고, 목록용 참여자 조회는 비어 있다.
+    prisma.v1ChatRoomParticipant.findMany.mockImplementation(async ({ where }: { where: { userId?: { not: string } } }) =>
+      where.userId?.not === userA.id ? [{ userId: userB.id }] : [],
+    );
+    return approvedAt;
+  }
+
+  it('개인매치 참가자가 방을 처음 열면 \'들어왔어요\'를 입장 시각이 아니라 참가 승인 시각에 남긴다', async () => {
+    const approvedAt = firstEntryAfterApproval(0);
 
     await service.messages(userA, 'room-1', { limit: 30 });
+    await new Promise(setImmediate);
 
     expect(prisma.v1ChatRoomParticipant.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'participant-a', visibleFromAt: null },
-        data: { visibleFromAt: expect.any(Date) },
-      }),
+      expect.objectContaining({ where: { id: 'participant-a', visibleFromAt: null }, data: { visibleFromAt: approvedAt } }),
     );
-    expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          chatRoomId: 'room-1',
-          senderUserId: userA.id,
-          messageType: 'system',
-          systemEventType: 'joined',
-          sentAt: expect.any(Date),
-        }),
-      }),
-    );
-    expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { chatRoomId: 'room-1', sentAt: { gte: expect.any(Date) } },
-      }),
-    );
+    expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ chatRoomId: 'room-1', senderUserId: userA.id, messageType: 'system', systemEventType: 'joined', sentAt: approvedAt }),
+    }));
+    // 지난 시각의 줄 — 방 목록 정렬(lastMessageAt)은 더 늦을 때만 밀고, 열려 있는 방에 실시간으로 밀어 넣지 않는다.
+    expect(prisma.v1ChatRoom.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'room-1', OR: [{ lastMessageAt: null }, { lastMessageAt: { lt: approvedAt } }] },
+    }));
+    expect(prisma.v1ChatRoom.update).not.toHaveBeenCalled();
+    expect(realtime.emitToUser).not.toHaveBeenCalled();
+  });
+
+  it('이미 \'들어왔어요\'가 있는 참가자가 방을 나갔다 다시 열면 지금 시각에 남기고 다른 참여자에게 실시간으로 알린다', async () => {
+    const approvedAt = firstEntryAfterApproval(1);
+
+    await service.messages(userA, 'room-1', { limit: 30 });
+    await new Promise(setImmediate);
+
+    const sentAt = prisma.v1ChatMessage.create.mock.calls[0][0].data.sentAt as Date;
+    expect(sentAt.getTime()).toBeGreaterThan(approvedAt.getTime());
+    expect(prisma.v1ChatRoom.update).toHaveBeenCalled();
+    // 저장한 입장 줄이 방의 다른 참여자에게 chat:message 로 뜬다 — 들어온 본인은 받지 않는다.
+    expect(realtime.emitToUser.mock.calls).toEqual([
+      [userB.id, 'chat:message', expect.objectContaining({ messageId: 'join-1', roomId: 'room-1', messageType: 'system', systemEventType: 'joined' })],
+    ]);
   });
 
   it('returns visible messages with Kakao-style unread counts', async () => {
@@ -161,12 +186,69 @@ describe('ChatService room polish', () => {
 
     expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { chatRoomId: 'room-1', sentAt: { gte: visibleFromAt } },
+        where: expect.objectContaining({ chatRoomId: 'room-1', sentAt: { gte: visibleFromAt } }),
       }),
     );
     expect(result.items).toEqual([
       expect.objectContaining({ messageId: 'message-1', messageType: 'text', unreadCount: 1 }),
       expect.objectContaining({ messageId: 'join-1', messageType: 'system', systemEventType: 'joined', unreadCount: 0 }),
+    ]);
+  });
+
+  it('사진 메시지는 imageUrl 을 싣고 읽지 않은 수에 들어간다 — 숨김 메시지는 사진도 내리지 않는다', async () => {
+    const visibleFromAt = new Date('2026-06-21T09:00:00Z');
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom(visibleFromAt));
+    const imageMessage = (id: string, status: string) => ({
+      id,
+      chatRoomId: 'room-1',
+      senderUserId: userA.id,
+      body: '사진',
+      status,
+      messageType: 'image',
+      systemEventType: null,
+      sentAt,
+      attachmentAsset: { url: `/uploads/2026/10/${id}.jpg` },
+      senderUser: { id: userA.id, profile: { nickname: 'Alice', displayName: null, profileImageUrl: null } },
+    });
+    prisma.v1ChatMessage.findMany.mockResolvedValue([imageMessage('photo-1', 'sent'), imageMessage('photo-2', 'hidden')]);
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([
+      { userId: userA.id, visibleFromAt, lastReadMessage: { sentAt } },
+      { userId: userB.id, visibleFromAt, lastReadMessage: null },
+    ]);
+
+    const result = await service.messages(userA, 'room-1', { limit: 30 });
+
+    expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: expect.objectContaining({ attachmentAsset: { select: expect.objectContaining({ url: true }) } }) }),
+    );
+    expect(result.items).toEqual([
+      expect.objectContaining({ messageId: 'photo-1', messageType: 'image', content: '사진', imageUrl: '/uploads/2026/10/photo-1.jpg', unreadCount: 1 }),
+      expect.objectContaining({ messageId: 'photo-2', content: null, imageUrl: null }),
+    ]);
+  });
+
+  it('공유 메시지는 shareCard 를 싣는다 — 숨김 메시지는 카드도 내리지 않는다', async () => {
+    const visibleFromAt = new Date('2026-06-21T09:00:00Z');
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom(visibleFromAt));
+    const card = { kind: 'match', targetId: 'm-1', title: '토요일 풋살', startAt: '2026-06-27T10:00:00.000Z', place: '잠실', sub: null, route: '/matches/m-1' };
+    const shareMessage = (id: string, status: string) => ({
+      id, chatRoomId: 'room-1', senderUserId: userA.id, body: '[매치] 토요일 풋살', status, messageType: 'share',
+      systemEventType: null, sentAt, attachmentAsset: null, shareCard: card,
+      senderUser: { id: userA.id, profile: { nickname: 'Alice', displayName: null, profileImageUrl: null } },
+    });
+    prisma.v1ChatMessage.findMany.mockResolvedValue([shareMessage('share-1', 'sent'), shareMessage('share-2', 'hidden')]);
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([
+      { userId: userA.id, visibleFromAt, lastReadMessage: { sentAt } },
+      { userId: userB.id, visibleFromAt, lastReadMessage: null },
+    ]);
+
+    const result = await service.messages(userA, 'room-1', { limit: 30 });
+
+    expect(result.items).toEqual([
+      expect.objectContaining({ messageId: 'share-1', messageType: 'share', shareCard: card, unreadCount: 1 }),
+      expect.objectContaining({ messageId: 'share-2', content: null, shareCard: null }),
     ]);
   });
 

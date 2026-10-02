@@ -25,7 +25,10 @@
 - `apps/v1_api/src/teams/teams.service.ts`
 - `apps/v1_api/src/teams/teams.service.spec.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
+- `apps/v1_web/src/types/api.ts`
 - `apps/v1_web/src/components/teams/**`
+- `apps/v1_web/src/app/teams/page.tsx` (dev SSR variant only)
+- `apps/v1_web/src/lib/seo-list.ts` and focused test (dev SSR variant only)
 - `docs/api/domains/teams.md`
 
 ## Forbidden Scope

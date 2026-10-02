@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { PopupsService } from '../popups/popups.service';
+import { countMonthlyGames } from '../profile/activity-counts';
+import { HomeTeamActivityService } from './home-team-activity.service';
 import { HomeQueryDto, HomeRecommendationsQueryDto } from './dto/home-query.dto';
 
 @Injectable()
@@ -10,10 +12,11 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly popupsService: PopupsService,
+    private readonly teamActivityService: HomeTeamActivityService,
   ) {}
 
   async getHome(user: V1AuthUser | null, query: HomeQueryDto) {
-    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute] =
+    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute, teamActivity] =
       await Promise.all([
         this.getViewer(user),
         this.getSummary(user),
@@ -22,6 +25,7 @@ export class HomeService {
         this.getRecentNotices(),
         this.getUnreadCount(user),
         this.getMyTeamRoute(user),
+        this.teamActivityService.forUser(user),
       ]);
 
     const featured = recommendations[0] ?? null;
@@ -29,6 +33,7 @@ export class HomeService {
     return {
       viewer,
       summary,
+      teamActivity,
       featuredMatch: featured
         ? {
             matchId: featured.matchId,
@@ -109,18 +114,9 @@ export class HomeService {
       };
     }
 
-    const monthStart = new Date();
-    monthStart.setUTCDate(1);
-    monthStart.setUTCHours(0, 0, 0, 0);
-
     const [monthlyMatches, reputation, pendingApplications] = await Promise.all([
-      this.prisma.v1MatchParticipant.count({
-        where: {
-          userId: user.id,
-          status: { in: ['active', 'completed'] },
-          match: { startAt: { gte: monthStart } },
-        },
-      }),
+      // 마이 "이번 달 경기"와 같은 집계 함수다(F85) — 홈에서 조건을 따로 두면 두 화면 숫자가 다시 갈린다.
+      countMonthlyGames(this.prisma, user.id, new Date()),
       this.prisma.v1UserReputationSummary.findUnique({
         where: { userId: user.id },
         select: { mannerScore: true, trustState: true },
@@ -142,8 +138,13 @@ export class HomeService {
     const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
     const where: Prisma.V1MatchWhereInput = {
       status: 'recruiting',
-      // 홈 추천/대표 매치는 일반 탐색과 달리 지금 신청 가능한 모집 글만 노출한다.
+      // v1에는 만료를 자동으로 다른 status로 넘기는 cron이 없어 시작 시각이 지나도 status는
+      // 계속 'recruiting'으로 남는다 — startAt 필터가 없으면 홈 히어로(featuredMatch)가 가장
+      // 오래 지난 죽은 매치를 "신청 가능"인 것처럼(만료 표시 자체가 없는 payload라 더 나쁘다)
+      // 노출한다(2026-08-27 감사 M-A-personal-match-state, matches.service.ts list()의 동일
+      // 결함과 같은 근본 원인).
       startAt: { gte: new Date() },
+      // 홈 추천/대표 매치는 일반 탐색과 달리 지금 신청 가능한 모집 글만 노출한다.
       OR: [{ deadlineAt: null }, { deadlineAt: { gte: new Date() } }],
       deletedAt: null,
       ...(input.sportId ? { sportId: input.sportId } : {}),

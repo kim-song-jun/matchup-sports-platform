@@ -305,6 +305,72 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
     },
   );
 
+  // 정원 마지막 한 자리를 두 승인이 다투는 경합은 이 파일의 다른 경합 테스트들이 덮지
+  // 않는다 -- 기존 4건은 신청(createApplication)과 모집 수정(updateRecruitment) 쪽이고,
+  // 승인(reviewApplication)의 정원 게이트는 잠금 뒤에서 approvedCount를 세는 코드가
+  // 있을 뿐 그 게이트가 실제 경합에서 지켜지는지는 고정돼 있지 않았다. 정원을 넘겨
+  // 승인되면 용병이 자리보다 많아져 팀장이 현장에서 돌려보내야 한다.
+  it(
+    '정원 마지막 자리를 두 승인이 다투면 한 건만 승인되고 나머지는 GUEST_RECRUITMENT_FULL 로 막힌다',
+    async () => {
+      const { schedule, recruitment } = await createScheduleWithRecruitment();
+      await prisma.v1ScheduleGuestRecruitment.update({
+        where: { id: recruitment.id },
+        data: { slots: 1 },
+      });
+      const applyA = await service.createApplication(
+        authUser(ids.outsider),
+        ids.team,
+        schedule.id,
+        { displayName: '마지막 자리 A' },
+        'full-race-apply-a',
+      );
+      const applyB = await service.createApplication(
+        authUser(ids.outsiderB),
+        ids.team,
+        schedule.id,
+        { displayName: '마지막 자리 B' },
+        'full-race-apply-b',
+      );
+
+      // A 의 승인이 커밋되는 동안 B 의 승인은 모집 row 잠금에서 실제로 막혀 있어야 한다 --
+      // 그래야 B 가 "A 가 이미 자리를 채웠다"를 보고 정원 게이트에 걸린다.
+      const holder = await holdRowLock(
+        prisma,
+        (tx) =>
+          tx.$queryRaw`SELECT id FROM v1_schedule_guest_recruitments WHERE schedule_id = ${schedule.id} FOR UPDATE`,
+        async (tx) => {
+          await tx.$executeRaw`UPDATE v1_schedule_guest_applications SET state = 'APPROVED'::"V1GuestApplicationState" WHERE id = ${applyA.applicationId}`;
+        },
+      );
+
+      const reviewB = service.reviewApplication(
+        authUser(ids.owner),
+        ids.team,
+        schedule.id,
+        applyB.applicationId,
+        { state: 'approved' },
+        'full-race-review-b',
+      );
+
+      // 진짜 경합이었다는 증거: 잠금이 잡혀 있는 동안 B 는 정원 확인에 도달조차 못 한다.
+      expect(await isStillPending(reviewB, 250)).toBe(true);
+
+      await holder.release();
+
+      const error = await captureFailure(() => reviewB);
+      expectHttpCode(error, 409, 'GUEST_RECRUITMENT_FULL');
+
+      // 게이트가 없었다면 여기서 2가 된다 -- 자리는 하나인데 용병 둘이 승인된 상태.
+      const approved = await prisma.v1ScheduleGuestApplication.count({
+        where: { recruitmentId: recruitment.id, state: 'APPROVED' },
+      });
+      expect(approved).toBe(1);
+      const afterB = await prisma.v1ScheduleGuestApplication.findUniqueOrThrow({ where: { id: applyB.applicationId } });
+      expect(afterB.state).toBe('PENDING');
+    },
+  );
+
   // W3's originally-reported defect (an aborted-transaction P2028 on the try/catch(P2002)
   // recovery path) required a genuine concurrent INSERT collision for the same
   // (recruitmentId, userId). The W2 fix above added a schedule-then-recruitment FOR UPDATE lock

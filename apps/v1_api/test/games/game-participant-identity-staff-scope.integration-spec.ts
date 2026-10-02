@@ -11,7 +11,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * revokeIdentityLink/grantParticipantConsent/revokeParticipantConsent used to
  * resolve the calling actor via the plain `'read'` authorization scope - the
  * same scope `getGame` uses, satisfied by any scoped tournament staff
- * assignment (field_operator, support_readonly) on a TOURNAMENT_FIXTURE game,
+ * assignment (field_operator, support_readonly) on a canonical TEAM_MATCH game,
  * even though the canonical actor-action matrix grants those roles no
  * authority over participant identity/consent at all. This spec proves a
  * dedicated `participant_identity` scope now denies those staff roles and
@@ -34,6 +34,8 @@ const ids = {
   opponentTeam: '6b000000-0000-4000-8000-000000000021',
   tournament: '6b000000-0000-4000-8000-000000000030',
   fixture: '6b000000-0000-4000-8000-000000000040',
+  hostRegistration: '6b000000-0000-4000-8000-000000000041',
+  opponentRegistration: '6b000000-0000-4000-8000-000000000042',
   fieldOperatorAssignment: '6b000000-0000-4000-8000-000000000050',
 } as const;
 
@@ -102,7 +104,7 @@ describe('Task 14 participant identity/consent scope excludes tournament staff',
     await prisma.v1AdminUser.create({
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
     });
-    await prisma.v1Sport.upsert({
+    const sport = await prisma.v1Sport.upsert({
       where: { code: 'football' },
       create: { id: ids.sport, code: 'football', name: 'Task 14 Staff Scope Football' },
       update: {},
@@ -112,21 +114,30 @@ describe('Task 14 participant identity/consent scope excludes tournament staff',
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 14 Staff Scope Host' },
-        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 14 Staff Scope Opponent' },
+        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 14 Staff Scope Host' },
+        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 14 Staff Scope Opponent' },
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Task 14 staff scope tournament', competitionConfigVersionId: configId },
+      data: { id: ids.tournament, sportId: sport.id, title: 'Task 14 staff scope tournament', competitionConfigVersionId: configId },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TournamentRegistration.create({
       data: {
-        id: ids.fixture,
+        id: ids.hostRegistration,
         tournamentId: ids.tournament,
-        round: 'group',
-        fixtureNumber: 1,
-        competitionConfigVersionId: configId,
+        teamId: ids.hostTeam,
+        appliedByUserId: ids.platformOps,
+        status: 'confirmed',
       },
+    });
+    await prisma.v1TournamentRegistration.create({
+      data: { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+    });
+    await prisma.v1TeamMatch.create({
+      data: { id: ids.fixture, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 14 canonical staff scope match', status: 'matched', startAt: new Date('2030-01-01T00:00:00.000Z'), competitionConfigVersionId: configId },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: { teamMatchId: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
     });
     // v1_require_staff_scope (see prisma/migrations/20260729000100_v1_game_operations)
     // is a DEFERRED constraint trigger that rejects any FIELD_OPERATOR
@@ -148,12 +159,12 @@ describe('Task 14 participant identity/consent scope excludes tournament staff',
         ],
       });
       await tx.v1TournamentStaffFixtureScope.create({
-        data: { assignmentId: ids.fieldOperatorAssignment, fixtureId: ids.fixture },
+        data: { assignmentId: ids.fieldOperatorAssignment, tournamentId: ids.tournament, teamMatchId: ids.fixture },
       });
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [

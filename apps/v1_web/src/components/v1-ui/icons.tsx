@@ -197,3 +197,24 @@ export function InfoCircleIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+/** 리그 이의 제기 D-day 카드에서 쓴다(U3) — 마감이 다가온다는 것을 텍스트와 함께 보강한다. */
+export function ClockIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M12 6.5 V12 L15.5 14" />
+    </SvgIcon>
+  );
+}
+
+/** 가로 ⋯ — 히어로의 관리 메뉴 입구. 점은 선이 아니라 채움이라 stroke 를 끈다. */
+export function MoreIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none" />
+    </SvgIcon>
+  );
+}

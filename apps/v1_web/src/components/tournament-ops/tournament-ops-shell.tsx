@@ -13,9 +13,16 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import type { V1TournamentStaffRole } from '@/types/api';
+import type { V1CompetitionKind, V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { competitionOpsTitle } from '@/lib/competition-kind';
 import { staffRoleLabel } from './badges';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { overlayLinkClick } from '@/lib/overlay-history';
+import { displayInitials } from '@/lib/display-initials';
+import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -59,12 +66,12 @@ function TournamentEmblem({
         aria-hidden="true"
         width={size}
         height={size}
-        style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+        style={{ width: size, height: size, borderRadius: 'var(--radius-chip)', objectFit: 'cover', flexShrink: 0 }}
       />
     );
   }
   const palette = IDENTITY_PALETTE[hashToIndex(tournamentId, IDENTITY_PALETTE.length)];
-  const initial = title?.trim()?.[0] ?? '대';
+  const initial = displayInitials(title, { fallback: '대' });
   return (
     <span
       aria-hidden="true"
@@ -72,7 +79,7 @@ function TournamentEmblem({
       style={{
         width: size,
         height: size,
-        borderRadius: 8,
+        borderRadius: 'var(--radius-chip)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -112,8 +119,8 @@ const RESULT_MANAGEMENT_DISABLED_REASON = '결과 검토·정정은 대회 운�
  * 아는 사람만 갈 수 있는 고아 라우트였다(여정 검수 major 2건). 화면을 만들 때 셸의 nav 를
  * 함께 갱신하지 않으면 같은 일이 반복되므로, 라우트를 추가하는 쪽에서 이 목록도 같이 본다.
  */
-function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavItem[] {
-  const base = `/tournament-ops/tournaments/${tournamentId}`;
+function buildNavItems(basePath: string, role: V1TournamentStaffRole): NavItem[] {
+  const base = basePath;
   const canManageResults = role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
   const resultGate = canManageResults ? {} : { disabled: true, disabledReason: RESULT_MANAGEMENT_DISABLED_REASON };
   return [
@@ -150,7 +157,7 @@ function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavIt
 }
 
 // 공용 비활성 행 — Drawer/데스크톱 사이드바 둘 다에서 쓴다.
-function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean }) {
+function NavItemDisabledRow({ item }: { item: NavItem }) {
   return (
     <button
       type="button"
@@ -160,14 +167,14 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       className={[
         'flex w-full items-center gap-3 px-4 min-h-[44px] text-sm text-left border-l-2 border-transparent',
         'text-gray-300 dark:text-gray-600 cursor-not-allowed',
-        dense ? 'py-3' : 'py-2.5',
+        'py-3',
       ].join(' ')}
     >
       <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">{item.icon}</span>
       <span className="flex flex-col items-start">
         <span>{item.label}</span>
         {item.disabledReason ? (
-          <span className="text-[var(--font-size-micro)] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
+          <span className="text-[length:var(--font-size-micro)] font-normal text-[var(--text-muted)] dark:text-gray-500">{item.disabledReason}</span>
         ) : null}
       </span>
     </button>
@@ -187,13 +194,29 @@ interface TournamentOpsShellProps {
   role: V1TournamentStaffRole;
   /** T6-2 — admin에서 들어왔으면 복귀 링크가 그리로 향한다(`_gate.tsx`가 계산해 내려준다). */
   origin: TournamentOpsOrigin;
+  /**
+   * 리그면 어드민 복귀가 리그 관리로 간다. `undefined` = 아직 모름(공개 상세 조회 중) → 어드민 복귀
+   * 링크를 잠시 숨긴다. `null` = 옛 대회 행(`kind` 미기입은 대회 쪽이다) 또는 조회 실패 → 대회 관리.
+   */
+  tournamentKind?: V1CompetitionKind | null;
 }
 
-/** T6-2 — 진입 출처별 복귀 목적지. `_gate.tsx`가 계산한 `origin`을 그대로 받는다. */
-const RETURN_TARGET: Record<TournamentOpsOrigin, (tournamentId: string) => { href: string; label: string }> = {
-  admin: (tournamentId) => ({ href: `/admin/tournaments/${encodeURIComponent(tournamentId)}`, label: '대회 관리로 돌아가기' }),
-  home: () => ({ href: '/home', label: '서비스로 돌아가기' }),
-};
+/**
+ * T6-2 — 진입 출처별 복귀 목적지. `_gate.tsx`가 계산한 `origin`을 그대로 받는다.
+ *
+ * 리그도 같은 콘솔(`/admin/live/<리그id>`)을 쓰는데 예전엔 무조건 `/admin/tournaments/<id>` 로
+ * 보냈다 — 그 화면의 어드민 상세 API 는 대회 종류만 받아 리그면 "대회 정보를 불러오지 못했어요"가 떴다.
+ */
+function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: V1CompetitionKind | null) {
+  if (origin === 'home') return { href: '/home', label: '서비스로 돌아가기' };
+  // 종류를 알기 전에 대회 관리 링크를 그리면 리그 어드민이 그걸 눌러 열리지 않는 화면으로 간다.
+  // `null`(옛 대회 행)까지 숨기면 그 대회들에서 링크가 영영 사라지므로 `undefined` 만 본다.
+  if (kind === undefined) return null;
+  const id = encodeURIComponent(tournamentId);
+  return kind === 'regular_league'
+    ? { href: `/admin/league-matches/${id}`, label: '리그 관리로 돌아가기' }
+    : { href: `/admin/tournaments/${id}`, label: '대회 관리로 돌아가기' };
+}
 
 // ── Mobile drawer ─────────────────────────────────────────────────────────
 interface DrawerProps {
@@ -204,14 +227,14 @@ interface DrawerProps {
   tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
   pathname: string;
+  /** 지금 표면(스태프/어드민)의 nav base — 경로를 하드코딩하면 다른 표면으로 튕긴다. */
+  basePath: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
-  returnHref: string;
-  returnLabel: string;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, triggerRef, returnHref, returnLabel }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, basePath, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(tournamentId, role);
+  const navItems = buildNavItems(basePath, role);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -230,14 +253,8 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
     else panel.setAttribute('inert', '');
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  useOverlayHistory({ open, onClose });
+  useTopmostEscape({ open, onEscape: onClose });
 
   useEffect(() => {
     if (!open) return;
@@ -265,10 +282,8 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
   }, [open]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (!open) return;
+    return lockBodyScroll();
   }, [open]);
 
   return (
@@ -297,14 +312,20 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 h-[52px] border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={28} />
             <div className="flex flex-col min-w-0">
-              <span className="text-[13px] font-bold text-[var(--text-strong)] truncate">
+              {/* 목업처럼 접두어가 긴 이름은 뒤쪽 식별자가 통째로 잘려 어느 대회인지
+                  구분이 안 된다("(목업) 0818-0641 조..."). truncate 는 유지하되 전체
+                  이름을 title 로 남겨 확인할 방법을 준다. */}
+              <span
+                className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate"
+                title={tournamentTitle ?? '대회 운영'}
+              >
                 {tournamentTitle ?? '대회 운영'}
               </span>
               {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
                 {staffRoleLabel(role)}
               </span>
             </div>
@@ -319,16 +340,16 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           </button>
         </div>
 
-        <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
-            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} dense />;
+            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                onClick={onClose}
+                onClick={overlayLinkClick(item.href, pathname, onClose)}
                 className={[
                   'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
@@ -337,7 +358,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                     : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -345,17 +366,6 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
             );
           })}
         </nav>
-
-        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
-          <Link
-            href={returnHref}
-            onClick={onClose}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-          >
-            <ChevronLeft size={14} aria-hidden="true" />
-            {returnLabel}
-          </Link>
-        </div>
       </div>
     </>
   );
@@ -368,13 +378,14 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
  * `/admin`과 완전히 분리된 별도 인증 경로다 — admin이 아닌 tournament_director/
  * support_readonly/platform_ops(대회 스코프)가 대상이다.
  */
-export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, origin }: TournamentOpsShellProps) {
+export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, origin, tournamentKind }: TournamentOpsShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(tournamentId, role);
+  const basePath = resolveTournamentLiveBase(pathname, tournamentId);
+  const navItems = buildNavItems(basePath, role);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
-  const returnTarget = RETURN_TARGET[origin](tournamentId);
+  const back = returnTarget(origin, tournamentId, tournamentKind);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -383,29 +394,32 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
     setDrawerOpen(false);
   }, [pathname]);
 
-  const sectionLabel = navItems.find((item) => isActive(item))?.label ?? '대회 운영';
+  const sectionLabel = navItems.find((item) => isActive(item))?.label ?? competitionOpsTitle(tournamentKind);
 
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] flex">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────── */}
       <aside
         className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="대회 운영 사이드바"
       >
-        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-2.5 min-h-[64px]">
+        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-3 min-h-[64px]">
           <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={34} />
           <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight truncate">
+            <span
+              className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] leading-tight truncate"
+              title={tournamentTitle ?? '대회 운영'}
+            >
               {tournamentTitle ?? '대회 운영'}
             </span>
             {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-            <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+            <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
               {staffRoleLabel(role)}
             </span>
           </div>
         </div>
 
-        <nav className="flex-1 py-1.5" aria-label="주 메뉴">
+        <nav className="flex-1 py-2" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
             if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
@@ -415,14 +429,14 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
+                  'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                   active
                     ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-[var(--blue700)] font-semibold'
                     : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -430,16 +444,6 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
             );
           })}
         </nav>
-
-        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
-          <Link
-            href={returnTarget.href}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-          >
-            <ChevronLeft size={14} aria-hidden="true" />
-            {returnTarget.label}
-          </Link>
-        </div>
       </aside>
 
       {/* ── Mobile off-canvas drawer (<lg) ──────────────────────────────── */}
@@ -447,20 +451,19 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <Drawer
           open={drawerOpen}
           onClose={closeDrawer}
+          basePath={basePath}
           tournamentId={tournamentId}
           tournamentTitle={tournamentTitle}
           tournamentCoverImageUrl={tournamentCoverImageUrl}
           role={role}
           pathname={pathname}
           triggerRef={hamburgerRef}
-          returnHref={returnTarget.href}
-          returnLabel={returnTarget.label}
         />
       </div>
 
       {/* ── Right column ─────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
-        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
+        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[var(--tournament-ops-mobile-header-offset)] flex items-center px-2">
           <button
             ref={hamburgerRef}
             onClick={openDrawer}
@@ -471,14 +474,30 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)] truncate px-2">
+          <span className="flex-1 text-center text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] truncate px-2">
             {sectionLabel}
           </span>
           <div className="w-[44px]" aria-hidden="true" />
         </header>
 
         <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8">
-          <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">{children}</div>
+          <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">
+            {/* 복귀 링크는 본문 맨 위 한 곳 — 예전엔 사이드바 맨 아래·모바일 메뉴 안에만 있어 "뒤로가기가
+                없다"는 제보가 나왔다. 대회 관리 상세의 "대회 목록으로"와 같은 자리·같은 모양이다. */}
+            {/* 종류 조회 중에도 자리(44px)는 잡아 둬서 링크가 생길 때 본문이 밀리지 않게 한다. */}
+            <div className="mb-4 min-h-[44px]">
+              {back ? (
+                <Link
+                  href={back.href}
+                  className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                >
+                  <ChevronLeft size={14} aria-hidden="true" />
+                  {back.label}
+                </Link>
+              ) : null}
+            </div>
+            {children}
+          </div>
         </main>
       </div>
     </div>

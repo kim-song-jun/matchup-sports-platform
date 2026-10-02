@@ -32,7 +32,7 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 - ✅ **Rank5 a11y aria**(서브에이전트): useId(admin-filter-bar·SimpleModal 3인스턴스 id 중복), role=switch(알림토글), aria-pressed(칩 4종), aria-label(채팅입력·stepper), aria-busy. `553936dc`. **Rank5 완료.**
 - ✅ **테스트 정리**(서브에이전트): 전 기존 테스트 감사 → FAKE 0(제거 불필요), home thin-smoke 강화. `553936dc`.
 - ✅ **Rank4 silent API**(서브에이전트, D3 실버그 확인): notices 실패/로딩 중 정적 mock 노출 + notifications premature empty → loading/error/ready 분기(PageSkeleton/ErrorState 재사용). `16871608`, 라이브 검증. (window.confirm→modal은 잔여.)
-- ✅ **패턴 enforcement 인프라**(pillar 1): docs/v1-coding-patterns.md + scripts/v1-pattern-check.mjs(합니다체·미정의토큰) + pnpm lint 연결. `639f68bb`. (WS6-a 에이전트 중간종료 작업의 일관성을 이 검사가 즉시 검증 — undefined 토큰 0.)
+- ✅ **패턴 enforcement 인프라**(pillar 1): docs/guides/v1-coding-patterns.md + scripts/v1-pattern-check.mjs(합니다체·미정의토큰) + pnpm lint 연결. `639f68bb`. (WS6-a 에이전트 중간종료 작업의 일관성을 이 검사가 즉시 검증 — undefined 토큰 0.)
 - ✅ **WS6-a consumer 색 토큰화**(서브에이전트): tint/scrim/overlay/brand 토큰(동일값) → matches/applications/my/auth. `d83285de`, 시각 변화 0.
 - ✅ **Rank3 dead-end CTA**(서브에이전트, D3): match-1 하드코딩 3곳 동적화 + no-op 공유버튼 2곳(navigator.share) + disabled CTA 2곳(참가관리·비밀번호찾기 Link). `26bc6849`. **Rank3 완료 → top-6 중 5개(Rank1/3/4/5/6) 완료, Rank2만 잔여.**
 - ✅ **데드코드 MatchParticipantsPageView + 'participants' state 제거**(서브에이전트, D3): match-1 하드코딩 2건 동반 제거. `d3a26ff8`.

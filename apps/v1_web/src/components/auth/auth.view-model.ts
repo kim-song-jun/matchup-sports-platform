@@ -14,7 +14,8 @@ export function getLoginViewModel(redirectPath?: string | null): LoginViewModel 
     providers: [
       { label: '카카오', background: 'var(--kakao-yellow)', foreground: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
       { label: '네이버', background: 'var(--naver-green)', foreground: 'var(--static-white)', disabled: true },
-      { label: 'Apple', background: 'var(--static-black)', foreground: 'var(--static-white)', disabled: true },
+      // Apple 은 여기 없다. 네이티브 셸에서만 동작하므로 AppleLoginButton 이 브리지 존재
+      // 여부를 보고 스스로 나타난다 — 목록에 두면 브라우저에서 영영 "준비 중" 으로 남는다.
     ],
   };
 }
@@ -134,32 +135,8 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
 export function getTermsViewModel(): TermsViewModel {
   return {
     backHref: '/login',
-    title: '가입 전에 약관을 먼저 확인해 주세요',
-    sub: '가입 전에 약관을 확인해 주세요.\n필수 약관에 동의해야 다음 단계로 넘어갈 수 있어요.',
-    agreements: [
-      {
-        title: '서비스 이용약관',
-        meta: '필수',
-        required: true,
-        checked: true,
-        detail: '팀밋 서비스 이용을 위한 기본 약관이에요.',
-      },
-      {
-        title: '개인정보 수집 및 이용 동의',
-        meta: '필수',
-        required: true,
-        checked: true,
-        detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
-      },
-      {
-        title: '위치기반서비스 이용 동의',
-        meta: '선택 · 주변 매치 추천에 사용',
-        required: false,
-        checked: false,
-        locationBased: true,
-        detail: '',
-      },
-    ],
+    title: '약관에 동의해 주세요',
+    sub: '필수 약관에 동의해야 다음 단계로 넘어갈 수 있어요.',
     primary: { label: '동의하고 회원가입하기', href: '/signup' },
   };
 }

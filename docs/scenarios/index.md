@@ -1,5 +1,65 @@
 # Teameet QA Scenario Index
 
+## 2026-10-02 — 승격 보류 후 Alpha QA
+
+[Task 182](../../.github/tasks/182-alpha-qa-continuation.md) · [실행 기록](./alpha-qa-continuation-2026-10-02.md): 관리자 전용 경기 운영 API와 공식 1:0 화면 확인. 1명 팀 편집의 정원 저장 오류 수정안은 회귀 31/31 통과, dev CI·Alpha 재검증 진행 중. 실제 Kakao OAuth·Android·역할별 명단 QA와 최신 외부 clean 리뷰는 미완. main·Production 승격은 보류.
+
+2026-10-01 마이페이지 수정: 생년월일 저장·출발 화면 복귀·비밀번호 재설정 진입 구현 및 회귀 148개 통과. dev 리뷰/배포·Alpha 재검증 대기. [MY 실행 기록](executions/my-flow-execution.md).
+
+## 2026-09-30 — 플랫폼 팀매치 공동 운영
+
+[Task 149](../../.github/tasks/149-admin-assigned-team-match.md) · [검증 시나리오](./friendly-team-match-screen-flow.md): 기존 양 팀 협업을 유지하며 운영자 공동 기록·단방향 운영 리뷰 추가. 로컬 회귀/타입 검사 진행, 실제 DB CI 및 Alpha 시각 검증 대기. DEV만 배포하며 main은 변경하지 않는다.
+
+## 2026-09-22 — 팀매치 참석명단 경기 전 Alpha QA
+
+[팀매치 참석명단 경기 전 갤러리](./team-match-attendance-roster-pre-match-gallery.md): 마포 레인저스 모집 → 송파 유나이티드 신청·승인 → 양 팀 6명 참석 확정 → 양 팀 참석명단 등록·GK 지정·제출을 실제 Alpha에서 완료했다. 1440×900/390×844 스크린샷 20장, console/page/API 오류와 가로 넘침 0건. 팀매치 전용 문구만 `참석명단`으로 바뀌며 대회·리그의 `라인업`은 유지된다.
+
+## 2026-09-19 — Android 실기기 전체 화면 감사
+
+[Android UI 감사](./android-device-ui-audit.md): Task 156, 180/180 경로 처리. 일반/관리자 계정 실기기 캡처와 390/768/1440 비교. 캡처·권한 차단·데이터 부재 및 배포 상태는 해당 문서와 Task 156에서 구분한다.
+
+## 2026-09-15 갱신 — 아래 41/42 기록은 M11 마이그레이션+alpha 데이터 전체 재생성 이전 상태다
+
+**A-M을 현재 alpha 위에서 재실측했다(Task 168 문서 참조).** 주 흐름(결과 정정→공식화→공개/양팀 전적 반영)·멱등 재실행·비관리자 403 모두 PASS. 개인 기록 반영은 대상 픽스처에 라인업 연결 골이 없어 미시도. 아래 "기본29/30 + 경계12/12"는 재생성 이전 alpha를 기준으로 한 것이라 **그 42흐름 전체가 지금 alpha에도 유효하다고 보증되지 않는다** — 이 파일은 그 재검증 전까지 참고용으로만 쓴다.
+
+## 현재 진행(구) — 41/42
+
+- **기본29/30 + 경계12/12**. S-T 실제 배정 경기 진입·도착 확인6명·시작·득점/도움·전후반·종료를 실행했다. Game ENDED v7, 결과 revision SUBMITTED/1:0/참가자6명, API3역할과 DB가 일치하며3viewport·기존 X10/S-R 증거를 합쳐 Sol PASS. 근거 `output/qa/task168/staff-tournament-runtime-review-20260912.md`.
+- PR1176은 dev03bc025 및 Alpha34664688509 SUCCESS,3viewport 신청/확인/완료 UI Sol PASS. 취소된 RSC GET3건을 기록했고 API 오류/런타임 예외는 관측되지 않았다. 열린 dev 대상 PR0.
+- 잔여 **A-M**, Phase3 최종 전환과 Task168 본체 dev·Alpha는 미완. S-T 비공개 대회의 본인 배정 Game projection 수정은 API10/Web16 및 실제 화면 PASS. 소유 런타임42722/API42780/Web42781은 S-T 후 TERM 종료,8121/3013 비점유·원본 DB연결0 확인. 테스트 launcher/child52336/52414,54169/54246,54723/54825,62893/62950도 종료 확인했다. A-M 복제 환경 준비 도구는 Sol 실행 전 검토에서 발견된 계약·보존 검사 오류를 수정 중이며 아직 실행하지 않았다.
+- 검증 한계: 최초2회 scheduled preflight는 API에 없는 필드 검사로 쓰기 전 중단했다. 성공한6개403의 이벤트 collection hash 누락은 별도 명시하고, 최종 durable verifier가 실제 이벤트 envelope/DB를 대조했다. 득점 POST 본문은 미캡처이며 실제 UI와 후속 영속 조회로 증명했다. 종료 뒤 잘못된 문구 대기 timeout은201 응답과 ENDED 상태로 구분했으며 mutation을 반복하지 않았다.
+- 아래 시점별 기록은 당시 상태다.
+
+2026-09-12 10:24 최신 집계: **39/42 = 기본27/30 + 경계12/12**. L-T는 기존 무료6명 명단/전체 출전/중복/역할 경계와 실제 유료·무료 신청201×4, 유료 확정200/DB paid, 마감409/선수 불변, 최종 확정·마감3viewport를 합쳐 Sol PASS로 완료했다. 초기 권한 로딩 안내는 정착된 권한 오류로 확대하지 않고 별도 검토한다. 근거 `output/qa/task168/leader-paid-tournament-final-review-20260912.md`. 잔여 **S-T/A-T/A-M**, Phase3 최종 전환과 Task168 본체 dev·Alpha는 미완. PR1175 dev/Alpha PASS, PR1176 CI34664210238 PASS·머지 전 Alpha 화면 확보 중. 아래 시점별 기록은 당시 상태다.
+
+2026-09-12 10:22 최신 Task168: **38/42 유지**. L-T 실제 유료/무료 신청 POST201 네 건, 입금확인200·참가확정200 및 마감 명단409/데이터 불변은 Sol PASS. 확정 내 신청/마감 명단의3viewport 최종 증거를 저장했다. 초기 권한 로딩 중 “팀장에게 요청” 표시는 실제 owner 응답 후 “제출 마감”으로 정상 전환되므로 영속적인 권한 오류와 구분해 검토 중이다. PR1175 dev/Alpha 검증 완료, PR1176(head503fba225, dev base)은7CTA 대비 수정으로 CI34664210238 진행 중이다. S-T 실행 준비 보완, A-T/A-M 및 Phase3 retirement/Task168 본체 dev·Alpha는 미완. 위09:52 문단과 아래 기록은 과거 상태이며 Task168의 최신 Progress Snapshot과 각 QA 보고서를 기준으로 한다.
+
+2026-09-12 09:40 최신 Task168: **37/42(기본25/30, 경계12/12)**. M-L은 Alpha 일반 팀원 실제 동선·읽기 전용 목록·후보 구분과 이전 로컬 탈퇴/권한/기록 보존의 복합 증거로 Sol PASS. Alpha 탈퇴/기록 연결 쓰기는 수행하지 않았다. PR1174 dev9ebb1177·Alpha 배포 및3viewport 검수 완료. 열린 dev PR은1175 하나이며 후속 수정 검증 중이다. 잔여 L-T,S-T,A-T,A-L,A-M 및 Phase3 retirement/Task168 본체 dev·Alpha는 미완. 근거 Task168 09:40 항목, `output/qa/task168/pr1174-alpha-review-20260912.md`. 아래는 과거 기록이다.
+
+2026-09-12 09:12 후속: **36/42 유지**. PR1174 dev9ebb1177 머지 완료, Alpha 배포/팀원 after 검증 진행 중. A-T 정보수정 24필드 hydration 및 3viewport/hover/disabled 시각검증, 대비5.41 보정은 Sol scoped PASS로 PR1175에 분리했으며 미머지다. 저장 지속성과 A-T 전체동선 증거는 아니다. 최신 진행은 Task168의 09:12 항목 및 `output/qa/task168/pr1174-progress-20260912.md`.
+
+2026-09-12 최신 Task168: **36/42(기본24/30, 경계12/12)**. L-L 마지막 공식 이력 팀 삭제 경계는 실제 관리자409 및 예상 오류 로그 한 행 외 123개 public 테이블 불변으로 통과했다. 기존 신청/중복/명단/알림/관리자 권한 증거와 Sol 최종 대조 완료, 전용 clone API/DB 정리 완료. 근거 `output/qa/task168/official-removal-final-proof-20260912.md`. 잔여 기본6개(M-L,L-T,S-T,A-T,A-L,A-M), Phase3최종retirement, Task168본체dev/alpha는 미완이다. 아래집계는과거기록이다.
+
+2026-09-11 운영자 후속 검증: **31/42 유지**. Field 실제 종료→SUBMITTED12명, owner UI 공식확정→정상worker 결과2건 COMPLETED→공개1:0/팀1승/개인1골 재조회. readonly/공식화 버튼·모바일배치 등 수정, Sol4이미지PASS. S-T/S-R 잔여 offline/event-CAS/역할별 허용 경로 및 Task168 본체 dev/alpha는 미완. 근거 `output/qa/task168/staff-execution-proof-20260911.md`.
+
+2026-09-11 최신 Task168: **31/42 = 기본19/30 + 경계12/12**. L-R 팀장 명단·공식 결과·팀/개인 전적 연결과 terminal 차단을 실제 Ego/API/PG로 확인했다. 개인전적17+1, 라인업55+21, 실제PG5PASS, Sol 최종PASS. 근거 `output/qa/task168/leader-records-proof.md`. 기본11개·최종schema retirement·Task168 본체 dev/alpha는 미완이며 아래는 과거 기록이다.
+
+2026-09-10 최신 Task168: **30/42 = 기본18/30 + 경계12/12**. S-A/S-V 실제 운영자 시상·후기 읽기/쓰기권한 분리와 DB불변, UI 전후3폭 검증/Sol blocker0. 기본12개·Phase3 최종 retirement·dev merge/alpha는 미완. 상세는 [Task168 문서](../../.github/tasks/168-competition-phase3-full-flow-verification.md) 참조(별도 증거 문서는 커밋되지 않았다); 아래는 과거 기록이다.
+
+2026-09-10 최신 Task168: **28/42 = 기본16/30 + 경계12/12**. L-M 기존 Ego 여정에 실제 PostgreSQL 동시 승인/신청·중복·취소/삭제·비호스트 승인 거부와 DB 불변 검증을 추가했다. 기존8 PASS + 추가2 PASS/8skip, Sol blocker0. `output/qa/task168/leader-match-proof.md`와 Task168 참조. 기본14개·Phase3 최종 retirement·dev merge/alpha는 미완이다. 아래 집계는 과거 시점 기록이다.
+
+2026-09-10 19:00 Task168: **23/42 유지**, Phase3 write seal·첫 snapshot 전 잠금·진출 edge 원본 ID/시각 보존 보강. 실제 PG 봉인2/2+full-cutover6/6+삭제 조회1/1, presenter38/38·read service45/45·backfill9/9 통과. 실제 clone CLI 봉인/재실행 및 Game/audit/fact hash 불변 확인. 사용자 흐름 추가 완료와 혼동하지 않는다. 최종 schema 제거·dev/alpha 미완; 상세 Task168 최신 기록 참조.
+
+2026-09-10 18:41 최신 Task168: **23/42 = 기본11/30 + 경계12/12**. G-R 공개 일정→정정/확정 전 경기 기록 실제 Ego 클릭, HIDDEN/동의 철회 계약, 390/768/1440px 시각 검증 완료. 익명 my-fixtures401 수정 후 console/network 오류0, 회귀3/3 및 Sol blocker0. 나머지 기본19개·Phase3 최종 retirement·dev 반영/alpha는 미완. 아래는 시점별 과거 기록이다.
+
+2026-09-10 17:34 최신 Task168: **22/42 = 기본10/30 + 경계12/12**. G-L은 실제 clone DB worker→공식fact/teamfact→public API draws1/points1→비로그인 Ego 목록/상세/일정/순위와390/768/1440px 확인으로 로컬 완료. 원본DBhash불변, 정확한 persona 재확인 증거는 Task168 참조. dev/alpha 및 Phase3 retirement는 미완.
+
+2026-09-10 17:04 Task168: **21/42 유지**. Ego로 리그 준비/진행/종료 필터와 상세 이동을 확인했고 draft desktop 빈 오른쪽 열·일정 누락을 수정하여390/768/1440px 재검증했다. 개인 기록 canonical 조회 unit17/17+actual PG3/3, 상세UI5/5 및 Sol blocker0. 정규리그 공식 결과 준비는 현재 운영 명령 계약에 맞게 수정 중이므로 G-L 전체 PASS가 아니다. dev/alpha 미반영.
+
+2026-09-10 16:44 최신 Task168 집계: **21/42 = 기본9/30 + 경계12/12**. X06 실제 Ego 응답 유실·동일 요청 재시도·DB 전체 행 불변 검증 완료. local actual API/DB 결과이며 dev merge/alpha 및 나머지 기본21흐름·Phase3 최종 retirement는 미완이다.
+
+2026-09-10 Task168: 기본 9/30 + 경계 11/12 = 20/42 유지. G-L 공개 상태·상세·빈 순위 경로와 로컬 runtime cutover를 추가 검증했으며 populated 순위 및 전체 E2E는 미완이다. dev merge/alpha 검증 완료 아님.
+
 이 문서는 실제 검증의 허브다. 개별 시나리오 체크는 각 문서에서 진행하고, 전체 상태 집계와 discussion은 이 파일에서 관리한다.
 
 ## Status Convention
@@ -15,8 +75,8 @@
 
 ## Canonical Documents
 
-- 상세 초안: [real-flow plan](./../plans/2026-04-07-real-flow-qa-scenarios.md)
-- 기술 계획 보고서: [tech-planner remediation report](./../plans/2026-04-07-tech-planner-qa-remediation-report.md)
+- 상세 초안: [real-flow plan](./../archive/v0-plans/2026-04-07-real-flow-qa-scenarios.md)
+- 기술 계획 보고서: [tech-planner remediation report](./../archive/v0-plans/2026-04-07-tech-planner-qa-remediation-report.md)
 - 실제 실행 허브: 이 문서
 
 ## Preflight
@@ -32,7 +92,10 @@
 - Isolated stack path:
   - concurrent local runner가 필요하면 `make e2e-isolated-up RUN=<id>` / `make test-e2e-isolated RUN=<id>` / `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` / `make e2e-isolated-down RUN=<id>`를 사용한다.
   - isolated helper가 run별 compose project, web/api port, auth dir, docker-postgres runtime을 직접 관리한다. shared `localhost:3013/8121` preflight를 재사용하지 않는다.
-  - 상세 절차, 병렬 실행 패턴, 트러블슈팅은 `docs/PLAYWRIGHT_E2E_RUNBOOK.md`를 기준 문서로 사용한다.
+  - 상세 절차·병렬 실행 패턴·`make e2e-isolated-*`/`qa-visual-audit-*` 트러블슈팅은
+    `docs/archive/v0-reports/playwright-e2e-runbook.md`에 있었으나 **레거시(삭제됨 — legacy-v0-final)**
+    다 — 그 Makefile 타깃·스크립트는 더 이상 존재하지 않는다. 현재 v1 E2E는 `pnpm test:e2e:v1`
+    (`e2e/v1.config.ts`, `e2e/v1-tests/`)만 지원한다.
 - E2E preflight 정책:
   - 기본: strict fail-fast (`global-setup`에서 API/Web/dev-login/docker-postgres 실패 시 즉시 종료)
   - 예외: 런타임 디버깅 목적일 때만 `E2E_ALLOW_OFFLINE=1`로 완화 실행한다. 단, 이 모드는 full suite 보장용이 아니라 page/debug 용도다.
@@ -52,9 +115,9 @@
 
 - [x] [01-auth-and-session.md](./01-auth-and-session.md) - Verified: 기존 session/auth wall/admin matrix와 신규 가입 required-profile, social required-step 409/no-write contract가 focused/live evidence로 갱신됨
 - [ ] [02-home-and-discovery.md](./02-home-and-discovery.md)
-- [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003` verified, restart-persistence follow-up remains
+- [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003/004` verified; 개인 친선매치 신청·승인·채팅·참여 기록 27상태/81스크린샷
 - [x] [04-team-and-membership.md](./04-team-and-membership.md) - Legacy stack (`apps/api`/`apps/web`): `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` verified. **v1 stack (Task 26, 2026-08-04)**: `TeamsController` route table documented; `e2e/v1-tests/team-join.spec.ts` + `team-management.spec.ts` cover list/detail/owner-menu render only, deeper apply/role-change round trip unverified
-- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - Legacy stack: partial, `TM-004` operational spec exists, stale `submitResult` contract issue is cleared, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`. **v1 stack (Task 26, 2026-08-04)**: route table + Game result-revision result flow documented; owns `E2E-TEAM-01`/`E2E-TEAM-02` (unimplemented in `e2e/v1-tests/team-match.spec.ts` as of this revision)
+- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - Legacy stack remains partial. **v1 stack:** `E2E-TEAM-01`/`E2E-TEAM-02` remain pending; Task 149's `E2E-TEAM-03` platform recruitment -> public same-ID listing -> real manager application -> admin persisted receipt is verified. The 2026-09-21 condition-parity follow-up passed headed Chrome 4/4 and captured empty/filled/detail evidence at desktop/tablet/mobile.
 - [ ] [06-mercenary-flows.md](./06-mercenary-flows.md) - not implemented in active v1: prior checked lifecycle evidence belonged to legacy `apps/api` + `apps/web`; v1 DB/API/list-create-detail flow is gated by the new-page A/B/C decision
 - [ ] [07-chat-and-notifications.md](./07-chat-and-notifications.md) - partial: `NOTI-001` verified, chat realtime/unread scenarios pending
 - [ ] [08-marketplace-and-lessons.md](./08-marketplace-and-lessons.md) - partial: `MKT-003` / `LES-003` verified, lesson user-side purchase/ownership is implemented via Task 42, but live smoke is blocked by current dev runtime and host-side reflection remains follow-up
@@ -63,21 +126,14 @@
 - [ ] [11-team-and-venue-hubs.md](./11-team-and-venue-hubs.md) - Legacy stack: partial, team/venue hub aggregate payload, flat-list affiliation context, tournaments surface, route/API smoke are verified; owner/admin interactive browser smoke remains follow-up. **v1 stack (Task 26, 2026-08-04)**: v1 has no hub/venue domain at all (confirmed by source read); closest v1 equivalents mapped to Tasks 12/18/22/24; owns `E2E-PUBLIC-01` (unimplemented in `e2e/v1-tests/tournament.spec.ts` as of this revision)
 - [ ] [12-v1-sm-new-e2e-scenarios.md](./12-v1-sm-new-e2e-scenarios.md) - partial: SM New v1 E2E 시나리오 매트릭스. Task 135의 V1-14-008 진행 중 대회 fixture 리뷰는 역할별 대상·개인화 CTA·승부차기 표시와 member-light/owner-dark 390/768/1440 실제 브라우저 6/6 증거까지 Verified
 - [ ] [19-game-operations-result-correction.md](./19-game-operations-result-correction.md) - live event correction, own goals, official timeline, penalty correction, reconnect/jersey/minute regression; headed evidence pending
-- [x] [13-v1-open-design-recovery-from-zero.md](./13-v1-open-design-recovery-from-zero.md) - Verified: Open Design Recovery From Zero completed for 109-page export, current 87-route feature implementation audit, Task 11 full parity evidence, and 2026-06-05 ULW full visual QA with 522/522 live captures plus 348/348 wide desktop captures passing
+- [x] `13-v1-open-design-recovery-from-zero.md`(문서 삭제됨 — git 이력 참고) - Verified: Open Design Recovery From Zero completed for 109-page export, current 87-route feature implementation audit, Task 11 full parity evidence, and 2026-06-05 ULW full visual QA with 522/522 live captures plus 348/348 wide desktop captures passing
 - [x] [14-policy-hardening-rules.md](./14-policy-hardening-rules.md) - Verified: POSCO MDS-derived QA policy hardening rules, GREEN contract test, CLI manual evidence, and tmux unavailable error record captured on 2026-06-07
+- [ ] [Task168 문서](../../.github/tasks/168-competition-phase3-full-flow-verification.md)(별도 시나리오 문서 없음) - 2026-09-11 Task168: **35/42 = 기본23/30 + 경계12/12**. 완료 기본: G-T·G-L·G-M·G-R·G-A·G-V·M-T·M-M·M-R·M-A·M-V·L-M·L-R·L-A·L-V·S-L·S-M·S-R·S-A·S-V·A-R·A-A·A-V. 기본7개·Phase3 최종 retirement·committed-tree/Task168 dev merge/alpha는 미완; 전체 PASS 아님. 상세 근거와 과거 진행 이력은 링크 문서 및 Task168 참조.
 - [ ] [15-focused-full-flow-test-matrix.md](./15-focused-full-flow-test-matrix.md) - in progress: Task 122가 alpha 프로필·대회 persona E2E를 canonical v1 route와 6개 상태 fixture로 좁혔고, completed detail→results→영상 tab→awards 실제 이동과 awards mobile/tablet overflow 0을 확인했다. Awards 높이 수정은 alpha 배포됐고 after 캡처가 남았다. 영상 제어·profile/upload·registration/admin permission과 exact-ID cleanup은 남음
 - [x] [16-tournament-campaigns.md](./16-tournament-campaigns.md) - Verified: API/DB/role/migration, dev lifecycle/public-admin UI/real 404/exact cleanup, campaign story·prize·motion, 375/768/1280 final alpha visual review까지 완료
-- [ ] [17-tournament-gender-wizard.md](./17-tournament-gender-wizard.md) - Implemented: 성별 카테고리·혼성 쿼터와 4단계 생성/공용 편집 계약 구현, host-gated focused/live/visual verification pending. **Task 26 (2026-08-04)**: cross-linked to `E2E-AUTH-01` (staff actor-authorization matrix, `tournament-operations-auth.md`), which this file does not itself cover
+- [ ] [17-tournament-gender-wizard.md](./17-tournament-gender-wizard.md) - Implemented: 성별 카테고리·혼성 쿼터와 4단계 생성/공용 편집 계약 구현, host-gated focused/live/visual verification pending. **Task 26 (2026-08-04)**: cross-linked to `E2E-AUTH-01` (staff actor-authorization matrix, `docs/api/domains/tournament-operations-auth.md`), which this file does not itself cover
 - [x] [18-managed-terms-v11-data-migration.md](./18-managed-terms-v11-data-migration.md) - Verified: 고정 약관 11건을 독립 v1.1 문서로 등록하고 기존 회원·대회 동의 원본/false 보존과 백필 멱등성을 검증했다. owner/ops 관리·감사, support read-only, 회원가입 정확 문서 ID 바인딩, 기존 사용자 새 필수 약관 차단/재동의, `/admin/terms` 및 재동의 화면 1440/768/390 실제 브라우저 QA까지 통과
-- [x] [native-route-parity-contract.md](./native-route-parity-contract.md) - Verified: Task 100 Wave 0 native parity contract covers all 87 current v1 web routes, backend ownership, native surface target, web reference, and implementation wave
-- [x] [native-backend-contract-audit.md](./native-backend-contract-audit.md) - Verified: Task 100 Wave 1 backend/native owner contract maps every native route `backendOwner` token to v1 API runtime, docs, or explicit native-local/deferred decision
-- [x] [native-mobile-foundation.md](./native-mobile-foundation.md) - Verified: Task 100 Wave 2 Expo SDK 56 `apps/v1_mobile` foundation exists with 87-route manifest, native API/auth/design boundaries, and no WebView dependency
-- [x] [native-core-flow.md](./native-core-flow.md) - Verified: Task 100 Wave 3 Expo native core shell renders auth, onboarding, home, matches, teams, search, and my routes with browser screenshots and route-contract regression
-- [x] [native-route-shell.md](./native-route-shell.md) - Verified: Task 100 Wave 4 all 87 native manifest routes resolve to explicit or catch-all Expo native shell coverage without claiming full business parity
-- [x] [native-auth-onboarding-flow.md](./native-auth-onboarding-flow.md) - Verified: Task 100 Wave 5 native auth/public/onboarding flow data covers 18 routes with SecureStore, Kakao deep link, DTO-compatible onboarding, honest blocked/error states, and browser screenshots
-- [x] [native-discovery-detail-flow.md](./native-discovery-detail-flow.md) - Verified: Task 100 Wave 6 native discovery/search/detail data covers 23 route patterns with API boundaries, dynamic detail matching, and browser screenshots
-- [x] [native-operations-account-realtime-flow.md](./native-operations-account-realtime-flow.md) - Verified: Task 100 Wave 7 native create/edit/account/realtime data covers 41 route patterns with API boundaries, permission/transaction honesty, realtime reconnect markers, and browser screenshots
-- [x] [native-runtime-desktop-proof.md](./native-runtime-desktop-proof.md) - Verified: Task 100 Wave 8 runtime readiness blocks unsupported iOS/Android simulator claims and proves macOS desktop preview through Expo Web
+- [x] Task 100 네이티브(Expo) 트랙 Wave 0–8 시나리오 9개 — 트랙 반려로 `apps/v1_mobile` 와 문서가 모두 제거됐다(기록은 git 이력).
 
 ## v1 Team & Tournament Operations Scenario Ledger (Task 26)
 
@@ -96,6 +152,20 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 **Screen ledger (18 screen IDs `T-01`-`T-09`/`A-01`-`A-05`/`P-01`-`P-04`) status**: the plan file (`.omo/plans/teameet-team-tournament-operations-v1.md`) states the total count (18) twice but contains no table binding each individual ID to a route/actor/backend-contract/wave/scenario/owner — that binding was Todo 1's job ("create the canonical task/screen ledger") and, if it exists, lives in a separate ledger artifact not present in the plan file itself or anywhere under `docs/scenarios/`, `docs/api/`, or `.omo/` as of this revision (grepped for literal `T-01`, `A-01`, `P-01` and markdown table rows matching them; zero hits outside the plan's two summary-count lines). This index cannot claim "screen ledger is 18/18" without that artifact; it is recorded here as **unresolved**, not silently assumed complete.
 
 ## Recommended Execution Order
+
+### 개인 매치 호스트 처리 보완 — 2026-09-19
+
+V1-03-007 승인 취소 / V1-03-008 불참 처리 2/2 구현·검증.
+확정 명단의 기존 참가자 메뉴에서 필수 사유와 확인 모달을 사용한다.
+실DB 통합 9/9, 화면 단위 8/8, headed 390/768/1440px 캡처 14장과 동작 8/8 통과.
+콘솔 error/pageerror/requestfailed/API HTTP 오류 각각 0건.
+범위·대표 스크린샷·남은 분석 항목은 [Task 130](../../.github/tasks/130-v1-match-create-edit-contract-audit.md#progress-snapshot--host-actions).
+이 결과는 개인 매치 전체 기능의 전수 완료 판정이 아니다.
+
+후속 최종 코드/계약 점검은 Task 130의 17개 항목을 확인했다. 모집 재개의 취소/완료 덮어쓰기와
+수정 저장의 버전·정원 경합을 수정했고 서비스 34/34, 실제 DB 13/13 + 추가 편집 제한 1/1 통과.
+검증 수준(코드/단위/DB/기존 브라우저/alpha 미검증)을 구분한 표를 Task 130에 유지한다.
+dev 머지와 alpha 최종 검증은 필수 리뷰 게이트 미충족으로 아직 완료하지 않았다.
 
 1. 인증 / 세션 / 권한
 2. 개인 매치
@@ -126,30 +196,21 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 | Scenario File | Primary Spec | Status |
 |---------------|--------------|--------|
-| `01-auth-and-session.md` | `e2e/tests/auth-session-matrix.spec.ts`, API/Web focused signup/onboarding suites | Verified: 기존 session matrix `Desktop Chrome 7/7`, `Mobile Chrome 7/7`; required signup API 55/55, Web 28/28, MSW 14/14; onboarding required-step/no-write 14/14; signup 390/768/1440 live evidence |
-| `02-home-and-discovery.md` | `e2e/tests/home.spec.ts`, `e2e/tests/match-discovery.spec.ts` | Home smoke passed (`Desktop Chrome`, `Mobile Chrome`), discovery deep-link/url persistence `Desktop Chrome 3/3`, `HOME-002` pending |
-| `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts` | Verified: `MATCH-001/002/003` covered (`Desktop Chrome 13/13`, `Mobile Chrome deep 2/2`) with restart-persistence follow-up |
-| `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` | TDD pack verified: `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` passed. `TEAM-003` and `TEAM-004-B/TEAM-005-C` are planned. `TM-SMOKE-001` skip lives in the same spec file but belongs to `05-team-match-flows.md`. |
-| `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-match-operations.spec.ts` | Partial: step-0 smoke exists and `TM-004` operational spec now passes live API `health`/`dev-login`, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`, so full Desktop Chrome green is pending |
-| `06-mercenary-flows.md` | `e2e/tests/mercenary-flow.spec.ts` | Partial: create -> detail redirect, unauthenticated apply redirect, apply -> host accept -> applicant status flow verified in targeted automation, but explicit reload/API-restart persistence and local Next `webServer` cold-boot instability (`.next/routes-manifest.json` / `app-paths-manifest.json` ENOENT) remain |
-| `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts` | Partial: chat room smoke verified, notification center `Desktop Chrome 3/3` verified (`match_created`, `player_joined`, `payment_confirmed`) |
-| `08-marketplace-and-lessons.md` | `e2e/tests/marketplace-flow.spec.ts` | Partial: marketplace browse smoke exists, `MKT-003` / `LES-003` visual fallback verified, lesson user-side purchase/ownership contract is implemented in Task 42, but live browser smoke is blocked by current dev runtime and host-side reflection remains follow-up |
+| `01-auth-and-session.md` | `e2e/tests/auth-session-matrix.spec.ts`(레거시·삭제됨), API/Web focused signup/onboarding suites | Verified: 기존 session matrix `Desktop Chrome 7/7`, `Mobile Chrome 7/7`; required signup API 55/55, Web 28/28, MSW 14/14; onboarding required-step/no-write 14/14; signup 390/768/1440 live evidence (레거시·삭제됨 — legacy-v0-final) |
+| `02-home-and-discovery.md` | `e2e/tests/home.spec.ts`(레거시·삭제됨), `e2e/tests/match-discovery.spec.ts`(레거시·삭제됨) | Home smoke passed (`Desktop Chrome`, `Mobile Chrome`), discovery deep-link/url persistence `Desktop Chrome 3/3`, `HOME-002` pending (레거시·삭제됨 — legacy-v0-final) |
+| `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts`(레거시·삭제됨), `scripts/docs/capture-individual-friendly-match-flow.mjs` | Verified: `MATCH-001/002/003/004`; 개인 친선매치 27상태 × 3 viewport = 81/81, runtime issue 0 (레거시·삭제됨 — legacy-v0-final) |
+| `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`(레거시·삭제됨), `e2e/tests/team-manager-membership.spec.ts`(레거시·삭제됨) | TDD pack verified: `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` passed. `TEAM-003` and `TEAM-004-B/TEAM-005-C` are planned. `TM-SMOKE-001` skip lives in the same spec file but belongs to `05-team-match-flows.md`. (레거시·삭제됨 — legacy-v0-final) |
+| `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts`(레거시·삭제됨), `e2e/tests/team-match-operations.spec.ts`(레거시·삭제됨), `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` | Partial overall: legacy and `E2E-TEAM-01/02` remain pending; v1 platform recruitment public listing/application/admin receipt is verified against isolated PostgreSQL/API/Web, Playwright desktop 1/1, and headed Chrome at 1440×900/834×1112/390×844. |
+| `06-mercenary-flows.md` | `e2e/tests/mercenary-flow.spec.ts`(레거시·삭제됨) | Partial: create -> detail redirect, unauthenticated apply redirect, apply -> host accept -> applicant status flow verified in targeted automation, but explicit reload/API-restart persistence and local Next `webServer` cold-boot instability (`.next/routes-manifest.json` / `app-paths-manifest.json` ENOENT) remain (레거시·삭제됨 — legacy-v0-final) |
+| `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts`(레거시·삭제됨), `e2e/tests/notification-center.spec.ts`(레거시·삭제됨) | Partial: chat room smoke verified, notification center `Desktop Chrome 3/3` verified (`match_created`, `player_joined`, `payment_confirmed`) (레거시·삭제됨 — legacy-v0-final) |
+| `08-marketplace-and-lessons.md` | `e2e/tests/marketplace-flow.spec.ts`(레거시·삭제됨) | Partial: marketplace browse smoke exists, `MKT-003` / `LES-003` visual fallback verified, lesson user-side purchase/ownership contract is implemented in Task 42, but live browser smoke is blocked by current dev runtime and host-side reflection remains follow-up (레거시·삭제됨 — legacy-v0-final) |
 | `09-payment-review-badge.md` | TBD review spec, `V1-14-*` in `12-v1-sm-new-e2e-scenarios.md` | Partial: Task 89 post-event review API/UI validation and route smoke complete; payment/badge verification still pending |
-| `10-profile-settings-admin.md` | `e2e/tests/admin-dashboard.spec.ts` | Partial: admin dashboard smoke exists, dashboard/users/payments/reviews honest-data runtime verified on 2026-04-11, profile/onboarding verification pending, notification preference server sync implemented with unit coverage, but live protected-route smoke is blocked by current dev runtime instability |
+| `10-profile-settings-admin.md` | `e2e/tests/admin-dashboard.spec.ts`(레거시·삭제됨) | Partial: admin dashboard smoke exists, dashboard/users/payments/reviews honest-data runtime verified on 2026-04-11, profile/onboarding verification pending, notification preference server sync implemented with unit coverage, but live protected-route smoke is blocked by current dev runtime instability (레거시·삭제됨 — legacy-v0-final) |
 | `11-team-and-venue-hubs.md` | Manual API/runtime smoke + targeted unit/typecheck | Partial: `/teams/:id/hub`, `/venues/:id/hub`, `/tournaments`, `/teams/:id`, `/venues/:id`, `/venues/:id/edit` runtime smoke and targeted tests passed on 2026-04-11, but owner/admin interactive browser flow is still follow-up |
-| `13-v1-open-design-recovery-from-zero.md` | `scripts/qa/v1-open-design-route-matrix.test.mjs`, `scripts/qa/v1-open-design-parity.mjs`, `scripts/qa/v1-open-design-desktop-visual.mjs` | Verified: `evidence/task-11-full-parity.json`, `evidence/task-11-feature-audit.json`, `output/playwright/visual-audit/task-11-open-design-full/`, focused `/home` remake evidence, 2026-06-05 recheck evidence under `evidence/open-design-recheck-20260605/`, and ULW full visual QA under `evidence/ulw-full-visual-qa-20260605/` with 522/522 live PASS and 348/348 wide desktop PASS |
+| Task 100 네이티브(Expo) 트랙 9개 + `13-v1-open-design-recovery-from-zero.md` | (제거됨 — 문서·검증 스크립트 모두 git 이력에만 있음) | 트랙 반려·문서 삭제 |
 | `15-focused-full-flow-test-matrix.md` | Manual route/API matrix + Task 122 alpha persona execution | In progress: canonical `/my`·`/my/profile/edit`와 6개 alpha 대회 상태를 고정했다. Completed detail→results→영상 tab→awards live evidence와 awards 390/768 overflow 0은 확보했다. Awards layout fix는 alpha에 배포됐고 after 캡처가 남았다. profile/upload/role mutation/media controls/admin과 exact-ID cleanup은 남았다. |
 | `16-tournament-campaigns.md` | focused campaign suites + existing dev API/DB/browser lifecycle | Verified: API/DB/role/retention/concurrency, public/admin UI, reload persistence, proxy GET/HEAD real 404, exact QA cleanup, final 375/768/1280 story·prize·CTA visual review complete |
 | `17-tournament-gender-wizard.md` | focused tournament admin/player suites + existing dev API/DB/browser lifecycle | Implemented: schema/API/wizard/shared editing and Pretendard default landed; serial focused tests and 390/768/1440 live evidence pending |
-| `native-route-parity-contract.md` | `scripts/qa/native-route-parity-contract.test.mjs`, `scripts/qa/native-architecture-contract.test.mjs` | Verified: Task 100 Wave 0 contract covers 87/87 current v1 routes and locks backend/app/web/macOS architecture references before Expo implementation starts |
-| `native-backend-contract-audit.md` | `scripts/qa/native-backend-contract-audit.test.mjs` | Verified: Task 100 Wave 1 contract covers all native route backend owner tokens, search/reviews docs drift, and deferred native backend boundaries |
-| `native-mobile-foundation.md` | `scripts/qa/native-mobile-foundation.test.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 2 Expo SDK 56 app foundation covers 87-route manifest and compiles with strict TypeScript |
-| `native-core-flow.md` | `scripts/qa/native-core-flow-contract.test.mjs`, `scripts/qa/native-mobile-web-smoke.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 3 core native shell covers 9 first-flow routes, browser-smoked 7 routes on Expo Web, and keeps Wave 0-2 contracts green |
-| `native-route-shell.md` | `scripts/qa/native-route-shell-contract.test.mjs`, `scripts/qa/native-mobile-web-smoke.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 4 native route shell covers 87/87 manifest routes with explicit core routes plus manifest catch-all; business parity remains in later waves |
-| `native-auth-onboarding-flow.md` | `scripts/qa/native-auth-flow-contract.test.mjs`, `scripts/qa/native-mobile-web-smoke.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 5 auth/public/onboarding native data covers 18 routes and browser-smoked 18 routes on Expo Web |
-| `native-discovery-detail-flow.md` | `scripts/qa/native-discovery-flow-contract.test.mjs`, `scripts/qa/native-mobile-web-smoke.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 6 discovery/search/detail native data covers 23 route patterns and browser-smoked 23 routes on Expo Web |
-| `native-operations-account-realtime-flow.md` | `scripts/qa/native-operations-flow-contract.test.mjs`, `scripts/qa/native-mobile-web-smoke.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 7 create/edit/account/realtime native data covers 41 route patterns and browser-smoked 41 concrete routes on Expo Web |
-| `native-runtime-desktop-proof.md` | `scripts/qa/native-runtime-readiness.test.mjs`, `scripts/qa/native-mobile-web-smoke.mjs`, `corepack pnpm --filter v1_mobile expo:doctor`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 8 runtime readiness gate records iOS/Android simulator blockers and browser-smokes representative native route families at macOS desktop viewport |
 
 ## Discussion
 
@@ -186,12 +247,13 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 | Date | Scenario | Result | Summary | Follow-up |
 |------|----------|--------|---------|-----------|
+| 2026-09-19 | Personal match participation lifecycle | Passed | 호스트 완료·채팅, 승인 참가자의 시작 전 철회, 완료 후 후기 진입, 확정 명단/전체 이력, 내 매치 cursor pagination을 실DB와 headed Chromium 390/768/1440에서 검증했다. API unit 52/52, Web focused 53/53, integration 5/5, 21 screenshots, 7 actions, console/network 오류 0건이다. | PR에서 `docs/screenshots/personal-match-participation/` 대표 이미지와 Task 130 계약을 검토 |
 | 2026-04-07 | Initial | Drafted | 시나리오 문서 구조 생성 완료 | 실제 실행 후 업데이트 |
-| 2026-04-07 | Auth + Home + Match + Team + Chat | Failed | 96 tests run, 3 passed, 93 failed. Main blockers were API container health failure, host Prisma DB access mismatch, and Playwright worker dependency instability. | `docs/plans/2026-04-07-qa-remediation-plan.md` 기준으로 runtime → harness → suite rerun 순서로 수정 |
-| 2026-04-07 | Auth / Home / Match / Team / Chat | Failed | Playwright 데스크톱 스모크 실행 48건 중 11건 통과, 37건 실패. 핵심 장애는 API 컨테이너 비정상, DB 포트 드리프트, Playwright 의존성 해상 실패, 일부 brittle selector. | `docs/plans/2026-04-07-agent-all-qa-remediation-plan.md` 기준으로 정리 및 수정 |
+| 2026-04-07 | Auth + Home + Match + Team + Chat | Failed | 96 tests run, 3 passed, 93 failed. Main blockers were API container health failure, host Prisma DB access mismatch, and Playwright worker dependency instability. | `docs/archive/v0-plans/2026-04-07-qa-remediation-plan.md` 기준으로 runtime → harness → suite rerun 순서로 수정 |
+| 2026-04-07 | Auth / Home / Match / Team / Chat | Failed | Playwright 데스크톱 스모크 실행 48건 중 11건 통과, 37건 실패. 핵심 장애는 API 컨테이너 비정상, DB 포트 드리프트, Playwright 의존성 해상 실패, 일부 brittle selector. | `docs/archive/v0-plans/2026-04-07-agent-all-qa-remediation-plan.md` 기준으로 정리 및 수정 |
 | 2026-04-07 | Harness hardening | Updated | `expectLoginRedirectOrLink`를 visible/canonical contract로 강화하고, `global-setup` preflight를 strict fail-fast 기본으로 전환했다. | 런타임 복구 후 auth/team/chat 묶음 재실행으로 false negative 감소 확인 |
 | 2026-04-07 | Teams unauth single run | Blocked | `E2E_ALLOW_OFFLINE=1`로 단건 실행 시도했지만 `global-setup/global-teardown`에서 `Cannot find module '@prisma/client'`로 시작 전 실패. | e2e hook의 Prisma 의존 해상 경로를 런타임 복구 단계에서 우선 정리 |
-| 2026-04-07 | Planning | Updated | tech-planner 보고서에서 dev runtime instability, API health, DB topology mismatch, Playwright drift, selector brittleness의 root cause와 수정 순서를 고정했다. | `docs/plans/2026-04-07-tech-planner-qa-remediation-report.md`를 기준선으로 build/review/QA 진행 |
+| 2026-04-07 | Planning | Updated | tech-planner 보고서에서 dev runtime instability, API health, DB topology mismatch, Playwright drift, selector brittleness의 root cause와 수정 순서를 고정했다. | `docs/archive/v0-plans/2026-04-07-tech-planner-qa-remediation-report.md`를 기준선으로 build/review/QA 진행 |
 | 2026-04-07 | Project-Director Round Gate | Planned | 이번 라운드 종료 기준을 `gate 통과 + priority rerun + 결과 재분류 + docs write-back`으로 고정했다. | runtime gate부터 순차 복구 후 findings 갱신 |
 | 2026-04-07 | Runtime recovery | Updated | API health, host Playwright resolution, DB setup/teardown topology, auth storage injection, home/chat selector 안정화를 반영했다. | priority bundle 재실행 결과를 기준으로 remaining scenario expansion 계획 수립 |
 | 2026-04-07 | Auth / Home / Match / Team / Chat | Passed | 로컬 기본 Playwright 설정을 직렬화한 뒤 Desktop Chrome priority bundle `48/48` 통과. 이전 `36/48` 및 `11/48` 실패는 주로 dev-server compile saturation과 brittle selector에서 발생한 false negative로 재분류했다. | Mobile Chrome 재실행, multi-browser matrix 확대, deeper create/join/notification flow 자동화 추가 |
@@ -199,12 +261,12 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 | 2026-04-07 | Home mobile cross-check | Passed | `home.spec.ts`를 `Mobile Chrome`에서 `14/14` 통과시켰다. 종목 칩 클릭은 모바일 숨김 중복 DOM을 피하도록 `button:visible` 계약으로 보정했다. | match/team/chat mobile coverage 확대 |
 | 2026-04-07 | Backend auth unit | Passed | `pnpm --filter api test -- auth.service.spec.ts` 재검증 후 `242/242` 통과. `findUnique` mock 누락을 수정하고 soft-delete 사용자 `dev-login` 복구 케이스를 회귀 테스트로 고정했다. | auth integration/e2e와 연결된 soft-delete edge case 추가 검토 |
 | 2026-04-07 | Persona QA | Passed | Beginner/Regular/Power/UIUX 모두 현재 validated scope에서 blocking issue를 보고하지 않았다. 남은 이슈는 deep flow coverage와 소규모 UX polish다. | `MATCH-001~003`, `TM-002~004`, `NOTI-001`, unread/read sync, restart persistence 자동화 확장 |
-| 2026-04-08 | Match deep flow | Passed with follow-up | `e2e/tests/match-join-flow.spec.ts`에서 `MATCH-001` 생성->목록/상세/내 매치/새 탭/새로고침과 `MATCH-002` 다중 컨텍스트 참가/정원 초과 차단을 Desktop Chrome `13/13`, Mobile Chrome deep `2/2`로 검증했다. 실행 중 `/matches/new`가 UI 전용 필드를 DTO 그대로 POST해 실패하던 버그를 수정했다. | `MATCH-003`용 backend patch route 추가, custom venue 지원 여부 결정, host detail live sync 검증 |
+| 2026-04-08 | Match deep flow | Passed with follow-up | `e2e/tests/match-join-flow.spec.ts`에서 `MATCH-001` 생성->목록/상세/내 매치/새 탭/새로고침과 `MATCH-002` 다중 컨텍스트 참가/정원 초과 차단을 Desktop Chrome `13/13`, Mobile Chrome deep `2/2`로 검증했다. 실행 중 `/matches/new`가 UI 전용 필드를 DTO 그대로 POST해 실패하던 버그를 수정했다. | `MATCH-003`용 backend patch route 추가, custom venue 지원 여부 결정, host detail live sync 검증 (레거시·삭제됨 — legacy-v0-final) |
 | 2026-04-08 | Photoreal fallback rollout | Passed | `/home`, `/marketplace/new`, `/my/listings`, `/matches/[id]`, `/lessons/[id]`, `/venues`, `/matches/new`, `/matches/[id]/edit`까지 실사형 로컬 fallback이 정리됐다. `sport-image` unit `21/21`, `tsc --noEmit`, 주요 페이지 `200 OK`, 디자인 `🔴 0 / 🟡 0`, QA 4개 페르소나에서 검증된 26개 체크 무실패를 확인했다. | 보호 경로 auth-injected visual smoke와 `/venues` skeleton 이후 이미지 대기 조건 보강 |
 | 2026-04-08 | Trust / Transaction / Admin remediation | Passed with scoped gaps | 결제 상세/환불은 owner-bound real data로 바뀌었고, 리뷰/뱃지에는 trust signal이 추가됐다. 유료 매치 결제는 `join -> participant -> prepare/confirm` 순서로 정렬했고, lesson/marketplace commerce는 fake success 없이 명시적 미지원으로 전환했다. 관리자 쪽은 user moderation audit log, dispute history, settlement partial-failure flow, admin team-match shell continuity를 반영했다. Backend service tests `247/247`, web `tsc --noEmit` 통과. | payment/review/badge 및 admin 시나리오의 실제 Playwright coverage 확장, lesson/marketplace commerce backend 구현 시 unsupported state 해제 |
 | 2026-04-08 | Shared media lightbox rollout | Passed with follow-up | `MediaLightbox`를 추가해 `matches/[id]`, `lessons/[id]`, `marketplace/[id]`, `teams/[id]`, `venues/[id]` 상세 이미지에서 full-screen viewer, index, keyboard navigation, backdrop close, swipe를 공통화했다. `media-lightbox` unit `7/7`, web `tsc --noEmit`, `venue` detail browser smoke(`open -> Escape close`) 통과. dedicated Playwright spec은 아직 없어 follow-up으로 남긴다. | detail image lightbox Playwright spec 추가, mobile/desktop smoke 고정 |
 | 2026-04-08 | Match discovery 2.0 v1 | Passed with scoped gaps | `/matches`가 URL 기반 필터 상태를 읽고 quick filter, 지역/레벨/정렬 패널을 유지하도록 바뀌었다. backend는 `q/city/district/freeOnly/availableOnly/beginnerFriendly/sort`를 지원하고, discovery helper unit `6/6`, backend match spec `252/252`, Playwright discovery subset `Desktop Chrome 3/3`를 통과했다. saved search와 recommendation reason badge는 이번 범위에서 제외했다. | saved search, personalized recommendation reason, distance/GPS filtering, multi-tab query-state matrix |
-| 2026-04-08 | Discovery live-contract rerun | Passed with runtime note | DTO/query 변경 후 `localhost:8111`이 stale contract를 계속 서빙할 수 있어 `curl`로 먼저 검증했고, dev compose `api` watch compile blocker를 우회해 transpile-only runtime에서 `e2e/tests/match-discovery.spec.ts` `Desktop Chrome 3/3`를 다시 확인했다. | dev compose `api` watch 정상화, `teams` seed/create runtime drift 정리 |
+| 2026-04-08 | Discovery live-contract rerun | Passed with runtime note | DTO/query 변경 후 `localhost:8111`이 stale contract를 계속 서빙할 수 있어 `curl`로 먼저 검증했고, dev compose `api` watch compile blocker를 우회해 transpile-only runtime에서 `e2e/tests/match-discovery.spec.ts` `Desktop Chrome 3/3`를 다시 확인했다. | dev compose `api` watch 정상화, `teams` seed/create runtime drift 정리 (레거시·삭제됨 — legacy-v0-final) |
 | 2026-04-08 | Notification center v1 | Passed | `match_created`, `player_joined`, `payment_confirmed`, `payment_refunded` producer를 backend에 연결했고, `/notifications`를 API + websocket action center로 전환했다. `Desktop Chrome`에서 `notification-center.spec.ts` 전체 `3/3`를 통과했고, explicit in-app navigation, socket connect backfill, focus/visibility backfill, lighter `global-setup` bootstrap, fresh mutation token 패턴까지 고정했다. | chat-origin notification producer, `/settings/notifications` 영속화, unrelated `teams` seed drift 정리 |
 | 2026-04-10 | Team/Membership TDD pack | Passed with scoped skips | `04-team-and-membership.md`를 Given/When/Then + Case Matrix 형식으로 정리하고, `/teams/new` payload를 실제 저장 필드 기준으로 정렬했다. `/my/teams`, `/teams/[id]`의 unsupported edit/delete CTA를 제거했고, owner row action menu를 row-scoped outside-click 기준으로 고쳐 `TEAM-005-A` role-change persistence까지 복구했다. Docker dev stack 기준 Desktop Chrome에서 team bundle `10 passed / 1 skipped`를 확인했다. `04` 시나리오 범위로는 `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B`가 통과했다. | TEAM-003 media fallback automation, `TEAM-004-B`, `TEAM-005-C`, `TM-SMOKE-001 /team-matches/new` owner smoke, `make dev-local` 지원용 DB runtime abstraction |
 | 2026-04-11 | Scenario/doc truth sync | Updated | Task 40에서 시나리오 허브와 backlog 문구를 현재 코드 사실에 맞춰 재분류했다. `MATCH-003`는 blocked가 아니라 implemented + spec 존재 상태로, `/mercenary/[id]`는 existing route로, `/settings/notifications`는 persistence unsupported 상태로 정리했다. | Docker dev stack 정상화 후 `MATCH-003`와 settings notification follow-up을 런타임 기준으로 재검증 |
@@ -255,21 +317,21 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 - 2026-04 priority QA remediation 실행 명령:
   - `pnpm --filter api test -- teams.service.spec.ts`
   - `pnpm --filter web exec tsc --noEmit`
-  - `pnpm exec playwright test e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
+  - `pnpm exec playwright test e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
   - `pnpm --filter api test -- auth.service.spec.ts`
   - `pnpm --filter web test -- src/stores/__tests__/auth-store.test.ts`
-  - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts e2e/tests/team-owner-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
-  - `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/home.spec.ts e2e/tests/match-join-flow.spec.ts e2e/tests/team-owner-flow.spec.ts e2e/tests/chat-realtime.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome'`
-  - `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/home.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome'`
-  - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
-  - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line --grep 'Deep match flows'`
+  - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts e2e/tests/team-owner-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
+  - `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/home.spec.ts e2e/tests/match-join-flow.spec.ts e2e/tests/team-owner-flow.spec.ts e2e/tests/chat-realtime.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome'` (레거시·삭제됨 — legacy-v0-final)
+  - `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/home.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome'` (레거시·삭제됨 — legacy-v0-final)
+  - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
+  - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line --grep 'Deep match flows'` (레거시·삭제됨 — legacy-v0-final)
   - `pnpm --filter api test -- notifications.service.spec.ts matches.service.spec.ts payments.service.spec.ts`
   - `pnpm --filter api test -- notifications.service.spec.ts`
   - `pnpm --filter web test`
   - `pnpm --filter web test -- src/lib/__tests__/notification-center.test.ts`
   - `pnpm --filter web test -- src/hooks/__tests__/use-realtime.test.tsx`
-  - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' -g 'payment-confirmed notification opens the payment detail route' --workers=1`
-  - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1`
+  - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' -g 'payment-confirmed notification opens the payment detail route' --workers=1` (레거시·삭제됨 — legacy-v0-final)
+  - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1` (레거시·삭제됨 — legacy-v0-final)
   - targeted browser smoke on `/settings/notifications` (stale API process와 web restart instability로 completion blocked)
 - 결과:
   - runtime matrix: Docker dev stack (`make dev`), `localhost:3003`, `localhost:8111`, `docker compose exec postgres ...`
@@ -316,6 +378,16 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 ## How To Use
 
+## 2026-09-03 — Android Play policy follow-up (items 2-6)
+
+- Status: local implementation/validation PASS; Play Console and physical-device gates remain external.
+- Covered: Data safety wording, withdrawal/final-deletion cleanup, minimal permissions, hardened WebView
+  source contracts, target SDK/release gates, and the public account-deletion surface.
+- Explicitly excluded: reviewer/test credentials and closed-testing cohort management.
+- Canonical task: `.github/tasks/156-android-app-fcm-foundation.md`.
+- Evidence: policy source gate PASS; backend 48/48, public-page 1/1, API/Web typechecks PASS; Android
+  JVM/AAB build PASS; AAB 16 KB alignment PASS; headed public-route QA 3/3 with zero runtime errors.
+
 1. `index.md`에서 현재 우선순위와 열린 논점을 확인한다.
 2. 해당 기능 문서로 이동해 체크박스를 직접 갱신한다.
 3. 이슈가 생기면 개별 문서에도 적고, 최종 판단/논의는 `Discussion`에 요약한다.
@@ -350,3 +422,46 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 | Kakao OAuth /callback/kakao 경로 동작 | 실 OAuth 앱 redirect_uri 수정 필요 (운영자) |
 | notification href DB migration | 기존 DB의 /v1/* route는 runtime migrateV1NotificationHref로 자동 처리됨 |
 | 세션 1 (backend security) · 세션 2 (campaign/tournament) 커밋 | 아직 미커밋 working tree 상태 |
+
+## Android Play readiness — 2026-09-19
+
+Task 156 continuation: [scenario](./android-play-readiness.md). Organization D-U-N-S pending.
+Implementation and isolated API/browser evidence tracked in Task 156; production and Play/device gates remain separate.
+
+### 2026-09-21 — Task 172 친선 팀매치 공동 경기 기록
+
+- 대상: [팀매치 시나리오](./05-team-match-flows.md#v1-공동-경기-기록--task-172) TM-SHARED-01..12.
+- 구현/검증 상태: [Task 172](../../.github/tasks/172-team-match-shared-record.md)의 Progress Snapshot과 PR 갤러리가 현재 결과의 정본.
+- 양 팀 일반 선수 / 비참가자, 실제 API·격리 PostgreSQL, headed Chromium 390/768/1440 흐름 검증.
+
+- Task 172 [공동 경기 기록 화면별 플로우·42개 스크린샷](team-match-shared-record-gallery.md) — 390/768/1440, 실제 API·양 팀 일반 참가자 검증.
+
+## Task 149 condition parity — 2026-09-21
+
+- Admin platform recruitment now uses the ordinary team-match image, level, format, style, uniform, gender, cost, place, schedule, and optional deadline contract.
+- Focused API tests `6/6`, Web tests `13/13`, API/Web typecheck, and headed Chrome condition-parity E2E `4/4` passed.
+- Canonical evidence: `docs/screenshots/task149-admin-team-match-condition-parity/` (`desktop`/`tablet`/`mobile` × empty form/filled form/detail) and `report.json`.
+- Platform provenance is now persisted independently of team assignment; public list/detail keep the `플랫폼 주관` badge while showing assigned home/away teams. Headed Chrome provenance E2E passed 2/2 and added desktop/tablet/mobile public-list screenshots to the canonical Task 149 evidence directory.
+### 2026-09-21 Task 149 일반/관리자 팀매치 parity 보완
+
+- [TM-149-P](05-team-match-flows.md#tm-149-p-일반관리자-모집-조건-parity): 6/6 viewport/persona journeys PASS; actual API/DB create, elapsed deadline intake vs confirmation, Game/schedules and DB CHECK verified.
+- Before/after screenshot + reports: [Task 149](../../.github/tasks/149-admin-assigned-team-match.md#follow-up-verification-evidence).
+- New migration fixes the hostless platform recruitment 500 reproduced on a fresh migrated DB. Existing ordinary-friendly host/metadata constraints remain enforced.
+
+## Task 173 — 팀매치 공동 기록 서브매치 (PR #1249)
+
+- PR #1243의 양 팀 라인업 참가자 공동 기록에 선택적인 서브매치를 추가한다.
+- 최상단 점수와 공식 결과는 모든 서브매치 득점의 합이며 팀매치 한 경기로 한 번만 집계한다.
+- [시나리오](05-team-match-flows.md#v1-공동-경기-기록-서브매치--task-173) · [선수 사진·이름 변경 포함 30장 갤러리](team-match-shared-submatches-gallery.md)
+
+## 2026-09-30 — 팀매치 종료 확인 표시·자책골 귀속 보완
+
+- 친선 팀매치가 지정 종료 시각을 지났지만 양 팀 확인 전이면 목록과 상세에 `종료 확인 중`을 표시한다.
+- 이 표시는 자동 완료나 편집 잠금이 아니며, 점수·공동 기록 수정과 기존 종료 확인 동작을 유지한다.
+- 자책골은 선수 또는 익명 팀으로 자책한 쪽을 고르고 상대 팀 점수에 귀속한다.
+- 정본: [Task 172](../../.github/tasks/172-team-match-shared-record.md), [팀매치 시나리오](./05-team-match-flows.md), [경기 기록 시나리오](./19-game-operations-result-correction.md).
+
+
+### 2026-10-01 — Task 181 매치 보류 후속 조치
+
+개인·팀매치 보류와 주최자 후속 조치. [Task 181](../../.github/tasks/181-match-on-hold-lifecycle.md)에서 배포 및 검증 진행 상태를 관리한다.

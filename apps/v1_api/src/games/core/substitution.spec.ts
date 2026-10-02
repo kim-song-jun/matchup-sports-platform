@@ -213,7 +213,7 @@ describe('validateSubstitution', () => {
       outParticipantId: 'out-1',
       participants,
       priorEvents: [],
-      substitutionMode: 'rolling',
+      substitutionMode: 'limited',
       maxSubstitutions: null,
     });
     expect(result).toEqual({ position: 'FW', positionX: 50, positionY: 80 });
@@ -227,7 +227,10 @@ describe('validateSubstitution', () => {
         outParticipantId: 'out-1',
         participants,
         priorEvents: [],
-        substitutionMode: 'rolling',
+        // Task 166 이후 'rolling' 은 교체 기록 자체를 거부하므로, **다른 불변식**을
+        // 재는 이 케이스들은 'limited' + 무제한(null)으로 바꾼다 — 원래 의도(cap 이
+        // 방해하지 않는 상태에서 그 검사만 본다)는 그대로다.
+        substitutionMode: 'limited',
         maxSubstitutions: null,
       }),
     ).toThrow(expect.objectContaining({ code: 'SUBSTITUTION_INVALID' }));
@@ -241,7 +244,10 @@ describe('validateSubstitution', () => {
         outParticipantId: 'out-1',
         participants,
         priorEvents: [],
-        substitutionMode: 'rolling',
+        // Task 166 이후 'rolling' 은 교체 기록 자체를 거부하므로, **다른 불변식**을
+        // 재는 이 케이스들은 'limited' + 무제한(null)으로 바꾼다 — 원래 의도(cap 이
+        // 방해하지 않는 상태에서 그 검사만 본다)는 그대로다.
+        substitutionMode: 'limited',
         maxSubstitutions: null,
       }),
     ).toThrow(expect.objectContaining({ code: 'PARTICIPANT_SIDE_MISMATCH' }));
@@ -255,7 +261,10 @@ describe('validateSubstitution', () => {
         outParticipantId: 'in-1', // never started, not on pitch
         participants,
         priorEvents: [],
-        substitutionMode: 'rolling',
+        // Task 166 이후 'rolling' 은 교체 기록 자체를 거부하므로, **다른 불변식**을
+        // 재는 이 케이스들은 'limited' + 무제한(null)으로 바꾼다 — 원래 의도(cap 이
+        // 방해하지 않는 상태에서 그 검사만 본다)는 그대로다.
+        substitutionMode: 'limited',
         maxSubstitutions: null,
       }),
     ).toThrow(expect.objectContaining({ code: 'SUBSTITUTION_OUT_NOT_ON_PITCH' }));
@@ -273,7 +282,10 @@ describe('validateSubstitution', () => {
         outParticipantId: 'out-1',
         participants: bothStarted,
         priorEvents: [],
-        substitutionMode: 'rolling',
+        // Task 166 이후 'rolling' 은 교체 기록 자체를 거부하므로, **다른 불변식**을
+        // 재는 이 케이스들은 'limited' + 무제한(null)으로 바꾼다 — 원래 의도(cap 이
+        // 방해하지 않는 상태에서 그 검사만 본다)는 그대로다.
+        substitutionMode: 'limited',
         maxSubstitutions: null,
       }),
     ).toThrow(expect.objectContaining({ code: 'SUBSTITUTION_IN_ALREADY_ON_PITCH' }));
@@ -296,7 +308,40 @@ describe('validateSubstitution', () => {
     ).toThrow(expect.objectContaining({ code: 'SUBSTITUTION_LIMIT_REACHED' }));
   });
 
-  it('does not enforce a cap when substitutionMode is rolling, even if maxSubstitutions is set', () => {
+  it('롤링 종목은 교체를 기록하지 않는다 — SUBSTITUTION_NOT_TRACKED (Task 166)', () => {
+    // 정본 §3: 롤링 종목은 교체 기록이 없다. 선수가 경기 내내 자유롭게 드나들어
+    // "교체 이벤트" 라는 개념 자체가 성립하지 않는다.
+    expect(() =>
+      validateSubstitution({
+        sideId: 'side-home',
+        inParticipantId: 'in-1',
+        outParticipantId: 'out-1',
+        participants,
+        priorEvents: [],
+        substitutionMode: 'rolling',
+        maxSubstitutions: null,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SUBSTITUTION_NOT_TRACKED' }));
+  });
+
+  it('롤링 거부는 다른 어떤 검사보다 먼저다 — 입력이 그 검사들에도 걸리는 경우로 잰다', () => {
+    // 순서가 뒤집히면 운영자가 "선수를 잘못 골랐다" 로 읽고 다른 조합을 계속 시도한다.
+    // 같은 선수를 in/out 으로 넣어 SUBSTITUTION_INVALID 에도 걸리는 입력을 준다 —
+    // 그런데도 NOT_TRACKED 가 나와야 한다.
+    expect(() =>
+      validateSubstitution({
+        sideId: 'side-home',
+        inParticipantId: 'out-1',
+        outParticipantId: 'out-1',
+        participants,
+        priorEvents: [],
+        substitutionMode: 'rolling',
+        maxSubstitutions: null,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SUBSTITUTION_NOT_TRACKED' }));
+  });
+
+  it('제한 교체 종목은 기존 동작 그대로다 — cap 안에서는 통과한다 (회귀)', () => {
     const priorEvents = [subEvent('e1', 1, 'side-home', 'in-1', 'out-1')];
     expect(() =>
       validateSubstitution({
@@ -305,8 +350,8 @@ describe('validateSubstitution', () => {
         outParticipantId: 'in-1',
         participants,
         priorEvents,
-        substitutionMode: 'rolling',
-        maxSubstitutions: 1,
+        substitutionMode: 'limited',
+        maxSubstitutions: 5,
       }),
     ).not.toThrow();
   });

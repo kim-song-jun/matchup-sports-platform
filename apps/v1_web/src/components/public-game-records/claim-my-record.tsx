@@ -1,0 +1,390 @@
+'use client';
+
+import Link from 'next/link';
+import { createPortal } from 'react-dom';
+import { useState } from 'react';
+import { Card } from '@/components/v1-ui/primitives';
+import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
+import { extractErrorMessage } from '@/lib/error-message';
+import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
+import {
+  useV1AuthMe,
+  useV1ClaimableParticipants,
+  useV1LeagueClaimableParticipants,
+  useV1LeagueRequestIdentityLink,
+  useV1RequestIdentityLink,
+  useV1TeamMatchClaimableParticipants,
+  useV1TeamMatchRequestIdentityLink,
+} from '@/hooks/use-v1-api';
+
+/**
+ * "이 경기에 뛰었는데 내 기록이 없나요?" (Task 154 P0-5, 사용자 선택 B안).
+ *
+ * 라인업에 이름만 올라가고 계정이 연결되지 않으면 그 경기는 선수의 활동 기록에
+ * 영영 잡히지 않는다. 라인업이 마감된 뒤에는 매니저도 되돌릴 수 없어서, 예전에는
+ * 운영 문의 말고 방법이 없었다.
+ *
+ * ## 왜 배너 → 모달인가 (A안: 라인업 행 인라인 버튼 대신)
+ * 인라인 버튼은 맥락이 가장 가깝지만 **남의 이름 옆에도 "저예요" 버튼이 붙는다**.
+ * 아무나 누를 수 있게 보이는 것 자체가 잘못된 신호라, 선택을 모달 안으로 넣어
+ * "내 기록이 없다"는 증상에서 출발하게 했다.
+ *
+ * ## 안전장치는 서버에 있다
+ * 신청은 확정이 아니다. `requestIdentityLink` 는 append-only 원장에 요청만 남기고,
+ * "신청자 ≠ 확인자" 규칙(서비스 + DB 트리거)이 혼자서 연결을 완성하는 것을 막는다.
+ * 이 화면은 그 요청을 만드는 입구일 뿐이다.
+ *
+ * ## 대회·리그 공용 (2026-08-25 대회 패리티 후속)
+ * 화면·문구·신청 API 는 소스 불문 동일하고 **목록 훅만** 도메인이 다르다 — 그래서
+ * 훅 호출부만 얇은 래퍼(`ClaimMyRecordSection`/`LeagueClaimMyRecordSection`)로 갈라
+ * 두고 본문은 `ClaimMyRecordView` 하나를 공유한다(영상 등록 폼 공용화와 같은 구조).
+ */
+export function ClaimMyRecordSection({
+  tournamentId,
+  fixtureId,
+}: {
+  tournamentId: string;
+  fixtureId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const { viewer, recheck } = useClaimViewer();
+  // 목록 조회 자체가 인가(참가팀 멤버)를 태우므로, 모달을 열기 전에는 부르지 않는다 --
+  // 관전자가 이 페이지를 열 때마다 403 을 만들 이유가 없다.
+  const claimable = useV1ClaimableParticipants(tournamentId, fixtureId, { enabled: open && viewer === 'verified' });
+  const request = useV1RequestIdentityLink(tournamentId, fixtureId);
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} />;
+}
+
+type ClaimViewer = 'pending' | 'guest' | 'error' | 'verified';
+
+/**
+ * 후보 조회·신청은 로그인이 필요한 API 라, 판정이 끝나 `verified` 일 때만 호출한다.
+ * 대회 경기 상세는 비로그인 관전자에게도 열려 있어서 이 판정이 없으면 401 원문이 모달에 샌다.
+ */
+function useClaimViewer(): { viewer: ClaimViewer; recheck: () => void } {
+  const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
+  const recheck = () => void authMe.refetch();
+  if (isUnauthenticatedError(authMe.error)) return { viewer: 'guest', recheck };
+  if (authMe.isError) return { viewer: 'error', recheck };
+  if (authMe.data?.user?.id) return { viewer: 'verified', recheck };
+  return { viewer: 'pending', recheck };
+}
+
+/**
+ * 리그 경기 상세용 — 목록만 리그 스코프 API 를 쓰고 나머지는 대회와 동일하다.
+ * `variant="link"` 는 명단 카드 아래 한 줄 입구(G13 F61) — 노출 조건은 호출부가 상태 모델로 정한다.
+ */
+export function LeagueClaimMyRecordSection({
+  leagueId,
+  teamMatchId,
+  variant = 'card',
+}: {
+  leagueId: string;
+  teamMatchId: string;
+  variant?: ClaimEntryVariant;
+}) {
+  const [open, setOpen] = useState(false);
+  const { viewer, recheck } = useClaimViewer();
+  const claimable = useV1LeagueClaimableParticipants(leagueId, teamMatchId, { enabled: open && viewer === 'verified' });
+  const request = useV1LeagueRequestIdentityLink(leagueId, teamMatchId);
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} variant={variant} />;
+}
+
+type ClaimEntryVariant = 'card' | 'link';
+
+/** 팀매치 상세용 — 후보 목록 API만 팀매치 스코프로 바꾸고 화면·신청 계약은 공유한다. */
+export function TeamMatchClaimMyRecordSection({ teamMatchId }: { teamMatchId: string }) {
+  const [open, setOpen] = useState(false);
+  const { viewer, recheck } = useClaimViewer();
+  const claimable = useV1TeamMatchClaimableParticipants(teamMatchId, { enabled: open && viewer === 'verified' });
+  const request = useV1TeamMatchRequestIdentityLink(teamMatchId);
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} viewer={viewer} onRecheckViewer={recheck} claimable={claimable} request={request} rosterLabel="참석명단" />;
+}
+
+function ClaimMyRecordView({
+  open,
+  onOpenChange,
+  viewer,
+  onRecheckViewer,
+  claimable,
+  request,
+  variant = 'card',
+  rosterLabel = '경기 명단',
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  viewer: ClaimViewer;
+  onRecheckViewer: () => void;
+  claimable: ReturnType<typeof useV1ClaimableParticipants>;
+  request: ReturnType<typeof useV1RequestIdentityLink>;
+  variant?: ClaimEntryVariant;
+  /** 빈 명단 안내에 쓰는 이름 — 친선은 팀이 내는 "참석명단", 대회·리그는 "경기 명단". */
+  rosterLabel?: '경기 명단' | '참석명단';
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  // 포커스 트랩·ESC 닫기·스크롤 잠금·포커스 복원은 공용 훅(useModalA11y)에 위임.
+  // 신청 mutation 이 진행 중일 때는 ESC/backdrop 으로 닫히지 않게 pending 을 넘긴다.
+  // early return(`if (done) return ...`) 보다 위에서 호출해 Hooks 규칙을 지킨다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
+    open,
+    onClose: () => onOpenChange(false),
+    pending: request.isPending,
+  });
+  // alpha 실화면(2026-08-24)에서 잡은 것: 고를 참가자가 0명인데 "이 선수가 저예요"
+  // 버튼이 그대로 남아 있었다. disabled 라도 회색 버튼이 보이면 "누를 수 있을 것 같은"
+  // 신호를 주고, 사용자는 왜 안 눌리는지 찾게 된다. 아무것도 할 수 없는 상태에서는
+  // 그 버튼을 아예 렌더하지 않고 닫기만 남긴다.
+  const loaded = viewer === 'verified' && claimable.data !== undefined;
+  const hasCandidates = (claimable.data?.participants.length ?? 0) > 0;
+  // 후보 0명은 두 상태다 — 제출된 명단이 아직 없거나, 명단의 모두가 이미 연결(신청 중)됐거나.
+  // 초안만 있는 명단은 서버가 인원·후보로 세지만(공식 결과와 같은 기준) 화면 위쪽은 "제출 전"이라 앞쪽으로 읽는다.
+  const noSubmittedRoster =
+    loaded && !hasCandidates && (claimable.data?.rosterCount === 0 || claimable.data?.rosterSubmitted === false);
+
+  // 신청이 끝나면 배너를 접는다. 같은 경기에 두 번 신청할 이유가 없고, 남겨 두면
+  // "아직 안 됐나?" 하고 다시 누르게 된다.
+  if (done && variant === 'link') {
+    return (
+      <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0' }}>
+        연결을 신청했어요. 다른 참가자가 확인하면 내 활동 기록에 이 경기가 표시돼요.
+      </p>
+    );
+  }
+  if (done) {
+    return (
+      <Card pad={16} style={{ marginTop: 12 }}>
+        <div className="tm-text-body-lg">연결을 신청했어요</div>
+        <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+          다른 참가자의 확인을 거쳐 연결돼요. 확인되면 내 활동 기록에 이 경기가 표시돼요.
+        </div>
+      </Card>
+    );
+  }
+
+  const openModal = () => {
+    setError(null);
+    onOpenChange(true);
+  };
+
+  return (
+    <>
+      {variant === 'link' ? (
+        <button type="button" className="tm-section-action" style={{ paddingLeft: 0, marginTop: 4 }} onClick={openModal}>
+          내 기록이 안 보이나요? 명단에서 나 찾기
+          <ChevronRightIcon size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
+      ) : (
+        <Card pad={16} style={{ marginTop: 12, borderStyle: 'solid' }}>
+          <div className="tm-text-body-lg">이 경기에 뛰었는데 내 기록이 없나요?</div>
+          <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.
+          </div>
+          <button
+            type="button"
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 12, minHeight: 44 }}
+            onClick={openModal}
+          >
+            명단에서 나 찾기
+          </button>
+        </Card>
+      )}
+
+      {open && typeof document !== 'undefined'
+        ? createPortal((
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ background: 'rgba(25, 31, 40, 0.48)' }}
+              onClick={onBackdropClick}
+            >
+              <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="claim-my-record-title"
+                tabIndex={-1}
+                className="w-full max-w-[420px] overflow-hidden rounded-2xl"
+                style={{ background: 'var(--surface, #fff)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
+              >
+            {/*
+              제목과 안내는 목록 상태를 따라간다. 고를 것이 없는 화면이 "골라 주세요"라고
+              말하면 사용자는 자기가 뭘 잘못했는지 찾게 된다 -- 실제로 alpha 실화면에서
+              그렇게 읽혔다. 0건은 정상 상태이므로 결론을 먼저 말하고, 그래도 기록이
+              안 보이는 진짜 원인(공개 동의)으로 이어 준다.
+            */}
+            {viewer === 'guest' ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  로그인이 필요해요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  로그인한 뒤 명단에서 본인을 찾아 내 기록으로 연결할 수 있어요.
+                </div>
+              </>
+            ) : viewer === 'error' ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  로그인 상태를 확인하지 못했어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  잠시 후 다시 확인해 주세요.
+                </div>
+              </>
+            ) : noSubmittedRoster ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  아직 제출된 {rosterLabel}이 없어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  {rosterLabel}이 올라오면 여기서 내 이름을 찾아 계정에 연결할 수 있어요.
+                </div>
+              </>
+            ) : loaded && !hasCandidates ? (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  연결할 참가자가 없어요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  이 경기 명단은 모두 계정에 연결돼 있어요. 그런데도 내 기록이 안 보인다면{' '}
+                  {/* 인라인 텍스트 링크 관례는 auth-page 와 같은 --blue700. 밑줄은
+                      "컬러만으로 정보 전달 금지" 규칙 때문에 함께 둔다. */}
+                  <Link
+                    href="/my/settings/record-consent"
+                    style={{ color: 'var(--blue700)', textDecoration: 'underline' }}
+                  >
+                    기록 공개 설정
+                  </Link>
+                  을 확인해 주세요.
+                </div>
+              </>
+            ) : (
+              <>
+                <div id="claim-my-record-title" className="tm-text-heading">
+                  명단에서 본인을 골라 주세요
+                </div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  이미 계정이 연결된 참가자는 목록에 없어요. 신청 후 다른 참가자의 확인을 거쳐 연결돼요.
+                </div>
+              </>
+            )}
+
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+              {viewer === 'guest' || viewer === 'error' ? null : viewer === 'pending' || claimable.isLoading ? (
+                <div className="tm-text-caption">불러오는 중이에요…</div>
+              ) : claimable.isError ? (
+                <div className="tm-text-caption" style={{ color: 'var(--red700)' }}>
+                  {extractErrorMessage(claimable.error, '명단을 불러오지 못했어요.')}
+                </div>
+              ) : !hasCandidates ? (
+                // 0건 안내는 제목·부제가 이미 하고 있다. 여기서 한 번 더 말하면 같은
+                // 문장이 한 화면에 두 번 뜬다.
+                null
+              ) : (
+                claimable.data?.participants.map((participant) => (
+                  <button
+                    key={participant.participantId}
+                    type="button"
+                    className={`tm-btn tm-btn-md ${selected === participant.participantId ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                    style={{
+                      minHeight: 44,
+                      width: '100%',
+                      minWidth: 0,
+                      justifyContent: 'flex-start',
+                      alignItems: 'flex-start',
+                      textAlign: 'left',
+                      whiteSpace: 'normal',
+                      overflowWrap: 'anywhere',
+                      ...(selected === participant.participantId ? { background: 'var(--static-blue)' } : {}),
+                    }}
+                    aria-pressed={selected === participant.participantId}
+                    onClick={() => setSelected(participant.participantId)}
+                  >
+                    <span style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span className="tm-text-caption" style={{ color: selected === participant.participantId ? 'inherit' : 'var(--grey700)' }}>
+                        {participant.sideLabel} · {participant.sideKey === 'HOME' ? '홈' : '원정'}
+                      </span>
+                      <span>
+                        {participant.jerseyNumber !== null ? `${participant.jerseyNumber}. ` : ''}
+                        {participant.displayName}
+                      </span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {error ? (
+              <div role="alert" className="tm-text-caption" style={{ marginTop: 12, color: 'var(--red700)' }}>
+                {error}
+              </div>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                className={`tm-btn tm-btn-md ${loaded && !hasCandidates ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                style={{ flex: 1, minHeight: 44, ...(loaded && !hasCandidates ? { background: 'var(--static-blue)' } : {}) }}
+                onClick={() => onOpenChange(false)}
+              >
+                {viewer === 'error' || (loaded && !hasCandidates) ? '닫기' : '취소'}
+              </button>
+              {viewer === 'guest' ? (
+                <Link
+                  href={getLoginPathForRedirect(getCurrentRedirectPath())}
+                  className="tm-btn tm-btn-md tm-btn-primary"
+                  style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
+                >
+                  로그인하기
+                </Link>
+              ) : viewer === 'error' ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-md tm-btn-primary"
+                  style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
+                  onClick={onRecheckViewer}
+                >
+                  다시 확인
+                </button>
+              ) : loaded && !hasCandidates ? null : (
+              <button
+                type="button"
+                className="tm-btn tm-btn-md tm-btn-primary"
+                style={{ flex: 1, minHeight: 44, ...(selected !== null && !request.isPending && claimable.data !== undefined ? { background: 'var(--static-blue)' } : {}) }}
+                disabled={selected === null || request.isPending || claimable.data === undefined}
+                onClick={() => {
+                  if (selected === null || claimable.data === undefined) return;
+                  setError(null);
+                  request.mutate(
+                    {
+                      gameId: claimable.data.gameId,
+                      participantId: selected,
+                      // 서버가 낙관적 동시성으로 요구하는 값. 목록과 같은 시점의 버전을
+                      // 그대로 보낸다 -- 그 사이 경기가 바뀌었으면 서버가 409 로 끊는다.
+                      expectedVersion: claimable.data.version,
+                    },
+                    {
+                      onSuccess: () => {
+                        onOpenChange(false);
+                        setDone(true);
+                      },
+                      onError: (mutationError) =>
+                        setError(extractErrorMessage(mutationError, '신청하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+                    },
+                  );
+                }}
+              >
+                {request.isPending ? '신청 중' : '이 선수가 저예요'}
+              </button>
+              )}
+            </div>
+              </div>
+            </div>
+          ), document.body)
+        : null}
+    </>
+  );
+}

@@ -158,6 +158,121 @@ describe('PushSendForm', () => {
     });
   });
 
+  /**
+   * 회귀 방지: 앱 기기만 가진 사용자에게 보낸 발송이 "구독 0건 · 나가지 않음" 으로만 보였다
+   * (2026-09-02 alpha 실측 — 시뮬레이터에 배너가 도착했는데 화면은 0건). 앱 줄이 따로 있고,
+   * 토스트도 "나가지 않았다" 를 붙이지 않아야 한다.
+   */
+  it('앱 기기로만 전송된 경우 앱 푸시 줄에 건수를 보여주고 나가지 않았다고 말하지 않는다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 1,
+        skipped: 0,
+        failed: 0,
+        push: {
+          subscriptions: 0,
+          delivered: 0,
+          failed: 0,
+          disabled: false,
+          native: { devices: 1, delivered: 1, failed: 0, disabled: false },
+        },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      const result = screen.getByTestId('push-send-result');
+      expect(within(result).getByText(/기기 1대 중 1대 전송/)).toBeInTheDocument();
+      expect(within(result).getByText(/브라우저 알림을 켠 사용자가 없어/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/푸시는 나가지 않았어요\)/)).not.toBeInTheDocument();
+  });
+
+  it('앱 결과가 없는 예전 응답은 앱 쪽을 알 수 없으므로 토스트에 나가지 않았다고 붙이지 않는다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 1,
+        skipped: 0,
+        failed: 0,
+        push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/발송 완료/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/푸시는 나가지 않았어요\)/)).not.toBeInTheDocument();
+    // 결과 카드의 웹 줄은 여전히 사실을 말한다.
+    expect(within(screen.getByTestId('push-send-result')).getByText(/브라우저 알림을 켠 사용자가 없어/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('push-send-result')).queryByText(/앱 푸시/)).not.toBeInTheDocument();
+  });
+
+  it('앱 푸시 어댑터가 꺼져 있으면 그 사실을 앱 줄에 밝힌다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 1,
+        skipped: 0,
+        failed: 0,
+        push: {
+          subscriptions: 0,
+          delivered: 0,
+          failed: 0,
+          disabled: false,
+          native: { devices: 0, delivered: 0, failed: 0, disabled: true },
+        },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      const result = screen.getByTestId('push-send-result');
+      expect(within(result).getByText(/APNs·FCM 키가 설정되지 않아/)).toBeInTheDocument();
+    });
+  });
+
+  it('앱 푸시 일부가 실패하면 토스트도 error 톤으로 띄운다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 2,
+        skipped: 0,
+        failed: 0,
+        push: {
+          subscriptions: 0,
+          delivered: 0,
+          failed: 0,
+          disabled: false,
+          native: { devices: 2, delivered: 1, failed: 1, disabled: false },
+        },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    const toast = await screen.findByText(/푸시 일부가 실패했어요/);
+    // 알림 생성은 전부 성공했지만(failed 0) 푸시 전송이 실패했으므로 success 로 흘려보내지 않는다.
+    expect(toast.closest('[role="status"]')?.querySelector('.bg-red-500') ?? toast.closest('.bg-red-500')).not.toBeNull();
+  });
+
   it('실제로 푸시가 전송되면 구독·전송 건수를 보여준다', async () => {
     sendMutate.mockImplementation((_payload, options) => {
       options.onSuccess({

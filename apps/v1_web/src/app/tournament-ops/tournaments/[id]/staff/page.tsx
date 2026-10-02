@@ -1,4 +1,4 @@
-import { StaffClient } from './staff-client';
+import { StaffClient } from '@/components/tournament-live/staff-client';
 
 interface Props {
   params: Promise<{ id: string }>;

@@ -10,6 +10,7 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'user.delete': '회원 삭제',
   'match.status.update': '매치 상태 변경',
   'team.status.update': '팀 상태 변경',
+  'team.rename': '보관 팀 이름 변경',
   'team_match.status.update': '팀매치 상태 변경',
   // 관리자
   'admin.grant': '관리자 권한 부여',
@@ -21,6 +22,7 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   'tournament.status': '대회 상태 변경',
   // 대회 — 참가 신청
   'player.eligibility': '선수 자격 변경',
+  'player.export': '명단 CSV 내려받기',
   'registration.confirm': '참가 확정',
   'registration.confirm_payment': '참가비 결제 확인',
   'registration.cancel': '참가 신청 취소',

@@ -9,6 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AppleTokenService } from '../auth/apple-token.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -20,6 +21,8 @@ import {
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdatePlayerCardHiddenDto,
+  UpdatePlayerCardShapeDto,
   UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
 } from './dto/profile.dto';
@@ -27,7 +30,10 @@ import { ProfileService } from './profile.service';
 
 @Controller()
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(
+    private readonly profileService: ProfileService,
+    private readonly appleTokens: AppleTokenService,
+  ) {}
 
   @Get('me/profile')
   @UseGuards(V1AuthGuard)
@@ -89,6 +95,32 @@ export class ProfileController {
     return this.profileService.updateMyRecordConsent(user, dto);
   }
 
+  /** 선수 카드 숨김 토글 (Task 155). 컬럼만 있고 쓰는 경로가 없던 것을 연다. */
+  @Get('me/player-card-hidden')
+  @UseGuards(V1AuthGuard)
+  myPlayerCardHidden(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.myPlayerCardHidden(user);
+  }
+
+  @Patch('me/player-card-hidden')
+  @UseGuards(V1AuthGuard)
+  updateMyPlayerCardHidden(@CurrentUser() user: V1AuthUser, @Body() dto: UpdatePlayerCardHiddenDto) {
+    return this.profileService.updateMyPlayerCardHidden(user, dto);
+  }
+
+  /** 선수 카드 모양 (코스메틱 업적). 잠금 판정은 서버가 하고, 화면은 결과만 그린다. */
+  @Get('me/player-card-shape')
+  @UseGuards(V1AuthGuard)
+  myPlayerCardShape(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.myPlayerCardShape(user);
+  }
+
+  @Patch('me/player-card-shape')
+  @UseGuards(V1AuthGuard)
+  updateMyPlayerCardShape(@CurrentUser() user: V1AuthUser, @Body() dto: UpdatePlayerCardShapeDto) {
+    return this.profileService.updateMyPlayerCardShape(user, dto);
+  }
+
   @Get('me/tournament-real-name-visibility')
   @UseGuards(V1AuthGuard)
   myTournamentRealNameVisibility(@CurrentUser() user: V1AuthUser) {
@@ -105,14 +137,19 @@ export class ProfileController {
   }
 
   @Post('auth/logout')
+  @UseGuards(OptionalV1AuthGuard)
   @UseInterceptors(V1SessionLogoutInterceptor)
-  logout() {
-    return this.profileService.logout();
+  logout(@CurrentUser() user: V1AuthUser | undefined) {
+    return this.profileService.logout(user);
   }
 
   @Post('me/withdrawal-request')
   @UseGuards(V1AuthGuard)
-  withdrawalRequest(@CurrentUser() user: V1AuthUser, @Body() dto: WithdrawalRequestDto) {
-    return this.profileService.withdrawalRequest(user, dto);
+  async withdrawalRequest(@CurrentUser() user: V1AuthUser, @Body() dto: WithdrawalRequestDto) {
+    const result = await this.profileService.withdrawalRequest(user, dto);
+    // App Store 5.1.1(v): Apple 로그인 계정은 삭제 요청 시점에 토큰을 폐기한다. 운영자 최종 삭제는
+    // 기한이 없고 거치지 않는 경로도 있어 여기서 한다. 커밋 후에 부르고, 실패해도 탈퇴는 성공이다.
+    await this.appleTokens.revokeForUser(user.id);
+    return result;
   }
 }

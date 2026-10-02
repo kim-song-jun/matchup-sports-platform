@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
@@ -20,6 +21,7 @@ const ids = {
   hostUser: '61000000-0000-4000-8000-000000000001',
   opponentUser: '61000000-0000-4000-8000-000000000002',
   operatorUser: '61000000-0000-4000-8000-000000000003',
+  outsiderUser: '61000000-0000-4000-8000-000000000004',
   sport: '61000000-0000-4000-8000-000000000010',
   region: '61000000-0000-4000-8000-000000000011',
   hostTeam: '61000000-0000-4000-8000-000000000020',
@@ -28,6 +30,8 @@ const ids = {
   tournament: '61000000-0000-4000-8000-000000000040',
   fixture: '61000000-0000-4000-8000-000000000041',
   invalidFixture: '61000000-0000-4000-8000-000000000042',
+  homeRegistration: '61000000-0000-4000-8000-000000000043',
+  awayRegistration: '61000000-0000-4000-8000-000000000044',
   assignment: '61000000-0000-4000-8000-000000000050',
 } as const;
 
@@ -78,7 +82,6 @@ describe('Task 6 L1 game lifecycle', () => {
   let tournamentGameId: string;
   let teamGameId: string;
   let tournamentHomeSideId: string;
-  let tournamentAwaySideId: string;
   let teamRevisionId: string;
 
   beforeAll(async () => {
@@ -95,7 +98,7 @@ describe('Task 6 L1 game lifecycle', () => {
     }
     configId = config.id;
     await prisma.v1User.createMany({
-      data: [ids.hostUser, ids.opponentUser, ids.operatorUser].map((id, index) => ({
+      data: [ids.hostUser, ids.opponentUser, ids.operatorUser, ids.outsiderUser].map((id, index) => ({
         id,
         email: `task6-l1-${index}@example.test`,
         accountStatus: 'active',
@@ -163,23 +166,36 @@ describe('Task 6 L1 game lifecycle', () => {
         competitionConfigVersionId: configId,
       },
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TournamentRegistration.createMany({
       data: [
-        {
-          id: ids.fixture,
-          tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 1,
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.invalidFixture,
-          tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 2,
-          competitionConfigVersionId: configId,
-        },
+        { id: ids.homeRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.hostUser, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.opponentUser, status: 'confirmed' },
       ],
+    });
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.fixture,
+        tournamentId: ids.tournament,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.operatorUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 6 L1 canonical tournament match',
+        status: 'matched',
+        startAt: new Date('2026-09-12T00:00:00.000Z'),
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
+        round: 'group',
+        fixtureNumber: 1,
+        homeRegistrationId: ids.homeRegistration,
+        awayRegistrationId: ids.awayRegistration,
+      },
     });
     await prisma.$transaction(async (tx) => {
       await tx.v1TournamentStaffAssignment.create({
@@ -205,7 +221,7 @@ describe('Task 6 L1 game lifecycle', () => {
 
   it('creates a tournament game atomically from a valid immutable pin and replays the same source command', async () => {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [
@@ -250,9 +266,6 @@ describe('Task 6 L1 game lifecycle', () => {
     tournamentHomeSideId = persisted.sides.find(
       (side) => side.sideKey === V1GameSideKey.HOME,
     )?.id ?? '';
-    tournamentAwaySideId = persisted.sides.find(
-      (side) => side.sideKey === V1GameSideKey.AWAY,
-    )?.id ?? '';
 
     expect(replay).toEqual(first);
     expect(persisted.competitionConfigVersionId).toBe(configId);
@@ -260,96 +273,14 @@ describe('Task 6 L1 game lifecycle', () => {
     expect(persisted.periods.length).toBeGreaterThan(0);
     expect(persisted.participants).toHaveLength(1);
 
-    const savedLineup = await service.saveLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      tournamentHomeSideId,
-      'lineup-save',
-      {
-        expectedVersion: 1,
-        clientCommandId: 'lineup-save',
-        formation: '1-0',
-        // football-v1 pins minPlayers:7/maxPlayers:11 (added lineup-size gate on
-        // this generic saveLineup route — previously unvalidated, an empty
-        // roster was silently accepted). This test is about lifecycle
-        // mechanics (idempotent replay, submit flow), not roster sizing, so a
-        // minimal-but-valid 7-player roster keeps that unrelated behavior
-        // exercised without tripping the new invariant.
-        participants: Array.from({ length: 7 }, (_, index) => ({
-          displayNameSnapshot: `Lifecycle Player ${index + 1}`,
-          ...(index === 0 ? { position: 'GK' } : {}),
-          started: true,
-        })),
-      },
-    );
-    const staleSameSideSave = await captureFailure(() =>
-      service.saveLineup(
-        authUser(ids.operatorUser),
-        tournamentGameId,
-        tournamentHomeSideId,
-        'lineup-save-stale-same-side',
-        {
-          expectedVersion: 0,
-          clientCommandId: 'lineup-save-stale-same-side',
-          formation: '1-0',
-          participants: Array.from({ length: 7 }, (_, index) => ({
-            displayNameSnapshot: `Stale Lifecycle Player ${index + 1}`,
-            ...(index === 0 ? { position: 'GK' } : {}),
-            started: true,
-          })),
-        },
-      ),
-    );
-    expectHttpCode(staleSameSideSave, 409, 'VERSION_CONFLICT');
-    const lineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
-    const submittedLineup = await service.submitLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      String(savedLineup.lineupId),
-      'lineup-submit',
-      {
-        expectedVersion: savedLineup.lineupRevision,
-        clientCommandId: 'lineup-submit',
-        takeoverToken: lineupSubmitToken,
-      },
-    );
-    expect(submittedLineup).toEqual(expect.objectContaining({ lineupState: 'SUBMITTED', version: 2 }));
-
-    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
-    // lineup on every side before `start` is allowed -- give the AWAY side one
-    // too so the next test's `start` command exercises lifecycle mechanics
-    // instead of tripping LINEUP_NOT_SUBMITTED.
-    const awaySavedLineup = await service.saveLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      tournamentAwaySideId,
-      'lineup-save-away',
-      {
-        // Lineup CAS is side-scoped: HOME save/submit must not stale AWAY's
-        // first editor, whose latest auto-created lineup revision is still 1.
-        expectedVersion: 1,
-        clientCommandId: 'lineup-save-away',
-        formation: '1-0',
-        participants: Array.from({ length: 7 }, (_, index) => ({
-          displayNameSnapshot: `Away Lifecycle Player ${index + 1}`,
-          ...(index === 0 ? { position: 'GK' } : {}),
-          started: true,
-        })),
-      },
-    );
-    const awayLineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
-    const awaySubmittedLineup = await service.submitLineup(
-      authUser(ids.operatorUser),
-      tournamentGameId,
-      String(awaySavedLineup.lineupId),
-      'lineup-submit-away',
-      {
-        expectedVersion: awaySavedLineup.lineupRevision,
-        clientCommandId: 'lineup-submit-away',
-        takeoverToken: awayLineupSubmitToken,
-      },
-    );
-    expect(awaySubmittedLineup).toEqual(expect.objectContaining({ lineupState: 'SUBMITTED', version: 4 }));
+    // Task 179: 대회 경기 명단은 참가 명단에서 계산된다 — 운영자라도 라인업 저장·제출 경로는 409 이고
+    // 게임 버전·리비전을 건드리지 않는다.
+    const lineupWrite = await captureFailure(() => service.rejectLineupWrite(authUser(ids.operatorUser), tournamentGameId));
+    expectHttpCode(lineupWrite, 409, 'ROSTER_MANAGED_BY_ADJUSTMENTS');
+    expect(await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId }, select: { version: true } })).toEqual({
+      version: 0,
+    });
+    expect(await prisma.v1GameLineup.count({ where: { gameId: tournamentGameId } })).toBe(2);
 
     const missingPinInput = { ...input, sourceId: ids.invalidFixture, competitionConfigVersionId: '' };
     const missingPin = await captureFailure(() =>
@@ -362,15 +293,14 @@ describe('Task 6 L1 game lifecycle', () => {
       ),
     );
     expectHttpCode(missingPin, 409, 'COMPETITION_CONFIG_REQUIRED');
-    expect(await prisma.v1Game.findUnique({ where: { tournamentFixtureId: ids.invalidFixture } })).toBeNull();
+    expect(await prisma.v1Game.findUnique({ where: { teamMatchId: ids.invalidFixture } })).toBeNull();
   });
 
   it('enforces header/body durable IDs, payload reuse, lifecycle, event append, and visibility', async () => {
     const startToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const start = {
-      // Game version at this point: create(0) + home lineup save(1) + home
-      // lineup submit(2) + away lineup save(3) + away lineup submit(4) -> 4.
-      expectedVersion: 4,
+      // 생성 직후 게임 버전 0 — 라인업 쓰기가 없다(Task 179).
+      expectedVersion: 0,
       clientCommandId: 'tournament-start',
       takeoverToken: startToken,
       occurredAt: new Date().toISOString(),
@@ -392,6 +322,28 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expect(started.state).toBe(V1GameState.LIVE);
     expect(replay).toEqual({ ...started, replayed: true });
+
+    // 응답을 놓친 사이 takeover 가 다시 발급돼도 재생은 처음 본문 그대로여야 한다 — 멱등 조회가 토큰 검증보다
+    // 먼저이고 토큰도 해시에 들어간다. 웹 운영 콘솔의 "같은 요청 재시도"가 이 순서에 기댄다.
+    const regrantedToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
+    const replayAfterRegrant = await service.executeCommand(
+      authUser(ids.operatorUser),
+      tournamentGameId,
+      'start',
+      start.clientCommandId,
+      start,
+    );
+    expect(replayAfterRegrant).toEqual({ ...started, replayed: true });
+    const swappedToken = await captureFailure(() =>
+      service.executeCommand(
+        authUser(ids.operatorUser),
+        tournamentGameId,
+        'start',
+        start.clientCommandId,
+        { ...start, takeoverToken: regrantedToken },
+      ),
+    );
+    expectHttpCode(swappedToken, 409, 'IDEMPOTENCY_PAYLOAD_CONFLICT');
 
     const mismatch = await captureFailure(() =>
       service.executeCommand(
@@ -417,7 +369,7 @@ describe('Task 6 L1 game lifecycle', () => {
 
     const appendToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const append = {
-      expectedVersion: 5,
+      expectedVersion: 1,
       clientEventId: 'event-period-start',
       takeoverToken: appendToken,
       type: V1GameEventType.PERIOD_START,
@@ -451,8 +403,9 @@ describe('Task 6 L1 game lifecycle', () => {
       }),
     );
     expectHttpCode(stale, 409, 'VERSION_CONFLICT');
+    // 킬스위치는 진행 중 노출만 끈다 — 모드 이름보다 "라이브 점수가 안 나간다" 쪽이 계약이다.
     expect(await service.getVisibility(tournamentGameId)).toEqual(
-      expect.objectContaining({ effectiveMode: 'status_only', score: null }),
+      expect.objectContaining({ effectiveMode: 'official_only', score: null, scoreStatus: 'unavailable' }),
     );
     await prisma.v1GameOperationFlag.update({ where: { key: 'PUBLIC_LIVE' }, data: { value: 'on' } });
     expect(await service.getVisibility(tournamentGameId)).toEqual(
@@ -463,7 +416,7 @@ describe('Task 6 L1 game lifecycle', () => {
   it('derives tournament participants while draft and freezes only after the complete snapshot exists', async () => {
     const endToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const endCommand = {
-      expectedVersion: 6,
+      expectedVersion: 2,
       clientCommandId: 'tournament-end',
       takeoverToken: endToken,
       occurredAt: new Date().toISOString(),
@@ -501,13 +454,10 @@ describe('Task 6 L1 game lifecycle', () => {
       failure: null,
       resultState: V1GameState.ENDED,
       gameState: V1GameState.ENDED,
-      gameVersion: 7,
+      gameVersion: 3,
       revisionStates: [V1GameResultRevisionState.SUBMITTED],
-      // The creation-time HOME placeholder ("Host One") is superseded once a submitted lineup exists.
-      // The latest 7-player HOME and AWAY lineup rosters are retained (the
-      // AWAY lineup exists so `start` clears assertLineupsSubmittedForStart --
-      // the official snapshot freezes 14 unique latest-lineup appearances).
-      participantCounts: [14],
+      // 제출본이 없으면 셀렉터는 최신 리비전을 읽는다 — 생성 시점 HOME 참가자("Host One") 한 명.
+      participantCounts: [1],
     });
 
     const replay = await service.executeCommand(
@@ -567,6 +517,7 @@ describe('Task 6 L1 game lifecycle', () => {
         ),
       )
     ).gameId;
+    await submitFriendlyTeamMatchLineups(prisma, teamGameId);
 
     // D-20/B6 (this PR) narrowed the TEAM_MATCH generic-command gate to block only
     // 'end' -- start/pause/resume/next-period now fall through to the tournament
@@ -586,13 +537,36 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expectHttpCode(genericCommand, 409, 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN');
 
+    const beforeTournamentGame = await prisma.v1Game.findUniqueOrThrow({
+      where: { id: tournamentGameId },
+      select: { version: true, lastSequence: true, currentOfficialRevisionId: true },
+    });
+    const beforeTournamentAudits = await prisma.v1OperationAudit.count({ where: { resourceId: tournamentGameId } });
+    const beforeTournamentIdempotency = await prisma.v1IdempotencyRecord.count({ where: { resourceId: tournamentGameId } });
+    const tournamentOutsider = await captureFailure(() =>
+      service.createResultRevision(
+        authUser(ids.outsiderUser),
+        tournamentGameId,
+        'tournament-outsider-draft',
+        {
+          expectedVersion: 3,
+          clientCommandId: 'tournament-outsider-draft',
+          score: { home: 0, away: 0 },
+          actualParticipants: [],
+          eventsHash: 'events-tournament-outsider',
+        },
+      ),
+    );
+    expectHttpCode(tournamentOutsider, 403, 'PERMISSION_DENIED');
+    expect(await prisma.v1OperationAudit.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentAudits);
+    expect(await prisma.v1IdempotencyRecord.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentIdempotency);
     const tournamentDraft = await captureFailure(() =>
       service.createResultRevision(
         authUser(ids.operatorUser),
         tournamentGameId,
         'tournament-draft',
         {
-          expectedVersion: 7,
+          expectedVersion: 3,
           clientCommandId: 'tournament-draft',
           score: { home: 0, away: 0 },
           actualParticipants: [],
@@ -602,6 +576,12 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expectHttpCode(tournamentDraft, 409, 'TOURNAMENT_RESULT_DERIVED_ONLY');
     expect(await prisma.v1GameResultRevision.count({ where: { gameId: tournamentGameId } })).toBe(1);
+    expect(await prisma.v1Game.findUniqueOrThrow({
+      where: { id: tournamentGameId },
+      select: { version: true, lastSequence: true, currentOfficialRevisionId: true },
+    })).toEqual(beforeTournamentGame);
+    expect(await prisma.v1OperationAudit.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentAudits);
+    expect(await prisma.v1IdempotencyRecord.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentIdempotency);
   });
 
   it('freezes submitted result content and gives concurrent approve/change-request exactly one winner', async () => {

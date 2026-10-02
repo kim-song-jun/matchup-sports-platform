@@ -9,7 +9,7 @@ import type {
 } from './tournament-campaign-admin-model';
 
 const INPUT_CLASS = [
-  'min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)]',
+  'min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm text-[var(--text-strong)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
 ].join(' ');
 
@@ -50,7 +50,7 @@ export function TournamentCampaignEditorCollections({
         ])}
       >
         {form.highlights.map((item, index) => (
-          <div key={`highlight-${index}`} className="rounded-xl bg-[var(--surface-soft)] p-4">
+          <div key={`highlight-${index}`} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-[var(--text-muted)]">참가할 이유 {index + 1}</p>
               <RemoveButton
@@ -98,7 +98,7 @@ export function TournamentCampaignEditorCollections({
         onAdd={() => onFaqChange([...form.faq, { question: '', answer: '' }])}
       >
         {form.faq.map((item, index) => (
-          <div key={`faq-${index}`} className="rounded-xl bg-[var(--surface-soft)] p-4">
+          <div key={`faq-${index}`} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-[var(--text-muted)]">FAQ {index + 1}</p>
               <RemoveButton
@@ -156,7 +156,7 @@ function EditorCollectionSection({
           type="button"
           disabled={addDisabled}
           onClick={onAdd}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:opacity-40"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:opacity-40"
         >
           <Plus size={14} aria-hidden="true" />
           {addLabel}
@@ -182,7 +182,7 @@ function CollectionField({
   readonly onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-[var(--text-body)]">
+    <label className="grid gap-2 text-xs font-semibold text-[var(--text-body)]">
       {label}
       {multiline ? (
         <textarea className={INPUT_CLASS} rows={3} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} />

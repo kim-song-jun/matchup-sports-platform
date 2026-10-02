@@ -20,15 +20,24 @@ Backend work must start by checking:
 
 - Canonical frontend app: `apps/v1_web`
 - Framework: Next.js App Router
-- Design source: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
+- Design source of truth: `DESIGN.md` (priority in its §1); visual reference: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 
 Frontend work must start by checking:
 
 1. Existing v1 route/page structure
 2. Existing v1 components/hooks/types
-3. The Teameet Design HTML
-4. Existing design tokens and shared UI patterns
+3. `DESIGN.md` and `docs/guides/v1-coding-patterns.md` (then the Teameet Design HTML for layout intent)
+4. Existing design tokens (`tokens.css`, `globals.css`) and shared UI patterns (`components/v1-ui/`)
+
+## Android
+
+- Canonical Android app: `apps/v1_android`
+- Architecture: dedicated native WebView shell over the deployed v1 Web origin, with native FCM, permission, and deep-link handling
+- Alpha and production must use distinct application IDs, Firebase projects, and API origins.
+- Teameet API owns Android notification delivery and calls FCM HTTP v1 directly with a short-lived OAuth token; `firebase-admin` is not used.
+- FCM remains only the Android OS transport and client token source. Service-account credentials never belong in the Android artifact; only public Firebase app identifiers are build inputs.
+- iOS delivery is separate: Teameet API calls APNs directly over HTTP/2 and the iOS app contains no Firebase SDK.
 
 ## Shared Rule
 
-If a rule or implementation outside `apps/v1_api`, `apps/v1_web`, or `.codex` conflicts with v1, ignore the old source and follow v1.
+If a rule or implementation outside `apps/v1_api`, `apps/v1_web`, `apps/v1_android`, or `.codex` conflicts with v1, ignore the old source and follow v1.

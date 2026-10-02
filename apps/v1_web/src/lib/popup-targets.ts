@@ -46,7 +46,11 @@ export function isSafePopupLink(value: string) {
   }
 }
 
+/** 백엔드 DTO(@MaxLength(500, { each: true }))와 맞춘 상한 — 두 값이 갈리면 저장 400이 난다. */
+export const POPUP_TARGET_PATH_MAX_LENGTH = 500;
+
 export function isSafePopupTargetPath(value: string) {
+  if (value.length > POPUP_TARGET_PATH_MAX_LENGTH) return false;
   if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return false;
   if (value.startsWith('/admin')) return false;
   if (value.includes('?') || value.includes('#')) return false;

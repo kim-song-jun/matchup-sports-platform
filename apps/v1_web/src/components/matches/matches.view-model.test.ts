@@ -29,8 +29,17 @@ describe('applyLabel — 참가 CTA 라벨 계약', () => {
     expect(applyLabel('guest', 'recruiting', false, undefined)).toBe('참가 신청');
   });
 
-  it('종료 계열 status(closed/cancelled/completed/expired/full)는 eligible과 무관하게 "신청 불가"', () => {
-    for (const s of ['closed', 'cancelled', 'completed', 'expired', 'full'] as const) {
+  /**
+   * [P2] status==='closed'(마감 시각이 지남)만 본문 상태 카드와 같은 말 '신청 마감'으로
+   * 통일한다 — 카드 제목("신청이 마감됐어요")과 버튼이 다른 단어를 쓰면 어휘가 갈린다.
+   * 정원 마감(full)·취소·완료·만료는 이유가 다르므로 기존 '신청 불가'를 그대로 유지한다.
+   */
+  it('마감 시각이 지난 status(closed)는 본문 상태 카드와 같은 말 "신청 마감"', () => {
+    expect(applyLabel('guest', 'closed', true, '신청할 수 있어요.')).toBe('신청 마감');
+  });
+
+  it('마감 시각 외 종료 계열 status(cancelled/completed/expired/full)는 eligible과 무관하게 "신청 불가"', () => {
+    for (const s of ['cancelled', 'completed', 'expired', 'full'] as const) {
       expect(applyLabel('guest', s, true, '신청할 수 있어요.')).toBe('신청 불가');
     }
   });

@@ -79,7 +79,9 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
 
 export function SessionFallback() {
   return (
-    <main className="tm-auth-frame">
+    // 셸 승격 후 AppChrome의 <main class="tm-scroll-area"> 안에 중첩되므로
+    // <main> 랜드마크 중복을 피하기 위해 div로 렌더한다 (tm-auth-frame 셀렉터는 태그와 무관)
+    <div className="tm-auth-frame">
       <div className="tm-auth-scroll tm-auth-scroll-full">
         <div className="tm-auth-login">
           <div>
@@ -91,6 +93,6 @@ export function SessionFallback() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

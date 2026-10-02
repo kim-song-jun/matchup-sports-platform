@@ -97,6 +97,11 @@ export function calculateCompetitionStandings(input: {
   registrationIds: string[];
   fixtures: StandingFixture[];
   config: CompetitionConfig;
+  /**
+   * registrationId → 누적 페어플레이 벌점(낮을수록 상위).
+   * 주지 않으면 전부 0으로 두어 기존 동작을 유지한다.
+   */
+  fairPlayByRegistration?: ReadonlyMap<string, number>;
 }): CalculatedStanding[] {
   const stats = new Map<string, StandingWithoutPosition>(
     input.registrationIds.map((registrationId) => [
@@ -109,7 +114,7 @@ export function calculateCompetitionStandings(input: {
         losses: 0,
         goalsFor: 0,
         goalsAgainst: 0,
-        fairPlayPoints: 0,
+        fairPlayPoints: input.fairPlayByRegistration?.get(registrationId) ?? 0,
       },
     ]),
   );

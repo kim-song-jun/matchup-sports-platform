@@ -7,6 +7,7 @@
  * No test merely verifies that a mock was called with what we told it to return.
  */
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,18 +38,44 @@ function makeNotification(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Prisma where 를 실제로 평가한다(같음·startsWith·in·gte) — 줄·알림을 고르는 조건이 하나라도 빠지면
+ * 다른 팀·다른 사람·다른 초대의 알림을 건드리는데, 호출 인자만 보는 단언으로는 그걸 못 잡는다.
+ */
+function whereMatches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
+  return Object.entries(where).every(([key, expected]) => {
+    const actual = row[key];
+    if (expected === null || typeof expected !== 'object' || expected instanceof Date) {
+      return actual instanceof Date && expected instanceof Date ? actual.getTime() === expected.getTime() : actual === expected;
+    }
+    const filter = expected as { startsWith?: string; in?: unknown[]; gte?: Date };
+    if (filter.startsWith !== undefined) return typeof actual === 'string' && actual.startsWith(filter.startsWith);
+    if (filter.in !== undefined) return filter.in.includes(actual);
+    if (filter.gte !== undefined) return actual instanceof Date && actual.getTime() >= filter.gte.getTime();
+    throw new Error(`unsupported where filter on ${key}`);
+  });
+}
+
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let prisma: {
+    $transaction: jest.Mock;
     v1NotificationPreference: { findUnique: jest.Mock; upsert: jest.Mock };
     v1Notification: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
       count: jest.Mock;
     };
+    v1TeamMatch: { findUnique: jest.Mock };
+    v1TeamSchedule: { findUnique: jest.Mock };
+    v1Team: { findUnique: jest.Mock };
+    v1TeamMembership: { findMany: jest.Mock };
+    v1TeamJoinApplication: { count: jest.Mock; findFirst: jest.Mock };
+    v1TeamInvitation: { count: jest.Mock; findUnique: jest.Mock };
   };
 
   const realtimeNotifier = { emitToUser: jest.fn() };
@@ -57,6 +84,7 @@ describe('NotificationsService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(),
       v1NotificationPreference: {
         findUnique: jest.fn(),
         upsert: jest.fn(),
@@ -64,12 +92,21 @@ describe('NotificationsService', () => {
       v1Notification: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1TeamSchedule: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1Team: { findUnique: jest.fn().mockResolvedValue({ name: '마포 FC' }) },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TeamJoinApplication: { count: jest.fn(), findFirst: jest.fn() },
+      v1TeamInvitation: { count: jest.fn(), findUnique: jest.fn() },
     };
+    // 팀·팀매치 알림은 밤에 푸시를 보류한다 — 시각에 따라 결과가 갈리지 않게 한낮(KST 12시)으로 고정한다.
+    jest.useFakeTimers({ now: new Date('2026-06-14T03:00:00Z'), doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -84,13 +121,17 @@ describe('NotificationsService', () => {
     service = module.get(NotificationsService);
   });
 
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
 
   // ─── emitNotification ──────────────────────────────────────────────────────
 
   it('선호도 row 없을 때 알림을 생성한다 (기본값 활성)', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null); // no pref row
-    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+    // 저장한 행을 그대로 돌려준다 — 푸시는 저장된 제목·본문을 싣는다.
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
 
     await service.emitNotification('user-1', 'match_application_received', 'match-1');
 
@@ -109,6 +150,48 @@ describe('NotificationsService', () => {
         }),
       }),
     );
+    expect(webPushService.sendToUser).toHaveBeenCalledWith('user-1', {
+      notificationId: 'notif-1',
+      title: expect.any(String),
+      body: expect.any(String),
+      url: '/matches/match-1',
+    });
+  });
+
+  it('문의 답변 알림을 중요 알림으로 분류하고 canonical 문의 상세 경로로 push fan-out 한다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: true });
+    prisma.v1Notification.create.mockResolvedValue(
+      makeNotification({
+        id: 'inquiry-notification-1',
+        targetType: 'inquiry',
+        targetId: 'inquiry-1',
+        title: '문의에 답변이 등록됐어요',
+        body: '답변 내용을 확인해 주세요.',
+        deepLink: '/my/inquiries/inquiry-1',
+      }),
+    );
+
+    await service.emitNotification('user-1', 'inquiry_answered', 'inquiry-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1NotificationPreference.findUnique).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      select: { importantEnabled: true },
+    });
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: 'user-1',
+        targetType: 'inquiry',
+        targetId: 'inquiry-1',
+        deepLink: '/my/inquiries/inquiry-1',
+      }),
+    });
+    expect(webPushService.sendToUser).toHaveBeenCalledWith('user-1', {
+      notificationId: 'inquiry-notification-1',
+      title: '문의에 답변이 등록됐어요',
+      body: '답변 내용을 확인해 주세요.',
+      url: '/my/inquiries/inquiry-1',
+    });
   });
 
   it('사용자가 해당 카테고리를 비활성화했을 때 알림 DB row를 생성하지 않는다', async () => {
@@ -232,7 +315,7 @@ describe('NotificationsService', () => {
 
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', err: pushError }),
-      '웹 푸시 발송 실패',
+      '푸시 알림 발송 실패',
     );
   });
 
@@ -260,20 +343,20 @@ describe('NotificationsService', () => {
     );
   });
 
-  it('team join application received notifications deep-link to team member management', async () => {
+  it('team invitation received notifications deep-link to the invitation inbox, not the team page', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification());
 
-    await service.emitNotification('manager-1', 'team_join_application_received', 'team-1');
+    await service.emitNotification('invitee-1', 'team_invitation_received', 'team-1');
     await new Promise(setImmediate);
 
     expect(prisma.v1Notification.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          recipientUserId: 'manager-1',
+          recipientUserId: 'invitee-1',
           targetType: 'team',
           targetId: 'team-1',
-          deepLink: '/teams/team-1/members',
+          deepLink: '/my/invitations',
         }),
       }),
     );
@@ -296,6 +379,82 @@ describe('NotificationsService', () => {
     expect(prisma.v1Notification.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ deepLink: expectedDeepLink }),
+      }),
+    );
+  });
+
+  // 리그 결과 확정 알림은 결과 영수증 화면(경기 상세가 아니라 확정 결과를 보여주는
+  // 화면)으로 딥링크한다. Task 166 이 이의 알림 4종을 없애 남은 것은 이 하나다.
+  it.each([
+    ['league_team_match_completed' as const, 'tm-1', '/team-matches/tm-1/result'],
+  ])('%s 알림은 결과 영수증 화면으로 딥링크한다', async (type, targetId, expectedDeepLink) => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', type, targetId);
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ deepLink: expectedDeepLink, targetType: 'team_match' }),
+      }),
+    );
+  });
+
+  // team_match_completed(일반 팀매치) 문구·링크는 이 태스크로 인해 한 글자도 바뀌면 안 된다
+  // -- 리그 전용 형제 타입을 새로 추가했을 뿐 기존 타입은 그대로다(회귀 고정).
+  it('team_match_completed(일반) 문구·링크는 리그 전용 타입 추가 이후에도 그대로다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'team_match_completed', 'tm-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: '팀매치가 완료됐어요. 리뷰를 남겨보세요!',
+          body: '팀매치 리뷰를 남겨보세요.',
+          deepLink: '/my/reviews/team_match/tm-1',
+        }),
+      }),
+    );
+  });
+
+  // ─── tournament_record_consent_invite 딥링크 (Task 154 P0-4·P0-6) ──────────
+  //
+  // 이 알림은 "동의를 켜 달라"고 요청한다. 그러니 눌렀을 때 **켤 수 있는 화면**에
+  // 떨어져야 한다 -- 폴백(ROUTE_BASE_BY_TARGET_TYPE['tournament'])으로 새면
+  // /tournaments/{id} 로 가는데 그 화면엔 동의를 켤 방법이 없어 막다른 길이 된다.
+  // 대회 id 는 착지 화면이 "어느 대회 때문에 왔는지" 를 설명하는 데 쓴다.
+
+  it('tournament_record_consent_invite: 동의를 켤 수 있는 화면으로 가고 대회 맥락을 함께 싣는다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'tournament_record_consent_invite', 'tour-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          targetType: 'tournament',
+          deepLink: '/my/settings/record-consent?from=tournament&tournamentId=tour-1',
+        }),
+      }),
+    );
+  });
+
+  it('tournament_record_consent_invite: targetId 가 없으면 파라미터 없이 기본 화면으로 간다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'tournament_record_consent_invite', null);
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ deepLink: '/my/settings/record-consent' }),
       }),
     );
   });
@@ -391,5 +550,526 @@ describe('NotificationsService', () => {
     expect(upsertCall.update).toEqual({ marketingEnabled: true });
     expect(upsertCall.update).not.toHaveProperty('importantEnabled');
     expect(upsertCall.update).not.toHaveProperty('activityEnabled');
+  });
+
+  // ─── team_contact_* mapping (Task 6) ──────────────────────────────────────
+  // preferenceFieldForEvent / targetTypeForEvent 는 말미에 폴백 return이 있어 분기를
+  // 빠뜨려도 tsc가 안 잡는다(조용히 activityEnabled/team_match로 샌다). deepLinkForEvent도
+  // 특례 없이 두면 ROUTE_BASE_BY_TARGET_TYPE['team']='/teams' 로 떨어져 /teams/{id} 라는
+  // 404 링크가 만들어진다. 세 함수 모두 파일 로컬이라 직접 import할 수 없으므로,
+  // emitNotification이 실제로 prisma.v1Notification.create에 저장하는 데이터로 관측한다.
+  describe.each([
+    ['team_contact_received' as const, '새 팀 컨택이 도착했어요', '상대 팀이 보낸 컨택을 확인해 주세요.'],
+    ['team_contact_accepted' as const, '팀 컨택이 수락됐어요', '이제 상대 팀과 대화할 수 있어요.'],
+    ['team_contact_declined' as const, '팀 컨택이 거절됐어요', '아쉽지만 이번에는 성사되지 않았어요.'],
+  ])('%s 알림 매핑', (eventType, expectedTitle, expectedBody) => {
+    it("targetType 이 'chat' 이고 딥링크가 /chat/{roomId} 로 간다", async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+      await service.emitNotification('user-1', eventType, 'contact-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            targetType: 'chat',
+            deepLink: '/chat/contact-1',
+            title: expectedTitle,
+            body: expectedBody,
+          }),
+        }),
+      );
+    });
+
+    it('teamEnabled 를 끈 사용자에게는 발송되지 않는다', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({
+        matchEnabled: true,
+        teamEnabled: false,
+        teamMatchEnabled: true,
+        activityEnabled: true,
+        importantEnabled: true,
+      });
+
+      await service.emitNotification('user-1', eventType, 'contact-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+
+    it('activityEnabled 만 꺼도 발송된다 — activityEnabled 폴백으로 새지 않았다는 증거', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({
+        matchEnabled: true,
+        teamEnabled: true,
+        teamMatchEnabled: true,
+        activityEnabled: false,
+        importantEnabled: true,
+      });
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+      await service.emitNotification('user-1', eventType, 'contact-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).toHaveBeenCalled();
+    });
+  });
+
+  // ─── 야간 푸시 보류(H1-night) ─────────────────────────────────────────────
+
+  describe('밤(21~9시)의 팀·팀매치 사건 알림', () => {
+    const at = (iso: string) => jest.setSystemTime(new Date(iso));
+    async function emitAndFlush(type: Parameters<NotificationsService['emitNotification']>[1], targetId: string) {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+      await service.emitNotification('user-1', type, targetId);
+      await new Promise(setImmediate);
+    }
+
+    it('밤에는 알림함 행만 만들고 푸시는 보내지 않는다 — 아침에 몰아 보내지도 않는다', async () => {
+      at('2026-06-14T14:00:00Z'); // KST 23:00
+      await emitAndFlush('team_join_application_accepted', 'team-1');
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+      expect(realtimeNotifier.emitToUser).toHaveBeenCalledTimes(1);
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('낮에는 같은 알림을 푸시한다', async () => {
+      at('2026-06-14T03:00:00Z'); // KST 12:00
+      await emitAndFlush('team_join_application_accepted', 'team-1');
+
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('그 밤이 끝나기(다음 9시) 전에 시작하는 경기 알림은 밤에도 푸시한다', async () => {
+      at('2026-06-14T14:00:00Z'); // KST 23:00
+      prisma.v1TeamMatch.findUnique.mockResolvedValue({ startAt: new Date('2026-06-14T22:00:00Z') }); // 다음 날 07:00
+      await emitAndFlush('team_match_cancelled', 'team-match-1');
+
+      expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'team-match-1' } }));
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('다음 9시 이후에 시작하는 경기 알림은 밤에 푸시하지 않는다', async () => {
+      at('2026-06-14T17:30:00Z'); // KST 02:30
+      prisma.v1TeamMatch.findUnique.mockResolvedValue({ startAt: new Date('2026-06-15T00:00:00Z') }); // KST 09:00 정각
+      await emitAndFlush('team_match_cancelled', 'team-match-1');
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('시작 시각 조회가 실패하면 푸시만 보류하고 알림함 행은 남긴다', async () => {
+      at('2026-06-14T14:00:00Z');
+      prisma.v1TeamMatch.findUnique.mockRejectedValue(new Error('db down'));
+      await emitAndFlush('team_match_cancelled', 'team-match-1');
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(1);
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('팀·팀매치 밖의 알림(개인 매치)은 밤에도 지금처럼 푸시한다', async () => {
+      at('2026-06-14T14:00:00Z');
+      await emitAndFlush('match_application_received', 'match-1');
+
+      expect(prisma.v1TeamMatch.findUnique).not.toHaveBeenCalled();
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ─── 몰림 줄(H1-join-burst) ──────────────────────────────────────────────
+
+  describe('가입 신청·초대 수락 몰림 줄', () => {
+    type Row = Record<string, unknown> & { id: string; businessKey: string | null; readAt: Date | null; createdAt: Date };
+    let rows: Row[];
+    let committed: Set<string>;
+    let sentBeforeCommit: string[];
+    const matches = whereMatches;
+
+    beforeEach(() => {
+      rows = [];
+      let seq = 0;
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      // Prisma 처럼 행의 사본을 돌려준다 — 참조를 돌려주면 뒤이은 update 가 앞서 읽은 값을 바꿔 버린다.
+      const copy = (row: Row | undefined) => (row === undefined ? null : { ...row });
+      prisma.v1Notification.findUnique.mockImplementation(async ({ where }) => copy(rows.find((row) => matches(row, where))));
+      prisma.v1Notification.findFirst.mockImplementation(async ({ where }) =>
+        copy(rows.filter((row) => matches(row, where)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]),
+      );
+      prisma.v1Notification.create.mockImplementation(async ({ data }) => {
+        if (data.businessKey && rows.some((row) => row.businessKey === data.businessKey)) {
+          throw new Prisma.PrismaClientKnownRequestError('duplicate', { code: 'P2002', clientVersion: 'test' });
+        }
+        const row: Row = { id: `n-${++seq}`, businessKey: null, readAt: null, createdAt: new Date(), ...data };
+        rows.push(row);
+        return copy(row);
+      });
+      prisma.v1Notification.update.mockImplementation(async ({ where, data }) => copy(Object.assign(rows.find((row) => matches(row, where))!, data)));
+      prisma.v1Notification.updateMany.mockImplementation(async ({ where, data }) => {
+        const hit = rows.filter((row) => matches(row, where));
+        hit.forEach((row) => Object.assign(row, data));
+        return { count: hit.length };
+      });
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }]);
+
+      // Postgres 흉내: 같은 키의 pg_advisory_xact_lock 은 앞 트랜잭션이 끝날 때까지 기다리고, 트랜잭션이 쓴 줄은
+      // 콜백이 끝나야 커밋된다. 커밋 전에 실시간 알림·푸시로 나간 줄은 sentBeforeCommit 에 남긴다.
+      committed = new Set();
+      sentBeforeCommit = [];
+      const locks = new Map<string, Promise<void>>();
+      prisma.$transaction.mockImplementation(async (work: (tx: unknown) => Promise<unknown>) => {
+        const written: string[] = [];
+        let release = () => {};
+        const track = <T extends { id: string }>(row: T) => {
+          written.push(row.id);
+          return row;
+        };
+        const tx = {
+          ...prisma,
+          $executeRaw: async (_sql: TemplateStringsArray, key: string) => {
+            const held = new Promise<void>((resolve) => (release = resolve));
+            const before = locks.get(key) ?? Promise.resolve();
+            locks.set(key, before.then(() => held));
+            await before;
+          },
+          v1Notification: {
+            ...prisma.v1Notification,
+            create: async (args: unknown) => track(await prisma.v1Notification.create(args)),
+            update: async (args: unknown) => track(await prisma.v1Notification.update(args)),
+          },
+        };
+        try {
+          const result = await work(tx);
+          written.forEach((id) => committed.add(id));
+          return result;
+        } finally {
+          release();
+        }
+      });
+      realtimeNotifier.emitToUser.mockImplementation((_userId: string, _event: string, notification: { id: string }) => {
+        if (!committed.has(notification.id)) sentBeforeCommit.push(notification.id);
+      });
+      webPushService.sendToUser.mockImplementation(async (_userId: string, payload: { notificationId: string }) => {
+        if (!committed.has(payload.notificationId)) sentBeforeCommit.push(payload.notificationId);
+      });
+    });
+
+    afterEach(() => {
+      realtimeNotifier.emitToUser.mockReset();
+      webPushService.sendToUser.mockReset();
+      webPushService.sendToUser.mockResolvedValue(undefined);
+    });
+
+    const pending = (count: number, latestName: string) => {
+      prisma.v1TeamJoinApplication.count.mockResolvedValue(count);
+      prisma.v1TeamJoinApplication.findFirst.mockResolvedValue(
+        count === 0 ? null : { applicantUser: { profile: { nickname: latestName, displayName: null } } },
+      );
+    };
+    const later = () => jest.advanceTimersByTime(60_000);
+
+    it('신청 3건이 몰려도 팀장에게는 한 줄·푸시 1회 — "가입 신청 3건이 기다려요 · 막내님 외 2명"', async () => {
+      pending(1, '첫째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      expect(rows[0]).toMatchObject({ title: '첫째님이 가입을 신청했어요', body: '"마포 FC" · 승인하거나 거절해 주세요.' });
+
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      pending(3, '막내');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        recipientUserId: 'owner-1',
+        title: '가입 신청 3건이 기다려요',
+        body: '"마포 FC" · 막내님 외 2명 · 승인하거나 거절해 주세요.',
+        deepLink: '/teams/team-1/members?tab=requests',
+        readAt: null,
+      });
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+      expect(realtimeNotifier.emitToUser).toHaveBeenCalledTimes(3);
+    });
+
+    it('읽은 줄에 새 신청이 오면 같은 줄이 다시 안 읽음이 되어 맨 위로 올라오고 푸시가 다시 간다', async () => {
+      pending(1, '첫째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      rows[0].readAt = new Date();
+      const firstCreatedAt = rows[0].createdAt;
+      later();
+
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].readAt).toBeNull();
+      expect(rows[0].createdAt.getTime()).toBeGreaterThan(firstCreatedAt.getTime());
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('처리하면 남은 건수로 문구만 고치고(푸시 없음), 대기가 0 이 되면 읽음 — 다른 팀 줄은 그대로다', async () => {
+      pending(3, '막내');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+      await service.refreshTeamJoinApplicationsLine('team-2', 'arrival');
+      jest.mocked(webPushService.sendToUser).mockClear();
+
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'recount');
+      const team1 = rows.find((row) => row.targetId === 'team-1')!;
+      expect(team1).toMatchObject({ title: '가입 신청 2건이 기다려요', readAt: null });
+
+      pending(0, '');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'recount');
+      expect(team1.readAt).toBeInstanceOf(Date);
+      expect(rows.find((row) => row.targetId === 'team-2')).toMatchObject({ title: '가입 신청 3건이 기다려요', readAt: null });
+      expect(webPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('처리 뒤 다시 세는 줄은 지금 팀장·매니저 것뿐이다 — 매니저에서 내려온 사람의 옛 줄에는 새 신청자 이름이 실리지 않는다', async () => {
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }, { userId: 'manager-2' }]);
+      pending(2, '둘째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ userId: 'owner-1' }]);
+      pending(3, '셋째');
+      await service.refreshTeamJoinApplicationsLine('team-1', 'recount');
+
+      const lineOf = (userId: string) => rows.find((row) => row.recipientUserId === userId)!;
+      expect(lineOf('owner-1').body).toBe('"마포 FC" · 셋째님 외 2명 · 승인하거나 거절해 주세요.');
+      expect(lineOf('manager-2').body).toBe('"마포 FC" · 둘째님 외 1명 · 승인하거나 거절해 주세요.');
+    });
+
+    it('초대 수락은 안 읽은 동안 한 줄로 모이고("○○님 외 N명"), 읽은 뒤의 수락은 새 줄로 다시 알린다', async () => {
+      const accepted: Array<{ respondedAt: Date }> = [];
+      prisma.v1TeamInvitation.count.mockImplementation(async ({ where }) =>
+        accepted.filter((invitation) => invitation.respondedAt >= where.respondedAt.gte).length,
+      );
+      const accept = async (id: string, name: string) => {
+        later();
+        const acceptedAt = new Date();
+        accepted.push({ respondedAt: acceptedAt });
+        prisma.v1TeamInvitation.findUnique.mockResolvedValue({ invitedUser: { profile: { nickname: name, displayName: null } } });
+        await service.recordTeamInvitationAccepted({ inviterUserId: 'owner-1', teamId: 'team-1', invitationId: id, acceptedAt });
+      };
+
+      await accept('inv-a', '선수10');
+      await accept('inv-b', '선수11');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ title: '선수11님 외 1명이 초대를 수락했어요', body: '"마포 FC" 멤버가 됐어요.', deepLink: '/teams/team-1' });
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+
+      rows[0].readAt = new Date();
+      await accept('inv-c', '선수12');
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toMatchObject({ title: '선수12님이 초대를 수락했어요', readAt: null });
+      expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
+    });
+
+    describe('동시에 온 요청', () => {
+      const acceptances = (list: Array<{ id: string; name: string; at: string }>) => {
+        prisma.v1TeamInvitation.count.mockImplementation(async ({ where }) =>
+          list.filter((invitation) => new Date(invitation.at) >= where.respondedAt.gte).length,
+        );
+        prisma.v1TeamInvitation.findUnique.mockImplementation(async ({ where }) => {
+          const nickname = list.find((invitation) => invitation.id === where.id)?.name ?? null;
+          return { invitedUser: { profile: { nickname, displayName: null } } };
+        });
+        return (id: string) => {
+          const acceptedAt = new Date(list.find((invitation) => invitation.id === id)!.at);
+          return service.recordTeamInvitationAccepted({ inviterUserId: 'owner-1', teamId: 'team-1', invitationId: id, acceptedAt });
+        };
+      };
+
+      it('초대 수락 두 건이 거의 동시에 와도 초대한 사람에게는 한 줄·푸시 1회이고 두 사람을 모두 센다', async () => {
+        const accept = acceptances([
+          { id: 'inv-a', name: '선수10', at: '2026-06-14T03:00:00.000Z' },
+          { id: 'inv-b', name: '선수11', at: '2026-06-14T03:00:00.004Z' },
+        ]);
+        await Promise.all([accept('inv-a'), accept('inv-b')]);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].title).toMatch(/^선수1[01]님 외 1명이 초대를 수락했어요$/);
+        expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+      });
+
+      it('잠금을 먼저 잡은 쪽이 더 늦게 수락한 사람이어도 먼저 수락한 사람까지 센다', async () => {
+        const accept = acceptances([
+          { id: 'inv-early', name: '선수10', at: '2026-06-14T02:59:59.000Z' },
+          { id: 'inv-late', name: '선수11', at: '2026-06-14T03:00:00.000Z' },
+        ]);
+        await accept('inv-late');
+        await accept('inv-early');
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].title).toBe('선수10님 외 1명이 초대를 수락했어요');
+      });
+
+      it('읽은 가입 신청 줄에 신청 두 건이 동시에 와도 줄을 다시 여는 푸시는 1회다', async () => {
+        pending(1, '첫째');
+        await service.refreshTeamJoinApplicationsLine('team-1', 'arrival');
+        rows[0].readAt = new Date();
+        webPushService.sendToUser.mockClear();
+
+        pending(3, '셋째');
+        await Promise.all([
+          service.refreshTeamJoinApplicationsLine('team-1', 'arrival'),
+          service.refreshTeamJoinApplicationsLine('team-1', 'arrival'),
+        ]);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ title: '가입 신청 3건이 기다려요', readAt: null });
+        expect(webPushService.sendToUser).toHaveBeenCalledTimes(1);
+      });
+
+      it('줄의 실시간 알림·푸시는 그 줄을 쓴 트랜잭션이 커밋된 뒤에 나간다', async () => {
+        pending(1, '첫째');
+        const accept = acceptances([{ id: 'inv-a', name: '선수10', at: '2026-06-14T03:00:00.000Z' }]);
+        await Promise.all([service.refreshTeamJoinApplicationsLine('team-1', 'arrival'), accept('inv-a')]);
+
+        expect(realtimeNotifier.emitToUser).toHaveBeenCalledTimes(2);
+        expect(webPushService.sendToUser).toHaveBeenCalledTimes(2);
+        expect(sentBeforeCommit).toEqual([]);
+      });
+    });
+  });
+
+  // ─── 팀 사건 알림 문구·착지(H1) ───────────────────────────────────────────
+
+  describe('팀 사건 알림 문구·착지', () => {
+    async function rendered(
+      type: Parameters<NotificationsService['emitNotification']>[1],
+      targetId: string,
+      vars: Record<string, string>,
+    ) {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+      await service.emitNotification('user-1', type, targetId, undefined, { vars });
+      await new Promise(setImmediate);
+      return prisma.v1Notification.create.mock.calls.at(-1)?.[0].data;
+    }
+
+    it.each([
+      ['team_manager_assigned', {}, '매니저가 되었어요', '"마포 FC" · 가입 신청과 팀 일정을 관리할 수 있어요.', '/teams/team-1'],
+      ['team_manager_revoked', {}, '매니저에서 멤버로 바뀌었어요', '"마포 FC" · 팀 관리 메뉴는 더 보이지 않아요.', '/teams/team-1'],
+      ['team_owner_received', {}, '팀장이 되었어요', '"마포 FC" · 팀장을 넘겨받았어요. 멤버 관리와 팀 정보를 바꿀 수 있어요.', '/teams/team-1/members'],
+      ['team_owner_changed', { name: '새팀장' }, '팀장이 바뀌었어요', '"마포 FC" · 새 팀장은 새팀장님이에요.', '/teams/team-1'],
+      ['team_membership_removed', {}, '팀에서 제외됐어요', '"마포 FC" · 이 팀의 일정과 채팅은 더 볼 수 없어요.', '/teams/team-1'],
+      ['team_member_left', { name: '선수07', count: '9' }, '선수07님이 팀을 나갔어요', '"마포 FC" · 지금 멤버는 9명이에요.', '/teams/team-1/members'],
+      ['team_invitation_declined', { name: '선수17' }, '선수17님이 초대를 거절했어요', '"마포 FC" 팀 초대가 거절됐어요.', '/teams/team-1/members?tab=invitations'],
+    ] as const)('%s', async (type, extra, title, body, deepLink) => {
+      const data = await rendered(type, 'team-1', { team: '마포 FC', ...extra });
+      expect(data).toMatchObject({ targetType: 'team', targetId: 'team-1', title, body, deepLink });
+    });
+
+    it('팀매치 신청 도착은 제목에 신청한 팀, 본문 맨 앞에 우리 팀을 싣고 팀매치 상세로 간다(H1-teammatch-applied)', async () => {
+      const data = await rendered('team_match_application_received', 'tm-1', { name: '합정 유나이티드', team: '마포 FC', when: '9/30 (수) 01:10' });
+      expect(data).toMatchObject({
+        targetType: 'team_match',
+        title: '합정 유나이티드 팀이 팀매치를 신청했어요',
+        body: '"마포 FC" · 친선 팀매치 · 9/30 (수) 01:10 · 승인하거나 거절해 주세요.',
+        deepLink: '/team-matches/tm-1',
+      });
+    });
+
+    it('문구의 자리를 채우지 못하면 "{team}" 이 보이는 알림을 만들지 않는다', async () => {
+      await rendered('team_owner_changed', 'team-1', { team: '마포 FC' });
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
+    });
+  });
+
+  // ─── 팀 초대 도착 알림의 후속 처리 ─────────────────────────────────────────
+
+  describe('팀 초대 도착 알림 처리', () => {
+    type Row = ReturnType<typeof makeNotification>;
+    // 이 초대를 보낸(다시 보낸) 시각. 기본 알림 행은 그 뒤(10:00)에 만들어졌다.
+    const SENT_AT = new Date('2026-06-14T09:59:00Z');
+
+    function seed(): Row[] {
+      const invite = (id: string, overrides: Record<string, unknown> = {}) =>
+        makeNotification({
+          id,
+          targetType: 'team',
+          targetId: 'team-1',
+          title: '팀 초대가 도착했어요',
+          deepLink: '/my/invitations',
+          ...overrides,
+        });
+      return [
+        invite('target'),
+        invite('other-team', { targetId: 'team-2' }),
+        invite('other-user', { recipientUserId: 'user-2' }),
+        invite('already-read', { readAt: new Date('2026-06-14T09:00:00Z') }),
+        // 같은 팀이지만 초대가 아닌 알림 — 가입 신청 도착(팀장에게 가는 것)
+        invite('join-request', { title: '팀 가입 신청이 도착했어요', deepLink: '/teams/team-1/members?tab=requests' }),
+        // 같은 사람·같은 팀의 옛 초대(만료된 채 안 읽음) — 이번 초대가 아니다(W2-V7 대조군).
+        invite('older-invitation', { createdAt: new Date('2026-06-01T10:00:00Z') }),
+      ];
+    }
+
+    function useFakeStore(rows: Row[]) {
+      prisma.v1Notification.updateMany.mockImplementation(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        const matched = rows.filter((row) => whereMatches(row, where));
+        matched.forEach((row) => Object.assign(row, data));
+        return { count: matched.length };
+      });
+    }
+
+    const byId = (rows: Row[], id: string) => rows.find((row) => row.id === id)!;
+    const handled = (result: 'accepted' | 'declined') =>
+      service.markTeamInvitationHandled({ userId: 'user-1', teamId: 'team-1', teamName: '성수 FC', sentAt: SENT_AT, result });
+
+    it('수락하면 그 초대의 도착 알림만 "수락했어요"로 바꿔 읽음 처리하고 팀 상세로 보낸다', async () => {
+      const rows = seed();
+      useFakeStore(rows);
+
+      await handled('accepted');
+
+      expect(byId(rows, 'target')).toMatchObject({ title: '팀 초대를 수락했어요', body: '"성수 FC" 멤버가 됐어요.', deepLink: '/teams/team-1' });
+      expect(byId(rows, 'target').readAt).toBeInstanceOf(Date);
+      for (const untouched of ['other-team', 'other-user', 'join-request', 'older-invitation']) {
+        expect(byId(rows, untouched).readAt).toBeNull();
+      }
+      expect(byId(rows, 'older-invitation')).toMatchObject({ title: '팀 초대가 도착했어요', deepLink: '/my/invitations' });
+      expect(byId(rows, 'already-read').readAt).toEqual(new Date('2026-06-14T09:00:00Z'));
+    });
+
+    it('거절하면 "거절했어요"로 바꾸고 공개 팀 상세로 보낸다', async () => {
+      const rows = seed();
+      useFakeStore(rows);
+
+      await handled('declined');
+
+      expect(byId(rows, 'target')).toMatchObject({ title: '팀 초대를 거절했어요', body: '"성수 FC" 팀 초대를 거절했어요.', deepLink: '/teams/team-1' });
+      expect(byId(rows, 'older-invitation').readAt).toBeNull();
+    });
+
+    it('초대 취소는 그 초대의 알림만 "취소됐어요"로 바꾸고 도착지를 팀 상세로 옮긴다 — 옛 초대 알림은 그대로다', async () => {
+      const rows = seed();
+      useFakeStore(rows);
+
+      await service.markTeamInvitationCancelled('user-1', 'team-1', '성수 FC', SENT_AT);
+
+      const target = byId(rows, 'target');
+      expect(target).toMatchObject({
+        title: '팀 초대가 취소됐어요',
+        body: '"성수 FC" 팀이 초대를 취소했어요.',
+        deepLink: '/teams/team-1',
+      });
+      expect(target.readAt).toBeInstanceOf(Date);
+      expect(byId(rows, 'older-invitation')).toMatchObject({ title: '팀 초대가 도착했어요', readAt: null });
+      expect(byId(rows, 'other-team').title).toBe('팀 초대가 도착했어요');
+      expect(byId(rows, 'join-request').title).toBe('팀 가입 신청이 도착했어요');
+      expect(byId(rows, 'join-request').deepLink).toBe('/teams/team-1/members?tab=requests');
+    });
+
+    it('알림 갱신이 실패해도 던지지 않고 로그를 남긴다 — 수락·거절·취소 응답을 깨지 않는다', async () => {
+      prisma.v1Notification.updateMany.mockRejectedValue(new Error('db down'));
+
+      await expect(handled('accepted')).resolves.toBeUndefined();
+      await expect(service.markTeamInvitationCancelled('user-1', 'team-1', '성수 FC', SENT_AT)).resolves.toBeUndefined();
+
+      expect(logger.warn).toHaveBeenCalledTimes(2);
+    });
   });
 });

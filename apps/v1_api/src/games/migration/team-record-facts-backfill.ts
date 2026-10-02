@@ -1,7 +1,8 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { GameResultOfficialFactsService } from '../../game-operations/game-result-official-facts.service';
-import type { OfficialRevisionRow } from '../../game-operations/game-result-official-projection.types';
+import type { OfficialRevisionRow, OfficialRevisionRowRaw } from '../../game-operations/game-result-official-projection.types';
 import { officialRevisionRowSelect } from '../../game-operations/official-revision-row.query';
+import { normalizeOfficialRevisionRow } from '../../game-operations/official-revision-row.normalizer';
 import { parseOfficialScore } from '../../game-operations/parse-official-score';
 
 /**
@@ -71,7 +72,7 @@ import { parseOfficialScore } from '../../game-operations/parse-official-score';
  * project()` is the single source of truth for every column written.
  */
 
-export type TeamRecordFactsBackfillQuarantineReason = 'CORRUPT_SCORE';
+export type TeamRecordFactsBackfillQuarantineReason = 'CORRUPT_SCORE' | 'INVALID_SOURCE_OWNERSHIP';
 
 export type TeamRecordFactsBackfillQuarantine = {
   revisionId: string;
@@ -94,7 +95,7 @@ export type TeamRecordFactsBackfillResult = {
 // narrower once the WHERE clause has filtered to `state = 'OFFICIAL' AND
 // official_at IS NOT NULL`, mirroring `GameResultOfficialProjectionService`'s
 // own `LockedOfficialRevisionRow` / `lockOfficialRevision()` narrowing.
-type CandidateRow = Omit<OfficialRevisionRow, 'officialAt'> & {
+type CandidateRow = Omit<OfficialRevisionRowRaw, 'officialAt'> & {
   state: string;
   officialAt: Date | null;
 };
@@ -143,23 +144,11 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
     // (never expected to trigger) rather than a non-null assertion, mirroring
     // lockOfficialRevision()'s equivalent narrowing.
     if (officialAt === null) continue;
-    toProject.push({
-      revisionId: row.revisionId,
-      gameId: row.gameId,
-      revision: row.revision,
-      score: row.score,
-      sourceHash: row.sourceHash,
-      playedAt: row.playedAt,
-      officialAt,
-      reason: row.reason,
-      sourceType: row.sourceType,
-      currentOfficialRevisionId: row.currentOfficialRevisionId,
-      tournamentId: row.tournamentId,
-      tournamentFixtureId: row.tournamentFixtureId,
-      homeTeamId: row.homeTeamId,
-      awayTeamId: row.awayTeamId,
-      visibility: row.visibility,
-    });
+    try {
+      toProject.push(normalizeOfficialRevisionRow({ ...row, officialAt }));
+    } catch {
+      quarantine.push({ revisionId: row.revisionId, gameId: row.gameId, reason: 'INVALID_SOURCE_OWNERSHIP' });
+    }
   }
 
   return { revisionsEligible: rows.length, toProject, quarantine };

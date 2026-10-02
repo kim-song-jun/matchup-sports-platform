@@ -1,14 +1,14 @@
 /**
  * 대진 관리 조 카드(bracket-group-*.tsx)용 입력·버튼 클래스.
  *
- * tournament-detail-client.tsx에도 동일한 이름의 상수가 있다(그 파일 안에서만 30곳 넘게
+ * tournament-detail-shared.tsx에도 동일한 이름의 상수가 있다(대회 상세 섹션 파일들에서 30곳 넘게
  * 재사용돼 이번 리팩터 범위 밖). 그 파일을 이 파일이 import하면 (그 파일이 이 컴포넌트들을
  * import하는) 순환 참조가 생기므로, 짧은 CSS 토큰 문자열 2개만 여기 그대로 복제해 둔다.
  */
 
 /** h-[44px] 통일 제출 버튼 */
 export const submitBtnCls = [
-  'inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl',
+  'inline-flex items-center justify-center gap-2 h-[44px] px-4 rounded-xl',
   'whitespace-nowrap',
   'text-[13px] text-white bg-blue-500 hover:bg-blue-600',
   'transition-colors disabled:opacity-50',

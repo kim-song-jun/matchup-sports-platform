@@ -44,26 +44,31 @@ export interface LineupConfigFormation {
   slots: Array<{ position: string; x: number; y: number }>;
 }
 
-/** 서버가 내려준 lineupConfig.positions/formations를 화면이 쓰는 FormationPreset[]로
- * 옮겨 담는다 — 계산도 데이터 발명도 없이, positions 사전으로 formations의 각 슬롯에
- * 라벨만 붙인다. positions 사전에 없는 코드가 슬롯에 나오면(서버·프론트 배포 시점이
- * 어긋나는 등 방어적 상황) 코드 자체를 라벨로 폴백해 화면이 깨지지 않게 한다. */
-export function buildFormationPresets(
-  positions: readonly LineupConfigPosition[],
-  formations: readonly LineupConfigFormation[],
+/**
+ * 서버 사전 → 대형 목록. `outfield` 가 주어지면 그 필드 인원(경기 인원 − GK) 대형만 남긴다 —
+ * 5:5 경기에 필드 5명 대형이 섞이면 고를 때마다 한 자리가 남거나 모자란다.
+ * `keepCode` 는 이미 저장된 대형이 인원 필터에 걸려도 목록에 남긴다(저장본을 그대로 읽기 위해).
+ * 슬롯 표시는 포지션 약칭(FX·AL·PV)이다 — 44px 빈 자리 원 안에 들어가는 길이.
+ */
+export function presetsFromLineupConfig(
+  config: { positions: readonly LineupConfigPosition[]; formations: readonly LineupConfigFormation[] },
+  outfield: number | null,
+  keepCode: string | null = null,
 ): FormationPreset[] {
-  const labelByCode = new Map(positions.map((position) => [position.code, position.label]));
-  return formations.map((formation) => ({
-    code: formation.code,
-    label: formation.label,
-    outfield: formation.outfield,
-    slots: formation.slots.map((slot) => ({
-      positionCode: slot.position,
-      label: labelByCode.get(slot.position) ?? slot.position,
-      x: slot.x,
-      y: slot.y,
-    })),
-  }));
+  const shortByCode = new Map(config.positions.map((position) => [position.code, position.short]));
+  return config.formations
+    .filter((formation) => outfield === null || formation.outfield === outfield || formation.code === keepCode)
+    .map((formation) => ({
+      code: formation.code,
+      label: formation.label,
+      outfield: formation.outfield,
+      slots: formation.slots.map((slot) => ({
+        positionCode: slot.position,
+        label: shortByCode.get(slot.position) ?? slot.position,
+        x: slot.x,
+        y: slot.y,
+      })),
+    }));
 }
 
 /** 골키퍼 슬롯은 좌표가 (50,6) 고정이라 서버 프리셋 slots 배열에 담기지 않는다(현행
@@ -77,30 +82,6 @@ export function buildFormationPresets(
  * 골키퍼 자리다"를 구분하는 용도일 뿐, 축구/풋살 어느 쪽이든 같은 내부 마커를 공유해도 된다. */
 export function slotsWithGoalkeeper(preset: FormationPreset): FormationSlot[] {
   return [{ positionCode: GOALKEEPER_SLOT_CODE, label: 'GK', x: 50, y: 6 }, ...preset.slots];
-}
-
-/**
- * 이 경기가 허용하는 출전 인원(GK 포함)을 화면 문구용으로 정리한다.
- *
- * **범위라는 점이 핵심이다.** canonical config는 축구 7~11, 풋살 3~6이고 관리자는 상한만
- * 고르므로(`lineup-size.ts#buildLineupSizeConfig`) minPlayers와 maxPlayers가 서로 다를 수 있다.
- * maxPlayers만 단일 값처럼 비교하면 7~11 경기에서 선발 9명(완전히 정상)에게 "11명인데
- * 9명이에요"라는 틀린 경고가 뜬다 — PR #402 Copilot 리뷰가 잡은 실제 결함이다.
- *
- * team-match 라인업과 대회 fixture 라인업이 같은 판정을 각자 구현하지 않도록 여기 한 곳에 둔다.
- * 인원 정보가 없는 구버전 응답(min/max가 null)에서는 label=null·outOfRange=false로 조용히
- * 안내를 생략한다 — 모르는 값을 근거로 경고하지 않는다.
- */
-export function describeSquadSize(
-  minPlayers: number | null,
-  maxPlayers: number | null,
-  starterCount: number,
-): { label: string | null; outOfRange: boolean } {
-  if (minPlayers === null || maxPlayers === null) return { label: null, outOfRange: false };
-  const label = minPlayers === maxPlayers ? `${maxPlayers}명` : `${minPlayers}~${maxPlayers}명`;
-  // 선발이 아직 0명인 상태(막 진입)는 "벗어났다"고 말할 단계가 아니다.
-  const outOfRange = starterCount > 0 && (starterCount < minPlayers || starterCount > maxPlayers);
-  return { label, outOfRange };
 }
 
 /** 골키퍼 슬롯을 가리키는 **화면 내부 마커**. 서버에 저장되는 실제 포지션 코드가 아니다

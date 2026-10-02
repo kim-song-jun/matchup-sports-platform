@@ -30,6 +30,15 @@
 ### `GET /me/profile`
 
 현재 사용자의 계정, 프로필, 종목 선호, 지역, 평판 snapshot을 반환한다. deleted 계정은 조회 대상이 아니며, mutable profile API는 active 계정만 허용한다.
+응답에는 로그인 방식 메타데이터도 포함된다: `authProvider`, `authProviders`, `hasPassword`. 클라이언트는
+`hasPassword`로 이메일/비밀번호 계정 컨트롤 노출 여부를 판단해야 한다(카카오 전용 계정은 비밀번호가 없다).
+
+## Creator Profile Gate
+
+`POST /matches`, `POST /teams`, `POST /team-matches`는 프로필에 비어있지 않은 `realName`, 저장된
+`phone`, `male`/`female` `gender`가 모두 있어야 한다. 하나라도 없으면 `422
+PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "/my/profile/edit"`를
+반환한다. 신청·초대·채팅·리뷰·문의·프로필 수정·기존 엔티티 관리 엔드포인트는 이 게이트를 쓰지 않는다.
 
 ### `PATCH /me/profile`
 
@@ -54,16 +63,27 @@
 ## 활동·공개 프로필
 
 - `GET /me/activity-summary`는 `totals: { activityCount, teamCount, mannerScore }`와 `monthly: { matchCount, mannerScore, winRate }`를 반환한다.
+  `monthly.matchCount`(이번 KST 달에 끝난 개인 매치 참가 + 현재 공식 리비전의 팀매치 출전)는 홈 `GET /home` 의
+  `summary.monthlyMatches` 와 같은 함수(`profile/activity-counts.ts` `countMonthlyGames`)로 센다 — 두 화면의 "이번 달 경기"가
+  갈리지 않게 한다(Task 180 F85). 홈의 신청 대기는 숫자에 더하지 않고 `summary.pendingLabel`("대기 중인 신청 N건")로 싣는다.
 - `GET /users/:userId/public-profile`은 optional auth이며 active/non-deleted 사용자만 반환한다.
-- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`만 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다.
+- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `bio`, 공개 명단의 `teams`, `recentActivity`, `playerCard`, `reputation`, `activitySummary`를 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다. `displayName`은 공개 닉네임에서만 파생되며 `realName`에서 파생되지 않는다.
+- `playerCard`는 카드 숨김을 켜면 `null`이다. 카드가 있으면 `stats[].value`와 `overall`은 1~99 능력치 점수이며 실제 골·도움 개수가 아니다. `records: { appearances, goals, assists } | null`은 카드와 동일한 공식 결과/신원 연결/공개 동의 게이트를 통과한 원본 집계다. 공개 동의가 없으면 `records=null`이며, 1~2경기로 골·도움 능력치가 잠겨 있어도 동의한 원본 집계는 반환한다. `appearances`는 gameId 기준 중복 제거 수다. 본인/타인 모두 같은 카드 계약을 쓰며, 본인 기록 목록의 동의 우회를 카드 원본 집계에 적용하지 않는다. 구 API에 `records` 필드가 없으면 클라이언트는 원본 수치를 추정하거나 0으로 표시하지 않는다.
+- `reputation`은 `mannerScore`, `reviewCount`, `trustState`에 더해 `highlight`(`tagCode`, `label`, `rate`
+  0-1, `reviewCount`)를 포함한다. `highlight`는 `mannerScore`와 같은 리뷰 중 가장 많이 공개된 태그이며,
+  서로 다른 리뷰어 3명 미만이면 `null`이다(2명 이하 평가로 비율을 단정하지 않기 위함). `GET
+  /teams/:teamId/reviews`도 팀에 대해 같은 `highlight`를 반환한다.
 - 공개 `activitySummary`는 누적 match/team/review 수와 이번 달 match/team join/review 수를 구분한다.
+- 사용자가 선택하는 프로필 공개 범위 설정은 v1 계약에 없다 — 클라이언트는 공개 프로필 데이터를
+  "필드 단위로 공개 안전"하다고 취급해야지, 사용자가 고른 공개 상태로 취급하면 안 된다.
 
 ## 설정·선호
 
 ### `GET/PATCH /me/settings`
 
 - 조회 응답은 `account`, `profile`, `notifications`를 반환한다.
-- `UpdateSettingsDto.notifications`의 선택 boolean 필드: `matchEnabled`, `teamEnabled`, `teamMatchEnabled`, `chatEnabled`, `noticeEnabled`, `marketingEnabled`.
+- `UpdateSettingsDto.notifications`의 선택 boolean 필드: `activityEnabled`, `matchEnabled`, `teamEnabled`, `teamMatchEnabled`, `chatEnabled`, `noticeEnabled`, `marketingEnabled`.
+- 사용자 화면의 경기·대회 스위치는 `matchEnabled`, `teamMatchEnabled`, `activityEnabled`를 함께 갱신한다.
 - 수정 응답은 `{ profile, notifications, updatedAt }`이다.
 
 ### `PATCH /me/regions`
@@ -108,9 +128,10 @@
 
 - `reason`은 선택 문자열 또는 null, 최대 500자다.
 - 현재 `accountStatus=active`인 사용자만 `withdrawal_pending`으로 전이할 수 있다.
-- 서비스는 사용자 행을 `FOR UPDATE`로 잠근 뒤 최신 계정 상태와 운영자 상태를 다시 확인하고, 상태 변경과 `V1StatusChangeLog` 기록을 같은 트랜잭션에서 처리한다.
+- 서비스는 사용자 행을 `FOR UPDATE`로 잠근 뒤 최신 계정 상태와 운영자 상태를 다시 확인하고, 상태 변경·활성 멤버십/로스터 정리·웹 Push 구독 삭제·네이티브 Push 기기 revoke·`V1StatusChangeLog` 기록을 같은 트랜잭션에서 처리한다.
 - active 운영자는 이 self-service 경로로 사용자 계정을 비활성화할 수 없다. owner가 먼저 운영자 접근을 revoke해야 하며, 위반하면 `403 ADMIN_WITHDRAWAL_FORBIDDEN`이다.
 - 성공 응답은 `{ userId, accountStatus: "withdrawal_pending", requestedAt }`이다.
+- 관리자 최종 삭제는 FCM/APNs 토큰과 웹 Push endpoint를 영구 제거하고, 프로필의 실명·생년월일·성별·표시 지역 및 활동 지역·선호 종목·검색 기록·인증 토큰을 삭제 또는 비식별화한다. 완료 경기·결제·분쟁·감사 기록처럼 별도 보관 근거가 있는 데이터는 해당 정책을 따른다.
 
 ## Permission / Error Rules
 

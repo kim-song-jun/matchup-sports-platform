@@ -1,12 +1,12 @@
 .rewards {
   margin-top: 72px;
   padding: 32px;
-  border-radius: 24px;
+  border-radius: var(--radius-hero);
   background: var(--grey50);
 }
 
 .rewardsHeading { max-width: 680px; }
-.rewardsHeading > p { margin: 10px 0 0; color: var(--text-muted); line-height: 1.65; text-wrap: pretty; }
+.rewardsHeading > p { margin: 12px 0 0; color: var(--text-muted); line-height: 1.65; text-wrap: pretty; }
 
 .sectionKicker {
   display: block;
@@ -40,20 +40,20 @@
   height: 48px;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--blue50);
   color: var(--blue600);
 }
 
 .prize p { margin: 8px 0 0; color: var(--text-muted); line-height: 1.6; }
-.prizeBreakdown { margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--bg); }
+.prizeBreakdown { margin: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-container); background: var(--bg); }
 .prizeBreakdown > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 16px 16px;
   border-bottom: 1px solid var(--border);
 }
 .prizeBreakdown > div:first-child { background: var(--blue50); }
@@ -95,8 +95,8 @@
   .sectionTitle, .prizeTitle, .rewardsActionTitle { font-size: 24px; }
   .prize { grid-template-columns: 1fr; gap: 24px; margin-top: 24px; }
   .prizeSummary { gap: 12px; }
-  .prizeBreakdown > div { grid-template-columns: minmax(0, 1fr) minmax(80px, auto); gap: 10px; padding: 13px 14px; }
-  .prizeBreakdown dt { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
+  .prizeBreakdown > div { grid-template-columns: minmax(0, 1fr) minmax(80px, auto); gap: 12px; padding: 12px 16px; }
+  .prizeBreakdown dt { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; }
   .rewardsAction { align-items: stretch; flex-direction: column; margin-top: 24px; padding-top: 24px; }
   .rewardsActionConversion { align-items: stretch; }
   .actionLinks { display: grid; gap: 8px; width: 100%; }

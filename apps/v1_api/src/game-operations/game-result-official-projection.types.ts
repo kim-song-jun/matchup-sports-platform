@@ -21,11 +21,22 @@ export type OfficialRevisionRow = {
   reason: string | null;
   sourceType: string;
   currentOfficialRevisionId: string | null;
+  /** The canonical TeamMatch source id, when the game has one. */
+  teamMatchId: string | null;
+  /** Details identity, kept separate so owner drift cannot be hidden. */
+  tournamentTeamMatchId: string | null;
+  /** Raw league ownership on TeamMatch. */
+  leagueId: string | null;
+  /** Raw tournament ownership on TeamMatch. */
+  teamMatchTournamentId: string | null;
   tournamentId: string | null;
-  tournamentFixtureId: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
   visibility: V1VisibilityMode;
+};
+
+export type OfficialRevisionRowRaw = Omit<OfficialRevisionRow, 'tournamentId'> & {
+  detailsTournamentId: string | null;
 };
 
 export type PublicResultPayload = {

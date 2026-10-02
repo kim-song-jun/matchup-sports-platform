@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { TournamentTitle } from './tournament-title';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pause, Play } from 'lucide-react';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
@@ -24,8 +26,14 @@ export function TournamentPromoCarousel({
   const promos = getSortedTournamentPromos(items, 'list');
   const railRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [autoPlayPaused, setAutoPlayPaused] = useState(false);
+  // hover/포커스는 "지금 보는 중"의 임시 정지, manuallyPaused는 WCAG 2.2.2가
+  // 요구하는 명시적 정지 수단(토글 버튼) — 마우스가 벗어나도 유지돼야 한다.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [manuallyPaused, setManuallyPaused] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const isInteracting = hovered || focused;
+  const autoPlayPaused = isInteracting || manuallyPaused;
   const promoIds = promos.map((promo) => promo.id).join(':');
 
   useEffect(() => {
@@ -94,21 +102,18 @@ export function TournamentPromoCarousel({
       {loading ? (
         <div className="tm-tournament-promo-carousel-skeleton" aria-busy="true" aria-label="추천 대회 불러오는 중" />
       ) : error ? (
-        <div className="tm-tournament-promo-carousel-error" role="alert">
-          <span className="tm-text-caption">추천 대회를 불러오지 못했어요.</span>
-          {onRetry ? (
-            <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry}>
-              다시 불러오기
-            </button>
-          ) : null}
+        <div className="tm-tournament-promo-carousel-error">
+          <ErrorState message="추천 대회를 불러오지 못했어요." onRetry={onRetry} retryLabel="다시 불러오기" />
         </div>
       ) : (
         <div
           className="tm-tournament-promo-carousel-body"
-          onFocusCapture={() => setAutoPlayPaused(true)}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          onFocusCapture={() => setFocused(true)}
           onBlurCapture={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setAutoPlayPaused(false);
+              setFocused(false);
             }
           }}
         >
@@ -158,7 +163,7 @@ export function TournamentPromoCarousel({
                   style={{
                     background: imageUrl
                       ? `${cssUrl(imageUrl)} center/cover`
-                      : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+                      : 'var(--brand-hero-gradient)',
                   }}
                 >
                   {imageUrl ? <span className="tm-tournament-promo-card-scrim" aria-hidden="true" /> : null}
@@ -184,12 +189,25 @@ export function TournamentPromoCarousel({
             })}
           </div>
 
-          <span className="sr-only" aria-live="polite">
+          {/* 캐러셀 밖(예: 아래 대회 목록)에 포커스/마우스가 있을 때는 자동 전환마다
+              읽는 걸 끈다 — 캐러셀을 보고 있을 때만 "n / N" 이 스크린리더에 끼어든다. */}
+          <span className="sr-only" aria-live={isInteracting ? 'polite' : 'off'}>
             {activeIndex + 1} / {promos.length}
           </span>
 
           {promos.length > 1 ? (
             <div className="tm-tournament-promo-dots" aria-label={`추천 대회 ${activeIndex + 1} / ${promos.length}`}>
+              <button
+                type="button"
+                className="tm-tournament-promo-dot-button"
+                aria-label={manuallyPaused ? '자동 전환 다시 시작' : '자동 전환 멈추기'}
+                aria-pressed={manuallyPaused}
+                onClick={() => setManuallyPaused((paused) => !paused)}
+              >
+                {manuallyPaused
+                  ? <Play size={14} strokeWidth={2} aria-hidden="true" />
+                  : <Pause size={14} strokeWidth={2} aria-hidden="true" />}
+              </button>
               {promos.map((promo, index) => (
                 <button
                   key={promo.id}

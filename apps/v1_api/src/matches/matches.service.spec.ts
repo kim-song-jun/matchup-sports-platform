@@ -20,6 +20,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ChatService } from '../chat/chat.service';
 import { MatchesService } from './matches.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 
@@ -72,6 +73,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     minSportLevel: null,
     maxSportLevel: null,
     status: 'recruiting',
+    proceedConfirmedAt: null as Date | null,
     cancelledAt: null,
     completedAt: null,
     createdAt: new Date('2026-06-01T00:00:00.000Z'),
@@ -121,6 +123,7 @@ describe('MatchesService', () => {
       findMany: jest.Mock;
       count: jest.Mock;
       create: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
       upsert: jest.Mock;
     };
@@ -132,27 +135,29 @@ describe('MatchesService', () => {
   };
 
   let notifications: { emitNotification: jest.Mock; emitNotificationToMany: jest.Mock };
+  let chat: { joinMatchChatOnApproval: jest.Mock; deliverSystemLine: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '호스트 실명', gender: 'male' } }) },
       v1Match: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
       },
       v1MatchApplication: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       v1MatchParticipant: {
         findMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         upsert: jest.fn(),
       },
@@ -175,11 +180,17 @@ describe('MatchesService', () => {
       emitNotificationToMany: jest.fn().mockResolvedValue(undefined),
     };
 
+    chat = {
+      joinMatchChatOnApproval: jest.fn().mockResolvedValue({ messageId: 'joined-line' }),
+      deliverSystemLine: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MatchesService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: ChatService, useValue: chat },
       ],
     }).compile();
 
@@ -229,6 +240,136 @@ describe('MatchesService', () => {
   });
 
   // ─── 1. 비-호스트 취소 → 403 ──────────────────────────────────────────────
+
+  it('complete: 참가 조건 미달 보류는 진행 확인 없이 완료할 수 없다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ startAt: PAST, participants: [] }));
+    await expect(service.complete(host, 'match-1', { participants: [] })).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('complete: 호스트가 모든 활성 참가자의 참여 여부를 확정하면 매치와 참가자 기록을 함께 완료한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      proceedConfirmedAt: new Date(),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+    prisma.v1MatchApplication.findMany.mockResolvedValue([{ applicantUserId: 'waiting-user' }]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    });
+
+    expect(result).toMatchObject({
+      matchId: 'match-1',
+      status: 'completed',
+      completedParticipants: 2,
+      noShowParticipants: 0,
+      expiredApplications: 1,
+    });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'match-1' },
+      data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }),
+    }));
+    expect(prisma.v1MatchParticipant.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'guest-participant' },
+      data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }),
+    }));
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      [otherUser.id],
+      'match_completed',
+      'match-1',
+      expect.any(String),
+    );
+  });
+
+  it('complete: 참가하지 않는 호스트를 참가자로 다시 만들거나 완료 인원에 포함하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      proceedConfirmedAt: new Date(),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'cancelled' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+
+    const result = await service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    });
+
+    expect(result.completedParticipants).toBe(1);
+    expect(prisma.v1MatchParticipant.update).toHaveBeenCalledTimes(1);
+    expect(prisma.v1MatchParticipant.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'guest-participant' },
+    }));
+    expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+  });
+
+  it('complete: 활성 참가자를 빠뜨리면 완료하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      proceedConfirmedAt: new Date(),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+      ],
+    }));
+
+    await expect(service.complete(host, 'match-1', { participants: [] })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('complete: 동일 참석 payload 재시도는 저장된 완료 결과로 수렴하고 알림을 중복 발송하지 않는다', async () => {
+    const completedAt = new Date('2026-09-23T05:00:00.000Z');
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      status: 'completed',
+      completedAt,
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'completed' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'completed' },
+      ],
+    }));
+
+    await expect(service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    })).resolves.toMatchObject({
+      matchId: 'match-1',
+      status: 'completed',
+      completedAt,
+      completedParticipants: 2,
+      noShowParticipants: 0,
+      expiredApplications: 0,
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1MatchParticipant.update).not.toHaveBeenCalled();
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
+  it('complete: 이미 확정된 참석 상태와 다른 재시도는 성공으로 위장하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      status: 'completed',
+      completedAt: new Date('2026-09-23T05:00:00.000Z'),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'completed' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'no_show' },
+      ],
+    }));
+
+    await expect(service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    })).rejects.toMatchObject({ response: { code: 'ALREADY_PROCESSED' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
 
   it('cancel: 호스트가 아닌 사용자가 취소하면 403 PERMISSION_DENIED를 던진다', async () => {
     // getHostMatch 내부 v1Match.findFirst → 매치 존재, but hostUserId != otherUser.id
@@ -288,8 +429,9 @@ describe('MatchesService', () => {
 
     await expect(service.approveApplication(host, 'app-1', {})).rejects.toThrow(ConflictException);
     await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
-      response: { code: 'FULL' },
+      response: { code: 'FULL', message: '정원이 모두 찼어요. 기존 참가자의 승인을 취소하면 승인할 수 있어요.' },
     });
+    expect(chat.joinMatchChatOnApproval).not.toHaveBeenCalled();
     expect(prisma.v1MatchApplication.update).not.toHaveBeenCalled();
     // TOCTOU 방지 락이 정원 재검증보다 먼저, 올바른 matchId로 걸렸는지 확인한다.
     expect(prisma.$queryRaw).toHaveBeenCalled();
@@ -318,6 +460,21 @@ describe('MatchesService', () => {
     expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
   });
 
+  it('approveApplication: 승인과 같은 트랜잭션에서 매치 채팅에 승인 시각으로 등록하고, 커밋 뒤 입장 줄을 알린다', async () => {
+    prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1MatchParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
+
+    await service.approveApplication(host, 'app-1', {});
+
+    const approvedAt = prisma.v1MatchParticipant.upsert.mock.calls[0][0].create.approvedAt;
+    expect(chat.joinMatchChatOnApproval).toHaveBeenCalledWith(prisma, {
+      matchId: 'match-1', hostUserId: host.id, userId: applicationRow().applicantUserId, approvedAt,
+    });
+    expect(chat.deliverSystemLine).toHaveBeenCalledWith({ messageId: 'joined-line' });
+  });
+
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────
 
   it('approveApplication: 호스트가 아닌 사용자가 승인하면 403 PERMISSION_DENIED를 던진다', async () => {
@@ -337,7 +494,8 @@ describe('MatchesService', () => {
 
   // ─── 6. 비-requested 상태 신청 철회 → 409 STATE_CONFLICT ─────────────────
 
-  it('withdrawApplication: approved 상태 신청을 철회하면 409 STATE_CONFLICT를 던진다', async () => {
+  it('withdrawApplication: 시작한 매치의 approved 신청 철회는 409 STATE_CONFLICT를 던진다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ startAt: PAST }));
     prisma.v1MatchApplication.findFirst.mockResolvedValue(
       applicationRow({
         applicantUserId: otherUser.id,
@@ -353,6 +511,7 @@ describe('MatchesService', () => {
   });
 
   it('withdrawApplication: 승인이 먼저 확정돼 requested 전이가 실패하면 withdrawn으로 보고하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
     prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
     prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
 
@@ -406,6 +565,104 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.findFirst).not.toHaveBeenCalled();
   });
 
+  // ─── 2026-08-27 감사 M-A-personal-match-state ────────────────────────────
+  // status='recruiting'인데 startAt이 이미 지난("만료") 매치는 raw status 만으로는 다른
+  // 종료 상태와 구분되지 않는다. getApiStatus/getDisplayState/update()/cancel()은 이미 이
+  // 판정을 쓰는데 getEligibilityReason()과 edit()의 editable 계산은 빠져 있었다.
+
+  it('createApplication: 시작 시각이 지난 매치는 마감시각이 없어도(deadlineAt:null) 신청을 막는다', async () => {
+    const expiredMatch = matchRow({
+      hostUserId: host.id,
+      status: 'recruiting',
+      startAt: PAST,
+      deadlineAt: null,
+      maxParticipants: 6,
+      participants: [],
+      applications: [],
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(expiredMatch);
+
+    await expect(service.createApplication(otherUser, 'match-1', {})).rejects.toThrow(ConflictException);
+    await expect(service.createApplication(otherUser, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'EXPIRED' },
+    });
+    expect(prisma.v1MatchApplication.create).not.toHaveBeenCalled();
+  });
+
+  it('createApplication: 시작 시각이 아직 남은 매치는 정상적으로 신청을 접수한다 (회귀 방지)', async () => {
+    const openMatch = matchRow({
+      hostUserId: host.id,
+      status: 'recruiting',
+      startAt: FUTURE,
+      deadlineAt: null,
+      maxParticipants: 6,
+      participants: [],
+      applications: [],
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(openMatch);
+    prisma.v1MatchApplication.create.mockResolvedValue({
+      id: 'app-new',
+      matchId: 'match-1',
+      status: 'requested',
+    });
+
+    await expect(service.createApplication(otherUser, 'match-1', {})).resolves.toMatchObject({
+      status: 'requested',
+      viewerState: 'requested',
+    });
+  });
+
+  it('edit: 참가 조건 미달로 시작 시각이 지난 매치는 보류에서 수정 가능하다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ hostUserId: host.id, status: 'recruiting', startAt: PAST }),
+    );
+    prisma.v1MatchParticipant.count.mockResolvedValue(1);
+
+    const result = await service.edit(host, 'match-1');
+
+    expect(result.editable).toBe(true);
+    expect(result.lockedReason).toBeNull();
+    expect(result.status).toBe('on_hold');
+  });
+
+  it('edit: 시작 시각이 남은 recruiting 매치는 editable:true를 반환한다 (회귀 방지)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ hostUserId: host.id, status: 'recruiting', startAt: FUTURE }),
+    );
+    prisma.v1MatchParticipant.count.mockResolvedValue(1);
+
+    const result = await service.edit(host, 'match-1');
+
+    expect(result.editable).toBe(true);
+    expect(result.lockedReason).toBeNull();
+  });
+
+  it('list: status 생략 기본 탐색은 진행중·종료 확인 중·최근 완료 매치를 7일 범위로 포함한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, {});
+
+    const where = prisma.v1Match.findMany.mock.calls[0][0].where;
+    expect(where.status).toBeUndefined();
+    expect(where.OR).toEqual([
+      {
+        status: { in: ['recruiting', 'closed'] },
+        OR: [
+          { startAt: { gte: expect.any(Date) } },
+          { endAt: { gte: expect.any(Date) } },
+          { endAt: null, startAt: { gte: expect.any(Date) } },
+        ],
+      },
+      {
+        status: 'completed',
+        OR: [
+          { completedAt: { gte: expect.any(Date) } },
+          { completedAt: null, startAt: { gte: expect.any(Date) } },
+        ],
+      },
+    ]);
+  });
+
   it('list: 기본 조회는 최신 생성순이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
     prisma.v1Match.findMany.mockResolvedValue([]);
 
@@ -413,8 +670,7 @@ describe('MatchesService', () => {
 
     const args = prisma.v1Match.findMany.mock.calls[0][0];
     expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
-    expect(args.where.status).toEqual({ in: ['recruiting', 'closed'] });
-    expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(args.where.OR).toHaveLength(2);
     expect(args.where.AND).toBeUndefined();
   });
 
@@ -428,5 +684,685 @@ describe('MatchesService', () => {
     expect(args.where.AND).toEqual(expect.arrayContaining([
       { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
     ]));
+  });
+
+  it('list: 시작 후 종료 전에는 진행중, 종료 뒤 완료 전에는 종료 확인 필요 상태를 내려준다', async () => {
+    const now = Date.now();
+    const common = {
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [{ role: 'participant', status: 'active' }],
+      proceedConfirmedAt: new Date(),
+      hostUser: { id: host.id, profile: null, reputationSummary: null },
+    };
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({ ...common, id: 'in-progress', startAt: new Date(now - 30 * 60 * 1000), endAt: new Date(now + 30 * 60 * 1000) }),
+      matchRow({ ...common, id: 'pending-completion', startAt: new Date(now - 2 * 60 * 60 * 1000), endAt: new Date(now - 60 * 60 * 1000) }),
+    ]);
+
+    const result = await service.list(null, {});
+
+    expect(result.items.map((item: { displayState: string }) => item.displayState)).toEqual(['in_progress', 'completion_pending']);
+  });
+
+  // 감사 결함 회귀 방지(2026-08-27): toListItem()이 host를 아예 내려주지 않아 프론트가
+  // 항상 목업 호스트 이름으로 폴백했다(모든 카드가 '김정민' 등 동일 이름). detail()과 같은
+  // hostUser include를 목록 직렬화에도 그대로 매핑하는지 고정한다.
+  it('list: 각 아이템에 실제 호스트(hostUser)를 매핑해 내려준다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({
+        hostUserId: 'host-1',
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [],
+        hostUser: {
+          id: 'host-1',
+          profile: { nickname: '박지훈', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    ]);
+
+    const result = await service.list(null, {});
+
+    expect(result.items[0].host).toEqual({
+      userId: 'host-1',
+      displayName: '박지훈',
+      profileImageUrl: null,
+      trustState: 'verified',
+    });
+  });
+
+  it('list: status=completed 조회는 startAt 필터를 적용하지 않는다 (지난 매치를 의도적으로 조회)', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, { status: 'completed' });
+
+    const where = prisma.v1Match.findMany.mock.calls[0][0].where;
+    expect(where.status).toBe('completed');
+    expect(where.startAt).toBeUndefined();
+  });
+
+  // ─── 개인매치 참가비 노출 (2026-09-22 리뷰 대응) ───────────────────────────
+  // 리뷰에서 실제로 발견된 회귀: rulesText가 levelNote·genderRule·costNote를 합쳐 내려보내
+  // 상세 화면의 "규칙" 카드와 "참가비"·"성별 조건" 행에 같은 값이 중복 노출됐다. rulesText는
+  // levelNote만 담아야 하고, genderRule·costNote는 그 자체로 별도 필드에 유지돼야 한다.
+
+  it('list/detail: rulesText에는 levelNote만 담고, genderRule·costNote는 별도 필드로 유지한다 (규칙 카드 중복 노출 방지)', async () => {
+    const row = matchRow({
+      hostUserId: 'host-1',
+      levelNote: '풋살화 착용, 지각 시 미리 연락',
+      genderRule: '남',
+      costNote: '10,000원/1인',
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      hostUser: {
+        id: 'host-1',
+        profile: { nickname: '박지훈', displayName: null, profileImageUrl: null },
+        reputationSummary: { trustState: 'verified' },
+      },
+    });
+
+    prisma.v1Match.findMany.mockResolvedValue([row]);
+    const listResult = await service.list(null, {});
+    expect(listResult.items[0].rulesText).toBe('풋살화 착용, 지각 시 미리 연락');
+    expect(listResult.items[0].genderRule).toBe('남');
+    expect(listResult.items[0].costNote).toBe('10,000원/1인');
+
+    prisma.v1Match.findFirst.mockResolvedValue(row);
+    const detailResult = await service.detail(null, 'match-1');
+    expect(detailResult.rulesText).toBe('풋살화 착용, 지각 시 미리 연락');
+    expect(detailResult.genderRule).toBe('남');
+    expect(detailResult.costNote).toBe('10,000원/1인');
+  });
+
+  it('list/detail: levelNote가 없으면 rulesText는 genderRule·costNote를 대신 채우지 않고 null이다', async () => {
+    const row = matchRow({
+      hostUserId: 'host-1',
+      levelNote: null,
+      genderRule: '남',
+      costNote: '10,000원/1인',
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      hostUser: { id: 'host-1', profile: null, reputationSummary: null },
+    });
+
+    prisma.v1Match.findMany.mockResolvedValue([row]);
+    expect((await service.list(null, {})).items[0].rulesText).toBeNull();
+
+    prisma.v1Match.findFirst.mockResolvedValue(row);
+    expect((await service.detail(null, 'match-1')).rulesText).toBeNull();
+  });
+
+  it('edit: costNote를 폼에 포함해 반환한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ costNote: '5,000원/1인' }));
+
+    const result = await service.edit(host, 'match-1');
+
+    expect(result.form.costNote).toBe('5,000원/1인');
+  });
+
+  it('create: costNote를 그대로 저장한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow({ costNote: '10,000원/1인' }));
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'participant-1' });
+
+    await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남역',
+      costNote: '10,000원/1인',
+    });
+
+    expect(prisma.v1Match.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ costNote: '10,000원/1인' }) }),
+    );
+  });
+
+  it('create: costNote 미입력 시 null로 저장한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'participant-1' });
+
+    await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남역',
+    });
+
+    expect(prisma.v1Match.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ costNote: null }) }),
+    );
+  });
+
+  it('create: hostParticipates=false면 호스트 참가자를 만들지 않는다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+
+    const result = await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '용병 모집 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      hostParticipates: false,
+      manualPlaceName: '강남 풋살장',
+    });
+
+    expect(prisma.v1MatchParticipant.create).not.toHaveBeenCalled();
+    expect(result.hostParticipantId).toBeUndefined();
+  });
+
+  it('create: hostParticipates를 생략하면 기존처럼 호스트 참가자를 만든다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'host-participant' });
+
+    const result = await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '함께 뛰는 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남 풋살장',
+    });
+
+    expect(prisma.v1MatchParticipant.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ userId: host.id, role: 'host', status: 'active' }),
+    }));
+    expect(result.hostParticipantId).toBe('host-participant');
+  });
+
+  it('create: 주최자가 참가하는데 정원이 1명이면 400 VALIDATION_FAILED', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+
+    await expect(service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 1,
+      manualPlaceName: '강남역',
+    })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED', details: { field: 'capacity' } },
+    });
+    expect(prisma.v1Match.create).not.toHaveBeenCalled();
+  });
+
+  it('create: 주최자가 참가하지 않으면 정원 1명도 허용한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow({ maxParticipants: 1 }));
+
+    const result = await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '용병 1명 모집',
+      startsAt: FUTURE.toISOString(),
+      capacity: 1,
+      hostParticipates: false,
+      manualPlaceName: '강남역',
+    });
+
+    expect(prisma.v1MatchParticipant.create).not.toHaveBeenCalled();
+    expect(result.hostParticipantId).toBeUndefined();
+  });
+
+  it('update: hostParticipates=false면 활성 호스트를 취소하고 정원 계산에서도 제외한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({ status: 'recruiting', startAt: FUTURE });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+    prisma.v1MatchParticipant.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(1);
+    prisma.v1Match.update.mockResolvedValue(matchRow({ maxParticipants: 2 }));
+
+    await service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '용병만 모집하는 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 2,
+      hostParticipates: false,
+      manualPlaceName: current.placeName,
+      version: current.updatedAt.toISOString(),
+    });
+
+    expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1MatchParticipant.updateMany).toHaveBeenCalledWith({
+      where: { matchId: 'match-1', userId: host.id, role: 'host', status: 'active' },
+      data: { status: 'cancelled', cancelledAt: expect.any(Date) },
+    });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ maxParticipants: 2 }),
+    }));
+  });
+
+  it('update: 주최자가 참가하는데 정원이 1명이면 400 VALIDATION_FAILED', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({ status: 'recruiting', startAt: FUTURE });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+
+    await expect(service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 1,
+      hostParticipates: true,
+      manualPlaceName: '강남역',
+      version: current.updatedAt.toISOString(),
+    })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED', details: { field: 'capacity' } },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('myMatches: 완료 경기의 불참 상태를 viewer.participantStatus로 내려준다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({
+        status: 'completed',
+        startAt: PAST,
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [{
+          id: 'guest-participant',
+          userId: otherUser.id,
+          role: 'participant',
+          status: 'no_show',
+          applicationId: 'application-1',
+        }],
+        applications: [{
+          id: 'application-1',
+          applicantUserId: otherUser.id,
+          status: 'approved',
+        }],
+        hostUser: {
+          id: host.id,
+          profile: { nickname: '호스트', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    ]);
+
+    const result = await service.myMatches(otherUser, { mode: 'joined' });
+
+    const findManyArgs = prisma.v1Match.findMany.mock.calls[0][0];
+    expect(findManyArgs.where.OR[0].participants.some.status.in).toEqual([
+      'active',
+      'completed',
+      'no_show',
+    ]);
+    expect(findManyArgs.include.participants.where.OR).toContainEqual({
+      userId: otherUser.id,
+      status: 'no_show',
+    });
+
+    expect(result.items[0]).toMatchObject({
+      viewerState: 'participant',
+      viewer: {
+        state: 'participant',
+        participantId: 'guest-participant',
+        participantStatus: 'no_show',
+      },
+    });
+  });
+
+  it('detail: 본인의 불참 행을 읽어 viewer 를 불참 참가자로 내려주고 인원에는 넣지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({
+        status: 'completed',
+        startAt: PAST,
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [{
+          id: 'guest-participant',
+          userId: otherUser.id,
+          role: 'participant',
+          status: 'no_show',
+          applicationId: 'application-1',
+        }],
+        applications: [{ id: 'application-1', applicantUserId: otherUser.id, status: 'approved' }],
+        hostUser: {
+          id: host.id,
+          profile: { nickname: '호스트', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    );
+
+    const result = await service.detail(otherUser, 'match-1');
+
+    expect(prisma.v1Match.findFirst.mock.calls[0][0].include.participants.where.OR).toContainEqual({
+      userId: otherUser.id,
+      status: 'no_show',
+    });
+    expect(result).toMatchObject({
+      participantCount: 0,
+      viewer: { state: 'participant', participantId: 'guest-participant', participantStatus: 'no_show' },
+    });
+  });
+
+  it('detail: 비로그인 조회는 불참 행을 읽지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      status: 'completed',
+      startAt: PAST,
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      applications: [],
+      hostUser: { id: host.id, profile: { nickname: '호스트', displayName: null, profileImageUrl: null }, reputationSummary: null },
+    }));
+
+    await service.detail(null, 'match-1');
+
+    expect(prisma.v1Match.findFirst.mock.calls[0][0].include.participants.where).toEqual({
+      status: { in: ['active', 'completed'] },
+    });
+  });
+
+  it('update: costNote를 갱신한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({ costNote: null, status: 'recruiting', startAt: FUTURE });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+    prisma.v1Match.update.mockResolvedValue(matchRow({ costNote: '5,000원' }));
+
+    await service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남역',
+      costNote: '5,000원',
+      version: current.updatedAt.toISOString(),
+    });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ costNote: '5,000원' }) }),
+    );
+  });
+
+  // ─── 모집 마감 / 다시 열기 (2026-09-07 제보 대응) ─────────────────────────
+
+  it('close: 대기 중이던 신청서를 expired로 넘기고 그 신청자에게만 알린다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ status: 'recruiting', startAt: FUTURE }));
+    prisma.v1MatchApplication.findMany.mockResolvedValue([
+      { applicantUserId: 'applicant-1' },
+      { applicantUserId: 'applicant-2' },
+    ]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await service.close(host, 'match-1', {});
+
+    expect(result).toMatchObject({ status: 'closed', expiredApplications: 2 });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'closed' } }),
+    );
+    expect(prisma.v1MatchApplication.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { matchId: 'match-1', status: 'requested' },
+        data: expect.objectContaining({ status: 'expired' }),
+      }),
+    );
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      ['applicant-1', 'applicant-2'],
+      'match_closed',
+      'match-1',
+      expect.stringContaining('마감'),
+    );
+  });
+
+  it('close: 이미 닫힌 매치를 또 닫으면 409 ALREADY_PROCESSED (취소와 달리 상태를 덮지 않는다)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ status: 'closed' }));
+
+    await expect(service.close(host, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'ALREADY_PROCESSED' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('close: 호스트가 아니면 403 PERMISSION_DENIED', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ hostUserId: host.id }));
+
+    await expect(service.close(otherUser, 'match-1', {})).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancelled', 'completed'])('reopen: 최초 조회 뒤 %s로 바뀐 매치를 되살리지 않는다', async (status) => {
+    prisma.v1Match.findFirst
+      .mockResolvedValueOnce(matchRow({ status: 'closed' }))
+      .mockResolvedValueOnce(matchRow({ status }));
+    prisma.v1Match.update.mockResolvedValue(matchRow());
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('reopen: 지난 마감 시각을 지워 다시 모집 상태로 만든다 (안 지우면 눌러도 그대로 마감으로 보인다)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: null }),
+    );
+
+    const result = await service.reopen(host, 'match-1', {});
+
+    expect(result).toMatchObject({ status: 'recruiting', deadlineAt: null });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: null } }),
+    );
+  });
+
+  it('reopen: 마감 시각이 지나 displayState만 닫힌 recruiting 매치도 되돌린다', async () => {
+    // 호스트가 close()를 누른 적이 없어도 화면에는 똑같이 "신청 마감"으로 보인다 —
+    // 이 경로를 빼면 다시 열기가 한쪽에서만 듣는다.
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: null }),
+    );
+
+    await service.reopen(host, 'match-1', {});
+
+    // 응답의 deadlineAt 은 mock 이 돌려준 값이라 아무것도 증명하지 못한다 —
+    // **무엇을 쓰라고 보냈는지**를 본다.
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: null } }),
+    );
+  });
+
+  it('reopen: 새 마감 시각을 주면 그 값으로 갱신한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'recruiting' }));
+    const nextDeadline = new Date(FUTURE.getTime() - 60 * 60 * 1000);
+
+    await service.reopen(host, 'match-1', { deadlineAt: nextDeadline.toISOString() });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: nextDeadline } }),
+    );
+  });
+
+  it('reopen: 아직 남은 마감 시각은 건드리지 않고, 이미 모집 중이면 409 ALREADY_PROCESSED', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: FUTURE }),
+    );
+
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'ALREADY_PROCESSED' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('reopen: 시작 시각이 지난 매치는 되돌릴 수 없다 (409 STATE_CONFLICT)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: PAST, deadlineAt: PAST }),
+    );
+
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('reopen: 새 마감 시각이 경기 시작 이후면 400 VALIDATION_FAILED', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    const afterStart = new Date(FUTURE.getTime() + 60 * 60 * 1000).toISOString();
+
+    await expect(service.reopen(host, 'match-1', { deadlineAt: afterStart })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED', details: { field: 'deadlineAt' } },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchesService — on-hold lifecycle', () => {
+  const makeService = (row: ReturnType<typeof matchRow>, count = 1, history = 0) => {
+    const db: any = {
+      v1Match: { findFirst: jest.fn().mockImplementation(async () => row.deletedAt ? null : row), update: jest.fn().mockImplementation(async ({ data }) => Object.assign(row, data)) },
+      v1MatchParticipant: { upsert: jest.fn().mockResolvedValue({ id: 'host-participant' }), count: jest.fn().mockImplementation(async ({ where }) => where.role === 'host' ? (count > 0 ? 1 : 0) : where.role === 'participant' ? Math.max(0, count - 1) : count), findMany: jest.fn().mockResolvedValue(count > 1 ? [{ userId: otherUser.id }] : []) },
+      v1MatchApplication: { count: jest.fn().mockResolvedValue(history), findMany: jest.fn().mockResolvedValue([]) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    db.$transaction = async (fn: any) => fn(db);
+    const notifications: any = { emitNotificationToMany: jest.fn().mockResolvedValue(undefined) };
+    return { service: new MatchesService(db, notifications, {} as ChatService), db };
+  };
+
+  it('past match with no confirmed applicants is editable on hold', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }));
+    expect(await service.edit(host, 'match-1')).toMatchObject({ editable: true, status: 'on_hold' });
+  });
+
+  it('zero participants in a one-person recruitment stays on hold and can be deleted', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, maxParticipants: 1 }), 0);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ editable: true, status: 'on_hold' });
+    await expect(service.confirmProceed(host, 'match-1')).rejects.toBeInstanceOf(ConflictException);
+    expect(await service.remove(host, 'match-1')).toEqual({ matchId: 'match-1', deleted: true });
+  });
+
+  it('a nonparticipating host can confirm one active guest below capacity', async () => {
+    const { service, db } = makeService(matchRow({ deadlineAt: PAST }), 1);
+    db.v1MatchParticipant.count.mockImplementation(async ({ where }: any) => where.role === 'host' ? 0 : 1);
+    expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'scheduled' });
+  });
+
+  it('pending applications do not permit proceeding without confirmed participants', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }), 1, 3);
+    await expect(service.confirmProceed(host, 'match-1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('under-capacity match stays on hold until the host confirms', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, endAt: FUTURE }), 3);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'on_hold' });
+    expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'in_progress' });
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress', editable: false });
+  });
+
+  it('returns to on hold when the last confirmed guest leaves after the host confirms', async () => {
+    const row = matchRow({ startAt: PAST, endAt: FUTURE, proceedConfirmedAt: new Date() });
+    const { service, db } = makeService(row, 2);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress' });
+    db.v1MatchParticipant.count.mockImplementation(async ({ where }: any) => where.role === 'host' ? 1 : where.role === 'participant' ? 0 : 1);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'on_hold', editable: true });
+  });
+
+  it('rejects cancellation after a confirmed match has begun', async () => {
+    const { service, db } = makeService(matchRow({ startAt: PAST, endAt: FUTURE, proceedConfirmedAt: new Date() }), 3);
+    await expect(service.cancel(host, 'match-1', {})).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(db.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('confirmation before kickoff is scheduled, not in progress', async () => {
+    const { service } = makeService(matchRow({ deadlineAt: PAST }), 3);
+    expect(await service.confirmProceed(host, 'match-1')).toMatchObject({ status: 'scheduled' });
+  });
+
+  it('fully confirmed match follows normal kickoff and cannot be edited', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, endAt: FUTURE }), 6);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'in_progress', editable: false });
+  });
+
+  it('non-host cannot confirm or delete', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST, endAt: FUTURE }), 3);
+    await expect(service.confirmProceed(otherUser, 'match-1')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.remove(otherUser, 'match-1')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('past match with no application history can be deleted', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }));
+    expect(await service.remove(host, 'match-1')).toEqual({ matchId: 'match-1', deleted: true });
+    await expect(service.edit(host, 'match-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rescheduling clears the proceed decision and requires existing participants to reapply', async () => {
+    const row = matchRow({ proceedConfirmedAt: new Date() });
+    const { service, db } = makeService(row, 3);
+    const active = new Set([otherUser.id, 'participant-2']);
+    db.v1Sport = { findFirst: jest.fn().mockResolvedValue({ id: 'sport-1' }) };
+    db.v1Region = { findFirst: jest.fn().mockResolvedValue({ id: 'region-1' }) };
+    db.v1MatchParticipant.findMany.mockImplementation(async () => [...active].map(userId => ({ userId })));
+    db.v1MatchParticipant.updateMany = jest.fn().mockImplementation(async () => { const count = active.size; active.clear(); return { count }; });
+    const applications = [{ status: 'approved' }, { status: 'requested' }];
+    db.v1MatchApplication.updateMany = jest.fn().mockImplementation(async ({ where, data }) => {
+      let count = 0;
+      for (const application of applications) if (application.status === where.status) { application.status = data.status; count++; }
+      return { count };
+    });
+    let saved = row;
+    db.v1Match.update.mockImplementation(async ({ data }: { data: Partial<typeof row> }) => { saved = { ...saved, ...data }; return saved; });
+    const result = await service.update(host, 'match-1', {
+      sportId: 'sport-1', regionId: 'region-1', title: row.title, manualPlaceName: '새 구장', capacity: 6,
+      startsAt: new Date(FUTURE.getTime() + 86400000).toISOString(), version: row.updatedAt.toISOString(),
+    });
+    expect(result.status).toBe('recruiting');
+    expect(saved.proceedConfirmedAt).toBeNull();
+    expect(active.size).toBe(0);
+    expect(applications.map(a => a.status)).toEqual(['withdrawn', 'expired']);
+  });
+
+  it('editing only the description preserves a closed match and its proceed decision', async () => {
+    const confirmedAt = new Date();
+    const row = matchRow({ status: 'closed', proceedConfirmedAt: confirmedAt, deadlineAt: PAST });
+    const { service, db } = makeService(row, 3);
+    db.v1Sport = { findFirst: jest.fn().mockResolvedValue({ id: 'sport-1' }) };
+    db.v1Region = { findFirst: jest.fn().mockResolvedValue({ id: 'region-1' }) };
+    const result = await service.update(host, 'match-1', {
+      sportId: 'sport-1', regionId: 'region-1', title: row.title, description: '설명 수정', manualPlaceName: row.placeName,
+      capacity: row.maxParticipants, startsAt: row.startAt.toISOString(), deadlineAt: PAST.toISOString(),
+      version: row.updatedAt.toISOString(),
+    });
+    expect(result.status).toBe('closed');
+    expect(row.proceedConfirmedAt).toEqual(confirmedAt);
+    expect(await service.edit(host, 'match-1')).toMatchObject({ status: 'scheduled' });
+  });
+
+  it('withdrawn application history still prevents deletion', async () => {
+    const { service } = makeService(matchRow({ startAt: PAST }), 1, 1);
+    await expect(service.remove(host, 'match-1')).rejects.toBeInstanceOf(ConflictException);
   });
 });

@@ -167,10 +167,14 @@ export class AppleIdentityService {
   private async signingKeys(options: { force?: boolean } = {}): Promise<readonly AppleJsonWebKey[]> {
     const age = this.now() - this.keysFetchedAtMs;
     const wanted = options.force || this.keys.length === 0 || age > KEY_MAX_AGE_MS;
-    // Nothing refetches inside the floor, however badly it is wanted. The first call after a
-    // boot passes it because no attempt has been made yet.
+    if (!wanted) return this.keys;
+    // loadKeys records its attempt before awaiting Apple. Requests needing that result must
+    // share it before the floor check; otherwise a cold cache rejects valid concurrent tokens.
+    if (this.inFlight) return this.inFlight;
+
+    // The floor prevents starting another fetch, including after a failed attempt.
     const sinceAttempt = this.now() - this.keysAttemptedAtMs;
-    if (!wanted || sinceAttempt < KEY_REFETCH_FLOOR_MS) return this.keys;
+    if (sinceAttempt < KEY_REFETCH_FLOOR_MS) return this.keys;
 
     // One fetch at a time. A burst of sign-ins right after a rotation would otherwise send a
     // request per sign-in to Apple, which is how a rate limit turns one rotation into an

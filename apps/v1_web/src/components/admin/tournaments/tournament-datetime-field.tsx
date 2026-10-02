@@ -1,7 +1,5 @@
 'use client';
 
-import { KST_OFFSET_MS } from '@/lib/kst-calendar';
-
 type TournamentDatetimeFieldProps = {
   id: string;
   label: string;
@@ -78,20 +76,4 @@ export function TournamentDatetimeField({
       ) : null}
     </div>
   );
-}
-
-// datetime-local 값은 오프셋 없는 벽시계 문자열이다. 대회 일정은 전부 KST 기준이라
-// 브라우저 시간대와 무관하게 KST 로 읽고 쓴다(서버로 가는 값은 ISO UTC).
-export function datetimeLocalToIso(value: string): string | null {
-  if (!value) return null;
-  const withSeconds = /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
-  const parsed = new Date(`${withSeconds}+09:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
-export function isoToDatetimeLocal(value: string | null | undefined): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Date(date.getTime() + KST_OFFSET_MS).toISOString().slice(0, 16);
 }

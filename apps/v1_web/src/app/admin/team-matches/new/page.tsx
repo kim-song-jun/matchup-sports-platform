@@ -13,11 +13,11 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { MultiPresetChipSelector } from '@/components/v1-ui/create-form-fields';
-import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
 import { GENDER_RULE_OPTIONS } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
@@ -72,11 +72,11 @@ export default function AdminTeamMatchNewPage() {
   const matchFormatOptions = useMemo(() => formatOptions(selectedSport), [selectedSport]);
 
   // 검증도 제출과 같은 KST 인스턴트로 한다(원본 문자열을 new Date 로 읽으면 브라우저 로컬 해석).
-  const startIso = fromDatetimeLocalValue(startsAt);
+  const startIso = kstDatetimeLocalToIso(startsAt);
   const dateErrors = teamMatchDateErrors({
     startsAt: startIso ?? '',
-    endsAt: fromDatetimeLocalValue(endsAt) ?? null,
-    deadlineAt: fromDatetimeLocalValue(deadlineAt) ?? null,
+    endsAt: kstDatetimeLocalToIso(endsAt),
+    deadlineAt: kstDatetimeLocalToIso(deadlineAt),
   });
   const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
   const canSubmit =
@@ -113,8 +113,8 @@ export default function AdminTeamMatchNewPage() {
         description: description.trim() || null,
         imageUrl: imageUrl || null,
         startsAt: startIso,
-        endsAt: fromDatetimeLocalValue(endsAt) ?? null,
-        deadlineAt: fromDatetimeLocalValue(deadlineAt) ?? null,
+        endsAt: kstDatetimeLocalToIso(endsAt),
+        deadlineAt: kstDatetimeLocalToIso(deadlineAt),
         manualPlaceName: placeName.trim(),
         addressText: addressText.trim() || null,
         costNote: moneyNote(totalCost, opponentCost),

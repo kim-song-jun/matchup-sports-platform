@@ -26,11 +26,10 @@ import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-p
 import { formatDate } from './tournament-admin-shared';
 import {
   SimpleModal,
-  datetimeLocalValueToIso,
   inputCls,
-  isoToDatetimeLocalValue,
   submitBtnCls,
 } from './tournament-detail-shared';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 
 /**
@@ -180,11 +179,11 @@ export function BracketTab({
     // 읽어 기존 배정이 그대로 남는다(과거 버그).
     const homeChanged = editFxHomeRegId !== (editFixture.homeRegistrationId ?? '');
     const awayChanged = editFxAwayRegId !== (editFixture.awayRegistrationId ?? '');
-    // datetime-local 입력값은 오프셋이 없는 KST 벽시계 문자열이다(isoToDatetimeLocalValue가
+    // datetime-local 입력값은 오프셋이 없는 KST 벽시계 문자열이다(isoToKstDatetimeLocal 이
     // Asia/Seoul로 채워 넣는다) — new Date(value).toISOString()로 바로 변환하면 브라우저
-    // 로컬 타임존으로 잘못 해석된다. 대칭 함수 datetimeLocalValueToIso로 KST 오프셋을 고정해야
+    // 로컬 타임존으로 잘못 해석된다. 대칭 함수 kstDatetimeLocalToIso 로 KST 오프셋을 고정해야
     // 값을 안 건드리고 저장만 눌러도 킥오프가 밀리지 않는다.
-    const scheduledAtIso = editFxScheduledAt ? datetimeLocalValueToIso(editFxScheduledAt) : null;
+    const scheduledAtIso = editFxScheduledAt ? kstDatetimeLocalToIso(editFxScheduledAt) : null;
     updateFixture.mutate(
       {
         fixtureId: editFixture.id,
@@ -470,8 +469,8 @@ export function BracketTab({
     if (publishBlockedReason || !publishScheduleInput) return;
     // datetime-local 은 타임존 표기가 없는 KST 벽시계 문자열이다 — new Date(value)로 바로
     // 감싸면 브라우저 로컬 타임존으로 해석돼 해외/TZ 다른 기기에서 예약 시각이 밀린다
-    // (bracket-tab.tsx 다른 자리와 동일한 계약: datetimeLocalValueToIso로 KST 오프셋 고정).
-    const scheduledIso = datetimeLocalValueToIso(publishScheduleInput);
+    // (bracket-tab.tsx 다른 자리와 동일한 계약: kstDatetimeLocalToIso 로 KST 오프셋 고정).
+    const scheduledIso = kstDatetimeLocalToIso(publishScheduleInput);
     if (!scheduledIso) {
       showToast('공개 예약 시각을 다시 확인해 주세요.', 'error');
       return;
@@ -724,7 +723,7 @@ export function BracketTab({
                     type="button"
                     onClick={() => {
                       setEditFixture(f);
-                      setEditFxScheduledAt(isoToDatetimeLocalValue(f.scheduledAt));
+                      setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
                       setEditFxVenue(f.venue ?? '');
                       setEditFxHomeRegId(f.homeRegistrationId ?? '');
                       setEditFxAwayRegId(f.awayRegistrationId ?? '');

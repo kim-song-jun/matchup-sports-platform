@@ -3,9 +3,9 @@
 import { useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
-import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueFixture } from '@/types/league-match';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 /** 서버 PATCH 본문 — 바뀐 필드만 담는다. */
 export interface LeagueFixtureSchedulePatch {
@@ -38,7 +38,7 @@ export function LeagueFixtureScheduleModal({
   const startsAtId = useId();
   const placeNameId = useId();
   const placeAddressId = useId();
-  const initialStartsAt = toDatetimeLocalValue(fixture.startAt);
+  const initialStartsAt = isoToKstDatetimeLocal(fixture.startAt);
   const initialPlaceAddress = fixture.placeAddress ?? '';
   const [startsAtLocal, setStartsAtLocal] = useState(initialStartsAt);
   const [placeName, setPlaceName] = useState(fixture.placeName);
@@ -63,8 +63,8 @@ export function LeagueFixtureScheduleModal({
     setError(null);
     const patch: LeagueFixtureSchedulePatch = {};
     if (changed.startAt) {
-      const startsAt = fromDatetimeLocalValue(startsAtLocal);
-      if (startsAt === undefined) {
+      const startsAt = kstDatetimeLocalToIso(startsAtLocal);
+      if (startsAt === null) {
         setError('경기 시작 일시를 입력해 주세요.');
         return;
       }

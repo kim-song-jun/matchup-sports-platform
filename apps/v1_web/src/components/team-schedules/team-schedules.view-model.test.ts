@@ -6,7 +6,6 @@ import {
   attendanceSummaryText,
   buildScheduleCalendarMonth,
   dateKeyOf,
-  fromDatetimeLocalValue,
   isDeadlinePassed,
   kstMonthStart,
   isScheduleManagerRole,
@@ -19,7 +18,6 @@ import {
   scheduleRsvpDeadlineLabel,
   scheduleStateLabel,
   scheduleTypeLabel,
-  toDatetimeLocalValue,
   toScheduleListItemModel,
 } from './team-schedules.view-model';
 
@@ -276,27 +274,6 @@ describe('team-schedules view-model — KST 날짜 기준 (브라우저 시간�
     const listItems = items.map((item) => toScheduleListItemModel(item, 'team-1'));
     expect(listItems.find((item) => item.id === 'late-night')?.dateKey).toBe('2026-10-04');
     expect(listItems.find((item) => item.id === 'evening')?.dateKey).toBe('2026-10-03');
-  });
-
-  it('datetime-local 값은 KST 벽시계로 읽고 쓴다', () => {
-    expect(toDatetimeLocalValue(KST_OCT4_0030)).toBe('2026-10-04T00:30');
-    expect(fromDatetimeLocalValue('2026-10-04T00:30')).toBe(KST_OCT4_0030);
-    // 이슈 #1425: 10/1 23:59 입력은 KST 10/1 23:59 = 14:59Z 여야 한다(로컬 해석이면 다른 시각).
-    expect(fromDatetimeLocalValue('2026-10-01T23:59')).toBe('2026-10-01T14:59:00.000Z');
-  });
-
-  it('ISO → 입력값 → ISO 왕복이 값을 바꾸지 않는다', () => {
-    for (const iso of [KST_OCT4_0030, KST_OCT3_2359, '2026-12-31T15:00:00.000Z']) {
-      expect(fromDatetimeLocalValue(toDatetimeLocalValue(iso))).toBe(iso);
-    }
-  });
-
-  it('returns an empty string / undefined for missing or invalid input', () => {
-    expect(toDatetimeLocalValue(null)).toBe('');
-    expect(toDatetimeLocalValue(undefined)).toBe('');
-    expect(toDatetimeLocalValue('not-a-date')).toBe('');
-    expect(fromDatetimeLocalValue('')).toBeUndefined();
-    expect(fromDatetimeLocalValue('not-a-date')).toBeUndefined();
   });
 
   it('kstMonthStart 는 KST 기준 이번 달 1일을 돌려준다 (UTC 로는 아직 전달)', () => {

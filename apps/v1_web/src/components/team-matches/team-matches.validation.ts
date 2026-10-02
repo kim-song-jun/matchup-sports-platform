@@ -1,8 +1,8 @@
-import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
+import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 /**
  * 팀매치 생성/수정 위저드의 "필수값이 뭔지" 를 판정하는 단일 소스.
@@ -38,17 +38,17 @@ const defaultGenderRule = '성별 무관';
 // 날짜·시간 입력은 KST 벽시계다 — 브라우저 시간대와 무관하게 KST 로 해석한다.
 function parseStartsAt(draft: TeamMatchDraft): string | null {
   if (!draft.date || !draft.startTime) return null;
-  return fromDatetimeLocalValue(`${draft.date}T${draft.startTime}`) ?? null;
+  return kstDatetimeLocalToIso(`${draft.date}T${draft.startTime}`);
 }
 
 function parseDeadlineAt(draft: TeamMatchDraft): string | null {
   if (!draft.deadlineDate || !draft.deadlineTime) return null;
-  return fromDatetimeLocalValue(`${draft.deadlineDate}T${draft.deadlineTime}`) ?? null;
+  return kstDatetimeLocalToIso(`${draft.deadlineDate}T${draft.deadlineTime}`);
 }
 
 function parseEndsAt(draft: TeamMatchDraft): string | null {
   if (!draft.endTime) return null;
-  return fromDatetimeLocalValue(`${draft.endDate || draft.date}T${draft.endTime}`) ?? null;
+  return kstDatetimeLocalToIso(`${draft.endDate || draft.date}T${draft.endTime}`);
 }
 
 const RULES: Array<{

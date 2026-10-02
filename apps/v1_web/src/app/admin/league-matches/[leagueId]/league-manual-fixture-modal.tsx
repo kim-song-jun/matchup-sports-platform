@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
-import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1CreateManualLeagueFixturePayload } from '@/types/league-match';
+import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 /**
  * 리그에 **한 경기만** 추가하는 모달(사용자 B안, 2026-09-04 — 전체화면 모달 + EntityPicker 재사용).
@@ -67,8 +67,8 @@ export function LeagueManualFixtureModal({
       setError('같은 팀끼리는 경기를 만들 수 없어요.');
       return;
     }
-    const startsAt = fromDatetimeLocalValue(startsAtLocal);
-    if (startsAt === undefined) {
+    const startsAt = kstDatetimeLocalToIso(startsAtLocal);
+    if (startsAt === null) {
       setError('경기 시작 일시를 입력해 주세요.');
       return;
     }

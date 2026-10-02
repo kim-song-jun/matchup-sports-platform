@@ -1,5 +1,5 @@
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { KST_OFFSET_MS, toKstDateString } from '@/lib/kst-calendar';
+import { toKstDateString } from '@/lib/kst-calendar';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type {
   V1AttendanceStatus,
@@ -259,24 +259,6 @@ export function isDeadlinePassed(deadline: string | null): boolean {
   const d = new Date(deadline);
   if (Number.isNaN(d.getTime())) return false;
   return d.getTime() < Date.now();
-}
-
-// ── <input type="datetime-local"> 변환 ────────────────────────────────────────
-// datetime-local 값은 오프셋 없는 벽시계 문자열이다. 이 저장소의 일정은 전부 KST 기준이라
-// 브라우저 시간대와 무관하게 KST 벽시계로 읽고 쓴다(서버로 가는 값은 그대로 ISO UTC).
-export function toDatetimeLocalValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return new Date(d.getTime() + KST_OFFSET_MS).toISOString().slice(0, 16);
-}
-
-export function fromDatetimeLocalValue(value: string): string | undefined {
-  if (!value) return undefined;
-  const withSeconds = /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
-  const d = new Date(`${withSeconds}+09:00`);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString();
 }
 
 // ── 캘린더(월간 그리드) ───────────────────────────────────────────────────────

@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminEmpty, AdminPageHeader, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
-import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import {
   useV1AdminMe,
   useV1AdminTeamMatch,
@@ -19,6 +18,7 @@ import { V1_LEVELS } from '@/lib/v1-levels';
 import { GENDER_RULE_OPTIONS, genderRuleLabel } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 const inputClass = 'mt-1 min-h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60';
 
@@ -36,9 +36,9 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const [regionId, setRegionId] = useState(teamMatch.regionId);
   const [placeName, setPlaceName] = useState(teamMatch.placeName);
   const [addressText, setAddressText] = useState(teamMatch.placeAddress ?? '');
-  const [startsAt, setStartsAt] = useState(toDatetimeLocalValue(teamMatch.startAt));
-  const [endsAt, setEndsAt] = useState(toDatetimeLocalValue(teamMatch.endAt));
-  const [deadlineAt, setDeadlineAt] = useState(toDatetimeLocalValue(teamMatch.deadlineAt));
+  const [startsAt, setStartsAt] = useState(isoToKstDatetimeLocal(teamMatch.startAt));
+  const [endsAt, setEndsAt] = useState(isoToKstDatetimeLocal(teamMatch.endAt));
+  const [deadlineAt, setDeadlineAt] = useState(isoToKstDatetimeLocal(teamMatch.deadlineAt));
   const [minLevelCode, setMinLevelCode] = useState(teamMatch.minLevelCode ?? '');
   const [maxLevelCode, setMaxLevelCode] = useState(teamMatch.maxLevelCode ?? '');
   const [matchFormat, setMatchFormat] = useState(teamMatch.matchFormat ?? '');
@@ -50,9 +50,9 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const [uploading, setUploading] = useState(false);
   // 검증도 제출과 같은 KST 인스턴트로 한다(원본 문자열을 new Date 로 읽으면 브라우저 로컬 해석).
   const dateErrors = teamMatchDateErrors({
-    startsAt: fromDatetimeLocalValue(startsAt) ?? '',
-    endsAt: fromDatetimeLocalValue(endsAt) ?? null,
-    deadlineAt: fromDatetimeLocalValue(deadlineAt) ?? null,
+    startsAt: kstDatetimeLocalToIso(startsAt) ?? '',
+    endsAt: kstDatetimeLocalToIso(endsAt),
+    deadlineAt: kstDatetimeLocalToIso(deadlineAt),
     existingDeadlineAt: teamMatch.deadlineAt,
   });
   const canSubmit = canWrite && title.trim() !== '' && regionId !== '' && placeName.trim() !== '' && startsAt !== '' && Object.keys(dateErrors).length === 0 && !uploading;
@@ -71,7 +71,7 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   };
 
   const submit = async () => {
-    const startsAtIso = fromDatetimeLocalValue(startsAt);
+    const startsAtIso = kstDatetimeLocalToIso(startsAt);
     if (!canSubmit || !startsAtIso) return;
     try {
       const result = await mutation.mutateAsync({
@@ -83,8 +83,8 @@ function EditForm({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
         description: description.trim() || null,
         imageUrl: imageUrl || null,
         startsAt: startsAtIso,
-        endsAt: fromDatetimeLocalValue(endsAt) ?? null,
-        deadlineAt: fromDatetimeLocalValue(deadlineAt) ?? null,
+        endsAt: kstDatetimeLocalToIso(endsAt),
+        deadlineAt: kstDatetimeLocalToIso(deadlineAt),
         manualPlaceName: placeName.trim(),
         addressText: addressText.trim() || null,
         costNote: costNote.trim() || null,

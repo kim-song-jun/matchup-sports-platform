@@ -11,11 +11,7 @@ import {
   serializeTournamentPrizeRows,
 } from '@/components/admin/tournaments/prize-breakdown-editor';
 import type { TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
-import {
-  datetimeLocalToIso,
-  isoToDatetimeLocal,
-} from '@/components/admin/tournaments/tournament-datetime-field';
-import { DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
+import { DAY_MS, isoToKstDatetimeLocal, kstDatetimeLocalToIso, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import {
   applyPromoFactDefaults,
@@ -363,10 +359,10 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     title: tournament.title,
     format: tournament.format,
     genderCategory: tournament.genderCategory ?? 'mixed',
-    scheduledAt: isoToDatetimeLocal(tournament.scheduledAt),
-    scheduledEndAt: isoToDatetimeLocal(tournament.scheduledEndAt),
-    registrationDeadlineAt: isoToDatetimeLocal(tournament.registrationDeadlineAt),
-    rosterDeadlineAt: isoToDatetimeLocal(tournament.rosterDeadlineAt),
+    scheduledAt: isoToKstDatetimeLocal(tournament.scheduledAt),
+    scheduledEndAt: isoToKstDatetimeLocal(tournament.scheduledEndAt),
+    registrationDeadlineAt: isoToKstDatetimeLocal(tournament.registrationDeadlineAt),
+    rosterDeadlineAt: isoToKstDatetimeLocal(tournament.rosterDeadlineAt),
     // 이미 서버에 저장된 값이니 자동 제안 로직(D-3)이 다시 덮어쓰면 안 된다.
     registrationDeadlineDirty: true,
     venue: tournament.venue ?? '',
@@ -471,9 +467,9 @@ export function buildTournamentPreviewItem(
     // 이 위저드는 단발 대회만 만든다(정규 리그 시즌은 리그 어드민에서 만들어진다).
     // state.format 이 'league' 여도 그건 "리그 방식으로 치른다"는 뜻이지 리그 시즌이 아니다.
     kind: 'regular_tournament',
-    registrationDeadlineAt: datetimeLocalToIso(state.registrationDeadlineAt),
-    scheduledAt: datetimeLocalToIso(state.scheduledAt),
-    scheduledEndAt: datetimeLocalToIso(state.scheduledEndAt),
+    registrationDeadlineAt: kstDatetimeLocalToIso(state.registrationDeadlineAt),
+    scheduledAt: kstDatetimeLocalToIso(state.scheduledAt),
+    scheduledEndAt: kstDatetimeLocalToIso(state.scheduledEndAt),
     venue: state.venue.trim() || null,
     coverImageUrl: state.coverImageUrl,
     teamCount: Number(state.teamCount) || 0,
@@ -682,11 +678,11 @@ export function buildTournamentCreatePayload(
     title: state.title.trim(),
     format: state.format,
     genderCategory: state.genderCategory,
-    scheduledAt: datetimeLocalToIso(state.scheduledAt) ?? undefined,
-    scheduledEndAt: datetimeLocalToIso(state.scheduledEndAt),
-    registrationDeadlineAt: datetimeLocalToIso(state.registrationDeadlineAt) ?? undefined,
+    scheduledAt: kstDatetimeLocalToIso(state.scheduledAt) ?? undefined,
+    scheduledEndAt: kstDatetimeLocalToIso(state.scheduledEndAt),
+    registrationDeadlineAt: kstDatetimeLocalToIso(state.registrationDeadlineAt) ?? undefined,
     // 비우면 null 을 보낸다 — 초안을 이어 고칠 때(PATCH) 지운 마감이 서버에 남지 않게.
-    rosterDeadlineAt: datetimeLocalToIso(state.rosterDeadlineAt),
+    rosterDeadlineAt: kstDatetimeLocalToIso(state.rosterDeadlineAt),
     venue: state.venue.trim() || undefined,
     coverImageUrl: state.coverImageUrl,
     teamCount: Number(state.teamCount),
@@ -820,7 +816,7 @@ function suggestDeadline(startValue: string, daysBefore: number) {
 
 /** 입력값(KST 벽시계)의 인스턴트 밀리초. 비었거나 깨졌으면 `null`. */
 function localTimestamp(value: string) {
-  const iso = datetimeLocalToIso(value);
+  const iso = kstDatetimeLocalToIso(value);
   return iso ? Date.parse(iso) : null;
 }
 

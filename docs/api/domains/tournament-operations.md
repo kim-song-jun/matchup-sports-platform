@@ -42,19 +42,23 @@ All routes below are under `/api/v1`, require `V1AuthGuard` (authenticated user)
 - A revoked or fully-non-staff user (no admin grant, no assignment row at all) gets `403 STAFF_SCOPE_DENIED` on every route in this table, including `GET` — access is re-derived per call, so revoking the last active assignment for a user immediately removes both read and write access on their next request (`RealtimeGateway.evictUserFromScopedGameRooms` also disconnects any live socket).
 - `reason` on revoke is validated (non-empty string) and **is persisted** (Task 18 review finding #11) as a follow-up `V1OperationAudit` row scoped to the assignment id, since `TournamentStaffService.revokeStaff`'s own audit envelope has no free-text field to carry it.
 
-### `GET /api/v1/tournament-ops/me/assignments` — the assignee's own entry path
+### `GET /api/v1/me/tournament-staff` — the assignee's own entry path
 
-`MyTournamentStaffAssignmentsController`/`Service` (same directory). Guarded by `V1AuthGuard` only, **not** `TournamentStaffGuard`: the route carries no tournament path parameter and its result set is closed to the caller (`where.userId` comes from the authenticated principal; there is no request field that can name another user). Returns only assignments that are neither revoked nor expired.
+`MyTournamentStaffController` (same directory) → `TournamentOperationsStaffService.myAssignments()`. Guarded by `V1AuthGuard` only, **not** `TournamentStaffGuard`: the route carries no tournament path parameter and its result set is closed to the caller (`where.userId` comes from the authenticated principal; there is no request field that can name another user). Returns only assignments that are neither revoked nor expired.
+
+Response: `{platformRole, items[]}`.
 
 | Field | Meaning |
 |---|---|
-| `assignmentId`, `tournamentId`, `tournamentTitle`, `tournamentStatus`, `tournamentScheduledAt`, `role`, `expiresAt`, `fieldId`, `fieldName` | the assignment itself |
+| `platformRole` | `'PLATFORM_OPS'` for an active `owner`/`ops` admin with an active account, otherwise `null` |
+| `items[]` — `{tournamentId,tournamentTitle,tournamentStatus,assignments[],fixtures[]}` | one entry per tournament (several assignments in one tournament collapse into one), in-progress tournaments first |
+| `assignments[]` — `{id,role,fieldId,fieldName,version,expiresAt,fixtureIds}` | the assignment itself; `fixtureIds` is its fixture scope (empty for a field-only scope) |
 | `version` | the assignment's optimistic-lock version. The `/game-operations` socket handshake must present this value or `game.subscribe`/`game.takeover.request` deny it as stale (`RealtimeGateway`). The web console used to read it from the tournament-wide staff list — which a `FIELD_OPERATOR` is always denied, so that role presented `0` and its live subscription broke as soon as its assignment version moved past `0`. This route is now that value's single source for every role (`useMyTournamentStaffAssignmentVersion`). |
-| `fixtures[]` — `{fixtureId,round,fixtureNumber,legNumber,scheduledAt,status,fieldId,fieldName,homeTeamName,awayTeamName}` | **`FIELD_OPERATOR` only.** The fixtures this assignment covers, earliest first, capped at 50 per assignment (`fixturesTruncated` flags the cut). Other roles always get `[]` and no fixture query runs at all. |
+| `fixtures[]` — `{fixtureId,gameId,tournamentId,title,scheduledAt,status,gameState,round,fixtureNumber,legNumber,groupName,fieldId,fieldName}` | **`FIELD_OPERATOR` scopes only.** The canonical team matches those assignments cover, earliest first; other roles get `[]` and no fixture query runs. `groupName` is `V1TournamentGroup.name`, `null` outside any group (knockout etc.) — the web names the match with `competitionMatchLabel` ("A조 · 조별리그 2라운드"). |
 
 - **Why it exists.** A `FIELD_OPERATOR` assignment always carries a fixture and/or field scope (`tournament-staff-policy.ts`'s `parseAssignment`), so the tournament-wide `read` that the ops shell's entry check performs is *always* denied for that role with `FIXTURE_SCOPE_REQUIRED`/`FIELD_SCOPE_REQUIRED`. Before this route there was no way for such a staffer to discover which fixture console they may open — the shell was the only entry point and it is structurally closed to them. The web client deep-links straight to `/tournament-ops/tournaments/:id/fixtures/:fixtureId/operate` from this response.
-- **Scope resolution mirrors the policy, it does not replace it.** `fixtures[]` is computed with the same rule the policy applies (`fixtureIds` membership AND `fieldId` equality when each is present). It is a *display* list: every call the console then makes is still authorized per request by `TournamentStaffAccessService.assertAccess()` (see `TournamentFixtureLineupService.authorizeAndResolveGameId`), so a fixture absent from this list cannot be operated by hand-editing the URL. `my-tournament-staff-assignments.service.spec.ts` cross-checks the two rules against `decideTournamentStaffAccess` in both directions (listed ⇒ ALLOWED, excluded ⇒ denied).
-- **`platform_ops` admins get an empty list**, since the admin bypass leaves no assignment row; their entry point remains the admin screens (`?from=admin`).
+- **Scope resolution mirrors the policy, it does not replace it.** `fixtures[]` is computed with the same rule the policy applies (`fixtureIds` membership AND `fieldId` equality when each is present). It is a *display* list: every call the console then makes is still authorized per request by `TournamentStaffAccessService.assertAccess()` (see `TournamentFixtureLineupService.authorizeAndResolveGameId`), so a fixture absent from this list cannot be operated by hand-editing the URL.
+- **`platform_ops` admins get `platformRole:"PLATFORM_OPS"` and usually no `items`**, since the admin bypass leaves no assignment row; their entry point remains the admin screens (`?from=admin`).
 
 ### Errors
 
@@ -147,7 +151,7 @@ These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK
 
 ```
 {
-  fixtureId, tournamentId, round, fixtureNumber,
+  fixtureId, tournamentId, round, fixtureNumber, groupName,
   gameId, gameState, fieldId, fieldName,
   homeRegistrationId, awayRegistrationId, scheduledAt,
   currentScore, warnings: string[], version, revisionId, stableRevision
@@ -169,7 +173,7 @@ is one `FixtureOperationsRow`; `LiveWarningEntry` is `{fixtureId, warnings: stri
 
 ### Incremental key: `items[].stableRevision` (P0 fix, Task 18 review finding #5)
 
-`(fixtureId, version, revisionId)` alone cannot identify every stable-body change: `version`/`revisionId` are `V1Game` fields, so a fixture-only mutation (field (re)assignment, a field rename, an escalation transition that doesn't flip `RESULT_REVIEW_OVERDUE`'s boolean) can change the response without moving either, and a fixture with no game at all always has `version:null, revisionId:null` regardless of its own mutations. Each item now carries `stableRevision` — a `sha256` hex digest over EVERY persisted input that can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version` (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId` (nullable), and the max `V1ResultEscalation.version`/`updatedAt` across ALL escalations tied to the fixture's game. A correct client diff compares `stableRevision` per `fixtureId` (falling back to "present in one snapshot but not the other" for adds/removals); `version`/`revisionId` remain for backward compatibility but are no longer sufficient alone.
+`(fixtureId, version, revisionId)` alone cannot identify every stable-body change: `version`/`revisionId` are `V1Game` fields, so a fixture-only mutation (field (re)assignment, a field rename, an escalation transition that doesn't flip `RESULT_REVIEW_OVERDUE`'s boolean) can change the response without moving either, and a fixture with no game at all always has `version:null, revisionId:null` regardless of its own mutations. Each item now carries `stableRevision` — a `sha256` hex digest over EVERY persisted input that can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version` (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId` (nullable), the max `V1ResultEscalation.version`/`updatedAt` across ALL escalations tied to the fixture's game, and `groupName` itself (a group rename or a move to another group need not touch any timestamp above, and groups created together share `updatedAt`). A correct client diff compares `stableRevision` per `fixtureId` (falling back to "present in one snapshot but not the other" for adds/removals); `version`/`revisionId` remain for backward compatibility but are no longer sufficient alone.
 
 ### Stable body vs. `liveWarnings` (D3 determinism hardening)
 
@@ -183,6 +187,7 @@ Stable body field → persisted source:
 | `items[].tournamentId` | `V1TournamentFixture.tournamentId` |
 | `items[].round` | `V1TournamentFixture.round` |
 | `items[].fixtureNumber` | `V1TournamentFixture.fixtureNumber` |
+| `items[].groupName` | `V1TournamentGroup.name` (via `tournamentDetails.group`); `null` outside any group and on regular-league rows. The web names the match with `competitionMatchLabel` |
 | `items[].gameId` | `V1Game.id` (via `fixture.game`, nullable) |
 | `items[].gameState` | `V1Game.state` |
 | `items[].fieldId` | `V1TournamentFixture.fieldId` |
@@ -194,7 +199,7 @@ Stable body field → persisted source:
 | `items[].warnings` | `NO_FIELD_ASSIGNED` ← `fieldId`; `MISSING_SCORER` ← `currentOfficialRevision.missingScorer`; `RESULT_REVIEW_OVERDUE` ← `V1ResultEscalation.status` |
 | `items[].version` | `V1Game.version` |
 | `items[].revisionId` | `V1Game.currentOfficialRevisionId` |
-| `items[].stableRevision` | `sha256` of `[fixture.updatedAt, field.version, game.version, game.updatedAt, revisionId, maxEscalationVersion, maxEscalationUpdatedAt]` — see "Incremental key" above |
+| `items[].stableRevision` | `sha256` of `[fixture.updatedAt, groupName, field.version, game.version, game.updatedAt, revisionId, revisionState, score, missingScorer, maxEscalationVersion, maxEscalationUpdatedAt]` — see "Incremental key" above |
 | `nextCursor` | opaque-encoded `(tournamentId, round, fixtureNumber, id)` of the last page row (keyset cursor; no longer a bare `V1TournamentFixture.id` — Task 18 review P1-1/P1-2) |
 | `watermark` | `sha256` hash of the page's ordered `(fixtureId, stableRevision)` list |
 
@@ -280,7 +285,7 @@ throws `409 TOURNAMENT_RESULT_DERIVED_ONLY`. That dead input was removed in the 
 
 | Method and route | Body | Result | Actor |
 |---|---|---|---|
-| `GET /api/v1/tournament-ops/tournaments/:tournamentId/videos` | — | `{items: [{fixtureId,round,fixtureNumber,legNumber,scheduledAt,status,homeTeamName,awayTeamName,videos[]}]}` | tournament-wide `read` (so `platform_ops`, `tournament_director`, `support_readonly`) |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/videos` | — | `{items: [{fixtureId,round,fixtureNumber,legNumber,groupName,scheduledAt,status,homeTeamName,awayTeamName,videos[]}]}` (`groupName` is `null` outside any group) | tournament-wide `read` (so `platform_ops`, `tournament_director`, `support_readonly`) |
 | `GET /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos` | — | `{items: FixtureVideo[]}` | `read` on that fixture (adds scoped `field_operator`) |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos` | `{url, title?}` | created `FixtureVideo` (`201`) | `event_append` on that fixture |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/upload` | multipart `files` (exactly one MP4/WebM/MOV, 200MB) + optional `title` text field | created `FixtureVideo` (`201`) | `event_append` on that fixture |

@@ -36,6 +36,21 @@ type VideoRow = {
   createdAt: Date;
 };
 
+type TeamMatchRow = {
+  id: string;
+  startAt: Date | null;
+  status: string;
+  tournamentDetails: {
+    round: string;
+    fixtureNumber: number;
+    legNumber: number;
+    group: { name: string } | null;
+    homeRegistration: { team: { name: string } } | null;
+    awayRegistration: { team: { name: string } } | null;
+  };
+  videos: VideoRow[];
+};
+
 /**
  * 권한은 목이 아니라 **실제 정책**(`decideTournamentStaffAccess`)으로 검증한다 — 여기서
  * `TournamentStaffAccessService` 를 진짜로 만들고 배정 행만 가짜 prisma 로 공급한다. 그래서
@@ -49,6 +64,8 @@ function createHarness(options: {
   fixtureExists?: boolean;
   /** 다른 canonical 팀매치가 같은 업로드 URL을 참조하는 행 수. */
   teamMatchVideoRefCount?: number;
+  /** 대회 전체 목록(`listTournamentVideos`)이 읽는 팀매치 행. */
+  teamMatchRows?: TeamMatchRow[];
 }) {
   const assignments = options.assignments ?? [];
   const videos: VideoRow[] = [...(options.videos ?? [])];
@@ -85,7 +102,15 @@ function createHarness(options: {
           ? { id: where.id, fieldId: options.fixtureFieldId ?? null }
           : null,
       ),
-      findMany: jest.fn().mockResolvedValue([]),
+      // select 에 없는 상세 컬럼은 돌려주지 않는다 — 서비스가 `group` 을 안 고르면 조 이름도 없다.
+      findMany: jest.fn(async ({ select }: { select: { tournamentDetails: { select: Record<string, unknown> } } }) =>
+        (options.teamMatchRows ?? []).map((row) => ({
+          ...row,
+          tournamentDetails: Object.fromEntries(
+            Object.entries(row.tournamentDetails).filter(([key]) => key in select.tournamentDetails.select),
+          ),
+        })),
+      ),
     },
     // 다른 canonical 팀매치가 같은 업로드 URL을 참조하면 파일을 지우지 않는다.
     v1TeamMatchVideo: {
@@ -507,6 +532,34 @@ describe('TournamentFixtureVideosService — 대회 단위 조회', () => {
       ],
     });
     await expect(harness.service.listTournamentVideos(user('director'), tournamentId)).resolves.toBeDefined();
+  });
+
+  it('경기마다 조 이름을 싣는다 — 조에 속하지 않은 결선 경기는 null', async () => {
+    const row = (id: string, round: string, group: { name: string } | null): TeamMatchRow => ({
+      id,
+      startAt: null,
+      status: 'completed',
+      tournamentDetails: {
+        round,
+        fixtureNumber: 1,
+        legNumber: 1,
+        group,
+        homeRegistration: { team: { name: '서울FC' } },
+        awayRegistration: { team: { name: '부산FC' } },
+      },
+      videos: [],
+    });
+    const harness = createHarness({
+      assignments: [{ userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] }],
+      teamMatchRows: [row(fixtureId, 'league_r2', { name: 'A조' }), row(otherFixtureId, 'semi', null)],
+    });
+
+    const result = await harness.service.listTournamentVideos(user('director'), tournamentId);
+
+    expect(result.items.map(({ fixtureId: id, groupName }) => ({ id, groupName }))).toEqual([
+      { id: fixtureId, groupName: 'A조' },
+      { id: otherFixtureId, groupName: null },
+    ]);
   });
 });
 

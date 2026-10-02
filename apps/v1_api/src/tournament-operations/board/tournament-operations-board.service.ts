@@ -180,7 +180,7 @@ const BOARD_GAME_SELECT = {
  * 두 축을 하나로 만든 **정규화 행**. 이 아래의 경고 계산·해시·항목 매핑은 전부 이 모양만
  * 본다 — 두 축을 끝까지 따로 끌고 가면 같은 계산이 두 벌이 되고, 한쪽만 고치는 날이 온다.
  *
- * 리그(팀매치)에서 `round`·`fixtureNumber`·`fieldId`·`field` 는 **항상 `null`** 이다.
+ * 리그(팀매치)에서 `round`·`fixtureNumber`·`groupName`·`fieldId`·`field` 는 **항상 `null`** 이다.
  * `V1TeamMatch` 에 그 컬럼들이 아예 없기 때문이지, 값이 안 채워진 것이 아니다.
  */
 type BoardRow = {
@@ -188,6 +188,7 @@ type BoardRow = {
   tournamentId: string;
   round: string | null;
   fixtureNumber: number | null;
+  groupName: string | null;
   fieldId: string | null;
   field: { name: string; version: number } | null;
   homeRegistrationId: string | null;
@@ -245,6 +246,7 @@ type BoardRow = {
  * - `items[].tournamentId`         <- `V1TeamMatch.tournamentId`
  * - `items[].round`                <- `V1TournamentMatchDetails.round`
  * - `items[].fixtureNumber`        <- `V1TournamentMatchDetails.fixtureNumber`
+ * - `items[].groupName`            <- `V1TournamentGroup.name` (via `tournamentDetails.group`, nullable)
  * - `items[].gameId`               <- `V1Game.id` (via the TeamMatch `game` relation, nullable)
  * - `items[].gameState`            <- `V1Game.state`
  * - `items[].fieldId`              <- `V1TeamMatch.fieldId`
@@ -291,7 +293,9 @@ type BoardRow = {
  * across ALL (not only open) escalations tied to the fixture's game -- so an escalation closing
  * (open -> closed) also moves this hash even though it does not, by itself, change
  * `RESULT_REVIEW_OVERDUE`'s stable boolean membership for a fixture that already had other reasons
- * to carry that code, or none at all.
+ * to carry that code, or none at all. `groupName` is hashed as the value itself: a group
+ * rename or a move to another group need not touch `V1TeamMatch.updatedAt` or any version
+ * above, and groups created together share `updatedAt`, so no timestamp can stand in.
  * `watermark` is the hash of the page's ordered `(fixtureId, stableRevision)` list rather than two
  * running maxima, so it moves whenever ANY item's `stableRevision` moves, regardless of which
  * underlying model changed. A correct client diff is: compare `stableRevision` per `fixtureId`
@@ -617,6 +621,7 @@ export class TournamentOperationsBoardService {
         .update(
           JSON.stringify([
             row.updatedAt.getTime(),
+            row.groupName,
             fieldVersion,
             gameVersion,
             gameUpdatedAtMs,
@@ -636,6 +641,7 @@ export class TournamentOperationsBoardService {
           tournamentId: row.tournamentId,
           round: row.round,
           fixtureNumber: row.fixtureNumber,
+          groupName: row.groupName,
           gameId: row.game?.id ?? null,
           gameState: row.game?.state ?? null,
           fieldId: row.fieldId,
@@ -1017,6 +1023,7 @@ export class TournamentOperationsBoardService {
             fixtureNumber: true,
             homeRegistrationId: true,
             awayRegistrationId: true,
+            group: { select: { name: true } },
           },
         },
         game: { select: BOARD_GAME_SELECT },
@@ -1028,6 +1035,7 @@ export class TournamentOperationsBoardService {
       tournamentId: row.tournamentId ?? tournamentId,
       round: row.tournamentDetails?.round ?? null,
       fixtureNumber: row.tournamentDetails?.fixtureNumber ?? null,
+      groupName: row.tournamentDetails?.group?.name ?? null,
       fieldId: row.fieldId,
       field: row.field,
       homeRegistrationId: row.tournamentDetails?.homeRegistrationId ?? null,
@@ -1130,6 +1138,7 @@ export class TournamentOperationsBoardService {
       // `V1TeamMatch` 에 없는 컬럼이다 — 안 채운 게 아니라 존재하지 않는다.
       round: null,
       fixtureNumber: null,
+      groupName: null,
       fieldId: null,
       field: null,
       // A legacy league row can have no host team while it is still recruiting. Keep that

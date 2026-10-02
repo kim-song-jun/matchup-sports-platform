@@ -126,7 +126,7 @@ Status: implementation in progress — original audit 20/20 preserved below
 - [x] Phase 1: revalidate latest dev, establish regression cases (league-first classification included).
 - [x] Phase 2: implement all five findings and sync API/mock contracts.
 - [x] Phase 3: narrow regression tests, scoped typechecks, committed diff review.
-- [ ] Phase 4: PR to dev, Copilot review loop, clean CI, merge.
+- [x] Phase 4: PR to dev, external review limitation recorded, required CI PASS, dev merge. Copilot clean review unavailable due monthly quota.
 - [ ] Phase 5: confirm Alpha deployed SHA/health; actual authenticated browser QA at 390/768/1440, PR gallery.
 - Acceptance: competition generic moderation returns 409 without writes; friendly moderation retains audit logs; admin shows competition title/type/manage link; public managed records choose actual competition fixture routes with sanitized `from`; only non-deleted friendly recruiting rows enable recruiting-only contact; live league dissolution blocker links to league fixture.
 - No migration needed. All competitions continue using canonical TeamMatch storage.
@@ -153,3 +153,14 @@ Status: implementation in progress — original audit 20/20 preserved below
 
 - Latest CI then exposed a pre-existing calendar-dependent Web assertion (`defaultStart != 2026-10-03`) on the current date. Its test fixture clock is now fixed to the existing NOW constant; only Date is faked, leaving MSW/polling timers real. No game-roster product code changed. This test file is added to owned scope solely to restore deterministic required CI.
 - Generic status modal now initializes from an allowed option when current status is completed, avoiding a hidden forbidden selection after removing direct completion. New modal regression plus game-roster regressions: 27/27 PASS (10 + 17).
+
+
+### Deployment progress
+
+- Code PR #1545 merged to dev: `d4c7cfd990370f7af7e175849e69db4a9ca9406c` (merge commit; repository disallows squash).
+- Final pre-merge CI run 37042668515: Gates/API/Web PASS, including full unit suites, both builds and migration replay/drift checks. The matching dev-push CI 37043891731 also passed.
+- Alpha deployment run 37043891674 is building immutable images; health/identity/browser verdict remains pending.
+- Isolated worktree fast-forwarded to origin/dev immediately after merge. The shared root's unrelated WIP and stale feature branch were preserved; the documented macOS sync-back path does not exist in this WSL environment.
+- Anonymous league record baseline: 390/768/1440 already reach canonical league fixture detail through the previous generic detail redirect. Treat this as a positive control, not a reproduced league handoff failure. New ownership response removes that intermediate route and must preserve the same outcome.
+
+- Final accessibility follow-up: the new tournament ownership link inherited the league badge's undersized hit area. Both ownership links now explicitly provide 44×44px targets. This preserves the badge destinations and management action while meeting the project minimum. Follow-up dev PR/Alpha identity verification pending; no claims of authenticated admin visual QA.

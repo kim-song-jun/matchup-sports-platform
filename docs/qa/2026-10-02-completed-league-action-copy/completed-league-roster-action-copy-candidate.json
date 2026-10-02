@@ -1,0 +1,234 @@
+{
+  "title": "Completed league match roster uses edit-action wording to lead to a locked participant roster",
+  "role": "captain B",
+  "environment": "https://alpha.teameet.co.kr",
+  "createdAt": "2026-10-02T09:42:08.069Z",
+  "finding": {
+    "candidate": "Completed league match roster uses edit-action wording to lead to a locked participant roster",
+    "severity": "P3 / low UX-copy candidate. The observed destination UI is correctly read-only; no permission-bypass finding.",
+    "reproducedWidths": [
+      402,
+      787,
+      1180
+    ],
+    "source": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/games/a5dd522f-6311-413c-af55-c5b12c2298a2/roster?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%2Ffixtures%2F3054516f-a173-4775-9e35-7ea4acb652a9",
+    "action": "참가 명단에서 선수 추가·빼기",
+    "supportingCopy": "선수를 더하거나 명단에서 아예 빼려면 리그 참가 명단에서 바꿔요. 바꾸면 시작 전 경기에 모두 반영돼요.",
+    "actual": "Keyboard Enter at all 3 widths opens same completed-league registration with 수정 불가 and 종료/취소 explanation, without any edit controls.",
+    "expected": "For a completed league, retain useful read-only navigation with view-only wording and align explanatory copy with the ended state; do not suggest add/remove is currently available.",
+    "triage": "Candidate only; duplicate triage pending; no issue number assigned by this evidence package"
+  },
+  "evidence": [
+    {
+      "file": "lineup-league-completed-mobile-action-controls.jpg",
+      "timestamp": "2026-10-02T09:35:01.223Z",
+      "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/games/a5dd522f-6311-413c-af55-c5b12c2298a2/roster?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%2Ffixtures%2F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "note": "Mobile CTA/explanation only below member badges, screenshot clip specified in zoom-scaled pixels",
+      "privacy": "Control-only crop; visually inspect before publication",
+      "raster": {
+        "width": 402,
+        "height": 106
+      },
+      "sha256": "2b20b0076262347f564f029abdf06d04847b91980af7075a1f9adc5c4a57ca4d",
+      "pixelReview": "Generic status/action only; no member names or DOB visible. Original bytes not edited.",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "sourceClip": {
+        "x": 0,
+        "y": 625,
+        "width": 503,
+        "height": 132
+      },
+      "coordinateNote": "viewportCss records the source page viewport in CSS pixels. sourceClip records the original capture clip coordinates as supplied, including browser zoom scaling. raster records the delivered crop pixel dimensions. They must not be treated as the same coordinate space.",
+      "bytes": 8071,
+      "git_blob_sha": "a5f5fba2980260c9fb0f99dfb7bdce720c17a459",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "lineup-league-completed-mobile-action-destination-controls.jpg",
+      "timestamp": "2026-10-02T09:35:13.211Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations/234e4447-24d0-46d7-bb69-b3593ed6a91b/roster?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%2Fgames%2Fa5dd522f-6311-413c-af55-c5b12c2298a2%2Froster%3Ffrom%3D%252Fleague-matches%252Fc1f2ff15-9363-4915-9c11-8179e57369cb%252Ffixtures%252F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "note": "Destination read-only registration lock, no member rows",
+      "privacy": "Control-only crop; visually inspect before publication",
+      "raster": {
+        "width": 402,
+        "height": 234
+      },
+      "sha256": "572f7ccd9b191d0e18ba56802add2c9c7816a10053aeda90174506b08c91479f",
+      "pixelReview": "Generic status/action only; no member names or DOB visible. Original bytes not edited.",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "sourceClip": {
+        "x": 0,
+        "y": 0,
+        "width": 503,
+        "height": 292
+      },
+      "coordinateNote": "viewportCss records the source page viewport in CSS pixels. sourceClip records the original capture clip coordinates as supplied, including browser zoom scaling. raster records the delivered crop pixel dimensions. They must not be treated as the same coordinate space.",
+      "bytes": 10785,
+      "git_blob_sha": "9f4f77de1d6d78bbadb535b9e94fb78ce4a2d7c8",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "lineup-league-completed-tablet-action-controls.jpg",
+      "timestamp": "2026-10-02T09:35:56.954Z",
+      "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/games/a5dd522f-6311-413c-af55-c5b12c2298a2/roster?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%2Ffixtures%2F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "note": "787px viewport control-only crop below member badges; zoom150%",
+      "privacy": "Control-only crop; visually inspect before publication",
+      "raster": {
+        "width": 561,
+        "height": 99
+      },
+      "sha256": "827fed6aa920816e263366d3c19783a24a26db48a96d0970ad7f8ccfc2924b34",
+      "pixelReview": "Generic status/action only; no member names or DOB visible. Original bytes not edited.",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "sourceClip": {
+        "x": 169,
+        "y": 585,
+        "width": 842,
+        "height": 149
+      },
+      "coordinateNote": "viewportCss records the source page viewport in CSS pixels. sourceClip records the original capture clip coordinates as supplied, including browser zoom scaling. raster records the delivered crop pixel dimensions. They must not be treated as the same coordinate space.",
+      "bytes": 9433,
+      "git_blob_sha": "3fa3c913b09eff01538d839bcb17513e791b319c",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "lineup-league-completed-tablet-destination-controls.jpg",
+      "timestamp": "2026-10-02T09:36:15.224Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations/234e4447-24d0-46d7-bb69-b3593ed6a91b/roster?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%2Fgames%2Fa5dd522f-6311-413c-af55-c5b12c2298a2%2Froster%3Ffrom%3D%252Fleague-matches%252Fc1f2ff15-9363-4915-9c11-8179e57369cb%252Ffixtures%252F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "note": "Tablet title and completed read-only lock, excludes member rows",
+      "privacy": "Control-only crop; visually inspect before publication",
+      "raster": {
+        "width": 603,
+        "height": 229
+      },
+      "sha256": "64e84a4b3cdd27df63a04212294a4e5870856c874797d4eed4970225af494d27",
+      "pixelReview": "Generic status/action only; no member names or DOB visible. Original bytes not edited.",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "sourceClip": {
+        "x": 137,
+        "y": 0,
+        "width": 905,
+        "height": 344
+      },
+      "coordinateNote": "viewportCss records the source page viewport in CSS pixels. sourceClip records the original capture clip coordinates as supplied, including browser zoom scaling. raster records the delivered crop pixel dimensions. They must not be treated as the same coordinate space.",
+      "bytes": 11731,
+      "git_blob_sha": "35128a26a12a776164c11d857a14e0862d4d3032",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "lineup-league-completed-desktop-action-controls.jpg",
+      "timestamp": "2026-10-02T09:36:39.981Z",
+      "url": "https://alpha.teameet.co.kr/teams/ea0e4cf0-34ab-411c-ac89-5b931f25e781/games/a5dd522f-6311-413c-af55-c5b12c2298a2/roster?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%2Ffixtures%2F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "note": "1180px viewport CTA/explanation crop; member badges excluded",
+      "privacy": "Control-only crop; visually inspect before publication",
+      "raster": {
+        "width": 1032,
+        "height": 99
+      },
+      "sha256": "35bdba78295999dc3c16a4a5ed7701c57ae75d19a5ffa39ba923ce2af9bac3ee",
+      "pixelReview": "Generic status/action only; no member names or DOB visible. Original bytes not edited.",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "sourceClip": {
+        "x": 74,
+        "y": 481,
+        "width": 1032,
+        "height": 99
+      },
+      "coordinateNote": "viewportCss records the source page viewport in CSS pixels. sourceClip records the original capture clip coordinates as supplied, including browser zoom scaling. raster records the delivered crop pixel dimensions. They must not be treated as the same coordinate space.",
+      "bytes": 12443,
+      "git_blob_sha": "2f1b241678516f072617ba13f9e01bf970c2b9b5",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "lineup-league-completed-desktop-destination-controls-clear.jpg",
+      "timestamp": "2026-10-02T09:38:57.668Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations/234e4447-24d0-46d7-bb69-b3593ed6a91b/roster?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%2Fgames%2Fa5dd522f-6311-413c-af55-c5b12c2298a2%2Froster%3Ffrom%3D%252Fleague-matches%252Fc1f2ff15-9363-4915-9c11-8179e57369cb%252Ffixtures%252F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "note": "Desktop lock card after moving browser pointer to blank part of period label row; no members",
+      "privacy": "Control-only crop; visually inspect before publication",
+      "raster": {
+        "width": 602,
+        "height": 160
+      },
+      "sha256": "1c7482b3973fc65c12316e9c77d520edba774b063279fa15c79bbfece73da3b9",
+      "pixelReview": "Generic status/action only; no member names or DOB visible. Original bytes not edited.",
+      "captureType": "control-only crop; not full viewport",
+      "viewportCss": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "sourceClip": {
+        "x": 289,
+        "y": 164,
+        "width": 602,
+        "height": 160
+      },
+      "coordinateNote": "viewportCss records the source page viewport in CSS pixels. sourceClip records the original capture clip coordinates as supplied, including browser zoom scaling. raster records the delivered crop pixel dimensions. They must not be treated as the same coordinate space.",
+      "bytes": 9797,
+      "git_blob_sha": "fda906041a8a03a49466f27c2c06d08bed9da0f7",
+      "publicationPixelReviewed": true,
+      "exifPresent": false
+    }
+  ],
+  "destinations": [
+    {
+      "at": "2026-10-02T09:35:13.201Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations/234e4447-24d0-46d7-bb69-b3593ed6a91b/roster?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%2Fgames%2Fa5dd522f-6311-413c-af55-c5b12c2298a2%2Froster%3Ffrom%3D%252Fleague-matches%252Fc1f2ff15-9363-4915-9c11-8179e57369cb%252Ffixtures%252F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "lockText": "리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요."
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations/234e4447-24d0-46d7-bb69-b3593ed6a91b/roster?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%2Fgames%2Fa5dd522f-6311-413c-af55-c5b12c2298a2%2Froster%3Ffrom%3D%252Fleague-matches%252Fc1f2ff15-9363-4915-9c11-8179e57369cb%252Ffixtures%252F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "lockText": "리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.",
+      "at": "2026-10-02T09:36:15.224Z"
+    },
+    {
+      "url": "https://alpha.teameet.co.kr/tournaments/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations/234e4447-24d0-46d7-bb69-b3593ed6a91b/roster?from=%2Fteams%2Fea0e4cf0-34ab-411c-ac89-5b931f25e781%2Fgames%2Fa5dd522f-6311-413c-af55-c5b12c2298a2%2Froster%3Ffrom%3D%252Fleague-matches%252Fc1f2ff15-9363-4915-9c11-8179e57369cb%252Ffixtures%252F3054516f-a173-4775-9e35-7ea4acb652a9",
+      "lockText": "리그가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.",
+      "at": "2026-10-02T09:36:50.723Z"
+    }
+  ],
+  "privacy": "Only generic lock/action controls. No personal member rows, names, DOB, profile IDs, or held A-team originals.",
+  "limits": [
+    "Action-label and explanatory-copy observation at CSS widths 402, 787, and 1180.",
+    "Destination visibly reports ended/cancelled and 수정 불가; no server-side permission testing or permission-bypass claim.",
+    "All six files are control-only crops. Source CSS viewport, source clip coordinates, and delivered crop raster dimensions are separately recorded.",
+    "Only these six exact pre-existing crop files and this narrow candidate proof are included. Full roster captures and private-lineup-readonly materials are excluded.",
+    "Exact serving page commit SHA was not directly observed."
+  ],
+  "servingCommitSha": "unobserved",
+  "publicationReview": {
+    "croppedCaptureBytesUnchanged": true,
+    "privacy": "All six exact crop images were directly reviewed as pixels. They contain generic action/lock controls, league period, and ordinary navigation only. No member names, DOB, profile data, contact details, credentials, or member-list payload are visible. Full underlying images were not read for this publication.",
+    "sourceScope": "Narrow completed-league-roster-action-copy-candidate.json only. Local image paths were replaced with filenames and metadata/limitations were clarified; observations, URLs, UTC timestamps, and crop bytes preserved."
+  }
+}

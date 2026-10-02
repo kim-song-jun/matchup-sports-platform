@@ -17,10 +17,9 @@ export function tournamentRoundLabel(round: string): string {
   return TOURNAMENT_PHASE_LABEL[trimmed.toLowerCase()] ?? trimmed;
 }
 
-/** 생성기 키(`league_r{n}`)·시드(`group`)·어드민 직접 입력(`조별 N라운드`). 결선 조("4강" 조)의 라운드는 여기 걸리지 않는다. */
-function isGroupStageRound(round: string): boolean {
-  const trimmed = round.trim();
-  return LEAGUE_ROUND.test(trimmed) || trimmed.toLowerCase() === 'group' || trimmed.startsWith('조별');
+/** 결선 라운드(8강·4강·결승·3·4위전 …)만 조 이름을 붙이지 않는다 — 그 밖(조별·예선·운영자 입력)은 조 이름과 함께 쓴다. */
+function isKnockoutRound(round: string): boolean {
+  return /^(\d+강|준결승|결승|3·4위전)$/.test(tournamentRoundLabel(round).trim());
 }
 
 export interface CompetitionMatchLabelInput {
@@ -40,6 +39,6 @@ export function competitionMatchLabel({ groupName, round, legNumber, withinGroup
   const leg = legNumber != null && legNumber > 1 && !LEAGUE_ROUND.test(round.trim()) ? ` ${legNumber}차` : '';
   const roundPart = `${tournamentRoundLabel(round)}${leg}`;
   const group = groupName?.trim() ?? '';
-  if (withinGroup || group === '' || !isGroupStageRound(round)) return roundPart;
+  if (withinGroup || group === '' || isKnockoutRound(round) || group === tournamentRoundLabel(round)) return roundPart;
   return `${group} · ${roundPart}`;
 }

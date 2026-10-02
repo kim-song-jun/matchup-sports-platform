@@ -34,6 +34,9 @@ describe('competitionMatchLabel', () => {
     ['어드민이 고른 조별 라운드', { groupName: 'A조', round: '조별 3라운드' }, 'A조 · 조별 3라운드'],
     ['빈 조 이름', { groupName: '  ', round: 'league_r1' }, '조별리그 1라운드'],
     ['정규 리그 주차', { groupName: null, round: '3주차', legNumber: 1 }, '3주차'],
+    ['조가 있는 예선(운영자 입력 라운드)', { groupName: 'A조', round: '예선' }, 'A조 · 예선'],
+    ['조 안의 결선 키', { groupName: '본선', round: 'final' }, '결승'],
+    ['조 안의 N강', { groupName: 'A조', round: '8강' }, '8강'],
   ])('%s', (_case, input, label) => {
     expect(competitionMatchLabel(input)).toBe(label);
   });

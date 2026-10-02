@@ -4,6 +4,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { GOALKEEPER_MARKER } from '../team-matches/team-match-lineup.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
+import { competitionMatchLabel } from '../tournaments/tournament-round-label';
 import { assertTeamLineupManager } from './team-lineup-access';
 
 /** 훑을 사이드의 상한. 팀이 아무리 오래 활동해도 최근 것 말고는 불러올 일이 없고,
@@ -112,7 +113,7 @@ export class TeamLineupHistoryService {
               sport: { select: { name: true } },
               tournament: { select: { title: true, sport: { select: { name: true } } } },
               league: { select: { id: true } },
-              tournamentDetails: { select: { round: true } },
+              tournamentDetails: { select: { round: true, legNumber: true, group: { select: { name: true } } } },
             },
           },
           sides: { select: { id: true, teamId: true, displayNameSnapshot: true } },
@@ -157,9 +158,11 @@ export class TeamLineupHistoryService {
         ? goalkeeperCodeByConfigId.get(game.competitionConfigVersionId) ?? 'GK'
         : GOALKEEPER_MARKER;
       const tournamentName = teamMatch.tournament?.title ?? null;
-      // round는 자유 문자열 표시 라벨이고 한글·영문이 섞여 저장돼 있다("8강", "Round 1").
-      // 파싱하거나 순서를 추론하지 않고 그대로 이어 붙이기만 한다.
-      const round = teamMatch.tournamentDetails?.round ?? null;
+      const details = teamMatch.tournamentDetails;
+      // 경기 이름은 다른 화면과 같은 규칙(competitionMatchLabel)으로 — 원값 round(league_r2 등)를 그대로 붙이지 않는다.
+      const matchLabel = details
+        ? competitionMatchLabel({ groupName: details.group?.name, round: details.round, legNumber: details.legNumber })
+        : null;
 
       items.push({
         lineupId: lineup.id,
@@ -167,7 +170,7 @@ export class TeamLineupHistoryService {
         source: game.sourceType,
         competitionKind,
         sourceLabel: isTournament
-          ? [tournamentName, round].filter((part): part is string => Boolean(part)).join(' · ') || '대회 경기'
+          ? [tournamentName, matchLabel].filter((part): part is string => Boolean(part)).join(' · ') || '대회 경기'
           : '팀 매치',
         opponentName: opponent?.displayNameSnapshot ?? null,
         playedAt: teamMatch.startAt,

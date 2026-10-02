@@ -151,7 +151,7 @@ Required body:
 - `regionId` (활성 시·군·구)
 - `title`, `startsAt`, `manualPlaceName`
 
-Optional body: `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addressText`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
+Optional body: `description`, `imageUrl`, `listImageUrl`, `endsAt`, `deadlineAt`, `addressText`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
 
 Rules:
 
@@ -264,13 +264,15 @@ Rules:
 - `hostTeamId`에 대해 요청자는 `manager+`여야 한다
 - 생성자는 `realName`, `phone`, `gender`가 모두 있는 creator profile을 가져야 한다.
 - `sportId`는 host team의 단일 `sportId`와 같아야 하며, 다르면 `400 VALIDATION_FAILED`를 반환한다.
-- `imageUrl`은 선택 사항이다. web create/edit는 `/uploads`가 반환한 루트 상대 URL만 저장하고, 미선택 상태를 `null`로 보낸다.
+- `imageUrl`(상세용 가로형)과 `listImageUrl`(목록용 정사각형)은 모두 선택 사항이다. 일반·관리자 생성/수정은 `/uploads`가 반환한 루트 상대 URL을 저장하고, 미선택 상태를 `null`로 보낸다. `V1TeamMatch.listImageUrl`은 nullable `v1_team_matches.list_image_url`에 저장된다.
+- 목록·상세·일반 수정 form·관리자 상세 응답은 두 이미지 값을 반환한다. 각 화면은 자기 이미지 → 다른 화면 이미지 → 종목 기본 이미지 순서로 표시한다. 기존 `imageUrl` 한 장만 있는 row는 양쪽 화면에서 계속 사용하므로 기존 사진의 일괄 복사/변경이 필요 없다.
+- 수정 요청의 `listImageUrl` 생략은 기존 목록 이미지를 유지하고, 명시적 `null`/빈 문자열은 목록 이미지를 제거한다. 기존 `imageUrl` 쓰기 계약은 유지한다. 기본 이미지는 화면에서만 선택하며 DB에 업로드 사진처럼 저장하지 않는다.
 - `deadlineAt`은 선택 사항이며 새로 설정할 때 현재보다 이후이고 `startsAt`보다 빨라야 한다. 수정 시에는 저장된 기존 마감 시각을 그대로 유지할 수 있다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
 ## PATCH /team-matches/:teamMatchId (UpdateTeamMatchDto)
 
 - 요청자는 host team `manager+`(owner/manager), `version: string` 필수
-- `title`, `description`, `imageUrl`, `startsAt`, `endsAt`, `deadlineAt`, `manualPlaceName`,
+- `title`, `description`, `imageUrl`, `listImageUrl`, `startsAt`, `endsAt`, `deadlineAt`, `manualPlaceName`,
   `addressText`, `costNote`, `rulesText`, `genderRule`, `minLevelCode`, `maxLevelCode` 등 모집글
   필드를 부분 수정한다.
 - `403`: host team 권한 없음 / `404`: team-match 없음 / `409`: 현재 상태에서 수정 불가(버전 충돌 포함)

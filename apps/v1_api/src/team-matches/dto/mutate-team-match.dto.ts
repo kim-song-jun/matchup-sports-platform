@@ -34,6 +34,10 @@ export class MutateTeamMatchDto {
   @IsString()
   imageUrl?: string | null;
 
+  @IsOptional()
+  @IsString()
+  listImageUrl?: string | null;
+
   @IsDateString()
   startsAt!: string;
 

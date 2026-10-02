@@ -13,7 +13,9 @@ const requireVitest = createRequire(requireWeb.resolve('vitest/package.json'));
 const { createServer } = await import(pathToFileURL(requireVitest.resolve('vite')).href);
 const react = (await import(pathToFileURL(requireWeb.resolve('@vitejs/plugin-react')).href)).default;
 const tailwind = requireWeb('@tailwindcss/postcss');
-const out = path.join(repo, 'output/playwright/visual-audit/team-match-image-brightness');
+const imageSlots = process.env.QA_MODE === 'slots';
+const closedCards = process.env.QA_MODE === 'closed';
+const out = path.join(repo, `output/playwright/visual-audit/${closedCards ? 'team-match-closed-cards' : imageSlots ? 'team-match-image-slots' : 'team-match-image-brightness'}`);
 const fixture = path.join(out, 'fixture');
 await fs.mkdir(fixture, { recursive: true });
 const normalized = (file) => file.replaceAll('\\', '/');
@@ -24,16 +26,25 @@ await fs.writeFile(path.join(fixture, 'entry.tsx'), `
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
-import {TeamMatchListPageView,TeamMatchDetailPageView} from '@/components/team-matches/team-matches-page';
-import {getTeamMatchListViewModel,getTeamMatchDetailViewModel} from '@/components/team-matches/team-matches.view-model';
+import {TeamMatchListPageView,TeamMatchDetailPageView,TeamMatchCreatePageView} from '@/components/team-matches/team-matches-page';
+import {TeamMatchImagesField} from '@/components/team-matches/team-match-images';
+import {getTeamMatchListViewModel,getTeamMatchDetailViewModel,getTeamMatchCreateViewModel} from '@/components/team-matches/team-matches.view-model';
 import ${JSON.stringify(normalized(path.join(web, 'src/app/globals.css')))};
 import ${JSON.stringify(normalized(path.join(web, 'src/app/desktop/index.css')))};
 const kind=new URLSearchParams(location.search).get('surface');
 const list=getTeamMatchListViewModel(); const detail=getTeamMatchDetailViewModel();
 list.matches=list.matches.slice(0,2).map(m=>({...m,imageUrl:'/mock/generated/futsal-rooftop.webp'}));
 detail.match.imageUrl='/mock/generated/futsal-rooftop.webp';
+const create=getTeamMatchCreateViewModel('info'); create.selectedSport='풋살';
+create.form={selectedTeamId:'team-1',selectedSportId:'sport-1',regionId:'region-1',regions:[],onSelectTeam(){},onSelectSport(){},onFieldChange(){},onRegionChange(){},onBack(){},onNext(){},onSubmit(){},uploadImage:async()=>{throw new Error('Presentation fixture has no upload API');}};
+if(${imageSlots}) {
+  list.matches=list.matches.map(m=>({...m,listImageUrl:'/mock/generated/team-huddle.webp'}));
+  detail.match.listImageUrl='/mock/generated/team-huddle.webp';
+}
+if(${closedCards}) { list.matches=[{...list.matches[0],closed:false,status:'open'}, {...list.matches[1],closed:true,status:'closed',apiStatus:'completed',live:false,completionPending:false}]; }
+function Images(){const [images,setImages]=React.useState({imageUrl:'',listImageUrl:''});return <TeamMatchImagesField sport="풋살" images={images} onChange={(field,value)=>setImages(current=>({...current,[field]:value}))}/>;}
 const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}><main style={{maxWidth:1200,margin:'auto'}}>{kind==='list'?<TeamMatchListPageView model={list}/>:<TeamMatchDetailPageView model={detail}/>}</main></QueryClientProvider>);
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}><main style={{maxWidth:1200,margin:'auto'}}>{kind==='list'?<TeamMatchListPageView model={list}/>:kind==='create'?<TeamMatchCreatePageView model={create}/>:kind==='images'?<Images/>:<TeamMatchDetailPageView model={detail}/>}</main></QueryClientProvider>);
 `);
 
 const report = { scope: 'actual components with explicit presentation fixtures; no live API QA', processId: process.pid, captures: [] };
@@ -73,7 +84,7 @@ try {
     await server.listen();
     try {
       for (const [viewport, width, height] of [['mobile',390,844],['tablet',768,1024],['desktop',1440,900]]) {
-        for (const surface of ['list', 'detail']) {
+        for (const surface of closedCards ? ['list'] : imageSlots ? ['list', 'detail', 'create', ...(phase === 'after' ? ['images'] : [])] : ['list', 'detail']) {
           const context = await browser.newContext({ viewport: { width, height } });
           try {
             const page = await context.newPage();
@@ -82,8 +93,13 @@ try {
             page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
             page.on('response', (response) => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
             await page.goto(`http://127.0.0.1:3193/__qa_team_match_image?surface=${surface}`);
-            const media = page.locator(surface === 'list' ? '.tm-match-row-thumb' : '.tm-team-vs-hero').first();
-            await expect(media).toBeVisible();
+            const media = page.locator(surface === 'list' ? '.tm-match-row-thumb' : surface === 'detail' ? '.tm-team-vs-hero' : phase === 'before' ? '.tm-create-image-preview' : '.tm-team-match-image-preview').first();
+            try { await expect(media).toBeVisible({ timeout: 15000 }); }
+            catch (error) {
+              report.captures.push({ phase, viewport, surface, errors, failures, renderFailure: error.message });
+              console.error(JSON.stringify({ errors, failures }));
+              throw error;
+            }
             await page.waitForLoadState('networkidle');
             await page.evaluate(async () => { await document.fonts.ready; });
             const metrics = await media.evaluate((element) => ({ background: getComputedStyle(element).backgroundImage,
@@ -95,6 +111,21 @@ try {
               await expect(media).toHaveClass(/tm-team-vs-hero-photo/);
               await expect(media.locator('.tm-team-vs-summary')).toHaveCSS('background-color', 'rgba(17, 24, 39, 0.8)');
               await expect(media.locator('.tm-hero-button').first()).toHaveCSS('background-color', 'rgba(17, 24, 39, 0.8)');
+            }
+            if (imageSlots && phase === 'after') {
+              if (surface === 'list') expect(metrics.background).toContain('/mock/generated/team-huddle.webp');
+              if (surface === 'detail') expect(metrics.background).toContain('/mock/generated/futsal-rooftop.webp');
+              if (surface === 'create' || surface === 'images') {
+                await expect(page.getByRole('img', { name: '목록 이미지 미리보기' })).toBeVisible();
+                await expect(page.getByRole('img', { name: '상세 이미지 미리보기' })).toBeVisible();
+                const square = await page.locator('.tm-team-match-image-square').evaluate(e=>({width:e.clientWidth,height:e.clientHeight}));
+                expect(Math.abs(square.width-square.height)).toBeLessThanOrEqual(1);
+              }
+            }
+            if (closedCards && phase === 'after') {
+              await expect(page.locator('.tm-match-row.tm-card-closed')).toHaveCSS('filter', 'brightness(0.88) grayscale(0.35)');
+              await expect(page.locator('.tm-match-row.tm-card-closed .tm-match-row-thumb')).toHaveCSS('opacity', '1');
+              await expect(page.locator('.tm-match-row:not(.tm-card-closed)').first()).toHaveCSS('filter', 'none');
             }
             expect(errors).toEqual([]); expect(failures).toEqual([]); expect(overflow).toBe(false);
             const directory = path.join(out, phase); await fs.mkdir(directory, { recursive: true });

@@ -376,6 +376,7 @@ export const v1TeamsFixture: V1Team[] = [
 export const v1TeamMatchesFixture: V1TeamMatch[] = [
   {
     id: 'team-match-1',
+    listImageUrl: null,
     title: '마포 FC 상대팀 모집',
     sportName: '축구',
     levelLabel: 'A-',

@@ -110,7 +110,8 @@ describe('AdminTeamMatchDetailPage', () => {
     const conditions = screen.getByRole('region', { name: '경기 조건' });
     expect(within(conditions).getByText('중급')).toBeInTheDocument();
     expect(within(conditions).getByText('5v5')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '주말 정기전 대표 이미지' })).toHaveStyle({ backgroundImage: 'url(/uploads/team-match.webp)' });
+    expect(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/team-match.webp');
+    expect(screen.getByRole('img', { name: '목록 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/team-match.webp');
     expect(within(conditions).getByText('친선, 리그전')).toBeInTheDocument();
     expect(within(conditions).getByText('남녀 혼성')).toBeInTheDocument();
   });

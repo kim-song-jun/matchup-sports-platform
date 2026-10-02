@@ -32,6 +32,10 @@ export class CreateAdminTeamMatchRecruitmentDto {
   @IsString()
   imageUrl?: string | null;
 
+  @IsOptional()
+  @IsString()
+  listImageUrl?: string | null;
+
   @IsDateString()
   startsAt!: string;
 

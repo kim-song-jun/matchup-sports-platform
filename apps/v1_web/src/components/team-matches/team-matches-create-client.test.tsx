@@ -293,6 +293,7 @@ describe('team match edit hydration', () => {
       form: {
         hostTeamId: 'team-1', sportId: 'sport-futsal', regionId: 'region-gangnam',
         title: '이미지 팀매치', imageUrl: '/uploads/team-match-cover.webp',
+        listImageUrl: '/uploads/team-match-list.webp',
         startsAt: startsAt.toISOString(), deadlineAt: deadlineAt.toISOString(),
         manualPlaceName: '잠실 풋살파크', addressText: '서울 송파구 올림픽로 25',
       },
@@ -303,11 +304,13 @@ describe('team match edit hydration', () => {
 
     expect(draft).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
+      listImageUrl: '/uploads/team-match-list.webp',
       venue: '잠실 풋살파크',
       address: '서울 송파구 올림픽로 25',
     });
     expect(payload).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
+      listImageUrl: '/uploads/team-match-list.webp',
       manualPlaceName: '잠실 풋살파크',
       addressText: '서울 송파구 올림픽로 25',
       deadlineAt: deadlineAt.toISOString(),

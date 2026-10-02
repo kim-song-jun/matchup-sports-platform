@@ -78,6 +78,7 @@ const draft = {
   opponentTeam: null,
   gender: '성별 무관',
   imageUrl: '',
+  listImageUrl: '',
   cost: 0,
   opponentCost: 0,
   venue: '',

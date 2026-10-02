@@ -184,3 +184,51 @@ Runtime: a fresh PostgreSQL cluster in /tmp on 55439, API 18149, web 3149; no ex
 - RED: two open/closed hero regressions failed before the fix. GREEN: detail/page suite 62/62.
 - Headed Chromium + real isolated API/DB: before/after at 390×844, 768×1024, 1440×900. Zero console/API errors and horizontal overflow.
 - Evidence: `docs/screenshots/task149-two-team-hero/{before,after}/`; reproduction: `scripts/qa/capture-task149-two-team-hero.mjs` with the local fixture match ID supplied through `QA_MATCH_ID`.
+
+## 2026-10-03 platform recruitment wording
+
+- [x] Platform-managed public list uses `팀 모집 중`; ordinary team recruitment keeps `상대 모집 중`.
+- [x] Platform-managed public detail uses `각 팀 부담금`; ordinary team detail keeps `상대팀 부담금`. Amounts and cost persistence are unchanged.
+- [x] Focused rendering verification: both platform/ordinary cases passed (2/2).
+- Initial image intake proposal was subsequently approved by the user; implementation is tracked below.
+- Alpha/manual route QA remains unverified: this local change has not been deployed and the available session has no alpha browser/login capability. No layout or image rendering styles changed.
+
+## 2026-10-03 two optional image slots (user-approved follow-up)
+
+Scope: ordinary/admin create, edit, public list/detail, admin detail, API, nullable Prisma migration, contract/mocks.
+The user explicitly selected the previously proposed two optional slots with single-image reuse and sport defaults, then asked to implement them. Reuse the existing form/Card/control patterns for that selected flow.
+
+- [x] Persist `listImageUrl` separately; retain `imageUrl` as the detail image and backward-compatible shared image.
+- [x] Create/edit show square 1:1 and wide 16:9 previews, optional inputs, independent removal, shared fallback and sport defaults. The create confirmation and admin detail show both previews.
+- [x] Reject upload failures/empty successful responses visibly, retain saved images, disable competing uploads/removal and submitting during uploads.
+- [x] Nullable-only migration `20261003001000_v1_team_match_list_image` adds `v1_team_matches.list_image_url`; no rewrite/backfill is required. Old clients omitting the new field on update retain it.
+- [x] Sync public/admin response, mutation and edit types, MSW fixture and API domain documentation.
+- [x] API focused suites 99/99. Web affected suites 200/200 across final focused runs. Both package typechecks pass; Prisma client generated.
+- [ ] Alpha and real DB HTTP create/edit/readback validation: not deployed; no configured local PostgreSQL or alpha authenticated browser is available in this session.
+- [x] Headed component/CSS visual evidence at 390/768/1440: before 9/9 and after 12/12. Public list/detail, ordinary create, and shared admin/ordinary image field; console/network errors and horizontal overflow 0. This is presentation verification only, not a live API or upload success substitute. QA runner closes its own browser/server; PID metadata is in each report.
+- Canonical create screenshots: `docs/screenshots/team-match-image-slots/{before,after}/{mobile,tablet,desktop}-create.png`; raw capture set/reports: `output/playwright/visual-audit/team-match-image-slots/`. Before refs use `16cf66b63`. Reproduce with `QA_MODE=slots QA_PHASE=before|after QA_BASE_REF=16cf66b63 node scripts/qa/capture-team-match-image-brightness.mjs` (set env through PowerShell on Windows).
+
+### Release binding blocker / reviewable proposed change
+
+Automatic approval review rejected updating the deployment schema pins and accepted manifest hash allowlist: it requires explicit approval for a separate deployment-control task. No deploy/release gate files were changed. Image implementation and local verification are prepared, but the API image will fail the old schema pin until this follow-up is approved and applied.
+
+Canonical LF schema SHA-256 changes from `eef298c3f325d99eb5940e5a466cf6e37404c3291167afcefaa1c572a5ee7930` to `614e05114ddd39e059fc778b078c70a4d71d160c0af4b1a31c18df76d1cdc733` for the single nullable `listImageUrl` column.
+
+| File | Proposed update after explicit approval |
+| --- | --- |
+| `deploy/Dockerfile.v1-api` | Replace builder schema check and generated-client attestation hash with the new schema hash. |
+| `scripts/release/prepare-task168-final-steady-inputs.sh` | Replace the current live-schema pin; preserve the immutable M11 migration hash. |
+| `scripts/release/create-alpha-release-manifest.sh` | Replace the current schema pin in validation and its self-test fixture. |
+| `deploy/alpha-manifest-common.sh` | Append the new schema hash to the accepted final manifests; retain every predecessor hash for rollback. |
+
+Approval scope is these four local release-binding updates and their focused verification; it does not deploy alpha/production or promote main. Frozen Task 168 cutover schemas/migrations and M11 binding remain unchanged. Linux release-binder execution and actual Docker image build remain unverified in this Windows session.
+
+## 2026-10-03 ended card surface / requested DEV deployment
+
+- User requested DEV-only deployment, then corrected closure visuals: the image and its containing card must darken together.
+- [x] Team-match closed cards apply a single `brightness(0.88) grayscale(0.35)` filter to the entire card; remove the extra thumbnail opacity/grayscale so the image is not dimmed twice. Text/badges and click/focus behavior remain in the same card.
+- [x] Completed/cancelled/expired league fixtures also use this terminal-state appearance. Upcoming league fixtures and live/completion-pending friendlies remain undimmed.
+- [x] Focused lifecycle/render tests 7/7, Web typecheck PASS. Headed actual component/CSS captures before 3/3 + after 3/3 at 390/768/1440; console/network/overflow 0; browser/server cleaned up.
+- Evidence: `docs/screenshots/team-match-closed-cards/{before,after}/{mobile,tablet,desktop}-list.png`; reproduce with `QA_MODE=closed`, `QA_PHASE=before|after`, `QA_BASE_REF=16cf66b63` and the same capture runner.
+- [ ] DEV-only release: attempted the four proposed schema-binding edits after the DEV-only request. Automatic review rejected them again, stating that deployment authorization did not constitute explicit separate approval for these production/alpha integrity controls. The rejected action made no partial deploy/release edits; no branch push, PR merge, DB migration or deployment occurred.
+- Needed next authorization: explicitly approve the four-file schema-binding proposal above for this DEV/alpha release. No main promotion or production deployment is requested or permitted.

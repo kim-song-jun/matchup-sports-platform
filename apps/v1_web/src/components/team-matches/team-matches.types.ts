@@ -7,9 +7,10 @@ export type TeamMatchModel = {
   /**
    * API 가 사진을 안 주면 null — matches.card-model.ts 의 `image` 와 같은 이유(웨이브4,
    * 2026-09-04). 목업 사진(`/mock/generated/team-huddle.webp`)으로 메우면 실제 팀매치에
-   * 다른 매치의 사진이 그대로 붙는다. 화면은 null 이면 종목 그래픽(sportIllustration)을 그린다.
+   * 다른 매치의 사진이 그대로 붙는다. 두 슬롯 모두 비어 있으면 종목 그래픽을 그린다.
    */
   imageUrl: string | null;
+  listImageUrl?: string | null;
   sport: string;
   hostTeam: string;
   /** 플랫폼이 개설해 두 팀의 신청을 받는 모집이면 true. */
@@ -286,6 +287,7 @@ export type TeamMatchCreateViewModel = {
     uniform: string;
     gender: string;
     imageUrl: string;
+    listImageUrl?: string;
     cost: number;
     opponentCost: number;
     venue: string;

@@ -1222,6 +1222,7 @@ export type V1MySchedulePage = {
 };
 
 export type V1TeamMatch = V1Match & {
+  listImageUrl?: string | null;
   /** Server-clock derived friendly-match progress; raw matched status remains the permission contract. */
   isLive?: boolean;
   teamMatchId?: string;
@@ -1342,6 +1343,7 @@ export type V1TeamMatchMutationPayload = {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  listImageUrl?: string | null;
   startsAt: string;
   endsAt?: string | null;
   deadlineAt?: string | null;
@@ -1382,6 +1384,7 @@ export type V1TeamMatchEdit = {
     title: string;
     description?: string | null;
     imageUrl?: string | null;
+    listImageUrl?: string | null;
     startsAt: string;
     endsAt?: string | null;
     deadlineAt?: string | null;
@@ -3032,6 +3035,7 @@ export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicati
   description: string | null;
   imageUrl: string | null;
   levelLabel: string | null;
+  listImageUrl?: string | null;
   sportCode: string;
   regionName: string | null;
   placeName: string;
@@ -3061,6 +3065,7 @@ export type V1AdminTeamMatchRecruitmentPayload = {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  listImageUrl?: string | null;
   startsAt: string;
   endsAt?: string | null;
   deadlineAt?: string | null;

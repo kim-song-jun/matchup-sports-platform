@@ -1,5 +1,17 @@
 # Teameet QA Scenario Index
 
+## 2026-10-03 — 종료 팀매치 카드 전체 dim / DEV 요청
+
+이미지와 카드 전체에 동일한 dim 적용; 완료·취소·만료된 리그 포함. 진행 중/종료 확인 중/예정 리그는 유지.
+회귀 7/7, Web 타입 검사 PASS, headed fixture 6/6(390/768/1440), console/network/overflow 0.
+DEV 배포 요청은 접수했으나 schema binding 4파일 수정이 자동 승인 검토에서 다시 거절됨. 구체적인 승인 대상과 증거는 [Task 149](../../.github/tasks/149-admin-assigned-team-match.md)에 기록. 배포 미실행.
+
+## 2026-10-03 — 팀매치 목록/상세 이미지 입력
+
+[Task 149 후속](../../.github/tasks/149-admin-assigned-team-match.md): 일반·관리자 생성/수정의 선택 이미지 두 슬롯, 한 장 공유, 종목 기본 이미지, 기존 사진 호환. [시나리오](./05-team-match-flows.md).
+API 99/99, Web 200/200, 두 패키지 타입 검사 PASS. Headed 컴포넌트 fixture 전후 21/21(390/768/1440), console/network/overflow 0.
+실제 DB 적용·HTTP 저장/재조회 및 alpha QA 미실행. 배포 스키마 pin 갱신은 자동 승인 검토가 별도 승인 대상으로 거절하여 보류했고, 구체적인 4개 파일 변경안을 Task 149에 남겼다.
+
 ## 2026-10-02 — 팀매치 이미지 밝기
 
 [Task 132 후속](../../.github/tasks/archive/132-v1-team-match-full-edit-and-image-contract.md):

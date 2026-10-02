@@ -18,6 +18,7 @@ import { V1_LEVELS } from '@/lib/v1-levels';
 import { GENDER_RULE_OPTIONS } from '@/lib/v1-status-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
 
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
@@ -49,6 +50,7 @@ export default function AdminTeamMatchNewPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [listImageUrl, setListImageUrl] = useState('');
   const [placeName, setPlaceName] = useState('');
   const [addressText, setAddressText] = useState('');
   const [deadlineAt, setDeadlineAt] = useState('');
@@ -85,17 +87,10 @@ export default function AdminTeamMatchNewPage() {
     datesValid &&
     !uploadingImage;
 
-  const uploadImage = async (file: File | undefined) => {
-    if (!file) return;
-    setUploadingImage(true);
-    try {
-      const result = await uploadImages.mutateAsync([file]);
-      setImageUrl(result.urls[0] ?? '');
-    } catch (error) {
-      showToast(extractErrorMessage(error, '이미지를 업로드하지 못했어요.'), 'error');
-    } finally {
-      setUploadingImage(false);
-    }
+  const uploadImage = async (file: File) => {
+    const result = await uploadImages.mutateAsync([file]);
+    if (!result.urls[0]) throw new Error('이미지를 업로드하지 못했어요.');
+    return result.urls[0];
   };
 
   const submit = async () => {
@@ -108,6 +103,7 @@ export default function AdminTeamMatchNewPage() {
         title: title.trim(),
         description: description.trim() || null,
         imageUrl: imageUrl || null,
+        listImageUrl: listImageUrl || null,
         startsAt: startIso,
         endsAt: kstDatetimeLocalToIso(endsAt),
         deadlineAt: kstDatetimeLocalToIso(deadlineAt),
@@ -175,24 +171,9 @@ export default function AdminTeamMatchNewPage() {
               모집 안내 (선택)
               <textarea aria-label="모집 안내 (선택)" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={4} className={`${inputClass} mt-1 h-auto min-h-[112px] py-3`} />
             </label>
-            <div>
-              <label htmlFor="admin-team-match-image" className="block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">대표 이미지</label>
-              <input
-                id="admin-team-match-image"
-                aria-label="대표 이미지"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                disabled={uploadingImage}
-                onChange={(event) => void uploadImage(event.target.files?.[0])}
-                className="mt-1 block min-h-[44px] w-full text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] file:mr-3 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-[var(--surface-soft)] file:px-4 file:font-semibold file:text-[var(--text-body)]"
-              />
-              {imageUrl ? (
-                <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)]">
-                  <div role="img" aria-label="대표 이미지 미리보기" className="h-40 bg-cover bg-center" style={{ backgroundImage: `url("${imageUrl.replaceAll('"', '%22')}")` }} />
-                  <button type="button" onClick={() => setImageUrl('')} className="min-h-[44px] w-full text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-muted)]">이미지 제거</button>
-                </div>
-              ) : null}
-            </div>
+            <TeamMatchImagesField images={{ imageUrl, listImageUrl }} sport={selectedSport?.name}
+              onChange={(field, value) => field === 'listImageUrl' ? setListImageUrl(value) : setImageUrl(value)}
+              onUpload={uploadImage} onUploadingChange={setUploadingImage} disabled={createRecruitment.isPending} />
           </section>
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 md:p-5">

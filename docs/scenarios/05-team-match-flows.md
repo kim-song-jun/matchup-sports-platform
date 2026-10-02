@@ -1,6 +1,15 @@
 > 친선 팀매치의 현재 전체 화면 흐름, 화면별 입출력, 공식 기록 반영 규칙과 모바일/데스크톱
 > 스크린샷 32개는 [`friendly-team-match-screen-flow.md`](./friendly-team-match-screen-flow.md)를 참고한다.
 
+## 2026-10-03 목록/상세 이미지 분리
+
+- 일반·관리자 생성/수정: 목록 정사각형과 상세 가로형 이미지를 각각 선택 업로드한다. 양쪽 모두 선택 사항이다.
+- 한 장만 업로드하면 양쪽에서 공유하며, 둘 다 없거나 두 이미지를 제거하면 종목별 기본 이미지를 표시한다.
+- 각각 다른 이미지 저장 후 목록/상세/수정 재진입에서도 선택한 사진이 유지돼야 한다. 업로드 실패는 오류로 표시하고 기존 사진을 유지하며, 업로드 중 제출·다른 업로드·삭제를 막는다.
+- 기존 `imageUrl`만 가진 매치는 양쪽 화면에서 계속 표시한다. 새 nullable `list_image_url` 마이그레이션은 기존 사진을 변경하지 않는다.
+- 로컬 검증: API 99/99, Web 200/200, 양 패키지 타입 검사 PASS. 실제 DB 및 배포된 alpha의 업로드→저장→재조회 검증은 미실행이다.
+- Headed 컴포넌트/CSS 전후 확인: 390/768/1440에서 before 9/9, after 12/12. 콘솔·네트워크 오류와 가로 넘침 0. [모바일 이전](../screenshots/team-match-image-slots/before/mobile-create.png) / [이후](../screenshots/team-match-image-slots/after/mobile-create.png), [데스크톱 이후](../screenshots/team-match-image-slots/after/desktop-create.png). 관리자 폼의 공유 입력은 별도 fixture로 검증했으며 alpha/API 동작을 대체하지 않는다.
+
 # Team Match Flow Scenarios
 
 ## 2026-10-02 — Team-match photo brightness

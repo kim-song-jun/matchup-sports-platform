@@ -1,4 +1,5 @@
 'use client';
+import { TeamMatchImagesPreview } from '@/components/team-matches/team-match-images';
 
 import Link from 'next/link';
 import { useState } from 'react';
@@ -297,14 +298,7 @@ export default function AdminTeamMatchDetailPage() {
               </Link>
             )}
 
-            {teamMatch.imageUrl && (
-              <div
-                role="img"
-                aria-label={`${teamMatch.title} 대표 이미지`}
-                className="mt-5 aspect-[16/7] w-full rounded-2xl bg-[var(--surface-soft)] bg-cover bg-center"
-                style={{ backgroundImage: `url("${teamMatch.imageUrl.replaceAll('"', '%22')}")` }}
-              />
-            )}
+            <TeamMatchImagesPreview images={teamMatch} sport={teamMatch.sportName} />
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <AdminDetailRow label="팀매치 ID" value={teamMatch.teamMatchId} />

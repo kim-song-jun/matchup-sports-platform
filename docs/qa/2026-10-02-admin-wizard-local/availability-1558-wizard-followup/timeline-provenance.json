@@ -1,0 +1,61 @@
+{
+  "utc": "2026-10-02T20:11:53.033Z",
+  "url": "https://alpha.teameet.co.kr/admin/league-matches",
+  "dom": "- heading \"503 Service Temporarily Unavailable\" [level=1]",
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "width": 404
+  },
+  "reloadCheck": {
+    "utc": "2026-10-02T20:12:17.395Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches",
+    "result": "503 Service Temporarily Unavailable",
+    "method": "One normal tab.reload()"
+  },
+  "scope": "Actual mobile admin sidebar league navigation; no wizard opened, no input entered, no mutation attempted.",
+  "relatedIssue": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1558",
+  "sourceImageSHA256": "20da19451cf71be34f74a4fdfe0630fc4190b16a00d2a3b4caf587e093203401",
+  "recovery": "20:17:55 reload auth-checking,20:18:00 list confirmed",
+  "cause": "Unknown",
+  "pixelIntegrity": "Byte-identical source copy",
+  "file": "league503.png",
+  "rasterPixels": [
+    404,
+    606
+  ],
+  "bytes": 9908,
+  "originalBytesUnchanged": true,
+  "captureType": "Original page viewport PNG, not cropped, altered or regenerated",
+  "firstObservedUTC": "2026-10-02T20:11:39Z",
+  "timestampMeaning": "utc20:11:53.033 is capture-sequence evidence time; distinct from first observation20:11:39 and not an independently measured pixel shutter timestamp.",
+  "timeline": [
+    {
+      "utc": "2026-10-02T20:11:39Z",
+      "observation": "First503 on actual sidebar league navigation"
+    },
+    {
+      "utc": "2026-10-02T20:11:53.033Z",
+      "observation": "Recorded503 DOM/capture evidence"
+    },
+    {
+      "utc": "2026-10-02T20:12:17.395Z",
+      "observation": "One ordinary reload still503"
+    },
+    {
+      "utc": "2026-10-02T20:17:55Z",
+      "observation": "Later ordinary reload showed authentication-checking shell"
+    },
+    {
+      "utc": "2026-10-02T20:18:00Z",
+      "observation": "League list confirmed rendered"
+    }
+  ],
+  "limits": [
+    "Cause unknown; later success does not establish lasting service stability or incident resolution.",
+    "Recovery events are recorded action observations, not additional published recovery screenshots.",
+    "Exact page-serving SHA unobserved.",
+    "No server change, restart, create/save/upload/enrollment or permission change."
+  ],
+  "publisherPixelReview": "Directly reviewed, generic503 text only with no personal/account data."
+}

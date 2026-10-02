@@ -1,0 +1,455 @@
+{
+  "method": "Designated outputs copied byte-for-byte for publication. Capture worker used existing source viewport screenshots and Pillow crop; tablet files02/08/09 contain one out-of-bounds padding column as explicitly documented below. No redraw, masking, retouch or composite.",
+  "coordinateSystem": "Saved viewport raster pixel coordinates [left,top,right,bottom]; left/top inclusive, right/bottom exclusive.",
+  "timeMeaning": "sourceEvidenceUTC is start of DOM/metrics/screenshot capture sequence, not independently measured pixel shutter time.",
+  "privacy": "Main controls only; no member names, contact details, DOB or account IDs. Synthetic QA text retained.",
+  "images": [
+    {
+      "file": "01-league-mobile-blank.png",
+      "sourceSHA256": "8f083fc45bb36585b94b658ddb558327e2615aa36b4032d6fab8ddafb1cf2094",
+      "imageSHA256": "153a87afadf19b1182d8d8f979c7d4a57e1feeb311430150af5145ace2cdbabc",
+      "sourceEvidenceUTC": "2026-10-02T20:18:40.371Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/league-matches/new",
+      "viewportCSS": {
+        "documentWidth": 404,
+        "dpr": 1.25,
+        "height": 606,
+        "scrollX": 0,
+        "scrollY": 0,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        404,
+        606
+      ],
+      "actionProof": "League initial form; accessible labels and 44 CSS px fields.",
+      "outputRasterPixels": [
+        404,
+        606
+      ],
+      "bytes": 90630,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "02-league-tablet-local.png",
+      "sourceSHA256": "cebc0f2c1f6f216d770f7a9c5d32898ba9f67ef5589d5b9233e0596134b28034",
+      "imageSHA256": "15c057098a1c688de604b047ced47a5fd395b54b117d60dc59b58763c0c933fe",
+      "sourceEvidenceUTC": "2026-10-02T20:22:02.130Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/league-matches/new",
+      "viewportCSS": {
+        "documentWidth": 788,
+        "dpr": 1.5,
+        "height": 505,
+        "scrollX": 0,
+        "scrollY": 66,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        787,
+        505
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        788,
+        505
+      ],
+      "actionProof": "League local synthetic values preserved at 788×505, keyboard focus on sport.",
+      "outputRasterPixels": [
+        788,
+        505
+      ],
+      "bytes": 102093,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "03-league-desktop-local.png",
+      "sourceSHA256": "413c7dc49f3bac3d8826777be5f168dc24eab8ec80ffe219de1ef74941473deb",
+      "imageSHA256": "0af6f704e14fa090d5355a2cf2d69b190460660310c2c1f0db9edc2c5c79f443",
+      "sourceEvidenceUTC": "2026-10-02T20:22:15.340Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/league-matches/new",
+      "viewportCSS": {
+        "documentWidth": 1182,
+        "dpr": 1,
+        "height": 758,
+        "scrollX": 0,
+        "scrollY": 0,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        758
+      ],
+      "cropLTRB": [
+        360,
+        20,
+        1070,
+        745
+      ],
+      "actionProof": "Local name/sport/region/native dates; create disabled with current zero-team guidance.",
+      "outputRasterPixels": [
+        710,
+        725
+      ],
+      "bytes": 140979,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "04-tournament-mobile-blank-errors.png",
+      "sourceSHA256": "97f24b775c5ea04fd47eb5a1ca2af3f8f2360e2a2f42fb2c44afa5a5ce9cdca4",
+      "imageSHA256": "eb1e1d0747aad6be3f8f7143fd0fe86284a9df283a4e9ade53c7bc1f21056bb2",
+      "sourceEvidenceUTC": "2026-10-02T20:28:22.557Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 403,
+        "dpr": 1.25,
+        "height": 606,
+        "scrollX": 0,
+        "scrollY": 271.20001220703125,
+        "width": 403
+      },
+      "sourceRasterPixels": [
+        403,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        403,
+        606
+      ],
+      "actionProof": "Blank Next focuses sport and shows sport/title errors; no save.",
+      "outputRasterPixels": [
+        403,
+        606
+      ],
+      "bytes": 77344,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "05-tournament-mobile-step3-initial.png",
+      "sourceSHA256": "243198c3dc5f3606a30d676b2900614894f1d1b32febf56a165388356edef963",
+      "imageSHA256": "a17bd8fc6efe03f94ac4ed6473993289fda6a7debe7d305efd8b2d1b1dd3ed19",
+      "sourceEvidenceUTC": "2026-10-02T20:31:27.277Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 403,
+        "dpr": 1.25,
+        "height": 606,
+        "scrollY": 0,
+        "width": 403
+      },
+      "sourceRasterPixels": [
+        403,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        403,
+        606
+      ],
+      "actionProof": "After Previous to Step3, H2 focused and scrollY0, first field behind fixed CTA.",
+      "outputRasterPixels": [
+        403,
+        606
+      ],
+      "bytes": 88144,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "06-tournament-mobile-tab-recovery.png",
+      "sourceSHA256": "685b5ab934bac7b2d1bfcd2ce85153231c895bb33f1c568aa38f03b96c4c1681",
+      "imageSHA256": "44e4107efd25eef88ef9e43351b03c03347a99eb71a95e7cfa1ccf479e4b028a",
+      "sourceEvidenceUTC": "2026-10-02T20:31:34.506Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 403,
+        "dpr": 1.25,
+        "height": 606,
+        "scrollY": 142.39999389648438,
+        "width": 403
+      },
+      "sourceRasterPixels": [
+        403,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        403,
+        606
+      ],
+      "actionProof": "One Tab from heading exposes team count; actual hit-test matches input.",
+      "outputRasterPixels": [
+        403,
+        606
+      ],
+      "bytes": 83994,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "07-tournament-mobile-scroll-recovery.png",
+      "sourceSHA256": "db3e0fe8f00b08c6aaf68138c31dbf8103c273cc0e3c46093ddda6ff1743a05e",
+      "imageSHA256": "260a02d07606e84c769be4c62cc5fda07a5676b09dde227a16599408899ede3d",
+      "sourceEvidenceUTC": "2026-10-02T20:32:00.792Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 403,
+        "dpr": 1.25,
+        "height": 606,
+        "scrollY": 288,
+        "width": 403
+      },
+      "sourceRasterPixels": [
+        403,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        403,
+        606
+      ],
+      "actionProof": "Ordinary scroll exposes schedule input with actual hit-test matching input.",
+      "outputRasterPixels": [
+        403,
+        606
+      ],
+      "bytes": 80424,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "08-tournament-tablet-step3-initial.png",
+      "sourceSHA256": "879efb0afbbbbefed8fa871a6d1018cbced760427c3c4ee44e98285e6a294586",
+      "imageSHA256": "a6731d019824456d638bdac6eda5e98e74cc92b18b6577c9d23383e9ea1d91bf",
+      "sourceEvidenceUTC": "2026-10-02T20:32:40.924Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 788,
+        "dpr": 1.5,
+        "height": 505,
+        "scrollY": 0,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        787,
+        505
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        788,
+        505
+      ],
+      "actionProof": "Deep-scroll Next to Step3 focuses H2 and resets scroll; heading obscured by CTA and first input below viewport.",
+      "outputRasterPixels": [
+        788,
+        505
+      ],
+      "bytes": 109975,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "09-tournament-tablet-tab-recovery.png",
+      "sourceSHA256": "2d90e670282b9db276ef1d0d64c08340b555d31ba37ebe69675108ef9c62b3f7",
+      "imageSHA256": "6f14c1a8cda97e2da3f52321f68bd46cbb3c9e5e35e4ff66cfcdb566e490fde1",
+      "sourceEvidenceUTC": "2026-10-02T20:32:51.594Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 788,
+        "dpr": 1.5,
+        "height": 505,
+        "scrollY": 209.3333282470703,
+        "width": 788
+      },
+      "sourceRasterPixels": [
+        787,
+        505
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        788,
+        505
+      ],
+      "actionProof": "One Tab exposes title and first input; input is focus-visible and hit-test target.",
+      "outputRasterPixels": [
+        788,
+        505
+      ],
+      "bytes": 96405,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "10-tournament-desktop-step3-initial.png",
+      "sourceSHA256": "85786099abb324c0738561015865c832429f15189cdbb29ae8003929884ab054",
+      "imageSHA256": "4a1e34ae678893ec3d322abd14356306b4ff17e9b31cbfd39eedaf0fdfc67de2",
+      "sourceEvidenceUTC": "2026-10-02T20:33:18.754Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 1182,
+        "dpr": 1,
+        "height": 758,
+        "scrollY": 0,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        758
+      ],
+      "cropLTRB": [
+        260,
+        15,
+        1170,
+        758
+      ],
+      "actionProof": "Desktop title and first input both visible after deep-scroll Next; input hit-test passes.",
+      "outputRasterPixels": [
+        910,
+        743
+      ],
+      "bytes": 169078,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "11-tournament-mobile-schedule-errors.png",
+      "sourceSHA256": "26afd1fe2ecb6b5416d1495d8f63b358bce51ffd5ba2ca86dd4fbeb5bb32fdd9",
+      "imageSHA256": "af05240b3ce65428fb9090ef807970854fc0371837b8442f6b1a833241a7187f",
+      "sourceEvidenceUTC": "2026-10-02T20:28:58.399Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 403,
+        "dpr": 1.25,
+        "height": 606,
+        "scrollX": 0,
+        "scrollY": 270.3999938964844,
+        "width": 403
+      },
+      "sourceRasterPixels": [
+        403,
+        606
+      ],
+      "cropLTRB": [
+        0,
+        0,
+        403,
+        606
+      ],
+      "actionProof": "Blank Next focuses scheduled-at; required, aria-invalid and described-by error association present.",
+      "outputRasterPixels": [
+        403,
+        606
+      ],
+      "bytes": 80997,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "12-tournament-desktop-discard-reset.png",
+      "sourceSHA256": "793235e30d13919473622e23933d661d411ea9bb64ef3dd752ed15b06552879b",
+      "imageSHA256": "929486ad0e0f2b6ba29318bfeb92617ee27afa52b06b2d354b179c8cfe4c8365",
+      "sourceEvidenceUTC": "2026-10-02T20:35:27.298Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 1182,
+        "dpr": 1,
+        "height": 758,
+        "scrollY": 0,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        758
+      ],
+      "cropLTRB": [
+        260,
+        15,
+        1170,
+        758
+      ],
+      "actionProof": "After full local steps1–4 and Cancel, fresh wizard has empty title/sport and defaults.",
+      "outputRasterPixels": [
+        910,
+        743
+      ],
+      "bytes": 155819,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    },
+    {
+      "file": "13-tournament-desktop-local-summary.png",
+      "sourceSHA256": "118731246152c740c2b78886cd33ac94ac4d58e4b853e207104cfc1011338edf",
+      "imageSHA256": "1215efa18ab78f0db8d2fababa16c6555ebe78ef96c1a4414cfceb397edf4b27",
+      "sourceEvidenceUTC": "2026-10-02T20:34:26.966Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+      "viewportCSS": {
+        "documentWidth": 1182,
+        "dpr": 1,
+        "height": 758,
+        "scrollY": 963,
+        "width": 1182
+      },
+      "sourceRasterPixels": [
+        1182,
+        758
+      ],
+      "cropLTRB": [
+        280,
+        5,
+        1145,
+        685
+      ],
+      "actionProof": "Synthetic local summary and keyboard focus only; final create untouched.",
+      "outputRasterPixels": [
+        865,
+        680
+      ],
+      "bytes": 128036,
+      "originalDesignatedBytesUnchanged": true,
+      "publisherPixelReview": "Directly reviewed: general form controls and synthetic QA text only; no individual/account identity or private bank data."
+    }
+  ],
+  "visualInspection": {
+    "completedUTC": "2026-10-02T20:37:40Z",
+    "result": "All 13 crops individually viewed; no member names, account identifiers, contact details, DOB or private bank data.",
+    "publisherReview": "All13 designated output images reviewed individually; tablet padding explicitly qualified."
+  },
+  "sourceHashScope": "SourceSHA256 retained from capture-worker provenance; publisher verified output bytes and did not read excluded private originals.",
+  "tabletPaddingClarification": {
+    "files": [
+      "02-league-tablet-local.png",
+      "08-tournament-tablet-step3-initial.png",
+      "09-tournament-tablet-tab-recovery.png"
+    ],
+    "cssWidth": 788,
+    "sourceRasterWidth": 787,
+    "outputRasterWidth": 788,
+    "height": 505,
+    "cropLTRB": [
+      0,
+      0,
+      788,
+      505
+    ],
+    "padding": "Rightmost column x=787 is out-of-source black padding. Publisher verified the output column is black; capture worker confirmed RGBA(0,0,0,255), unchanged source pixels at x0–786, and matching recorded source/output hashes.",
+    "limit": "Padding is capture processing, not product UI. CSS/raster width discrepancy cause was not established. Do not describe these three outputs as wholly inside-source, no-added-pixel crops.",
+    "imageTreatment": "Existing designated crop files are published unchanged; no new edit or recapture."
+  }
+}

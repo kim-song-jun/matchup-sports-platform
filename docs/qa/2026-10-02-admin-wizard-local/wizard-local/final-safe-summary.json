@@ -1,0 +1,171 @@
+{
+  "completedUTC": "2026-10-02T20:39:34Z",
+  "environment": {
+    "browser": "Cloud Chromium, ordinary native window resizing and browser DOM observations",
+    "role": "Previously confirmed 운영 admin shell",
+    "leagueCSS": [
+      [
+        404,
+        606,
+        1.25
+      ],
+      [
+        788,
+        505,
+        1.5
+      ],
+      [
+        1182,
+        758,
+        1
+      ]
+    ],
+    "tournamentCSS": [
+      [
+        403,
+        606,
+        1.25
+      ],
+      [
+        788,
+        505,
+        1.5
+      ],
+      [
+        1182,
+        758,
+        1
+      ]
+    ],
+    "sizing": "Ordinary native window resize and Chrome zoom; no physical-device claim",
+    "deployedSHA": "1d09562a9b7d1b2be261a89519167ff2a031a576, supplied deployment context; actual page-serving SHA unobserved"
+  },
+  "routes": {
+    "leagueNew": "https://alpha.teameet.co.kr/admin/league-matches/new",
+    "tournamentNew": "https://alpha.teameet.co.kr/admin/tournaments/new"
+  },
+  "existingIssue1437Followup": {
+    "classification": "Residual initial-step visibility usability observation; not inaccessible, not a new duplicate issue, not a complete1437PASS.",
+    "reproduction": "At actual observed route, enter local title/sport and date values; from deep Step2 venue focus click explicit Next, or from Step4 click Previous to Step3; wait for settled layout; inspect H2, first input and fixed CTA.",
+    "expected": "New heading and first meaningful input should be visible above the fixed CTA immediately after transition, with focus on heading/first control.",
+    "mobile": {
+      "CSS": [
+        403,
+        606
+      ],
+      "sourceUTC": "2026-10-02T20:31:27.277Z",
+      "focus": "H2 참가 조건",
+      "scrollY": 0,
+      "headingY": [
+        431.375,
+        459.375
+      ],
+      "firstInputY": [
+        556.1749877929688,
+        600.1749877929688
+      ],
+      "hitTest": "Center of first input hits CTA DIV (이전/다음).",
+      "recovery": "One Tab focuses team-count and scrolls to142.4, inputy413.77–457.77; hit-test matches input. Ordinary scroll also exposes Step2 date input."
+    },
+    "tablet": {
+      "CSS": [
+        788,
+        505
+      ],
+      "sourceUTC": "2026-10-02T20:32:40.924Z",
+      "focus": "H2 참가 조건",
+      "scrollY": 0,
+      "headingY": [
+        448,
+        476
+      ],
+      "firstInputY": [
+        572.6666870117188,
+        616.6666870117188
+      ],
+      "visibleResult": "Heading behind bottom CTA; first input below viewport.",
+      "recovery": "One Tab focuses team-count, scrollY209.33, headingy238.67–266.67 and inputy363.33–407.33; input hit-test passes."
+    },
+    "desktop": {
+      "CSS": [
+        1182,
+        758
+      ],
+      "sourceUTC": "2026-10-02T20:33:18.754Z",
+      "focus": "H2 참가 조건",
+      "scrollY": 0,
+      "headingY": [
+        384,
+        412
+      ],
+      "firstInputY": [
+        509,
+        553
+      ],
+      "result": "Both visible immediately; first input center hit-test matches input."
+    },
+    "safeEvidence": "Original designated images05–10 plus the recorded DOM/metrics in this summary; exact image coordinates/UTC/source hashes in provenance.json."
+  },
+  "otherObservations": [
+    "Step1 visible errors are role=alert but sport/title fields have no aria-invalid or aria-describedby in captured DOM. Step2 date errors are associated. This is a narrow semantic consistency observation; actual screen-reader announcement was not tested and it is not filed as a new defect.",
+    "1425 original scope is an existing league registrations datetime input/output and stored cutoff. New league fields are date-only; tournament schedule visible copy contains no explicit KST/UTC label in captured DOM. No timezone emulation, persisted save/round-trip or cutoff test was performed, so1425 is neither passed nor declared regressed."
+  ],
+  "availability1558": {
+    "relatedIssue": 1558,
+    "separateFolder": "../availability-1558-wizard-followup",
+    "scope": "Separate503 recurrence/recovery evidence; form observations do not establish stable service recovery."
+  },
+  "console": {
+    "captureUTC": "2026-10-02T20:35:58.716Z",
+    "capturedLastWarningsErrors": 100,
+    "allCapturedSource": "chrome-extension content script",
+    "limit": "No app-source warning/error in this captured sample. Not a clean network/availability claim."
+  },
+  "finalBrowser": {
+    "UTC": "2026-10-02T20:35:58.716Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "state": "Actual tournament list, no form/draft/dialog active; retained tab6 for broader assigned QA."
+  },
+  "untested": [
+    "Stepper shortcuts",
+    "Final create/save/enrollment, implicit Enter submit, upload",
+    "Real touch/virtual keyboard/physical devices or crossbrowser",
+    "Allvalidation permutations; optional financial/promotion settings",
+    "1425storedtimezone equivalence in Asia/Seoul versus America/Los_Angeles",
+    "Every control on every step at every viewport; responsive comparisons focused common fields and deep2→3transition"
+  ],
+  "sourceProofFile": "final-safe-summary.json",
+  "exactServingCommitSha": null,
+  "localOnlyBoundary": {
+    "observed": "Actual sidebar and create links only. Local synthetic form values only.",
+    "suppliedSourceReference": "https://github.com/kim-song-jun/matchup-sports-platform/blob/1d09562a9b7d1b2be261a89519167ff2a031a576/apps/v1_web/src/app/admin/tournaments/new/page.tsx",
+    "reportedStaticSourceContext": "QA-reported exact-source context: field dispatch and explicit Next/Previous through steps1–4 local-only; step4 create/save is POST/PATCH, step5 enrollment mutation, file selection immediate upload, form Enter may submit regardless of step.",
+    "notExecuted": [
+      "Final create/save",
+      "Step5 enrollment/publish",
+      "Enter form submission",
+      "File selection or upload",
+      "Any real team selection",
+      "Load previous tournament bank details",
+      "Any record, permission, roster, result or consent mutation"
+    ]
+  },
+  "scopedObservedResults": [
+    "League creation is a single form, not a multi-step wizard. Field labels resolve with accessible names; captured inputs/selects/date controls measured44 CSS px high. No document-level horizontal overflow at sampled widths.",
+    "League local title/sport/region, native-calendar dates2026-10-10 and2026-10-11 persisted across mobile/tablet/desktop resize; create remained disabled with correct current0-team requirement. Title→sport Tab showed focus-visible ring.",
+    "League browser Back reached list; reopening actual create link at20:22:25 produced blank title,sport,region,start,end and team search fields.",
+    "Tournament blank Step1 Next focuses sport and shows sport/title alerts; blank Step2 Next focuses start datetime and provides required/aria-invalid/error-describedby; blank Step3 team count focuses invalid count with visible alert.",
+    "Tournament local1→2→3→4 and Previous transitions changed heading/step and retained synthetic title/schedule/venue/default counts; local Step4 summary persisted through Previous/Next.",
+    "Tournament deep-scroll2→3 at403×606,788×505,1182×758 reset scrollY0 and focused new H2. Old deep-scroll and Next-focus symptom from1437 did not reproduce.",
+    "Tournament cancel returned to list; reopening at20:35:27 showed empty title/sport, default radio values and Step1. Final cancel returned to tournament list.",
+    "Observed radio ArrowDown changed selected tournament format, Tab advanced to gender group; Step4 summary Tab reached disciplinary field without form submit."
+  ],
+  "publicationLimits": [
+    "Thirteen designated original form captures only; private full DOM/account-bearing sources are excluded.",
+    "Recorded focus, hit-test, aria attributes and local transition outcomes are action/DOM observations; images alone do not prove them.",
+    "#1437 heading focus and scroll reset improvement is separate from residual initial visibility at mobile/tablet; no complete1437PASS or inaccessible-control claim.",
+    "#1425 persisted timezone, save roundtrip and enrollment remain untested. No new duplicate issue is asserted.",
+    "Image13 shows local prize-summary text/controls, not a full saved event preview.",
+    "No actual device/touch, actual screen-reader or complete accessibility-conformance claim."
+  ]
+}

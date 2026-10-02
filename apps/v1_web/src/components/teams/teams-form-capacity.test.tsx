@@ -21,7 +21,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamNameAvailability: () => ({ data: undefined }),
 }));
 
-function team(memberGoalCount: number | null = null, memberCount = 1) {
+function team(memberGoalCount: number | null = null, memberCount = 1, version = 'version-1') {
   api.detail.mockReturnValue({
     data: {
       teamId: 'capacity-team', name: '정원 보존 팀', sport: { sportId: 'sport-futsal', name: '풋살' },
@@ -32,7 +32,7 @@ function team(memberGoalCount: number | null = null, memberCount = 1) {
         genderRule: '성별 무관', memberGoalCount, joinPolicy: 'approval_required',
         levelLabel: null, skillLevelText: null, minLevel: null, maxLevel: null,
       },
-      memberCount, membersVisibilityEnabled: false, version: 'version-1', viewer: { role: 'owner' },
+      memberCount, membersVisibilityEnabled: false, version, viewer: { role: 'owner' },
     },
     isError: false, isLoading: false,
   });
@@ -162,8 +162,8 @@ describe('팀 정원 편집 — 실제 client/공용 폼/미저장 확인', () =
     expect(api.update).toHaveBeenCalledTimes(1);
   });
 
-  it('실패와 재시도에서 미정 초안을 유지하고 실패를 성공 이동으로 숨기지 않는다', async () => {
-    api.update.mockRejectedValueOnce(new V1ApiError({ status: 'error', statusCode: 409, code: 'VERSION_CONFLICT', message: 'stale', timestamp: '2026-10-02T00:00:00Z' }));
+  it('서버 version이 바뀌지 않은 일시500 후 재시도는 미정 초안을 보존한다', async () => {
+    api.update.mockRejectedValueOnce(new V1ApiError({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: 'temporary failure before update', timestamp: '2026-10-02T00:00:00Z' }));
     const { introduction, capacity } = await edit();
     fireEvent.change(introduction, { target: { value: '재시도할 소개' } });
     save();
@@ -172,7 +172,53 @@ describe('팀 정원 편집 — 실제 client/공용 폼/미저장 확인', () =
     expect(capacity).toHaveValue('0');
     save();
     await waitFor(() => expect(api.update).toHaveBeenCalledTimes(2));
-    for (const [payload] of api.update.mock.calls) expect(payload).toMatchObject({ memberGoalCount: null, introduction: '재시도할 소개' });
+    for (const [payload] of api.update.mock.calls) expect(payload).toMatchObject({ memberGoalCount: null, introduction: '재시도할 소개', version: 'version-1' });
+    await waitFor(() => expect(api.push).toHaveBeenCalledWith(result.detailRoute));
+  });
+
+  it.each([null, 24])('정원 %s의 stale version 재제출도409이고 초안/실패를 유지한다', async (memberGoalCount) => {
+    team(memberGoalCount);
+    api.update.mockImplementation(async (payload) => {
+      if (payload.version !== 'version-2') {
+        throw new V1ApiError({ status: 'error', statusCode: 409, code: 'VERSION_CONFLICT', message: 'stale', timestamp: '2026-10-02T00:00:00Z' });
+      }
+      return result;
+    });
+    const { introduction, capacity } = await edit();
+    fireEvent.change(introduction, { target: { value: '충돌 뒤에도 남길 소개' } });
+    for (const attempt of [1, 2]) {
+      save();
+      await waitFor(() => expect(api.update).toHaveBeenCalledTimes(attempt));
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('다른 사람이 먼저 팀 정보를 바꿨어요. 새로 불러온 뒤 다시 저장해 주세요.');
+      expect(api.push).not.toHaveBeenCalled();
+      expect(introduction).toHaveValue('충돌 뒤에도 남길 소개');
+      expect(capacity).toHaveValue(String(memberGoalCount ?? 0));
+    }
+    for (const [payload] of api.update.mock.calls) expect(payload).toMatchObject({ memberGoalCount, introduction: '충돌 뒤에도 남길 소개', version: 'version-1' });
+  });
+
+  it('상세 fixture 재조회로 새 version을 hydrate한 뒤 다시 쓴 소개만 성공시킨다', async () => {
+    api.update.mockImplementation(async (payload) => {
+      if (payload.version !== 'version-2') {
+        throw new V1ApiError({ status: 'error', statusCode: 409, code: 'VERSION_CONFLICT', message: 'stale', timestamp: '2026-10-02T00:00:00Z' });
+      }
+      return result;
+    });
+    const { view, introduction, capacity } = await edit();
+    fireEvent.change(introduction, { target: { value: '재조회 전 소개 초안' } });
+    save();
+    expect(await screen.findByRole('alert')).toHaveTextContent('다른 사람이 먼저 팀 정보를 바꿨어요. 새로 불러온 뒤 다시 저장해 주세요.');
+    expect(api.push).not.toHaveBeenCalled();
+    team(null, 1, 'version-2');
+    view.rerender(<TeamEditPageClient teamId="capacity-team" />);
+    // 기존 hydrate는 초안 전체를 서버 값으로 바꾼다. 자동 재조회/초안 병합의 증거가 아니다.
+    await waitFor(() => expect(introduction).toHaveValue('원래 소개'));
+    expect(capacity).toHaveValue('0');
+    fireEvent.change(introduction, { target: { value: '재조회 뒤 다시 쓴 소개' } });
+    save();
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(2));
+    expect(api.update.mock.calls[1][0]).toMatchObject({ memberGoalCount: null, introduction: '재조회 뒤 다시 쓴 소개', version: 'version-2' });
     await waitFor(() => expect(api.push).toHaveBeenCalledWith(result.detailRoute));
   });
 

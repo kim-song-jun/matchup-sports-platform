@@ -128,8 +128,8 @@ describe('팀 레벨 편집 — 실제 client와 공용 폼 렌더', () => {
     expect(api.update).toHaveBeenCalledTimes(1);
   });
 
-  it('실패 후 소개만 다시 저장해도 null을 보존하고 실패를 성공 이동으로 숨기지 않는다', async () => {
-    api.update.mockRejectedValueOnce(new V1ApiError({ status: 'error', statusCode: 409, code: 'VERSION_CONFLICT', message: 'stale', timestamp: '2026-10-02T00:00:00Z' }));
+  it('version이 바뀌지 않은 일시500 후 소개 재시도는 원본 null을 보존한다', async () => {
+    api.update.mockRejectedValueOnce(new V1ApiError({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: 'temporary failure before update', timestamp: '2026-10-02T00:00:00Z' }));
     await editIntroduction();
     save();
     expect(await screen.findByRole('alert')).toBeInTheDocument();

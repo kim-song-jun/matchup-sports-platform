@@ -1,0 +1,490 @@
+{
+  "issueContext": 1516,
+  "issueUrl": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1516",
+  "scope": "1516 remaining status-specific empty results, read-only filter UI",
+  "role": "Authenticated synthetic QA captain B",
+  "startedUtc": "2026-10-02T10:27:09.601Z",
+  "completedUtc": "2026-10-02T10:33:29.353Z",
+  "visualCoverage": {
+    "mobile": [
+      "all",
+      "draft",
+      "in_progress",
+      "completed"
+    ],
+    "tablet": [
+      "completed representative"
+    ],
+    "desktop": [
+      "completed representative"
+    ],
+    "result": "Visual empty title and description observed at all six canonical states. This is not full error/loading or screen-reader coverage."
+  },
+  "states": [
+    {
+      "label": "mobile all clear",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male",
+      "utc": "2026-10-02T10:30:23.042Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "filter": [
+        {
+          "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1",
+          "name": "필터 열기 — 현재 수영 · 남성부",
+          "text": "수영 · 남성부2"
+        }
+      ],
+      "visibleCardCount": 0,
+      "recordedListText": "대회 목록\n진행 중인 대회 목록\n전체\n정규 대회\n정규 리그\n수영 · 남성부\n2\n조건에 맞는 대회가 없어요\n필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n팀밋 대회 보기",
+      "visualEmptyTitleObserved": true,
+      "visualEmptyDescriptionObserved": true
+    },
+    {
+      "label": "mobile draft canonical",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=draft",
+      "utc": "2026-10-02T10:29:53.889Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "filter": [
+        {
+          "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=draft&filter=1",
+          "name": "필터 열기 — 현재 준비 중 · 수영 · 남성부",
+          "text": "준비 중 · 수영 · 남성부3"
+        }
+      ],
+      "visibleCardCount": 0,
+      "recordedListText": "대회 목록\n진행 중인 대회 목록\n전체\n정규 대회\n정규 리그\n준비 중 · 수영 · 남성부\n3\n조건에 맞는 대회가 없어요\n필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n팀밋 대회 보기",
+      "visualEmptyTitleObserved": true,
+      "visualEmptyDescriptionObserved": true
+    },
+    {
+      "label": "mobile in_progress",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=in_progress",
+      "utc": "2026-10-02T10:28:46.944Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "filter": [
+        {
+          "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=in_progress&filter=1",
+          "name": "필터 열기 — 현재 진행 중 · 수영 · 남성부",
+          "text": "진행 중 · 수영 · 남성부3"
+        }
+      ],
+      "visibleCardCount": 0,
+      "recordedListText": "대회 목록\n진행 중인 대회 목록\n전체\n정규 대회\n정규 리그\n진행 중 · 수영 · 남성부\n3\n조건에 맞는 대회가 없어요\n필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n팀밋 대회 보기",
+      "visualEmptyTitleObserved": true,
+      "visualEmptyDescriptionObserved": true
+    },
+    {
+      "label": "mobile completed",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "utc": "2026-10-02T10:29:12.415Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "filter": [
+        {
+          "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1",
+          "name": "필터 열기 — 현재 종료 · 수영 · 남성부",
+          "text": "종료 · 수영 · 남성부3"
+        }
+      ],
+      "visibleCardCount": 0,
+      "recordedListText": "대회 목록\n진행 중인 대회 목록\n전체\n정규 대회\n정규 리그\n종료 · 수영 · 남성부\n3\n조건에 맞는 대회가 없어요\n필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n팀밋 대회 보기",
+      "visualEmptyTitleObserved": true,
+      "visualEmptyDescriptionObserved": true
+    },
+    {
+      "label": "tablet completed",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "utc": "2026-10-02T10:32:09.619Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "filter": [
+        {
+          "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1",
+          "name": "필터 열기 — 현재 종료 · 수영 · 남성부",
+          "text": "종료 · 수영 · 남성부3"
+        }
+      ],
+      "visibleCardCount": 0,
+      "recordedListText": "대회 목록\n진행 중인 대회 목록\n전체\n정규 대회\n정규 리그\n종료 · 수영 · 남성부\n3\n조건에 맞는 대회가 없어요\n필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n팀밋 대회 보기",
+      "visualEmptyTitleObserved": true,
+      "visualEmptyDescriptionObserved": true
+    },
+    {
+      "label": "desktop completed",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "utc": "2026-10-02T10:32:45.879Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "filter": [
+        {
+          "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1",
+          "name": "필터 열기 — 현재 종료 · 수영 · 남성부",
+          "text": "종료 · 수영 · 남성부3"
+        }
+      ],
+      "visibleCardCount": 0,
+      "recordedListText": "대회 목록\n진행 중인 대회 목록\n전체\n정규 대회\n정규 리그\n종료 · 수영 · 남성부\n3\n조건에 맞는 대회가 없어요\n필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n팀밋 대회 보기",
+      "visualEmptyTitleObserved": true,
+      "visualEmptyDescriptionObserved": true
+    }
+  ],
+  "actions": [
+    {
+      "action": "mobile CTA Tab focus",
+      "focus": {
+        "boxShadow": "none",
+        "checked": null,
+        "expanded": null,
+        "href": "/home",
+        "name": "홈",
+        "outline": "rgb(16, 16, 16) auto 0.8px",
+        "rect": {
+          "height": 49.20000076293945,
+          "width": 80.4749984741211,
+          "x": 0,
+          "y": 540.7999877929688
+        },
+        "role": null,
+        "tabIndex": 0,
+        "tag": "A"
+      },
+      "utc": "2026-10-02T10:30:23.134Z"
+    },
+    {
+      "action": "mobile read-only CTA click",
+      "url": "https://alpha.teameet.co.kr/events",
+      "utc": "2026-10-02T10:30:39.591Z",
+      "destinationHeading": "팀밋이 여는 대회"
+    },
+    {
+      "action": "mobile browser Back from events",
+      "state": {
+        "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male",
+        "utc": "2026-10-02T10:30:49.747Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "filter": [
+          {
+            "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1",
+            "name": "필터 열기 — 현재 수영 · 남성부",
+            "text": "수영 · 남성부2"
+          }
+        ],
+        "visibleCardCount": 0,
+        "emptyTitlePresent": true,
+        "emptyDescriptionPresent": true
+      }
+    },
+    {
+      "action": "mobile reset",
+      "state": {
+        "url": "https://alpha.teameet.co.kr/tournaments",
+        "utc": "2026-10-02T10:30:59.105Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "filter": [
+          {
+            "href": "https://alpha.teameet.co.kr/tournaments?filter=1",
+            "name": "필터 열기 — 현재 전체",
+            "text": "전체"
+          }
+        ],
+        "visibleCardCount": 20,
+        "emptyTitlePresent": false,
+        "emptyDescriptionPresent": false,
+        "pageCountText": "대회 20개를 보고 있어요."
+      }
+    },
+    {
+      "action": "mobile browser Back after reset",
+      "dialogCount": 0,
+      "state": {
+        "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male",
+        "utc": "2026-10-02T10:31:09.295Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "filter": [
+          {
+            "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1",
+            "name": "필터 열기 — 현재 수영 · 남성부",
+            "text": "수영 · 남성부2"
+          }
+        ],
+        "visibleCardCount": 0,
+        "emptyTitlePresent": true,
+        "emptyDescriptionPresent": true
+      }
+    },
+    {
+      "action": "tablet read-only CTA click",
+      "url": "https://alpha.teameet.co.kr/events",
+      "utc": "2026-10-02T10:32:12.948Z"
+    },
+    {
+      "action": "tablet browser Back from events",
+      "state": {
+        "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+        "utc": "2026-10-02T10:32:23.095Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "filter": [
+          {
+            "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1",
+            "name": "필터 열기 — 현재 종료 · 수영 · 남성부",
+            "text": "종료 · 수영 · 남성부3"
+          }
+        ],
+        "visibleCardCount": 0,
+        "emptyTitlePresent": true,
+        "emptyDescriptionPresent": true
+      }
+    },
+    {
+      "action": "desktop read-only CTA click",
+      "url": "https://alpha.teameet.co.kr/events",
+      "utc": "2026-10-02T10:32:49.141Z"
+    },
+    {
+      "action": "desktop browser Back from events",
+      "state": {
+        "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+        "utc": "2026-10-02T10:32:59.288Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "filter": [
+          {
+            "href": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1",
+            "name": "필터 열기 — 현재 종료 · 수영 · 남성부",
+            "text": "종료 · 수영 · 남성부3"
+          }
+        ],
+        "visibleCardCount": 0,
+        "emptyTitlePresent": true,
+        "emptyDescriptionPresent": true
+      }
+    }
+  ],
+  "summary": {
+    "providedStatusOptions": [
+      "전체",
+      "진행 중",
+      "준비 중",
+      "종료"
+    ],
+    "mobile": "All four provided states were reached using actual filter links with swimming+male; all had no result cards and the exact empty title/description.",
+    "tablet": "787×505 completed-state representative, filter/title consistent",
+    "desktop": "1180×757 completed-state representative, filter/title consistent",
+    "emptyTitle": "조건에 맞는 대회가 없어요",
+    "emptyDescription": "필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.",
+    "reset": "Mobile reset cleared all query filters, restored real first page of 20 cards. Browser Back restored previous swimming+male filters and empty state.",
+    "ctaBack": "All 3 widths: clicked 팀밋 대회 보기 to /events, then browser Back restored prior filtered list URL and empty result. Mobile all status; tablet/desktop completed.",
+    "candidate": "Visual empty title passes, but section#tournament-list aria-labelledby=tournament-list-heading points to sr-only text 진행 중인 대회 목록 for all/draft/completed as well. Actual AX snapshot exposes region with that name. Candidate for duplicate triage, not new issue filed.",
+    "loading": "Only transient pagination wording 불러오는 중… / 대회를 더 불러오는 중이에요. observed during mobile reset at10:30:50UTC, then stable20 cards. Full-page initial-loading and API-error branches not exercised.",
+    "noWrites": true
+  },
+  "regionNameCandidate": {
+    "classification": "DOM/browser-accessibility-tree naming candidate; duplicate triage pending, no new issue number assigned",
+    "evidenceType": "DOM linkage plus browser AX snapshot; not screenshot-only evidence or an actual screen-reader test",
+    "dom": {
+      "ariaLabelledBy": "tournament-list-heading",
+      "labelClass": "sr-only",
+      "labelRect": {
+        "bottom": 0.09999996423721312,
+        "height": 1,
+        "left": 19,
+        "right": 20,
+        "top": -0.9000000357627869,
+        "width": 1,
+        "x": 19,
+        "y": -0.9000000357627869
+      },
+      "labelText": "진행 중인 대회 목록",
+      "role": null,
+      "tag": "SECTION",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=draft",
+      "utc": "2026-10-02T10:29:53.948Z"
+    },
+    "linkage": "SECTION aria-labelledby=\"tournament-list-heading\" resolves to the sr-only label text 진행 중인 대회 목록. The direct linkage capture is from the draft-filter URL. Recorded list text also retains that label for all and completed states.",
+    "tabletCompletedAXExcerpt": "  - region \"진행 중인 대회 목록\":\n    - generic: 대회 목록\n    - generic: 진행 중인 대회 목록\n    - navigation \"대회 유형\":\n      - link \"전체\":\n        - /url: /tournaments\n      - link \"정규 대회\":\n        - /url: /tournaments?kind=tournament\n      - link \"정규 리그\":\n        - /url: /tournaments?kind=league\n    - link \"필터 열기 — 현재 종료 · 수영 · 남성부\" [active]:\n      - /url: /tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1\n      - generic: 종료 · 수영 · 남성부\n      - generic: \"3\"\n    - generic: 조건에 맞는 대회가 없어요\n    - generic: 필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n    - link \"팀밋 대회 보기\":\n      - /url: /events",
+    "desktopCompletedAXExcerpt": "  - region \"진행 중인 대회 목록\":\n    - generic: 대회 목록\n    - generic: 진행 중인 대회 목록\n    - navigation \"대회 유형\":\n      - link \"전체\":\n        - /url: /tournaments\n      - link \"정규 대회\":\n        - /url: /tournaments?kind=tournament\n      - link \"정규 리그\":\n        - /url: /tournaments?kind=league\n    - link \"필터 열기 — 현재 종료 · 수영 · 남성부\":\n      - /url: /tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1\n      - generic: 종료 · 수영 · 남성부\n      - generic: \"3\"\n    - generic: 조건에 맞는 대회가 없어요\n    - generic: 필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.\n    - link \"팀밋 대회 보기\":\n      - /url: /events",
+    "limitations": "The sr-only accessible region name cannot be established from image pixels alone. No actual screen reader or conformance verdict."
+  },
+  "images": [
+    {
+      "file": "1516-empty-mobile-402-all-clear.jpg",
+      "utc": "2026-10-02T10:30:23.054Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "fullPage": false,
+      "bytes": 15002,
+      "sha256": "880304883b14959ea6db6c2d4aa09eaafd0882f9d09844886e2310ebbb22b8f0",
+      "git_blob_sha": "dbc870ea00dc431e1f8a5dc46d9183280586a9d4",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1516-empty-mobile-402-draft-context.jpg",
+      "utc": "2026-10-02T10:29:53.906Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=draft",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "fullPage": false,
+      "bytes": 15372,
+      "sha256": "7d2678ed1e3f218e2bdab35d392761a2090c24e07a50341fba3b3918b0c1e52b",
+      "git_blob_sha": "7352d38b8b7fd08b56f367ed4536529356054038",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1516-empty-mobile-402-in-progress-context.jpg",
+      "utc": "2026-10-02T10:28:46.955Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=in_progress",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "fullPage": false,
+      "bytes": 15390,
+      "sha256": "3ca4e8b8aca6dc2cd5710fe780a9d7a831b77677f25d72abfd51f8373116b211",
+      "git_blob_sha": "53508305c5e011d5a10fd9584d694695cda1b6a8",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1516-empty-mobile-402-completed-context.jpg",
+      "utc": "2026-10-02T10:29:12.441Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "fullPage": false,
+      "bytes": 15231,
+      "sha256": "28585872f5e44ab2c87304dc1db411019904db2ab00f45236d5139e7cbb6ec15",
+      "git_blob_sha": "22c3ef8717588663c01929151b98cf19034f8fd1",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1516-empty-tablet-787-completed-context.jpg",
+      "utc": "2026-10-02T10:32:09.636Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "fullPage": false,
+      "bytes": 15327,
+      "sha256": "13af72513b900d1c7f83af41826d49891feab4b502e9c050ac8d8c96b625fc4e",
+      "git_blob_sha": "ec1add583027c7e2cd12016e37373b5967ed325f",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1516-empty-desktop-1180-completed-context.jpg",
+      "utc": "2026-10-02T10:32:45.888Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "fullPage": false,
+      "bytes": 31424,
+      "sha256": "612aed7e313a58ad11e379632d0b252ffe5c9ffaa9cfb5e8c362d5618a663cca",
+      "git_blob_sha": "02fdc8fc46aa89738e6a1266e4b83bf03ad3f940",
+      "pixelReviewed": true,
+      "exifPresent": false
+    }
+  ],
+  "framingNotes": [
+    "Initial all/all-context and draft files do not fully show target context and are not canonical.",
+    "Tablet canonical shows filter/title/description but CTA is below fixed navigation at that scroll position; actual click auto-scrolled and navigated successfully. Do not infer inaccessible CTA from this framing. Prior dedicated CTA reachability pass exists.",
+    "Mobile viewport CSS402×606, raster may be402×605 from rounding.",
+    "No member/profile/name lists in canonical images."
+  ],
+  "limits": [
+    "No induced API error or network manipulation",
+    "No claim of error/loading branch coverage",
+    "No physical device or software keyboard test",
+    "Serving page SHA not observed",
+    "Actual screen reader not tested.",
+    "The recorded mobile Tab-focus sample landed on the Home navigation link, not the CTA. CTA navigation was exercised by actual clicks; this sample does not establish keyboard CTA access.",
+    "Only transient pagination-loading wording during mobile reset was observed. Initial full-page loading and API-error branches were not tested."
+  ],
+  "servingCommitSha": "unobserved",
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All six canonical originals were pixel-reviewed. Public tournament filters and empty-result UI only; no member list, player name, profile ID, birth date, contact details, or credentials.",
+    "minimization": "Only canonical states, relevant DOM/AX linkage, action results, and image integrity metadata are included. Reset card contents, unrelated navigation snapshots, and intermediate captures are excluded. Original source proof remains unchanged locally."
+  }
+}

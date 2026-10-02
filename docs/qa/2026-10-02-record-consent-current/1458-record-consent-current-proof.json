@@ -1,0 +1,251 @@
+{
+  "issue": 1458,
+  "issueUrl": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1458",
+  "startedAt": "2026-10-02T09:24:23.329Z",
+  "finalAt": "2026-10-02T09:28:44.215Z",
+  "role": "Authenticated synthetic QA captain B",
+  "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+  "observedBranch": "OFF/private, with five records awaiting publication",
+  "scope": "Read-only rendered UI/DOM; no consent toggle or save; ordinary cloud Linux browser window/zoom; not a physical mobile device",
+  "measurements": [
+    {
+      "widthLabel": "mobile",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "timestamp": "2026-10-02T09:24:45.025Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "renderedBackCount": 1,
+      "visibleExactTitleCount": 1,
+      "visibleTitleTags": [
+        "DIV"
+      ],
+      "renderedH1Count": 0,
+      "explanations": [
+        {
+          "text": "경기 상세에서 내 이름을 누르면 내 활동 기록이 열려요",
+          "occurrencesInRecordedMainText": 1
+        },
+        {
+          "text": "이름은 닉네임으로 나와요. 팀 라인업에 내 계정으로 연결된 경기만 해당돼요. 지금까지 참가한 경기도 함께 공개돼요.",
+          "occurrencesInRecordedMainText": 1
+        },
+        {
+          "text": "언제든 설정에서 바꿀 수 있어요. 끄면 바로 모두 비공개로 돌아가요.",
+          "occurrencesInRecordedMainText": 1
+        }
+      ],
+      "privateRecordBadgeCount": 5,
+      "actions": [
+        "공개 안 함",
+        "5경기 공개하기"
+      ]
+    },
+    {
+      "widthLabel": "tablet",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "timestamp": "2026-10-02T09:26:18.441Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "renderedBackCount": 1,
+      "visibleExactTitleCount": 1,
+      "visibleTitleTags": [
+        "DIV"
+      ],
+      "renderedH1Count": 0,
+      "explanations": [
+        {
+          "text": "경기 상세에서 내 이름을 누르면 내 활동 기록이 열려요",
+          "occurrencesInRecordedMainText": 1
+        },
+        {
+          "text": "이름은 닉네임으로 나와요. 팀 라인업에 내 계정으로 연결된 경기만 해당돼요. 지금까지 참가한 경기도 함께 공개돼요.",
+          "occurrencesInRecordedMainText": 1
+        },
+        {
+          "text": "언제든 설정에서 바꿀 수 있어요. 끄면 바로 모두 비공개로 돌아가요.",
+          "occurrencesInRecordedMainText": 1
+        }
+      ],
+      "privateRecordBadgeCount": 5,
+      "actions": [
+        "공개 안 함",
+        "5경기 공개하기"
+      ]
+    },
+    {
+      "widthLabel": "desktop",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "timestamp": "2026-10-02T09:26:44.999Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "renderedBackCount": 1,
+      "visibleExactTitleCount": 1,
+      "visibleTitleTags": [
+        "H1"
+      ],
+      "renderedH1Count": 1,
+      "explanations": [
+        {
+          "text": "경기 상세에서 내 이름을 누르면 내 활동 기록이 열려요",
+          "occurrencesInRecordedMainText": 1
+        },
+        {
+          "text": "이름은 닉네임으로 나와요. 팀 라인업에 내 계정으로 연결된 경기만 해당돼요. 지금까지 참가한 경기도 함께 공개돼요.",
+          "occurrencesInRecordedMainText": 1
+        },
+        {
+          "text": "언제든 설정에서 바꿀 수 있어요. 끄면 바로 모두 비공개로 돌아가요.",
+          "occurrencesInRecordedMainText": 1
+        }
+      ],
+      "privateRecordBadgeCount": 5,
+      "actions": [
+        "공개 안 함",
+        "5경기 공개하기"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "file": "1458-record-consent-current-mobile-402-viewport.jpg",
+      "timestamp": "2026-10-02T09:24:45.025Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "bytes": 31603,
+      "sha256": "da6d07b4508261ca9456c647202c73cdb848d2943965bc40a31aa1dae611a2da",
+      "git_blob_sha": "19071b2a711ae5e8b595305c64223f8397fbf9da",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1458-record-consent-current-tablet-787-viewport.jpg",
+      "timestamp": "2026-10-02T09:26:18.441Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "bytes": 28610,
+      "sha256": "fc0277018bb69e2735d13851f80ad7d0072a7673051da96c1267e86e7f39193d",
+      "git_blob_sha": "fa3ad3e0899b49b7f26671490cadd79ba0551fd1",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1458-record-consent-current-desktop-1180-viewport.jpg",
+      "timestamp": "2026-10-02T09:26:44.999Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "bytes": 51804,
+      "sha256": "88761fbed97f92932698fdf9f8b9f6fe71e474e4a4810122c62c887a3ec957ba",
+      "git_blob_sha": "0e735bdfe8d3ea8bfd481636768e5064b27d9697",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1458-record-consent-current-mobile-402-description-viewport.jpg",
+      "timestamp": "2026-10-02T09:25:51.736Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "bytes": 29204,
+      "sha256": "dfc606be87fbaf15dbb4e0ac8ab54417a5e4ef2d5fa65d912688107e3734f1a0",
+      "git_blob_sha": "2eb36c2805d979488f3d0f33d817532d5cd09e36",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "1458-record-consent-current-desktop-1180-description-viewport.jpg",
+      "timestamp": "2026-10-02T09:26:56.012Z",
+      "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "bytes": 47702,
+      "sha256": "b34a3c00b48e5d4e96e16ade29a2b813fdcc9ac2b1243ac2e84d75a6c00388df",
+      "git_blob_sha": "71fa98d05328522b967e33f77874cd82b54ef496",
+      "pixelReviewed": true,
+      "exifPresent": false
+    }
+  ],
+  "acceptanceResults": [
+    {
+      "criterion": 1,
+      "result": "PASS for current OFF branch at all 3 measured widths",
+      "evidence": "One rendered Back and one visible exact page title. Desktop one rendered H1; mobile/tablet app-bar DIV title, H1 is zero-sized/hidden, not a claim of semantic H1 accessibility conformance."
+    },
+    {
+      "criterion": 2,
+      "result": "PARTIAL: OFF explanatory sentences occur once; ON-only repetition/date condition untested",
+      "evidence": "Each scope/withdrawal explanation occurs once. Five 나만 보여요 badges correspond to five individual record rows, not duplicate page-level status prose."
+    },
+    {
+      "criterion": 3,
+      "result": "PASS in current OFF disclosure view",
+      "evidence": "Nickname, account-linked team lineups, previous matches included, and immediate return to private after disabling are all present once."
+    },
+    {
+      "criterion": 4,
+      "result": "PASS in current OFF branch without changing settings",
+      "evidence": "공개를 기다리는 기록 · 5경기; individual 나만 보여요; actions 공개 안 함 and 5경기 공개하기."
+    }
+  ],
+  "mutations": "None. No consent action button, switch, save, or submit activated.",
+  "closureAssessment": "Partial evidence only. Consent-ON status/date repetition was not tested; this package does not justify closing the full issue.",
+  "servingCommitSha": "unobserved",
+  "limitations": [
+    "Current OFF branch only; no consent or privacy setting was changed.",
+    "Mobile and tablet have one visible app-bar DIV title and a zero-sized hidden H1; this is not a semantic-H1 or accessibility-conformance pass.",
+    "The five 나만 보여요 labels belong to five distinct record rows and are not repeated page-level status prose.",
+    "Tablet description screenshots excluded because the pointer covers disclosure words. Tablet explanation counts are based on recorded DOM text; clear visual supplements are mobile and desktop only.",
+    "Mobile CSS viewport height 606 maps to a 605px raster; original bytes are preserved. Widths match 402/787/1180. Tablet and desktop heights match 505/757."
+  ],
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All five images were pixel-reviewed. Only synthetic QA match records and generic settings/disclosure UI are visible. No member list, player name, profile ID, birth date, contact detail, or credential is included.",
+    "minimization": "Original complete source proof remains local and unchanged. Public proof includes only relevant counts, explanatory text, route, timestamps, image metadata, and bounded conclusions; full DOM, accessibility snapshots, and unrelated account content are not published."
+  }
+}

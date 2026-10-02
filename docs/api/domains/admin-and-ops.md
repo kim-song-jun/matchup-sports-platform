@@ -283,3 +283,11 @@ type AdminListSummary = {
 #### Task 149 — 팀매치 모집 조건 일치
 
 `POST /admin/team-matches`는 일반 생성과 같은 미래 시작/선택 종료/선택 마감 검증을 사용한다. 경기 스타일은 직접 입력을 포함해 최대 3개다. 신청 마감 뒤에도 접수된 두 팀은 경기 시작 전까지 확정할 수 있다(raw `recruiting`에 한함). 자세한 계약은 [팀매치](team-matches.md#일반관리자-날짜확정-공통-계약-task-149)를 따른다.
+
+## Competition fixtures in team-match administration (2026-10-03)
+
+`GET /admin/team-matches` and `GET /admin/team-matches/:id` include friendly, league, and tournament fixtures. Use the returned `league` / `tournament` ownership fields to classify rows; `league` takes precedence because a regular league also has a tournament relation. Admin links remain in `/admin/league-matches/:leagueId` or `/admin/tournaments/:tournamentId`.
+
+`POST /admin/team-matches/:id/status` (owner/ops) rejects fixtures with either `leagueId` or `tournamentId` with HTTP 409 `COMPETITION_TEAM_MATCH_STATUS_MANAGED`, after locking and loading the target and before any status/audit write. Manage those fixtures through competition operations; generic status updates would bypass Game/schedule consistency. Friendly updates retain both action and status-change logs. Direct `completed` remains independently forbidden with `TEAM_MATCH_COMPLETION_ADMIN_FORBIDDEN`.
+
+Admin team-match list also accepts optional `kind=friendly|league|tournament`; DTO whitelist rejects other values. Friendly means both IDs null; league means non-null `leagueId`; tournament means null `leagueId` and non-null `tournamentId`. Pagination totals and status facets share this category filter (status itself remains excluded from status facets).

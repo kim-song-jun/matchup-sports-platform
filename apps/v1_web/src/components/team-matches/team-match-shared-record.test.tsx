@@ -39,7 +39,7 @@ beforeEach(() => {
   state.replace.mockReset();
   state.search = '';
   state.data = {
-    teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
+    leagueId: null, tournamentId: null, teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
     serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, operator: false, ownSideId: 'home',
     lineupReady: true, missingSides: [],
     sides: [{ id: 'home', key: 'HOME', name: '한강', score: 0 }, { id: 'away', key: 'AWAY', name: '마포', score: 0 }],
@@ -254,10 +254,10 @@ describe('shared record participant flow', () => {
     expect(screen.queryByText('이 경기는 기존 경기 기록 화면에서 확인할 수 있어요.')).toBeNull();
   });
 
-  it('운영 관리 경기(managed)도 출처가 없으면 매치 상세로만 넘긴다', () => {
-    state.data = { ...state.data, phase: 'managed' };
+  it('대회 기록은 대회 경기 상세로 넘긴다', () => {
+    state.data = { ...state.data, phase: 'managed', leagueId: null, tournamentId: 'cup-1' };
     render(<TeamMatchSharedRecord teamMatchId="match" />);
-    expect(state.replace).toHaveBeenCalledWith('/team-matches/match?view=detail');
+    expect(state.replace).toHaveBeenCalledWith('/tournaments/cup-1/matches/match');
   });
 
   it('공동 기록 경기(live)는 넘기지 않고 이 화면에서 기록을 보여준다', () => {
@@ -656,4 +656,11 @@ describe('H5 — 기록 화면의 팀장 권한·게스트·공개 득점·늦�
     expect(screen.queryByRole('button', { name: '늦게 온 선수 추가' })).not.toBeInTheDocument();
     if (!('manageableHostTeam' in viewer)) expect(lineup.calls.every((call) => call.enabled === false)).toBe(true);
   });
+});
+
+it('리그 기록은 대회 관계가 함께 있어도 리그 경기로 이동하고 출처를 보존한다', () => {
+  state.data = { ...state.data, phase: 'managed', leagueId: 'league-1', tournamentId: 'league-1' };
+  state.search = `from=${encodeURIComponent('/teams/team-1/records')}`;
+  render(<TeamMatchSharedRecord teamMatchId="match" />);
+  expect(state.replace).toHaveBeenCalledWith(`/league-matches/league-1/fixtures/match?from=${encodeURIComponent('/teams/team-1/records')}`);
 });

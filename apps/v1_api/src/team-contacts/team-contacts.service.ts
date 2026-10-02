@@ -11,6 +11,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService } from '../chat/chat.service';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { contactRecruitingWhere } from '../team-matches/contact-recruiting';
 import { archiveEndedContactRooms } from './contact-room-archive';
 import {
   CreateContactBlockDto,
@@ -361,11 +362,11 @@ export class TeamContactsService {
         where: { id: toTeamId, status: 'active', deletedAt: null },
         select: { contactPolicy: true },
       }),
-      // '모집 중' = 이 팀이 host 인 recruiting 팀매치가 하나라도 있음 (스펙 §2 확정 결정 5).
+      // '모집 중'은 삭제되지 않은 친선 모집이다. 대회·리그 대진은 컨택을 열지 않는다.
       // 캐시 컬럼을 두지 않는다 — 두면 공고 생성·마감 시 무효화 책임이 새로 생긴다.
       // policy 가 recruiting_only 가 아니어도 항상 조회한다(위 타이밍 노트 참고).
       this.prisma.v1TeamMatch.findFirst({
-        where: { hostTeamId: toTeamId, status: 'recruiting' },
+        where: contactRecruitingWhere(toTeamId),
         select: { id: true },
       }),
     ]);

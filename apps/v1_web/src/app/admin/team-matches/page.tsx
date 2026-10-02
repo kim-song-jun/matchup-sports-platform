@@ -42,9 +42,15 @@ const REASON_MODAL_STATUS_OPTIONS = [
   { value: 'closed', label: STATUS_META['closed']?.label ?? '마감' },
   { value: 'matched', label: STATUS_META['matched']?.label ?? '매칭됨' },
   { value: 'cancelled', label: STATUS_META['cancelled']?.label ?? '취소됨' },
-  { value: 'completed', label: STATUS_META['completed']?.label ?? '완료' },
   { value: 'archived', label: STATUS_META['archived']?.label ?? '보관' },
 ];
+
+const KIND_OPTIONS = [
+  { value: '', label: '전체 경기' },
+  { value: 'friendly', label: '친선 경기' },
+  { value: 'league', label: '정규 리그' },
+  { value: 'tournament', label: '대회' },
+] as const;
 
 const PAGE_SIZE = 20;
 
@@ -67,6 +73,9 @@ function AdminTeamMatchesPageContent() {
   const initialStatus = pickAllowedParam(searchParams.get('status'), STATUS_OPTIONS);
   // ── Admin capabilities ─────────────────────────────────────────────
   const canWrite = useAdminCanWrite();
+  const [activeKind, setActiveKind] = useState<(typeof KIND_OPTIONS)[number]['value']>(
+    KIND_OPTIONS.find((option) => option.value === searchParams.get('kind'))?.value ?? '',
+  );
 
   // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
   // (백엔드 q 지원이 이번에 추가되어 hideSearch도 함께 해제한다 — 제목·호스트 팀명 검색)
@@ -80,7 +89,7 @@ function AdminTeamMatchesPageContent() {
     buildPagination,
   } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
 
-  const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches(filters);
+  const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches({ ...filters, ...(activeKind ? { kind: activeKind } : {}) });
   const rows = data?.items ?? [];
   const pageInfo = data?.pageInfo;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
@@ -121,7 +130,7 @@ function AdminTeamMatchesPageContent() {
       <AdminPageHeader
         eyebrow="플랫폼"
         title="팀매치 관리"
-        description="플랫폼 내 모든 팀매치의 상태를 필터링하고 관리해요."
+        description="친선·리그·대회 경기를 함께 조회해요. 리그·대회 경기는 해당 운영 화면에서 관리해요."
         action={
           canWrite ? (
             <Link
@@ -144,6 +153,23 @@ function AdminTeamMatchesPageContent() {
           statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
+          rightSlot={
+            <label className="inline-flex min-h-[44px] items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-body)]">
+              경기 유형
+              <select
+                value={activeKind}
+                onChange={(event) => {
+                  const next = KIND_OPTIONS.find((option) => option.value === event.target.value);
+                  if (!next) return;
+                  setActiveKind(next.value);
+                  resetToFirstPage();
+                }}
+                className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                {KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+          }
         />
       </div>
 
@@ -193,12 +219,23 @@ function AdminTeamMatchesPageContent() {
                       정규 리그
                     </Link>
                   )}
+                  {!row.league && row.tournament && (
+                    <Link
+                      href={`/admin/tournaments/${encodeURIComponent(row.tournament.tournamentId)}`}
+                      onClick={(event) => event.stopPropagation()}
+                      title={row.tournament.title}
+                      aria-label={`대회 ${row.tournament.title} 상세 보기`}
+                      className="shrink-0 rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      대회
+                    </Link>
+                  )}
                   <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                     {row.title}
                   </span>
                 </div>
                 <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
-                  {row.league ? `${row.league.title} · ` : ''}
+                  {row.league ? `${row.league.title} · ` : row.tournament ? `${row.tournament.title} · ` : ''}
                   {row.hostTeamName && row.approvedApplicantTeamName
                     ? `${row.hostTeamName} vs ${row.approvedApplicantTeamName}`
                     : row.hostTeamName ?? row.approvedApplicantTeamName ?? '플랫폼 모집'}
@@ -223,7 +260,7 @@ function AdminTeamMatchesPageContent() {
         ]}
         renderActions={(row) => (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {row.platformManaged && row.status === 'recruiting' && row.pendingApplicationCount > 0 && (
+            {row.platformManaged && !row.league && !row.tournament && row.status === 'recruiting' && row.pendingApplicationCount > 0 && (
               <Link
                 href={`/admin/team-matches/${encodeURIComponent(row.teamMatchId)}`}
                 aria-label={`${row.title} 대기 신청 ${row.pendingApplicationCount}건 관리`}
@@ -232,7 +269,17 @@ function AdminTeamMatchesPageContent() {
                 신청 {row.pendingApplicationCount}건 관리
               </Link>
             )}
-            {canWrite && (
+            {(row.league || row.tournament) && (
+              <Link
+                href={row.league
+                  ? `/admin/league-matches/${encodeURIComponent(row.league.leagueId)}`
+                  : `/admin/tournaments/${encodeURIComponent(row.tournament!.tournamentId)}`}
+                className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-[var(--surface-soft)] px-3 text-[length:var(--font-size-label)] font-medium text-[var(--text-body)] transition-colors hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                {row.league ? '리그 관리' : '대회 관리'}
+              </Link>
+            )}
+            {canWrite && !row.league && !row.tournament && (
               <button
                 type="button"
                 onClick={() => setModalRow(row)}

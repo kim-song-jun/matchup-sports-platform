@@ -749,6 +749,23 @@ describe('AdminService — list/detail endpoints', () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
     });
 
+    it.each(['friendly', 'league', 'tournament'] as const)('kind=%s filters both rows and status facets with league precedence', async (kind) => {
+      const rows = [
+        makeTeamMatchRow({ id: 'friendly', leagueId: null, tournamentId: null, status: 'recruiting' }),
+        makeTeamMatchRow({ id: 'league', leagueId: 'lg-1', tournamentId: 'lg-1', status: 'matched' }),
+        makeTeamMatchRow({ id: 'tournament', leagueId: null, tournamentId: 'cup-1', status: 'completed' }),
+      ];
+      const match = (where: Record<string, unknown>, row: Record<string, unknown>) => Object.entries(where).every(([key, expected]) =>
+        expected && typeof expected === 'object' && 'not' in expected ? row[key] !== expected.not : row[key] === expected,
+      );
+      prisma.v1TeamMatch.findMany.mockImplementation(async ({ where }) => rows.filter((row) => match(where, row)));
+      prisma.v1TeamMatch.groupBy.mockImplementation(async ({ where }) => rows.filter((row) => match(where, row)).map((row) => ({ status: row.status, _count: { _all: 1 } })));
+      const result = await service.listTeamMatches(adminAuthUser, { kind });
+      expect(result.items.map((row) => row.teamMatchId)).toEqual([kind]);
+      expect(result.summary.total).toBe(1);
+      expect(result.pageInfo.total).toBe(1);
+    });
+
     it('returns items with correct shape', async () => {
       prisma.v1TeamMatch.findMany.mockResolvedValue([makeTeamMatchRow()]);
       prisma.v1TeamMatch.groupBy.mockResolvedValue([

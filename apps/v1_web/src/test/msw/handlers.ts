@@ -1181,6 +1181,7 @@ export const v1MswHandlers = [
     if (!match || params.teamMatchId !== 'team-match-1') return HttpResponse.json({ message: '경기를 찾을 수 없어요.' }, { status: 404 });
     return ok({
       teamMatchId: match.id, title: match.title, startsAt: match.startsAt ?? null,
+      leagueId: null, tournamentId: null,
       phase: v1GameResultRevisions.length ? 'legacy' : 'scheduled', version: 0,
       serverTime: new Date().toISOString(), canEdit: false, participant: false, operator: false, ownSideId: null,
       lineupReady: false,

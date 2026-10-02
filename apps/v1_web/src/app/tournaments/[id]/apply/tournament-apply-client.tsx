@@ -649,6 +649,8 @@ type TournamentConsentDocument = {
   body: string;
 };
 
+// 관리 약관 v1.1 원문 사본이다 — 화면은 서버가 주는 약관(term.content)을 쓰고 이 값을 읽지 않는다.
+// scripts/qa/generate-v1-managed-terms-baseline.mjs 가 이 이름으로 읽어 managed-terms-v1.1.json 을 만들므로 지우거나 고치지 않는다.
 const TOURNAMENT_CONSENT_DOCUMENTS = {
   rules: {
     title: '대회 규정 및 안내사항 동의',

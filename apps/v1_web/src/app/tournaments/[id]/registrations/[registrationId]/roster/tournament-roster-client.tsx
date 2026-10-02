@@ -126,6 +126,7 @@ export function TournamentRosterDeadlineCard({
   isRosterDeadlineBlocked,
   canManageRoster = true,
   permissionResolved = true,
+  context,
   season,
   nowMs,
 }: {
@@ -152,6 +153,7 @@ export function TournamentRosterDeadlineCard({
    * 재시도 배너와 서로 다른 말을 하는 모순이 있었다).
    */
   permissionResolved?: boolean;
+  context?: { teamName: string; tournamentTitle: string } | null;
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
@@ -204,6 +206,14 @@ export function TournamentRosterDeadlineCard({
 
   return (
     <Card pad={16} style={{ marginBottom: 16 }}>
+      {context ? (
+        <div role="group" aria-label="명단 대상" style={{ marginBottom: 16, overflowWrap: 'anywhere' }}>
+          <div className="tm-text-label" style={{ fontWeight: 700 }}>{context.teamName}</div>
+          <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+            {season ? '리그' : '대회'} · {context.tournamentTitle}
+          </div>
+        </div>
+      ) : null}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
@@ -1252,6 +1262,14 @@ export function TournamentRosterPageClient({
   const teamPermissionError = Boolean(registration?.teamId) && isTeamError;
   const canManageRoster =
     teamPermissionResolved && (team?.viewer.role === 'owner' || team?.viewer.role === 'manager');
+  // 다른 등록으로 전환 중인 이전 query/placeholder 이름을 현재 명단의 문맥으로 쓰지 않는다.
+  const rosterContext = teamPermissionResolved
+    && registration?.id === registrationId
+    && registration.tournamentId === tournamentId
+    && tournament?.id === tournamentId
+    && team?.teamId === registration.teamId
+    ? { teamName: team.name, tournamentTitle: tournament.title }
+    : null;
   const rosterBlockReason = rosterEditBlockReason({
     isTournamentRosterClosed,
     isRosterLocked,
@@ -1472,6 +1490,7 @@ export function TournamentRosterPageClient({
             isRosterDeadlineBlocked={rosterDeadlineState.blocked}
             canManageRoster={canManageRoster}
             permissionResolved={teamPermissionResolved}
+            context={rosterContext}
             season={
               tournament.kind === 'regular_league'
                 ? { startAt: tournament.scheduledAt, endAt: tournament.scheduledEndAt, status: tournament.status }

@@ -1,0 +1,529 @@
+{
+  "startedAt": "2026-10-02T08:21:17.221Z",
+  "role": {
+    "label": "captain B",
+    "observedName": "E2E팀장B",
+    "verifiedAt": "2026-10-02T08:21:17.221Z",
+    "url": "https://alpha.teameet.co.kr/my",
+    "evidence": "Visible profile card and logout button on /my; existing authenticated session preserved"
+  },
+  "context": {
+    "browser": "our cloud Chromium",
+    "rendering": "ordinary native window sizing and browser zoom; no device emulation",
+    "guestComparison": "This is an authenticated captain B control; not a new guest reproduction",
+    "deployment": "Deployment pipeline context only; exact serving page SHA was not directly observed"
+  },
+  "scenes": [
+    {
+      "key": "1519-filtered-empty-mobile-402-captain-b-stable-viewport",
+      "file": "1519-filtered-empty-mobile-402-captain-b-stable-viewport.jpg",
+      "timestamp": "2026-10-02T08:22:22.550Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "notes": {
+        "filter": "진행 중 · 수영 · 남성부",
+        "message": "조건에 맞는 대회가 없어요",
+        "supersedes": "1519-filtered-empty-mobile-402-captain-b-viewport.jpg; stable framing includes filter and empty message"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1519-filtered-empty-tablet-787-captain-b-viewport",
+      "file": "1519-filtered-empty-tablet-787-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:22:34.834Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "notes": {
+        "filter": "진행 중 · 수영 · 남성부",
+        "message": "조건에 맞는 대회가 없어요"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1519-filtered-empty-desktop-1180-captain-b-viewport",
+      "file": "1519-filtered-empty-desktop-1180-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:22:42.194Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "notes": {
+        "filter": "진행 중 · 수영 · 남성부",
+        "message": "조건에 맞는 대회가 없어요"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1525-friendly-final-mobile-402-captain-b-viewport",
+      "file": "1525-friendly-final-mobile-402-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:24:05.805Z",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349?view=detail",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "notes": {
+        "bodyText": "홈팀\nE2E 알파 A팀\n팀 평점 5.0 · 4승 · 입문-고수\nvs\n우리 팀\nE2E 알파 B팀\n3승\n참가 확정\n경기 종료 · 결과 확정\n\nE2E 알파 A팀 0 : E2E 알파 B팀 1\n\n득점 기록 접기 (1)\n골\n2′ 박팀장\n공동 경기 기록 열기\n후기 남기기\n경기 종료\n\n결과를 확인하고 후기를 남겨요.\n\n완료:\n상대팀 확정\n참석명단 제출\n완료:\n경기 결과 기록\n경기 결과 보기\n후기\n후기 남기기\n일정 · 장소\n날짜와 시간\n10월 1일 (목) 21:10-21:30\n장소\nALPHA QA E2E 가상 테스트 구장\n지역\n종로구\n경기 조건\n종목\n풋살\n실력등급\n초보등급\n경기방식\n5:5\n경기 스타일\n친선\n유니폼 색상\n파랑\n성별 조건\n성별 무관\n설명\n합성 QA 테스트용 무료 친선 매치입니다. 실제 경기·장소 예약·결제는 없습니다.\n경기 상태\n경기 종료\n채팅\n후기 남기기",
+        "expandedGoal": true,
+        "hasRequestedCopy": false,
+        "participantCopy": true,
+        "score": [
+          "경기 종료 · 결과 확정\n\nE2E 알파 A팀 0 : E2E 알파 B팀 1\n\n득점 기록 접기 (1)\n골\n2′ 박팀장\n공동 경기 기록 열기"
+        ]
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1525-friendly-final-tablet-787-captain-b-viewport",
+      "file": "1525-friendly-final-tablet-787-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:24:24.122Z",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349?view=detail",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "notes": {
+        "bodyText": "홈팀\nE2E 알파 A팀\n팀 평점 5.0 · 4승 · 입문-고수\nvs\n우리 팀\nE2E 알파 B팀\n3승\n참가 확정\n경기 종료 · 결과 확정\n\nE2E 알파 A팀 0 : E2E 알파 B팀 1\n\n득점 기록 접기 (1)\n골\n2′ 박팀장\n공동 경기 기록 열기\n후기 남기기\n경기 종료\n\n결과를 확인하고 후기를 남겨요.\n\n완료:\n상대팀 확정\n참석명단 제출\n완료:\n경기 결과 기록\n경기 결과 보기\n후기\n후기 남기기\n일정 · 장소\n날짜와 시간\n10월 1일 (목) 21:10-21:30\n장소\nALPHA QA E2E 가상 테스트 구장\n지역\n종로구\n경기 조건\n종목\n풋살\n실력등급\n초보등급\n경기방식\n5:5\n경기 스타일\n친선\n유니폼 색상\n파랑\n성별 조건\n성별 무관\n설명\n합성 QA 테스트용 무료 친선 매치입니다. 실제 경기·장소 예약·결제는 없습니다.\n경기 상태\n경기 종료\n채팅\n후기 남기기",
+        "expandedGoal": true,
+        "hasRequestedCopy": false,
+        "participantCopy": true,
+        "score": [
+          "경기 종료 · 결과 확정\n\nE2E 알파 A팀 0 : E2E 알파 B팀 1\n\n득점 기록 접기 (1)\n골\n2′ 박팀장\n공동 경기 기록 열기"
+        ]
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1525-friendly-final-desktop-1180-captain-b-viewport",
+      "file": "1525-friendly-final-desktop-1180-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:24:33.996Z",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349?view=detail",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "notes": {
+        "bodyText": "teameet\n홈\n매치\n대회\n팀\n마이\n99+\nALPHA QA E2E 친선 20261001\n홈팀\nE2E 알파 A팀\n팀 평점 5.0 · 4승 · 입문-고수\nvs\n우리 팀\nE2E 알파 B팀\n3승\n참가 확정\n경기 종료 · 결과 확정\n\nE2E 알파 A팀 0 : E2E 알파 B팀 1\n\n득점 기록 접기 (1)\n골\n2′ 박팀장\n공동 경기 기록 열기\n경기 종료\n\n결과를 확인하고 후기를 남겨요.\n\n완료:\n상대팀 확정\n참석명단 제출\n완료:\n경기 결과 기록\n경기 결과 보기\n후기\n후기 남기기\n일정 · 장소\n날짜와 시간\n10월 1일 (목) 21:10-21:30\n장소\nALPHA QA E2E 가상 테스트 구장\n지역\n종로구\n경기 조건\n종목\n풋살\n실력등급\n초보등급\n경기방식\n5:5\n경기 스타일\n친선\n유니폼 색상\n파랑\n성별 조건\n성별 무관\n설명\n합성 QA 테스트용 무료 친선 매치입니다. 실제 경기·장소 예약·결제는 없습니다.\n경기 상태\n경기 종료\n채팅\n후기 남기기\nteameet\n같이 뛸 사람을 한 번에\n공지사항\n서비스 이용약관\n개인정보처리방침\n위치기반서비스 이용약관\n대회 운영정책\n고객센터\n\n© 2026 Teameet",
+        "expandedGoal": true,
+        "hasRequestedCopy": false,
+        "participantCopy": true,
+        "score": [
+          "경기 종료 · 결과 확정\n\nE2E 알파 A팀 0 : E2E 알파 B팀 1\n\n득점 기록 접기 (1)\n골\n2′ 박팀장\n공동 경기 기록 열기"
+        ]
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1526-team-card-mobile-402-captain-b-viewport",
+      "file": "1526-team-card-mobile-402-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:25:28.841Z",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "notes": {
+        "cardText": "센텀 위켄드 FC\n풋살 · 부산 전체 · 현재 7명\n레벨 미설정\n남\n센텀 위켄드 FC는 함께 즐겁게 뛰는 부산 지역 생활 풋살 모임입니다. ALPHA 테스트용 가상 팀입니다.",
+        "href": "/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+        "expectedGender": "남"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1526-team-card-tablet-787-captain-b-viewport",
+      "file": "1526-team-card-tablet-787-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:25:55.591Z",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "notes": {
+        "cardText": "센텀 위켄드 FC\n풋살 · 부산 전체 · 현재 7명\n레벨 미설정\n남\n센텀 위켄드 FC는 함께 즐겁게 뛰는 부산 지역 생활 풋살 모임입니다. ALPHA 테스트용 가상 팀입니다.",
+        "href": "/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+        "expectedGender": "남"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1526-team-card-desktop-1180-captain-b-viewport",
+      "file": "1526-team-card-desktop-1180-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:26:14.077Z",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "notes": {
+        "cardText": "센텀 위켄드 FC\n풋살 · 부산 전체 · 현재 7명\n레벨 미설정\n남\n센텀 위켄드 FC는 함께 즐겁게 뛰는 부산 지역 생활 풋살 모임입니다. ALPHA 테스트용 가상 팀입니다.",
+        "href": "/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+        "expectedGender": "남",
+        "fullReload": true,
+        "react418Captured": []
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1526-team-detail-mobile-402-captain-b-viewport",
+      "file": "1526-team-detail-mobile-402-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:27:07.824Z",
+      "url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "notes": {
+        "visibleRow": {
+          "label": "성별 조건",
+          "rect": {
+            "height": 46.54999923706055,
+            "width": 328.8000183105469,
+            "x": 36.79999923706055,
+            "y": 255.15000915527344
+          },
+          "row": "성별 조건\n남"
+        },
+        "requested": "가입 조건 > 성별 조건 > 남"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1526-team-detail-tablet-787-captain-b-viewport",
+      "file": "1526-team-detail-tablet-787-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:27:27.450Z",
+      "url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "notes": {
+        "visibleRow": {
+          "label": "성별 조건",
+          "rect": {
+            "height": 46.41666793823242,
+            "width": 251.33334350585935,
+            "x": 405.3333435058594,
+            "y": 162.1666717529297
+          },
+          "row": "성별 조건\n남"
+        },
+        "requested": "가입 조건 > 성별 조건 > 남"
+      },
+      "visibleError": false
+    },
+    {
+      "key": "1526-team-detail-desktop-1180-captain-b-viewport",
+      "file": "1526-team-detail-desktop-1180-captain-b-viewport.jpg",
+      "timestamp": "2026-10-02T08:28:07.908Z",
+      "url": "https://alpha.teameet.co.kr/teams/97e70a02-1af6-4c44-bcd9-4c8a09eb9298",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "notes": {
+        "visibleRow": {
+          "label": "성별 조건",
+          "rect": {
+            "height": 46.75,
+            "width": 311,
+            "x": 406,
+            "y": 697.65625
+          },
+          "row": "성별 조건\n남"
+        },
+        "requested": "가입 조건 > 성별 조건 > 남",
+        "fullReload": true,
+        "react418Captured": []
+      },
+      "visibleError": false
+    }
+  ],
+  "roleRouting": {
+    "requested": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "actual": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349/record",
+    "time": "2026-10-02T08:23:40.595Z",
+    "observation": "Captain B auto-redirected to locked final record, A 0:1 B; visible Back provides ?view=detail"
+  },
+  "friendlySummary": {
+    "score": "E2E 알파 A팀 0 : E2E 알파 B팀 1",
+    "status": "경기 종료 · 결과 확정",
+    "requestedGuestCopyPresent": false,
+    "observedParticipantCopy": "결과를 확인하고 후기를 남겨요.",
+    "goalDisclosure": "one away goal, 2 minutes; expanded at all three widths",
+    "result": "Confirmed score and disclosure pass. Guest wording is not rendered in captain B participant branch."
+  },
+  "teamChecksStarted": "2026-10-02T08:24:55.972Z",
+  "desktopTeamReloadAt": "2026-10-02T08:25:55.879Z",
+  "desktopTeamDetailReloadAt": "2026-10-02T08:27:27.661Z",
+  "completedAt": "2026-10-02T08:28:08.004Z",
+  "consoleObservation": {
+    "observedThrough": "2026-10-02T08:28:08.004Z",
+    "react418": [],
+    "hydration": [],
+    "limitation": "Same authenticated session. Desktop team list and detail each fully reloaded once. No fresh context or guest run; absence of recurrence does not establish cause or universal resolution."
+  },
+  "additionalObservation": {
+    "time": "2026-10-02T08:23:40.963Z",
+    "message": "team match chat auto-resolve failed V1ApiError: Request failed",
+    "scope": "Warning appeared during friendly detail load; chat was not clicked and is outside this bounded result/gender test."
+  },
+  "mutations": "No server-changing controls clicked, no logout, no roster/result changes",
+  "imageMetadata": [
+    {
+      "file": "1519-filtered-empty-mobile-402-captain-b-stable-viewport.jpg",
+      "utc": "2026-10-02T08:22:22.550Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "7e621c40a6ec9e47d96a4404e9fe15e43ca3f1a78d1aa26ec5c81b63af8578da",
+      "bytes": 15241,
+      "git_blob_sha": "198cca9ed497458e7a9b625d69c8ef230ad53da5",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1519-filtered-empty-tablet-787-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:22:34.834Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "805855b1d168370f0bf2fdda6f65ae039280200a5b2f9661d39ff5612d52c0fc",
+      "bytes": 15590,
+      "git_blob_sha": "1bdbec15aea2b79e660e0f1de40458a41b86146d",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1519-filtered-empty-desktop-1180-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:22:42.194Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "b97d7a31a54ea2ccf68b2f36c172fdc925026db002b2278bfefb036522646ce8",
+      "bytes": 31442,
+      "git_blob_sha": "75d5152f92c9ca1af5c1697ce07f41b9a5df80a1",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1525-friendly-final-mobile-402-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:24:05.805Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "3942bcf9f7d3fb62e23b9371c88809059368137b1b9e8659d94a3a9f98f11d88",
+      "bytes": 21639,
+      "git_blob_sha": "cc0dd45c1410e8016ed0ed1fb256048ae6c9b2aa",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1525-friendly-final-tablet-787-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:24:24.122Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "bd3b82e1c312f14b5309a6ea9e540161da6968c6aaae1143525b7830e63c8d62",
+      "bytes": 22568,
+      "git_blob_sha": "90bd8baa84d15a485e1e6de0245b6b65be70808e",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1525-friendly-final-desktop-1180-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:24:33.996Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "b823f9a9927ab81fe50fdd592d8e1f00d45d2d58ab7de8afd347ced34de470bc",
+      "bytes": 42374,
+      "git_blob_sha": "b20436388aab95fe33886fe8d499326c63f7aece",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1526-team-card-mobile-402-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:25:28.841Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "3b5d9c1f1e221351b045a6dc108b2c57151c5ff40301ed9676e5bcf8522fb742",
+      "bytes": 30003,
+      "git_blob_sha": "edaea364a1ae65b7c7c51737f75898424cc5f507",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1526-team-card-tablet-787-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:25:55.591Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "60928a93a84174769e9c6285bc3b51aeb3c605a3e3e98bce923f4b1d794db654",
+      "bytes": 32166,
+      "git_blob_sha": "7940f27a52d29caa3f360737bc6839f2f6337a7d",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1526-team-card-desktop-1180-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:26:14.077Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "94133c9781acb6beb883896bbce23748931015369ad83759171ff58f764a4dc7",
+      "bytes": 69558,
+      "git_blob_sha": "11028948e873ad6c107bb4bb1ba490707365d270",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1526-team-detail-mobile-402-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:27:07.824Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "ddda0dcd3445353d8bb71dfd13a65d4abbaebf79288e6b4a86739c25d014d87b",
+      "bytes": 20617,
+      "git_blob_sha": "330ac78d9842e6cb94678656839a942e3098de3f",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1526-team-detail-tablet-787-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:27:27.450Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "0f57cb6271a83607355940cfcb12ba5d070d05c55d8a2b440a418b244df70825",
+      "bytes": 24798,
+      "git_blob_sha": "fa3cb4f3fbf4d332303374b393b98e1475e5d3cb",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "1526-team-detail-desktop-1180-captain-b-viewport.jpg",
+      "utc": "2026-10-02T08:28:07.908Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "b52f7bee07293414fa556b4fe93eb34f3e321341bc6f094640ee4b2080e1654f",
+      "bytes": 39073,
+      "git_blob_sha": "994a5b89842a04cc84bbf2d08831b18792fb08c0",
+      "pixel_reviewed": true,
+      "exif_present": false
+    }
+  ],
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All 12 images were visually reviewed. No credentials, authentication tokens, contact details, profile IDs, join dates, or member-list payload are shown. Friendly-result scenes include a synthetic test scorer display label.",
+    "roleLimit": "Authenticated captain B after-gallery. Earlier guest before captures use a different role; these scenes are not a guest re-test.",
+    "copyLimit": "Participant text 결과를 확인하고 후기를 남겨요. was observed. Guest text 경기 결과가 확정됐어요. was not verified in this role.",
+    "consoleLimit": "Desktop team list and detail were each fully reloaded once without React418 recurrence. This does not establish root-cause resolution. The one chat auto-resolve warning at 2026-10-02T08:23:40.963Z remains an observation, not a confirmed chat feature defect; chat was not clicked.",
+    "framingLimit": "In the tablet tournament-empty viewport, most of the CTA is below or obscured by the bottom-navigation region. This capture verifies filter and empty-state text, not CTA accessibility or activation. Friendly participant text is captured in the desktop image and recorded page text; it is outside the mobile/tablet viewport framing.",
+    "dimensionsLimit": "Mobile CSS viewport is 402×606 while original JPEG raster is 402×605. Both remain unchanged."
+  }
+}

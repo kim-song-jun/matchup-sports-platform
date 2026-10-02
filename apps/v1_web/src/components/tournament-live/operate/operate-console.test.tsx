@@ -1884,8 +1884,8 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
   });
 });
 
-// 과제 2 — 승부차기 입력 단계. "언제 나타날지"(요구사항 1: TOURNAMENT_FIXTURE +
-// 정규시간(+연장) 종료 시 동점 + knockout 픽스처) 게이팅과, 최종 결과 반영
+// 과제 2 — 승부차기 입력 단계. "언제 나타날지"(요구사항 1: 정규시간(+연장) 종료 시 동점 + knockout 픽스처)
+// 게이팅과, 최종 결과 반영
 // (요구사항 4·5: end 커맨드의 payload.penalties로 실제 반영, 확인 모달을 거침)
 // 을 검증한다.
 describe('OperateConsole — 승부차기 (과제 2)', () => {
@@ -1936,7 +1936,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     mocks.useV1Game.mockReturnValue({
       data: {
         id: 'game-1',
-        sourceType: overrides.sourceType ?? 'TOURNAMENT_FIXTURE',
+        sourceType: overrides.sourceType ?? 'TEAM_MATCH',
         isKnockoutFixture: overrides.isKnockoutFixture ?? true,
         state: 'LIVE', version: 2, lastSequence: 1,
         periods: overrides.periods ?? [FIRST_PERIOD, FINAL_PERIOD],
@@ -2037,11 +2037,12 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
   });
 
-  it('일반 팀 매치는(방어적 케이스, isKnockoutFixture가 와도) "승부차기 시작"이 보이지 않는다', () => {
-    setup({ sourceType: 'TEAM_MATCH' });
+  it('현행 대회 경기(TEAM_MATCH)도 결선 무승부면 "승부차기 시작"이 보이고 일반 종료는 막힌다', () => {
+    setup({ sourceType: 'TEAM_MATCH', isKnockoutFixture: true });
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
   });
 
   /**

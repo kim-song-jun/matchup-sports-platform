@@ -2,7 +2,7 @@
 
 ## 2026-10-03 — 대회·리그 팀매치 관리 경계 수정
 
-[감사 및 후속 작업](../../.github/tasks/20261003-competition-team-match-surface-audit.md): 기존 감사 20/20에서 발견한 관리자 분류·상태 변경, 사용자 공동 기록 이동, 조건부 컨택 판정·해체 리그 링크를 최신 dev에서 수정한다. [관리자 시나리오](./10-profile-settings-admin.md), [팀매치 시나리오](./05-team-match-flows.md). 회귀·타입 검사, dev PR 리뷰·CI, Alpha 배포·3폭 실제 화면 확인 진행 중.
+[감사 및 후속 작업](../../.github/tasks/20261003-competition-team-match-surface-audit.md): 기존 감사 20/20에서 발견한 관리자 분류·상태 변경, 사용자 공동 기록 이동, 조건부 컨택 판정·해체 리그 링크를 최신 dev에서 수정한다. [관리자 시나리오](./10-profile-settings-admin.md), [팀매치 시나리오](./05-team-match-flows.md). F1/F2/F3/R1/R2 수정 dev 머지·Alpha 배포 완료(`1d09562a9`), 필수 CI 통과. [실행 기록](./competition-team-match-alpha-qa-20261003.md): 공개 대회·리그 기록 3폭 이동/복귀 6/6 통과. 관리자 로그인 화면 QA는 인증 정보 부재로 미검증; 외부 자동 리뷰는 사용량 제한으로 미완료.
 
 ## 2026-10-02 — 승격 보류 후 Alpha QA
 

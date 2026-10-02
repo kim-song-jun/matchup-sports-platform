@@ -2,7 +2,7 @@
 
 Date: 2026-10-03 (KST)
 Mode: CODE / audit follow-up, dev deployment
-Status: implementation in progress — original audit 20/20 preserved below
+Status: code/dev/Alpha complete; authenticated admin QA pending — original audit 20/20 preserved below
 
 ## Context / Goal
 
@@ -127,7 +127,9 @@ Status: implementation in progress — original audit 20/20 preserved below
 - [x] Phase 2: implement all five findings and sync API/mock contracts.
 - [x] Phase 3: narrow regression tests, scoped typechecks, committed diff review.
 - [x] Phase 4: PR to dev, external review limitation recorded, required CI PASS, dev merge. Copilot clean review unavailable due monthly quota.
-- [ ] Phase 5: confirm Alpha deployed SHA/health; actual authenticated browser QA at 390/768/1440, PR gallery.
+- [x] Phase 5a: confirm final Alpha deployed SHA/health; public tournament/league record QA at 390/768/1440.
+- [ ] Phase 5c: publish SHA-pinned PR screenshot gallery.
+- [ ] Phase 5b: authenticated admin visual/click QA at 390/768/1440 — blocked by missing private account/session; not represented as completed.
 - Acceptance: competition generic moderation returns 409 without writes; friendly moderation retains audit logs; admin shows competition title/type/manage link; public managed records choose actual competition fixture routes with sanitized `from`; only non-deleted friendly recruiting rows enable recruiting-only contact; live league dissolution blocker links to league fixture.
 - No migration needed. All competitions continue using canonical TeamMatch storage.
 
@@ -143,7 +145,7 @@ Status: implementation in progress — original audit 20/20 preserved below
 - Alpha auth prerequisite: repository-designated private credential memory is absent in this environment; requested existing session/private account file location asynchronously. No authentication bypass and no secrets in repository/PR.
 
 - Final focused checks: API 6 suites / 285 tests PASS; Web 5 files / 97 tests PASS; both v1 `tsc --noEmit` PASS. `git diff --check` PASS. No schema migration or new TODO/FIXME/HACK/XXX markers.
-- Remaining: external Copilot/CI, dev merge/deploy, authenticated Alpha visual evidence. No local Next runtime/build loops used.
+- Verification snapshot before PR completion: external Copilot/CI, dev merge/deploy and authenticated Alpha evidence were pending. Later deployment entries below supersede this snapshot. No local Next runtime/build loops used.
 
 - PR: #1545. Pre-deploy headed public record QA reproduced 404 at 390/768/1440 (same sample, no auth required); before screenshots/report under output/playwright/visual-audit/competition-team-match-before. Browser tree closed.
 - Web CI initially rejected one newly copied `text-sm` class under the typography baseline; switched competition links to the existing font-size token (no baseline increase).
@@ -159,8 +161,19 @@ Status: implementation in progress — original audit 20/20 preserved below
 
 - Code PR #1545 merged to dev: `d4c7cfd990370f7af7e175849e69db4a9ca9406c` (merge commit; repository disallows squash).
 - Final pre-merge CI run 37042668515: Gates/API/Web PASS, including full unit suites, both builds and migration replay/drift checks. The matching dev-push CI 37043891731 also passed.
-- Alpha deployment run 37043891674 is building immutable images; health/identity/browser verdict remains pending.
+- Initial Alpha deployment run 37043891674 succeeded. Actual landing/health 200, DB true, served commit `d4c7cfd990370f7af7e175849e69db4a9ca9406c`, release `1.1.2-alpha.20261003.gd4c7cfd99037`. Public tournament record handoff and source/back navigation passed at 390/768/1440; only expected anonymous auth/me 401 responses occurred.
 - Isolated worktree fast-forwarded to origin/dev immediately after merge. The shared root's unrelated WIP and stale feature branch were preserved; the documented macOS sync-back path does not exist in this WSL environment.
 - Anonymous league record baseline: 390/768/1440 already reach canonical league fixture detail through the previous generic detail redirect. Treat this as a positive control, not a reproduced league handoff failure. New ownership response removes that intermediate route and must preserve the same outcome.
 
-- Final accessibility follow-up: the new tournament ownership link inherited the league badge's undersized hit area. Both ownership links now explicitly provide 44×44px targets. This preserves the badge destinations and management action while meeting the project minimum. Follow-up dev PR/Alpha identity verification pending; no claims of authenticated admin visual QA.
+- Final accessibility follow-up: the new tournament ownership link inherited the league badge's undersized hit area. Both ownership links now explicitly provide 44×44px targets. This preserves the badge destinations and management action while meeting the project minimum. Follow-up PR #1552 passed Gates/API/Web and merged to dev as `1d09562a9b7d1b2be261a89519167ff2a031a576`. Matching dev CI 37047094770 succeeded; final Alpha run 37047094838 succeeded. No claims of authenticated admin visual QA.
+
+### Final deployment and live QA
+
+- Actual Alpha identity: `1d09562a9b7d1b2be261a89519167ff2a031a576`, release `1.1.2-alpha.20261003.g1d09562a9b7d`; landing and API health 200, `data.checks.db: true`. Brief landing 502 during the SSM replacement window resolved before QA; not counted as a normal response.
+- Final headed public QA: tournament 3/3, league 3/3 at 390×844, 768×1024, 1440×900. Correct ownership, managed/read-only projection, canonical fixture route, source preservation, actual back click and no horizontal overflow. Screenshots visually inspected at all three widths for both kinds.
+- Tournament pages produced one expected anonymous `/api/v1/auth/me` 401 per width; league pages had no error responses. Unexpected page/console/network failures 0 across 6 final pages.
+- Baseline + final screenshot set: 12/12 processed (2 competition kinds × 3 widths × before/after). This is public record QA, not authenticated admin UI QA.
+- Browser PID/PPID trees recorded; both owned browser trees closed with 0 remaining owned processes. Host preflight: low load, ~14.9GB available, swap unused, Node 1/browser 0. Local Docker daemon unavailable; no local runtime/DB was needed or started.
+- Execution details: [Alpha QA scenario](../../docs/scenarios/competition-team-match-alpha-qa-20261003.md). Reusable read-only headed runner: `scripts/qa/verify-competition-team-match-boundaries.mjs`. Raw results remain under ignored output/playwright; only referenced screenshots promoted.
+- Review limitation: initial Copilot requests failed monthly quota (HTTP 402); follow-up request failed weekly usage limit (HTTP 429). No fresh external clean review; internal review and required CI PASS are distinct evidence.
+- Runtime changes are merged/deployed. Subsequent evidence-only commits publish screenshots/task/scenario on the existing feature branch without triggering another app deployment. Authenticated admin 3-width/click QA remains open because the private session/account is unavailable.

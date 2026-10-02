@@ -101,3 +101,11 @@ Alpha의 실제 응답과 저장 지속성을 검증하고, 실행하지 못한 
 - 사용자 지시로 정원 수정안 리뷰 → dev PR/반영 → Alpha 재배포·브라우저 저장 재검증 단계 진행. Windows gh 인증 확인, 최신 origin/dev와 기준 SHA 일치. 기존 31/31 결과를 재사용하고 커밋 전 v1_web 타입·패턴 검사 1회 수행. 분리 작업트리의 깨끗한 시나리오 허브에 기록 링크 추가.
 
 - 커밋 전 타입 검사: 처음 공유 의존성(React Query 5.91)이 lockfile(5.102.8)보다 오래돼 실패. 별도 /tmp pnpm store에 frozen-lockfile/ignore-scripts 설치 후 tsc 통과. 패턴 검사는 샌드박스 spawnSync EPERM으로 실패했으나 같은 후보에서 제한 밖으로 해당 검사만 재실행해 통과. Changeset 정책 통과. 저장소 의존성·lockfile 변경 없음.
+
+## 2026-10-02 PR review handoff
+
+승인된 수정 PR 11/11 dev 병합, CI 및 alpha 배포 SUCCESS (SHA `9a35d05abd32`). 공개 QA 12개 조합에서 최초 11 PASS/1 hydration FAIL, 해당 desktop 재확인 3 PASS. 인증 흐름은 현재 세션 자격증명 없어 미검증. [리뷰·QA·릴리스 준비 기록](../../docs/ops/pr-review-2026-10-02.md). 이전 섹션의 실행/미실행 표시는 당시 스냅샷이며 이번 결과와 구분한다.
+
+## 2026-10-02 approved continuation
+
+추가 수정 #1529/#1532 dev 병합. 사용자 승인으로 최신 production read-only dump의 로컬 사본에서 source e0f58632821b 실제 Stage A/B·189 checksum/원장 clean·drift0·공개32 경기·별도 backup restore 통과. 최종 릴리스 merge SHA 재검증은 후속. 실제 RDS PITR/인증 alpha QA/공지·승인 담당자·동결은 미완. [상세 기록](../../docs/ops/pr-review-2026-10-02.md).

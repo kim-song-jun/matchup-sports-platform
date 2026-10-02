@@ -214,9 +214,9 @@ function AdminTeamMatchesPageContent() {
                       onClick={(event) => event.stopPropagation()}
                       title={row.league.title}
                       aria-label={`정규 리그 ${row.league.title} 상세 보기`}
-                      className="shrink-0 rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="group inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
-                      정규 리그
+                      <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 group-hover:bg-[var(--tint-blue)]">정규 리그</span>
                     </Link>
                   )}
                   {!row.league && row.tournament && (
@@ -225,9 +225,9 @@ function AdminTeamMatchesPageContent() {
                       onClick={(event) => event.stopPropagation()}
                       title={row.tournament.title}
                       aria-label={`대회 ${row.tournament.title} 상세 보기`}
-                      className="shrink-0 rounded-full bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="group inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-[length:var(--font-size-micro)] font-bold text-[var(--blue700)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
-                      대회
+                      <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 group-hover:bg-[var(--tint-blue)]">대회</span>
                     </Link>
                   )}
                   <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>

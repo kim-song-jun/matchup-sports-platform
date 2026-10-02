@@ -8,14 +8,14 @@
 import type { TeamListViewModel, TeamModel } from './teams.types';
 import type { V1Team } from '@/types/api';
 import { formatProvinceWide } from '@/lib/v1-regions';
-import { teamRecruitmentLabel } from '@/lib/v1-status-labels';
+import { teamGenderRuleLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
 
 export function toTeam(team: V1Team): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
   const regionName = formatTeamRegion(team.region, team.regionName);
   const levelTag = formatTeamLevelTag(team);
-  const genderRule = team.genderRule ?? '';
+  const genderRule = teamGenderRuleLabel(team.genderRule);
   const recruitment = teamRecruitmentLabel(team);
 
   return {

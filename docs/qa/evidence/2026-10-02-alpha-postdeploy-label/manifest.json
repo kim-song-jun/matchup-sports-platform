@@ -1,0 +1,468 @@
+{
+  "observations": [
+    {
+      "height": 844,
+      "scrollWidth": 390,
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:30:33.326Z",
+      "width": 390,
+      "surface": "round-label-1515-after",
+      "file": "round-label-1515-after-css390.jpg",
+      "sha256": "9fa6a01098ff9591ec6b4a2ec1370acaebb838b8dc111889067062b2565bac37",
+      "git_blob_sha": "870b006ad1f03effb8f6cdc1c41d245d04386340",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 844,
+      "scrollWidth": 402,
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:30:52.787Z",
+      "width": 402,
+      "surface": "round-label-1515-after",
+      "file": "round-label-1515-after-css402.jpg",
+      "sha256": "8be2b3dfccc325721a55f1fcd2957c76b36c11d1bb6860501da4740b6545f746",
+      "git_blob_sha": "ffce98498eb68bcae51561f183004f132043eeb8",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 1024,
+      "scrollWidth": 768,
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:30:53.643Z",
+      "width": 768,
+      "surface": "round-label-1515-after",
+      "file": "round-label-1515-after-css768.jpg",
+      "sha256": "95b158cd2cf80026783516088496e89ff1366cdd154e2fa23ee7eee366be57cf",
+      "git_blob_sha": "f43364fc76503f00f71dab15431faa8b9d23dee2",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 900,
+      "scrollWidth": 1440,
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:31:26.094Z",
+      "width": 1440,
+      "surface": "round-label-1515-after",
+      "file": "round-label-1515-after-css1440.jpg",
+      "sha256": "6eb7e2d71361f7257bec4dff100180ad68b2ab7d95bae15661af23f272f4ae42",
+      "git_blob_sha": "1156c3a973a53f56b018dbd3452fc168b6be6edd",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 844,
+      "scrollWidth": 390,
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:36:04.241Z",
+      "width": 390,
+      "surface": "round-label-qa179-after",
+      "file": "round-label-qa179-after-css390.jpg",
+      "sha256": "80e453f5b806114f8ca47da15803badc0822e12aebb1e6a5725727da41df0ee0",
+      "git_blob_sha": "c9479819a2489806fd66d63a2cd83ed9214d9bd0",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 844,
+      "scrollWidth": 402,
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:29.045Z",
+      "width": 402,
+      "surface": "round-label-qa179-after",
+      "file": "round-label-qa179-after-css402.jpg",
+      "sha256": "5b0331aaa8e8716d9018df296f18a01b797acb79958e725c6966e410dd05465c",
+      "git_blob_sha": "d8b703946733d40962579414c6ad8f98dc7a48c0",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 1024,
+      "scrollWidth": 768,
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:29.823Z",
+      "width": 768,
+      "surface": "round-label-qa179-after",
+      "file": "round-label-qa179-after-css768.jpg",
+      "sha256": "1134f61cb6cd8008fe0e1d59d356f8c1cf79833f59d5eca1f323ad6402d51a08",
+      "git_blob_sha": "895c737d315f663c97f6e67afa6a70cfa90383c3",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    },
+    {
+      "height": 900,
+      "scrollWidth": 1440,
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:51.261Z",
+      "width": 1440,
+      "surface": "round-label-qa179-after",
+      "file": "round-label-qa179-after-css1440.jpg",
+      "sha256": "6382fbb61d2ab30d0dde4786d2ca2e823592d7e50d5cda9fc99ef9137c895485",
+      "git_blob_sha": "a9ea17cefb719032399436aeef27746b3957d038",
+      "persona": "guest",
+      "environment": "Codex in-app Chromium CSS viewport override, not physical device",
+      "serving_sha_at_capture": "unobserved",
+      "phase": "post deployment UI observation; not original defect before"
+    }
+  ],
+  "label_dom_measurements": [
+    {
+      "card": {
+        "height": 128,
+        "width": 350,
+        "x": 20,
+        "y": 343.59375
+      },
+      "clientWidth": 81,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 81,
+        "x": 37,
+        "y": 356.59375
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:30:52.284Z",
+      "viewport": {
+        "height": 844,
+        "scrollWidth": 390,
+        "width": 390
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 128,
+        "width": 362,
+        "x": 20,
+        "y": 343.59375
+      },
+      "clientWidth": 81,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 81,
+        "x": 37,
+        "y": 356.59375
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:30:52.838Z",
+      "viewport": {
+        "height": 844,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 128,
+        "width": 560,
+        "x": 104,
+        "y": 523.1875
+      },
+      "clientWidth": 81,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 81,
+        "x": 121,
+        "y": 536.1875
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:30:53.705Z",
+      "viewport": {
+        "height": 1024,
+        "scrollWidth": 768,
+        "width": 768
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 128,
+        "width": 494,
+        "x": 220,
+        "y": 332.1875
+      },
+      "clientWidth": 81,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 81,
+        "x": 237,
+        "y": 345.1875
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99/bracket",
+      "utc": "2026-10-02T03:31:26.113Z",
+      "viewport": {
+        "height": 900,
+        "scrollWidth": 1440,
+        "width": 1440
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 195,
+        "width": 350,
+        "x": 20,
+        "y": 325.09375
+      },
+      "cardText": "조별리그 1라운드\n서울월드컵경기장 보조구장\n10/15 (목) 10:00\n하프타임\nE2E 알파 B팀\n1 : 1\nE2E 알파 A팀\n전반\n2′ E2E선수08\n⚽\n골\n🟨\n옐로카드\n3′ 김선수일\n⚽\n골\n4′ E2E선수04\n🟨\n옐로카드\n4′ E2E선수04",
+      "clientWidth": 61,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 61.171875,
+        "x": 37,
+        "y": 340.09375
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:36:04.432Z",
+      "viewport": {
+        "height": 844,
+        "scrollWidth": 390,
+        "width": 390
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 81,
+        "width": 350,
+        "x": 20,
+        "y": 532.09375
+      },
+      "cardText": "조별리그 2라운드\n서울월드컵경기장 보조구장\n10/15 (목) 14:00 · 예정\nE2E 알파 A팀\n- : -\nE2E 알파 B팀",
+      "clientWidth": 74,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 73.859375,
+        "x": 37,
+        "y": 545.09375
+      },
+      "scrollWidth": 83,
+      "text": "조별리그 2라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:36:04.597Z",
+      "viewport": {
+        "height": 844,
+        "scrollWidth": 390,
+        "width": 390
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 195,
+        "width": 362,
+        "x": 20,
+        "y": 325.09375
+      },
+      "cardText": "조별리그 1라운드\n서울월드컵경기장 보조구장\n10/15 (목) 10:00\n하프타임\nE2E 알파 B팀\n1 : 1\nE2E 알파 A팀\n전반\n2′ E2E선수08\n⚽\n골\n🟨\n옐로카드\n3′ 김선수일\n⚽\n골\n4′ E2E선수04\n🟨\n옐로카드\n4′ E2E선수04",
+      "clientWidth": 64,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 63.8125,
+        "x": 37,
+        "y": 340.09375
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:29.135Z",
+      "viewport": {
+        "height": 844,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 81,
+        "width": 362,
+        "x": 20,
+        "y": 532.09375
+      },
+      "cardText": "조별리그 2라운드\n서울월드컵경기장 보조구장\n10/15 (목) 14:00 · 예정\nE2E 알파 A팀\n- : -\nE2E 알파 B팀",
+      "clientWidth": 77,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 76.546875,
+        "x": 37,
+        "y": 545.09375
+      },
+      "scrollWidth": 83,
+      "text": "조별리그 2라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:29.209Z",
+      "viewport": {
+        "height": 844,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 195,
+        "width": 560,
+        "x": 104,
+        "y": 439.6875
+      },
+      "cardText": "조별리그 1라운드\n서울월드컵경기장 보조구장\n10/15 (목) 10:00\n하프타임\nE2E 알파 B팀\n1 : 1\nE2E 알파 A팀\n전반\n2′ E2E선수08\n⚽\n골\n🟨\n옐로카드\n3′ 김선수일\n⚽\n골\n4′ E2E선수04\n🟨\n옐로카드\n4′ E2E선수04",
+      "clientWidth": 81,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 81,
+        "x": 121,
+        "y": 454.6875
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:29.912Z",
+      "viewport": {
+        "height": 1024,
+        "scrollWidth": 768,
+        "width": 768
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 81,
+        "width": 560,
+        "x": 104,
+        "y": 646.6875
+      },
+      "cardText": "조별리그 2라운드\n서울월드컵경기장 보조구장\n10/15 (목) 14:00 · 예정\nE2E 알파 A팀\n- : -\nE2E 알파 B팀",
+      "clientWidth": 83,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 82.703125,
+        "x": 121,
+        "y": 659.6875
+      },
+      "scrollWidth": 83,
+      "text": "조별리그 2라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:30.005Z",
+      "viewport": {
+        "height": 1024,
+        "scrollWidth": 768,
+        "width": 768
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 195,
+        "width": 494,
+        "x": 220,
+        "y": 406.6875
+      },
+      "cardText": "조별리그 1라운드\n서울월드컵경기장 보조구장\n10/15 (목) 10:00\n하프타임\nE2E 알파 B팀\n1 : 1\nE2E 알파 A팀\n전반\n2′ E2E선수08\n⚽\n골\n🟨\n옐로카드\n3′ 김선수일\n⚽\n골\n4′ E2E선수04\n🟨\n옐로카드\n4′ E2E선수04",
+      "clientWidth": 81,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 81,
+        "x": 237,
+        "y": 421.6875
+      },
+      "scrollWidth": 81,
+      "text": "조별리그 1라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:51.343Z",
+      "viewport": {
+        "height": 900,
+        "scrollWidth": 1440,
+        "width": 1440
+      },
+      "whiteSpace": "nowrap"
+    },
+    {
+      "card": {
+        "height": 81,
+        "width": 494,
+        "x": 726,
+        "y": 406.6875
+      },
+      "cardText": "조별리그 2라운드\n서울월드컵경기장 보조구장\n10/15 (목) 14:00 · 예정\nE2E 알파 A팀\n- : -\nE2E 알파 B팀",
+      "clientWidth": 83,
+      "lineHeight": "18px",
+      "rect": {
+        "height": 18,
+        "width": 82.703125,
+        "x": 743,
+        "y": 419.6875
+      },
+      "scrollWidth": 83,
+      "text": "조별리그 2라운드",
+      "textOverflow": "ellipsis",
+      "url": "https://alpha.teameet.co.kr/tournaments/b9be4094-ada6-42a5-968b-2c64b668621e/bracket",
+      "utc": "2026-10-02T03:37:51.423Z",
+      "viewport": {
+        "height": 900,
+        "scrollWidth": 1440,
+        "width": 1440
+      },
+      "whiteSpace": "nowrap"
+    }
+  ],
+  "limits": [
+    "CSSviewport testing only, not physical mobile/tablet, screen reader or software keyboard",
+    "Current7e04 public bracket has only1round and unknown schedule. Original1502 gallery is QA179 b9be public bracket with1/2rounds, dated fixtures and long venue. QA179 exactURL was found from actual visible tournament title and bracket link, not guessed.",
+    "QA179390/402 have one-line but ellipsized normal1/2round text. No claim all normal labels render in full. Tablet768/desktop1440 render complete1/2round text.",
+    "No unusually long group-name label fixture; long-label ellipsis behavior remains unverified. Fixed-date long venue and1/2round normal labels were observed onQA179.",
+    "No app mutation, new registration, membership/roster/result change, permission/payment/user message or oldQA179 roster change.",
+    "Evidence commit is not serving app SHA. Successful alpha98a2a9e deployment03:16:14Z is an observed boundary; servingSHA at each later capture is unobserved."
+  ],
+  "historical_original_image": "https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/75b40aa7c76d679c943278a42eb163f2a542014d/.screenshots/task180-wave10/1502-public-schedule-card-390.png",
+  "previous_actual_coverage": "https://github.com/kim-song-jun/matchup-sports-platform/blob/d64f8f74c815f81157c9b89a37444e2aa3a77506/docs/qa/evidence/2026-10-02-alpha-tournament-coverage/coverage.json"
+}

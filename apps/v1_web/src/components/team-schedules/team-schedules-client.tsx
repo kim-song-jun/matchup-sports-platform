@@ -143,6 +143,8 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
   const listItems = items.map((item) => toScheduleListItemModel(item, teamId));
   const visibleItems =
     view === 'calendar' && selectedDateKey ? listItems.filter((item) => item.dateKey === selectedDateKey) : listItems;
+  const hasSelectedDate = view === 'calendar' && selectedDateKey !== null;
+  const hasQueryFilters = typeFilter !== 'all' || stateFilter !== 'all';
 
   const model: ScheduleListViewModel = {
     teamId,
@@ -167,9 +169,11 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
     loading: query.isLoading,
     error: query.isError,
     onRetry: () => void query.refetch(),
-    emptyTitle: '아직 등록된 일정이 없어요',
-    emptySub: canManage
-      ? '팀원과 함께할 첫 일정을 만들어 보세요.'
+    emptyTitle: hasSelectedDate ? '선택한 날짜에 일정이 없어요'
+      : hasQueryFilters ? '조건에 맞는 일정이 없어요' : '아직 등록된 일정이 없어요',
+    emptySub: hasSelectedDate ? '다른 날짜를 선택하거나 날짜 필터를 해제해 보세요.'
+      : hasQueryFilters ? '종류·상태 필터를 바꿔서 다시 확인해 보세요.'
+      : canManage ? '팀원과 함께할 첫 일정을 만들어 보세요.'
       : '팀장·매니저가 일정을 등록하면 여기서 확인할 수 있어요.',
   };
 

@@ -1,0 +1,383 @@
+{
+  "candidate": "Personal activity category filter resets after record-detail Back",
+  "role": "Authenticated current user viewing own QA activity records; sharing remains private",
+  "observedUtc": {
+    "start": "2026-10-02T17:48:51.715Z",
+    "end": "2026-10-02T18:00:00.741Z"
+  },
+  "repro": [
+    "My→My activity records",
+    "Select League tab: one QA record",
+    "Open completed league fixture and use page Back",
+    "Observe correct activity page but All selected and five records"
+  ],
+  "expected": "Preserve selected activity category and filtered list on returning from the opened record.",
+  "before": [
+    {
+      "name": "activity-mobile-402-league-filter",
+      "utc": "2026-10-02T17:49:01.822Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "selectedTabs": [
+        "리그"
+      ],
+      "recordCount": 1
+    },
+    {
+      "name": "activity-tablet-787-league-filter",
+      "utc": "2026-10-02T17:55:19.807Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "selectedTabs": [
+        "리그"
+      ],
+      "recordCount": 1
+    },
+    {
+      "name": "activity-desktop-1180-league-filter",
+      "utc": "2026-10-02T17:57:44.528Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "selectedTabs": [
+        "리그"
+      ],
+      "recordCount": 1
+    }
+  ],
+  "tabletReproNote": "Tablet route included optional official-result view and returned to fixture before page Back; mobile/desktop minimal fixture roundtrip independently reproduced.",
+  "finalState": {
+    "routeTemplate": "/users/{userId}/records?from=%2Fmy",
+    "utc": "2026-10-02T18:00:00.749Z",
+    "css": {
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "selectedTabs": [
+      "전체"
+    ],
+    "recordCount": 5
+  },
+  "sourceProofFile": "activity-record-filter-reset-candidate.json",
+  "scope": "Pre-fix read-only category-state observations. Four original control-only screenshot crops accompany three-width action evidence; they are not four full viewport captures.",
+  "sourceRouteTemplate": "/users/{userId}/records?from=%2Fmy",
+  "urlDisclosure": "Explicitly de-identified route template, not the exact observed URL. Exact URLs and full private record evidence are retained locally and are not included in this publication.",
+  "actual": "League selected / 1 record before detail navigation; correct activity page returns with All / 5 records after page Back at 402, 787 and 1180 CSS pixels. Mobile browser Back also resets. The mobile control crop is a separate Tournament-detail Back observation, not a League-before image.",
+  "after": [
+    {
+      "action": "mobile league page Back",
+      "utc": "2026-10-02T17:49:56.478Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "selectedTabs": [
+        "전체"
+      ],
+      "recordCount": 5
+    },
+    {
+      "action": "mobile browser Back",
+      "utc": "2026-10-02T17:51:02.602Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "selectedTabs": [
+        "전체"
+      ],
+      "recordCount": 5
+    },
+    {
+      "action": "Tournament page Back",
+      "utc": "2026-10-02T17:54:16.064Z",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "selectedTabs": [
+        "전체"
+      ],
+      "recordCount": 5
+    },
+    {
+      "action": "tablet league page Back",
+      "utc": "2026-10-02T17:57:28.068Z",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "selectedTabs": [
+        "전체"
+      ],
+      "recordCount": 5
+    },
+    {
+      "action": "desktop league page Back",
+      "utc": "2026-10-02T17:58:17.041Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "selectedTabs": [
+        "전체"
+      ],
+      "recordCount": 5
+    }
+  ],
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Not observed on the served page; repository evidence commit is not a deployment identifier.",
+  "distinction": "Activity-source category-state preservation candidate. Return destination was the correct activity page; this is not the #1418 profile Back wrong-destination case. Duplicate triage remains separate; no new issue number is asserted.",
+  "evidenceBasis": "before/after arrays are recorded UI/action observations of selected tab and aggregate record count. Crops show only the tab controls and cannot independently establish counts, destination correctness or the navigation sequence.",
+  "safeImages": [
+    {
+      "dpr": 1.25,
+      "rect": {
+        "height": 52,
+        "width": 362.3999938964844,
+        "x": 20,
+        "y": 260.6000061035156
+      },
+      "tabs": [
+        {
+          "selected": "true",
+          "text": "전체"
+        },
+        {
+          "selected": "false",
+          "text": "대회"
+        },
+        {
+          "selected": "false",
+          "text": "리그"
+        },
+        {
+          "selected": "false",
+          "text": "친선"
+        },
+        {
+          "selected": "false",
+          "text": "개인"
+        }
+      ],
+      "utc": "2026-10-02T17:55:05.382Z",
+      "viewport": {
+        "height": 606,
+        "width": 402
+      },
+      "file": "activity-mobile-402-after-tournament-back-tabs.jpg",
+      "clip": {
+        "x": 25,
+        "y": 325.75000762939453,
+        "width": 452.99999237060547,
+        "height": 65
+      },
+      "explanation": "Actual Back from tournament detail reset Tournament→All, as recorded immediately before this crop. Crop shows generic controls only.",
+      "sourceRouteTemplate": "/users/{userId}/records?from=%2Fmy",
+      "note": "Direct screenshot of generic tab controls only; no player names/profile IDs. Full viewport and exact URL retained privately.",
+      "raster": [
+        362,
+        52
+      ],
+      "sha256": "3a79fdb3020222d4e08b2ab84ccc350f59278fd67975d8458f74b343de51e5cc",
+      "bytes": 2327,
+      "originalBytesUnchanged": true,
+      "captureType": "Original direct control-only screenshot crop; not full viewport or full page",
+      "pixelReview": "Generic tabs only. No profile identifier, person name, private record body, image of a person or credential visible"
+    },
+    {
+      "dpr": 1.5,
+      "rect": {
+        "height": 52,
+        "width": 560,
+        "x": 113.33333587646484,
+        "y": 240.83334350585935
+      },
+      "tabs": [
+        {
+          "selected": "true",
+          "text": "전체"
+        },
+        {
+          "selected": "false",
+          "text": "대회"
+        },
+        {
+          "selected": "false",
+          "text": "리그"
+        },
+        {
+          "selected": "false",
+          "text": "친선"
+        },
+        {
+          "selected": "false",
+          "text": "개인"
+        }
+      ],
+      "utc": "2026-10-02T17:57:28.399Z",
+      "viewport": {
+        "height": 505,
+        "width": 787
+      },
+      "file": "activity-tablet-787-after-back-tabs.jpg",
+      "clip": {
+        "x": 170.00000381469727,
+        "y": 361.250015258789,
+        "width": 840,
+        "height": 78
+      },
+      "explanation": "Actual Back returned with All selected; pointer moved to noninteractive notice outside crop.",
+      "sourceRouteTemplate": "/users/{userId}/records?from=%2Fmy",
+      "note": "Direct screenshot of generic tab controls only; no player names/profile IDs. Full viewport and exact URL retained privately.",
+      "raster": [
+        560,
+        52
+      ],
+      "sha256": "f16a57386f616e3a140c737964b3cea7463e0b8253a1ccc59a40caaaa133e8ee",
+      "bytes": 2732,
+      "originalBytesUnchanged": true,
+      "captureType": "Original direct control-only screenshot crop; not full viewport or full page",
+      "pixelReview": "Generic tabs only. No profile identifier, person name, private record body, image of a person or credential visible"
+    },
+    {
+      "dpr": 1,
+      "rect": {
+        "height": 52,
+        "width": 1032,
+        "x": 74,
+        "y": 337.5
+      },
+      "tabs": [
+        {
+          "selected": "false",
+          "text": "전체"
+        },
+        {
+          "selected": "false",
+          "text": "대회"
+        },
+        {
+          "selected": "true",
+          "text": "리그"
+        },
+        {
+          "selected": "false",
+          "text": "친선"
+        },
+        {
+          "selected": "false",
+          "text": "개인"
+        }
+      ],
+      "utc": "2026-10-02T17:57:44.553Z",
+      "viewport": {
+        "height": 757,
+        "width": 1180
+      },
+      "file": "activity-desktop-1180-before-league-tabs.jpg",
+      "clip": {
+        "x": 74,
+        "y": 337.5,
+        "width": 1032,
+        "height": 52
+      },
+      "explanation": "League selected, no pointer overlay within crop",
+      "sourceRouteTemplate": "/users/{userId}/records?from=%2Fmy",
+      "note": "Direct screenshot of generic tab controls only; no player names/profile IDs. Full viewport and exact URL retained privately.",
+      "raster": [
+        1032,
+        52
+      ],
+      "sha256": "a4aa565153c90e11e919f313dacd699ac3ba4911580fe353bd101841896d4988",
+      "bytes": 2775,
+      "originalBytesUnchanged": true,
+      "captureType": "Original direct control-only screenshot crop; not full viewport or full page",
+      "pixelReview": "Generic tabs only. No profile identifier, person name, private record body, image of a person or credential visible"
+    },
+    {
+      "dpr": 1,
+      "rect": {
+        "height": 52,
+        "width": 1032,
+        "x": 74,
+        "y": 337.5
+      },
+      "tabs": [
+        {
+          "selected": "true",
+          "text": "전체"
+        },
+        {
+          "selected": "false",
+          "text": "대회"
+        },
+        {
+          "selected": "false",
+          "text": "리그"
+        },
+        {
+          "selected": "false",
+          "text": "친선"
+        },
+        {
+          "selected": "false",
+          "text": "개인"
+        }
+      ],
+      "utc": "2026-10-02T17:58:17.366Z",
+      "viewport": {
+        "height": 757,
+        "width": 1180
+      },
+      "file": "activity-desktop-1180-after-back-tabs.jpg",
+      "clip": {
+        "x": 74,
+        "y": 337.5,
+        "width": 1032,
+        "height": 52
+      },
+      "explanation": "Actual Back returns All selected",
+      "sourceRouteTemplate": "/users/{userId}/records?from=%2Fmy",
+      "note": "Direct screenshot of generic tab controls only; no player names/profile IDs. Full viewport and exact URL retained privately.",
+      "raster": [
+        1032,
+        52
+      ],
+      "sha256": "e21af91a376ff4f92f3924c4a5238944ca90ed6ecc0b786f97966f9d5407f601",
+      "bytes": 2736,
+      "originalBytesUnchanged": true,
+      "captureType": "Original direct control-only screenshot crop; not full viewport or full page",
+      "pixelReview": "Generic tabs only. No profile identifier, person name, private record body, image of a person or credential visible"
+    }
+  ],
+  "framingNotes": [
+    "Four designated original crops are published unchanged; no additional cropping/redaction/re-encoding was performed.",
+    "Source CSS viewport, CSS rect, recorded DPR, capture clip and final raster are separate retained measurements. Clip dimensions are not final raster dimensions.",
+    "Only desktop has both League-before and All-after control crops. Tablet shows All after League navigation; mobile crop shows All after Tournament navigation.",
+    "Three-width League reset and mobile browser Back are supported by the recorded action observations rather than a screenshot pair for each width."
+  ],
+  "limits": [
+    "Read-only QA; no record, roster, result, privacy or review change, reopening or identity linking.",
+    "No exact profile identifier, exact private-record URL, private activity body, person name, result/scorer detail or full viewport is published.",
+    "No actual screen-reader, touch-device or software-keyboard test.",
+    "Tablet League route included an optional official-result view and returned to the fixture before page Back. Mobile and desktop minimal fixture roundtrips independently reproduced.",
+    "No fresh-context, exact-serving-SHA, post-fix pass, full-feature pass or issue-closure claim.",
+    "Candidate overlap/severity remains for QA issue triage."
+  ],
+  "excludedImageNote": "The tablet before-tab crop with pointer overlay is excluded; only the four designated canonical control crops are published."
+}

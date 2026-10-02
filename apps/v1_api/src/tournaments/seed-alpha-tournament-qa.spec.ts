@@ -18,10 +18,10 @@ import {
   SHOWCASE_SQUAD_PERSONAS,
 } from '../../prisma/seed-alpha-league-qa';
 import { assertShowcaseResultSeedAllowed } from '../../prisma/seed-alpha-showcase-results';
-import { SEED_TOURNAMENT_PHASE_LABEL, seedTournamentRoundLabel } from '../../prisma/seed-tournament-round-label';
+import { SEED_TOURNAMENT_PHASE_LABEL, seedCompetitionMatchLabel, seedTournamentRoundLabel } from '../../prisma/seed-tournament-round-label';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
-import { TOURNAMENT_PHASE_LABEL, tournamentRoundLabel } from './tournament-round-label';
+import { TOURNAMENT_PHASE_LABEL, competitionMatchLabel, tournamentRoundLabel, type CompetitionMatchLabelInput } from './tournament-round-label';
 
 describe('alpha tournament QA campaign content', () => {
   it('10개 번들 팀 로고를 재현 가능한 셔플 순서로 배정한다', () => {
@@ -141,6 +141,20 @@ describe('alpha tournament QA campaign content', () => {
       ...Object.keys(TOURNAMENT_PHASE_LABEL), 'Final', ' SEMI ', '결승', 'round_of_16', '',
     ];
     expect(rounds.map(seedTournamentRoundLabel)).toEqual(rounds.map(tournamentRoundLabel));
+  });
+
+  it('시드의 경기 이름 규칙이 서버 competitionMatchLabel 과 같다', () => {
+    const inputs: CompetitionMatchLabelInput[] = [
+      { groupName: 'A조', round: 'group' },
+      { groupName: 'A조', round: 'league_r2', legNumber: 2 },
+      { groupName: 'A조', round: 'league_r2', legNumber: 2, withinGroup: true },
+      { groupName: '4강', round: '4강', legNumber: 2 },
+      { groupName: null, round: 'semi', legNumber: 2 },
+      { groupName: 'B조', round: '조별 3라운드' },
+      { groupName: ' ', round: 'final' },
+      { round: '3주차' },
+    ];
+    expect(inputs.map(seedCompetitionMatchLabel)).toEqual(inputs.map(competitionMatchLabel));
   });
 
   it('배포 이미지 안에서 실행되는 prisma 스크립트는 src/ 를 import 하지 않는다', () => {

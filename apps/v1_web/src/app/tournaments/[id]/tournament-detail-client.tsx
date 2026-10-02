@@ -21,7 +21,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
-import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
@@ -1920,7 +1920,11 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {groupFixtures.map((fixture) => (
-              <FixtureCard key={fixture.id} fixture={fixture} />
+              <FixtureCard
+                key={fixture.id}
+                fixture={fixture}
+                groupName={groups.find((group) => group.id === fixture.groupId)?.name ?? null}
+              />
             ))}
           </div>
         </section>
@@ -2169,8 +2173,11 @@ function FixtureStatusBadge({ liveStatus }: { liveStatus: V1TournamentFixture['l
  * **어휘는 여기서만 갖는다** — 대회 status 는 `scheduled | completed`, 리그는
  * `matched | completed | cancelled` 로 값 영역이 다르다.
  */
-export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
-  const roundLabel = fixture.round ? tournamentRoundLabel(fixture.round) : `${fixture.fixtureNumber}경기`;
+export function FixtureCard({ fixture, groupName = null }: { fixture: V1TournamentFixture; groupName?: string | null }) {
+  // 이 목록은 조별로 묶지 않고 "조별 일정" 한 줄로 흐른다 — 조 이름을 카드마다 붙인다.
+  const roundLabel = fixture.round
+    ? competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })
+    : `${fixture.fixtureNumber}경기`;
   // 일정 라벨: 날짜 + **시각**. 참가자는 이 카드로 "내 경기가 몇 시인지"를 판단하므로
   // 날짜만으로는 쓸모가 없다(오너 지적: "조별 일정에도 각 경기 시간들 나타나야하고").
   // invalid/누락이면 null 이 오는데, 그때 영역을 통째로 숨기면 "시간이 안 정해진 것"과

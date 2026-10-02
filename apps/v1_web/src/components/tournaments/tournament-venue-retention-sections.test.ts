@@ -321,6 +321,7 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
 describe('TournamentFixtureReviewEntrySection', () => {
   const COMPLETED_FIXTURE = {
     id: 'fixture-9',
+    groupId: 'group-a',
     round: '조별 1라운드',
     status: 'completed',
     homeTeamName: '팀A',
@@ -347,11 +348,14 @@ describe('TournamentFixtureReviewEntrySection', () => {
     render(
       createElement(TournamentFixtureReviewEntrySection, {
         fixtures: [COMPLETED_FIXTURE],
+        groups: [{ id: 'group-a', name: 'A조' }],
         state: { status: 'ready', items: [reviewItem()] },
       }),
     );
 
     expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
+    // W9-V2 — 대회 화면 전체가 같은 경기 이름("A조 · 조별 1라운드")을 쓴다.
+    expect(screen.getByText('A조 · 조별 1라운드')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /팀A 대 팀B/ })).toHaveAttribute(
       'href',
       `/my/reviews/tournament_fixture/fixture-9?from=${encodeURIComponent('/tournaments/t1?from=%2Fhome')}`,
@@ -363,6 +367,7 @@ describe('TournamentFixtureReviewEntrySection', () => {
     const { container } = render(
       createElement(TournamentFixtureReviewEntrySection, {
         fixtures: [COMPLETED_FIXTURE],
+        groups: [],
         state: { status: 'ready', items: [reviewItem({ remainingCount: 0, state: 'done' })] },
       }),
     );
@@ -374,6 +379,7 @@ describe('TournamentFixtureReviewEntrySection', () => {
     const { container } = render(
       createElement(TournamentFixtureReviewEntrySection, {
         fixtures: [COMPLETED_FIXTURE],
+        groups: [],
         state: { status: 'guest', items: [] },
       }),
     );

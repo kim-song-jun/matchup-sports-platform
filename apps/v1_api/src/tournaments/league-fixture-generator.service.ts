@@ -10,7 +10,7 @@ import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { createTournamentMatchInTx } from './tournament-match-creation';
-import { tournamentRoundLabel } from './tournament-round-label';
+import { competitionMatchLabel } from './tournament-round-label';
 import { lockGameRows } from '../games/roster/game-roster-sync';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { updateTournamentMatchInTx } from './tournament-match-update';
@@ -103,11 +103,14 @@ export interface BlockedLeagueFixture {
  */
 const BLOCKED_SAMPLE_LIMIT = 5;
 
-/** "league_r1 3번(경기 기록), league_r1 4번(경기 기록) 외 26개" 형태로 지목한다. */
+/** 교체하려는 그 조의 대진이라 조 이름 없이 "조별리그 1라운드 3번(경기 기록), … 외 26개" 형태로 지목한다. */
 function describeBlockedFixtures(blocked: readonly BlockedLeagueFixture[]): string {
   const sample = blocked
     .slice(0, BLOCKED_SAMPLE_LIMIT)
-    .map((fixture) => `${fixture.round} ${fixture.fixtureNumber}번(${describeFixtureDeleteBlockers(fixture.reasons)})`)
+    .map((fixture) => {
+      const label = competitionMatchLabel({ round: fixture.round, legNumber: fixture.legNumber, withinGroup: true });
+      return `${label} ${fixture.fixtureNumber}번(${describeFixtureDeleteBlockers(fixture.reasons)})`;
+    })
     .join(', ');
   const rest = blocked.length - Math.min(blocked.length, BLOCKED_SAMPLE_LIMIT);
   return rest > 0 ? `${sample} 외 ${rest}개` : sample;
@@ -754,7 +757,7 @@ export class LeagueFixtureGeneratorService {
             sportId: pinnedTournament.sportId,
             regionId: pinnedTournament.regionId ?? null,
             // round 는 `league_r{n}` 좌표 키다 — 제목은 팀 일정·알림에 그대로 복사되므로 화면 이름으로 저장한다.
-            title: `${pinnedTournament.title} · ${tournamentRoundLabel(row.round)} ${row.fixtureNumber}`,
+            title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: currentGroup.name, round: row.round, legNumber: row.legNumber })} ${row.fixtureNumber}`,
             placeName: null,
             startAt: row.startAt,
             createdByUserId: user.id,

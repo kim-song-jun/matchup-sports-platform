@@ -60,7 +60,7 @@ import { createTournamentMatchInTx } from './tournament-match-creation';
 import { updateTournamentMatchInTx } from './tournament-match-update';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
-import { tournamentRoundLabel } from './tournament-round-label';
+import { competitionMatchLabel } from './tournament-round-label';
 
 type AdminBracketResult = {
   id: string;
@@ -401,7 +401,10 @@ export class TournamentBracketService {
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', durableCommandId);
-      if (dto.groupId && !await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { id: true } })) {
+      const group = dto.groupId
+        ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true } })
+        : null;
+      if (dto.groupId && group === null) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
       }
       const pinnedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
@@ -563,7 +566,7 @@ export class TournamentBracketService {
         awayRegistrationId: dto.awayRegistrationId ?? null,
         sportId: pinnedTournament.sportId,
         regionId: pinnedTournament.regionId ?? null,
-        title: pinnedTournament.title + ' · ' + tournamentRoundLabel(dto.round) + ' ' + dto.fixtureNumber,
+        title: `${pinnedTournament.title} · ${competitionMatchLabel({ groupName: group?.name, round: dto.round, legNumber })} ${dto.fixtureNumber}`,
         placeName: commandPayload.venue,
         startAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdByUserId: user.id,

@@ -286,7 +286,7 @@ describe('BracketTab — 대진 삭제 거절 안내', () => {
 
     // AdminDataTable 은 데스크톱 <table> 과 모바일 카드 스택을 둘 다 렌더하므로 같은 버튼이
     // 여러 번 나온다 — 첫 번째만 누른다.
-    const buttons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 삭제' });
+    const buttons = screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 삭제' });
     expect(buttons.length).toBeGreaterThan(0);
     await act(async () => {
       fireEvent.click(buttons[0]);
@@ -328,7 +328,27 @@ describe('BracketTab — 대진 삭제 거절 안내', () => {
     ];
     renderTab();
 
-    expect(screen.queryAllByRole('button', { name: 'league_r1 1번 경기 삭제' })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 삭제' })).toHaveLength(0);
+  });
+});
+
+// W9-V2 — 모든 조를 한 표에 섞는 "경기 일정 전체보기" 가 라운드 키(`league_r1`)를 그대로 찍었다.
+describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('조별 경기는 조 이름과 라운드를, 조 없는 결선은 라운드만 쓴다', () => {
+    bracketFixtures = [
+      fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1 }),
+      fixtureRow({ id: 'fx-2', groupId: null, round: 'semi', fixtureNumber: 2, legNumber: 2 }),
+    ];
+    renderTab();
+
+    expect(screen.getAllByText('A조 · 조별리그 1라운드').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('4강 2차').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '4강 2차 2번 경기 수정' }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/league_r/)).not.toBeInTheDocument();
   });
 });
 
@@ -389,7 +409,7 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
 
     // AdminDataTable 은 데스크톱 <table> 과 모바일 카드 스택을 둘 다 렌더하므로 같은 버튼이
     // 여러 번 나온다(다른 describe 블록의 선례와 동일) — 첫 번째만 누른다.
-    const editButtons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 수정' });
+    const editButtons = screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' });
     fireEvent.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
 
@@ -416,7 +436,7 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
     ];
     renderTab(vi.fn(), registrations);
 
-    const editButtons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 수정' });
+    const editButtons = screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' });
     fireEvent.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
 
@@ -461,7 +481,7 @@ describe('BracketTab — 경기 수정: 킥오프 시각 KST 왕복', () => {
     ];
     renderTab(vi.fn(), registrations);
 
-    const editButtons = screen.getAllByRole('button', { name: 'league_r1 1번 경기 수정' });
+    const editButtons = screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' });
     fireEvent.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
 

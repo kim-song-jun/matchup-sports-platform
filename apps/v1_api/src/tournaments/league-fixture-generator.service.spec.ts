@@ -103,7 +103,9 @@ describe('assertLeagueGenerationAllowed', () => {
       }),
     );
     expect(response.code).toBe('LEAGUE_FIXTURES_NOT_DELETABLE');
-    expect(response.message).toContain('league_r1 3번');
+    // W9-V2 — 운영자에게도 라운드 키 원값이 아니라 화면과 같은 라운드 이름으로 지목한다.
+    expect(response.message).toContain('조별리그 1라운드 3번');
+    expect(response.message).not.toContain('league_r');
     expect(response.message).toContain('경기 기록');
     expect(response.message).toContain('운영 감사 기록');
   });
@@ -117,8 +119,8 @@ describe('assertLeagueGenerationAllowed', () => {
         blockedFixtures: Array.from({ length: 28 }, (_, index) => blocked(index + 1, ['game'])),
       }),
     );
-    expect(response.message).toContain('league_r1 5번');
-    expect(response.message).not.toContain('league_r1 6번');
+    expect(response.message).toContain('조별리그 1라운드 5번');
+    expect(response.message).not.toContain('조별리그 1라운드 6번');
     expect(response.message).toContain('외 23개');
   });
 
@@ -557,17 +559,18 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   });
 
   // W8-V3 후속 — 제목에 좌표 키 원값("· league_r1 1")이 저장돼 팀 일정·알림에 그대로 복사됐다.
-  it('팀매치 제목은 라운드 키가 아니라 화면 이름을 쓴다', async () => {
+  // W9-V2 — 화면들과 같은 경기 이름("A조 · 조별리그 1라운드")으로 저장한다.
+  it('팀매치 제목은 라운드 키가 아니라 조 이름이 붙은 화면 이름을 쓴다', async () => {
     prisma.v1Tournament.findFirst.mockResolvedValue({
       id: 't1', title: '봄 대회', format: 'league', minMatchesPerTeam: null, competitionConfigVersionId: 'ccv-1',
     });
-    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue({ ...groupOf('group-a', ['r1', 'r2', 'r3', 'r4']), name: 'A조' });
 
     await service.generate(user, 't1', dto());
 
     const titles = prisma.v1TeamMatch.create.mock.calls.map((call) => String(call[0].data.title));
     expect(titles).toHaveLength(6);
-    expect(titles).toContain('봄 대회 · 조별리그 1라운드 1');
+    expect(titles).toContain('봄 대회 · A조 · 조별리그 1라운드 1');
     expect(titles.filter((title) => title.includes('league_r'))).toEqual([]);
   });
 

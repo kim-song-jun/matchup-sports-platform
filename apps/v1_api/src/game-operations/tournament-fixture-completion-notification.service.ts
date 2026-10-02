@@ -6,7 +6,7 @@ import type { OfficialRevisionRow } from './game-result-official-projection.type
 import { loadOfficialResultRecipients, loadResultTeamNames, officialResultNoticeBody } from './official-result-notice';
 import { parseOfficialScore } from './parse-official-score';
 import { notificationCopyFor } from '../notifications/notifications.service';
-import { tournamentRoundLabel } from '../tournaments/tournament-round-label';
+import { competitionMatchLabel } from '../tournaments/tournament-round-label';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
 
 /**
@@ -72,7 +72,10 @@ export class TournamentFixtureCompletionNotificationService {
         where: { id: tournamentId },
         select: { title: true },
       }),
-      tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId }, select: { round: true } }),
+      tx.v1TournamentMatchDetails.findUnique({
+        where: { teamMatchId: fixtureId },
+        select: { round: true, legNumber: true, group: { select: { name: true } } },
+      }),
       loadResultTeamNames(tx, revision.homeTeamId, revision.awayTeamId),
     ]);
     if (tournament === null || details === null) {
@@ -80,7 +83,7 @@ export class TournamentFixtureCompletionNotificationService {
     }
 
     const copy = notificationCopyFor('tournament_match_completed', 'tournament', `${tournamentId}:${fixtureId}`);
-    const label = `${tournament.title} · ${tournamentRoundLabel(details.round)}`;
+    const label = `${tournament.title} · ${competitionMatchLabel({ groupName: details.group?.name, round: details.round, legNumber: details.legNumber })}`;
     const score = parseOfficialScore(revision.score);
     const businessKeyFor = (userId: string) =>
       `tournament-fixture-completed:${fixtureId}:${userId}`;

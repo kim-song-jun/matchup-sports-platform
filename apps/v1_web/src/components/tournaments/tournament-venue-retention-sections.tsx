@@ -9,6 +9,7 @@ import { withFromPath } from '@/lib/session-storage';
 import type {
   V1ReviewListItem,
   V1TournamentFixture,
+  V1TournamentGroup,
   V1TournamentStatus,
 } from '@/types/api';
 import {
@@ -21,7 +22,7 @@ import {
 } from './tournament-venue-retention-model';
 import { TournamentVenueMap } from './tournament-venue-map';
 import { TournamentVenueNavigationButton } from './tournament-venue-navigation-button';
-import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { competitionMatchLabel } from '@/lib/tournament-round-label';
 
 export {
   getTournamentPostEventCards,
@@ -200,9 +201,11 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
 
 export function TournamentFixtureReviewEntrySection({
   fixtures,
+  groups,
   state,
 }: {
   fixtures: V1TournamentFixture[];
+  groups: readonly Pick<V1TournamentGroup, 'id' | 'name'>[];
   state: TournamentFixtureReviewState;
 }) {
   if (state.status === 'guest') return null;
@@ -244,7 +247,8 @@ export function TournamentFixtureReviewEntrySection({
     if (item.sourceType !== 'tournament_fixture' || item.remainingCount <= 0) return [];
     const fixture = fixtureById.get(item.sourceId);
     if (!fixture || fixture.status !== 'completed' || fixture.result === null) return [];
-    return [{ fixture, remainingCount: item.remainingCount }];
+    const groupName = groups.find((group) => group.id === fixture.groupId)?.name ?? null;
+    return [{ fixture, groupName, remainingCount: item.remainingCount }];
   });
 
   if (entries.length === 0) return null;
@@ -254,7 +258,7 @@ export function TournamentFixtureReviewEntrySection({
 function TournamentFixtureReviewEntryList({
   entries,
 }: {
-  entries: Array<{ fixture: V1TournamentFixture; remainingCount: number }>;
+  entries: Array<{ fixture: V1TournamentFixture; groupName: string | null; remainingCount: number }>;
 }) {
   // 리뷰 작성 화면에서 뒤로가면 이 대회 화면(받은 출처 포함)으로 돌아온다.
   const from = useCurrentHref();
@@ -267,11 +271,13 @@ function TournamentFixtureReviewEntryList({
         경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.
       </p>
       <Card pad={0} style={{ overflow: 'hidden' }}>
-        {entries.map(({ fixture, remainingCount }, index) => {
+        {entries.map(({ fixture, groupName, remainingCount }, index) => {
           const homeTeamName = getFixtureTeamLabel(fixture.homeTeamName);
           const awayTeamName = getFixtureTeamLabel(fixture.awayTeamName);
           const result = fixture.result!;
-          const roundLabel = fixture.round ? tournamentRoundLabel(fixture.round) : `${fixture.fixtureNumber}경기`;
+          const roundLabel = fixture.round
+            ? competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })
+            : `${fixture.fixtureNumber}경기`;
           const hasPenaltyResult =
             result.hasPenalty && result.homePenaltyScore !== null && result.awayPenaltyScore !== null;
 

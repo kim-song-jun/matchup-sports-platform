@@ -1,0 +1,57 @@
+{
+  "observations": [
+    {
+      "surface": "tournaments-empty-status-before",
+      "height": 844,
+      "scrollWidth": 390,
+      "url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "utc": "2026-10-02T02:11:54.955Z",
+      "width": 390,
+      "file": "tournaments-empty-status-before-css390.jpg",
+      "sha256": "c3d6c0c6a10267bafca85bb43474392d5783f456f6153799823fff8e72aebdca",
+      "git_blob_sha": "f0bd53f5e02c67a8660ac88545e2a14ecf111fc0",
+      "phase": "before",
+      "environment": "alpha public guest UI, CSS viewport, not a physical device",
+      "serving_sha_at_capture": "not recorded"
+    },
+    {
+      "surface": "tournaments-empty-status-before",
+      "height": 1024,
+      "scrollWidth": 768,
+      "url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "utc": "2026-10-02T02:11:55.599Z",
+      "width": 768,
+      "file": "tournaments-empty-status-before-css768.jpg",
+      "sha256": "d681416a424f0c83c27741be02b9a26a8f9a5735f379d01e2122f39d3281625c",
+      "git_blob_sha": "d0dcff3909d18b9ad4f178ba18265c78109f1fb4",
+      "phase": "before",
+      "environment": "alpha public guest UI, CSS viewport, not a physical device",
+      "serving_sha_at_capture": "not recorded"
+    },
+    {
+      "surface": "tournaments-empty-status-before",
+      "height": 900,
+      "scrollWidth": 1440,
+      "url": "https://alpha.teameet.co.kr/tournaments?status=in_progress&genderCategory=male&sportId=10fe8a75-9824-4a09-824a-385b37266fff",
+      "utc": "2026-10-02T02:11:56.009Z",
+      "width": 1440,
+      "file": "tournaments-empty-status-before-css1440.jpg",
+      "sha256": "34b6eb44d49c12ebe1e81389e0334d62d7302db50545363750f4b858e3c587f4",
+      "git_blob_sha": "0bfcc98fda56d5b01edf8e478147eddb31e88509",
+      "phase": "before",
+      "environment": "alpha public guest UI, CSS viewport, not a physical device",
+      "serving_sha_at_capture": "not recorded"
+    }
+  ],
+  "network_observation": {
+    "route": "GET /api/v1/tournaments",
+    "http_status": 200,
+    "scope": "observed browser Network.responseReceived after reload; no API response body or authentication material saved"
+  },
+  "limits": [
+    "No after image: no fix deployed",
+    "No physical device or screen-reader test",
+    "API payload filtering correctness not independently tested",
+    "Earlier deployment-window 502 and React419 console entries are separate observations and are not asserted as this copy defect"
+  ]
+}

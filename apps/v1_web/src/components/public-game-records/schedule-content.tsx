@@ -379,12 +379,16 @@ function ScheduleRow({
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {matchLabel === groupHeading ? '' : matchLabel}
+          {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 모자라면 장소(flexShrink 2)가
+              먼저 줄고, 조 이름이 아주 길 때만 이름도 말줄임으로 줄어 날짜 쪽으로 넘치지 않는다. */}
+          {matchLabel === groupHeading ? null : (
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>{matchLabel}</span>
+          )}
           <VideoBadge hasVideo={entry.hasVideo} />
           {venue ? (
             // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는
             // 그게 장소인지 번호인지 알 수 없다(오너 지적: "1(1)은 뭔지 모르겠고").
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, fontWeight: 400 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, flexShrink: 2, fontWeight: 400 }}>
               <MapPin size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue}</span>
             </span>

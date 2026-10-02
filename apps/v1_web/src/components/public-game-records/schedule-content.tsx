@@ -379,7 +379,8 @@ function ScheduleRow({
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-          {matchLabel === groupHeading ? '' : matchLabel}
+          {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 줄어드는 건 장소(말줄임)가 맡는다. */}
+          {matchLabel === groupHeading ? null : <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>{matchLabel}</span>}
           <VideoBadge hasVideo={entry.hasVideo} />
           {venue ? (
             // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는

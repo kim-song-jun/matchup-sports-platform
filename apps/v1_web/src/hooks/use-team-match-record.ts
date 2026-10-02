@@ -15,6 +15,8 @@ export type SharedPublicGoalEvent = {
 export type SharedSubMatch = { id: string; title: string; order: number; scores: { sideId: string; score: number | null }[] };
 export type RecordChange = { id: string; version: number; action: string; actorName: string; goalId: string | null; subMatchId: string | null; before: SharedGoal | SharedSubMatch | null; after: SharedGoal | SharedSubMatch | null; at: string };
 export type SharedRecord = {
+  /** Competition ownership chooses the managed detail route; leagues take precedence. */
+  leagueId: string | null; tournamentId: string | null;
   teamMatchId: string; title: string; startsAt: string | null; phase: 'scheduled' | 'live' | 'official' | 'cancelled' | 'legacy' | 'managed';
   version: number; serverTime: string; canEdit: boolean; participant: boolean; ownSideId: string | null;
   operator: boolean;

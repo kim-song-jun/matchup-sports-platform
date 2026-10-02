@@ -299,3 +299,13 @@ describe('TeamMatchRecordService — 확정 뒤 어드민 정정', () => {
     await expect(service.mutate(user('ops-admin'), 'tm-1', editGoal(3))).rejects.toMatchObject({ status: 403 });
   });
 });
+
+
+it.each([
+  { leagueId: null, tournamentId: 'cup-1' },
+  { leagueId: 'league-1', tournamentId: 'league-1' },
+  { leagueId: null, tournamentId: null },
+])('record read returns ownership for the correct detail handoff: %j', async (ownership) => {
+  const { service } = createFake({ ...ownership, memberships: [] });
+  await expect(service.read(null, 'tm-1')).resolves.toMatchObject(ownership);
+});

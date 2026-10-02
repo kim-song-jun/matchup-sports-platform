@@ -399,3 +399,9 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 
 - 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.
 - 취소·삭제 시 연결된 SCHEDULED Game도 CANCELLED로 전환하여 팀 일정/경기 상태가 어긋나지 않게 한다.
+
+## Managed record handoff ownership (2026-10-03)
+
+`GET/POST /team-matches/:id/record` responses add `leagueId: string | null` and `tournamentId: string | null`. The response remains under the existing envelope and GET optional-auth / POST authorization and version gates are unchanged.
+
+On the public `/team-matches/:id/record` screen, `phase=managed` hands off to `/league-matches/:leagueId/fixtures/:id` when `leagueId` exists, otherwise `/tournaments/:tournamentId/matches/:id`. League ownership wins when both IDs exist. The sanitized `from` parameter is preserved. `phase=legacy` keeps `/team-matches/:id?view=detail`; the admin record screen stays in its admin shell. A managed response does not grant record mutation permissions.

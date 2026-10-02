@@ -1,6 +1,6 @@
-import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request = require('supertest');
+import { createGlobalValidationPipe } from '../common/global-validation-pipe';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AppleIdentityService } from './apple-identity.service';
@@ -290,15 +290,7 @@ describe('AuthController', () => {
         ],
       }).compile();
       const app = moduleRef.createNestApplication();
-      // Same options as the global pipe in main.ts.
-      app.useGlobalPipes(
-        new ValidationPipe({
-          whitelist: true,
-          forbidNonWhitelisted: true,
-          transform: true,
-          transformOptions: { enableImplicitConversion: true },
-        }),
-      );
+      app.useGlobalPipes(createGlobalValidationPipe());
       await app.init();
       return { app, authService };
     };
@@ -307,7 +299,8 @@ describe('AuthController', () => {
       'rejects %s with 400 before reaching the service',
       async (url) => {
         const { app, authService } = await buildApp();
-        await request(app.getHttpServer()).get(url).expect(400);
+        const res = await request(app.getHttpServer()).get(url).expect(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
         expect(authService.checkEmail).not.toHaveBeenCalled();
         await app.close();
       },
@@ -317,7 +310,8 @@ describe('AuthController', () => {
       'rejects %s with 400 before reaching the service',
       async (url) => {
         const { app, authService } = await buildApp();
-        await request(app.getHttpServer()).get(url).expect(400);
+        const res = await request(app.getHttpServer()).get(url).expect(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
         expect(authService.checkNickname).not.toHaveBeenCalled();
         await app.close();
       },

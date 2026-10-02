@@ -64,8 +64,9 @@ session cookie.
 
 `GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are unauthenticated
 availability probes (`{ available: boolean }`) used by signup forms; both are rate-limited
-(30/min). Nickname must be at least 2 trimmed characters; email must normalize to at least 3
-characters, else `400 VALIDATION_ERROR`.
+(30/min). A missing or empty `email`/`nickname` query is rejected by the query DTO before the
+service runs. Nickname must be at least 2 trimmed characters; email must normalize to at least 3
+characters. Every rejection is `400 VALIDATION_ERROR`.
 
 ## Account Recovery (Pre-session)
 

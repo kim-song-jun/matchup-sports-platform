@@ -22,7 +22,7 @@ import {
   useV1MyTeams,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { formatEntryFee } from '@/lib/date-utils';
+import { formatEntryFee, formatTournamentDateRangeMedium } from '@/lib/date-utils';
 import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
@@ -171,20 +171,6 @@ function formatDateShort(dateStr: string | null): string {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function formatMonthDay(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-function formatMonthDayRange(startStr: string | null, endStr: string | null): string {
-  const start = formatMonthDay(startStr);
-  if (!start) return '';
-  const end = formatMonthDay(endStr);
-  if (!end || end === start) return start;
-  return `${start}~${end}`;
-}
-
 /* ── Inline fact icons for the registration pass (none of these exist in icons.tsx) ── */
 
 function FactIconBase({ size = 15, children }: { size?: number; children: React.ReactNode }) {
@@ -327,7 +313,7 @@ function RegistrationPass({
             display: 'flex', flexDirection: 'column', gap: 8,
           }}
         >
-          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDayRange(scheduledAt, scheduledEndAt) || '일정 미정'} />
+          <PassFact icon={<CalendarIcon />} label="일정" value={formatTournamentDateRangeMedium(scheduledAt, scheduledEndAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
         </div>
@@ -344,7 +330,7 @@ function RegistrationPass({
 
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
-  const dateStr = formatMonthDayRange(scheduledAt, scheduledEndAt);
+  const dateStr = formatTournamentDateRangeMedium(scheduledAt, scheduledEndAt);
   const rosterLink = rosterBlocked
     ? { text: '명단 확인', ariaLabel: '선수 명단 확인하기' }
     : !canManageRoster

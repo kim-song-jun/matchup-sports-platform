@@ -1101,6 +1101,86 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
   });
 
+  describe('#1407 빈 명단 저장', () => {
+    function renderEmptySaveCase(data: V1TeamMatchLineup) {
+      hoisted.refetchLineup.mockResolvedValue({ data });
+      hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+        data, isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup,
+      });
+      render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    }
+
+    it('pristine-empty는 저장됨·제출 비활성이고 오류를 먼저 띄우지 않는다', () => {
+      renderEmptySaveCase(baseLineup());
+      expect(screen.getByRole('button', { name: '저장됨' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeDisabled();
+      expect(screen.queryByText('참석명단을 최소 한 명 이상 등록해 주세요.')).not.toBeInTheDocument();
+    });
+
+    it('dirty-empty는 저장·제출을 막고 실행 취소로 원본을 복구하면 저장할 수 있다', () => {
+      renderEmptySaveCase(baseLineup({ starters: [GUEST_STARTER] }));
+      fireEvent.click(screen.getByRole('button', { name: '용병 참석명단에서 빼기' }));
+
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeDisabled();
+      expect(screen.getByText('참석명단을 최소 한 명 이상 등록해 주세요.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      expect(hoisted.saveMutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
+      expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+      expect(screen.queryByText('참석명단을 최소 한 명 이상 등록해 주세요.')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      expect(hoisted.saveMutate.mock.calls[0][0].payload).toMatchObject({
+        participants: [{ displayName: '용병', jerseyNumber: 50 }],
+      });
+    });
+
+    it('dirty-empty에 선수를 다시 추가하면 정상 명단으로 저장한다', () => {
+      renderEmptySaveCase(baseLineup({ starters: [GUEST_STARTER] }));
+      fireEvent.click(screen.getByRole('button', { name: '용병 참석명단에서 빼기' }));
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: '팀원 1명 모두 넣기' }));
+      expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      expect(hoisted.saveMutate.mock.calls[0][0].payload).toMatchObject({
+        participants: [{ userId: 'user-1', displayName: '홍길동' }],
+      });
+    });
+
+    it('제출본의 마지막 선수를 빼면 다시 제출을 막고 변경 취소로 제출본을 복원한다', async () => {
+      renderEmptySaveCase(baseLineup({ state: 'SUBMITTED', starters: [GUEST_STARTER], revision: 4 }));
+      fireEvent.click(screen.getByRole('button', { name: '용병 참석명단에서 빼기' }));
+      expect(screen.getByRole('button', { name: '다시 제출하기' })).toBeDisabled();
+      expect(screen.getByText('참석명단을 최소 한 명 이상 등록해 주세요.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '변경 취소' }));
+      expect(await screen.findByRole('button', { name: '용병 등번호 50번 바꾸기' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();
+      expect(screen.queryByText('참석명단을 최소 한 명 이상 등록해 주세요.')).not.toBeInTheDocument();
+      expect(hoisted.saveMutate).not.toHaveBeenCalled();
+    });
+
+    it('제출 전 저장 응답을 기다리다가 명단을 비우면 후속 빈 저장·옛 명단 제출을 하지 않는다', () => {
+      renderEmptySaveCase(baseLineup({ starters: [GUEST_STARTER] }));
+      fireEvent.click(screen.getByRole('button', { name: '용병을 골키퍼로 지정' }));
+      fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+      expect(screen.getByRole('button', { name: '변경사항 저장 중…' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: '용병 참석명단에서 빼기' }));
+
+      act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 1, state: 'DRAFT' }));
+      act(() => hoisted.saveMutate.mock.calls[0][1].onSettled());
+
+      expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+      expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+      expect(hoisted.submitMutate).not.toHaveBeenCalled();
+      expect(screen.getByText('저장하지 않은 변경사항이 있어요.')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
+      expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeEnabled();
+    });
+  });
+
   // ── P0-1 regression (insane review, 2026-08 GPT Pro): flush-then-submit ──
   // Before this fix, clicking "참석명단 제출하기" always submitted with state.baseRevision
   // regardless of dirty — a jersey number entered right before the click could be submitted

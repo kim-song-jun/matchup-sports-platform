@@ -449,7 +449,7 @@ export function setGoalkeeper(state: LineupEditorState, key: string): LineupEdit
   };
 }
 
-/** 제출 전 클라이언트 사전 검증 — 서버(`team-match-lineup.service.ts#resolveEntries`)가
+/** 저장·제출 전 클라이언트 사전 검증 — 서버(`team-match-lineup.service.ts#resolveEntries`)가
  * 거절하는 규칙만 옮긴다. `lineupConfig.minPlayers/maxPlayers` 는 응답에 있지만 서버가
  * 제출에서 검증하지 않으므로(Task 163, `team-match-lineup-size.integration-spec.ts`) 여기서도
  * 막지 않는다. */

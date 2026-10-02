@@ -390,6 +390,24 @@ export function genderRuleLabel(value: string | null | undefined): string {
   return (GENDER_RULE_OPTIONS as readonly string[]).includes(value ?? '') ? (value as string) : '';
 }
 
+/** 팀 프로필의 알려진 저장값을 표시만 정규화한다. 작성·필터의 정본 검증은 확장하지 않는다. */
+export function teamGenderRuleLabel(value: string | null | undefined): string {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  const canonical = genderRuleLabel(normalized);
+  if (canonical) return canonical;
+  switch (normalized) {
+    case 'male':
+    case '남성': return '남';
+    case 'female':
+    case '여성': return '여';
+    case 'any':
+    case '무관': return '성별 무관';
+    case 'mixed':
+    case '혼성': return '혼성';
+    default: return '';
+  }
+}
+
 type RegistrationTone = 'grey' | 'blue' | 'orange' | 'green' | 'red';
 
 const REGISTRATION_TONE: Record<RegistrationTone, { badgeClass: string; textColor: string }> = {

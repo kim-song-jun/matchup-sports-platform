@@ -455,7 +455,7 @@ function TeamBasicInfoCard({ team, capacity }: { team: TeamDetailViewModel['team
           <div className="tm-text-label">가입 조건</div>
           <div className="tm-team-detail-info-grid">
             <InfoRow label="레벨" value={team.level} />
-            <InfoRow label="성별 조건" value={team.genderRule} />
+            <InfoRow label="성별 조건" value={team.genderRule || '성별 미정'} />
             <InfoRow label="정원" value={capacity} />
             <InfoRow label="가입 신청" value={team.statusLabel} />
           </div>

@@ -8,6 +8,10 @@ import type { V1AuthMe } from '@/types/api';
 import { v1TeamCompetitionEntriesFixture } from '@/test/msw/fixtures';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TeamDetailPageClient, TeamMembersPageClient } from './teams-client';
+import { TeamListPageView } from './teams-page';
+import { toTeam } from './teams.card-model';
+import { getTeamListViewModel } from './teams.view-model';
+import type { V1Team } from '@/types/api';
 
 type AuthProbeFixture = Partial<Pick<ReturnType<typeof import('@/hooks/use-v1-api').useV1AuthMe>,
   'data' | 'error' | 'isPending' | 'isFetching' | 'isError'>> & {
@@ -1040,6 +1044,36 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
       viewer: { role: 'none', membershipId: null, joinState: 'none', canRequestJoin: false, disabledReason: 'LOGIN_REQUIRED', manageRoute: null },
     };
   }
+
+  it.each([
+    ['남', '남'], ['여', '여'], ['성별 무관', '성별 무관'], ['무관', '성별 무관'],
+    ['남성', '남'], ['여성', '여'], ['혼성', '혼성'],
+    ['male', '남'], ['female', '여'], ['any', '성별 무관'], ['mixed', '혼성'],
+    [' MALE ', '남'], [' FEMALE ', '여'],
+    ['unknown-rule', ''], ['', ''], [null, ''], [undefined, ''],
+  ])('팀 성별 %s는 실제 목록 카드와 상세 client에서 같은 표시 정책을 따른다', (raw, label) => {
+    const api = {
+      id: 'team-1', teamId: 'team-1', name: '성수 풋살 크루', sportName: '풋살',
+      regionName: '서울', memberCount: 4, genderRule: raw,
+    } as unknown as V1Team;
+    const list = render(<TeamListPageView model={{ ...getTeamListViewModel(), teams: [toTeam(api)] }} />);
+    const tags = Array.from(list.container.querySelectorAll('.tm-team-tag-text')).map((el) => el.textContent);
+    if (label) expect(tags).toContain(label);
+    else expect(tags.filter((tag) => tag === raw || tag === '성별 무관')).toHaveLength(0);
+    if (raw && raw !== label) expect(tags).not.toContain(raw);
+    list.unmount();
+
+    const detail = seededDetail();
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { ...detail, profile: { ...detail.profile, genderRule: raw } },
+      isError: false, isPlaceholderData: false,
+    });
+    render(<TeamDetailPageClient teamId="team-1" />);
+    screen.getAllByText('성별 조건').forEach((el) =>
+      expect(el.closest('.tm-team-info-row')).toHaveTextContent(`성별 조건${label || '성별 미정'}`),
+    );
+    expect(screen.getAllByRole('button', { name: '로그인 후 가입 신청' }).length).toBeGreaterThan(0);
+  });
 
   it('guest does not request protected eligibility and gets a login return CTA', async () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: seededDetail(), isError: false, isPlaceholderData: false });

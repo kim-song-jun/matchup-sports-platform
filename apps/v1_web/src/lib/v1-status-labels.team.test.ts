@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { teamRecruitmentLabel, teamRoleLabel } from './v1-status-labels';
+import { genderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from './v1-status-labels';
+
+describe('성별 컨트롤의 정본 계약', () => {
+  it.each(['성별 무관', '남', '여'])('%s는 기존 정본 그대로다', (value) => {
+    expect(genderRuleLabel(value)).toBe(value);
+  });
+  it.each(['male', 'female', 'any', 'mixed', 'unknown-rule'])('표시용 %s를 정본 컨트롤 값으로 확장하지 않는다', (value) => {
+    expect(genderRuleLabel(value)).toBe('');
+  });
+});
 
 // H2: 같은 manager 역할이 화면마다 운영진·관리자·감독으로 불리던 것을 세 낱말로 통일했다.
 describe('teamRoleLabel', () => {

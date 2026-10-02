@@ -43,7 +43,7 @@ import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/l
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
-import { sentInvitationStatusLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
+import { sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -326,9 +326,6 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
       description: query.data.profile.introduction ?? '',
       activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
       condition: formatTeamDetailLevel(query.data),
-      // 목업('성별 무관'·'초보-중수')으로 메우지 않는다 — 설정하지 않은 팀에 있지도 않은
-      // 조건이 붙어 보였다.
-      genderRule: query.data.profile.genderRule ?? '',
       schedule: '',
       city: regionParts.city,
       county: regionParts.county,
@@ -1002,7 +999,7 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
   const levelLabel = formatTeamDetailLevel(team);
   const recruitmentLabel = teamRecruitmentLabel({ joinPolicy: team.profile.joinPolicy, memberCount: team.memberCount, memberGoalCount: team.profile.memberGoalCount });
   const regionName = formatTeamRegion(team.region);
-  const genderRule = team.profile.genderRule ?? '';
+  const genderRule = teamGenderRuleLabel(team.profile.genderRule);
   // 목업(teams.view-model.ts)을 fallback 으로 받지 않는다. `...fallback` 스프레드는 여기서
   // 덮어쓰지 않은 칸(next 등)에 **다른(가짜) 팀의 값**을 그대로 남겼고,
   // 그 결과 어느 팀 상세를 열어도 "오늘 21:00 정기전"·"주 1회 정기적으로 풋살을 즐기는

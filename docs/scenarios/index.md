@@ -1,5 +1,12 @@
 # Teameet QA Scenario Index
 
+## 2026-10-02 — 팀매치 이미지 밝기
+
+[Task 132 후속](../../.github/tasks/archive/132-v1-team-match-full-edit-and-image-contract.md):
+목록·상세의 전체 사진 암막 제거, 상세 텍스트/버튼에만 대비 배경 적용.
+실제 컴포넌트 회귀 124/124, headed fixture 전후 캡처 12/12 (390/768/1440), 오류·overflow 0.
+[시나리오/이미지 비교](./05-team-match-flows.md). 실제 업로드·API 생성 흐름 및 Alpha 배포는 미실행.
+
 ## 2026-10-02 — 승격 보류 후 Alpha QA
 
 [Task 182](../../.github/tasks/182-alpha-qa-continuation.md) · [실행 기록](./alpha-qa-continuation-2026-10-02.md): 관리자 전용 경기 운영 API와 공식 1:0 화면 확인. 1명 팀 편집의 정원 저장 오류 수정안은 회귀 31/31 통과, dev CI·Alpha 재검증 진행 중. 실제 Kakao OAuth·Android·역할별 명단 QA와 최신 외부 clean 리뷰는 미완. main·Production 승격은 보류.

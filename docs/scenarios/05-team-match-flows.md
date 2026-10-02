@@ -3,6 +3,19 @@
 
 # Team Match Flow Scenarios
 
+## 2026-10-02 — Team-match photo brightness
+
+- PASS (presentation fixtures): uploaded photo on list/detail has no full-image gradient and retains local image fallback.
+- PASS: photo detail team summary and buttons retain scoped contrast backgrounds; no-photo sport graphics unchanged.
+- PASS: headed Chrome before/after, 390/768/1440, 12/12 captures; console/network errors 0, horizontal overflow 0.
+- PASS: actual component regression 124/124 (RED 2 -> GREEN).
+- PENDING: live creation/upload/API verification and Alpha deployment. No live result is claimed from component fixtures.
+
+Mobile detail [before](../screenshots/team-match-image-brightness/mobile-detail-before.png) ·
+[after](../screenshots/team-match-image-brightness/mobile-detail-after.png).
+Mobile list [before](../screenshots/team-match-image-brightness/mobile-list-before.png) ·
+[after](../screenshots/team-match-image-brightness/mobile-list-after.png).
+
 > **Stack scope note (Todo 26 reconciliation, 2026-08-04):** everything from `## Scenario Checklist` through `## Notes` below describes the **legacy** `apps/api` (port 8111) / `apps/web` (port 3003) stack. Its routes (`POST /team-matches/:id/result`, `POST /team-matches/:id/check-in`, `POST /team-matches/:id/evaluate`, `GET /team-matches/:id/referee-schedule`) still exist verbatim in `apps/api/src/team-matches/team-matches.controller.ts` — none of this is false, it just documents a different, older team-match implementation than the one Tasks 12-24 shipped. The **v1 team-match implementation is a full rewrite** with a different controller, different route shapes, a versioned `Game`/`GameResultRevision` result model, and no `check-in`/`evaluate`/`referee-schedule` routes at all. See `## v1 stack (Tasks 12-24)` immediately below for the current, verified v1 surface and the two Todo-26 E2E scenario IDs this domain owns.
 
 ## v1 stack (Tasks 12-24)

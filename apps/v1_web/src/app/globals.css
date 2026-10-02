@@ -4179,6 +4179,25 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: 12px;
 }
 
+/* Keep uploaded photos at their original brightness. Contrast belongs behind text and controls. */
+.tm-team-vs-hero-photo .tm-team-vs-summary {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: rgba(17, 24, 39, 0.8);
+}
+
+.tm-team-vs-hero-photo .tm-hero-button {
+  background: rgba(17, 24, 39, 0.8);
+}
+
+.tm-team-vs-hero-photo > .tm-complete-check {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  background: rgba(17, 24, 39, 0.8);
+}
+
 /*
  * 사진 없는 팀매치의 VS 카드/히어로 배경 — matches.tm-match-media-sport 와 같은 이유(웨이브4,
  * 2026-09-04). 이쪽은 matches 히어로와 달리 양옆에 팀 이름 텍스트가 항상 있어(비어 있는 쪽이

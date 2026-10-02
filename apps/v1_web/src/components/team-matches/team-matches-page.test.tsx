@@ -51,6 +51,7 @@ describe('team match images', () => {
 
     expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
     expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(media?.style.backgroundImage).not.toContain('linear-gradient');
   });
 
   it('renders the API image with a local fallback on the detail hero', () => {
@@ -62,6 +63,9 @@ describe('team match images', () => {
 
     expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
     expect(hero?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(hero?.style.backgroundImage).not.toContain('linear-gradient');
+    expect(hero).toHaveClass('tm-team-vs-hero-photo');
+    expect(hero?.querySelector('.tm-team-vs-summary')).not.toBeNull();
     expect(hero?.style.backgroundPosition).toBe('center');
     expect(hero?.style.backgroundRepeat).toBe('no-repeat');
     expect(hero?.style.backgroundSize).toBe('cover');

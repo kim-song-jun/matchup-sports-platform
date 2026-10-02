@@ -41,8 +41,8 @@ const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 function teamMatchBackgroundImage(imageUrl: string) {
   const fallback = cssUrl(TEAM_MATCH_IMAGE_FALLBACK);
   return imageUrl && imageUrl !== TEAM_MATCH_IMAGE_FALLBACK
-    ? `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${cssUrl(imageUrl)}, ${fallback}`
-    : `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${fallback}`;
+    ? `${cssUrl(imageUrl)}, ${fallback}`
+    : fallback;
 }
 
 export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel }) {
@@ -593,7 +593,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 패턴(웨이브4, 2026-09-04). 사진이 있을 때만 teamMatchBackgroundImage 를 호출한다
                 (그 안의 TEAM_MATCH_IMAGE_FALLBACK 층은 "사진이 404" 케이스 전용이라 별개). */}
             <div
-              className={`tm-team-vs-hero${match.imageUrl ? '' : ' tm-team-vs-hero-sport'}`}
+              className={`tm-team-vs-hero${match.imageUrl ? ' tm-team-vs-hero-photo' : ' tm-team-vs-hero-sport'}`}
               style={match.imageUrl ? {
                 backgroundImage: teamMatchBackgroundImage(match.imageUrl),
                 backgroundPosition: 'center',
@@ -618,7 +618,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
               </div>
               {awaitingPlatformTeams ? (
-                <div>
+                <div className="tm-team-vs-summary">
                   {heroStatusBadge}
                   <div className="tm-team-vs-row">
                     {['홈팀', 'vs', '어웨이팀'].map((side) => side === 'vs' ? (
@@ -636,7 +636,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                   </div>
                 </div>
               ) : (
-                <div>
+                <div className="tm-team-vs-summary">
                   {heroStatusBadge}
                   <div className="tm-team-vs-row">
                     <HeroTeamLink href={confirmedOpponent ? match.hostTeamHref ?? `/teams/${match.hostTeamId}` : undefined} name={match.hostTeam} align="left">

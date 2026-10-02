@@ -221,6 +221,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   function runQueuedSave() {
     const current = latestStateRef.current;
     if (!current || !current.dirty || !latestEditableRef.current) return;
+    // 저장 응답을 기다리는 동안 마지막 선수를 뺐을 수도 있다. 빈 후속 저장을 보내거나
+    // 앞선 리비전을 제출하지 않고, 명단을 복구한 뒤 사용자가 다시 저장·제출하게 한다.
+    if (validateLineupForSubmit(current).length > 0) {
+      pendingSubmitRef.current = false;
+      setSubmitFlowPending(false);
+      return;
+    }
     if (saveInFlightRef.current) {
       saveQueuedRef.current = true;
       return;
@@ -944,7 +951,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           }} />
         ) : null}
 
-        {validationErrors.length > 0 && editable && rosterRows.length > 0 ? (
+        {validationErrors.length > 0 && editable && (rosterRows.length > 0 || state.dirty) ? (
           <div style={{ marginBottom: 16 }}>
             <AlertBanner tone="warning" message={validationErrors.join(' ')} />
           </div>
@@ -1071,7 +1078,7 @@ function SubmitButtons(props: {
       <button
         type="button"
         className="tm-btn tm-btn-lg tm-btn-neutral"
-        disabled={!props.dirty || props.saving || props.submitFlowPending}
+        disabled={!props.dirty || props.saving || props.submitFlowPending || props.blocked}
         onClick={props.onSave}
       >
         {props.saving ? '저장 중…' : props.dirty ? '저장' : '저장됨'}

@@ -250,10 +250,6 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     sports: filterSports,
   });
 
-  const activeSportLabel = activeSportId
-    ? filterSports.find((sport) => sport.id === activeSportId)?.label
-    : null;
-
   return (
     <div className="tm-tournament-list">
       <h1 className="sr-only">스포츠 대회</h1>
@@ -293,8 +289,8 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
         ) : displayItems.length === 0 ? (
           <EmptyState
             illustration={{ name: 'journey-done' }}
-            title={activeSportLabel ? `${activeSportLabel} 모집 중인 대회가 없어요` : '현재 모집 중인 대회가 없어요'}
-            sub={activeSportLabel ? '다른 종목을 선택하거나 새로운 대회 알림을 기다려 주세요.' : '새로운 대회가 열리면 앱 알림으로 안내드릴게요.'}
+            title="조건에 맞는 대회가 없어요"
+            sub="필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요."
             cta="팀밋 대회 보기"
             ctaHref="/events"
           />

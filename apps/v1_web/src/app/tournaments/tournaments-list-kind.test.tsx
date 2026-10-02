@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
 
@@ -11,6 +12,7 @@ import { TournamentsListPageClient as TournamentsPage } from './tournaments-list
  */
 const tournamentsMock = vi.fn();
 let search = '';
+const SWIMMING_ID = '10fe8a75-9824-4a09-824a-385b37266fff';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
@@ -19,10 +21,11 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
-  useV1MasterSports: () => ({ data: [] }),
+  useV1MasterSports: () => ({ data: [{ id: SWIMMING_ID, name: '수영' }] }),
 }));
 
 beforeEach(() => {
+  search = '';
   tournamentsMock.mockReset();
   tournamentsMock.mockReturnValue({
     data: { items: [], pageInfo: { hasNext: false, nextCursor: null, totalCount: 0 } },
@@ -30,6 +33,64 @@ beforeEach(() => {
     isError: false,
     isFetching: false,
     refetch: vi.fn(),
+  });
+});
+
+describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
+  describe.each([false, true])('종목 선택: %s', (withSport) => {
+    it.each([
+      ['in_progress', '진행 중'],
+      ['draft', '준비 중'],
+      ['completed', '종료'],
+      [null, '전체'],
+    ] as const)('%s 상태의 요청·요약·빈 안내가 모순되지 않는다', (status, label) => {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      if (withSport) {
+        params.set('sportId', SWIMMING_ID);
+        params.set('genderCategory', 'male');
+      }
+      search = params.toString();
+      render(<TournamentsPage />);
+
+      expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({
+        status: status ?? undefined,
+        sportId: withSport ? SWIMMING_ID : undefined,
+        genderCategory: withSport ? 'male' : undefined,
+      });
+      const summary = withSport
+        ? `${status ? `${label} · ` : ''}수영 · 남성부`
+        : label;
+      expect(screen.getByRole('link', { name: `필터 열기 — 현재 ${summary}` })).toHaveAttribute(
+        'href', `/tournaments?${new URLSearchParams({ ...Object.fromEntries(params), filter: '1' })}`,
+      );
+      expect(screen.getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();
+      expect(screen.getByText('필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.')).toBeInTheDocument();
+      expect(screen.queryByText(/모집 중인 대회가 없어요|대회 알림/)).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '팀밋 대회 보기' })).toHaveAttribute('href', '/events');
+    });
+  });
+
+  it('API 실패는 빈 결과로 안내하지 않고 실제 오류와 재시도를 보여준다', async () => {
+    const refetch = vi.fn();
+    tournamentsMock.mockReturnValue({
+      data: undefined, isPending: false, isError: true, isFetching: false,
+      error: new Error('대회 목록 연결에 실패했어요.'), refetch,
+    });
+    render(<TournamentsPage />);
+    expect(screen.getByRole('alert')).toHaveTextContent('대회 목록 연결에 실패했어요.');
+    expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '목록 다시 불러오기' }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it('응답을 기다리는 동안에는 빈 안내 대신 로딩 상태를 보여준다', () => {
+    tournamentsMock.mockReturnValue({
+      data: undefined, isPending: true, isError: false, isFetching: true, refetch: vi.fn(),
+    });
+    render(<TournamentsPage />);
+    expect(screen.getByLabelText('대회 목록 불러오는 중')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
   });
 });
 

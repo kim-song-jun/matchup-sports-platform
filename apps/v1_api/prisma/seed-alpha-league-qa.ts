@@ -7,6 +7,7 @@ import {
   V1TeamMatchStatus,
   V1VisibilityMode,
 } from '@prisma/client';
+import { refreshAlphaTeamMembershipCounts } from './seed-alpha-membership-counts';
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다(`seed-alpha-tournament-qa.ts`
 // 상단 주석과 같은 이유). `assertAlphaSeedAllowed`는 alpha 전용 4중 가드를 그대로 재사용하고,
 // `ensureAlphaQaRecordConsent`는 득점/도움 순위 화면을 실 API로 검증할 수 있게 페르소나의
@@ -294,7 +295,7 @@ async function ensureLeagueTeams(
         create: { teamId: team.id, userId: memberId, role, status: 'active', joinedAt: now, jerseyNumber },
       });
     }
-    await tx.v1Team.update({ where: { id: team.id }, data: { memberCount: memberIds.length, managerCount: 1 } });
+    await refreshAlphaTeamMembershipCounts(tx, team.id);
     teams.push({ id: team.id, name: team.name, playerIds: memberIds });
   }
   return teams;
@@ -559,8 +560,9 @@ async function ensureShowcaseRoster(
   }
   await tx.v1Team.update({
     where: { id: teamSeed.id },
-    data: { memberCount: playerIds.length, managerCount: 1, membersVisible: true },
+    data: { membersVisible: true },
   });
+  await refreshAlphaTeamMembershipCounts(tx, teamSeed.id);
   await tx.v1TeamProfile.update({
     where: { teamId: teamSeed.id },
     data: {

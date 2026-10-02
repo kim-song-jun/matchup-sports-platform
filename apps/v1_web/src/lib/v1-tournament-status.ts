@@ -21,6 +21,7 @@ export function getTournamentStatusConfig(status: V1TournamentStatus): Tournamen
     case 'cancelled':
       return { badgeClass: 'tm-badge-red', label: '취소' };
     default:
-      return { badgeClass: 'tm-badge-grey', label: status };
+      // 서버가 웹 타입보다 먼저 새 상태를 내려도 영문 코드를 화면에 노출하지 않는다.
+      return { badgeClass: 'tm-badge-grey', label: '상태 확인 중' };
   }
 }

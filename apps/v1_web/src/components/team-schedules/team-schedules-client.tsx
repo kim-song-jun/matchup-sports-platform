@@ -66,7 +66,6 @@ import {
   buildScheduleCalendarMonth,
   dateKeyOf,
   kstMonthStart,
-  fromDatetimeLocalValue,
   guestRecruitmentStateLabel,
   isDeadlinePassed,
   isScheduleManagerRole,
@@ -85,9 +84,9 @@ import {
   scheduleTypeLabel,
   scheduleVisibilityLabel,
   scheduleVisibilityOptions,
-  toDatetimeLocalValue,
   toScheduleListItemModel,
 } from './team-schedules.view-model';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 const GUEST_APPLICATION_STATE_LABELS: Record<string, string> = {
   PENDING: '대기 중',
@@ -343,7 +342,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     const recruitment = schedule?.guestRecruitment;
     if (!recruitment) return;
     setRecruitmentSlots(String(recruitment.slots));
-    setRecruitmentClosesAt(toDatetimeLocalValue(recruitment.closesAt));
+    setRecruitmentClosesAt(isoToKstDatetimeLocal(recruitment.closesAt));
     setRecruitmentNote(recruitment.note ?? '');
     setRecruitmentVisibility(recruitment.visibility);
     setRecruitmentEditError(null);
@@ -353,7 +352,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   function onSaveRecruitmentEdit() {
     const recruitment = schedule?.guestRecruitment;
     if (!recruitment) return;
-    const closesAtIso = fromDatetimeLocalValue(recruitmentClosesAt);
+    const closesAtIso = kstDatetimeLocalToIso(recruitmentClosesAt);
     const slotsNum = Number(recruitmentSlots);
     if (!closesAtIso || !Number.isFinite(slotsNum) || slotsNum < 1) {
       setRecruitmentEditError('모집 인원과 마감 시각을 다시 확인해 주세요.');
@@ -676,10 +675,10 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
     setDraft({
       title: detail.data.title,
       type: detail.data.type,
-      startAt: toDatetimeLocalValue(detail.data.startAt),
-      endAt: toDatetimeLocalValue(detail.data.endAt),
+      startAt: isoToKstDatetimeLocal(detail.data.startAt),
+      endAt: isoToKstDatetimeLocal(detail.data.endAt),
       capacity: detail.data.capacity != null ? String(detail.data.capacity) : '',
-      rsvpDeadlineAt: toDatetimeLocalValue(detail.data.rsvpDeadlineAt),
+      rsvpDeadlineAt: isoToKstDatetimeLocal(detail.data.rsvpDeadlineAt),
       // MEMBERS는 폼 선택지에서 뺐다(TEAM과 백엔드 동작이 동일 — scheduleVisibilityOptions()
       // 주석 참고). 레거시로 MEMBERS가 저장된 일정을 열면 TEAM으로 정규화해 토글에 항상
       // 선택된 버튼이 보이게 한다. 실제 접근 범위는 바뀌지 않는다.
@@ -693,15 +692,15 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
   }
 
   function onSubmit() {
-    const startAtIso = fromDatetimeLocalValue(draft.startAt);
-    const endAtIso = fromDatetimeLocalValue(draft.endAt);
+    const startAtIso = kstDatetimeLocalToIso(draft.startAt);
+    const endAtIso = kstDatetimeLocalToIso(draft.endAt);
     if (!draft.title.trim() || !startAtIso || !endAtIso) {
       setError('제목과 시작·종료 시각을 모두 입력해 주세요.');
       return;
     }
     setError(null);
     const capacityNum = draft.capacity.trim() ? Number(draft.capacity) : undefined;
-    const rsvpDeadlineIso = fromDatetimeLocalValue(draft.rsvpDeadlineAt);
+    const rsvpDeadlineIso = kstDatetimeLocalToIso(draft.rsvpDeadlineAt) ?? undefined;
 
     if (mode === 'create') {
       // MATCH 일정은 팀매치가 시스템으로만 만든다(서버가 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY 로 거부).

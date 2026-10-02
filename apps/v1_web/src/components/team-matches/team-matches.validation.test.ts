@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildTeamMatchPayloadResult,
   firstIncompleteTeamMatchStep,
@@ -192,7 +192,7 @@ describe('regular/admin date parity', () => {
     const end = futureIso(8);
     Object.assign(ctx.draft, { startTime: '23:00', endDate: end.toISOString().slice(0, 10), endTime: '01:00' });
     const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
-    expect(result.payload?.endsAt).toBe(new Date(`${end.toISOString().slice(0, 10)}T01:00:00`).toISOString());
+    expect(result.payload?.endsAt).toBe(new Date(`${end.toISOString().slice(0, 10)}T01:00:00+09:00`).toISOString());
   });
 
   it('requires an end time when an end date is supplied', () => {
@@ -208,8 +208,69 @@ it('preserves the existing elapsed deadline on edit but rejects changing it to a
   const ctx = baseCtx();
   ctx.draft.deadlineDate = '2000-01-01';
   ctx.draft.deadlineTime = '12:00';
-  const saved = new Date('2000-01-01T12:00:00').toISOString();
+  const saved = '2000-01-01T03:00:00.000Z'; // 2000-01-01 12:00 KST
   expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId, saved).payload?.deadlineAt).toBe(saved);
   ctx.draft.deadlineTime = '11:00';
   expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId, saved).payload).toBeUndefined();
+});
+
+describe('KST 기준 검증 — 브라우저 시간대(TZ=UTC 러너)와 무관', () => {
+  const NOW = new Date('2026-09-04T14:30:00.000Z'); // KST 2026-09-04 23:30
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const draftAt = (date: string, startTime: string) => ({
+    ...baseCtx().draft,
+    date,
+    startTime,
+  });
+  const build = (draft: ReturnType<typeof draftAt>) =>
+    buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam');
+
+  it('입력한 시각을 KST 로 해석한 ISO 로 보낸다', () => {
+    const result = build({
+      ...draftAt('2026-10-10', '10:00'),
+      endDate: '2026-10-10',
+      endTime: '12:00',
+      deadlineDate: '2026-10-09',
+      deadlineTime: '23:59',
+    });
+    expect(result.payload).toMatchObject({
+      startsAt: '2026-10-10T01:00:00.000Z',
+      endsAt: '2026-10-10T03:00:00.000Z',
+      deadlineAt: '2026-10-09T14:59:00.000Z',
+    });
+  });
+
+  it('과거/미래 경계를 KST 자정 근처에서 정확히 가른다', () => {
+    // 지금은 KST 23:30. 로컬(UTC) 해석이면 23:00 이 미래, 00:30 이 과거로 뒤집힌다.
+    const past = build(draftAt('2026-09-04', '23:00'));
+    expect(past.payload).toBeUndefined();
+    expect(past.missingFields).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'startTime', label: '시작 시간은 지금 이후로 설정해 주세요' })]),
+    );
+    expect(build(draftAt('2026-09-05', '00:30')).payload?.startsAt).toBe('2026-09-04T15:30:00.000Z');
+  });
+
+  it('마감도 KST 로 지금과 비교한다', () => {
+    const base = draftAt('2026-09-05', '10:00');
+    expect(build({ ...base, deadlineDate: '2026-09-04', deadlineTime: '23:00' }).payload).toBeUndefined();
+    expect(build({ ...base, deadlineDate: '2026-09-04', deadlineTime: '23:59' }).payload?.deadlineAt)
+      .toBe('2026-09-04T14:59:00.000Z');
+  });
+
+  it('입력했는데 해석되지 않는 종료·마감은 오류로 잡는다 — 입력 안 함(오류 없음)과 구분한다', () => {
+    const base = draftAt('2026-10-10', '10:00');
+    const fieldsOf = (draft: ReturnType<typeof draftAt>) => build(draft).missingFields?.map((item) => item.field) ?? [];
+
+    expect(fieldsOf({ ...base, endDate: 'broken', endTime: '12:00' })).toContain('endTime');
+    expect(fieldsOf({ ...base, deadlineDate: 'broken', deadlineTime: '12:00' })).toContain('deadlineTime');
+    // 대조군: 비어 있으면 오류 없이 null 로 저장된다.
+    expect(build(base).payload).toMatchObject({ endsAt: null, deadlineAt: null });
+  });
 });

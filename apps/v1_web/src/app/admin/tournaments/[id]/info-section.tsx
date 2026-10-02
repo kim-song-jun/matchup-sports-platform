@@ -19,15 +19,14 @@ import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-pe
 import { TOURNAMENT_STATUS_LABEL, formatDate, formatDateRange } from './tournament-admin-shared';
 import {
   SimpleModal,
-  datetimeLocalValueToIso,
   formatCurrency,
   inputCls,
-  isoToDatetimeLocalValue,
   submitBtnBaseCls,
   submitBtnCls,
   substitutionPolicyLabel,
   textareaCls,
 } from './tournament-detail-shared';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 
 // ── Main detail client ────────────────────────────────────────────────────
@@ -133,10 +132,10 @@ export function TournamentInfoSection() {
     if (!tournament) return;
     setEditTitle(tournament.title);
     setEditSportId(tournament.sportId);
-    setEditScheduledAt(isoToDatetimeLocalValue(tournament.scheduledAt));
-    setEditScheduledEndAt(isoToDatetimeLocalValue(tournament.scheduledEndAt));
-    setEditDeadlineAt(isoToDatetimeLocalValue(tournament.registrationDeadlineAt));
-    setEditRosterDeadlineAt(isoToDatetimeLocalValue(tournament.rosterDeadlineAt));
+    setEditScheduledAt(isoToKstDatetimeLocal(tournament.scheduledAt));
+    setEditScheduledEndAt(isoToKstDatetimeLocal(tournament.scheduledEndAt));
+    setEditDeadlineAt(isoToKstDatetimeLocal(tournament.registrationDeadlineAt));
+    setEditRosterDeadlineAt(isoToKstDatetimeLocal(tournament.rosterDeadlineAt));
     setEditVenue(tournament.venue ?? '');
     setEditParkingInfo(tournament.parkingInfo ?? '');
     setEditEntryFee(String(tournament.entryFee));
@@ -223,8 +222,8 @@ export function TournamentInfoSection() {
     // 서버(ROSTER_DEADLINE_BEFORE_REGISTRATION_DEADLINE)와 같은 규칙·같은 범위 — 두 마감 중 하나를
     // 바꿀 때만 본다(순서가 어긋난 채 만들어진 대회의 다른 필드 수정은 막지 않는다).
     const deadlineTouched =
-      editDeadlineAt !== isoToDatetimeLocalValue(tournament.registrationDeadlineAt) ||
-      editRosterDeadlineAt !== isoToDatetimeLocalValue(tournament.rosterDeadlineAt);
+      editDeadlineAt !== isoToKstDatetimeLocal(tournament.registrationDeadlineAt) ||
+      editRosterDeadlineAt !== isoToKstDatetimeLocal(tournament.rosterDeadlineAt);
     if (deadlineTouched && editDeadlineAt && editRosterDeadlineAt && editRosterDeadlineAt < editDeadlineAt) {
       showToast('명단 제출 마감은 신청 마감과 같거나 그 뒤여야 해요.', 'error');
       return;
@@ -285,17 +284,17 @@ export function TournamentInfoSection() {
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     if (normalizedTitle !== tournament.title) payload.title = normalizedTitle;
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
-    if (editScheduledAt !== isoToDatetimeLocalValue(tournament.scheduledAt)) {
-      payload.scheduledAt = datetimeLocalValueToIso(editScheduledAt);
+    if (editScheduledAt !== isoToKstDatetimeLocal(tournament.scheduledAt)) {
+      payload.scheduledAt = kstDatetimeLocalToIso(editScheduledAt);
     }
-    if (editScheduledEndAt !== isoToDatetimeLocalValue(tournament.scheduledEndAt)) {
-      payload.scheduledEndAt = datetimeLocalValueToIso(editScheduledEndAt);
+    if (editScheduledEndAt !== isoToKstDatetimeLocal(tournament.scheduledEndAt)) {
+      payload.scheduledEndAt = kstDatetimeLocalToIso(editScheduledEndAt);
     }
-    if (editDeadlineAt !== isoToDatetimeLocalValue(tournament.registrationDeadlineAt)) {
-      payload.registrationDeadlineAt = datetimeLocalValueToIso(editDeadlineAt);
+    if (editDeadlineAt !== isoToKstDatetimeLocal(tournament.registrationDeadlineAt)) {
+      payload.registrationDeadlineAt = kstDatetimeLocalToIso(editDeadlineAt);
     }
-    if (editRosterDeadlineAt !== isoToDatetimeLocalValue(tournament.rosterDeadlineAt)) {
-      payload.rosterDeadlineAt = datetimeLocalValueToIso(editRosterDeadlineAt);
+    if (editRosterDeadlineAt !== isoToKstDatetimeLocal(tournament.rosterDeadlineAt)) {
+      payload.rosterDeadlineAt = kstDatetimeLocalToIso(editRosterDeadlineAt);
     }
     const normalizedVenue = editVenue.trim() || null;
     if (normalizedVenue !== tournament.venue) payload.venue = normalizedVenue;

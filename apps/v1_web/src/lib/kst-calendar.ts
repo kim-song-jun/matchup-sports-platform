@@ -28,3 +28,22 @@ export function toKstDateString(instant: Date): string {
 export function kstMidnightMs(date: string): number {
   return Date.parse(`${date}T00:00:00.000Z`) - KST_OFFSET_MS;
 }
+
+/**
+ * `<input type="datetime-local">` 값(`YYYY-MM-DDTHH:mm[:ss]`, 오프셋 없음)을 KST 벽시계로 읽어 ISO(UTC)로.
+ * 비었거나 깨졌으면 `null`. 서버에 보내는 값은 항상 이 함수를 거친다.
+ */
+export function kstDatetimeLocalToIso(value: string): string | null {
+  if (!value) return null;
+  const withSeconds = /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+  const parsed = new Date(`${withSeconds}+09:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/** ISO 인스턴트를 `datetime-local` 입력값(KST 벽시계 `YYYY-MM-DDTHH:mm`)으로. 비었거나 깨졌으면 `''`. */
+export function isoToKstDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() + KST_OFFSET_MS).toISOString().slice(0, 16);
+}

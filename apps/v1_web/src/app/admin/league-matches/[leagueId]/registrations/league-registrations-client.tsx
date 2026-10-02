@@ -7,7 +7,7 @@ import { RegistrationsTab } from '@/app/admin/tournaments/[id]/registrations-tab
 import { useV1AdminLeagueMatch, useV1OpenLeagueRegistration } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { extractErrorMessage } from '@/lib/error-message';
-import { fromDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
+import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 
 /**
  * 리그 참가 신청 관리 — **신청 열기(마감 지정) + 신청 목록**. 사용자 A안(Task 164 FE-3).
@@ -42,8 +42,8 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
     }
     // `datetime-local` → ISO 변환은 **공용 헬퍼**를 쓴다. 이 변환은 타임존이 걸린
     // 자리라(입력은 KST 벽시계, 저장은 UTC) 화면마다 따로 구현하면 한 곳만 고쳐진다.
-    const iso = fromDatetimeLocalValue(deadline);
-    if (iso === undefined) {
+    const iso = kstDatetimeLocalToIso(deadline);
+    if (iso === null) {
       showToast('신청 마감 일시를 읽을 수 없어요.', 'error');
       return;
     }

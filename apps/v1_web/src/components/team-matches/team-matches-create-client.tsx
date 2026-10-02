@@ -1,6 +1,6 @@
 'use client';
 
-import { localDateInput } from '@/lib/team-match-dates';
+import { DAY_MS, isoToKstDatetimeLocal, kstDatetimeLocalToIso, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -604,13 +604,9 @@ function usePersistedDraft() {
 }
 
 function buildDefaultDraft(): TeamMatchDraft {
-  const start = new Date();
-  start.setDate(start.getDate() + 7);
-  start.setHours(18, 0, 0, 0);
-
   return {
     ...getTeamMatchCreateViewModel('team').draft,
-    date: localDateInput(start),
+    date: toKstDateString(new Date(Date.now() + 7 * DAY_MS)),
     startTime: '',
     endTime: '',
   };
@@ -624,13 +620,11 @@ function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
   // 리셋된다(같은 세션 안의 정상 왕복인데도). 시작 시간이 아직 없으면 시:분이 아니라
   // 날짜(당일 자정 기준) 단위로만 지난 초안인지 판단한다 — 오늘 이후는 전부 유효.
   if (draft.startTime) {
-    const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
-    if (!Number.isNaN(startsAt.getTime()) && startsAt > new Date()) return draft;
+    const startsAt = kstDatetimeLocalToIso(`${draft.date}T${draft.startTime}`);
+    if (startsAt && Date.parse(startsAt) > Date.now()) return draft;
   } else {
-    const dateOnly = new Date(`${draft.date}T00:00:00`);
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    if (!Number.isNaN(dateOnly.getTime()) && dateOnly >= todayStart) return draft;
+    // 날짜가 깨졌으면 kstMidnightMs 가 NaN 이라 비교가 거짓이 된다 → 기본값으로 되돌린다.
+    if (kstMidnightMs(draft.date) >= kstMidnightMs(toKstDateString(new Date()))) return draft;
   }
 
   const fallback = buildDefaultDraft();
@@ -644,9 +638,10 @@ function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
 }
 
 export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
-  const start = new Date(edit.form.startsAt);
-  const end = edit.form.endsAt ? new Date(edit.form.endsAt) : null;
-  const deadline = edit.form.deadlineAt ? new Date(edit.form.deadlineAt) : null;
+  // 저장된 인스턴트를 KST 벽시계(날짜·시간)로 펼친다.
+  const start = isoToKstDatetimeLocal(edit.form.startsAt);
+  const end = isoToKstDatetimeLocal(edit.form.endsAt);
+  const deadline = isoToKstDatetimeLocal(edit.form.deadlineAt);
   const costs = parseCostNote(edit.form.costNote);
   const hasStructuredConditions =
     Boolean(edit.form.matchFormat) || (edit.form.matchStyle?.length ?? 0) > 0 || Boolean(edit.form.uniformColor);
@@ -668,12 +663,12 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     opponentCost: costs.opponentCost,
     venue: edit.form.manualPlaceName,
     address: edit.form.addressText ?? '',
-    date: localDateInput(start),
-    startTime: start.toTimeString().slice(0, 5),
-    endDate: end ? localDateInput(end) : '',
-    endTime: end ? end.toTimeString().slice(0, 5) : '',
-    deadlineDate: deadline ? localDateInput(deadline) : '',
-    deadlineTime: deadline ? deadline.toTimeString().slice(0, 5) : '',
+    date: start.slice(0, 10),
+    startTime: start.slice(11, 16),
+    endDate: end.slice(0, 10),
+    endTime: end.slice(11, 16),
+    deadlineDate: deadline.slice(0, 10),
+    deadlineTime: deadline.slice(11, 16),
   };
 }
 

@@ -49,7 +49,7 @@ type TournamentKstParts = {
  * 어드민 폼의 `datetime-local` 입력은 '2026-08-29T09:00' 처럼 오프셋이 없는 문자열을
  * 준다. `new Date()` 는 이런 값을 **브라우저 로컬**로 해석하므로, 같은 입력이 KST
  * 브라우저에서는 09:00 KST 로, UTC 브라우저에서는 09:00 UTC(= KST 18:00)로 갈린다.
- * 쓰기 쪽은 이미 KST 로 고정돼 있는데(`datetimeLocalValueToIso` 가 `+09:00` 을 붙인다)
+ * 쓰기 쪽은 이미 KST 로 고정돼 있는데(`kstDatetimeLocalToIso` 가 `+09:00` 을 붙인다)
  * 표시 쪽만 로컬로 읽으면 저장 전 미리보기와 저장 후 화면이 어긋난다 — 실제로
  * "하루짜리 대회"가 UTC 러너에서 이틀 범위로 표시됐다.
  */

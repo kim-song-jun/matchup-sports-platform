@@ -105,31 +105,6 @@ export function formatRegistrationPaymentSubtitle(
   return `${method} · ${status} · ${formatCurrency(payment.amount)}`;
 }
 
-export function isoToDatetimeLocalValue(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return '';
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
-  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? '';
-  return `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}`;
-}
-
-export function datetimeLocalValueToIso(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(`${value}:00+09:00`);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
-}
-
 type GenderQuotaCheck = {
   count: number;
   min: number | null;

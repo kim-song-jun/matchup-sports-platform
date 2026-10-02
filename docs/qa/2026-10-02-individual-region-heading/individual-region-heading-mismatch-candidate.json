@@ -1,0 +1,604 @@
+{
+  "title": "부산 필터를 적용해도 개인 매치 목록 제목이 서울 전체로 고정",
+  "role": "Authenticated synthetic QA captain B",
+  "reproduction": [
+    "매치 메뉴→개인",
+    "필터→지역 부산→적용하기",
+    "목록 URL regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2 확인",
+    "목록 H2 서울 전체 · 개인 매치 관찰; 필터 재개 시 부산 aria-current=true"
+  ],
+  "expected": "선택한 지역인 부산을 표시하거나 중립 제목 사용",
+  "actual": "402/787/1180에서 시각·AX H2가 서울 전체 · 개인 매치로 유지",
+  "scope": "URL/선택 상태/제목 불일치의 UI 증거. 서버 지역 필터 쿼리 정확성이나 실제 스크린리더 출력은 검증하지 않음",
+  "selectedRegion": {
+    "label": "부산",
+    "regionId": "a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+    "selectionEvidence": "Filter-panel DOM selected control has text 부산 and aria-current value true at 402/787/1180. List and panel URLs retain the same regionId."
+  },
+  "states": [
+    {
+      "label": "individual Busan mobile",
+      "captureFile": "ax-list-individual-mobile-402-busan.jpg",
+      "captureUtc": "2026-10-02T10:38:19.796Z",
+      "dom": {
+        "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+        "utc": "2026-10-02T10:38:19.839Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "pageTitle": "개인 매치 찾기 | Teameet",
+        "filterControls": [
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+            "label": "필터",
+            "tag": "A",
+            "text": "1"
+          }
+        ],
+        "scopeHeadingDom": [
+          {
+            "class": "tm-list-scope-heading",
+            "id": "",
+            "text": "서울 전체 · 개인 매치"
+          }
+        ],
+        "selectedRelevantControls": [
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "개인"
+          },
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "전체 0"
+          }
+        ]
+      },
+      "browserAXExcerpt": "  - heading \"서울 전체 · 개인 매치\" [level=2]\n  - text: 0개 · 오늘 0 · 모집 중\n  - generic: 조건에 맞는 매치가 없어요"
+    },
+    {
+      "label": "individual Busan selected filter mobile",
+      "captureFile": "ax-list-individual-mobile-402-busan-filter.jpg",
+      "captureUtc": "2026-10-02T10:38:49.212Z",
+      "dom": {
+        "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+        "utc": "2026-10-02T10:38:49.305Z",
+        "css": {
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        },
+        "pageTitle": "개인 매치 찾기 | Teameet",
+        "filterControls": [
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+            "label": "필터",
+            "tag": "A",
+            "text": "1"
+          },
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+            "label": "필터 닫기",
+            "tag": "A",
+            "text": ""
+          },
+          {
+            "href": "/matches?filter=1",
+            "label": null,
+            "tag": "A",
+            "text": "초기화"
+          }
+        ],
+        "scopeHeadingDom": [
+          {
+            "class": "tm-list-scope-heading",
+            "id": "",
+            "text": "서울 전체 · 개인 매치"
+          }
+        ],
+        "selectedRelevantControls": [
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "개인"
+          },
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "전체 0"
+          },
+          {
+            "current": "true",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "부산"
+          }
+        ]
+      },
+      "browserAXExcerpt": "  - heading \"서울 전체 · 개인 매치\" [level=2]\n  - text: 0개 · 오늘 0 · 모집 중\n  - generic: 조건에 맞는 매치가 없어요\n  - dialog \"매치 필터\":\n    - link \"부산\":"
+    },
+    {
+      "label": "individual Busan tablet",
+      "captureFile": "ax-list-individual-tablet-787-busan.jpg",
+      "captureUtc": "2026-10-02T10:39:13.933Z",
+      "dom": {
+        "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+        "utc": "2026-10-02T10:39:13.986Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "pageTitle": "개인 매치 찾기 | Teameet",
+        "filterControls": [
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+            "label": "필터",
+            "tag": "A",
+            "text": "1"
+          }
+        ],
+        "scopeHeadingDom": [
+          {
+            "class": "tm-list-scope-heading",
+            "id": "",
+            "text": "서울 전체 · 개인 매치"
+          }
+        ],
+        "selectedRelevantControls": [
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "개인"
+          },
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "전체 0"
+          }
+        ]
+      },
+      "browserAXExcerpt": "  - heading \"서울 전체 · 개인 매치\" [level=2]\n  - text: 0개 · 오늘 0 · 모집 중\n  - generic: 조건에 맞는 매치가 없어요"
+    },
+    {
+      "label": "individual Busan selected filter tablet",
+      "captureFile": "ax-list-individual-tablet-787-busan-filter.jpg",
+      "captureUtc": "2026-10-02T10:39:27.544Z",
+      "dom": {
+        "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+        "utc": "2026-10-02T10:39:27.582Z",
+        "css": {
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "pageTitle": "개인 매치 찾기 | Teameet",
+        "filterControls": [
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+            "label": "필터",
+            "tag": "A",
+            "text": "1"
+          },
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+            "label": "필터 닫기",
+            "tag": "A",
+            "text": ""
+          },
+          {
+            "href": "/matches?filter=1",
+            "label": null,
+            "tag": "A",
+            "text": "초기화"
+          }
+        ],
+        "scopeHeadingDom": [
+          {
+            "class": "tm-list-scope-heading",
+            "id": "",
+            "text": "서울 전체 · 개인 매치"
+          }
+        ],
+        "selectedRelevantControls": [
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "개인"
+          },
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "전체 0"
+          },
+          {
+            "current": "true",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "부산"
+          }
+        ]
+      },
+      "browserAXExcerpt": "  - heading \"서울 전체 · 개인 매치\" [level=2]\n  - text: 0개 · 오늘 0 · 모집 중\n  - generic: 조건에 맞는 매치가 없어요\n  - dialog \"매치 필터\":\n    - link \"부산\":"
+    },
+    {
+      "label": "individual Busan desktop",
+      "captureFile": "ax-list-individual-desktop-1180-busan.jpg",
+      "captureUtc": "2026-10-02T10:39:40.872Z",
+      "dom": {
+        "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+        "utc": "2026-10-02T10:39:40.905Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "pageTitle": "개인 매치 찾기 | Teameet",
+        "filterControls": [
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+            "label": "필터",
+            "tag": "A",
+            "text": "1"
+          }
+        ],
+        "scopeHeadingDom": [
+          {
+            "class": "tm-list-scope-heading",
+            "id": "",
+            "text": "서울 전체 · 개인 매치"
+          }
+        ],
+        "selectedRelevantControls": [
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "개인"
+          },
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "전체 0"
+          }
+        ]
+      },
+      "browserAXExcerpt": "  - heading \"서울 전체 · 개인 매치\" [level=2]\n  - text: 0개 · 오늘 0 · 모집 중\n  - generic: 조건에 맞는 매치가 없어요"
+    },
+    {
+      "label": "individual Busan selected filter desktop",
+      "captureFile": "ax-list-individual-desktop-1180-busan-filter.jpg",
+      "captureUtc": "2026-10-02T10:39:44.375Z",
+      "dom": {
+        "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+        "utc": "2026-10-02T10:39:44.412Z",
+        "css": {
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "pageTitle": "개인 매치 찾기 | Teameet",
+        "filterControls": [
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+            "label": "필터",
+            "tag": "A",
+            "text": "1"
+          },
+          {
+            "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+            "label": "필터 닫기",
+            "tag": "A",
+            "text": ""
+          },
+          {
+            "href": "/matches?filter=1",
+            "label": null,
+            "tag": "A",
+            "text": "초기화"
+          }
+        ],
+        "scopeHeadingDom": [
+          {
+            "class": "tm-list-scope-heading",
+            "id": "",
+            "text": "서울 전체 · 개인 매치"
+          }
+        ],
+        "selectedRelevantControls": [
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "개인"
+          },
+          {
+            "current": "page",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "전체 0"
+          },
+          {
+            "current": "true",
+            "label": null,
+            "pressed": null,
+            "selected": null,
+            "tag": "A",
+            "text": "부산"
+          }
+        ]
+      },
+      "browserAXExcerpt": "  - heading \"서울 전체 · 개인 매치\" [level=2]\n  - text: 0개 · 오늘 0 · 모집 중\n  - generic: 조건에 맞는 매치가 없어요\n  - dialog \"매치 필터\":\n    - link \"부산\":"
+    }
+  ],
+  "reload": {
+    "action": "individual Busan full reload",
+    "state": {
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "utc": "2026-10-02T10:40:13.294Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "pageTitle": "개인 매치 찾기 | Teameet",
+      "filterControls": [
+        {
+          "href": "/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+          "label": "필터",
+          "tag": "A",
+          "text": "1"
+        }
+      ],
+      "scopeHeadingDom": [
+        {
+          "class": "tm-list-scope-heading",
+          "id": "",
+          "text": "서울 전체 · 개인 매치"
+        }
+      ],
+      "selectedRelevantControls": [
+        {
+          "current": "page",
+          "label": null,
+          "pressed": null,
+          "selected": null,
+          "tag": "A",
+          "text": "개인"
+        },
+        {
+          "current": "page",
+          "label": null,
+          "pressed": null,
+          "selected": null,
+          "tag": "A",
+          "text": "전체 0"
+        }
+      ]
+    }
+  },
+  "reset": {
+    "action": "individual reset",
+    "state": {
+      "url": "https://alpha.teameet.co.kr/matches",
+      "utc": "2026-10-02T10:41:04.319Z",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "pageTitle": "개인 매치 찾기 | Teameet",
+      "filterControls": [
+        {
+          "href": "/matches?filter=1",
+          "label": "필터",
+          "tag": "A",
+          "text": ""
+        }
+      ],
+      "scopeHeadingDom": [
+        {
+          "class": "tm-list-scope-heading",
+          "id": "",
+          "text": "서울 전체 · 개인 매치"
+        }
+      ],
+      "selectedRelevantControls": [
+        {
+          "current": "page",
+          "label": null,
+          "pressed": null,
+          "selected": null,
+          "tag": "A",
+          "text": "개인"
+        },
+        {
+          "current": "page",
+          "label": null,
+          "pressed": null,
+          "selected": null,
+          "tag": "A",
+          "text": "전체 9"
+        }
+      ]
+    }
+  },
+  "noWrites": true,
+  "images": [
+    {
+      "file": "ax-list-individual-mobile-402-busan.jpg",
+      "timestamp": "2026-10-02T10:38:19.796Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "f38ddf9390128a85aa71765476ca6d58f58383a69b1477e6aa7be56b07db0278",
+      "bytes": 19625,
+      "git_blob_sha": "31fc9bfff4e0728b8046753437f769858d52f1db",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "ax-list-individual-mobile-402-busan-filter.jpg",
+      "timestamp": "2026-10-02T10:38:49.212Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "2f8bcd01360b8c7eb203493a0bd58ab7ff0057cce48b642b260aba53fc9905b4",
+      "bytes": 20179,
+      "git_blob_sha": "9894b9d9a984067841810e33a18b4e8f0d453cb5",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "ax-list-individual-tablet-787-busan.jpg",
+      "timestamp": "2026-10-02T10:39:13.933Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "c3a3aed3d005c7800df3e4daf6409bd4e53d21a79a6ce81478ad5f305733d3ab",
+      "bytes": 18510,
+      "git_blob_sha": "4c98380375ddf0ad3a2a2746719412a50665f1b0",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "ax-list-individual-tablet-787-busan-filter.jpg",
+      "timestamp": "2026-10-02T10:39:27.544Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "4f2e54dfe40cf645647d29f0f252ad0b53d64997273ec35de5ab00c8dd06ef17",
+      "bytes": 22308,
+      "git_blob_sha": "1b4b4f5d0dcf3c50f2efb2137f330a175888d914",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "ax-list-individual-desktop-1180-busan.jpg",
+      "timestamp": "2026-10-02T10:39:40.872Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "67339818e608185252d1913a0f67702b9e3ea7afe762a49c7518ffb9ef7faad5",
+      "bytes": 33539,
+      "git_blob_sha": "174aad1496471564426c5c91c6440f3ed4821401",
+      "pixelReviewed": true,
+      "exifPresent": false
+    },
+    {
+      "file": "ax-list-individual-desktop-1180-busan-filter.jpg",
+      "timestamp": "2026-10-02T10:39:44.375Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "498e56e2a6a0cdf87b7d8c9a28ba67f7c51e1b63dc23114892fa2b827d159530",
+      "bytes": 42816,
+      "git_blob_sha": "d2a33e3553d94bda139a0e0bd597ffc23d437514",
+      "pixelReviewed": true,
+      "exifPresent": false
+    }
+  ],
+  "triageStatus": "New candidate only; duplicate triage pending; no issue number assigned by this package",
+  "servingCommitSha": "unobserved",
+  "limitations": [
+    "URL/selected-control/visible and browser-AX heading mismatch only. No server-region-query or canonical-result-count correctness claim.",
+    "Browser AX snapshots were inspected; actual screen-reader output was not tested.",
+    "The desktop full-reload result is recorded in the action/DOM log; the six screenshots are list and filter-panel pairs, not a separate after-reload image.",
+    "Tablet list image shows the zero-count heading but the lower empty-state message is outside that saved viewport; the browser AX excerpt records that message.",
+    "Mobile CSS viewport is 402×606 while original JPEG raster is 402×605; original bytes are unchanged.",
+    "Exact serving page SHA was not directly observed."
+  ],
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All six exact images were pixel-reviewed. Public empty list and location filter controls only; no member names, profiles, birth dates, contact details, credentials, or member-list payload.",
+    "minimization": "Only individual-region-heading-mismatch-candidate.json and its six exact image files were used. Unrelated comparison material, full AX navigation dumps, and other filter options are excluded. Source remains unchanged locally."
+  }
+}

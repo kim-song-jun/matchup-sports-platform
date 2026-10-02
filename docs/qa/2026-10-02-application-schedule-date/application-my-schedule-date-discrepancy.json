@@ -1,0 +1,183 @@
+{
+  "role": "captain B",
+  "observedAt": "2026-10-02T09:17:08.224Z",
+  "comparison": {
+    "detailUrl": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "detailRegionLabel": "기본 정보",
+    "detailRowLabel": "일정",
+    "detailValue": "10/3 (토) 11:00",
+    "detailContext": "기본 정보\n일정\n10/3 (토) 11:00\n대회 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있습니다. 참가 전 꼭 확인해 주세요.\n참가팀\n2/2팀 확정\n참가비\n무료\n장소\nALPHA QA E2E 가상 테스트 구장\n선수단 규모\n팀당 6~10명",
+    "detailMarkup": "<div class=\"tm-info-row\" style=\"padding: 0px 16px;\"><div class=\"tm-text-caption\" style=\"color: var(--text-caption);\">일정</div><div class=\"tm-text-label\" style=\"text-align: right; color: var(--text-strong);\">10/3 (토) 11:00</div></div>",
+    "myUrl": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/my?reg=eb8ddeb2-7451-4055-87d7-ba3c066e2b86&from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "myRowLabel": "일정",
+    "myValue": "10월 2일",
+    "separateApplicationDates": {
+      "applied": "2026.10.01",
+      "confirmed": "2026.10.01"
+    },
+    "meaning": "Schedule row is in event card alongside venue/payment; separate 신청일/확정일 below. It is not the separately labeled application date.",
+    "api": "No supported Teameet read API connector used; DOM/AX only. No time-zone or backend-field cause inferred.",
+    "possibleOverlap": [
+      "#1456 calendar",
+      "#1425 timezone"
+    ],
+    "canonicalImages": [
+      "apply-date-detail-mobile-402-label-clear-viewport.jpg",
+      "apply-date-detail-tablet-787-viewport.jpg",
+      "apply-date-detail-desktop-1180-viewport.jpg",
+      "apply-existing-my-mobile-402-viewport.jpg",
+      "apply-existing-my-tablet-787-viewport.jpg",
+      "apply-existing-my-desktop-1180-viewport.jpg"
+    ]
+  },
+  "existingApplication": {
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/my?reg=eb8ddeb2-7451-4055-87d7-ba3c066e2b86&from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "observedAt": "2026-10-02T09:13:34.723Z",
+    "status": "참가 확정",
+    "payment": "무료 · 결제 완료",
+    "roster": "6명 · 마감",
+    "dateDisplayed": "10월 2일",
+    "dateMarkup": "<span class=\"tm-text-label\" style=\"color: var(--text-strong); font-weight: 600;\">10월 2일</span>",
+    "newApplyOrCancelActions": false,
+    "backUrl": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1"
+  },
+  "images": [
+    {
+      "file": "apply-existing-my-mobile-402-viewport.jpg",
+      "timestamp": "2026-10-02T09:12:37.861Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/my?reg=eb8ddeb2-7451-4055-87d7-ba3c066e2b86&from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "c4c68e3105a231f5f90d0ce97c52d4a603821f1b7576575005f9fcf34c16897b",
+      "bytes": 19144,
+      "git_blob_sha": "a50e7ed68698bba037a6b159328dd0071271e95f",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "apply-existing-my-tablet-787-viewport.jpg",
+      "timestamp": "2026-10-02T09:13:36.356Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/my?reg=eb8ddeb2-7451-4055-87d7-ba3c066e2b86&from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "25d4a982b8ba0fada9ed6903db8874d2ed2a674b868e6ce8ebd87a0fa325e701",
+      "bytes": 18919,
+      "git_blob_sha": "3658f2198a7ecef3c64909f6ea3714ce907441a7",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "apply-existing-my-desktop-1180-viewport.jpg",
+      "timestamp": "2026-10-02T09:13:36.593Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/my?reg=eb8ddeb2-7451-4055-87d7-ba3c066e2b86&from=%2Ftournaments%2F932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "9164bae38222d85695a63d4f68f32326decabdded789e671927399965fa544ae",
+      "bytes": 39712,
+      "git_blob_sha": "766dba20a299ef592c7fed233beaff41fdedcccd",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "apply-date-detail-tablet-787-viewport.jpg",
+      "timestamp": "2026-10-02T09:15:19.154Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "raster": [
+        787,
+        505
+      ],
+      "sha256": "ed4070de91a5f95f233cbbd0e423f6d825e267a8d7d51820c532da3e5c8badee",
+      "bytes": 21961,
+      "git_blob_sha": "eeba3a6ed0a494c00ded3ad7d1f295c6e29a9b1e",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "apply-date-detail-desktop-1180-viewport.jpg",
+      "timestamp": "2026-10-02T09:15:19.441Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "raster": [
+        1180,
+        757
+      ],
+      "sha256": "e1fd3d0fe6e002d63ede5dbe2725689ff0123525162e7a5d1c8dc4c83972786f",
+      "bytes": 54985,
+      "git_blob_sha": "9045d6319c4e406e3948ce0eadab04d2d31ae0d6",
+      "pixel_reviewed": true,
+      "exif_present": false
+    },
+    {
+      "file": "apply-date-detail-mobile-402-label-clear-viewport.jpg",
+      "timestamp": "2026-10-02T09:16:18.140Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "raster": [
+        402,
+        605
+      ],
+      "sha256": "cf6192634f0a0c71794a9e340f13bceaaaed2e2e8607dcf6f8e4b177d2eef2f2",
+      "bytes": 22184,
+      "git_blob_sha": "124d6c32d0d264f4f9be403a53e4effb7646f3a1",
+      "pixel_reviewed": true,
+      "exif_present": false
+    }
+  ],
+  "classification": "Observed display discrepancy; duplicate search against #1456/#1425 required. No root-cause, timezone, actual backend field or newly fixed regression claim.",
+  "changes": "No writes, consent, registration, payment or roster/result edits",
+  "servingCommitSha": "unobserved",
+  "triageStatus": "Observed display discrepancy only; overlap with #1456/#1425 remains under review; no new issue number assigned by this package",
+  "limitations": [
+    "No canonical/correct schedule date, backend field, timezone conversion, or root cause is inferred.",
+    "Authenticated captain B session only; no guest comparison in this package.",
+    "Exact serving page commit SHA was not directly observed.",
+    "The desktop detail screenshot displays the schedule in the side panel; mobile and tablet show the basic-information schedule row. The separately recorded DOM context refers to the basic-information row.",
+    "Mobile CSS viewport is 402×606 while original JPEG raster is 402×605; both are preserved.",
+    "The tablet /my capture does not include the separate application/confirmation date rows in its saved viewport; those dates are visible in mobile and desktop captures and recorded in the proof."
+  ],
+  "publicationReview": {
+    "imageBytesUnchanged": true,
+    "privacy": "All six exact candidate images were pixel-reviewed. Only synthetic QA tournament/team cards, aggregate roster counts, dates, and ordinary status labels are visible. No member list, player names, profile information, birth dates, contact details, or credentials are included.",
+    "sourceScope": "Only application-my-schedule-date-discrepancy.json and its exact six canonical image files were used. Source paths were replaced with filenames and review metadata was added; original observations and image bytes are preserved."
+  }
+}

@@ -407,7 +407,7 @@ describe('Team form client contracts', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('정원은 지금 팀원 수(12명)보다 적게 정할 수 없어요.');
     });
 
-    it.each([null, 1])('팀원 1명인 팀의 목표 정원 %s는 표시된 최소 정원 2명으로 저장한다', async (memberGoalCount) => {
+    it.each([[null, 0, null], [1, 2, 2]])('팀원 1명인 팀의 목표 정원 %s는 표시값 %s/저장값 %s로 처리한다', async (memberGoalCount, capacity, savedGoal) => {
       const current = useV1TeamDetailMock();
       useV1TeamDetailMock.mockReturnValue({
         ...current,
@@ -415,9 +415,9 @@ describe('Team form client contracts', () => {
       });
       await submitEdit();
 
-      expect(screen.getByTestId('capacity')).toHaveTextContent('2');
+      expect(screen.getByTestId('capacity')).toHaveTextContent(String(capacity));
 
-      await waitFor(() => expect(updateTeamMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ memberGoalCount: 2 })));
+      await waitFor(() => expect(updateTeamMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ memberGoalCount: savedGoal })));
       await waitFor(() => expect(routerPush).toHaveBeenCalled());
     });
 

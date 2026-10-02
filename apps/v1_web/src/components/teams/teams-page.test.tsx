@@ -523,17 +523,18 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
     render(<TeamFormPageView model={formModel({ minCapacity: 12, onFieldChange }, 12)} />);
 
     const select = screen.getByRole('combobox', { name: '정원' });
-    const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value));
+    const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value)).filter((value) => value > 0);
     expect(Math.min(...values)).toBe(12);
     expect(screen.getByRole('button', { name: '정원 한 명 줄이기' })).toBeDisabled();
-    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요. 정원이 다 차면 자동으로 “정원 마감”으로 보여요.')).toBeInTheDocument();
+    expect(screen.getByText('지금 팀원이 12명이라 숫자 정원은 그보다 적게 정할 수 없어요. 정원이 다 차면 자동으로 “정원 마감”으로 보여요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '정원 한 명 늘리기' }));
     expect(onFieldChange).toHaveBeenCalledWith('capacity', 13);
   });
 
   it('하한이 없으면(팀 만들기) 2명부터 고를 수 있다', () => {
-    render(<TeamFormPageView model={formModel({}, 12)} />);
+    render(<TeamFormPageView model={{ ...formModel({}, 12), mode: 'create' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /더 꾸미기/ }));
 
     const values = Array.from(screen.getByRole('combobox', { name: '정원' }).querySelectorAll('option')).map((option) => Number(option.value));
     expect(Math.min(...values)).toBe(2);

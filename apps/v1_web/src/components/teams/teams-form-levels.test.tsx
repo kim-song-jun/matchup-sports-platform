@@ -80,7 +80,7 @@ describe('팀 레벨 편집 — 실제 client와 공용 폼 렌더', () => {
     save();
 
     await waitFor(() => expect(api.update).toHaveBeenCalledWith(expect.objectContaining({
-      introduction: '소개만 고쳤어요', version: 'version-1', memberGoalCount: 2,
+      introduction: '소개만 고쳤어요', version: 'version-1', memberGoalCount: null,
       skillLevelText: level.skillLevelText, minLevelCode: level.minLevel?.code ?? null, maxLevelCode: level.maxLevel?.code ?? null,
     })));
     await waitFor(() => expect(api.push).toHaveBeenCalledWith('/teams/team-futsal'));

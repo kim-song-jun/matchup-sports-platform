@@ -75,7 +75,7 @@ export function MyPlayerCardSection({
       profileHref={withFromPath(`/users/${userId}`, '/my')}
       shareHref={withFromPath(`/users/${userId}/card`, '/my')}
       // 카드 설정(숨김·모양)은 내 카드에서 바로 -- 메뉴 2클릭 뒤에 숨기지 않는다.
-      settingsHref="/my/settings/player-card"
+      settingsHref={withFromPath('/my/settings/player-card', '/my')}
     />
   );
 }

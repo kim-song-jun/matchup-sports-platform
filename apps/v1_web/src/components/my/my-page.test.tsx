@@ -2,7 +2,8 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView, MyTeamsPageView } from './my-page';
+import { settingsModel } from './my.view-model';
+import { SettingsPageView, LegalPageView, MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView, MyTeamsPageView } from './my-page';
 import type {
   MyInvitationsViewModel,
   MyJoinApplicationItem,
@@ -285,5 +286,26 @@ describe('MyTeamsPageView — 팀 카드 출처', () => {
     render(<MyTeamsPageView model={{ teams: [team()], summary: [] }} />);
 
     expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute('href', '/teams/team-1?from=%2Fmy%2Fteams');
+  });
+});
+
+
+describe('설정의 비밀번호·약관 진입 경로', () => {
+  it('비밀번호 변경은 본인인증 재설정 화면과 설정 복귀 경로에 연결한다', () => {
+    render(<SettingsPageView model={{ ...settingsModel, account: {
+      loginMethod: '이메일', email: 'fixture@teameet.test', phone: '01012345678',
+      phoneVerified: true, password: '설정됨', canRequestPasswordChange: true,
+    } }} />);
+    expect(screen.getByRole('link', { name: '비밀번호 변경' })).toHaveAttribute(
+      'href', '/auth/find-account?mode=reset-password&from=%2Fmy%2Fsettings',
+    );
+  });
+  it('약관 3종은 각각 약관 목록을 복귀 경로로 전달한다', () => {
+    render(<LegalPageView model={settingsModel} />);
+    [['terms', '이용약관'], ['privacy', '개인정보 처리방침'], ['location', '위치기반 서비스 약관']].forEach(([document, label]) => {
+      expect(screen.getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute(
+        'href', `/terms?document=${document}&from=%2Fmy%2Fsettings%2Flegal`,
+      );
+    });
   });
 });

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { EmailVerificationCard } from '@/components/auth/email-verification/email-verification-card';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import {
+  useV1AuthMe,
   useV1FindAccountByPhone,
   useV1ResetPasswordByEmail,
   useV1ResetPasswordByPhone,
@@ -44,8 +45,13 @@ function looksLikeEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
-export function AccountRecoveryClient() {
-  const [mode, setMode] = useState<Mode>('find-id');
+export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/login/email' }: {
+  initialMode?: Mode;
+  backHref?: string;
+}) {
+  const returnToSettings = backHref === '/my/settings';
+  const currentAccount = useV1AuthMe({ enabled: returnToSettings });
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [method, setMethod] = useState<Method>('phone');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [proofToken, setProofToken] = useState<string | null>(null);
@@ -68,6 +74,17 @@ export function AccountRecoveryClient() {
   const resetPasswordByEmail = useV1ResetPasswordByEmail();
 
   const normalizedEmail = emailInput.trim().toLowerCase();
+  const accountPhone = currentAccount.data?.user.phone ?? '';
+  const accountEmail = currentAccount.data?.user.email ?? '';
+  useEffect(() => {
+    if (!returnToSettings) return;
+    setPhoneDigits(normalizeSeparatedDigits(accountPhone));
+    setEmailInput(accountEmail);
+    setProofToken(null);
+    setFound(null);
+    setEmailProofToken(null);
+    setResetDone(false);
+  }, [returnToSettings, accountPhone, accountEmail]);
 
   // 앞 단계에서 받은 증명·결과를 버린다 — 남겨 두면 "다른 방법으로 인증했는데 이 화면이
   // 이미 인증된 것처럼 보이는" 상태가 된다.
@@ -114,11 +131,14 @@ export function AccountRecoveryClient() {
   // 본인 확인을 마쳤고 아직 비밀번호를 못 바꾼 상태에서만 새 비밀번호 입력을 띄운다.
   const verifiedForReset =
     method === 'phone' ? Boolean(proofToken) && found !== null : Boolean(emailProofToken);
-  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && !socialOnly && !resetDone;
+  const matchesCurrentAccount = !returnToSettings || Boolean(currentAccount.data && (method === 'phone'
+    ? phoneDigits && phoneDigits === normalizeSeparatedDigits(accountPhone)
+    : normalizedEmail && normalizedEmail === accountEmail.trim().toLowerCase()));
+  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !socialOnly && !resetDone;
   const passwordReady = newPassword.length >= 8 && newPassword === passwordConfirm;
 
   const submitReset = async () => {
-    if (!passwordReady || resetting) return;
+    if (!passwordReady || resetting || !matchesCurrentAccount || !verifiedForReset || socialOnly) return;
     setError(null);
     try {
       if (method === 'phone') {
@@ -143,7 +163,7 @@ export function AccountRecoveryClient() {
   };
 
   return (
-    <AuthFrame topTitle="계정 찾기" backHref="/login/email" stage={AUTH_NOTICE_STAGE}>
+    <AuthFrame topTitle={returnToSettings ? '비밀번호 변경' : '계정 찾기'} backHref={backHref} appBack={returnToSettings} stage={AUTH_NOTICE_STAGE}>
       <div className="tm-auth-body">
         <div className="tm-auth-segmented" role="tablist" aria-label="찾기 방법">
           <button
@@ -170,6 +190,12 @@ export function AccountRecoveryClient() {
         <p className="tm-text-body tm-auth-sub">
           {mode === 'reset-password' ? RESET_SUB[method] : copy.sub}
         </p>
+
+        {returnToSettings && currentAccount.isError ? (
+          <Card pad={16} className="tm-auth-soft-card-error"><div role="alert">{extractErrorMessage(currentAccount.error, '계정 정보를 확인하지 못했어요. 설정에서 다시 시도해 주세요.')}</div></Card>
+        ) : verifiedForReset && !matchesCurrentAccount ? (
+          <Card pad={16} className="tm-auth-soft-card-error"><div role="alert">로그인한 계정의 휴대폰 번호 또는 이메일로 본인인증해 주세요.</div></Card>
+        ) : null}
 
         <div className="tm-auth-form">
           {mode === 'reset-password' ? (
@@ -347,9 +373,9 @@ export function AccountRecoveryClient() {
           {resetDone ? (
             <Card pad={16} className="tm-auth-soft-card">
               <div className="tm-text-body-lg">비밀번호를 바꿨어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>새 비밀번호로 로그인해 주세요.</div>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login/email" style={{ marginTop: 16 }}>
-                로그인하러 가기
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>{returnToSettings ? '인증한 계정의 비밀번호를 바꿨어요.' : '새 비밀번호로 로그인해 주세요.'}</div>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={returnToSettings ? backHref : '/login/email'} style={{ marginTop: 16 }}>
+                {returnToSettings ? '계정 설정으로 돌아가기' : '로그인하러 가기'}
               </Link>
             </Card>
           ) : null}

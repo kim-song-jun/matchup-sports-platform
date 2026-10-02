@@ -12,12 +12,13 @@ import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } 
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Check, Lock } from 'lucide-react';
+import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
-import { clearStoredV1Session, withFromPath } from '@/lib/session-storage';
+import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel, teamRoleLabel } from '@/lib/v1-status-labels';
@@ -303,10 +304,9 @@ export function MyJoinApplicationsPageClient() {
 export function ProfileEditPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedReturnTo = searchParams.get('returnTo');
-  const returnTo = requestedReturnTo?.startsWith('/') && !requestedReturnTo.startsWith('//')
-    ? requestedReturnTo
-    : '/my';
+  const returnTo = sanitizeRedirectPath(searchParams.get('from'))
+    ?? sanitizeRedirectPath(searchParams.get('returnTo'))
+    ?? '/my';
   const profile = useV1Profile();
   const profileAuthMe = useV1AuthMe();
   const update = useV1UpdateProfile();
@@ -345,7 +345,7 @@ export function ProfileEditPageClient() {
     setBio(profile.data.profile.bio ?? '');
     setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
-    setBirthDateDigits(profile.data.profile.birthDate ?? '');
+    setBirthDateDigits(normalizeSeparatedDigits(profile.data.profile.birthDate ?? ''));
     setGender(profile.data.profile.gender ?? '');
     setProfileImageUrl(profile.data.profile.profileImageUrl ?? '');
     setProfileImageName('');
@@ -362,7 +362,7 @@ export function ProfileEditPageClient() {
   // my-api-clients.tsx:613 참조). Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위,
   // 매 렌더 항상 실행한다 — 값만 success 여부로 갈린다(undefined면 테이블 기본값이 그대로
   // 살아남는다, team-schedules-page.tsx의 동일 패턴 참조).
-  useShellOverride({ desktopHead: profile.isPending || profile.isError || !profile.data ? undefined : false });
+  useShellOverride({ backHref: returnTo, desktopHead: profile.isPending || profile.isError || !profile.data ? undefined : false });
 
   if (profile.isPending) {
     return <PageSkeleton variant="detail" />;
@@ -586,7 +586,7 @@ export function ProfileEditPageClient() {
       <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop tm-content-enter" id="v1-profile-edit-form" onSubmit={submit}>
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
+          <AppBackLink className="tm-desktop-back" fallbackHref={returnTo}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </AppBackLink>
           <h1 className="tm-text-heading">프로필 수정</h1>
@@ -1950,6 +1950,9 @@ export function PlayerCardHiddenSettingsPageClient() {
  * 확인·성별 필수 같은 폼 게이트를 다시 통과시키면 "저장이 안 된다"로 읽힌다.
  */
 function PlayerCardPhotoAdjust() {
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+  const source = `/my/settings/player-card${query ? `?${query}` : ''}`;
   const profile = useV1Profile();
   const uploadImages = useV1UploadImages();
   const update = useV1UpdateProfile();
@@ -1979,11 +1982,12 @@ function PlayerCardPhotoAdjust() {
       await update.mutateAsync({
         realName: data.profile.realName ?? null,
         nickname: data.profile.nickname ?? '',
+        bio: data.profile.bio ?? null,
         email: data.email ?? null,
         profileImageUrl: nextUrl,
         phone: data.phone ?? null,
         // 서버는 8자리 숫자만 받는다 -- 시드로 들어간 옛 계정은 '1995-01-01' 형태가 남아 있다.
-        birthDate: data.profile.birthDate ? data.profile.birthDate.replace(/\D/g, '') || null : null,
+        birthDate: data.profile.birthDate ? normalizeSeparatedDigits(data.profile.birthDate) || null : null,
         gender: data.profile.gender,
       });
       setOpen(false);
@@ -2023,7 +2027,7 @@ function PlayerCardPhotoAdjust() {
             <ChevronRightIcon size={18} strokeWidth={2.2} aria-hidden="true" />
           </button>
         ) : (
-          <Link className="tm-my-menu-row tm-pressable" href="/my/profile/edit">
+          <Link className="tm-my-menu-row tm-pressable" href={withFromPath('/my/profile/edit', source)}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="tm-text-body">사진 올리기</div>
               <div className="tm-text-caption" style={{ marginTop: 3 }}>프로필 수정에서 사진을 올리면 카드에 들어가요</div>
@@ -2344,7 +2348,7 @@ function toMyHomeModel(
     accountItem.tag = phoneVerified === true ? { label: '본인인증 완료', icon: 'ShieldCheck' } : undefined;
   }
   const inboxSection = sections.find((section) => section.title === '받은 소식');
-  const chatItem = inboxSection?.items.find((item) => item.href === '/chat');
+  const chatItem = inboxSection?.items.find((item) => item.href === withFromPath('/chat', '/my'));
   if (chatItem) {
     chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
     chatItem.badgeLabel = pendingContactCount > 0 ? `답장을 기다리는 컨택 ${pendingContactCount}건` : undefined;
@@ -2568,19 +2572,4 @@ function formatPhone(value: string) {
   if (value.length <= 3) return value;
   if (value.length <= 7) return `${value.slice(0, 3)}-${value.slice(3)}`;
   return `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
-}
-
-function formatBirthDate(value: string) {
-  if (value.length <= 4) return value;
-  if (value.length <= 6) return `${value.slice(0, 4)}-${value.slice(4)}`;
-  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
-}
-
-function isValidBirthDateDigits(value: string) {
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }

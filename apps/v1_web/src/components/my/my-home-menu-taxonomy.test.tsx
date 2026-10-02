@@ -64,7 +64,7 @@ function mockBaseHooks() {
  * 정적 모델과 중복이던 '문의' 섹션 추가 코드를 지웠고, 리뷰 항목은 배열 중간에 끼워 넣는다.
  */
 const DESTINATIONS = [
-  '/chat',
+  '/chat?from=%2Fmy',
   '/my/invitations',
   '/my/reviews',
   '/my/join-applications',
@@ -103,7 +103,7 @@ describe('마이 메뉴 분류 — 서랍을 바꿔도 목적지는 그대로', 
     const inbox = screen.getByRole('heading', { name: '받은 소식' }).closest('section');
     expect(inbox).not.toBeNull();
     const inboxHrefs = Array.from(inbox!.querySelectorAll('a.tm-my-menu-row')).map((el) => el.getAttribute('href'));
-    expect(inboxHrefs).toEqual(['/chat', '/my/invitations', '/my/reviews', '/my/join-applications']);
+    expect(inboxHrefs).toEqual(['/chat?from=%2Fmy', '/my/invitations', '/my/reviews', '/my/join-applications']);
   });
 
   it('"받은 소식"이 모바일에서 카드 바로 아래로 올라갈 섹션으로 표시된다', () => {

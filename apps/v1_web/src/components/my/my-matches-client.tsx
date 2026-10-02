@@ -174,7 +174,7 @@ function toPersonalMatch(match: V1Match, listHref: string): MyMatch {
     note: buildPersonalNote(match, status),
     href: withFromPath(`/matches/${id}`, listHref),
     // 종료 확인이 필요한 호스트는 참여 여부를 체크하는 확정 명단 탭으로 바로 보낸다(매치 상세 CTA 와 같은 경로).
-    manageHref: needsCompletion ? `/matches/${id}/applications?tab=approved` : `/matches/${id}/applications`,
+    manageHref: withFromPath(needsCompletion ? `/matches/${id}/applications?tab=approved` : `/matches/${id}/applications`, listHref),
     manageLabel: needsCompletion ? '참여 확인' : '참가 관리',
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,
   };
@@ -198,7 +198,7 @@ function toTeamMatch(match: V1MyTeamMatch, mode: 'joined' | 'created', listHref:
     statusLabel: teamStatusLabel(match, mode),
     note: buildTeamNote(match, mode),
     href: withFromPath(match.detailRoute, listHref),
-    manageHref: mode === 'created' ? match.manageRoute ?? undefined : undefined,
+    manageHref: mode === 'created' && match.manageRoute ? withFromPath(match.manageRoute, listHref) : undefined,
     manageLabel: '팀매치 관리',
     reviewHref: canReview ? `/my/reviews/team_match/${match.teamMatchId}` : undefined,
   };

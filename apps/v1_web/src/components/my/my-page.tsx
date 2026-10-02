@@ -460,7 +460,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
                   <InfoRow
                     label="비밀번호"
                     value="비밀번호 변경"
-                    action={() => window.alert('비밀번호 변경은 문의로 요청해 주세요.')}
+                    href={withFromPath('/auth/find-account?mode=reset-password', '/my/settings')}
                   />
                 ) : (
                   <InfoRow label="비밀번호" value={model.account.password} />
@@ -496,10 +496,10 @@ export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
             <h1 className="tm-text-heading">약관 및 정책</h1>
           </div>
           <Card pad={16}>
-            <ListItem title="이용약관" sub="서비스 이용 전 꼭 확인해야 하는 약관이에요" trailing="2026.05" href="/terms?document=terms" chev />
-            <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" href="/terms?document=privacy" chev />
+            <ListItem title="이용약관" sub="서비스 이용 전 꼭 확인해야 하는 약관이에요" trailing="2026.05" href={withFromPath('/terms?document=terms', '/my/settings/legal')} chev />
+            <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" href={withFromPath('/terms?document=privacy', '/my/settings/legal')} chev />
             {/* chevron 만 있고 href 가 없어 눌러도 아무 데도 가지 않았다(2026-09-04 감사). */}
-            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" href="/terms?document=location" chev />
+            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" href={withFromPath('/terms?document=location', '/my/settings/legal')} chev />
           </Card>
         </div>
       </div>
@@ -675,14 +675,14 @@ function PhoneInfoRow({ value, verified }: { value: string; verified?: boolean }
   );
 }
 
-function InfoRow({ label, value, action }: { label: string; value: string; action?: () => void }) {
+function InfoRow({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="tm-info-row">
       <div className="tm-text-caption">{label}</div>
-      {action ? (
-        <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" onClick={action}>
+      {href ? (
+        <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={href}>
           {value}
-        </button>
+        </Link>
       ) : (
         <div className="tm-text-label" style={{ textAlign: 'right', flex: 1 }}>{value}</div>
       )}

@@ -1,0 +1,78 @@
+{
+  "source": "Previously saved complete visible DOM snapshots; names and account identifiers excluded",
+  "scopeLimit": "Full rendered DOM showed no generic status/recruitment-edit controls in inspected completed league/tournament detail. Recruiting friendly detail also lacked them for this role/record, so competition-specific causal protection was not isolated. Screenshot crops alone cannot prove global absence.",
+  "items": [
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:53:25.613Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "surface": "desktop1179-friendly-filter",
+      "genericStatusButtonCount": 20,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 0,
+      "dedicatedTournamentManageLinkCount": 0,
+      "dedicatedLeagueManageLinkCount": 0
+    },
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:52:15.907Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "surface": "desktop1179-league-filter",
+      "genericStatusButtonCount": 0,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 0,
+      "dedicatedTournamentManageLinkCount": 0,
+      "dedicatedLeagueManageLinkCount": 20
+    },
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:53:06.649Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "surface": "desktop1179-tournament-filter",
+      "genericStatusButtonCount": 0,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 0,
+      "dedicatedTournamentManageLinkCount": 20,
+      "dedicatedLeagueManageLinkCount": 0
+    },
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:51:56.296Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "surface": "desktop1179-tournament-game-protected",
+      "genericStatusButtonCount": 0,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 0,
+      "dedicatedTournamentManageLinkCount": 0,
+      "dedicatedLeagueManageLinkCount": 0
+    },
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:52:36.277Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9",
+      "surface": "desktop1179-league-game-protected",
+      "genericStatusButtonCount": 0,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 0,
+      "dedicatedTournamentManageLinkCount": 0,
+      "dedicatedLeagueManageLinkCount": 0
+    },
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:54:02.442Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "surface": "desktop1179-friendly-completed-detail",
+      "genericStatusButtonCount": 0,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 1,
+      "dedicatedTournamentManageLinkCount": 0,
+      "dedicatedLeagueManageLinkCount": 0
+    },
+    {
+      "sourceEvidenceUTC": "2026-10-02T19:54:43.783Z",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/87328d95-dae5-4548-918f-7954a24b7fcd",
+      "surface": "desktop1179-friendly-recruiting-detail",
+      "genericStatusButtonCount": 0,
+      "recruitmentEditLinkCount": 0,
+      "resultCorrectionLinkCount": 0,
+      "dedicatedTournamentManageLinkCount": 0,
+      "dedicatedLeagueManageLinkCount": 0
+    }
+  ],
+  "publicationLimit": "Sanitized recorded DOM counts only; original DOM remains private. Surface labels containing protected are original record labels, not proof of backend guard enforcement or competition-specific causal protection.",
+  "noMutation": true
+}

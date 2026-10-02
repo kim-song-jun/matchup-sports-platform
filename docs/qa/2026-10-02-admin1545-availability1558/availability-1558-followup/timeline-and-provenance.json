@@ -1,0 +1,148 @@
+{
+  "relatedIssue": "1558",
+  "scope": "Post-recovery browser observations only. Earlier outage package remains separate.",
+  "timeline": [
+    {
+      "utc": "2026-10-02T19:35:43Z",
+      "route": "/home",
+      "observation": "Normal reload rendered authenticated app; identity omitted"
+    },
+    {
+      "utc": "2026-10-02T19:37:20Z",
+      "route": "/admin/matches",
+      "observation": "Operational admin shell and individual-match list rendered"
+    },
+    {
+      "utc": "2026-10-02T19:37:34Z–2026-10-02T19:37:45Z",
+      "route": "/admin/team-matches",
+      "observation": "Initial team-match list rendered with displayed total206; first-page sample only."
+    },
+    {
+      "utc": "2026-10-02T19:38:54Z",
+      "route": "/admin/team-matches",
+      "observation": "Selected tournament type; request subsequently failed"
+    },
+    {
+      "utc": "2026-10-02T19:39:19Z",
+      "route": "/admin/team-matches",
+      "observation": "Visible list-load error with retry control"
+    },
+    {
+      "utc": "2026-10-02T19:39:54Z",
+      "route": "/admin/team-matches",
+      "observation": "One visible retry returned same list-load error"
+    },
+    {
+      "utc": "2026-10-02T19:40:14Z",
+      "route": "/admin/team-matches",
+      "observation": "Friendly type also returned list-load error"
+    },
+    {
+      "utc": "2026-10-02T19:40:50Z",
+      "route": "/admin/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "observation": "Clicking observed completed tournament row reached full503 page"
+    },
+    {
+      "utc": "2026-10-02T19:41:27Z",
+      "route": "/admin/team-matches",
+      "observation": "Normal browser Back rendered504; DOM observation only, no saved504 screenshot"
+    },
+    {
+      "utc": "2026-10-02T19:47:13Z",
+      "route": "/admin/team-matches",
+      "observation": "After five-minute pause, one normal reload rendered authentication-checking shell"
+    },
+    {
+      "utc": "2026-10-02T19:47:20Z",
+      "route": "/admin/team-matches",
+      "observation": "List rendered again with displayed total206; not a claim that206 rows were simultaneously rendered or exhaustively verified."
+    },
+    {
+      "utc": "2026-10-02T19:51:17Z–2026-10-02T19:52:53Z",
+      "route": "/admin/tournaments/[qa-tournament], /admin/team-matches/[qa-fixtures], /admin/league-matches/[qa-league]",
+      "observation": "Dedicated tournament/league destinations and completed fixture details rendered successfully"
+    },
+    {
+      "utc": "2026-10-02T19:51:57Z–2026-10-02T19:53:25Z",
+      "route": "/admin/team-matches",
+      "observation": "Regular league59, tournament82, friendly65 type-filter results rendered successfully"
+    },
+    {
+      "utc": "2026-10-02T19:57:45Z–2026-10-02T19:58:17Z",
+      "route": "/admin/team-matches",
+      "observation": "Tournament+completed56 and tournament+recruiting0 settled successfully"
+    },
+    {
+      "utc": "2026-10-02T19:59:12Z–2026-10-02T19:59:23Z",
+      "route": "/admin/team-matches",
+      "observation": "Mobile search+type combinations each returned expected one QA fixture"
+    }
+  ],
+  "interpretation": "Intermittent successful and failed browser observations. Cause remains unknown; later success does not prove host stability. No server state changed.",
+  "freshnessLimit": "Previous206-row UI reappeared after failures, but cache/network source was not inspected and freshness not established. Do not label it confirmed cache response.",
+  "errorScope": "Tournament and friendly filtered requests failed, plus full-page fixture503 and list504; no isolated filter-logic defect established.",
+  "evidence": [
+    {
+      "file": "01-filter-request-error.png",
+      "method": "Byte-identical copy of original captured viewport PNG; no cropping or alteration",
+      "firstObservedUTC": "2026-10-02T19:39:19Z",
+      "sourceFileSavedUTC": "2026-10-02T19:39:39.815354+00:00",
+      "pixelCaptureUTC": "Not separately recorded; do not treat saved timestamp as exact capture time",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "width": 404,
+        "height": 606,
+        "dpr": 1.25
+      },
+      "rasterPixels": [
+        404,
+        606
+      ],
+      "sha256": "7955c88e2d08b57c70083eccf9ade90f71883f14c9121d486b71f7c934578a27",
+      "privacy": "No member name, phone, birth date, account ID, or session secret visible",
+      "bytes": 20868,
+      "originalBytesUnchanged": true,
+      "publisherPixelReview": "Directly re-inspected: generic control/error state only, no member/account identity",
+      "captureType": "Original viewport PNG; no crop, edit or re-encoding"
+    },
+    {
+      "file": "02-fixture-503.png",
+      "method": "Byte-identical copy of original captured viewport PNG; no cropping or alteration",
+      "firstObservedUTC": "2026-10-02T19:40:50Z",
+      "sourceFileSavedUTC": "2026-10-02T19:41:17.319235+00:00",
+      "pixelCaptureUTC": "Not separately recorded; do not treat saved timestamp as exact capture time",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "viewportCSS": {
+        "width": 404,
+        "height": 606,
+        "dpr": 1.25
+      },
+      "rasterPixels": [
+        404,
+        606
+      ],
+      "sha256": "de1e28f99b0ee56affaf0ad64a125223a7e4764a4d2cca401a3e5b92970d4229",
+      "privacy": "No member name, phone, birth date, account ID, or session secret visible",
+      "bytes": 9922,
+      "originalBytesUnchanged": true,
+      "publisherPixelReview": "Directly re-inspected: generic control/error state only, no member/account identity",
+      "captureType": "Original viewport PNG; no crop, edit or re-encoding"
+    }
+  ],
+  "visualInspection": {
+    "completedUTC": "2026-10-02T20:06:22Z",
+    "result": "Both byte-identical error screenshots opened and inspected; no personal/account data visible"
+  },
+  "sourceProofFile": "timeline-and-provenance.json",
+  "exactServingCommitSha": null,
+  "publicationScope": "Two original error viewport PNGs plus sanitized chronology. Later recovery observations are reported separately from the pictured errors and do not establish stable resolution.",
+  "displayedCountLimit": "206 is a displayed total. Friendly65+league59+tournament82 is UI arithmetic; no full-server or exhaustive pagination reconciliation.",
+  "earlierOutageProof": "https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/af4ba574a44d697a479f6595416d251117631b0e/docs/qa/2026-10-02-alpha-503/20261002-1915-availability-blocker.json",
+  "limits": [
+    "No saved504 screenshot; that event is DOM-observation evidence only.",
+    "Saved-file timestamps are not exact pixel capture timestamps.",
+    "Rendered error text and subsequent successful rendering do not establish network root cause, cache source or stable service recovery.",
+    "No server change, restart, data mutation or permission change.",
+    "No private member/account data or external-machine probe logs are included."
+  ]
+}

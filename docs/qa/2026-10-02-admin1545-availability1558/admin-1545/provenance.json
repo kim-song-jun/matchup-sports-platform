@@ -1,0 +1,592 @@
+{
+  "preparedUTC": "2026-10-02T20:05:56.985188+00:00",
+  "method": "Pixel-preserving Pillow crop from unchanged previously captured viewport PNG. No page revisits, no browser writes, no regeneration/retouching. All final outputs were visually inspected.",
+  "observedRole": "운영 admin shell; identity and account ID omitted",
+  "aggregateLimit": "65+59+82=206 is consistency of displayed counts only, not server-wide reconciliation. First-page classification sampled20 rows per type; exhaustive pagination untested.",
+  "detailAbsenceLimit": "Full rendered DOM showed no generic status/recruitment-edit controls in inspected completed league/tournament detail. Recruiting friendly detail also lacked them for this role/record, so competition-specific causal protection was not isolated. Screenshot crops alone cannot prove global absence.",
+  "untested": [
+    "Both-ID league-precedence data combination not independently exposed/verified",
+    "Mutating409 protection and all mutations intentionally untested",
+    "Actual mobile/tablet hardware and touch input untested"
+  ],
+  "items": [
+    {
+      "file": "01-all-type-filter.png",
+      "sourceEvidenceUTC": "2026-10-02T19:50:46.236Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        270,
+        140,
+        1150,
+        248
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Displayed overall206 and type selector. Aggregate UI observation only; not full-server data reconciliation.",
+      "sourceFileSHA256": "880a6f3d50fab5a4ddc7a5246913cf87257e6d65f43296d974beaa35a5d60b60",
+      "cropFileSHA256": "34f91e6f8250a96a49c723e866b24b9bf98b277b589f2e500bdce4bd81af6ebd",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        880,
+        108
+      ],
+      "bytes": 45907,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "02-league-type-filter.png",
+      "sourceEvidenceUTC": "2026-10-02T19:52:15.907Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        270,
+        140,
+        1150,
+        248
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Selected regular league; displayed59. First20 visible rows classified as league in companion DOM.",
+      "sourceFileSHA256": "eb44dd24e7bab87d1974263a132956074aa40625c5f7beebf1a8c853f6ab979a",
+      "cropFileSHA256": "c159dd7064a14811eaf7dbf10cfb42f39046ae1c448dc53aa0411b06eb2c2fc5",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        880,
+        108
+      ],
+      "bytes": 44305,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "03-tournament-type-filter.png",
+      "sourceEvidenceUTC": "2026-10-02T19:56:38.862Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        270,
+        140,
+        1150,
+        248
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Selected tournament; displayed82. This crop proves type selection/count only; the initial subsequent status transition had not settled in this source.",
+      "sourceFileSHA256": "c07643a5a84edf5f7e998c98b81f3dff3f4ce78626951633872710b114011c57",
+      "cropFileSHA256": "b3a97be406abda1653f355526b094ab6037ee5aa0276fd7dcf41f7f89cd202b4",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        880,
+        108
+      ],
+      "bytes": 48441,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "04-friendly-type-filter.png",
+      "sourceEvidenceUTC": "2026-10-02T19:53:25.613Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        270,
+        140,
+        1150,
+        248
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Selected friendly; displayed65. First20 visible rows retain generic status controls in companion DOM.",
+      "sourceFileSHA256": "9b6306797284f72752fc1ec96662eaeb2aac394f035e5bfb01ddc0913f32aeef",
+      "cropFileSHA256": "b143b8a2d8dbe76fb601bf218a2888b83ddf89ab2ad090f1856a2ea341fd385f",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        880,
+        108
+      ],
+      "bytes": 44863,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "05-tournament-completed-filter.png",
+      "sourceEvidenceUTC": "2026-10-02T19:57:55.032Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        270,
+        140,
+        1150,
+        248
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Tournament+completed selected; settled DOM pagination shows56 filtered results.",
+      "sourceFileSHA256": "7d31aee43fe58736dfbeacbcc25bbe72e0ca8b8c0c682f518f4960dbfed5f96d",
+      "cropFileSHA256": "b4bb64b1b6b0763ce81e95e9008057528596801d856d5a880ec05b311798f26d",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        880,
+        108
+      ],
+      "bytes": 45284,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "06-tournament-empty-filter.png",
+      "sourceEvidenceUTC": "2026-10-02T19:58:17.364Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        270,
+        140,
+        1150,
+        479
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Tournament+recruiting0 gives clear empty-state guidance.",
+      "sourceFileSHA256": "6edc385073ef6f54ed2b4805339587ba9eead403613aa3e6ebee6133f7eb3c05",
+      "cropFileSHA256": "e01ac1a36a93e1a46f67a2d27d29acaca0e15b27e48c838a002147d519865ac3",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        880,
+        339
+      ],
+      "bytes": 61722,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "07-mobile-tournament-search.png",
+      "sourceEvidenceUTC": "2026-10-02T19:59:12.765Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        14,
+        186,
+        391,
+        451
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Mobile search ALPHA QA E2E plus tournament: displayed1 corresponding fixture.",
+      "sourceFileSHA256": "d381d1c18280a85b54f6278bc2854a6aa477f50e73e3f244bcf4de0c0d1658ba",
+      "cropFileSHA256": "add1b52841bbe678dc832866f675a055f9e61ba505491bdfff91021cbde3c84d",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        377,
+        265
+      ],
+      "bytes": 43502,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "08-mobile-league-search.png",
+      "sourceEvidenceUTC": "2026-10-02T19:59:13.182Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        14,
+        186,
+        391,
+        451
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Mobile search ALPHA QA E2E plus regular league: displayed1 corresponding fixture.",
+      "sourceFileSHA256": "0f7732466049a76855bcc0d50c783605655d6845f37930dc343fd755771944fa",
+      "cropFileSHA256": "f0c5b0bc70d5565aa5b1a6763b6c51b69d1210728709578902c593fe8466e989",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        377,
+        265
+      ],
+      "bytes": 44244,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "09-mobile-friendly-search.png",
+      "sourceEvidenceUTC": "2026-10-02T19:59:23.138Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        14,
+        186,
+        391,
+        451
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Mobile search ALPHA QA E2E plus friendly: displayed1 corresponding fixture.",
+      "sourceFileSHA256": "a3d268f671a57ca76019d753096f950826543f36b124f2968401d65497ac7132",
+      "cropFileSHA256": "957fc74e16a3cd534b916e224a2e58c6900d0c7d3124dc850c8e44aa6a6470d2",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        377,
+        265
+      ],
+      "bytes": 44357,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "10-friendly-status-action.png",
+      "sourceEvidenceUTC": "2026-10-02T19:48:18.668Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        286,
+        161,
+        375,
+        213
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Generic status-change entry remains on friendly row. Control was not activated.",
+      "sourceFileSHA256": "747450bb3f50bf31ec07b269112e05b70c367100e663075377178a6645426992",
+      "cropFileSHA256": "0d65e4b6c080ad1280cdea1cb4144e40b0435eefdf02ad0642b3cd81e87d527a",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        89,
+        52
+      ],
+      "bytes": 3877,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "11-tournament-management-action.png",
+      "sourceEvidenceUTC": "2026-10-02T19:48:18.668Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        296,
+        438,
+        375,
+        490
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Tournament row offers dedicated tournament management link.",
+      "sourceFileSHA256": "747450bb3f50bf31ec07b269112e05b70c367100e663075377178a6645426992",
+      "cropFileSHA256": "87dddba4ac1e43ae8d7843a59da8b9729bf87793d8e56eb97833b973753ab416",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        79,
+        52
+      ],
+      "bytes": 2856,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "12-league-management-action.png",
+      "sourceEvidenceUTC": "2026-10-02T19:48:58.746Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "sourceRasterPixels": [
+        404,
+        606
+      ],
+      "cropLTRB": [
+        296,
+        250,
+        375,
+        301
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "League row offers dedicated league management link.",
+      "sourceFileSHA256": "d0618fa2ddab5e0a45a5562af7867a118545c158e05322c6cfa1383e2945d20d",
+      "cropFileSHA256": "3a84a8edee886ac5e815c039526a9843696764a7ada99a59020166210e5f972a",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        79,
+        51
+      ],
+      "bytes": 2951,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "13-tournament-detail-association.png",
+      "sourceEvidenceUTC": "2026-10-02T19:51:56.296Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        290,
+        258,
+        620,
+        309
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Completed tournament game detail displays tournament association. Crop alone does not prove absence of controls elsewhere; full DOM observation summarized separately.",
+      "sourceFileSHA256": "e7d9aefa3b22be277d9a2b0963513dca0d454d8ee95988cf667ffa2f03921de4",
+      "cropFileSHA256": "b5c9951ba61592e05f2346c297b2a229db13545a3072a8e08da9c950ec011c26",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        330,
+        51
+      ],
+      "bytes": 19411,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "14-league-detail-association.png",
+      "sourceEvidenceUTC": "2026-10-02T19:52:36.277Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        290,
+        258,
+        647,
+        309
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Completed league game detail displays league association. Crop alone does not prove absence of controls elsewhere; full DOM observation summarized separately.",
+      "sourceFileSHA256": "5391f8fa1795b6fae40d59984e9003ed62fd03f6bc38eb59ae2ad28a6f128ecf",
+      "cropFileSHA256": "f24cc0617d62f7cf26b8ffe2cc8d78b9a989354e5c25a94972f3541bb725f0b0",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        357,
+        51
+      ],
+      "bytes": 21052,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "15-tournament-dedicated-destination.png",
+      "sourceEvidenceUTC": "2026-10-02T19:51:28.976Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/overview",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        269,
+        88,
+        776,
+        177
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Observed tournament badge navigation reaches dedicated tournament management heading.",
+      "sourceFileSHA256": "a7f165e51486d4c0f9bc95d2f8a29eb73ba4c340e5ce01ae6174537c3509e1bb",
+      "cropFileSHA256": "cfc2ba3e070ac39008bb55529d7eae90d9e6eeb08ece4c4e725516e304b6b172",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        507,
+        89
+      ],
+      "bytes": 38263,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    },
+    {
+      "file": "16-league-dedicated-destination.png",
+      "sourceEvidenceUTC": "2026-10-02T19:52:51.931Z",
+      "sourceTimestampMeaning": "Capture sequence start recorded immediately before DOM/metrics/screenshot; not exact pixel-capture microsecond",
+      "sourceURL": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "sourceRasterPixels": [
+        1179,
+        758
+      ],
+      "cropLTRB": [
+        269,
+        88,
+        758,
+        179
+      ],
+      "cropCoordinateSystem": "Saved viewport PNG raster pixels, left/top inclusive and right/bottom exclusive; not document coordinates",
+      "actionProof": "Observed league association navigation reaches dedicated league management heading.",
+      "sourceFileSHA256": "fc5a543d2aba9446f392e311ad1da82982995020e9b0a4e39c4fbf191025a36c",
+      "cropFileSHA256": "67e314dc267ec67cde8cae6cd11134544d402c5c4838daac2d86cda4a0f28435",
+      "privacy": "No member name, phone, birth date, or account ID included. Synthetic QA competition titles/search text may appear.",
+      "cropRasterPixels": [
+        489,
+        91
+      ],
+      "bytes": 27927,
+      "originalCropBytesUnchanged": true,
+      "publisherPixelReview": "Reviewed, no member/account identity visible",
+      "captureType": "Pixel-preserving crop from original viewport; not full viewport or a regenerated image"
+    }
+  ],
+  "visualInspection": {
+    "completedUTC": "2026-10-02T20:06:22Z",
+    "result": "All16 final crops opened and inspected. No member names, phone numbers, birth dates, account IDs, or secrets visible. Synthetic QA competition titles and QA search text retained where needed. No regeneration, masking, or compositing."
+  },
+  "publicationScope": "Sixteen original control/association/destination crops plus sanitized DOM-action inventory. No full private admin screenshot or DOM is published.",
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Not observed on the page; no new page-serving SHA claim is made by this publication.",
+  "sourceHashScope": "sourceFileSHA256 values are retained capture-worker provenance for locally retained full source PNGs. Publisher verified the designated crop bytes only and did not read excluded private source images.",
+  "pixelReview": "All16 designated original crops directly re-inspected for publication: only generic controls, aggregate displayed counts and synthetic QA competition/search text; no individual member or account identity.",
+  "evidenceLimits": [
+    "Source UTC is capture-sequence start, not exact pixel-shutter time.",
+    "CSS viewport, source raster, cropLTRB and output raster are different measurements.",
+    "Sixteen images do not independently prove every action or DOM absence; actions and control counts are attributed to the accompanying observations.",
+    "Displayed status/count values and65+59+82=206 arithmetic are UI observations, not exhaustive server data correctness.",
+    "Small desktop filter crops do not contain pagination/results;56 settled results and20-row classification samples rely on recorded companion DOM observations.",
+    "Real device/touch, both-ID precedence and mutating409 protections remain untested.",
+    "No overall PR1545/full-feature pass or availability resolution is asserted."
+  ]
+}

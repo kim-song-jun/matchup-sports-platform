@@ -131,7 +131,8 @@ export function RestTimer() {
           그대로 나눠 가져 넓은 화면에서 칩 하나가 200px 가까이 늘어나기 때문이다
           — 내용은 "10분" 세 글자뿐이라 헐거워 보인다. */}
       {/* 회색 바탕 위에서 칩이 묻히지 않게 흰 콘텐츠 표면(점수판·이벤트 목록과 같은 규칙)에
-          올리고 칩은 흰 채움 + 진한 테두리로 둔다. */}
+          올리고 칩은 흰 채움 + 진한 테두리로 둔다. `--border-strong`(grey300)은 흰 바탕
+          1.46:1 이라 WCAG 1.4.11(3:1)에 못 미쳐 grey500(라이트 3.04:1·다크 3.61:1)을 쓴다. */}
       <div className="grid grid-cols-6 gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-2 sm:max-w-md">
         {REST_PRESET_MINUTES.map((minutes) => (
           <button
@@ -144,7 +145,7 @@ export function RestTimer() {
             // 일어나지 않은 대기 상태에 쓰면 한 화면의 강조색이 하나 더 늘고
             // (R-C1) 정작 카운트다운이 도는 순간의 주의 환기력이 약해진다.
             // 호박색은 아래 "진행 중" 카드에만 남긴다.
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--card-surface)] px-1 text-sm font-bold text-[var(--text-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-[var(--grey500)] bg-[var(--card-surface)] px-1 text-sm font-bold text-[var(--text-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             {minutes}분
           </button>

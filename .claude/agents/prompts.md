@@ -205,3 +205,11 @@ The sections below fill project-specific gaps while preserving curated content a
 - output: updated file list, guidance summary, remaining drift or deferred follow-up
 
 <!-- /codex-init:delta -->
+
+# Production release preparation
+
+When `promote-main.yml` is absent from the default branch, prepare locally on an isolated feature branch:
+`CONFIRMATION=PROMOTE bash scripts/release/promote-main.sh --prepare-only`.
+This mode changes only the local release files and runs the promotion gate; it never stages, commits,
+pushes or dispatches. Deliver the diff through a PR to dev, recheck CI and alpha on the resulting SHA,
+and follow `docs/ops/prod-task168-transition-runbook.md`. Only the user promotes main and approves production.

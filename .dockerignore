@@ -8,6 +8,9 @@ dist
 coverage
 playwright-report
 test-results
+tests
+ultraplan
+.autoqa
 tmp
 output
 docs

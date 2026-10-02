@@ -289,6 +289,12 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 
 ## S1) 브랜치 · 배포 정책 (Critical — 2026-07-31 실측 기준 정정)
 
+`promote-main.yml`이 default branch에 없어 dispatch가 404이면 격리 feature 브랜치에서
+`CONFIRMATION=PROMOTE bash scripts/release/promote-main.sh --prepare-only`로 릴리스 diff를 준비한다.
+이 모드는 stage/commit/push/dispatch 없이 로컬 Changeset 소비와 승격 게이트만 실행한다.
+변경은 dev 대상 PR로 전달하고 새 dev SHA의 CI·alpha를 재검증한다. 운영 순서는
+`docs/ops/prod-task168-transition-runbook.md`를 따른다.
+
 > 이전 판은 "`main`은 유산 브랜치이고 배포와 무관"이라고 적고 있었는데 **사실이 아니다.**
 > 그 서술 때문에 `deploy.yml`의 main 전용 job을 dead code로 오판해 삭제 직전까지 간 사고가
 > 2026-07-31에 있었다 — 그 job은 라이브 프로덕션(teameet.co.kr)의 유일한 배포 경로다.

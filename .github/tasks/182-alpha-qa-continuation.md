@@ -105,3 +105,7 @@ Alpha의 실제 응답과 저장 지속성을 검증하고, 실행하지 못한 
 ## 2026-10-02 PR review handoff
 
 승인된 수정 PR 11/11 dev 병합, CI 및 alpha 배포 SUCCESS (SHA `9a35d05abd32`). 공개 QA 12개 조합에서 최초 11 PASS/1 hydration FAIL, 해당 desktop 재확인 3 PASS. 인증 흐름은 현재 세션 자격증명 없어 미검증. [리뷰·QA·릴리스 준비 기록](../../docs/ops/pr-review-2026-10-02.md). 이전 섹션의 실행/미실행 표시는 당시 스냅샷이며 이번 결과와 구분한다.
+
+## 2026-10-02 approved continuation
+
+추가 수정 #1529/#1532 dev 병합. 사용자 승인으로 최신 production read-only dump의 로컬 사본에서 source e0f58632821b 실제 Stage A/B·189 checksum/원장 clean·drift0·공개32 경기·별도 backup restore 통과. 최종 릴리스 merge SHA 재검증은 후속. 실제 RDS PITR/인증 alpha QA/공지·승인 담당자·동결은 미완. [상세 기록](../../docs/ops/pr-review-2026-10-02.md).

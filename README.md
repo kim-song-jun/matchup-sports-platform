@@ -135,8 +135,7 @@ DB 위치(컨테이너 Postgres ↔ RDS 전환), 백업, 복구 절차는 운영
 그 상태를 단정하지 않습니다.
 
 - 백업 구성·복구: [`docs/ops/prod-backup.md`](docs/ops/prod-backup.md)
-- RDS 전환 설계·실행: [`docs/ops/rds-migration-design.md`](docs/ops/rds-migration-design.md),
-  [`docs/ops/rds-cutover-runbook.md`](docs/ops/rds-cutover-runbook.md)
+- RDS 전환 설계(전환은 완료됨): [`docs/ops/rds-migration-design.md`](docs/ops/rds-migration-design.md)
 - v1 DB 운영: [`docs/ops/v1-database-operations.md`](docs/ops/v1-database-operations.md)
 
 ---

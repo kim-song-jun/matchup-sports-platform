@@ -1,0 +1,639 @@
+{
+  "title": "1545 captainB alpha user-route after regression",
+  "startedAt": "2026-10-02T18:22:07.697Z",
+  "completedAt": "2026-10-02T18:34:14.438Z",
+  "role": "captainB",
+  "pipelineContext": {
+    "sha": "d4c7cfd990370f7af7e175849e69db4a9ca9406c",
+    "run": "37043891674",
+    "successAt": "2026-10-02T18:11:18Z",
+    "source": "parent verified; serving page SHA unobserved",
+    "independentPublicationCheck": {
+      "method": "GitHub read-only actions run lookup",
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37043891674",
+      "headSha": "d4c7cfd990370f7af7e175849e69db4a9ca9406c",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-10-02T18:11:18Z"
+    }
+  },
+  "status": "PASS_SCOPED",
+  "scope": [
+    "Confirmed managed league/tournament shared-record URLs redirect to dedicated fixture/match details",
+    "Friendly shared record remains on /record, locked final A0:B1",
+    "Source from including nested /my retained; post-redirect destination refresh, browser Back and page Back checked"
+  ],
+  "widths": [
+    {
+      "css": [
+        402,
+        606
+      ],
+      "nativeChromeZoom": "125%"
+    },
+    {
+      "css": [
+        787,
+        505
+      ],
+      "nativeChromeZoom": "150%"
+    },
+    {
+      "css": [
+        1180,
+        757
+      ],
+      "nativeChromeZoom": "100%"
+    }
+  ],
+  "scores": {
+    "league": "B1:A0, league completed and match completed",
+    "tournament": "B0:A1, completed",
+    "friendly": "A0:B1, final and locked"
+  },
+  "observedInputs": {
+    "leagueInput": "https://alpha.teameet.co.kr/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9/record?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+    "tournamentInput": "https://alpha.teameet.co.kr/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11/record?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+    "sourceUrl": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+    "sourceQueryProvenance": "The from query was copied from an actually observed friendly activity-record link and reused for the confirmed managed record inputs. The published user-ID segment is explicitly templated; nested /my structure is retained.",
+    "runAtWidths": [
+      402,
+      787,
+      1180
+    ],
+    "perKindPerWidth": "direct goto -> dedicated detail, destination reload -> browser Back -> original source; direct goto again -> dedicated detail -> page Back -> original source"
+  },
+  "limitations": [
+    "captainB alpha only; admin classification and409 guards not exercised",
+    "No no-from fallback input, malformed query, unauthenticated guest or production testing",
+    "Refresh tests reload post-redirect dedicated destination, not intercepted in-flight shared-record page",
+    "Source selected activity kind was All; no prior filter-preservation issue retested",
+    "No network request/body inspection, no server write controls activated",
+    "Raw screenshots and full proof contain member names; local only"
+  ],
+  "console": {
+    "React": [],
+    "hydration": [],
+    "418": [],
+    "other": "Only browser-extension metadata errors in general error log; not attributed to app"
+  },
+  "finalState": {
+    "utc": "2026-10-02T18:34:14.423Z",
+    "view": {
+      "height": 757,
+      "ownCaptainB": true,
+      "privateBanner": true,
+      "visibleDialogs": 0,
+      "visibleEditableFields": 0,
+      "width": 1180
+    },
+    "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy"
+  },
+  "sourceProofFiles": [
+    "1545-user-route-after-safe-summary.json",
+    "1545-confirmed-route-provenance.json"
+  ],
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Page itself did not expose a verified serving commit SHA. Observations occurred after the successful deployment run; deployment metadata and evidence publication commit must not be equated to a page-level SHA observation.",
+  "confirmedRouteProvenance": {
+    "kind": "source provenance relayed by parent, not independent API verification by browser worker",
+    "receivedAt": "2026-10-02T18:28:51Z",
+    "upstreamObservedAt": "2026-10-02T18:26:11Z",
+    "upstreamObserver": "parent reports local QA session official public GET",
+    "routes": [
+      {
+        "apiPath": "/api/v1/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9/record",
+        "reportedResponseFields": {
+          "teamMatchId": "3054516f-a173-4775-9e35-7ea4acb652a9",
+          "leagueId": "c1f2ff15-9363-4915-9c11-8179e57369cb",
+          "phase": "managed"
+        },
+        "confirmedUiInput": "https://alpha.teameet.co.kr/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9/record",
+        "dedicatedRoutePreviouslyObserved": "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9"
+      },
+      {
+        "apiPath": "/api/v1/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11/record",
+        "reportedResponseFields": {
+          "teamMatchId": "04f8b827-d4dd-5225-835c-46ffd96b0e11",
+          "tournamentId": "932beb19-bc91-4446-86d8-9f69f5e4eae1",
+          "leagueId": null,
+          "phase": "managed"
+        },
+        "confirmedUiInput": "https://alpha.teameet.co.kr/team-matches/04f8b827-d4dd-5225-835c-46ffd96b0e11/record",
+        "dedicatedRoutePreviouslyObserved": "/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11"
+      }
+    ]
+  },
+  "urlDisclosure": "All activity user IDs are explicitly replaced with {userId} in URL templates, including nested from. Public synthetic match/league/tournament IDs and route structure are retained. These templated URLs are not exact private activity URLs; originals remain local.",
+  "checks": [
+    {
+      "label": "direct-mobile-402-league-redirected",
+      "utc": "2026-10-02T18:29:55.032Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-league-refreshed",
+      "utc": "2026-10-02T18:29:56.782Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-league-browser-back-source",
+      "utc": "2026-10-02T18:29:57.991Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-league-repeat-redirect",
+      "utc": "2026-10-02T18:30:12.907Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-league-page-back-source",
+      "utc": "2026-10-02T18:30:14.278Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-402-tournament-redirected",
+      "utc": "2026-10-02T18:30:16.653Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-tournament-refreshed",
+      "utc": "2026-10-02T18:30:41.561Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-tournament-browser-back-source",
+      "utc": "2026-10-02T18:30:42.848Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-tournament-repeat-redirect",
+      "utc": "2026-10-02T18:30:45.434Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-mobile-tournament-page-back-source",
+      "utc": "2026-10-02T18:30:46.573Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 402,
+      "cssHeight": 606
+    },
+    {
+      "label": "direct-tablet-787-league-redirected",
+      "utc": "2026-10-02T18:31:15.984Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-league-refreshed",
+      "utc": "2026-10-02T18:31:38.986Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-league-browser-back-source",
+      "utc": "2026-10-02T18:31:40.198Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-league-repeat-redirect",
+      "utc": "2026-10-02T18:31:42.461Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-league-page-back-source",
+      "utc": "2026-10-02T18:31:43.848Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-787-tournament-redirected",
+      "utc": "2026-10-02T18:31:46.293Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-tournament-refreshed",
+      "utc": "2026-10-02T18:32:07.400Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-tournament-browser-back-source",
+      "utc": "2026-10-02T18:32:08.566Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-tournament-repeat-redirect",
+      "utc": "2026-10-02T18:32:11.133Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-tablet-tournament-page-back-source",
+      "utc": "2026-10-02T18:32:12.267Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 787,
+      "cssHeight": 505
+    },
+    {
+      "label": "direct-desktop-1180-league-redirected",
+      "utc": "2026-10-02T18:32:24.918Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-league-refreshed",
+      "utc": "2026-10-02T18:32:47.104Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-league-browser-back-source",
+      "utc": "2026-10-02T18:32:48.611Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-league-repeat-redirect",
+      "utc": "2026-10-02T18:32:50.873Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-league-page-back-source",
+      "utc": "2026-10-02T18:32:52.268Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-1180-tournament-redirected",
+      "utc": "2026-10-02T18:32:54.836Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-tournament-refreshed",
+      "utc": "2026-10-02T18:33:17.068Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-tournament-browser-back-source",
+      "utc": "2026-10-02T18:33:18.415Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-tournament-repeat-redirect",
+      "utc": "2026-10-02T18:33:21.084Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    },
+    {
+      "label": "direct-desktop-tournament-page-back-source",
+      "utc": "2026-10-02T18:33:22.182Z",
+      "url": "https://alpha.teameet.co.kr/users/{userId}/records?from=%2Fmy",
+      "cssWidth": 1180,
+      "cssHeight": 757
+    }
+  ],
+  "checksEvidenceType": "Recorded browser URL/UTC and viewport state observations. The score crops alone do not prove redirect mechanics, history behavior, refreshed destination or Back targets.",
+  "safeImages": [
+    {
+      "label": "mobile-402-league-redirect-score",
+      "utc": "2026-10-02T18:29:55.158Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 300
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 502.5,
+        "height": 375
+      },
+      "file": "mobile-402-league-redirect-score.jpg",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 402,
+        "height": 300
+      },
+      "sha256": "ded17d44e3ec685d5ee5354204a7d1098b877da13732d01adbc6b318af0e1b9e",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 13185,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "mobile-402-tournament-redirect-score",
+      "utc": "2026-10-02T18:30:16.789Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 230
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 502.5,
+        "height": 287.5
+      },
+      "file": "mobile-402-tournament-redirect-score.jpg",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 402,
+        "height": 230
+      },
+      "sha256": "0eb2a735bd7d61258360f728e9a92db0ec6496a15f41376ca829cc7f2edd0edd",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 9416,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "mobile-402-friendly-score-lock",
+      "utc": "2026-10-02T18:30:59.677Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 370
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 502.5,
+        "height": 462.5
+      },
+      "file": "mobile-402-friendly-score-lock.jpg",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349/record?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 402,
+        "height": 370
+      },
+      "sha256": "1fe9c30f5f726573550c225c218c11024f5a990ee1f8c5ebbc500162c843a5a3",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 14817,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "tablet-787-league-redirect-score",
+      "utc": "2026-10-02T18:31:16.092Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 787
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 787,
+        "height": 275
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 1180.5,
+        "height": 412.5
+      },
+      "file": "tablet-787-league-redirect-score.jpg",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 787,
+        "height": 275
+      },
+      "sha256": "ca113c0f2d022d698cef070e5cd494ea7cd425d886fd0f2995c3417511232b78",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 14591,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "tablet-787-tournament-redirect-score",
+      "utc": "2026-10-02T18:31:46.421Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 787
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 787,
+        "height": 215
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 1180.5,
+        "height": 322.5
+      },
+      "file": "tablet-787-tournament-redirect-score.jpg",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 787,
+        "height": 215
+      },
+      "sha256": "ad8f44f3e3a7bdd3a1d68a961d4632767c5a7509aafff4fe634e47e3530a27fa",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 10269,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "tablet-787-friendly-score-lock",
+      "utc": "2026-10-02T18:32:13.464Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 787
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 787,
+        "height": 410
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 1180.5,
+        "height": 615
+      },
+      "file": "tablet-787-friendly-score-lock.jpg",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349/record?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 787,
+        "height": 410
+      },
+      "sha256": "581a022bf355b2fcf30883dfe4d292684b3a14c7cf8ebb16f0d58919b7e468b6",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 17774,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "desktop-1180-league-redirect-score",
+      "utc": "2026-10-02T18:32:25.045Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1180
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1180,
+        "height": 370
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 1180,
+        "height": 370
+      },
+      "file": "desktop-1180-league-redirect-score.jpg",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 1180,
+        "height": 370
+      },
+      "sha256": "82e3d78c80275f728ad0020bf09dc9dff3cace6a95141df5954ffb54dd8cac56",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 20968,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "desktop-1180-tournament-redirect-score",
+      "utc": "2026-10-02T18:32:54.972Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1180
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1180,
+        "height": 315
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 1180,
+        "height": 315
+      },
+      "file": "desktop-1180-tournament-redirect-score.jpg",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 1180,
+        "height": 315
+      },
+      "sha256": "a82b5ab40082be5763e6f639683fba8cb9eb6823c1b89256c9fafe147657c91a",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 16704,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    },
+    {
+      "label": "desktop-1180-friendly-score-lock",
+      "utc": "2026-10-02T18:33:23.517Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1180
+      },
+      "cssCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1180,
+        "height": 525
+      },
+      "requestedClip": {
+        "x": 0,
+        "y": 0,
+        "width": 1180,
+        "height": 525
+      },
+      "file": "desktop-1180-friendly-score-lock.jpg",
+      "url": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349/record?from=%2Fusers%2F{userId}%2Frecords%3Ffrom%3D%252Fmy",
+      "raster": {
+        "width": 1180,
+        "height": 525
+      },
+      "sha256": "3febd235e04fceb0e5bf3f0f9bdb709dc670ddeb55a7599cb4ceee7b7503c443",
+      "pixelReview": "Directly re-inspected for publication: only synthetic team names, score/status controls and generic navigation; no individual member names, photos, birth dates, contact data or credentials",
+      "bytes": 25483,
+      "originalBytesUnchanged": true,
+      "captureType": "Original partial-viewport score/control crop; no re-crop, redaction or re-encoding"
+    }
+  ],
+  "framingNotes": [
+    "Nine original score-control crops: league, tournament and friendly at each of three CSS viewport widths.",
+    "CSS viewport, native browser zoom/DPR, CSS crop, requested capture clip and output raster are separate preserved measurements. Crops are not full viewport images.",
+    "League and tournament checks explicitly exercise nested-from managed /record inputs and dedicated destinations.",
+    "Friendly /record preservation and final locked score are shown separately; do not transfer the managed redirect test matrix to friendly without evidence.",
+    "Status PASS_SCOPED refers only to the listed authenticated user-route checks; it is not an admin, 409 guard, no-from fallback or full-feature pass."
+  ],
+  "privacy": "Only nine designated pixel-reviewed crops and this minimized proof are published. Full member-containing screenshots/DOM and exact private activity URL are excluded."
+}

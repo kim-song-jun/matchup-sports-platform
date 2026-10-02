@@ -1,0 +1,138 @@
+{
+  "capturedAt": "2026-10-02T02:44:53.315Z",
+  "environment": "Cloud Chromium, existing admin session; native window and zoom, not device emulation",
+  "viewports": [
+    {
+      "width": 402,
+      "height": 606
+    },
+    {
+      "width": 787,
+      "height": 505
+    },
+    {
+      "width": 1180,
+      "height": 757
+    }
+  ],
+  "pageSHA": "unobserved",
+  "checks": [
+    {
+      "feature": "Admin match list search and focus",
+      "outcome": "pass",
+      "widths": [
+        402
+      ],
+      "evidence": "admin-match-search-empty-mobile-402-settled-viewport.jpg",
+      "details": "Search QA-NOMATCH-20261002 settles to zero counts and helpful empty state; focused input remains visible; no horizontal document overflow."
+    },
+    {
+      "feature": "Admin match filters survive browser Back",
+      "outcome": "fail-candidate",
+      "widths": [
+        402,
+        787,
+        1180
+      ],
+      "listURL": "https://alpha.teameet.co.kr/admin/matches",
+      "detailURL": "https://alpha.teameet.co.kr/admin/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "steps": [
+        "Search 1.0.3",
+        "Select 완료 1",
+        "Open (테스트) 1.0.3 QA 수명주기 상세 보기",
+        "Browser Back"
+      ],
+      "actual": "Search becomes empty and 전체29 is selected at every width.",
+      "expected": "Preserve 1.0.3 search and completed filter.",
+      "evidencePrefix": [
+        "admin-match-filter-",
+        "admin-match-browser-back-"
+      ]
+    },
+    {
+      "feature": "League confirmed console and result drilldown",
+      "outcome": "pass with convenience candidate",
+      "widths": [
+        402,
+        787,
+        1180
+      ],
+      "details": "Admin console shows 1:0 official result and recorded B goal/assist without editing controls. Standings link opens public league, fixture shows 6+6 lineups and official history. Public fixture ours-team result CTA routes current nonparticipant admin to participants-only message. Role boundary has no edit controls and fits all widths; the ours-team CTA may be misleading.",
+      "evidencePrefix": "league-result-nonparticipant-"
+    },
+    {
+      "feature": "Tournament per-match lineup and correction history links",
+      "outcome": "pass",
+      "widths": [
+        402,
+        1180
+      ],
+      "details": "A registration expands upcoming 0/player 0, no upcoming game; results-correction link opens correct fixture and official 0:1 revision1. No correction start or invalidate action.",
+      "evidence": "tournament-official-history-desktop-1180-viewport.jpg"
+    },
+    {
+      "feature": "Completed tournament roster add restrictions and modal navigation",
+      "outcome": "pass",
+      "widths": [
+        402,
+        787,
+        1180
+      ],
+      "details": "Six players shown; existing roster members and players already on other team are disabled; remaining members disabled for ended tournament. Add disabled. Focus, scroll, and close work. No add/remove/qualification changes.",
+      "proof": "tournament-roster-restrictions-proof.json",
+      "evidencePrefix": "tournament-roster-review-add-disabled-"
+    },
+    {
+      "feature": "Tournament identity lookup empty state",
+      "outcome": "pass",
+      "widths": [
+        402,
+        787,
+        1180
+      ],
+      "details": "Opens explicit no participants to connect dialog, record-consent settings link, and close button. No identity claim or setting changed.",
+      "evidencePrefix": "tournament-identity-lookup-empty-"
+    },
+    {
+      "feature": "Scorer statistics drilldown",
+      "outcome": "pass",
+      "widths": [
+        1180
+      ],
+      "details": "Tournament goal links to player profile; all activity records list exact tournament fixture with 1 goal and exact league fixture with 0 goals."
+    },
+    {
+      "feature": "Scorer profile page Back",
+      "outcome": "existing issue 1418 reproduced",
+      "widths": [
+        1180
+      ],
+      "referrer": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "profile": "https://alpha.teameet.co.kr/users/00709c0a-59bb-4a19-b32d-aa5e3842563c",
+      "actual": "Clicking page Back navigates to /teams rather than originating tournament match.",
+      "evidencePrefix": "1418-scorer-"
+    },
+    {
+      "feature": "Completed friendly result disclosure and role controls",
+      "outcome": "pass",
+      "widths": [
+        402,
+        787,
+        1180
+      ],
+      "details": "Ended confirmed 0:1, one expandable/collapsible scoring record 박팀장 2′; current admin nonparticipant sees disabled application and no participant editing controls.",
+      "evidencePrefix": "friendly-ended-records-"
+    }
+  ],
+  "coverageGaps": [
+    "No active/disposable roster draft validation submission: own requested fixtures are completed; no new registration or reopening used.",
+    "Duplicate jersey validation remains untested in a writable draft.",
+    "No actual mobile on-screen keyboard; mobile-sized cloud desktop focus only.",
+    "Scorer profile Back and statistics drilldown were additionally tested at desktop only."
+  ],
+  "excludedEvidence": [
+    "admin-match-search-empty-mobile-402-viewport.jpg is pre-debounce, use settled version",
+    "tournament-permatch-roster-empty-mobile-402-viewport.jpg does not show the empty-message text within the viewport"
+  ],
+  "writes": "No saved data, result, roster, membership, privacy, grant, payment, publication, or issue changes"
+}

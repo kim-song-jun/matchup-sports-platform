@@ -1,0 +1,197 @@
+{
+  "scope": "Read-only alpha functional repro evidence: admin match browser-Back filter loss candidate, existing issue 1418 scorer profile page-Back reproduction, and functional matrix",
+  "pageSHA": "unobserved",
+  "imageBytes": "unchanged",
+  "classification": "Reproduction sequence, not before/after a fix",
+  "matrixNote": "The full browser-only result matrix contains additional checks with capture filenames not included in this bounded supplement. Its no-write statement describes the browser run, before evidence publication.",
+  "records": [
+    {
+      "file": "supplement-0254/candidate-admin-filter-loss/admin-match-filter-mobile-402-viewport.jpg",
+      "sha256": "1c49bd521835a97cba7ad1387639c4e6f708500d69417f2cd3ea39829897ae4c",
+      "git_blob_sha": "3b8b9050a982d0228a5c8fe8c1ed714b94bcc3da",
+      "issue": null,
+      "finding": "candidate-admin-filter-loss",
+      "timestamp": "2026-10-02T02:34:56.040Z",
+      "url": "https://alpha.teameet.co.kr/admin/matches",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 402,
+        "height": 605
+      },
+      "state": "filtered list before navigation"
+    },
+    {
+      "file": "supplement-0254/candidate-admin-filter-loss/admin-match-filter-tablet-787-viewport.jpg",
+      "sha256": "61c034309a4fe3154ef14300a3cfc7be5646a561cb0500865cb46e91eef1be5c",
+      "git_blob_sha": "d1d4ab501866636e0ce4895fcd181241419e505c",
+      "issue": null,
+      "finding": "candidate-admin-filter-loss",
+      "timestamp": "2026-10-02T02:37:57.774Z",
+      "url": "https://alpha.teameet.co.kr/admin/matches",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 787,
+        "height": 505
+      },
+      "state": "filtered list before navigation"
+    },
+    {
+      "file": "supplement-0254/candidate-admin-filter-loss/admin-match-filter-desktop-1180-viewport.jpg",
+      "sha256": "4efc669cdf8f8a8ef8723a43d3d9f274d998fe7cc88d714406a4ba4edd0e9e49",
+      "git_blob_sha": "9aa25efd05167986adfe83c6ef28e6cf80b1b32c",
+      "issue": null,
+      "finding": "candidate-admin-filter-loss",
+      "timestamp": "2026-10-02T02:38:17.951Z",
+      "url": "https://alpha.teameet.co.kr/admin/matches",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      },
+      "state": "filtered list before navigation"
+    },
+    {
+      "file": "supplement-0254/candidate-admin-filter-loss/admin-match-browser-back-mobile-402-viewport.jpg",
+      "sha256": "45765af3743db499590e02e4d38b54d4411dcba75c8c105c6cfd61dbf0828e19",
+      "git_blob_sha": "907166899020f707df4e2ad142347a3e450288ca",
+      "issue": null,
+      "finding": "candidate-admin-filter-loss",
+      "timestamp": "2026-10-02T02:35:25.432Z",
+      "url": "https://alpha.teameet.co.kr/admin/matches",
+      "css": {
+        "height": 606,
+        "scrollWidth": 402,
+        "width": 402
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 402,
+        "height": 605
+      },
+      "state": "list after browser Back; search and filter lost"
+    },
+    {
+      "file": "supplement-0254/candidate-admin-filter-loss/admin-match-browser-back-tablet-787-viewport.jpg",
+      "sha256": "c37e107a0da0d70fc9ff878b688d7aaccef4cb6be3884407d3a4592bae8fc0b1",
+      "git_blob_sha": "903e9c317973a5965e64ed643dc1f6abf5d93f69",
+      "issue": null,
+      "finding": "candidate-admin-filter-loss",
+      "timestamp": "2026-10-02T02:38:06.704Z",
+      "url": "https://alpha.teameet.co.kr/admin/matches",
+      "css": {
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 787,
+        "height": 505
+      },
+      "state": "list after browser Back; search and filter lost"
+    },
+    {
+      "file": "supplement-0254/candidate-admin-filter-loss/admin-match-browser-back-desktop-1180-viewport.jpg",
+      "sha256": "388eb6d258515d690bf44e7b27f2adb73beccc13a61ce5536fcf87f8e6cfd18f",
+      "git_blob_sha": "14303ffb75d0ec92682201692c8639bfcd4a3ad2",
+      "issue": null,
+      "finding": "candidate-admin-filter-loss",
+      "timestamp": "2026-10-02T02:38:33.404Z",
+      "url": "https://alpha.teameet.co.kr/admin/matches",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      },
+      "state": "list after browser Back; search and filter lost"
+    },
+    {
+      "file": "supplement-0254/issue-1418/1418-scorer-link-referrer-desktop-1180-viewport.jpg",
+      "sha256": "a4c7076580fae0b8cbe0418c9c80d21e16a236be1938927987d57beae3d70a22",
+      "git_blob_sha": "2126179b0a7fad9c18065eb3a98f184f39fb0510",
+      "issue": 1418,
+      "finding": "issue-1418",
+      "timestamp": "2026-10-02T02:43:20.977Z",
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/matches/04f8b827-d4dd-5225-835c-46ffd96b0e11?from=%2Fadmin%2Flive%2F932beb19-bc91-4446-86d8-9f69f5e4eae1%2Frecords%2Fcorrections%3FfixtureId%3D04f8b827-d4dd-5225-835c-46ffd96b0e11",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      },
+      "state": "originating tournament match"
+    },
+    {
+      "file": "supplement-0254/issue-1418/1418-scorer-profile-desktop-1180-viewport.jpg",
+      "sha256": "9e66f229ebc63af849fd26e8e0480462331c41ce62b9dc2398b04f6c2df43617",
+      "git_blob_sha": "b08584d95deb847c5802680f1a5fde9addc7ff08",
+      "issue": 1418,
+      "finding": "issue-1418",
+      "timestamp": "2026-10-02T02:43:28.936Z",
+      "url": "https://alpha.teameet.co.kr/users/00709c0a-59bb-4a19-b32d-aa5e3842563c",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      },
+      "state": "linked scorer profile"
+    },
+    {
+      "file": "supplement-0254/issue-1418/1418-scorer-profile-back-teams-desktop-1180-viewport.jpg",
+      "sha256": "714e3a588b5a6b1d7e9f2111620f4c9823639ea77c59015eadd105332a9b76ec",
+      "git_blob_sha": "9761e8ea0aaf73fd9c9ce15024339d370586555e",
+      "issue": 1418,
+      "finding": "issue-1418",
+      "timestamp": "2026-10-02T02:43:35.620Z",
+      "url": "https://alpha.teameet.co.kr/teams",
+      "css": {
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "fullPage": false,
+      "rasterPixels": {
+        "width": 1180,
+        "height": 757
+      },
+      "state": "after clicking profile page Back; incorrect team-list destination"
+    },
+    {
+      "file": "supplement-0254/results/functional-matrix-20261002-0234.json",
+      "sha256": "e23dc1e310725e41d2c56cc0e3c03adf0feefae0be572b8b52c774ad6a92cbe7",
+      "git_blob_sha": "281abf288c9ada60c0d04387f623597237d00aa3",
+      "issue": null,
+      "finding": "results",
+      "capturedAt": "2026-10-02T02:44:53.315Z"
+    }
+  ]
+}

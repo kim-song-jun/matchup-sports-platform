@@ -1,4 +1,6 @@
 import { Test } from '@nestjs/testing';
+import request = require('supertest');
+import { createGlobalValidationPipe } from '../common/global-validation-pipe';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AppleIdentityService } from './apple-identity.service';
@@ -271,5 +273,61 @@ describe('AuthController', () => {
       next: { route: '/onboarding/sport' },
     });
     expect(authService.completeSocialProfile).toHaveBeenCalledWith('user-1', dto);
+  });
+
+  describe('GET check-email / check-nickname query validation', () => {
+    const buildApp = async () => {
+      const authService = {
+        checkEmail: jest.fn().mockResolvedValue({ available: true }),
+        checkNickname: jest.fn().mockResolvedValue({ available: true }),
+      };
+      const moduleRef = await Test.createTestingModule({
+        controllers: [AuthController],
+        providers: [
+          { provide: AuthService, useValue: authService },
+          { provide: PrismaService, useValue: {} },
+          { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        ],
+      }).compile();
+      const app = moduleRef.createNestApplication();
+      app.useGlobalPipes(createGlobalValidationPipe());
+      await app.init();
+      return { app, authService };
+    };
+
+    it.each(['/auth/check-email', '/auth/check-email?email='])(
+      'rejects %s with 400 before reaching the service',
+      async (url) => {
+        const { app, authService } = await buildApp();
+        const res = await request(app.getHttpServer()).get(url).expect(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(authService.checkEmail).not.toHaveBeenCalled();
+        await app.close();
+      },
+    );
+
+    it.each(['/auth/check-nickname', '/auth/check-nickname?nickname='])(
+      'rejects %s with 400 before reaching the service',
+      async (url) => {
+        const { app, authService } = await buildApp();
+        const res = await request(app.getHttpServer()).get(url).expect(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(authService.checkNickname).not.toHaveBeenCalled();
+        await app.close();
+      },
+    );
+
+    it('forwards the raw query values and returns the service result unchanged', async () => {
+      const { app, authService } = await buildApp();
+      await request(app.getHttpServer())
+        .get('/auth/check-email?email=A%40Example.com')
+        .expect(200, { available: true });
+      await request(app.getHttpServer())
+        .get('/auth/check-nickname?nickname=%EA%B0%80%EB%82%98')
+        .expect(200, { available: true });
+      expect(authService.checkEmail).toHaveBeenCalledWith('A@Example.com');
+      expect(authService.checkNickname).toHaveBeenCalledWith('가나');
+      await app.close();
+    });
   });
 });

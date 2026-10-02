@@ -12,6 +12,7 @@ import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
 import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
+import { CheckEmailQueryDto, CheckNicknameQueryDto } from './dto/check-availability.dto';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -100,13 +101,13 @@ export class AuthController {
 
   @Get('check-email')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  checkEmail(@Query('email') email: string) {
-    return this.authService.checkEmail(email);
+  checkEmail(@Query() query: CheckEmailQueryDto) {
+    return this.authService.checkEmail(query.email);
   }
 
   @Get('check-nickname')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  checkNickname(@Query('nickname') nickname: string) {
-    return this.authService.checkNickname(nickname);
+  checkNickname(@Query() query: CheckNicknameQueryDto) {
+    return this.authService.checkNickname(query.nickname);
   }
 }

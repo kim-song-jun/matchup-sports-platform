@@ -1,14 +1,10 @@
 // apps/v1_web/src/lib/route-chrome/fragments/my-settings.ts
 // U37 — my-settings 세그먼트(components/my/my-api-clients.tsx, 9개 export function, 17곳).
-// 전부 정적 title(하드코딩 문자열)이고 activeTab='my'/bottomNav=false 공통. desktopHead는
-// 두 함수(ProfileEditPageClient/NotificationSettingsPageClient)에서만 분기한다 —
-// loading/error 분기는 desktopHead:true, success 분기는 자체 tm-desktop-page-head를
-// 직접 그려서 desktopHead:false로 끈다(app-shell-promotion.md §1.9 R3 패턴, 이 파일
-// my-api-clients.tsx:399,407 vs :613 / :1396,1406,1417 vs :1479 에서 직접 확인).
-// 나머지 5개(RecordConsent/TournamentRealNameVisibility/PlayerCardHidden/Sports/Location)
-// 는 loading·error·success 전부 desktopHead 값이 같거나(RecordConsent 등, desktopHead:true
-// 고정) AppChrome 호출이 하나뿐(Sports/Location/Theme/Withdrawal, desktopHead 미지정)이라
-// override 없이 테이블 값만으로 충분하다.
+// 전부 정적 title(하드코딩 문자열)이고 activeTab='my'/bottomNav=false 공통. desktopHead:true 인
+// 화면 중 자체 tm-desktop-page-head 를 그리는 5개(ProfileEdit/NotificationSettings/RecordConsent/
+// TournamentRealNameVisibility/PlayerCardHidden)는 그 상태에서 useShellOverride({ desktopHead: false })
+// 로 셸 헤더를 끈다(app-shell-promotion.md §1.9 R3 패턴) — 이 표의 true 는 셸 헤더만 남는 상태
+// (에러 등)의 값이다. Sports/Location/Theme/Withdrawal 은 desktopHead 미지정이라 override 가 없다.
 import type { RouteChromeEntry } from '../types';
 
 export const MY_SETTINGS_ROUTES: RouteChromeEntry[] = [
@@ -42,17 +38,17 @@ export const MY_SETTINGS_ROUTES: RouteChromeEntry[] = [
     },
   },
   {
-    // RecordConsentSettingsPageClient(:1659). error/success 둘 다 desktopHead:true — 분기 없음.
+    // RecordConsentSettingsPageClient(:1649). 데이터가 있으면 자체 헤더 → override 로 false.
     pattern: '/my/settings/record-consent',
     chrome: { title: '경기 기록 공개', activeTab: 'my', bottomNav: false, backHref: '/my/settings', desktopHead: true },
   },
   {
-    // TournamentRealNameVisibilitySettingsPageClient(:1792). error/success 둘 다 desktopHead:true.
+    // TournamentRealNameVisibilitySettingsPageClient(:1773). 에러 외에는 자체 헤더 → override 로 false.
     pattern: '/my/settings/tournament-real-name',
     chrome: { title: '대회 기록 실명 표시', activeTab: 'my', bottomNav: false, backHref: '/my/settings', desktopHead: true },
   },
   {
-    // PlayerCardHiddenSettingsPageClient(:1883). error/success 둘 다 desktopHead:true.
+    // PlayerCardHiddenSettingsPageClient(:1863). 에러 외에는 자체 헤더 → override 로 false.
     pattern: '/my/settings/player-card',
     chrome: { title: '선수 카드', activeTab: 'my', bottomNav: false, backHref: '/my/settings', desktopHead: true },
   },

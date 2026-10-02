@@ -1773,6 +1773,8 @@ export function RecordConsentSettingsPageClient() {
 export function TournamentRealNameVisibilitySettingsPageClient() {
   const visibility = useV1TournamentRealNameVisibility();
   const update = useV1UpdateTournamentRealNameVisibility();
+  // 에러 분기는 셸 헤더가 유일한 헤더라 그대로 두고, 나머지는 자기 `.tm-desktop-page-head` 를 그리므로 셸 헤더를 끈다(알림 설정과 같은 R3 패턴).
+  useShellOverride({ desktopHead: visibility.isError ? undefined : false });
   const [toggleError, setToggleError] = useState(false);
 
   if (visibility.isError) {
@@ -1861,6 +1863,8 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
 export function PlayerCardHiddenSettingsPageClient() {
   const state = useV1PlayerCardHidden();
   const update = useV1UpdatePlayerCardHidden();
+  // 에러 분기는 셸 헤더가 유일한 헤더라 그대로 두고, 나머지는 자기 `.tm-desktop-page-head` 를 그리므로 셸 헤더를 끈다(알림 설정과 같은 R3 패턴).
+  useShellOverride({ desktopHead: state.isError ? undefined : false });
   const [toggleError, setToggleError] = useState(false);
 
   if (state.isError) {

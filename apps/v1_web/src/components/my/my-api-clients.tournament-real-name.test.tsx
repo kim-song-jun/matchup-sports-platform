@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TournamentRealNameVisibilitySettingsPageClient } from './my-api-clients';
 
 // 대회 경기 기록 실명 표시 토글(2026-08-18 사용자 결정) — record-consent와 같은 화면
@@ -17,6 +18,7 @@ const hooks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/my/settings/tournament-real-name',
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
@@ -124,5 +126,20 @@ describe('TournamentRealNameVisibilitySettingsPageClient', () => {
     expect(screen.queryByText('대회 경기 기록에 실명 표시')).not.toBeInTheDocument();
     expect(screen.getByText('공개')).toBeInTheDocument();
     expect(container.querySelectorAll('.tm-card').length).toBe(1);
+  });
+
+  // 성공·로딩 분기는 자기 헤더를 그리므로 셸 헤더가 겹치지 않게 꺼야 하고, 에러는 셸 헤더가 유일한 헤더다.
+  it.each([
+    ['성공', { data: { visible: false }, isLoading: false, isError: false }, false],
+    ['로딩', { data: undefined, isLoading: true, isError: false }, false],
+    ['에러', { data: undefined, isLoading: false, isError: true }, undefined],
+  ])('데스크톱 셸 헤더 override: %s', (_name, state, expected) => {
+    hooks.visibility.mockReturnValue({ ...state, refetch: vi.fn() });
+    hooks.updateVisibility.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    renderWithClient(<TournamentRealNameVisibilitySettingsPageClient />);
+
+    const { result } = renderHook(() => useShellOverrideForRoute('/my/settings/tournament-real-name'));
+    expect(result.current.desktopHead).toBe(expected);
   });
 });

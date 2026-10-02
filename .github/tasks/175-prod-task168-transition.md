@@ -276,3 +276,7 @@ alpha 의 안전장치(quiesce·백업·전환·migration-stage 영수증, 단�
 
 - 2026-09-27: 전환 방식 → C(alpha 방식). 중간 서비스 → C2(없음, 점검 시간 안에 연속). 시상 이름 → 현행 유지(PR #1309).
 - 미결: 점검 중 웹 화면 안내(점검 페이지)는 이 태스크 범위 밖 — 필요하면 UI 3안 절차로 별도 태스크.
+
+## 2026-10-02 PR review handoff
+
+사용자가 최신 production DB 사본 Stage A/B 리허설 상태를 **미실행**으로 확인했다. 기존 acceptance checkbox를 완료로 바꾸지 않는다. 수정 PR 11개 dev 병합 및 release 1.1.1 준비는 production GO 증거가 아니다. [현재 NO-GO 및 준비 기록](../../docs/ops/pr-review-2026-10-02.md).

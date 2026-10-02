@@ -567,13 +567,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 다 하고 "승부차기 종료"에서만 실패하는 깨진 UX가 된다. `isKnockoutFixture`
   // 는 그 판정을 프런트에도 그대로 노출한 것뿐이다(새 판정 로직 아님 —
   // `GET /games/:gameId`의 `GameDetail.isKnockoutFixture` doc 참고).
+  // sourceType 으로 거르지 않는다 — 현행 대회·리그 경기는 전부 TEAM_MATCH 이고
+  // 서버도 sourceType 이 아니라 대진 단계로 판정한다.
   const knockoutTied = useMemo(() => {
-    if (gameDetail.data?.sourceType !== 'TOURNAMENT_FIXTURE') return false;
     if (gameDetail.data?.isKnockoutFixture !== true) return false;
     const sidesList = gameDetail.data?.sides ?? [];
     if (sidesList.length !== 2) return false;
     return (scoreBySideId.get(sidesList[0].id) ?? 0) === (scoreBySideId.get(sidesList[1].id) ?? 0);
-  }, [gameDetail.data?.sourceType, gameDetail.data?.isKnockoutFixture, gameDetail.data?.sides, scoreBySideId]);
+  }, [gameDetail.data?.isKnockoutFixture, gameDetail.data?.sides, scoreBySideId]);
 
   const penaltyShootoutEligible = knockoutTied && regulationEnded;
 
@@ -1483,7 +1484,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             화면이 사라져 갈 곳도 없다. 남긴 이유는 **운영자가 상황을 알아야** 하기
             때문이다: 명단이 왜 비어 보이는지, 어느 팀이 아직 안 냈는지. 차단이 아니라
             경고다. */}
-        {/* 대회 축(TOURNAMENT_FIXTURE)은 제외한다 — 거기엔 라인업 제출 단계가 없어
+        {/* 레거시 TOURNAMENT_FIXTURE 는 제외한다 — 거기엔 라인업 제출 단계가 없어
             자동 생성된 초안이 영영 SUBMITTED 가 되지 않는다. 명단 검인에 선수가 다 차 있는데
             "아직 제출하지 않았어요" 가 뜨던 자리다(alpha 실측). */}
         {gameState === 'SCHEDULED' && startBlockedByTeams && (

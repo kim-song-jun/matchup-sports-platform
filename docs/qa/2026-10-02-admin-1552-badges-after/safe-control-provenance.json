@@ -1,0 +1,269 @@
+{
+  "title": "PR1552 Alpha admin badge target-size after observations",
+  "sourceProofFile": "safe-control-provenance.json",
+  "sourceUrl": "https://alpha.teameet.co.kr/admin/team-matches",
+  "environment": "Alpha, authenticated cloud Chromium browser",
+  "scope": "Six label-only crops and corresponding recorded DOM target/inner-label measurements at three actual CSS viewports. Only badge target-size and visual-label scope.",
+  "status": "SCOPED_MEASUREMENT_OBSERVATION",
+  "pipelineContext": {
+    "prUrl": "https://github.com/kim-song-jun/matchup-sports-platform/pull/1552",
+    "mergedAt": "2026-10-02T18:23:21Z",
+    "mergeCommitSha": "1d09562a9b7d1b2be261a89519167ff2a031a576",
+    "runUrl": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37047094838",
+    "runHeadSha": "1d09562a9b7d1b2be261a89519167ff2a031a576",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-10-02T18:37:35Z",
+    "source": "GitHub PR and deployment-run metadata independently read during publication; merge SHA equals deployed run head SHA."
+  },
+  "exactServingCommitSha": null,
+  "exactServingCommitShaStatus": "Unobserved on the page itself. Deployment evidence establishes pipeline context, not direct page-SHA verification.",
+  "measuredResult": {
+    "tournamentAnchor": "44x44 CSS pixels at each observed viewport",
+    "leagueAnchor": "approximately56.57x44 CSS pixels at each observed viewport",
+    "innerSpan": "Small visual badge dimensions preserved in separate spanCSS measurements.",
+    "evidenceBasis": "Anchor dimensions are recorded DOM measurements, not inferred from crop raster dimensions."
+  },
+  "captureProvenance": {
+    "url": "https://alpha.teameet.co.kr/admin/team-matches",
+    "urlQuery": null,
+    "timestampMeaning": "Each UTC is evidence-capture start immediately before DOM/metrics/screenshot within the same browser tool call; not a pixel-shutter microsecond.",
+    "cropCreatedUtc": "2026-10-02T19:55:47Z",
+    "cropMethod": "Pixel-preserving crop created by the capture worker from original viewport PNG. No further crop/redaction/re-encoding performed for publication.",
+    "cropCoordinates": "[left,top,right,bottom] in saved source-viewport PNG raster pixels, not DOM page-document clip coordinates. Source raster dimensions match each measured CSS viewport.",
+    "provenanceSource": "Capturing worker clarified source URL, timestamp semantics and crop coordinate system."
+  },
+  "images": [
+    {
+      "file": "mobile404-tournament-badge.png",
+      "utc": "2026-10-02T19:48:18.668Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "label": "tournament",
+      "anchorCSS": {
+        "height": 44,
+        "width": 44,
+        "x": 130.8000030517578,
+        "y": 302
+      },
+      "spanCSS": {
+        "height": 20.5,
+        "width": 35.025001525878906
+      },
+      "crop": [
+        131,
+        302,
+        174,
+        346
+      ],
+      "url": "https://alpha.teameet.co.kr/admin/team-matches",
+      "raster": {
+        "width": 43,
+        "height": 44
+      },
+      "bytes": 2056,
+      "sha256": "74b0e9510be3850c6cc3e2d7c4d2b091687da1e5d7dc8ae35c1c3a13501c5367",
+      "originalCropBytesUnchanged": true,
+      "captureType": "Label-only pixel crop, not full viewport",
+      "pixelReview": "Direct original crop inspection: badge label only; no person, team or account identity visible."
+    },
+    {
+      "file": "mobile404-league-badge.png",
+      "utc": "2026-10-02T19:48:58.746Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "label": "league",
+      "anchorCSS": {
+        "height": 44,
+        "width": 56.57500076293945,
+        "x": 130.8000030517578,
+        "y": 113.9000015258789
+      },
+      "spanCSS": {
+        "height": 20.5,
+        "width": 56.57500076293945
+      },
+      "crop": [
+        131,
+        114,
+        187,
+        157
+      ],
+      "url": "https://alpha.teameet.co.kr/admin/team-matches",
+      "raster": {
+        "width": 56,
+        "height": 43
+      },
+      "bytes": 2752,
+      "sha256": "f02738286a4062bde120dade5e98eeaa033a5778ba2bfe485f3c5cafdce38e10",
+      "originalCropBytesUnchanged": true,
+      "captureType": "Label-only pixel crop, not full viewport",
+      "pixelReview": "Direct original crop inspection: badge label only; no person, team or account identity visible."
+    },
+    {
+      "file": "tablet786-tournament-badge.png",
+      "utc": "2026-10-02T19:50:33.741Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 786,
+        "width": 786
+      },
+      "label": "tournament",
+      "anchorCSS": {
+        "height": 44,
+        "width": 44,
+        "x": 138.6666717529297,
+        "y": 340.8333435058594
+      },
+      "spanCSS": {
+        "height": 20.5,
+        "width": 35.020835876464844
+      },
+      "crop": [
+        139,
+        341,
+        182,
+        384
+      ],
+      "url": "https://alpha.teameet.co.kr/admin/team-matches",
+      "raster": {
+        "width": 43,
+        "height": 43
+      },
+      "bytes": 1854,
+      "sha256": "f2b0ac0223aec48bf675c2e2bafaa493677b0752b04700735a2f3865a054eab2",
+      "originalCropBytesUnchanged": true,
+      "captureType": "Label-only pixel crop, not full viewport",
+      "pixelReview": "Direct original crop inspection: badge label only; no person, team or account identity visible."
+    },
+    {
+      "file": "tablet786-league-badge.png",
+      "utc": "2026-10-02T19:50:39.939Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 786,
+        "width": 786
+      },
+      "label": "league",
+      "anchorCSS": {
+        "height": 44,
+        "width": 56.57291793823242,
+        "x": 138.6666717529297,
+        "y": 110.16667175292967
+      },
+      "spanCSS": {
+        "height": 20.5,
+        "width": 56.57291793823242
+      },
+      "crop": [
+        139,
+        111,
+        195,
+        154
+      ],
+      "url": "https://alpha.teameet.co.kr/admin/team-matches",
+      "raster": {
+        "width": 56,
+        "height": 43
+      },
+      "bytes": 3051,
+      "sha256": "703b473f1e590dd7181ae7174bce2ecbd84ad235d32919b3a08002ce9c0bfa66",
+      "originalCropBytesUnchanged": true,
+      "captureType": "Label-only pixel crop, not full viewport",
+      "pixelReview": "Direct original crop inspection: badge label only; no person, team or account identity visible."
+    },
+    {
+      "file": "desktop1179-tournament-badge.png",
+      "utc": "2026-10-02T19:50:46.236Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "label": "tournament",
+      "anchorCSS": {
+        "height": 44,
+        "width": 44,
+        "x": 526,
+        "y": 383.140625
+      },
+      "spanCSS": {
+        "height": 19.703125,
+        "width": 35.015625
+      },
+      "crop": [
+        526,
+        384,
+        570,
+        427
+      ],
+      "url": "https://alpha.teameet.co.kr/admin/team-matches",
+      "raster": {
+        "width": 44,
+        "height": 43
+      },
+      "bytes": 2225,
+      "sha256": "1fbf80bf9df0322ba055eabbcfe35fff3e846a0b1942b5fd877c722f16d16590",
+      "originalCropBytesUnchanged": true,
+      "captureType": "Label-only pixel crop, not full viewport",
+      "pixelReview": "Direct original crop inspection: badge label only; no person, team or account identity visible."
+    },
+    {
+      "file": "desktop1179-league-badge.png",
+      "utc": "2026-10-02T19:50:46.236Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1179,
+        "width": 1179
+      },
+      "label": "league",
+      "anchorCSS": {
+        "height": 44,
+        "width": 56.578125,
+        "x": 526,
+        "y": 605.84375
+      },
+      "spanCSS": {
+        "height": 19.703125,
+        "width": 56.578125
+      },
+      "crop": [
+        526,
+        606,
+        582,
+        649
+      ],
+      "url": "https://alpha.teameet.co.kr/admin/team-matches",
+      "raster": {
+        "width": 56,
+        "height": 43
+      },
+      "bytes": 3042,
+      "sha256": "966d4e0a76375d3d653e6148a347dfb58114c118be8f3b2c72d7b16bbdea1ef6",
+      "originalCropBytesUnchanged": true,
+      "captureType": "Label-only pixel crop, not full viewport",
+      "pixelReview": "Direct original crop inspection: badge label only; no person, team or account identity visible."
+    }
+  ],
+  "limits": [
+    "Actual CSS viewports are404x606,786x505,1179x758, with recorded DPR1.25/1.5/1; they are not rounded402/787/1180 targets.",
+    "Cloud browser resize/zoom measurements are not physical-device touch testing.",
+    "Integer crop bounds may produce43px rows/columns; output raster must not be mistaken for the anchor hit-target size.",
+    "Crops show only badge labels; click routing, competition classification, filters, detail rendering, edit guards and full PR1545 functionality require separate evidence.",
+    "No overall feature PASS, WCAG compliance determination, issue closure or server-write verification is implied.",
+    "Exact serving page SHA unobserved."
+  ],
+  "privacy": "Only six designated label-only crops and minimized measurements are published. Full admin screenshots, DOM, member/account identities and private-source links are excluded."
+}

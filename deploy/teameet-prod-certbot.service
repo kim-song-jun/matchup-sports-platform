@@ -1,0 +1,12 @@
+[Unit]
+Description=Renew the Teameet production TLS certificate
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# DNS-01 through Route53 with the instance role (teameet-certbot-route53); the renewal conf already names
+# the dns-route53 authenticator. CloudFront validates origin certificates (the ALB never did), so behind it a lapse is an outage.
+ExecStart=/usr/bin/docker run --rm -v /home/ec2-user/teameet/deploy/certbot/conf:/etc/letsencrypt certbot/dns-route53@sha256:38fdfaed25f1e2554b22b835d257756afcfe3acacb8f943ec0884c251e561130 renew --quiet
+ExecStartPost=/usr/bin/docker exec teameet_nginx nginx -s reload

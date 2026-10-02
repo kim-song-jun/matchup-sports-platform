@@ -52,6 +52,8 @@ curl -sS --no-keepalive -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/l
 - **서버나 nginx 컨테이너 자체가 죽으면 이 점검 페이지는 뜨지 않는다.** 그 경우는 CloudFront 사용자 지정 오류 페이지(502/504)가 맡는다 — 설정은 앞단 전환 문서에서 다룬다.
 - **켜 둔 동안 배포 검증이 실패한다.** `deploy.yml`·`deploy-alpha.yml`의 공개 경로 헬스 확인
   (`/landing`, `/api/v1/health`, 릴리스 헤더)이 503을 받는다. 배포 전에 끄거나, 배포가 끝난 뒤 켠다.
+- **ACME 인증서 검증과 ALB 헬스체크도 503을 받는다.** 플래그 검사가 위치(location) 선택보다 먼저 돌기 때문이다.
+  alpha 인증서 갱신 타이머(`teameet-alpha-certbot.timer`)가 도는 시각과 겹치지 않게 짧게 쓴다.
 - **운영자 예외 통과는 없다.** 켜면 모든 접속자(운영자 포함)가 점검 페이지를 본다. 확인이 필요하면 인스턴스에서
   내부 포트로 직접 본다(`curl http://localhost:8121/api/v1/health`).
 - 안내 문구를 바꾸려면 `deploy/maintenance/index.html`을 수정해 배포한다(외부 리소스 없이 인라인 스타일만 쓴다).

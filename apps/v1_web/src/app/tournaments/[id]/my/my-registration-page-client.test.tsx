@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentRegistration } from '@/types/api';
 import { MyRegistrationPageClient } from './my-registration-client';
@@ -853,5 +853,86 @@ describe('MyRegistrationPageClient — payment_checking 안내는 참가비 유�
     const text = container.textContent ?? '';
     expect(text).toContain('입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.');
     expect(text).not.toContain('신청이 접수됐어요. 운영자가');
+  });
+});
+
+describe('#1535 실제 선택 신청 카드의 대회 KST 일정', () => {
+  const originalTimezone = process.env.TZ;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.TZ = 'UTC';
+    searchParams = new URLSearchParams('reg=registration-1&from=%2Ftournaments%2Ftournament-1');
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+  });
+  afterEach(() => {
+    if (originalTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTimezone;
+  });
+
+  function arrangeSchedule(start: string | null, end: string | null, status: V1TournamentRegistration['status'] = 'confirmed') {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ scheduledAt: start, scheduledEndAt: end }), isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status })], isLoading: false, isError: false, error: null,
+    });
+    return render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+  }
+  function scheduleRow() {
+    // 실제 카드의 ‘일정’ 행을 검증한다. 다른 신청일/확정일 텍스트로 성공할 수 없다.
+    return screen.getByText('일정', { exact: true }).parentElement!;
+  }
+
+  it.each(['awaiting_payment', 'confirmed', 'paid', 'waitlisted'] as const)('UTC 날짜 경계에서도 %s의 실제 카드 일정은 KST다', (status) => {
+    arrangeSchedule('2026-10-02T15:30:00.000Z', null, status);
+    expect(scheduleRow()).toHaveTextContent('10월 3일');
+    expect(scheduleRow()).not.toHaveTextContent('10월 2일');
+    expect(screen.getAllByText('테스트 대회', { exact: true }).length).toBeGreaterThan(0);
+  });
+
+  it.each(['UTC', 'America/Los_Angeles', 'Asia/Seoul'])('원 이슈의 현재 API ISO는 %s에서도 10/3으로 표시한다', (timezone) => {
+    process.env.TZ = timezone;
+    arrangeSchedule('2026-10-03T02:00:00.000Z', null);
+    expect(scheduleRow()).toHaveTextContent('10월 3일');
+    expect(scheduleRow()).not.toHaveTextContent('10월 2일');
+  });
+
+  it.each([
+    ['2026-10-02T15:30:00Z', '2026-10-03T14:59:00Z', '10월 3일 (토)'],
+    ['2026-10-02T15:30:00Z', '2026-10-03T15:30:00Z', '10월 3일 (토)~10월 4일 (일)'],
+    ['2026-12-31T15:00:00Z', null, '1월 1일 (금)'],
+    ['2026-10-03T11:00:00+09:00', null, '10월 3일 (토)'],
+    ['2026-10-03T00:30', null, '10월 3일 (토)'],
+    [null, '2026-10-04T02:00:00Z', '일정 미정'],
+    ['invalid', null, '일정 미정'],
+  ])('같은날/다른날/연말/offset/naive/미정 계약 (%s, %s)', (start, end, expected) => {
+    const view = arrangeSchedule(start, end);
+    expect(scheduleRow().textContent).toBe(`일정${expected}`);
+    view.unmount();
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(scheduleRow().textContent).toBe(`일정${expected}`);
+  });
+
+  it('일정 변경과 구별하여 신청일·확정일·결제일과 실제 상세 링크를 보존한다', () => {
+    const view = arrangeSchedule('2026-10-02T15:30:00Z', null);
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({
+        createdAt: '2026-09-28T12:00:00Z', confirmedAt: '2026-09-29T12:00:00Z',
+        payment: { method: 'bank_transfer', status: 'paid', amount: 0, paidAt: '2026-09-30T12:00:00Z' },
+      })], isLoading: false, isError: false, error: null,
+    });
+    view.unmount();
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(scheduleRow()).toHaveTextContent('10월 3일');
+    expect(screen.getByText('신청일', { exact: true }).parentElement).toHaveTextContent('2026.09.28');
+    expect(screen.getByText('확정일', { exact: true }).parentElement).toHaveTextContent('2026.09.29');
+    expect(screen.getByText('결제일', { exact: true }).parentElement).toHaveTextContent('2026.09.30');
+    for (const link of screen.getAllByRole('link', { name: '대회 상세 보기' })) {
+      expect(link).toHaveAttribute('href', expect.stringContaining('/tournaments/tournament-1'));
+    }
   });
 });

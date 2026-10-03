@@ -67,7 +67,7 @@ export function PrizeBreakdownEditor({
           </p>
         </div>
         {rows.map((row, index) => (
-          <div key={row.id} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px] gap-2">
+          <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_44px] gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px]">
             <input
               type="text"
               list="tournament-prize-label-presets"
@@ -87,14 +87,14 @@ export function PrizeBreakdownEditor({
               maxLength={80}
               aria-label={`상금 항목 ${index + 1} 내용`}
               placeholder="예: 600,000원 또는 우승 트로피"
-              className={fieldClass}
+              className={`${fieldClass} col-span-2 col-start-1 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1`}
             />
             <button
               type="button"
               onClick={() => onChange(rows.filter((candidate) => candidate.id !== row.id))}
               disabled={disabled}
               aria-label={`상금 항목 ${index + 1} 삭제`}
-              className="grid h-[44px] w-[44px] place-items-center rounded-xl text-[var(--text-caption)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red500)] disabled:opacity-50"
+              className="col-start-2 row-start-1 grid h-[44px] w-[44px] place-items-center rounded-xl text-[var(--text-caption)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red500)] disabled:opacity-50 sm:col-start-3"
             >
               <X size={17} aria-hidden="true" />
             </button>

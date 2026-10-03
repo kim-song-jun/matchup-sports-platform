@@ -1,0 +1,55 @@
+{
+  "sourceHost": "https://alpha.teameet.co.kr",
+  "dateUTC": "2026-10-03",
+  "screenshots": [
+    {
+      "file": "01-league-mobile-review.png",
+      "sha256": "b6afac98e985efca2b3692410194047270574e68ff4b8a587e0cdc69cfd0d297",
+      "captureUTC": null,
+      "captureUTCStatus": "Exact screenshot capture timestamp was not recorded. DOM timeline timestamps are separate measurements and must not be relabelled as image capture time.",
+      "rasterPixels": [
+        373,
+        77
+      ],
+      "viewportCSS": [
+        405,
+        606
+      ]
+    },
+    {
+      "file": "02-league-tablet-review.png",
+      "sha256": "92fb2741ad5fdb8fbabbd890055fca1109a1e914e78b66b9cbd57cb746ddb4bc",
+      "captureUTC": null,
+      "captureUTCStatus": "Exact screenshot capture timestamp was not recorded. DOM timeline timestamps are separate measurements and must not be relabelled as image capture time.",
+      "rasterPixels": [
+        481,
+        77
+      ],
+      "viewportCSS": [
+        789,
+        505
+      ]
+    },
+    {
+      "file": "03-league-desktop-review.png",
+      "sha256": "fe4073dec068243fcd11bcbe60f285e468a7bd747c7ef52701f61fbffbb56185",
+      "captureUTC": null,
+      "captureUTCStatus": "Exact screenshot capture timestamp was not recorded. DOM timeline timestamps are separate measurements and must not be relabelled as image capture time.",
+      "rasterPixels": [
+        480,
+        77
+      ],
+      "viewportCSS": [
+        1183,
+        758
+      ]
+    }
+  ],
+  "method": "Real alpha browser screenshot, pixel-preserving header-only crops. Original screenshots excluded from publication.",
+  "viewportNote": "DOM CSS405×606,789×505,1183×758. Tablet PNG788×505 from raster rounding; do not infer CSS width from PNG. Desktop Chromium window resize plus browser zoom, not physical-device emulation.",
+  "privacy": "Images and the sanitized DOM timeline were inspected before publication. No member names, phone numbers, dates of birth, secrets, or full roster DOM are included.",
+  "limits": "Header crops identify the review modal only; they do not prove focus or full-viewport layout. Focus behavior is supported by the sanitized DOM interaction timeline. Screenshot capture UTC was not recorded.",
+  "imageTimeLimit": "Screenshots were captured in this QA run on2026-10-03. Capture-time precision is unavailable; safe DOM timelines separately record exact observation UTC.",
+  "publicationScope": "Synthetic alpha QA evidence only; no application code changes.",
+  "captureTimestampNote": "Exact screenshot capture UTC was not recorded. captureUTC is null; timestamps in the separate DOM timeline are exact DOM observations, not screenshot timestamps."
+}

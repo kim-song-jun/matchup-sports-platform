@@ -1,0 +1,174 @@
+[
+  {
+    "activeInModal": false,
+    "activeText": "경기별 명단",
+    "step": "mobile after Tab",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:43:04.317Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "visibleModals": [
+      {
+        "height": 574,
+        "labelledby": "_r_8_",
+        "role": "dialog",
+        "width": 372.8000183105469
+      }
+    ]
+  },
+  {
+    "activeInModal": false,
+    "activeText": "마감 예외 허용",
+    "step": "mobile Shift+Tab after reopen",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:43:42.426Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    }
+  },
+  {
+    "activeAria": "모달 닫기",
+    "activeInModal": true,
+    "activeText": "",
+    "step": "mobile after programmatic supported locator focus, Shift+Tab wraps last Close then Tab wraps first Close",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:43:53.993Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "명단 검토",
+    "step": "tablet immediate after open",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:44:20.385Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "경기별 명단 접기",
+    "step": "tablet Tab",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:44:41.043Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "activeText": "명단 검토",
+    "reviewOpen": false,
+    "step": "tablet Escape",
+    "utc": "2026-10-03T02:44:41.262Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "명단 검토",
+    "step": "desktop initial after open",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:44:59.574Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "경기별 명단 접기",
+    "step": "desktop Tab",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:44:59.910Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "마감 예외 허용",
+    "step": "desktop Shift+Tab twice from background per-match roster",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T02:45:30.513Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "activeText": "명단 검토",
+    "reviewOpen": false,
+    "step": "desktop click X",
+    "utc": "2026-10-03T02:45:30.660Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "경기별 명단",
+    "step": "tournament mobile Tab after opening roster review",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:51:33.813Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "명단 검토",
+    "step": "tournament tablet initial focus",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:54:11.649Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "경기별 명단",
+    "step": "tournament tablet Tab",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:54:11.892Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "명단 검토",
+    "step": "tournament desktop initial focus",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:54:37.347Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "activeInModal": false,
+    "activeText": "경기별 명단",
+    "step": "tournament desktop Tab",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:54:37.631Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  }
+]

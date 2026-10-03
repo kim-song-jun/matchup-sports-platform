@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "file": "08-tournament-mobile-waiting-empty.png",
+      "sha256": "5313794ce33b792f00af99f4dd9a4e1b752ba089d8f0c220974559ef490943d2",
+      "bytes": 18363
+    },
+    {
+      "file": "09-tournament-tablet-waiting-empty.png",
+      "sha256": "6cf770dc03be177351bc2c945966a3d35b123826736430944ea6c45fc27eba61",
+      "bytes": 19429
+    },
+    {
+      "file": "10-tournament-desktop-waiting-empty.png",
+      "sha256": "ceca057f6b422f3f8907d6301bb06eaf63628f73dcdf2c0629cdff7300ad7cb8",
+      "bytes": 121867
+    },
+    {
+      "file": "README.md",
+      "sha256": "e366d5cb6bcec20f8171686b782b39e20cfe7f3fe455bf7ed2491cab09a93bd6",
+      "bytes": 2424
+    },
+    {
+      "file": "empty-filter-sanitized-proof.json",
+      "sha256": "26dab2340b898ea9ce7a53d3976991dec696762687de3971aaf16cfba42f0df7",
+      "bytes": 1757
+    },
+    {
+      "file": "provenance.json",
+      "sha256": "c08ddb04f5685a50337fc826004f8ec6096f407c25edcdd9749894a583d1cbc2",
+      "bytes": 2677
+    }
+  ]
+}

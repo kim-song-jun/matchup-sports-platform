@@ -1,0 +1,55 @@
+{
+  "sourceHost": "https://alpha.teameet.co.kr",
+  "dateUTC": "2026-10-03",
+  "screenshots": [
+    {
+      "file": "08-tournament-mobile-waiting-empty.png",
+      "sha256": "5313794ce33b792f00af99f4dd9a4e1b752ba089d8f0c220974559ef490943d2",
+      "captureUTC": null,
+      "captureUTCStatus": "Exact screenshot capture timestamp was not recorded. DOM timeline timestamps are separate measurements and must not be relabelled as image capture time.",
+      "rasterPixels": [
+        405,
+        606
+      ],
+      "viewportCSS": [
+        405,
+        606
+      ]
+    },
+    {
+      "file": "09-tournament-tablet-waiting-empty.png",
+      "sha256": "6cf770dc03be177351bc2c945966a3d35b123826736430944ea6c45fc27eba61",
+      "captureUTC": null,
+      "captureUTCStatus": "Exact screenshot capture timestamp was not recorded. DOM timeline timestamps are separate measurements and must not be relabelled as image capture time.",
+      "rasterPixels": [
+        788,
+        505
+      ],
+      "viewportCSS": [
+        789,
+        505
+      ]
+    },
+    {
+      "file": "10-tournament-desktop-waiting-empty.png",
+      "sha256": "ceca057f6b422f3f8907d6301bb06eaf63628f73dcdf2c0629cdff7300ad7cb8",
+      "captureUTC": null,
+      "captureUTCStatus": "Exact screenshot capture timestamp was not recorded. DOM timeline timestamps are separate measurements and must not be relabelled as image capture time.",
+      "rasterPixels": [
+        927,
+        758
+      ],
+      "viewportCSS": [
+        1183,
+        758
+      ]
+    }
+  ],
+  "method": "Real alpha browser screenshots. Mobile and tablet are full viewport; desktop is cropped horizontally to exclude the global sidebar.",
+  "viewportNote": "DOM CSS405×606,789×505,1183×758. Tablet PNG788×505 from raster rounding; do not infer CSS width from PNG. Desktop Chromium window resize plus browser zoom, not physical-device emulation.",
+  "privacy": "Images and the sanitized DOM timeline were inspected before publication. No member names, phone numbers, dates of birth, secrets, or full roster DOM are included.",
+  "limits": "Filtered empty-state copy evidence only. Desktop crop is 927x758 from a CSS1183x758 viewport. Exact screenshot capture UTC was not recorded.",
+  "imageTimeLimit": "Screenshots were captured in this QA run on2026-10-03. Capture-time precision is unavailable; safe DOM timelines separately record exact observation UTC.",
+  "publicationScope": "Synthetic alpha QA evidence only; no application code changes.",
+  "captureTimestampNote": "Exact screenshot capture UTC was not recorded. captureUTC is null; timestamps in the separate DOM timeline are exact DOM observations, not screenshot timestamps."
+}

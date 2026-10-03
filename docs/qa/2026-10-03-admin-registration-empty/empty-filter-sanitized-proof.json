@@ -1,0 +1,68 @@
+[
+  {
+    "confirmedFilter": "확정2",
+    "emptyText": [
+      "2대기취소 요청취소전체 명단 CSV신청이 없어요아직 신청한 팀이 없어요."
+    ],
+    "selected": [
+      "대기"
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:52:29.747Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    }
+  },
+  {
+    "emptyText": [
+      "2대기취소 요청취소전체 명단 CSV신청이 없어요아직 신청한 팀이 없어요."
+    ],
+    "scrollWidth": 789,
+    "selected": [
+      "대기"
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:52:50.770Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "emptyText": [
+      "2대기취소 요청취소전체 명단 CSV신청이 없어요아직 신청한 팀이 없어요."
+    ],
+    "scrollWidth": 1183,
+    "selected": [
+      "대기"
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:52:50.997Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    }
+  },
+  {
+    "emptyMessage": false,
+    "reviewButtons": 2,
+    "selected": [
+      "전체"
+    ],
+    "step": "All restored",
+    "utc": "2026-10-03T02:53:01.620Z"
+  },
+  {
+    "selected": [
+      "대기"
+    ],
+    "step": "tablet recaptured with empty message visible",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T02:54:11.022Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    }
+  }
+]

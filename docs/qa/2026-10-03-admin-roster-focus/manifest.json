@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "file": "01-league-mobile-review.png",
+      "sha256": "b6afac98e985efca2b3692410194047270574e68ff4b8a587e0cdc69cfd0d297",
+      "bytes": 7692
+    },
+    {
+      "file": "02-league-tablet-review.png",
+      "sha256": "92fb2741ad5fdb8fbabbd890055fca1109a1e914e78b66b9cbd57cb746ddb4bc",
+      "bytes": 8589
+    },
+    {
+      "file": "03-league-desktop-review.png",
+      "sha256": "fe4073dec068243fcd11bcbe60f285e468a7bd747c7ef52701f61fbffbb56185",
+      "bytes": 8029
+    },
+    {
+      "file": "README.md",
+      "sha256": "8028b5fd978e997f4e11de767e81dd8d760bcfd9c0157522ef391a9654037665",
+      "bytes": 2965
+    },
+    {
+      "file": "focus-sanitized-proof.json",
+      "sha256": "d9bfee0f882f89b9348c45eb8438f466b98bc351a0953783b77fae3cd49bf9f3",
+      "bytes": 5024
+    },
+    {
+      "file": "provenance.json",
+      "sha256": "c76ea830469d410d2a8fd3906adea3b81ae0ac3b2f9ed88461ab005ae3e1b601",
+      "bytes": 2689
+    }
+  ]
+}

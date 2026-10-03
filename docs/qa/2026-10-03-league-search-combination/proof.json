@@ -1,0 +1,2143 @@
+[
+  {
+    "step": "league search mobile initial",
+    "utc": "2026-10-03T03:47:06.283Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "mainCount": 20,
+    "uniqueMainCount": 20,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": "더 보기"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 405,
+    "cards": [
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league search mobile loaded next page settled",
+    "utc": "2026-10-03T03:47:27.372Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "mainCount": 35,
+    "uniqueMainCount": 35,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 405,
+    "cards": [
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/bcc2f1e3-a67b-41d9-b139-e5c135ff0a03?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league search mobile after in-app Back",
+    "utc": "2026-10-03T03:48:16.642Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "mainCount": 20,
+    "uniqueMainCount": 20,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": "더 보기"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 405,
+    "cards": [
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league search mobile latest first page",
+    "utc": "2026-10-03T03:49:09.733Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8&sort=latest",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "mainCount": 20,
+    "uniqueMainCount": 20,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": "더 보기"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 405,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league search mobile latest settled second page",
+    "utc": "2026-10-03T03:49:10.564Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8&sort=latest",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "mainCount": 35,
+    "uniqueMainCount": 35,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 405,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/bcc2f1e3-a67b-41d9-b139-e5c135ff0a03?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league search tablet latest inherited35",
+    "utc": "2026-10-03T03:49:47.387Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8&sort=latest",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "mainCount": 35,
+    "uniqueMainCount": 35,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 789,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/bcc2f1e3-a67b-41d9-b139-e5c135ff0a03?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league tablet clear search settled",
+    "utc": "2026-10-03T03:49:59.544Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "mainCount": 20,
+    "uniqueMainCount": 20,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": "더 보기"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 789,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4e04f44-91dd-45d8-ab85-c654c1ad81f5?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 23:50",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e9235b90-c119-4e6b-8227-6aff827099e4?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 24일 (목) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/969f7e12-bbc8-4ea9-92ef-5c1a669b25a3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 04:20",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/11b0a90e-7217-47c8-972c-8fedc2166c15?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 04:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/14fb34ba-cb48-426e-9537-e904d66718a6?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 06:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league tablet no-query latest second page settled",
+    "utc": "2026-10-03T03:50:14.497Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "mainCount": 40,
+    "uniqueMainCount": 40,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 789,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4e04f44-91dd-45d8-ab85-c654c1ad81f5?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 23:50",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e9235b90-c119-4e6b-8227-6aff827099e4?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 24일 (목) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/969f7e12-bbc8-4ea9-92ef-5c1a669b25a3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 04:20",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/11b0a90e-7217-47c8-972c-8fedc2166c15?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 04:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/14fb34ba-cb48-426e-9537-e904d66718a6?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 06:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/bcc2f1e3-a67b-41d9-b139-e5c135ff0a03?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league tablet no-result query settled",
+    "utc": "2026-10-03T03:50:24.061Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=QA-NOMATCH-20261003-CHECK",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "mainCount": 0,
+    "uniqueMainCount": 0,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "QA-NOMATCH-20261003-CHECK"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 789,
+    "cards": []
+  },
+  {
+    "step": "league tablet empty query cleared restores first20",
+    "utc": "2026-10-03T03:50:35.491Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "mainCount": 20,
+    "uniqueMainCount": 20,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": "더 보기"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 789,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4e04f44-91dd-45d8-ab85-c654c1ad81f5?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 23:50",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e9235b90-c119-4e6b-8227-6aff827099e4?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 24일 (목) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/969f7e12-bbc8-4ea9-92ef-5c1a669b25a3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 04:20",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/11b0a90e-7217-47c8-972c-8fedc2166c15?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 04:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/14fb34ba-cb48-426e-9537-e904d66718a6?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "9월 16일 (수) 06:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league tablet repeat search latest second page settled",
+    "utc": "2026-10-03T03:50:47.044Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "mainCount": 35,
+    "uniqueMainCount": 35,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 789,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/bcc2f1e3-a67b-41d9-b139-e5c135ff0a03?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league desktop search latest responsive",
+    "utc": "2026-10-03T03:50:47.358Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    },
+    "mainCount": 35,
+    "uniqueMainCount": 35,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 1183,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/88a6c302-075d-4ce8-b977-afd6e66dad8e?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/42b77c80-2a01-421b-a3d2-e471c87da5d3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/bcc2f1e3-a67b-41d9-b139-e5c135ff0a03?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 1일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8193e043-2f03-4fc0-bb93-04fa3400ece3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e90d0465-fbd0-42a3-ba44-6972a9fb471a?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/8245852d-0eb8-4196-b4d9-69a4b3dd3347?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 25일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d5f51611-e28f-4bbf-a3d7-9d1fb56aac90?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a697b4cc-c216-4812-8141-69a0b050f21a?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/40990aef-bc68-47bc-b588-5b7f8d16d1a0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 18일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f70821a4-6272-4235-b86d-2d7041048e37?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c4b296a0-1290-445c-bbe7-a603bc850b0b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e457a18a-a87e-4e1b-9d92-75f1a0ab5206?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 11일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61092f9d-4373-483f-8e0f-59381783e341?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/61a987ff-2eaf-4705-b818-911da4b1988f?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4f04ff9c-4d15-4438-96eb-f6c0be2beb52?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 4일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  },
+  {
+    "step": "league desktop search latest browser Back",
+    "utc": "2026-10-03T03:51:12.372Z",
+    "url": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    },
+    "mainCount": 20,
+    "uniqueMainCount": 20,
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "×"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": false,
+        "text": "더 보기"
+      },
+      {
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "scrollWidth": 1183,
+    "cards": [
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000008?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000006?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000005?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ad400000-0000-4000-8000-000000000004?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 26일 (토) 12:08",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/a77a2c7f-0eec-40b0-baba-3c7878ddbeb0?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 2일 (금) 10:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/194e0b75-e818-4957-a7a1-09b3b8f9a85c?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 18:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d0897874-bebd-481a-ac82-4879df068a62?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 1일 (목) 00:45",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/e1d525cb-6f30-43e2-b3a7-0ca29f418e47?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 18:30",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/b4f57afb-49bc-4a71-a0ab-b34c93c330c1?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 7일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c7ca8b1b-5166-4017-abac-b303ab5a86be?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "9월 30일 (수) 01:10",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4531e606-b436-4e24-ab3f-dbeda9b320e3?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 17일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d4057deb-e403-4305-b6ae-c31a751f328b?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 10일 (토) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/c8c6fa16-e5b8-4cd6-be67-31f290e42e87?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "10월 13일 (화) 19:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/d96711eb-144a-450f-bfa9-05e2be144c19?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/f4b7993d-a117-439c-8899-32db4682ac6d?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/ac0ea56c-cec7-4aab-97ef-bb20fd891ac2?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 15일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/4c55a4f8-b641-4ffb-85e2-392e1e880573?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/9d7df9c7-b561-4acd-bc73-439ea4ca82de?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      },
+      {
+        "href": "/team-matches/18aec14f-284e-4318-84e6-15a111f7d646?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+        "displayDate": "11월 8일 (일) 00:00",
+        "regularLeagueLabel": true
+      }
+    ]
+  }
+]

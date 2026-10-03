@@ -1,0 +1,45 @@
+[
+  {
+    "utc": "2026-10-03T03:54:38.495Z",
+    "expectedHref": "/matches/4452982a-ef1d-45e8-b27b-15607647d288?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+    "actualURL": "https://alpha.teameet.co.kr/matches/4452982a-ef1d-45e8-b27b-15607647d288?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+    "backHref": "/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+  },
+  {
+    "utc": "2026-10-03T03:55:41.837Z",
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "expectedHref": "/matches/59b656d9-a963-4f23-9aca-0b8ac75abcdf?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+    "actualURL": "https://alpha.teameet.co.kr/matches/59b656d9-a963-4f23-9aca-0b8ac75abcdf?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+    "backType": "browser Back",
+    "afterURL": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+    "afterFocus": {
+      "aria": null,
+      "href": null,
+      "insideRail": false,
+      "tag": "BODY"
+    },
+    "afterRailScroll": 0
+  },
+  {
+    "utc": "2026-10-03T03:57:35.692Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    },
+    "expectedHref": "/matches/529036e7-86b9-4ca6-b4ee-0c19aab12ca4?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+    "actualURL": "https://alpha.teameet.co.kr/matches/529036e7-86b9-4ca6-b4ee-0c19aab12ca4?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+    "backType": "in-app Back",
+    "backHref": "/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+    "afterURL": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+    "afterFocus": {
+      "aria": null,
+      "href": null,
+      "insideRail": false,
+      "tag": "BODY"
+    },
+    "afterRailScroll": 0
+  }
+]

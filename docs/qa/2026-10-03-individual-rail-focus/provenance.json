@@ -1,0 +1,95 @@
+{
+  "host": "https://alpha.teameet.co.kr",
+  "dateUTC": "2026-10-03",
+  "method": "Pixel-preserving crops of inspected real CUA screenshots. Crops end before the host-identity row. Focus geometry comes from the full rendered DOM, not inferred from crop dimensions.",
+  "viewportMethod": "Cloud Chromium native window resize and browser zoom:405×606,789×505,1183×758. Tablet raster788px is rounding; CSS measure789 is authoritative.",
+  "privacy": "No host/member names, phone numbers, profile identifiers, credentials, or raw roster information in these images/proofs. Source personal-list screenshots remain private.",
+  "images": [
+    {
+      "file": "rail-mobile-reverse-middle-clipped.png",
+      "cropPixels": [
+        16,
+        240,
+        389,
+        491
+      ],
+      "captureStartUTC": "2026-10-03T03:54:10.606Z",
+      "captureEndUTC": "2026-10-03T03:54:10.626Z",
+      "sourceContext": {
+        "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+        "width": 405,
+        "height": 606
+      },
+      "sha256": "1b642094ff63ca2edc0025c1d96afa1c8ddb715ee243c2ce57cb649d427341a0",
+      "rasterPixels": [
+        373,
+        251
+      ]
+    },
+    {
+      "file": "rail-mobile-forward-middle-clipped.png",
+      "cropPixels": [
+        16,
+        240,
+        389,
+        491
+      ],
+      "captureStartUTC": "2026-10-03T03:54:11.069Z",
+      "captureEndUTC": "2026-10-03T03:54:11.084Z",
+      "sourceContext": {
+        "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+        "width": 405,
+        "height": 606
+      },
+      "sha256": "7330150a3c683e8c5bb81061f4b0b9a75ca67d710cdfb0f61dff20713e9006a9",
+      "rasterPixels": [
+        373,
+        251
+      ]
+    },
+    {
+      "file": "rail-tablet-middle.png",
+      "cropPixels": [
+        110,
+        140,
+        675,
+        390
+      ],
+      "captureStartUTC": "2026-10-03T03:55:41.087Z",
+      "captureEndUTC": "2026-10-03T03:55:41.111Z",
+      "sourceContext": {
+        "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+        "width": 789,
+        "height": 505
+      },
+      "sha256": "eaa42d0ca4bf7303446f31de631282cd5511239b25ea42f57e9d4ae39ed879ab",
+      "rasterPixels": [
+        565,
+        250
+      ]
+    },
+    {
+      "file": "rail-desktop-third.png",
+      "cropPixels": [
+        52,
+        415,
+        1044,
+        691
+      ],
+      "captureStartUTC": "2026-10-03T03:56:19.161Z",
+      "captureEndUTC": "2026-10-03T03:56:19.182Z",
+      "sourceContext": {
+        "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+        "width": 1183,
+        "height": 758
+      },
+      "sha256": "9a1328fbf3f379240cdfafd119882a3ffb073f39651e5ace016d97ce8c8aa41e",
+      "rasterPixels": [
+        992,
+        276
+      ]
+    }
+  ],
+  "cropCoordinates": "cropPixels are left, top, right, bottom in the original raster; rasterPixels are the actual published crop dimensions.",
+  "captureTimeNote": "Start/end UTC bounds bracket each screenshot call and are separate from the exact DOM observation UTC. Geometry is recomputed from full rendered DOM rectangles, not crop dimensions."
+}

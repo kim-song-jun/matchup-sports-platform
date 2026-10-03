@@ -1,0 +1,34 @@
+[
+  {
+    "beforeUTC": "2026-10-03T03:47:27.372Z",
+    "beforeCount": 35,
+    "target": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+    "returnHref": "/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "afterUTC": "2026-10-03T03:48:16.642Z",
+    "afterCount": 20,
+    "afterURL": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ]
+  },
+  {
+    "beforeUTC": "2026-10-03T03:50:47.358Z",
+    "beforeCount": 35,
+    "target": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+    "afterUTC": "2026-10-03T03:51:12.372Z",
+    "afterCount": 20,
+    "afterURL": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=%EB%A6%AC%EA%B7%B8",
+    "search": [
+      {
+        "label": "팀매치 검색어",
+        "placeholder": "지역, 팀 이름, 경기조건 검색",
+        "value": "리그"
+      }
+    ],
+    "backType": "browser Back"
+  }
+]

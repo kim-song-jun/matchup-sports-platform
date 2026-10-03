@@ -1,0 +1,55 @@
+{
+  "scope": "Individual featured rail keyboard reveal, activation and return; read-only",
+  "windowUTC": "2026-10-03T03:52:42.164Z–2026-10-03T03:57:36Z",
+  "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+  "browser": "Cloud Chromium; native resize/browser zoom, not physical mobile/tablet",
+  "viewportsCSS": [
+    [
+      405,
+      606
+    ],
+    [
+      789,
+      505
+    ],
+    [
+      1183,
+      758
+    ]
+  ],
+  "finding": {
+    "title": "Middle featured card remains mostly clipped when keyboard-focused on mobile",
+    "severityCandidate": "P2 keyboard usability candidate; no conformance ruling",
+    "reproduction": [
+      "At405×606, focus the last sport link 수영0 without activating it, then Tab to first featured card",
+      "Tab once to middle card: focus changes to4452982a… but horizontal scroll remains0",
+      "Only76.8px of its276px width is inside the364.8px rail viewport, so most content/title is out of view",
+      "Tab to third card scrolls to487.2 and shows it fully; Shift+Tab back to middle leaves scroll487.2 and only76.8px visible on the opposite edge"
+    ],
+    "repeat": "Forward sequence repeated. Reverse clipped state was still unchanged at03:54:10.603Z after prior03:53:12.748Z screenshot/DOM. Not presented as an animation-only observation.",
+    "expected": "Bring the keyboard-focused card fully into the rail viewport when it fits.",
+    "actual": "Focus changes and outline appears on a narrow visible slice while card remains mostly clipped.",
+    "responsiveControls": "At789×505, middle card loses4px of276px at an edge, but title is readable; at1183×758 all320px cards fit and focus targets are fully visible.",
+    "cause": "Unknown; no source inspection performed. Do not assert a specific CSS/JS cause or full WCAG violation."
+  },
+  "verifiedPasses": [
+    "Tab reaches all three rail links from the preceding sport link; each link has tabIndex0",
+    "Third card automatically becomes fully visible on mobile/tablet",
+    "All3 rail hrefs exactly match corresponding main-list hrefs including from query",
+    "Enter activated the exact second-card detail on mobile, third on tablet, first on desktop",
+    "Back preserved latest+futsal query. Final main list remains6 unique matches, separate from3 featured duplicates"
+  ],
+  "returnObservation": "After tested Back flows, activeElement isBODY and rail scroll resets0. Recorded as context, not filed as an independent defect.",
+  "keyboardScope": "Test entry uses supported locator press(Tab) from the known last sport link, then actual Tab/Shift+Tab/Return keys. No DOM focus injection or scroll mutation.",
+  "safety": "Server writes0; no signout, bookings, applications, roster edits, notifications or security/permission changes.",
+  "evidence": [
+    "rail-safe-proof.json",
+    "rail-destinations-safe.json",
+    "provenance.json",
+    "rail-mobile-forward-middle-clipped.png",
+    "rail-mobile-reverse-middle-clipped.png",
+    "rail-tablet-middle.png",
+    "rail-desktop-third.png"
+  ],
+  "privacy": "Images end before host-identity row; no member/host names, phones, profile IDs or secret material. Source screenshots remain private."
+}

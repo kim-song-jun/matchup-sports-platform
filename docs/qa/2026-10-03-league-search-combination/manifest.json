@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "30ed6d763cb5e241565e8c7459d6d874095dcb9e3135238f7ace2f09a6491da0",
+      "bytes": 2747
+    },
+    {
+      "file": "proof.json",
+      "sha256": "0d8eb2cf0d5b4c298a6a351900999e840d89316f1e4418f014db8cf0252d8a7c",
+      "bytes": 95042
+    },
+    {
+      "file": "roundtrip-proof.json",
+      "sha256": "9acb6f577ae032811b4a09922a4ed3cccdcb89f7f46999008abad5035124f5e1",
+      "bytes": 1401
+    },
+    {
+      "file": "summary.json",
+      "sha256": "adbccb9581951a7741bfe0dc2ff58eed4981207630534c53f636bae4c9612eaf",
+      "bytes": 1599
+    }
+  ]
+}

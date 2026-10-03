@@ -1,0 +1,43 @@
+{
+  "scope": "League-only filter + search + latest/default ordering and detail return",
+  "windowUTC": "2026-10-03T03:46:31Z–2026-10-03T03:51:12.372Z",
+  "viewportsCSS": [
+    [
+      405,
+      606
+    ],
+    [
+      789,
+      505
+    ],
+    [
+      1183,
+      758
+    ]
+  ],
+  "passed": [
+    "Default kind=competition + q=리그:20→35 unique cards",
+    "Latest same query:20→35; exact35-ID sequence equal on mobile, repeated tablet query and responsive desktop",
+    "Default/latest query sets match; every returned card has regular-league label",
+    "Clear search preserves kind+sort; league-only no-query pagination20→40",
+    "Nonmatching query shows0, clear restores20 with kind+sort intact",
+    "Known completed league card redirects to dedicated league fixture URL and preserves correctly encoded Korean query in from",
+    "Mobile in-app Back and desktop browser Back retain q/kind/sort context but reset loaded35→20"
+  ],
+  "comparisons": {
+    "latestMobileTabletSame": true,
+    "latestTabletDesktopSame": true,
+    "defaultLatestSameSet": true
+  },
+  "findingScope": "35→20 adds filtered/league-route coverage to existing loaded-pagination loss. No new independent defect established here.",
+  "limits": [
+    "No server writes; results not reopened",
+    "Deadline-sort semantics not evaluated",
+    "Desktop35 observation is responsive continuation of tablet data, not independent full reload",
+    "Search clear transient intermediate states were allowed to settle before counts were asserted"
+  ],
+  "evidence": [
+    "proof.json",
+    "roundtrip-proof.json"
+  ]
+}

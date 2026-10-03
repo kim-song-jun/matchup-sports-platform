@@ -1,0 +1,102 @@
+{
+  "scope": "Independent safe-only calculation and pixel review",
+  "sequenceHashMethod": "SHA256 of compact UTF8 JSON array of full href strings, no final newline",
+  "DOMRecordCount": 16,
+  "excludedProofIndexes": [
+    8
+  ],
+  "acceptedRecordCount": 15,
+  "backChecks": [
+    {
+      "beforeIndex": 1,
+      "afterIndex": 2,
+      "step": "mobile default in-app Back",
+      "countBefore": 35,
+      "countAfter": 35,
+      "fullOrderedHrefEqual": true,
+      "sequenceSHA256": "440f80832fafdd75b669f88e99795e54609ad577f618d22cdf0ac8bbb2088334",
+      "targetFixtureIdentityMatchesExactlyOneListRow": true
+    },
+    {
+      "beforeIndex": 14,
+      "afterIndex": 15,
+      "step": "desktop latest browser Back",
+      "countBefore": 35,
+      "countAfter": 35,
+      "fullOrderedHrefEqual": true,
+      "sequenceSHA256": "91fdf6962bdf12133f7ed4910fd0f4dbe7e93b7bddb478ad7f0ef87c7ca39474",
+      "targetFixtureIdentityMatchesExactlyOneListRow": true
+    }
+  ],
+  "crossWidthLatestOrderedIdentityEqual": true,
+  "defaultLatestSameIdentitySetDifferentOrder": true,
+  "conditionChanges": {
+    "clearedQueryFullyLoaded": 40,
+    "nonmatchingQuery": 0,
+    "settledClearInitialPage": 20,
+    "settledClearMoreEnabled": true
+  },
+  "images": [
+    {
+      "file": "filtered-league-mobile-default-return.png",
+      "sha256": "6f90334503fc9f008ad36e995cfc04a5703f5bb086d35ad7ddf5cb36c49848b2",
+      "dimensions": [
+        370,
+        253
+      ],
+      "actualSafePixelsViewed": true,
+      "boundsAndDOMUTCMappingVerified": true
+    },
+    {
+      "file": "filtered-league-mobile-latest.png",
+      "sha256": "72daaed4bed9fdbc884d4420bf95842966c19dc131d5e743d8bb73b9045f8a9a",
+      "dimensions": [
+        370,
+        253
+      ],
+      "actualSafePixelsViewed": true,
+      "boundsAndDOMUTCMappingVerified": true
+    },
+    {
+      "file": "filtered-league-tablet-latest.png",
+      "sha256": "c2347c7b084a5174317cb44613874f4b6f5987c95fc476d2f5e45d00e0e962e7",
+      "dimensions": [
+        564,
+        253
+      ],
+      "actualSafePixelsViewed": true,
+      "boundsAndDOMUTCMappingVerified": true
+    },
+    {
+      "file": "filtered-league-desktop-latest.png",
+      "sha256": "24020df3cfa882e2dba6d3f4320b4ca442963d4cee3538b6971443a78da8ff63",
+      "dimensions": [
+        1074,
+        228
+      ],
+      "actualSafePixelsViewed": true,
+      "boundsAndDOMUTCMappingVerified": true
+    },
+    {
+      "file": "filtered-league-desktop-browser-return.png",
+      "sha256": "020637c2fe819fc750492e7d76c3fe90c311ec26b6dfe8544e7b91692ef7c7a6",
+      "dimensions": [
+        1074,
+        228
+      ],
+      "actualSafePixelsViewed": true,
+      "boundsAndDOMUTCMappingVerified": true
+    }
+  ],
+  "limitations": [
+    "Only two Back branches were tested here: mobile default in-app Back and desktop latest browser Back. This is not a six-combination filtered Back pass.",
+    "Latest identity order matches across three widths. Default and latest have the same identity set but different order; no sequence-equality claim is made between those sorts.",
+    "Cross-width/sort identity checks normalize URL pathnames and ignore from-query formatting. Within each Back comparison the full stored href sequence matches exactly.",
+    "Proof record 8 is stale during nonmatching-query clearing and is excluded. Accepted record 9 restores the initial 20 with More available, not an automatically loaded 40.",
+    "Safe images show only query/type/count UI; the competition filter and full league-card labeling/identity counts come from stored DOM records.",
+    "Tablet source raster is 788×505 while CSS metadata reports 789×505. No resizing occurred.",
+    "No fresh browser replay, physical-device coverage, whole-page keyboard pass or independent serving-SHA observation.",
+    "scrollY was not measured; no exact scroll-position or focus restoration claim.",
+    "Source metadata collection hashes describe different appendable snapshots, not a frozen five-image set; exact snapshot timestamps were not recorded."
+  ]
+}

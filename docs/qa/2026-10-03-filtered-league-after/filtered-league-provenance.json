@@ -1,0 +1,207 @@
+{
+  "createdUTC": "2026-10-03T09:42:37.446Z",
+  "scope": "Minimum pixel-preserving crops for filtered-league Back and latest results",
+  "method": "Integer raster cropping only. No resizing, retouching, compositing, or redaction fill.",
+  "sourceCaptureMetadataSHA256": "ec5e095f5a6827e872d68887f0ab3408ae498c5a3b1aa000186e393286dedb57",
+  "crops": [
+    {
+      "file": "filtered-league-mobile-default-return.png",
+      "sourceBasename": "filtered-league-mobile-default-return.png",
+      "outputBasename": "filtered-league-mobile-default-return.png",
+      "sourceCaptureMetadataRecordIndex": 13,
+      "observationUTC": "2026-10-03T09:28:35.149Z",
+      "captureStartUTC": "2026-10-03T09:28:35.416Z",
+      "captureEndUTC": "2026-10-03T09:28:35.435Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        370,
+        253
+      ],
+      "cropBoundsLTRB": [
+        20,
+        5,
+        390,
+        258
+      ],
+      "sourceSHA256": "a132e6b782bf765f130ee9fa4e4af6e19109a47370ac90c551208f47a7d62e80",
+      "outputSHA256": "6f90334503fc9f008ad36e995cfc04a5703f5bb086d35ad7ddf5cb36c49848b2",
+      "cropInspectedDirectly": true,
+      "privacyPurpose": "Search/type/count header only; no team rows or account area.",
+      "proofFile": "filtered-league-proof.json",
+      "proofIndex": 2,
+      "observationToCaptureSeconds": 0.267,
+      "sourceCollectorReportedPixelEquality": true,
+      "sourceCollectorReportedOriginalInspection": true
+    },
+    {
+      "file": "filtered-league-mobile-latest.png",
+      "sourceBasename": "filtered-league-mobile-latest.png",
+      "outputBasename": "filtered-league-mobile-latest.png",
+      "sourceCaptureMetadataRecordIndex": 14,
+      "observationUTC": "2026-10-03T09:29:31.918Z",
+      "captureStartUTC": "2026-10-03T09:29:32.200Z",
+      "captureEndUTC": "2026-10-03T09:29:32.221Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        370,
+        253
+      ],
+      "cropBoundsLTRB": [
+        20,
+        5,
+        390,
+        258
+      ],
+      "sourceSHA256": "872ff871aa176feaf6a00f28b9231ae7bd0b367da2f37f523a5d3bb4bf7a6586",
+      "outputSHA256": "72daaed4bed9fdbc884d4420bf95842966c19dc131d5e743d8bb73b9045f8a9a",
+      "cropInspectedDirectly": true,
+      "privacyPurpose": "Search/type/count header only; no team rows or account area.",
+      "proofFile": "filtered-league-proof.json",
+      "proofIndex": 4,
+      "observationToCaptureSeconds": 0.282,
+      "sourceCollectorReportedPixelEquality": true,
+      "sourceCollectorReportedOriginalInspection": true
+    },
+    {
+      "file": "filtered-league-tablet-latest.png",
+      "sourceBasename": "filtered-league-tablet-latest.png",
+      "outputBasename": "filtered-league-tablet-latest.png",
+      "sourceCaptureMetadataRecordIndex": 15,
+      "observationUTC": "2026-10-03T09:31:13.962Z",
+      "captureStartUTC": "2026-10-03T09:31:14.238Z",
+      "captureEndUTC": "2026-10-03T09:31:14.264Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        564,
+        253
+      ],
+      "cropBoundsLTRB": [
+        114,
+        5,
+        678,
+        258
+      ],
+      "sourceSHA256": "1d8108686161e40d9c77c67b6cee39685a9a92bbee94746711c05672ce476caf",
+      "outputSHA256": "c2347c7b084a5174317cb44613874f4b6f5987c95fc476d2f5e45d00e0e962e7",
+      "cropInspectedDirectly": true,
+      "privacyPurpose": "Search/type/count header only; no team rows or account area.",
+      "proofFile": "filtered-league-proof.json",
+      "proofIndex": 12,
+      "observationToCaptureSeconds": 0.276,
+      "sourceCollectorReportedPixelEquality": true,
+      "sourceCollectorReportedOriginalInspection": true
+    },
+    {
+      "file": "filtered-league-desktop-latest.png",
+      "sourceBasename": "filtered-league-desktop-latest.png",
+      "outputBasename": "filtered-league-desktop-latest.png",
+      "sourceCaptureMetadataRecordIndex": 16,
+      "observationUTC": "2026-10-03T09:31:16.346Z",
+      "captureStartUTC": "2026-10-03T09:31:16.622Z",
+      "captureEndUTC": "2026-10-03T09:31:16.686Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        1074,
+        228
+      ],
+      "cropBoundsLTRB": [
+        55,
+        143,
+        1129,
+        371
+      ],
+      "sourceSHA256": "5c85a3c503fa87c26fa5e69ad91c91c99be1504aba523f0cb004ab081f6f82db",
+      "outputSHA256": "24020df3cfa882e2dba6d3f4320b4ca442963d4cee3538b6971443a78da8ff63",
+      "cropInspectedDirectly": true,
+      "privacyPurpose": "Search/type/count header only; no team rows or account area.",
+      "proofFile": "filtered-league-proof.json",
+      "proofIndex": 14,
+      "observationToCaptureSeconds": 0.276,
+      "sourceCollectorReportedPixelEquality": true,
+      "sourceCollectorReportedOriginalInspection": true
+    },
+    {
+      "file": "filtered-league-desktop-browser-return.png",
+      "sourceBasename": "filtered-league-desktop-browser-return.png",
+      "outputBasename": "filtered-league-desktop-browser-return.png",
+      "sourceCaptureMetadataRecordIndex": 17,
+      "observationUTC": "2026-10-03T09:32:11.831Z",
+      "captureStartUTC": "2026-10-03T09:32:12.103Z",
+      "captureEndUTC": "2026-10-03T09:32:12.140Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        1074,
+        228
+      ],
+      "cropBoundsLTRB": [
+        55,
+        143,
+        1129,
+        371
+      ],
+      "sourceSHA256": "fc1c9db48c5d61c6f951e08d0ee25653a760c180795984ed58a1cb99fbba450f",
+      "outputSHA256": "020637c2fe819fc750492e7d76c3fe90c311ec26b6dfe8544e7b91692ef7c7a6",
+      "cropInspectedDirectly": true,
+      "privacyPurpose": "Search/type/count header only; no team rows or account area.",
+      "proofFile": "filtered-league-proof.json",
+      "proofIndex": 15,
+      "observationToCaptureSeconds": 0.272,
+      "sourceCollectorReportedPixelEquality": true,
+      "sourceCollectorReportedOriginalInspection": true
+    }
+  ],
+  "finalReviewUTC": "2026-10-03T09:47:36.233Z",
+  "captureMetadataHashScopeNote": {
+    "addedUTC": "2026-10-03T12:07:08.525568+00:00",
+    "scope": "The two metadata hashes were recorded from the shared capture metadata collection at different collection/review stages. That manifest was appended as later QA screenshots were captured; it is not a frozen five-image package manifest.",
+    "provenanceRecordedSHA256": "ec5e095f5a6827e872d68887f0ab3408ae498c5a3b1aa000186e393286dedb57",
+    "reviewerRecordedSHA256": "e9763c9a2ab52b98b54033885338100782484ccf72a811af29724fed51814a71",
+    "limit": "Exact timestamps of those hash snapshots were not recorded. finalReviewUTC is not asserted to be the earlier hash snapshot time. This explanation does not replace image hashes, capture UTC bounds, or the per-image pixel checks. The original reviewer provenanceSHA256 is historical and predates this note."
+  },
+  "publicationLimit": "Publisher verified safe files only, without opening original screenshots or the source capture manifest. Original-to-crop equality remains collector-reported."
+}

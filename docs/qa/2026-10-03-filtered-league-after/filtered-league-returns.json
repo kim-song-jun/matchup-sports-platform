@@ -1,0 +1,38 @@
+[
+  {
+    "step": "mobile default in-app Back",
+    "beforeUTC": "2026-10-03T09:27:35.631Z",
+    "afterUTC": "2026-10-03T09:28:35.149Z",
+    "beforeCount": 35,
+    "afterCount": 35,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "targetURL": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+    "returnHref": "/team-matches?kind=competition&q=%EB%A6%AC%EA%B7%B8",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "desktop latest browser Back",
+    "beforeUTC": "2026-10-03T09:31:16.346Z",
+    "afterUTC": "2026-10-03T09:32:11.831Z",
+    "beforeCount": 35,
+    "afterCount": 35,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=%EB%A6%AC%EA%B7%B8",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches?kind=competition&sort=latest&q=%EB%A6%AC%EA%B7%B8",
+    "targetURL": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9?from=%2Fteam-matches%3Fkind%3Dcompetition%26sort%3Dlatest%26q%3D%25EB%25A6%25AC%25EA%25B7%25B8",
+    "returnHref": null,
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  }
+]

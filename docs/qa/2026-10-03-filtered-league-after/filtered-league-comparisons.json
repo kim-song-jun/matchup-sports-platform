@@ -1,0 +1,9 @@
+{
+  "utc": "2026-10-03T09:32:12.141Z",
+  "mobileTabletLatestSameIDs": true,
+  "tabletDesktopLatestSameIDs": true,
+  "mobileDefaultLatestSameIDSet": true,
+  "limits": [
+    "Compared URL pathname identity and order; from-query parameter order is excluded from cross-query identity comparison."
+  ]
+}

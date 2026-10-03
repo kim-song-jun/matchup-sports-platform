@@ -1,0 +1,106 @@
+{
+  "scope": "Filtered league list: two Back branches and query-condition changes",
+  "observationWindow": {
+    "startUTC": "2026-10-03T09:27:35.124Z",
+    "endUTC": "2026-10-03T09:32:11.831Z"
+  },
+  "comparisonUTC": "2026-10-03T09:32:12.141Z",
+  "result": "Default/latest mobile and latest tablet/desktop full filtered lists contain 35 unique entries. Two tested Back branches preserve 35 and the complete href sequence.",
+  "filterContext": {
+    "kind": "competition",
+    "query": "리그",
+    "sorts": [
+      "default",
+      "latest"
+    ]
+  },
+  "backChecks": [
+    {
+      "returnIndex": 0,
+      "step": "mobile default in-app Back",
+      "beforeProofIndex": 1,
+      "afterProofIndex": 2,
+      "beforeUTC": "2026-10-03T09:27:35.631Z",
+      "afterUTC": "2026-10-03T09:28:35.149Z",
+      "beforeCount": 35,
+      "afterCount": 35,
+      "sequenceSHA256Before": "440f80832fafdd75b669f88e99795e54609ad577f618d22cdf0ac8bbb2088334",
+      "sequenceSHA256After": "440f80832fafdd75b669f88e99795e54609ad577f618d22cdf0ac8bbb2088334",
+      "checks": {
+        "count35Both": true,
+        "fullOrderedURLSequenceEqual": true,
+        "listURLExact": true,
+        "viewportConsistent": true,
+        "UTCOrder": true,
+        "targetFixtureIdentityInExactlyOneRow": true,
+        "targetHasLeagueFixtureRoute": true,
+        "acceptedObservations": true,
+        "appReturnHrefExact": true
+      },
+      "destinationNote": "List rows use team-match routes; the observed detail is a league-fixture route. Fixture identity matches one row, while full route strings differ."
+    },
+    {
+      "returnIndex": 1,
+      "step": "desktop latest browser Back",
+      "beforeProofIndex": 14,
+      "afterProofIndex": 15,
+      "beforeUTC": "2026-10-03T09:31:16.346Z",
+      "afterUTC": "2026-10-03T09:32:11.831Z",
+      "beforeCount": 35,
+      "afterCount": 35,
+      "sequenceSHA256Before": "91fdf6962bdf12133f7ed4910fd0f4dbe7e93b7bddb478ad7f0ef87c7ca39474",
+      "sequenceSHA256After": "91fdf6962bdf12133f7ed4910fd0f4dbe7e93b7bddb478ad7f0ef87c7ca39474",
+      "checks": {
+        "count35Both": true,
+        "fullOrderedURLSequenceEqual": true,
+        "listURLExact": true,
+        "viewportConsistent": true,
+        "UTCOrder": true,
+        "targetFixtureIdentityInExactlyOneRow": true,
+        "targetHasLeagueFixtureRoute": true,
+        "acceptedObservations": true
+      },
+      "destinationNote": "List rows use team-match routes; the observed detail is a league-fixture route. Fixture identity matches one row, while full route strings differ."
+    }
+  ],
+  "crossIdentityChecks": {
+    "mobileTabletLatestSameIDs": true,
+    "tabletDesktopLatestSameIDs": true,
+    "mobileDefaultLatestSameIDSet": true,
+    "mobileDefaultLatestSameOrder": false
+  },
+  "clearQueryChecks": {
+    "leagueOnlyLatestFullyLoaded40": true,
+    "nonmatchingQueryZero": true,
+    "settledClearRestoresInitial20": true,
+    "settledClearHasEnabledMore": true
+  },
+  "excludedProofIndexes": [
+    8
+  ],
+  "safeCropCount": 5,
+  "limits": [
+    "Only two Back branches were tested here: mobile default in-app Back and desktop latest browser Back. This is not a six-combination filtered Back pass.",
+    "Latest identity order matches across three widths. Default and latest have the same identity set but different order; no sequence-equality claim is made between those sorts.",
+    "Cross-width/sort identity checks normalize URL pathnames and ignore from-query formatting. Within each Back comparison the full stored href sequence matches exactly.",
+    "Proof record 8 is stale during nonmatching-query clearing and is excluded. Accepted record 9 restores the initial 20 with More available, not an automatically loaded 40.",
+    "Safe images show only query/type/count UI; the competition filter and full league-card labeling/identity counts come from stored DOM records.",
+    "Tablet source raster is 788×505 while CSS metadata reports 789×505. No resizing occurred.",
+    "No fresh browser replay, physical-device coverage, whole-page keyboard pass or independent serving-SHA observation.",
+    "scrollY was not measured; no exact scroll-position or focus restoration claim.",
+    "Source metadata collection hashes describe different appendable snapshots, not a frozen five-image set; exact snapshot timestamps were not recorded."
+  ],
+  "evidence": [
+    "filtered-league-proof.json",
+    "filtered-league-returns.json",
+    "filtered-league-comparisons.json",
+    "filtered-league-provenance.json"
+  ],
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761",
+    "headSHA": "235730755db0e7393bec9e01014a6906effde6af",
+    "successUpdatedUTC": "2026-10-03T07:30:13Z",
+    "source": "Independently read successful workflow; observed browser serving identity remains unknown",
+    "runtimeServingSHA": "unknown"
+  }
+}

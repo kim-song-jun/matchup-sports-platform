@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2985,
+      "sha256": "0c16a53de3fb1d7fe56381082a3dde411d7651199134145cef0332f26cf1fe7d"
+    },
+    {
+      "file": "filtered-league-comparisons.json",
+      "bytes": 298,
+      "sha256": "c6ddc7fbc5215c22b42a2ccada05571e535d841914a0afc7d9e81a25d098e023"
+    },
+    {
+      "file": "filtered-league-desktop-browser-return.png",
+      "bytes": 39443,
+      "sha256": "020637c2fe819fc750492e7d76c3fe90c311ec26b6dfe8544e7b91692ef7c7a6"
+    },
+    {
+      "file": "filtered-league-desktop-latest.png",
+      "bytes": 38303,
+      "sha256": "24020df3cfa882e2dba6d3f4320b4ca442963d4cee3538b6971443a78da8ff63"
+    },
+    {
+      "file": "filtered-league-mobile-default-return.png",
+      "bytes": 40347,
+      "sha256": "6f90334503fc9f008ad36e995cfc04a5703f5bb086d35ad7ddf5cb36c49848b2"
+    },
+    {
+      "file": "filtered-league-mobile-latest.png",
+      "bytes": 38591,
+      "sha256": "72daaed4bed9fdbc884d4420bf95842966c19dc131d5e743d8bb73b9045f8a9a"
+    },
+    {
+      "file": "filtered-league-proof.json",
+      "bytes": 93672,
+      "sha256": "8c553dfc9e92c3fcc99751e8aeee918fa6e55b083250c999f7bd8215e3b3dfb7"
+    },
+    {
+      "file": "filtered-league-provenance.json",
+      "bytes": 7745,
+      "sha256": "b45855c1d36722ad6c678bc85ec0cc07bd701bd0cfd45d7c65b8dfd41f0a6ebf"
+    },
+    {
+      "file": "filtered-league-returns.json",
+      "bytes": 1629,
+      "sha256": "09a8ef0b5f377807df76811625a2df717adb4575227adefb620b1a47542f5672"
+    },
+    {
+      "file": "filtered-league-tablet-latest.png",
+      "bytes": 42139,
+      "sha256": "c2347c7b084a5174317cb44613874f4b6f5987c95fc476d2f5e45d00e0e962e7"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4888,
+      "sha256": "6e62dce2262f08e6b28e0dd54a980952d4353f25de7d22b02b40368fd0bf47a9"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 4029,
+      "sha256": "9abf1fba18310f3383ccb02614fc633512f0c044e66292fe6886e4a9861d7753"
+    }
+  ],
+  "scope": "All files except manifest itself"
+}

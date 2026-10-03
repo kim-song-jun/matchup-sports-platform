@@ -465,8 +465,10 @@ export function TermsView() {
                     </label>
                   ) : null}
                 </div>
+                {/* 편집 중 행 추가·삭제·재정렬은 없다. 변경 가능한 위치 값으로 key를
+                    만들면 select가 재마운트되어 키보드 포커스를 잃는다. */}
                 {placements.map((placement, index) => (
-                  <div key={`${placement.context}-${index}`} className="grid gap-2 rounded-xl bg-[var(--surface-soft)] p-3 sm:grid-cols-[1fr_1fr_90px_auto] sm:items-end">
+                  <div key={index} className="grid gap-2 rounded-xl bg-[var(--surface-soft)] p-3 sm:grid-cols-[1fr_1fr_90px_auto] sm:items-end">
                     <label className="space-y-1">
                       <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">노출 위치</span>
                       <select className={fieldClass} value={placement.context} onChange={(event) => setPlacementContext(index, event.target.value as V1ManagedTermsContext)} disabled={!canWrite}>

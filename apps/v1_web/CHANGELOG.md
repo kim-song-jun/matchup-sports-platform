@@ -1,5 +1,43 @@
 # v1_web
 
+## 1.1.4
+
+### Patch Changes
+
+- 4b67ad8: Explain that the existing team-match opponent contribution is the applying team's cost and connect the input explanation to its accessible description, preserving known amounts, unknown values and free-invitation semantics.
+- def2d00: Remove the dark overlay from text-free team-match list photos while preserving detail hero contrast and image fallback.
+- 855c0ff: Improve the tournament prize caption's light-theme contrast on its existing orange background without changing surrounding prize content or badges.
+
+## 1.1.3
+
+## 1.1.2
+
+### Patch Changes
+
+- 3cb3f3f: 활동 기록에서 경기 상세를 보고 돌아와도 선택한 종류 탭을 유지해요.
+- d408ba9: 관리자 개인 어워드의 수상명 입력이 모바일에서 삭제 버튼을 밀어내지 않도록 수정해요.
+- d9daad2: 관리자 명단 검토를 열면 키보드 포커스를 모달 안으로 이동하고 기존 닫기 후 복귀를 유지합니다.
+- 649cbf1: 관리자 신청 목록에서 선택한 상태의 빈 결과와 전체 신청이 없는 상태를 구분해 안내합니다.
+- 4a94b25: 대회 생성 단계 이동 시 작은 화면의 제목과 첫 입력이 고정 버튼에 가리지 않도록 스크롤 위치를 맞춰요.
+- 9406169: 전체 종료된 리그의 참가 명단 진입을 조회로 안내하고 개별 경기 종료와 구별합니다.
+- 9e9ccae: 지역 필터와 모순되던 개인 매치 목록의 고정 서울 제목을 중립 ‘개인 매치’로 교정합니다.
+- 66d55af: 리그 경기 일정 필터를 URL에 보존하고 시즌 결산에서 돌아올 때 같은 선택과 목록을 복원합니다.
+- f6b3408: 관리자 리그 경기 영상의 일정 날짜와 시각을 경기 상세와 같은 한국 시간으로 표시해요.
+- 067a7be: 개인매치 추천 레일에서 키보드로 이동한 카드와 포커스 테두리를 표시해요.
+- 130f51d: 내 신청의 대회 일정을 공용 한국 시간 서식으로 표시해 상세와 날짜를 일치시킵니다.
+- e57bea3: 참가 선수 명단의 기존 안내 카드에 선택한 팀과 대회·리그 이름을 표시합니다.
+- 771a443: 선택 날짜·조회 조건의 빈 일정 안내와 처음 등록하는 일정 안내를 구분합니다.
+- 1c70fa4: 전술보드의 미저장 배치에서 뒤로가기를 누르면 계속 작성 또는 나가기를 확인합니다.
+- 76eb483: 팀 소개만 수정해도 미정 정원은 그대로 유지하고, 편집에서 정원을 미정으로 선택할 수 있어요.
+- 4f6ce4c: 팀 폼에서 키보드로 이동한 입력이 고정 행동 영역에 가릴 때 필요한 만큼 스크롤해 보여 줍니다.
+- 01f8b04: 팀매치 상세에서 돌아올 때 마지막으로 로드한 누적 목록과 더보기 상태를 메모리 캐시에서 복원합니다.
+- 04af9d5: 소속 팀 상세의 모바일·태블릿 화면에도 팀 일정 진입 링크를 제공합니다.
+- 7481487: 대회·리그 경기의 관리자 분류와 전용 관리 경로를 표시하고 일반 팀매치 상태 변경을 차단해요. 공동 기록과 팀 해체 안내의 경기 링크, 모집 중 팀 컨택 판정을 소속에 맞게 수정해요.
+
+  관리자 목록의 대회·리그 유형 배지 링크는 44px 터치 영역을 제공해요.
+
+- fae40ea: 대회 목록의 접근성 영역 이름을 선택 상태와 모순되지 않는 ‘대회 목록’으로 맞춥니다.
+
 ## 1.1.1
 
 ### Patch Changes

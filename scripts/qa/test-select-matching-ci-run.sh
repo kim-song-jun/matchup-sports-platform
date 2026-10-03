@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# scripts/release/select-matching-ci-run.sh 의 계약 테스트. deploy-alpha.yml 이 어떤 CI run 을
+# "이 릴리스 SHA 의 CI" 로 인정하는지를 픽스처 JSON 으로 고정한다.
+
+set -Eeuo pipefail
+
+readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+readonly SELECTOR="${ROOT_DIR}/scripts/release/select-matching-ci-run.sh"
+readonly SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+readonly OTHER_SHA='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+
+fail() {
+  echo "[test-select-matching-ci-run] $*" >&2
+  exit 1
+}
+
+# run <id> <event> <status> <conclusion|null> <sha> <login> <created_at> [head_branch] [triggering_login]
+# triggering_login 을 생략하면 actor 와 같다(재실행이면 사람으로 갈라진다).
+run_json() {
+  local id="$1" event="$2" status="$3" conclusion="$4" sha="$5" login="$6" created="$7" branch="${8:-dev}" trig="${9:-$6}"
+  jq -nc --argjson id "${id}" --arg event "${event}" --arg status "${status}" \
+    --arg conclusion "${conclusion}" --arg sha "${sha}" --arg login "${login}" \
+    --arg created "${created}" --arg branch "${branch}" --arg trig "${trig}" '{
+      id: $id, event: $event, status: $status,
+      conclusion: (if $conclusion == "null" then null else $conclusion end),
+      head_sha: $sha, head_branch: $branch, created_at: $created,
+      actor: {login: $login}, triggering_actor: {login: $trig}
+    }'
+}
+
+expect() {
+  local name="$1" want="$2"; shift 2
+  local got
+  got="$(printf '{"workflow_runs":[%s]}' "$(IFS=,; echo "$*")" | bash "${SELECTOR}" "${SHA}")"
+  [[ "${got}" == "${want}" ]] || fail "${name}: 기대 '${want}', 실측 '${got}'"
+  echo "[test-select-matching-ci-run] ${name} -> ${want}: OK"
+}
+
+expect_empty() {
+  local name="$1" want="$2" got
+  got="$(printf '{"workflow_runs":[]}' | bash "${SELECTOR}" "${SHA}")"
+  [[ "${got}" == "${want}" ]] || fail "${name}: 기대 '${want}', 실측 '${got}'"
+  echo "[test-select-matching-ci-run] ${name} -> ${want}: OK"
+}
+
+BOT='github-actions[bot]'
+T1='2026-10-03T09:00:00Z'
+T2='2026-10-03T09:05:00Z'
+
+expect_empty 'no runs' wait
+
+expect 'push run success' pass \
+  "$(run_json 1 push completed success "${SHA}" human "${T1}")"
+
+# 회귀 대상: 버전 커밋은 push run 이 없고 Promote 의 dispatch run 만 있다.
+expect 'bot workflow_dispatch success' pass \
+  "$(run_json 2 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}")"
+
+expect 'human workflow_dispatch is not accepted' wait \
+  "$(run_json 3 workflow_dispatch completed success "${SHA}" kim-song-jun "${T1}")"
+
+# 회귀 대상: bot 이 건 dispatch run 을 사람이 `gh run rerun` 하면 actor 는 bot 그대로,
+# triggering_actor 만 사람이다(실측: deploy.yml run 37114520414). 재실행도 인정해야 한다.
+rerun_run="$(run_json 4 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
+expect 'human re-run of bot dispatch is accepted' pass "${rerun_run}"
+expect 'human dispatch re-run by human is not accepted' wait \
+  "$(run_json 5 workflow_dispatch completed success "${SHA}" kim-song-jun "${T1}" dev kim-song-jun)"
+expect 'failed human re-run of bot dispatch fails' 'fail failure' \
+  "$(run_json 19 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
+
+expect 'other SHA is ignored' wait \
+  "$(run_json 6 push completed success "${OTHER_SHA}" human "${T1}")"
+
+# dev→main PR 의 pull_request run 도 head_branch=dev, head_sha=dev tip 으로 찍힌다.
+expect 'pull_request run is not accepted' wait \
+  "$(run_json 7 pull_request completed success "${SHA}" human "${T1}")"
+
+expect 'other branch is ignored' wait \
+  "$(run_json 8 push completed success "${SHA}" human "${T1}" main)"
+
+expect 'pending push run' wait \
+  "$(run_json 9 push in_progress null "${SHA}" human "${T1}")"
+expect 'queued bot dispatch run' wait \
+  "$(run_json 10 workflow_dispatch queued null "${SHA}" "${BOT}" "${T1}")"
+
+expect 'completed failure fails' 'fail failure' \
+  "$(run_json 11 push completed failure "${SHA}" human "${T1}")"
+expect 'completed cancelled fails' 'fail cancelled' \
+  "$(run_json 12 workflow_dispatch completed cancelled "${SHA}" "${BOT}" "${T1}")"
+
+# push run 이 있으면 push 가 판정한다 — 더 최근의 bot dispatch(좁은 HEAD^ 범위)가 덮지 못한다.
+expect 'push decides over newer bot dispatch (dispatch pending)' pass \
+  "$(run_json 13 workflow_dispatch in_progress null "${SHA}" "${BOT}" "${T2}")" \
+  "$(run_json 14 push completed success "${SHA}" human "${T1}")"
+expect 'push failure is not hidden by newer bot dispatch success' 'fail failure' \
+  "$(run_json 15 push completed failure "${SHA}" human "${T1}")" \
+  "$(run_json 16 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")"
+
+# 같은 종류끼리는 가장 최근 run 이 판정한다(입력 순서는 상관없다).
+expect 'newest bot dispatch wins over older failed one' pass \
+  "$(run_json 21 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")" \
+  "$(run_json 22 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}")"
+
+# 인정되지 않는 run 은 더 최근이어도 판정에 끼어들지 못한다.
+expect 'newer human dispatch does not override push success' pass \
+  "$(run_json 17 push completed success "${SHA}" human "${T1}")" \
+  "$(run_json 18 workflow_dispatch completed failure "${SHA}" kim-song-jun "${T2}")"
+
+echo "[test-select-matching-ci-run] all scenarios passed"

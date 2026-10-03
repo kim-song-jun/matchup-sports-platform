@@ -3,7 +3,8 @@ import { resolve } from 'node:path';
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMembersPageClient } from './teams-client';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -523,17 +524,18 @@ describe('TeamFormPageView — 정원 하한과 저장 오류', () => {
     render(<TeamFormPageView model={formModel({ minCapacity: 12, onFieldChange }, 12)} />);
 
     const select = screen.getByRole('combobox', { name: '정원' });
-    const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value));
+    const values = Array.from(select.querySelectorAll('option')).map((option) => Number(option.value)).filter((value) => value > 0);
     expect(Math.min(...values)).toBe(12);
     expect(screen.getByRole('button', { name: '정원 한 명 줄이기' })).toBeDisabled();
-    expect(screen.getByText('지금 팀원이 12명이라 그보다 적게 정할 수 없어요. 정원이 다 차면 자동으로 “정원 마감”으로 보여요.')).toBeInTheDocument();
+    expect(screen.getByText('지금 팀원이 12명이라 숫자 정원은 그보다 적게 정할 수 없어요. 정원이 다 차면 자동으로 “정원 마감”으로 보여요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '정원 한 명 늘리기' }));
     expect(onFieldChange).toHaveBeenCalledWith('capacity', 13);
   });
 
   it('하한이 없으면(팀 만들기) 2명부터 고를 수 있다', () => {
-    render(<TeamFormPageView model={formModel({}, 12)} />);
+    render(<TeamFormPageView model={{ ...formModel({}, 12), mode: 'create' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /더 꾸미기/ }));
 
     const values = Array.from(screen.getByRole('combobox', { name: '정원' }).querySelectorAll('option')).map((option) => Number(option.value));
     expect(Math.min(...values)).toBe(2);
@@ -611,6 +613,103 @@ describe('TeamFormPageView — 만들기 첫 화면', () => {
 
     expect(screen.queryByRole('button', { name: /더 꾸미기/ })).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: '정원' })).toBeVisible();
+  });
+
+  describe('#1534 fixed CTA의 키보드 포커스 가림', () => {
+    let frames: Map<number, FrameRequestCallback>;
+    beforeEach(() => {
+      frames = new Map();
+      let id = 0;
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        frames.set(++id, callback);
+        return id;
+      });
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((key) => { frames.delete(key); });
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+    function flushFocusFrames() {
+      act(() => {
+        const pending = [...frames.values()];
+        frames.clear();
+        for (const callback of pending) callback(0);
+      });
+    }
+    function setupFocus({ mode = 'create', position = 'fixed', footerTop = 416, footerHeight = 89, bottom = 435.3333333333333 } = {}) {
+      const base = createModel();
+      const model = { ...base, mode, team: { ...base.team, level: '초보' } } as TeamFormViewModel;
+      const view = render(<div className="tm-scroll-area"><TeamFormPageView model={model} /></div>);
+      if (mode === 'create') fireEvent.click(screen.getByRole('button', { name: /더 꾸미기/ }));
+      const level = screen.getByRole('combobox', { name: '레벨' });
+      const footer = view.container.querySelector<HTMLElement>('.tm-team-form-cta')!;
+      const scroller = view.container.querySelector<HTMLElement>('.tm-scroll-area')!;
+      // Browser boundary only: jsdom does not calculate CSS layout. These are the original
+      // observed tablet coordinates, not a claim that actual alpha pixels are fixed.
+      footer.style.position = position;
+      vi.spyOn(footer, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, footerTop, 787, footerHeight));
+      vi.spyOn(level, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, bottom - 48, 300, 48));
+      const scrollBy = vi.fn();
+      Object.defineProperty(scroller, 'scrollBy', { value: scrollBy, configurable: true });
+      return { view, model, level, footer, scrollBy };
+    }
+
+    it.each(['create', 'edit'])('실제 %s 폼의 팀 소개→Tab 레벨에서 가린 거리+링만 회복한다', async (mode) => {
+      const { level, footer, model, scrollBy } = setupFocus({ mode });
+      const user = userEvent.setup();
+      screen.getByRole('textbox', { name: '팀 소개' }).focus();
+      await user.tab();
+      // 수정 폼은 기존 가입 정책 두 버튼이 소개와 레벨 사이에 있다.
+      if (mode === 'edit') { await user.tab(); await user.tab(); }
+      expect(level).toHaveFocus();
+      flushFocusFrames();
+      expect(scrollBy).toHaveBeenCalledTimes(1);
+      expect(scrollBy.mock.calls[0][0].top).toBeCloseTo(23.3333333333333);
+      expect(scrollBy.mock.calls[0][0].behavior).toBe('instant');
+      expect(level).toHaveValue('초보');
+      expect(model.form?.onFieldChange).not.toHaveBeenCalled();
+      expect(within(footer).getByRole('link', { name: mode === 'edit' ? '취소' : '이전' })).toHaveAttribute('href', '/teams');
+    });
+
+    it.each([
+      { footerTop: 500 },
+      { footerTop: 0, footerHeight: 0 },
+      { position: 'absolute' },
+    ])('이미 보이는 필드/desktop 숨김/IME absolute CTA는 스크롤하지 않는다 (%j)', (options) => {
+      const { level, scrollBy } = setupFocus(options);
+      level.focus();
+      flushFocusFrames();
+      expect(level).toHaveFocus();
+      expect(scrollBy).not.toHaveBeenCalled();
+    });
+
+    it('Shift+Tab→Tab 반복에서도 포커스와 선택을 유지한다', async () => {
+      const { level, scrollBy } = setupFocus();
+      const user = userEvent.setup();
+      level.focus();
+      flushFocusFrames();
+      await user.tab({ shift: true });
+      await user.tab();
+      flushFocusFrames();
+      expect(level).toHaveFocus();
+      expect(level).toHaveValue('초보');
+      expect(scrollBy).toHaveBeenCalledTimes(2);
+    });
+
+    it('빠른 다음 포커스나 폼 unmount 후 이전 예약이 스크롤하지 않는다', () => {
+      const { view, level, scrollBy } = setupFocus();
+      level.focus();
+      screen.getByRole('combobox', { name: '정원' }).focus();
+      flushFocusFrames();
+      expect(scrollBy).not.toHaveBeenCalled();
+      level.focus();
+      view.unmount();
+      expect(frames.size).toBe(0);
+      flushFocusFrames();
+      expect(scrollBy).not.toHaveBeenCalled();
+      const returned = setupFocus();
+      returned.level.focus();
+      flushFocusFrames();
+      expect(returned.scrollBy).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

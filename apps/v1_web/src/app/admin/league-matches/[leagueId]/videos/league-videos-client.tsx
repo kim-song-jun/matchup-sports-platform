@@ -10,7 +10,7 @@ import { AdminToasts, useAdminToast } from '@/components/admin/admin-toast';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { FixtureVideoAddForm } from '@/components/fixture-videos/fixture-video-add-form';
 import { useV1AdminLeagueMatch } from '@/hooks/use-v1-api';
-import { formatAdminDateTime } from '@/lib/date-utils';
+import { formatAdminKstDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   useCreateLeagueFixtureVideoLink,
@@ -66,7 +66,7 @@ function LeagueFixtureVideoCard({
             {fixtureLabel(fixture)}
           </p>
           <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
-            {fixture.scheduledAt ? formatAdminDateTime(fixture.scheduledAt) : '일정 미정'} · 영상{' '}
+            {fixture.scheduledAt ? formatAdminKstDateTime(fixture.scheduledAt) : '일정 미정'} · 영상{' '}
             {fixture.videos.length}개
           </p>
         </div>

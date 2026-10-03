@@ -843,7 +843,12 @@ export function RegistrationsTab({
         loading={isPending}
         error={isError ? extractErrorMessage(error, '신청 목록을 불러오지 못했어요.') : undefined}
         onRetry={() => void refetch()}
-        empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
+        empty={
+          <AdminEmpty
+            title={statusFilter === 'all' ? '신청이 없어요' : '선택한 상태의 신청이 없어요'}
+            description={statusFilter === 'all' ? '아직 신청한 팀이 없어요.' : '다른 상태를 선택하거나 전체 신청을 확인해 보세요.'}
+          />
+        }
         skeletonCards={8}
         minCardWidth="360px"
         renderExpanded={(reg) =>

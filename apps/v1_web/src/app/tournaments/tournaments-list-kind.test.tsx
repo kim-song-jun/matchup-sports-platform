@@ -36,6 +36,63 @@ beforeEach(() => {
   });
 });
 
+describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', () => {
+  describe.each([false, true])('결과 카드 있음: %s', (hasItems) => {
+    it.each([
+      [null, '전체'], ['draft', '준비 중'], ['in_progress', '진행 중'], ['completed', '종료'],
+    ] as const)('%s 상태에서 영역·필터·결과 의미를 유지한다', (status, label) => {
+      const params = new URLSearchParams({ sportId: SWIMMING_ID, genderCategory: 'male' });
+      if (status) params.set('status', status);
+      search = params.toString();
+      tournamentsMock.mockReturnValue({
+        data: {
+          items: hasItems ? [{
+            id: 'swimming-control', title: '수영 대조 대회', status: status ?? 'open',
+            sport: { code: 'swimming', name: '수영' }, scheduledAt: null,
+            registrationDeadlineAt: null, venue: null, coverImageUrl: null,
+            teamCount: 8, confirmedCount: 0, entryFee: 0,
+          }] : [],
+          pageInfo: { hasNext: false, nextCursor: null, totalCount: hasItems ? 1 : 0 },
+        },
+        isPending: false, isError: false, isFetching: false, refetch: vi.fn(),
+      });
+      render(<TournamentsPage />);
+
+      const region = screen.getByRole('region', { name: '대회 목록' });
+      const headingId = region.getAttribute('aria-labelledby');
+      expect(headingId).toBeTruthy();
+      expect(document.querySelectorAll(`[id="${headingId}"]`)).toHaveLength(1);
+      const accessibleHeading = document.getElementById(headingId!);
+      expect(region).toContainElement(accessibleHeading);
+      expect(accessibleHeading).toHaveTextContent(/^대회 목록$/);
+      expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({
+        kind: 'all', status: status ?? undefined, sportId: SWIMMING_ID, genderCategory: 'male',
+      });
+      const summary = `${status ? `${label} · ` : ''}수영 · 남성부`;
+      expect(within(region).getByRole('link', { name: `필터 열기 — 현재 ${summary}` }))
+        .toHaveAttribute('href', `/tournaments?${new URLSearchParams({ ...Object.fromEntries(params), filter: '1' })}`);
+      if (hasItems) {
+        const list = within(region).getByRole('list', { name: '대회 목록' });
+        expect(within(list).getByRole('link', { name: /수영 대조 대회/ }))
+          .toHaveAttribute('href', '/tournaments/swimming-control');
+        expect(within(region).queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+      } else {
+        expect(within(region).getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();
+        expect(within(region).getByRole('link', { name: '팀밋 대회 보기' }))
+          .toHaveAttribute('href', '/events');
+      }
+    });
+  });
+
+  it('리그 유형에서도 중립 이름과 실제 kind 요청을 유지한다', () => {
+    search = 'kind=league&status=completed';
+    render(<TournamentsPage />);
+    const region = screen.getByRole('region', { name: '대회 목록' });
+    expect(within(region).getByRole('link', { name: '정규 리그' })).toHaveAttribute('aria-current', 'page');
+    expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'league', status: 'completed' });
+  });
+});
+
 describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
   describe.each([false, true])('종목 선택: %s', (withSport) => {
     it.each([
@@ -78,6 +135,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
       error: new Error('대회 목록 연결에 실패했어요.'), refetch,
     });
     render(<TournamentsPage />);
+    expect(screen.getByRole('region', { name: '대회 목록' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('대회 목록 연결에 실패했어요.');
     expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '목록 다시 불러오기' }));
@@ -89,6 +147,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
       data: undefined, isPending: true, isError: false, isFetching: true, refetch: vi.fn(),
     });
     render(<TournamentsPage />);
+    expect(screen.getByRole('region', { name: '대회 목록' })).toBeInTheDocument();
     expect(screen.getByLabelText('대회 목록 불러오는 중')).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
   });

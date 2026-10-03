@@ -251,3 +251,43 @@ describe('MatchTeamRosterCard — 참가 명단 한 줄(Task 180 R-1 C)', () => 
     expect(screen.queryByRole('link', { name: '참가 명단' })).not.toBeInTheDocument();
   });
 });
+
+describe('#1538 경기 상세의 실제 inline 참가 명단 안내', () => {
+  function leagueStatus(status: string) {
+    mock.setCompetitionKind('LEAGUE');
+    server.use(http.get('*/api/v1/tournaments/:id', () => HttpResponse.json({
+      status: 'success', data: { id: GAME_ROSTER_MSW.tournamentId, kind: 'regular_league', status },
+    })));
+  }
+
+  it('완료 리그는 inline도 조회 설명과 실제 목적지를 사용한다', async () => {
+    leagueStatus('completed');
+    mock.setGameState(G1.gameId, 'ENDED');
+    renderCard();
+    const link = await screen.findByRole('link', { name: '참가 명단 보기' });
+    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${encodeURIComponent(`/tournaments/tournament-1/matches/${TEAM_MATCH_ID}`)}`);
+    expect(screen.getByText('종료된 리그의 참가 명단은 조회만 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/선수 추가·빼기와 등번호는/)).not.toBeInTheDocument();
+    expect(mock.requests.filter((r) => r.method !== 'GET')).toHaveLength(0);
+  });
+
+  it.each(['SCHEDULED', 'LIVE', 'ENDED'] as const)('진행 리그의 개별 %s와 참가 명단 안내는 별도다', async (gameState) => {
+    leagueStatus('in_progress');
+    mock.setGameState(G1.gameId, gameState);
+    renderCard();
+    await screen.findByText('선수 추가·빼기와 등번호는 리그 참가 명단에서 바꿔요');
+    expect(screen.getByRole('link', { name: '참가 명단' })).toBeInTheDocument();
+  });
+
+  it('팀원은 참가 명단 편집 안내나 불필요한 리그 상태 조회가 없다', async () => {
+    mock.setCompetitionKind('LEAGUE');
+    mock.setViewerRole('TEAM_MEMBER');
+    let statusHits = 0;
+    server.use(http.get('*/api/v1/tournaments/:id', () => { statusHits += 1; return new HttpResponse(null, { status: 500 }); }));
+    renderCard();
+    await screen.findByRole('heading', { name: '우리 팀 출전' });
+    await settle();
+    expect(statusHits).toBe(0);
+    expect(screen.queryByRole('link', { name: '참가 명단' })).not.toBeInTheDocument();
+  });
+});

@@ -268,7 +268,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section">
         <SectionTitle title="대회 목록" />
-        <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
+        <div id="tournament-list-heading" className="sr-only">대회 목록</div>
 
         <CompetitionKindSegment active={activeKind} />
 

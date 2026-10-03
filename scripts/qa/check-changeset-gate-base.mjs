@@ -100,6 +100,62 @@ function extractStepShell(path) {
 }
 
 /**
+ * Gates 의 세 스텝이 workflow_dispatch(dev) 에서도 도는지 `if:` 를 직접 본다.
+ *
+ * 이 조건이 빠져도 base 해석 셸은 멀쩡해서 위 픽스처들이 모두 통과한다. 그러면 Promote 가
+ * 거는 dispatch CI 가 게이트를 건너뛰고도 green 으로 끝나고, 매처는 그 run 을 받아들여
+ * 검사 안 된 버전 커밋이 alpha 로 나간다.
+ */
+const DISPATCH_GATED_STEPS = [
+  'Verify release changeset',
+  'Verify changeset gate base resolution',
+  'Validate planned SemVer',
+];
+const DISPATCH_DEV_CLAUSE = /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/;
+
+function extractStepCondition(path, stepName) {
+  const lines = readFileSync(path, 'utf8').split('\n');
+  const nameIdx = lines.findIndex((l) => l.includes(`- name: ${stepName}`));
+  if (nameIdx < 0) fail(`워크플로에서 "${stepName}" 스텝을 못 찾았다: ${path}`);
+  const stepIndent = lines[nameIdx].match(/^\s*/)[0];
+  const fieldIndent = `${stepIndent}  `;
+  let endIdx = lines.length;
+  for (let i = nameIdx + 1; i < lines.length; i += 1) {
+    if (lines[i].startsWith(`${stepIndent}- `)) { endIdx = i; break; }
+  }
+  const ifIdx = lines.findIndex((l, i) => i > nameIdx && i < endIdx && l.startsWith(`${fieldIndent}if:`));
+  if (ifIdx < 0) return '';
+  const parts = [lines[ifIdx].slice(lines[ifIdx].indexOf('if:') + 3)];
+  for (let i = ifIdx + 1; i < endIdx; i += 1) {
+    // 같은 들여쓰기의 다음 필드(env:, run: …)가 시작하면 if 가 끝난 것이다
+    if (lines[i].startsWith(fieldIndent) && !lines[i].startsWith(`${fieldIndent} `)) break;
+    parts.push(lines[i]);
+  }
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function checkDispatchConditions(path) {
+  for (const stepName of DISPATCH_GATED_STEPS) {
+    const condition = extractStepCondition(path, stepName);
+    if (!DISPATCH_DEV_CLAUSE.test(condition)) {
+      fail(
+        `"${stepName}" 스텝의 if: 에 workflow_dispatch(dev) 절이 없다 — Promote 가 거는 CI 가 이 게이트를 건너뛴다.\n`
+        + `  받은 조건: ${condition || '(if: 없음)'}`,
+      );
+    }
+  }
+  console.log('[changeset-gate-base] if: 통과 — 게이트 3스텝이 workflow_dispatch(dev) 에서도 실행');
+  // 픽스처는 EVENT_NAME 을 직접 넣으므로, 워크플로가 그 값을 실제로 넘기는지는 여기서만 잡힌다.
+  const workflow = readFileSync(path, 'utf8');
+  if (!/EVENT_NAME: \$\{\{ github\.event_name \}\}/.test(workflow)) {
+    fail('"Verify release changeset" 에 EVENT_NAME 이 없다 — dispatch 에서 HEAD^ base 분기가 안 탄다.');
+  }
+  if (!/bash scripts\/qa\/test-select-matching-ci-run\.sh/.test(workflow)) {
+    fail('Gates 에서 test-select-matching-ci-run.sh 가 빠졌다 — alpha 의 CI 판정 규칙이 무검증이 된다.');
+  }
+}
+
+/**
  * 픽스처: **#951 의 실제 모양**을 재현한다 — 옛 base 에서 분기했고, 자기 changeset 은
  * 없고, 그사이 base 쪽에 남의 changeset 이 들어왔다.
  */
@@ -129,13 +185,13 @@ function makeFixture() {
 }
 
 /** 스텝 셸을 픽스처에서 실행하고, 그 스텝이 만든 변경 목록을 돌려준다. */
-function runStep(shell, { repo, baseTip, head }) {
+function runStep(shell, { repo, baseTip, head, eventName = '' }) {
   if (existsSync(OUT_FILE)) rmSync(OUT_FILE);
   let stderr = '';
   try {
     execFileSync('bash', ['-c', shell], {
       cwd: repo,
-      env: { ...process.env, BASE_SHA: baseTip, HEAD_SHA: head, BASE_REF: '', HEAD_REF: '' },
+      env: { ...process.env, EVENT_NAME: eventName, BASE_SHA: baseTip, HEAD_SHA: head, BASE_REF: '', HEAD_REF: '' },
       stdio: ['ignore', 'ignore', 'pipe'],
       encoding: 'utf8',
     });
@@ -247,9 +303,35 @@ function makeZeroBaseFixture() {
   return { repo: work, origin, head: devTip };
 }
 
+/**
+ * 픽스처 4 — **workflow_dispatch**(Promote 가 버전 커밋을 push 한 뒤 거는 CI).
+ *
+ * 이 이벤트엔 `event.before` 가 없어 BASE_SHA 가 빈 값이다. 스텝이 첫 부모를 base 로 잡아야
+ * 버전 커밋이 push 였다면 검사받았을 범위(= 그 커밋 하나)가 그대로 검사된다. 못 잡으면 보강이
+ * dev 를 받아 base==head 가 되어 스텝이 변경 목록 없이 죽는다.
+ * 부모 앞에 남의 커밋을 하나 더 둬서, base 가 첫 부모보다 더 오래된 곳으로 잡히면 드러나게 한다.
+ */
+function makeDispatchFixture() {
+  const repo = mkdtempSync(join(tmpdir(), 'cs-gate-dispatch-'));
+  const git = (...a) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const commit = (rel, content, message) => {
+    mkdirSync(join(repo, rel.split('/').slice(0, -1).join('/') || '.'), { recursive: true });
+    writeFileSync(join(repo, rel), `${content}\n`);
+    git('add', '-A');
+    git('-c', 'user.email=g@local', '-c', 'user.name=guard', 'commit', '-qm', message);
+    return git('rev-parse', 'HEAD');
+  };
+  git('init', '-q', '-b', 'dev', '.');
+  commit('README.md', 'root', 'root');
+  commit('scripts/earlier.mjs', 'earlier', 'earlier dev commit');
+  const head = commit('apps/v1_api/package.json', '{"version":"1.2.0"}', 'chore(release): version Teameet 1.2.0');
+  return { repo, head };
+}
+
 const fixture = makeFixture();
 try {
   if (args.includes('--self-test')) selfTest(fixture);
+  checkDispatchConditions(workflowPath);
   const shell = extractStepShell(workflowPath);
   const list = runStep(shell, fixture);
   const foreign = list.filter((f) => f.startsWith('.changeset/'));
@@ -325,6 +407,21 @@ try {
     }
   } finally {
     rmSync(fb.repo, { recursive: true, force: true });
+  }
+
+  // workflow_dispatch — BASE_SHA 가 비어 있어도 첫 부모(HEAD^)가 base 가 된다
+  const dispatch = makeDispatchFixture();
+  try {
+    const dispatchList = runStep(shell, { repo: dispatch.repo, baseTip: '', head: dispatch.head, eventName: 'workflow_dispatch' });
+    if (dispatchList.join(',') !== 'apps/v1_api/package.json') {
+      fail(
+        'workflow_dispatch 에서 base 가 첫 부모(HEAD^)로 잡히지 않았다 — 기대 목록은 버전 커밋이 바꾼\n'
+        + `  apps/v1_api/package.json 하나다. 받은 목록: ${dispatchList.join(', ') || '(비어 있음)'}`,
+      );
+    }
+    console.log('[changeset-gate-base] workflow_dispatch 통과 — 첫 부모를 base 로 써서 그 커밋의 변경만 검사');
+  } finally {
+    rmSync(dispatch.repo, { recursive: true, force: true });
   }
 } finally {
   rmSync(fixture.repo, { recursive: true, force: true });

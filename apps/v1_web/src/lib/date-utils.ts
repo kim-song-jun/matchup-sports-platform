@@ -284,6 +284,14 @@ export function formatEntryFee(fee: number): string {
   return `${formatAmountNumber(fee)}원`;
 }
 
+/** 경기 일정용 KST 고정 일시. 기존 admin 연도·날짜 형식을 유지한다. */
+export function formatAdminKstDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return dateStr;
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
 /**
  * 관리자 운영 화면 공용 일시 포맷터: 'YYYY.M.D HH:MM'
  * 대회 도메인 밖의 관리자 로그/운영 테이블·상세 화면에서 사용해요.

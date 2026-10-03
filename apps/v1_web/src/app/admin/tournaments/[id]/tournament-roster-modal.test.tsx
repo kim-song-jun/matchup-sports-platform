@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { RosterModal } from './registrations-tab';
@@ -54,6 +55,17 @@ const registration: V1AdminTournamentRegistration = {
   updatedAt: '2026-07-14T00:00:00.000Z',
 };
 
+function RosterFocusHarness({ canWrite = true }: { canWrite?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>명단 검토</button>
+      <button>경기별 명단</button>
+      <RosterModal open={open} onClose={() => setOpen(false)} registration={registration} showToast={() => undefined} canWrite={canWrite} />
+    </>
+  );
+}
+
 describe('admin tournament roster modal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,6 +103,28 @@ describe('admin tournament roster modal', () => {
       error: null,
       refetch,
     };
+  });
+
+  it.each(['ready', 'loading', 'error', 'empty', 'read-only'])('실제 명단 modal의 %s 상태도 trigger에서 바로 내부 focus를 받아요', async (state) => {
+    if (state === 'loading') queryState = { ...queryState, data: undefined, isPending: true };
+    if (state === 'error') queryState = { ...queryState, data: undefined, isError: true, error: new Error('명단 조회 실패') };
+    if (state === 'empty') queryState = { ...queryState, data: { ...(queryState.data as object), players: [] } };
+    const user = userEvent.setup();
+    render(<RosterFocusHarness canWrite={state !== 'read-only'} />);
+    const trigger = screen.getByRole('button', { name: '명단 검토' });
+    await user.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: '명단 검토 — 번개팀' });
+    expect(within(dialog).getByRole('button', { name: '모달 닫기' })).toHaveFocus();
+    for (const shift of [false, true, true, false]) {
+      await user.tab({ shift });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(addPlayer).not.toHaveBeenCalled();
+    expect(removePlayer).not.toHaveBeenCalled();
+    expect(updateEligibility).not.toHaveBeenCalled();
   });
 
   it('renders the roster gender snapshot for an admin', () => {

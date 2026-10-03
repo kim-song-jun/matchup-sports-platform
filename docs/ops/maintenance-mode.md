@@ -16,6 +16,8 @@ production은 인스턴스가 따로라 **환경별로 독립**이다.
 - 플래그는 요청마다 평가되므로 **reload·재기동이 필요 없다.** 파일을 만들면 즉시, 지우면 즉시 풀린다.
 - `limit_req` 초과·upstream 오류 같은 **일반 503은 점검 페이지로 바뀌지 않는다**(점검 전용 내부 코드 418을
   503으로 바꿔 내보내는 구조다).
+- 메서드와 상관없이 `503`을 돌려준다(POST·PUT·PATCH·DELETE·OPTIONS 포함). 점검 페이지는 내부 경로
+  `/__teameet_maintenance.html`로 옮겨 GET으로 내보내므로, 이 경로는 점검 전용으로 예약돼 있다.
 
 ## 켜기 / 끄기 / 확인
 
@@ -43,6 +45,7 @@ aws ssm send-command --region ap-northeast-2 --instance-ids "$IID" --document-na
 # 켠 뒤: 503 + 점검 페이지 기대
 curl -sS --no-keepalive -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/     # production
 curl -sS --no-keepalive https://teameet.co.kr/ | grep -o '잠시 점검 중이에요'
+curl -sS --no-keepalive -X POST -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/api/v1/auth/login   # 쓰기 메서드도 503
 # 끈 뒤: 200 기대
 curl -sS --no-keepalive -o /dev/null -w '%{http_code}\n' https://teameet.co.kr/landing
 ```

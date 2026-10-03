@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
@@ -545,6 +546,68 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
     teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  // #1546 실제 client의 역할 매핑과 두 responsive 블록을 검증한다.
+  // JSDOM의 DOM/Tab/Enter 계약이며 실제 alpha CSS viewport/AX/pixel 판정은 아니다.
+  function renderScheduleEntry(role: string, joinState = 'member', joinPolicy = 'approval_required') {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'fixture-viewer', email: null, onboardingStatus: 'complete' }, profile: { displayName: '합성 팀원' } }, isPending: false, isFetching: false, isError: false });
+    const team = baseTeamDetail();
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: {
+      ...team, profile: { ...team.profile, joinPolicy },
+      viewer: { role, membershipId: role === 'none' ? null : 'fixture-membership', joinState,
+        canRequestJoin: false, disabledReason: null, manageRoute: null },
+    }, isError: false });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState, message: '' } });
+    render(<TeamDetailPageClient teamId="team-1" />);
+    const mobile = document.querySelector<HTMLElement>('.tm-team-detail-body.tm-hide-desktop')!;
+    const desktop = document.querySelector<HTMLElement>('.tm-team-detail-desktop-layout.tm-show-desktop')!;
+    return { mobile, desktop };
+  }
+
+  it.each(['owner', 'manager', 'member'])('#1546 %s의 두 블록에 일정 링크를 제공하고 기존 관리·채팅을 유지한다', (role) => {
+    const { mobile, desktop } = renderScheduleEntry(role);
+    for (const block of [mobile, desktop]) {
+      const link = within(block).getByRole('link', { name: /팀 일정/ });
+      expect(link).toHaveAttribute('href', '/teams/team-1/schedules');
+      expect(link).toHaveTextContent('훈련·경기·이벤트 일정을 보고 참석을 체크해요.');
+      expect(link.tabIndex).toBe(0);
+      expect(link).not.toHaveAttribute('aria-hidden');
+      expect(link).not.toHaveAttribute('aria-disabled');
+      const reviews = within(block).getByRole('link', { name: /받은 후기/ });
+      expect(reviews.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const basicInfo = within(block).getByText('팀 개요');
+      expect(link.compareDocumentPosition(basicInfo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(Boolean(within(block).queryByRole('link', { name: /정보 수정/ }))).toBe(role !== 'member');
+    }
+    expect(screen.getAllByRole('link', { name: /팀 일정/ })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: '팀 채팅' })).toHaveLength(2);
+  });
+
+  it.each([
+    ['default', 'none', 'approval_required'],
+    ['pending', 'requested', 'approval_required'],
+    ['closed', 'none', 'closed'],
+  ])('#1546 비소속 %s 상태는 회원용 일정 링크를 노출하지 않는다', (_mode, joinState, joinPolicy) => {
+    renderScheduleEntry('none', joinState, joinPolicy);
+    expect(screen.queryByRole('link', { name: /팀 일정/ })).not.toBeInTheDocument();
+  });
+
+  it('#1546 mobile 기록 묶음의 후기 다음 Tab은 일정 링크이며 Enter로 현재 href를 활성화한다', async () => {
+    const user = userEvent.setup();
+    const { mobile } = renderScheduleEntry('owner');
+    const reviews = within(mobile).getByRole('link', { name: /받은 후기/ });
+    const schedule = within(mobile).getByRole('link', { name: /팀 일정/ });
+    const activation = vi.fn((event: Event) => event.preventDefault());
+    schedule.addEventListener('click', activation);
+    reviews.focus();
+    await user.tab();
+    expect(schedule).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(activation).toHaveBeenCalledOnce();
+    expect(schedule).toHaveAttribute('href', '/teams/team-1/schedules');
+    expect(teamApiMocks.useV1CreateTeamJoinApplication().mutateAsync).not.toHaveBeenCalled();
+    expect(teamApiMocks.useV1WithdrawTeamJoinApplication().mutateAsync).not.toHaveBeenCalled();
   });
 
   it('운영진이면 운영 메뉴에 "받은 컨택" 행이 팀컨택 필터 채팅 목록으로 연결되고 대기 건수가 배지로 붙는다', () => {

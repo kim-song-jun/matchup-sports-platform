@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -19,15 +19,46 @@ function RecordsSkeleton() {
   );
 }
 
+function recordTabFromQuery(value: string | null): UserRecordTabFilter {
+  return value === 'league' || value === 'tournament' || value === 'friendly' || value === 'personal' ? value : 'all';
+}
+
 export function UserRecordsPageClient({ userId }: { userId: string }) {
   // Task 166 BE-4: 팀 전적과 같은 4탭 + '개인'(본인 전용, 서버 API와 무관 — user-records-content.tsx 참고).
   // '전체'와 '개인'은 로컬 값이라 서버로 보내지 않는다('개인'은 애초에 이 API가 모르는 값이다).
-  const [activeType, setActiveType] = useState<UserRecordTabFilter>('all');
-  const serverType = activeType === 'all' || activeType === 'personal' ? undefined : activeType;
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
+  const urlType = recordTabFromQuery(searchParams.get('type'));
+  const recordsPath = `/users/${encodeURIComponent(userId)}/records`;
+  const [selection, setSelection] = useState({ userId, type: urlType });
+  const selectedType = selection.userId === userId ? selection.type : urlType;
+  useEffect(() => {
+    // 빠른 연속 선택 뒤 늦게 도착한 이전 query는 현재 URL의 초안을 덮어쓰지 않는다.
+    if (window.location.pathname === recordsPath && new URLSearchParams(window.location.search).toString() !== queryString) return;
+    setSelection({ userId, type: urlType });
+  }, [userId, urlType, queryString, recordsPath]);
+  const serverType = selectedType === 'all' || selectedType === 'personal' ? undefined : selectedType;
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     usePublicUserRecords(userId, undefined, serverType);
 
   const firstPage = data?.pages[0];
+  const confirmedOwner = firstPage?.userId === userId && firstPage.viewerIsOwner === true;
+  const activeType = selectedType === 'personal' && !confirmedOwner ? 'all' : selectedType;
+
+  const changeType = (type: UserRecordTabFilter) => {
+    if (type === 'personal' && !confirmedOwner) return;
+    const onRecordsPath = window.location.pathname === recordsPath;
+    const params = new URLSearchParams(onRecordsPath ? window.location.search : queryString);
+    const returnFrom = sanitizeRedirectPath(params.get('from'));
+    params.delete('from');
+    if (type === 'all') params.delete('type');
+    else params.set('type', type);
+    const query = params.toString();
+    const hash = onRecordsPath ? window.location.hash : '';
+    setSelection({ userId, type });
+    // Next의 native-history 연동을 사용한다. null은 Next 검색 상태와 앱 history stamp를 함께 갱신한다.
+    window.history.replaceState(null, '', withFromPath(`${recordsPath}${query ? `?${query}` : ''}${hash}`, returnFrom));
+  };
 
   // 공유 링크로 들어온 방문자에게 "활동 기록"만 보여주면 누구의 기록인지 알 수 없다.
   // page.tsx 의 metadata.title 은 이미 닉네임을 붙이고 있었는데 화면 헤더만 제네릭이었다.
@@ -38,7 +69,13 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
   // 마이페이지 등 프로필을 거치지 않고 바로 들어오는 진입점을 위한 `?from=`
   // 오버라이드 — public-profile-client.tsx와 동일 패턴(route-chrome backHref는
   // 검색 파라미터를 못 받는다).
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(searchParams.get('from'));
+  const returnParams = new URLSearchParams(queryString);
+  if (activeType === 'all') returnParams.delete('type');
+  else returnParams.set('type', activeType);
+  returnParams.delete('from');
+  const returnQuery = returnParams.toString();
+  const selfHref = withFromPath(`${recordsPath}${returnQuery ? `?${returnQuery}` : ''}`, fromPath);
   useShellOverride({
     title: firstPage?.nickname ? `${firstPage.nickname} 님의 활동 기록` : '활동 기록',
   });
@@ -64,12 +101,12 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
   return (
     <UserRecordsContent
       data={combined}
-      selfHref={withFromPath(`/users/${userId}/records`, fromPath)}
+      selfHref={selfHref}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}
       activeType={activeType}
-      onChangeType={setActiveType}
+      onChangeType={changeType}
     />
   );
 }

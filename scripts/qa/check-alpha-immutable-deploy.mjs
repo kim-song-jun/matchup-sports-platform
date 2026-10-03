@@ -54,6 +54,8 @@ requirePatterns(workflowPath, [
   [/create-alpha-release-manifest\.sh/, 'must create or reuse the immutable manifest'],
   [/deploy-alpha-via-ssm\.sh/, 'must delegate the pinned release to SSM'],
   [/sync-alpha-firebase-env\.sh/, 'must restore Firebase Admin credentials before deployment'],
+  [/runs\?branch=dev&head_sha=\$\{RELEASE_SHA\}/, 'must query CI runs for the exact release SHA'],
+  [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (accepts the Promote bot dispatch of version commits)'],
 ]);
 
 requirePatterns(firebaseRuntimeSyncPath, [

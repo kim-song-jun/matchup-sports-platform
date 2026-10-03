@@ -17,7 +17,8 @@ const award: V1TournamentAward = {
   note: '3골 1어시스트',
 };
 
-const { playerRecordsHolder } = vi.hoisted(() => ({
+const { playerRecordsHolder, awardsHolder } = vi.hoisted(() => ({
+  awardsHolder: { current: null as V1TournamentAward[] | null },
   playerRecordsHolder: {
     current: undefined as undefined | { tournamentId: string; goals: unknown[]; assists: unknown[] },
     error: false,
@@ -31,7 +32,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     data: { players: [{ id: 'player-1', userId: 'user-player-1', realName: '김선수' }] },
     isFetching: false,
   }),
-  useV1AdminTournamentAwards: () => ({ data: [award] }),
+  useV1AdminTournamentAwards: () => ({ data: awardsHolder.current ?? [award] }),
   // STATS-3 추천 chip — 기본은 빈 랭킹(기존 테스트 화면 불변). chip 시나리오는
   // holder를 채워 사용한다.
   useV1AdminTournamentPlayerRecords: () => ({ data: playerRecordsHolder.current, isError: playerRecordsHolder.error === true, refetch: vi.fn() }),
@@ -66,6 +67,58 @@ describe('AwardsTab permissions', () => {
 
     await user.click(saveButton);
     expect(setAwardsMutate).toHaveBeenCalled();
+  });
+});
+
+// 실제 AwardsTab/AwardRow의 local draft 계약을 확인한다. jsdom은 flex 폭·링·
+// 페이지 overflow를 계산하지 않으므로 이 테스트는 alpha 시각 RED→GREEN 증거가 아니다.
+describe('#1571 AwardsTab 빈 로컬 초안 상호작용', () => {
+  beforeEach(() => { vi.clearAllMocks(); awardsHolder.current = []; });
+  afterEach(() => { awardsHolder.current = null; });
+
+  it('추가와 연속 제목 입력 뒤 Tab/Shift+Tab 및 Enter로 로컬 행을 제거한다', async () => {
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(screen.getByText('등록된 개인 어워드가 없어요.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '+ 항목 추가' }));
+    const title = screen.getByPlaceholderText('어워드명 (예: MVP)');
+    await user.type(title, '합성 수상명 연속 입력 확인');
+    expect(title).toHaveValue('합성 수상명 연속 입력 확인');
+    await user.tab();
+    expect(screen.getByRole('button', { name: '항목 삭제' })).toHaveFocus();
+    await user.tab({ shift: true }); expect(title).toHaveFocus();
+    await user.tab(); await user.keyboard('{Enter}');
+    expect(screen.queryByPlaceholderText('어워드명 (예: MVP)')).not.toBeInTheDocument();
+    expect(screen.getByText('등록된 개인 어워드가 없어요.')).toBeInTheDocument();
+    expect(setAwardsMutate).not.toHaveBeenCalled();
+  });
+
+  it('두 행 중 지정 행만 제거하고 나머지 입력과 다시 추가를 유지한다', async () => {
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    const add = screen.getByRole('button', { name: '+ 항목 추가' });
+    await user.click(add); await user.click(add);
+    const titles = screen.getAllByPlaceholderText('어워드명 (예: MVP)');
+    await user.type(titles[0], '첫 번째 초안'); await user.type(titles[1], '남길 초안');
+    await user.click(titles[0]); await user.tab(); await user.keyboard('{Enter}');
+    expect(screen.queryByDisplayValue('첫 번째 초안')).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue('남길 초안')).toBeInTheDocument();
+    await user.click(add);
+    expect(screen.getAllByPlaceholderText('어워드명 (예: MVP)')).toHaveLength(2);
+    expect(screen.getByDisplayValue('남길 초안')).toBeInTheDocument();
+    expect(setAwardsMutate).not.toHaveBeenCalled();
+  });
+
+  it('저장하지 않은 초안은 unmount/remount 시 빈 조회로 돌아간다', async () => {
+    const user = userEvent.setup();
+    const first = render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: '+ 항목 추가' }));
+    await user.type(screen.getByPlaceholderText('어워드명 (예: MVP)'), '저장하지 않은 초안');
+    first.unmount();
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+    expect(screen.getByText('등록된 개인 어워드가 없어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '항목 삭제' })).not.toBeInTheDocument();
+    expect(setAwardsMutate).not.toHaveBeenCalled();
   });
 });
 

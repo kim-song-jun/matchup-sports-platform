@@ -136,7 +136,16 @@ push_dev() {
 }
 
 # GITHUB_TOKEN 으로 만든 push 는 다른 워크플로를 트리거하지 않으므로(workflow_dispatch 는
-# 예외), 방금 push 한 버전 커밋을 alpha 에 반영하려면 배포를 직접 dispatch 해야 한다.
+# 예외), 방금 push 한 버전 커밋에는 deploy.yml push CI run 이 생기지 않는다. alpha 배포가 기다리는
+# 그 CI run 을 직접 dispatch 해 만든다 — 반드시 dispatch_alpha_deploy 보다 먼저 부른다.
+dispatch_ci() {
+  if ! gh workflow run deploy.yml --repo "${GITHUB_REPOSITORY}" --ref dev; then
+    log "deploy.yml(CI) dispatch 에 실패했다 — 버전 커밋은 이미 dev 에 push 됐으니 수동으로 deploy.yml 을 ref=dev 로 dispatch 한 뒤 deploy-alpha.yml 을 dispatch 하라."
+    return 1
+  fi
+}
+
+# 방금 push 한 버전 커밋을 alpha 에 반영하려면 배포도 직접 dispatch 해야 한다(같은 이유).
 dispatch_alpha_deploy() {
   if ! gh workflow run deploy-alpha.yml --repo "${GITHUB_REPOSITORY}" --ref dev; then
     log "deploy-alpha.yml dispatch 에 실패했다 — 버전 커밋은 이미 dev 에 push 됐으니 수동으로 dispatch 하라."
@@ -324,6 +333,7 @@ main() {
     stable_version="$(jq -er '.stableVersion' <<< "${metadata}")"
     commit_version_bump "${stable_version}" || { log "버전 커밋 생성에 실패했다"; return 1; }
     push_dev || return 1
+    dispatch_ci || return 1
     dispatch_alpha_deploy || return 1
     versioned=true
   else

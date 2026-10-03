@@ -25,6 +25,7 @@ import type {
 } from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
+import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   cascadeCancelTeamMatchSchedulesInTx,
@@ -129,78 +130,97 @@ export class TeamMatchesService {
           } satisfies Prisma.V1TeamMatchWhereInput]
         : []),
     ];
-    const teamMatches = await this.prisma.v1TeamMatch.findMany({
-      where: {
-        deletedAt: null,
-        OR: [{ tournamentId: null }, { leagueId: { not: null } }],
-        AND: [
-          ...constraints,
-          ...(isDefaultDiscovery
-            ? [query.sort === 'recommended'
-                ? { OR: [{ startAt: { gte: now } }, { status: 'matched' as const }] }
-                : {
-                    OR: [
-                      { status: { in: ['recruiting' as const, 'closed' as const] }, startAt: { gte: now } },
-                      { status: 'matched' as const },
-                      {
-                        status: 'completed' as const,
-                        OR: [
-                          { completedAt: { gte: publicHistoryFrom } },
-                          { completedAt: null, startAt: { gte: publicHistoryFrom } },
-                        ],
-                      },
-                    ],
-                  }]
-            : []),
-          {
-            OR: [
-              { hostTeam: { status: 'active', deletedAt: null } },
-              { hostTeamId: null, leagueId: null, tournamentId: null },
-            ],
-          },
-        ],
-        ...(status === 'expired'
-          ? { startAt: { lt: now } }
-          : isDefaultDiscovery
-            ? query.sort === 'recommended'
-              ? {
-                // Matched games remain discoverable during play until the teams finalize them.
-                status: {
-                  in: ['recruiting', 'matched'],
-                },
-              }
-              : {}
-            : status === 'recruiting'
-            ? { status, startAt: { gte: now } }
-            : { status }),
-        ...(query.sportId ? { sportId: query.sportId } : {}),
-        ...(query.regionId ? { regionId: query.regionId } : {}),
-        ...(query.teamId ? { hostTeamId: query.teamId } : {}),
-        // 이 목록은 위 OR(tournamentId:null 이거나 leagueId 있음)에서 이미 tournamentId
-        // 있는 행을 뺀다 — 그래서 여기서 구분해야 할 건 사실상 "일반(둘 다 null)" 대
-        // "리그 경기(leagueId 있음)" 둘뿐이다.
-        ...(query.kind === 'friendly'
-          ? { leagueId: null }
-          : query.kind === 'competition'
-            ? { leagueId: { not: null } }
-            : {}),
-        ...(query.genderRule ? { genderRule: genderRuleColumnFilter(query.genderRule) } : {}),
-        ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
-        // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
-        // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
-        // 경기가 0건으로 나왔다.
-      },
-      include: this.teamMatchInclude(user),
-      orderBy: getOrderBy(query.sort),
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    const where: Prisma.V1TeamMatchWhereInput = {
+      deletedAt: null,
+      OR: [{ tournamentId: null }, { leagueId: { not: null } }],
+      AND: [
+        ...constraints,
+        ...(isDefaultDiscovery
+          ? [query.sort === 'recommended'
+              ? { OR: [{ startAt: { gte: now } }, { status: 'matched' as const }] }
+              : {
+                  OR: [
+                    { status: { in: ['recruiting' as const, 'closed' as const] }, startAt: { gte: now } },
+                    { status: 'matched' as const },
+                    {
+                      status: 'completed' as const,
+                      OR: [
+                        { completedAt: { gte: publicHistoryFrom } },
+                        { completedAt: null, startAt: { gte: publicHistoryFrom } },
+                      ],
+                    },
+                  ],
+                }]
+          : []),
+        {
+          OR: [
+            { hostTeam: { status: 'active', deletedAt: null } },
+            { hostTeamId: null, leagueId: null, tournamentId: null },
+          ],
+        },
+      ],
+      ...(status === 'expired'
+        ? { startAt: { lt: now } }
+        : isDefaultDiscovery
+          ? query.sort === 'recommended'
+            ? {
+              // Matched games remain discoverable during play until the teams finalize them.
+              status: {
+                in: ['recruiting', 'matched'],
+              },
+            }
+            : {}
+          : status === 'recruiting'
+          ? { status, startAt: { gte: now } }
+          : { status }),
+      ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...(query.regionId ? { regionId: query.regionId } : {}),
+      ...(query.teamId ? { hostTeamId: query.teamId } : {}),
+      // 이 목록은 위 OR(tournamentId:null 이거나 leagueId 있음)에서 이미 tournamentId
+      // 있는 행을 뺀다 — 그래서 여기서 구분해야 할 건 사실상 "일반(둘 다 null)" 대
+      // "리그 경기(leagueId 있음)" 둘뿐이다.
+      ...(query.kind === 'friendly'
+        ? { leagueId: null }
+        : query.kind === 'competition'
+          ? { leagueId: { not: null } }
+          : {}),
+      ...(query.genderRule ? { genderRule: genderRuleColumnFilter(query.genderRule) } : {}),
+      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
+      // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
+      // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
+      // 경기가 0건으로 나왔다.
+    };
+    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기를 그 뒤에 최근
+    // 것부터, 일정 미정(startAt null — 리그 대진 등)은 맨 뒤. startAt asc 한 줄로 두면 기간 제한
+    // 없이 실리는 matched·최근 완료 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는
+    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>",
+    // matches.service.ts list() 와 같은 규칙). '최신순'을 고른 경우만 등록 최신순이다.
+    const groups: Record<string, Pick<Prisma.V1TeamMatchFindManyArgs, 'where' | 'orderBy'>> = {
+      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+      upcoming: { where: { AND: [where, { startAt: { gte: now } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      past: { where: { AND: [where, { startAt: { lt: now } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      unscheduled: { where: { AND: [where, { startAt: null }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+    };
+    const include = this.teamMatchInclude(user);
+    const { items: teamMatches, hasNext, nextCursor } = await paginateByStatePriority({
+      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past', 'unscheduled'],
+      limit,
+      cursor: query.cursor,
+      fetchGroup: (group, page) =>
+        this.prisma.v1TeamMatch
+          .findMany({
+            ...groups[group],
+            take: page.take,
+            ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
+            include,
+          })
+          .then((rows) => rows.map((row) => ({ ...row, state: group }))),
     });
 
-    const pageItems = teamMatches.slice(0, limit).map((teamMatch) => {
+    const pageItems = teamMatches.map((teamMatch) => {
       assertTeamMatchPublicInvariant(teamMatch);
       return teamMatch;
     });
-    const hasNext = teamMatches.length > limit;
 
     // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
     // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
@@ -224,7 +244,7 @@ export class TeamMatchesService {
       items: pageItems.map((teamMatch) =>
         this.toListItem(teamMatch, user, teamMatch.hostTeamId ? winsByHostTeam.get(teamMatch.hostTeamId) ?? 0 : 0),
       ),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: { nextCursor, hasNext },
     };
   }
 
@@ -496,7 +516,7 @@ export class TeamMatchesService {
           take: 1,
         },
       },
-      // { id } tie-breaker: getOrderBy 와 같은 이유(리그 일괄 생성 행의 동률 정렬 결정성).
+      // { id } tie-breaker: list() 와 같은 이유(리그 일괄 생성 행의 동률 정렬 결정성).
       orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
@@ -2178,11 +2198,6 @@ function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
 
 // 리그 일괄 생성 행은 startAt·createdAt이 전부 동일할 수 있어, 유일 tie-breaker(id)가
 // 없으면 cursor 페이지네이션 경계에서 행이 누락/중복된다.
-function getOrderBy(sort: TeamMatchesQueryDto['sort']): Prisma.V1TeamMatchOrderByWithRelationInput[] {
-  if (!sort || sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
-  return [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }];
-}
-
 type TeamMatchApplicationLedgerRow = Pick<
   V1TeamMatchApplication,
   'id' | 'teamMatchId' | 'applicantTeamId' | 'appliedByUserId' | 'status'

@@ -408,6 +408,27 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     expect(hostItems.map((m: { content: string }) => m.content)).toEqual(expect.arrayContaining(['승인 뒤 첫 안내', '저도 갈게요']));
   });
 
+  it('목록 기본 정렬은 경기일 순 — 시작 전 경기를 가까운 날부터, 지난 경기는 그 뒤에 이어 페이지를 넘긴다', async () => {
+    // 이 테스트만의 종목으로 걸러 다른 테스트가 만든 매치와 섞이지 않게 한다. 등록 순서는 경기일과 엇갈리게 둔다.
+    const ownSportId = (await db.v1Sport.create({ data: { code: `order-${randomUUID()}`, name: '풋살' } })).id;
+    const at = (hours: number) => new Date(Date.now() + hours * 3600000).toISOString();
+    const far = await createMatch({ sportId: ownSportId, title: '다음 주 경기', startsAt: at(24 * 7), endsAt: at(24 * 7 + 2) });
+    const ended = await createMatch({ sportId: ownSportId, title: '어제 경기' });
+    await db.v1Match.update({ where: { id: ended }, data: { startAt: new Date(at(-26)), endAt: new Date(at(-24)) } });
+    const near = await createMatch({ sportId: ownSportId, title: '내일 경기', startsAt: at(24), endsAt: at(26) });
+
+    const page1 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2`).expect(200)).body.data;
+    expect(page1.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, far]);
+    expect(page1.pageInfo).toEqual({ nextCursor: `upcoming:${far}`, hasNext: true });
+
+    const page2 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2&cursor=${page1.pageInfo.nextCursor}`).expect(200)).body.data;
+    expect(page2.items.map((m: { matchId: string }) => m.matchId)).toEqual([ended]);
+    expect(page2.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+
+    const latest = (await get(outsider, `/matches?sportId=${ownSportId}&sort=latest`).expect(200)).body.data;
+    expect(latest.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, ended, far]);
+  });
+
   it('참가자가 모두 철회된 보류 매치는 완료하지 않고 참여 이력을 늘리지 않는다', async () => {
     const id = await createMatch();
     const applicationId = await join(id);

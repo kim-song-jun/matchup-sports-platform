@@ -1,0 +1,12 @@
+{
+  "navigationStartUTC": "2026-10-03T18:43:18.324Z",
+  "requestedURLTemplate": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/info",
+  "sourceURLSHA256": "a31af0d6862d208a75fd70d974458867c5aff50a8aca9f8d8bc8fdc27d2c3980",
+  "fixtureIdentifierSHA256": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown"
+  },
+  "navigationCompleteUTC": "2026-10-03T18:43:18.652Z"
+}

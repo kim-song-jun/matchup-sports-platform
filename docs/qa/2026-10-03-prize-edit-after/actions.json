@@ -1,0 +1,104 @@
+[
+  {
+    "index": 0,
+    "label": "mobile native Tab content to delete; no activation",
+    "startUTC": "2026-10-03T18:45:35.855Z",
+    "endUTC": "2026-10-03T18:45:35.925Z"
+  },
+  {
+    "index": 1,
+    "label": "mobile native ShiftTab delete to content",
+    "startUTC": "2026-10-03T18:45:36.021Z",
+    "endUTC": "2026-10-03T18:45:36.160Z"
+  },
+  {
+    "index": 2,
+    "label": "type QA-only local prize content into originally blank field",
+    "startUTC": "2026-10-03T18:45:36.260Z",
+    "endUTC": "2026-10-03T18:45:36.281Z"
+  },
+  {
+    "index": 3,
+    "label": "resize tablet via native window border and150 zoom",
+    "startUTC": "2026-10-03T18:45:54.586Z",
+    "endUTC": "2026-10-03T18:45:59.524Z"
+  },
+  {
+    "index": 4,
+    "label": "tablet focus prize name",
+    "startUTC": "2026-10-03T18:45:59.611Z",
+    "endUTC": "2026-10-03T18:45:59.885Z"
+  },
+  {
+    "index": 5,
+    "label": "tablet native Tab name to content",
+    "startUTC": "2026-10-03T18:45:59.983Z",
+    "endUTC": "2026-10-03T18:46:00.052Z"
+  },
+  {
+    "index": 6,
+    "label": "tablet native Tab content to delete",
+    "startUTC": "2026-10-03T18:46:00.159Z",
+    "endUTC": "2026-10-03T18:46:00.228Z"
+  },
+  {
+    "index": 7,
+    "label": "tablet native ShiftTab delete to content",
+    "startUTC": "2026-10-03T18:46:00.340Z",
+    "endUTC": "2026-10-03T18:46:00.475Z"
+  },
+  {
+    "index": 8,
+    "label": "desktop browser zoom100",
+    "startUTC": "2026-10-03T18:46:31.111Z",
+    "endUTC": "2026-10-03T18:46:31.252Z"
+  },
+  {
+    "index": 9,
+    "label": "desktop focus prize name",
+    "startUTC": "2026-10-03T18:46:31.325Z",
+    "endUTC": "2026-10-03T18:46:31.594Z"
+  },
+  {
+    "index": 10,
+    "label": "desktop native Tab name to content",
+    "startUTC": "2026-10-03T18:46:31.691Z",
+    "endUTC": "2026-10-03T18:46:31.760Z"
+  },
+  {
+    "index": 11,
+    "label": "desktop native Tab content to delete",
+    "startUTC": "2026-10-03T18:46:31.886Z",
+    "endUTC": "2026-10-03T18:46:31.955Z"
+  },
+  {
+    "index": 12,
+    "label": "desktop native ShiftTab delete to content",
+    "startUTC": "2026-10-03T18:46:32.052Z",
+    "endUTC": "2026-10-03T18:46:32.189Z"
+  },
+  {
+    "index": 13,
+    "label": "leave unsaved prize editor via observed Overview link",
+    "startUTC": "2026-10-03T18:46:32.280Z",
+    "endUTC": "2026-10-03T18:46:32.374Z"
+  },
+  {
+    "index": 14,
+    "label": "reenter info through observed section link after discarding local editor",
+    "startUTC": "2026-10-03T18:46:51.715Z",
+    "endUTC": "2026-10-03T18:46:51.795Z"
+  },
+  {
+    "index": 15,
+    "label": "focus rehydrated prize content",
+    "startUTC": "2026-10-03T18:46:52.188Z",
+    "endUTC": "2026-10-03T18:46:52.476Z"
+  },
+  {
+    "index": 16,
+    "label": "leave restored editor for safe Overview state",
+    "startUTC": "2026-10-03T18:47:09.800Z",
+    "endUTC": "2026-10-03T18:47:09.875Z"
+  }
+]

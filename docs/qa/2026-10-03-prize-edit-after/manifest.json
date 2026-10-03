@@ -1,0 +1,85 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 7905,
+      "sha256": "295b82ea8c79e42c9d4a80da72f64b6a31b9ad524130d06cbc12a2c314eef5c6"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 2857,
+      "sha256": "4d6fb28133444ce0dd2e8f83d1ec6ec58ea15e33209401c58bd56d9598717ac0"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 831,
+      "sha256": "57432ed05aa5ad0fe62217394d2f4fb59138cac441e00dd5c5903f593994d67f"
+    },
+    {
+      "file": "discard.json",
+      "bytes": 1772,
+      "sha256": "a5a86f7b815ea2b9fdc8da5037fae6cb7e06992b3e466bd3f5dc71a4cc43a366"
+    },
+    {
+      "file": "edit-desktop-content-focus.png",
+      "bytes": 77020,
+      "sha256": "1082c0ddd4c48930fe46c41d9c051c6097f73250a2ed39b6ff715f8886e2514c"
+    },
+    {
+      "file": "edit-desktop-restored.png",
+      "bytes": 75765,
+      "sha256": "50b350f17eadf4ac5e1a6c36d2c901f7a18e1ff0eca0f2e233a0949b68ddcd11"
+    },
+    {
+      "file": "edit-mobile-content-focus.png",
+      "bytes": 68569,
+      "sha256": "3952f467033a6da94395139677b068a2bb317c73f25b23732705e46bb250f01f"
+    },
+    {
+      "file": "edit-tablet-content-focus.png",
+      "bytes": 65043,
+      "sha256": "e4450548f2eba50bc4b55949a7275cbf8f513e3e65d1635179509c1090ddca71"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 539,
+      "sha256": "817738680dd0de8524deda2ac2ed4af70f623893485f241138ad41bd675be07c"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 440,
+      "sha256": "3336a2188722657f7bf9f0bbc0129e4160a2171fd725c07d0b5ffea344818516"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 1241,
+      "sha256": "4a5e86c4a416365ed4ecdcc2996ffa31f5eef17f57e48962d5cdc520efbb6a40"
+    },
+    {
+      "file": "prelude-actions.json",
+      "bytes": 933,
+      "sha256": "7381ad25dab63d60c61bc4e227b1afdc00ddf1ce039f9ab3eb18e93078fc166d"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 93903,
+      "sha256": "85466872f6322031d1e523e6e818b126c321dfb3825128d1c68803b5d912fe20"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 6302,
+      "sha256": "2831dbc4e921a64112b3192637e6cedd7eb50c0e9fb84e6ec20998e3a9277999"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4426,
+      "sha256": "352d7d9c752012b967f7289fd11294dc7c1bd002bdb4e63f1b606cd456e07b2d"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 10924,
+      "sha256": "43ca497dcd6b044004f99123af1f4e5802e40f794ac1b3a5b3c40c6c98bd3dbf"
+    }
+  ],
+  "note": "Hashes cover public files. Manifest excludes itself; original safe source snapshots are hashed separately in provenance.json."
+}

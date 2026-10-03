@@ -1,0 +1,100 @@
+{
+  "issue": 1439,
+  "relatedPR": 1593,
+  "surface": "existing approved synthetic tournament inline prize editor",
+  "firstNavigationUTC": "2026-10-03T18:43:18.324Z",
+  "observedStartUTC": "2026-10-03T18:43:54.485Z",
+  "observedEndUTC": "2026-10-03T18:47:10.116Z",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown"
+  },
+  "matchingEditBefore": "none; this is current after-only coverage, not measured improvement for the edit surface",
+  "observations": [
+    {
+      "widthLabel": "mobile",
+      "proofIndex": 0,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "contentWidth": 328.8000183105469,
+      "totalWidth": 328.8000183105469,
+      "contentHeight": 44,
+      "contentBelowName": true,
+      "contentClientWidth": 327,
+      "contentScrollWidth": 327,
+      "documentWidth": 402,
+      "fullExampleVisibleInEmptyRows": true
+    },
+    {
+      "widthLabel": "tablet",
+      "proofIndex": 5,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "contentWidth": 383.6041870117187,
+      "totalWidth": 699.3333740234375,
+      "contentHeight": 44,
+      "contentBelowName": false,
+      "contentClientWidth": 382,
+      "contentScrollWidth": 382,
+      "documentWidth": 789,
+      "fullExampleVisibleInEmptyRows": true
+    },
+    {
+      "widthLabel": "desktop",
+      "proofIndex": 9,
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "contentWidth": 341.40625,
+      "totalWidth": 629,
+      "contentHeight": 44,
+      "contentBelowName": false,
+      "contentClientWidth": 339,
+      "contentScrollWidth": 339,
+      "documentWidth": 1183,
+      "fullExampleVisibleInEmptyRows": true
+    }
+  ],
+  "keyboard": "Mobile native name→content Tab is preserved in prelude-actions; proof row0 is a later retained focus endpoint. Thereafter each width records content→delete Tab and delete→content ShiftTab endpoints. Tablet/desktop also record name and name→content endpoints. No delete activation.",
+  "values": "Only original blank first prize content was changed to synthetic QA text. Other7 fields were untouched. The draft survived mobile→tablet→desktop resize. Leaving to Overview without Save and re-entering Info restored all8 baseline fields; discard.json shows equality.",
+  "cancel": "Inline prize region has zero Cancel/reset controls. Actual route unmount/remount was used to discard local content; no pretend Cancel click. Final Overview has no prize input and no visible dialog.",
+  "counts": {
+    "DOMRows": 13,
+    "actionRecords": 17,
+    "preludeActionRecords": 3,
+    "safePNGs": 4
+  },
+  "notPerformed": [
+    "save",
+    "Enter",
+    "uploads",
+    "create",
+    "step5",
+    "promotion modal/toggles",
+    "result change",
+    "API/database audit"
+  ],
+  "limitations": [
+    "No matching historical edit before.",
+    "First mobile Tab and later row0 differ in time; no intervening product change was performed.",
+    "Earlier2 discovery frames using the combined creation collector are excluded from this package; screenshots here have fresh capture intervals and correct own-proof indices.",
+    "Full example readability is pixel-observed in empty rows; clientWidth/scrollWidth alone does not prove placeholder fit.",
+    "Single-line fields do not promise visibility of arbitrary80-character values.",
+    "Screenshots and DOM are current admin session only, without virtual keyboard or screen-reader speech.",
+    "Current browser does not expose serving SHA; deployment context is separate.",
+    "UI restoration is not a network or DB write audit.",
+    "The 13 proof rows include 11 keyboard-related endpoints, one local-content entry endpoint and one restored endpoint; they are not 13 independent keyboard runs.",
+    "Prelude source indices31–33 are preserved as three edit actions, not 34 edit actions. The mobile Tab ended76.517 seconds before proof row0; no continuous focus assertion or relabelled immediate endpoint is made.",
+    "Only selected first-row focus targets fit the viewport. The whole prize region and Save button are not claimed visible together.",
+    "Route-away/reentry observations establish local UI value restoration; they do not inspect React component identity, storage deletion or network/database writes."
+  ]
+}

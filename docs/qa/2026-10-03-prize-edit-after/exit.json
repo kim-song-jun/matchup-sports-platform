@@ -1,0 +1,13 @@
+{
+  "prizeFieldCount": 0,
+  "urlTemplate": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/overview",
+  "sourceURLSHA256": "6cb2164659123ab1d24f75d735a7fda9c9ff91a99bb2bffb72065421821ba7aa",
+  "fixtureIdentifierSHA256": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+  "utc": "2026-10-03T18:47:10.116Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 757,
+    "width": 1183
+  },
+  "visibleDialogs": 0
+}

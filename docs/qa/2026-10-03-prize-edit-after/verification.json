@@ -1,0 +1,441 @@
+{
+  "verifiedUTC": "2026-10-03T18:58:13.661635+00:00",
+  "method": "Read-only safe artifact verification, no new UI run",
+  "counts": {
+    "DOMRows": 13,
+    "mainSelectedActionRecords": 17,
+    "preludeSelectedActionRecords": 3,
+    "forwardTabCalls": 6,
+    "reverseShiftTabCalls": 3,
+    "separateReverseEndpointSnapshots": 3,
+    "baselineFieldsCompared": 8,
+    "safePNGs": 4
+  },
+  "rows": [
+    {
+      "proofIndex": 0,
+      "utc": "2026-10-03T18:45:11.074Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 1,
+      "utc": "2026-10-03T18:45:36.014Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "activeLabel": "상금 항목 1 삭제",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 2,
+      "utc": "2026-10-03T18:45:36.255Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 3,
+      "utc": "2026-10-03T18:45:36.366Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 4,
+      "utc": "2026-10-03T18:45:59.976Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "activeLabel": "상금 항목 1 이름",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 5,
+      "utc": "2026-10-03T18:46:00.131Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 6,
+      "utc": "2026-10-03T18:46:00.332Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "activeLabel": "상금 항목 1 삭제",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 7,
+      "utc": "2026-10-03T18:46:00.550Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 8,
+      "utc": "2026-10-03T18:46:31.685Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "activeLabel": "상금 항목 1 이름",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 9,
+      "utc": "2026-10-03T18:46:31.855Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 10,
+      "utc": "2026-10-03T18:46:32.046Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "activeLabel": "상금 항목 1 삭제",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 11,
+      "utc": "2026-10-03T18:46:32.274Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "우승 트로피 QA1593",
+      "allOther7ValuesMatchBaseline": true
+    },
+    {
+      "proofIndex": 12,
+      "utc": "2026-10-03T18:46:52.581Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "activeLabel": "상금 항목 1 내용",
+      "focusVisible": true,
+      "activeRectInsideViewport": true,
+      "activeHeightCSS": 44,
+      "firstContent": "",
+      "allOther7ValuesMatchBaseline": true
+    }
+  ],
+  "geometry": [
+    {
+      "proofIndices": [
+        0,
+        1,
+        2
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "contentWidthCSS": 328.8000183105469,
+      "totalWidthCSS": 328.8000183105469,
+      "contentHeightCSS": 44,
+      "contentBelowName": true,
+      "deleteDimensionsCSS": [
+        44,
+        44
+      ],
+      "reverseContentProofIndex": 2,
+      "inputClientScrollWidthEqual": true
+    },
+    {
+      "proofIndices": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "contentWidthCSS": 383.6041870117187,
+      "totalWidthCSS": 699.3333740234375,
+      "contentHeightCSS": 44,
+      "contentBelowName": false,
+      "deleteDimensionsCSS": [
+        44,
+        44
+      ],
+      "reverseContentProofIndex": 7,
+      "inputClientScrollWidthEqual": true
+    },
+    {
+      "proofIndices": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "contentWidthCSS": 341.40625,
+      "totalWidthCSS": 629,
+      "contentHeightCSS": 44,
+      "contentBelowName": false,
+      "deleteDimensionsCSS": [
+        44,
+        44
+      ],
+      "reverseContentProofIndex": 11,
+      "inputClientScrollWidthEqual": true
+    }
+  ],
+  "images": [
+    {
+      "file": "edit-mobile-content-focus.png",
+      "proofIndex": 0,
+      "domUTC": "2026-10-03T18:45:11.074Z",
+      "captureStartedUTC": "2026-10-03T18:45:11.079Z",
+      "captureCompletedUTC": "2026-10-03T18:45:11.093Z",
+      "CSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 402
+      },
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        360,
+        530
+      ],
+      "safeSHA256": "3952f467033a6da94395139677b068a2bb317c73f25b23732705e46bb250f01f"
+    },
+    {
+      "file": "edit-tablet-content-focus.png",
+      "proofIndex": 5,
+      "domUTC": "2026-10-03T18:46:00.131Z",
+      "captureStartedUTC": "2026-10-03T18:46:00.136Z",
+      "captureCompletedUTC": "2026-10-03T18:46:00.158Z",
+      "CSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "sourceRasterPixels": [
+        789,
+        505
+      ],
+      "safeRasterPixels": [
+        729,
+        347
+      ],
+      "safeSHA256": "e4450548f2eba50bc4b55949a7275cbf8f513e3e65d1635179509c1090ddca71"
+    },
+    {
+      "file": "edit-desktop-content-focus.png",
+      "proofIndex": 9,
+      "domUTC": "2026-10-03T18:46:31.855Z",
+      "captureStartedUTC": "2026-10-03T18:46:31.861Z",
+      "captureCompletedUTC": "2026-10-03T18:46:31.884Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "sourceRasterPixels": [
+        1183,
+        757
+      ],
+      "safeRasterPixels": [
+        650,
+        399
+      ],
+      "safeSHA256": "1082c0ddd4c48930fe46c41d9c051c6097f73250a2ed39b6ff715f8886e2514c"
+    },
+    {
+      "file": "edit-desktop-restored.png",
+      "proofIndex": 12,
+      "domUTC": "2026-10-03T18:46:52.581Z",
+      "captureStartedUTC": "2026-10-03T18:46:52.588Z",
+      "captureCompletedUTC": "2026-10-03T18:46:52.616Z",
+      "CSSViewport": {
+        "dpr": 1,
+        "height": 757,
+        "width": 1183
+      },
+      "sourceRasterPixels": [
+        1183,
+        757
+      ],
+      "safeRasterPixels": [
+        650,
+        399
+      ],
+      "safeSHA256": "50b350f17eadf4ac5e1a6c36d2c901f7a18e1ff0eca0f2e233a0949b68ddcd11"
+    }
+  ],
+  "firstMobileTabCall": {
+    "index": 33,
+    "label": "edit mobile actual Tab name to content",
+    "startUTC": "2026-10-03T18:43:54.488Z",
+    "endUTC": "2026-10-03T18:43:54.557Z"
+  },
+  "laterMobileContentEndpointUTC": "2026-10-03T18:45:11.074Z",
+  "firstMobileTabEndToProofSeconds": 76.517,
+  "retainedProofIndices": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "restoredProofIndex": 12,
+  "fieldComparisons": [
+    {
+      "name": "총상금",
+      "before": "0",
+      "after": "0",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 1 이름",
+      "before": "1위",
+      "after": "1위",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 1 내용",
+      "before": "",
+      "after": "",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 2 이름",
+      "before": "2위",
+      "after": "2위",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 2 내용",
+      "before": "",
+      "after": "",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 3 이름",
+      "before": "3위",
+      "after": "3위",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 3 내용",
+      "before": "",
+      "after": "",
+      "equal": true
+    },
+    {
+      "name": "상품 및 상금",
+      "before": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다.",
+      "after": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다.",
+      "equal": true
+    }
+  ],
+  "all8BaselineValuesMatchRestored": true,
+  "fixtureIdentifierSHA256": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+  "runtimeServingSHA": "unknown",
+  "matchingEditBefore": null
+}

@@ -1,0 +1,25 @@
+{
+  "sourceSHA256": "f96487650ce22e4f29fe3993521b2c527327072edb5d46e4ec35f44be3a0f940",
+  "sourceRecordCount": 34,
+  "records": [
+    {
+      "index": 31,
+      "label": "resize mobile using native border and125 zoom",
+      "startUTC": "2026-10-03T18:43:27.288Z",
+      "endUTC": "2026-10-03T18:43:33.944Z"
+    },
+    {
+      "index": 32,
+      "label": "edit mobile focus first prize name",
+      "startUTC": "2026-10-03T18:43:54.086Z",
+      "endUTC": "2026-10-03T18:43:54.363Z"
+    },
+    {
+      "index": 33,
+      "label": "edit mobile actual Tab name to content",
+      "startUTC": "2026-10-03T18:43:54.488Z",
+      "endUTC": "2026-10-03T18:43:54.557Z"
+    }
+  ],
+  "scope": "These3 actual edit calls were recorded in the earlier combined buffer. Source index31–33 retained. No later replay. The two early discovery screenshots/DOM entries in that combined buffer are excluded; this package starts a separate13-row proof."
+}

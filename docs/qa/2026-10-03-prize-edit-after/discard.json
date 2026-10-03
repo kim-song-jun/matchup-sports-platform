@@ -1,0 +1,67 @@
+{
+  "away": {
+    "prizeInputCount": 0,
+    "urlTemplate": "https://alpha.teameet.co.kr/admin/tournaments/{synthetic-fixture}/overview",
+    "sourceURLSHA256": "6cb2164659123ab1d24f75d735a7fda9c9ff91a99bb2bffb72065421821ba7aa",
+    "fixtureIdentifierSHA256": "9bb8586d8d3512789a6b624a536a22dbfa1d02f082dab9a37ac8abf9bab7df08",
+    "utc": "2026-10-03T18:46:32.643Z"
+  },
+  "restoredProofIndex": 12,
+  "restoredUTC": "2026-10-03T18:46:52.581Z",
+  "fieldComparisons": [
+    {
+      "name": "총상금",
+      "before": "0",
+      "after": "0",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 1 이름",
+      "before": "1위",
+      "after": "1위",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 1 내용",
+      "before": "",
+      "after": "",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 2 이름",
+      "before": "2위",
+      "after": "2위",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 2 내용",
+      "before": "",
+      "after": "",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 3 이름",
+      "before": "3위",
+      "after": "3위",
+      "equal": true
+    },
+    {
+      "name": "상금 항목 3 내용",
+      "before": "",
+      "after": "",
+      "equal": true
+    },
+    {
+      "name": "상품 및 상금",
+      "before": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다.",
+      "after": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다.",
+      "equal": true
+    }
+  ],
+  "allFieldsMatch": true,
+  "savePerformed": false,
+  "limitations": [
+    "UI re-entry restored all8 observed values; no direct API or database inspection.",
+    "No inline Cancel control exists; discard was route unmount/remount."
+  ]
+}

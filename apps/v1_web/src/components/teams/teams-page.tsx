@@ -1021,7 +1021,7 @@ export function TeamFormPageView({
   const descriptionField = <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />;
   const detailFields = (
     <>
-      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} editing={edit} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
       <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
       <TeamActivityFields team={team} form={form} />
     </>
@@ -2158,25 +2158,27 @@ function TeamLevelSelect({ value, editing, onChange }: { value: string; editing:
   );
 }
 
-function TeamCapacityField({ value, min, onChange }: { value: number; min?: number; onChange?: (value: number) => void }) {
-  // 이미 있는 팀원보다 적은 정원은 서버가 거절한다 — 저장 전에 입력 칸에서 막는다.
-  const floor = Math.min(50, Math.max(2, min ?? 2));
-  const options = Array.from({ length: 50 - floor + 1 }, (_, index) => index + floor);
-  const normalized = Math.min(50, Math.max(floor, Number(value) || floor));
+function TeamCapacityField({ value, editing, min, onChange }: { value: number; editing: boolean; min?: number; onChange?: (value: number) => void }) {
+  // null은 기존 폼의 0으로 표현한다. 숫자일 때만 서버의 최소/현재 인원/최대 제약을 적용한다.
+  const floor = Math.max(2, min ?? 2);
+  const options = Array.from({ length: Math.max(0, 50 - floor + 1) }, (_, index) => index + floor);
+  const normalized = editing && (value === 0 || floor > 50) ? value : Math.min(50, Math.max(floor, Number(value) || floor));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">정원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" disabled={normalized <= floor} onClick={() => onChange?.(Math.max(floor, normalized - 1))}>−</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" disabled={normalized <= floor || floor > 50} onClick={() => onChange?.(Math.max(floor, normalized - 1))}>−</button>
         <select className="tm-create-input tm-create-select-control" aria-label="정원" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
+          {editing ? <option value={0}>정원 미정</option> : null}
+          {editing && floor > 50 && value > 0 ? <option value={value} disabled>{value}명 (변경 필요)</option> : null}
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
-        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" disabled={normalized >= 50 || floor > 50} onClick={() => onChange?.(normalized === 0 ? floor : Math.min(50, normalized + 1))}>+</button>
       </div>
       {min !== undefined ? (
         <div className="tm-text-caption" style={{ marginTop: 8 }}>
-          {floor > 2 ? `지금 팀원이 ${floor}명이라 그보다 적게 정할 수 없어요.` : `지금 팀원이 ${min}명이에요.`} 정원이 다 차면 자동으로 “정원 마감”으로 보여요.
+          {floor > 50 ? `지금 팀원이 ${min}명이라 50명 이하로 정할 수 없어요. 정원은 미정으로 둘 수 있어요.` : <>{floor > 2 ? `지금 팀원이 ${floor}명이라 숫자 정원은 그보다 적게 정할 수 없어요.` : `지금 팀원이 ${min}명이에요.`} 정원이 다 차면 자동으로 “정원 마감”으로 보여요.</>}
         </div>
       ) : null}
     </div>

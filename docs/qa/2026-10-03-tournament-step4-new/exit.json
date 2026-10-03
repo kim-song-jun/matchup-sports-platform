@@ -1,0 +1,22 @@
+{
+  "beforeExitStep5": {
+    "utc": "2026-10-03T15:29:18.424Z",
+    "count": 1,
+    "enabled": false,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new"
+  },
+  "exit": {
+    "headings": [
+      "대회 관리"
+    ],
+    "step5ButtonPresent": false,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T15:29:18.754Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1181
+    },
+    "wizardTitleFieldPresent": false
+  }
+}

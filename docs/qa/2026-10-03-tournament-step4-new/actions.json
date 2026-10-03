@@ -1,0 +1,162 @@
+[
+  {
+    "name": "Set local synthetic title and sport for required navigation",
+    "startedUTC": "2026-10-03T15:19:56.431Z",
+    "completedUTC": "2026-10-03T15:19:56.477Z"
+  },
+  {
+    "name": "Enter schedule using step2 button",
+    "startedUTC": "2026-10-03T15:19:56.511Z",
+    "completedUTC": "2026-10-03T15:19:56.789Z"
+  },
+  {
+    "name": "Open native date picker with visible calendar icon",
+    "startedUTC": "2026-10-03T15:20:26.313Z",
+    "completedUTC": "2026-10-03T15:20:26.419Z"
+  },
+  {
+    "name": "Select Oct17 in native calendar; keep displayed default time",
+    "startedUTC": "2026-10-03T15:20:41.676Z",
+    "completedUTC": "2026-10-03T15:20:41.777Z"
+  },
+  {
+    "name": "Reopen native picker after Escape left blank",
+    "startedUTC": "2026-10-03T15:20:53.591Z",
+    "completedUTC": "2026-10-03T15:20:53.691Z"
+  },
+  {
+    "name": "Choose Oct17 from native calendar and dismiss by clicking schedule helper",
+    "startedUTC": "2026-10-03T15:21:13.544Z",
+    "completedUTC": "2026-10-03T15:21:36.893Z"
+  },
+  {
+    "name": "Enter step4 using visible stepper; no submit",
+    "startedUTC": "2026-10-03T15:22:00.938Z",
+    "completedUTC": "2026-10-03T15:22:01.211Z"
+  },
+  {
+    "name": "Focus empty prize content field for mobile width inspection",
+    "startedUTC": "2026-10-03T15:22:17.159Z",
+    "completedUTC": "2026-10-03T15:22:17.427Z"
+  },
+  {
+    "name": "View collapsed promotion section on mobile",
+    "startedUTC": "2026-10-03T15:23:21.097Z",
+    "completedUTC": "2026-10-03T15:23:21.376Z"
+  },
+  {
+    "name": "Enable home promotion locally for geometry only",
+    "startedUTC": "2026-10-03T15:23:31.117Z",
+    "completedUTC": "2026-10-03T15:23:37.607Z"
+  },
+  {
+    "name": "Inspect empty home promo title field without editing",
+    "startedUTC": "2026-10-03T15:24:00.700Z",
+    "completedUTC": "2026-10-03T15:24:00.968Z"
+  },
+  {
+    "name": "Return home promotion OFF locally",
+    "startedUTC": "2026-10-03T15:24:16.553Z",
+    "completedUTC": "2026-10-03T15:24:16.831Z"
+  },
+  {
+    "name": "Enable tournament-list promotion locally",
+    "startedUTC": "2026-10-03T15:24:16.874Z",
+    "completedUTC": "2026-10-03T15:24:17.148Z"
+  },
+  {
+    "name": "Inspect empty list promo title without editing",
+    "startedUTC": "2026-10-03T15:24:17.240Z",
+    "completedUTC": "2026-10-03T15:24:17.513Z"
+  },
+  {
+    "name": "Return list promotion OFF locally before resizing",
+    "startedUTC": "2026-10-03T15:24:31.746Z",
+    "completedUTC": "2026-10-03T15:24:32.013Z"
+  },
+  {
+    "name": "Inspect tablet prize content without editing",
+    "startedUTC": "2026-10-03T15:24:58.720Z",
+    "completedUTC": "2026-10-03T15:24:58.989Z"
+  },
+  {
+    "name": "View tablet collapsed promotion section",
+    "startedUTC": "2026-10-03T15:24:59.068Z",
+    "completedUTC": "2026-10-03T15:24:59.342Z"
+  },
+  {
+    "name": "Enable home promotion locally on tablet",
+    "startedUTC": "2026-10-03T15:26:43.181Z",
+    "completedUTC": "2026-10-03T15:26:43.453Z"
+  },
+  {
+    "name": "Inspect tablet home promotion title without editing",
+    "startedUTC": "2026-10-03T15:27:12.488Z",
+    "completedUTC": "2026-10-03T15:27:12.770Z"
+  },
+  {
+    "name": "Return tablet home promotion OFF locally",
+    "startedUTC": "2026-10-03T15:27:12.872Z",
+    "completedUTC": "2026-10-03T15:27:13.143Z"
+  },
+  {
+    "name": "Enable tablet tournament-list promotion locally",
+    "startedUTC": "2026-10-03T15:27:13.209Z",
+    "completedUTC": "2026-10-03T15:27:13.494Z"
+  },
+  {
+    "name": "Inspect tablet list promotion title without editing",
+    "startedUTC": "2026-10-03T15:27:32.752Z",
+    "completedUTC": "2026-10-03T15:27:33.026Z"
+  },
+  {
+    "name": "Return tablet list promotion OFF locally",
+    "startedUTC": "2026-10-03T15:27:33.147Z",
+    "completedUTC": "2026-10-03T15:27:33.430Z"
+  },
+  {
+    "name": "Inspect desktop prize content without editing",
+    "startedUTC": "2026-10-03T15:28:01.440Z",
+    "completedUTC": "2026-10-03T15:28:01.715Z"
+  },
+  {
+    "name": "View desktop collapsed promotion section",
+    "startedUTC": "2026-10-03T15:28:01.804Z",
+    "completedUTC": "2026-10-03T15:28:02.082Z"
+  },
+  {
+    "name": "Enable home promotion locally on desktop",
+    "startedUTC": "2026-10-03T15:28:19.425Z",
+    "completedUTC": "2026-10-03T15:28:19.694Z"
+  },
+  {
+    "name": "Inspect desktop home promo title without editing",
+    "startedUTC": "2026-10-03T15:28:20.152Z",
+    "completedUTC": "2026-10-03T15:28:20.427Z"
+  },
+  {
+    "name": "Return desktop home promotion OFF locally",
+    "startedUTC": "2026-10-03T15:28:43.236Z",
+    "completedUTC": "2026-10-03T15:28:46.988Z"
+  },
+  {
+    "name": "Enable desktop tournament-list promotion locally",
+    "startedUTC": "2026-10-03T15:28:47.044Z",
+    "completedUTC": "2026-10-03T15:28:47.322Z"
+  },
+  {
+    "name": "Inspect desktop list promo title without editing",
+    "startedUTC": "2026-10-03T15:28:47.760Z",
+    "completedUTC": "2026-10-03T15:28:48.039Z"
+  },
+  {
+    "name": "Return desktop list promotion OFF before exit",
+    "startedUTC": "2026-10-03T15:28:48.141Z",
+    "completedUTC": "2026-10-03T15:28:48.407Z"
+  },
+  {
+    "name": "Leave local step4 draft through 대회 목록으로; no submit",
+    "startedUTC": "2026-10-03T15:29:18.442Z",
+    "completedUTC": "2026-10-03T15:29:18.524Z"
+  }
+]

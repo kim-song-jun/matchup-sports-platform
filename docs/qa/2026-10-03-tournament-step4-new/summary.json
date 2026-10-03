@@ -1,0 +1,203 @@
+{
+  "issueURL": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1439",
+  "relatedPRs": [
+    1492,
+    1498
+  ],
+  "scope": "New step4 promotion-switch geometry, collapsed bodies and selected field layout only. Entered-value preservation and step5 final summary were not retested.",
+  "startedUTC": "2026-10-03T15:19:36.309Z",
+  "endedUTC": "2026-10-03T15:29:18.754Z",
+  "runtimeServingSHA": "unknown",
+  "counts": {
+    "proofRows": 22,
+    "selectedActionRecords": 32,
+    "safePNGs": 18
+  },
+  "widthComparisons": [
+    {
+      "layout": "mobile",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 402,
+        "scrollY": 945.5999755859376,
+        "width": 402
+      },
+      "prizeProofIndex": 0,
+      "promoHomeFieldsProofIndex": 3,
+      "promoListFieldsProofIndex": 5,
+      "offProofIndex": 1,
+      "homeOnProofIndex": 2,
+      "prizeContent": {
+        "rect": {
+          "bottom": 324.8625183105469,
+          "height": 44,
+          "right": 313.6000061035156,
+          "width": 161.28750610351562,
+          "x": 152.3125,
+          "y": 280.8625183105469
+        },
+        "clientWidth": 160,
+        "scrollWidth": 160,
+        "placeholder": "예: 600,000원 또는 우승 트로피"
+      },
+      "totalPrizeWidth": 328.8000183105469,
+      "promoTitleWidth": 295.20001220703125,
+      "promoIntroWidth": 295.20001220703125,
+      "prizeLayout": "name, content and delete share one row",
+      "prizePlaceholderPixels": "Mobile shows leading cash example and only part of the remainder; trophy example is not fully visible."
+    },
+    {
+      "layout": "tablet",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "scrollY": 800,
+        "width": 787
+      },
+      "prizeProofIndex": 7,
+      "promoHomeFieldsProofIndex": 11,
+      "promoListFieldsProofIndex": 13,
+      "offProofIndex": 14,
+      "homeOnProofIndex": 10,
+      "prizeContent": {
+        "rect": {
+          "bottom": 274.1666717529297,
+          "height": 44,
+          "right": 682.6666870117188,
+          "width": 373.2083435058594,
+          "x": 309.4583435058594,
+          "y": 230.1666717529297
+        },
+        "clientWidth": 372,
+        "scrollWidth": 372,
+        "placeholder": "예: 600,000원 또는 우승 트로피"
+      },
+      "totalPrizeWidth": 682,
+      "promoTitleWidth": 318.3333435058594,
+      "promoIntroWidth": 648.6666870117188,
+      "prizeLayout": "name, content and delete share one row",
+      "prizePlaceholderPixels": "Full cash-or-trophy example is visible in the screenshot."
+    },
+    {
+      "layout": "desktop",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1181,
+        "scrollY": 610,
+        "width": 1181
+      },
+      "prizeProofIndex": 15,
+      "promoHomeFieldsProofIndex": 18,
+      "promoListFieldsProofIndex": 20,
+      "offProofIndex": 16,
+      "homeOnProofIndex": 17,
+      "prizeContent": {
+        "rect": {
+          "bottom": 400.5,
+          "height": 44,
+          "right": 1068,
+          "width": 455.40625,
+          "x": 612.59375,
+          "y": 356.5
+        },
+        "clientWidth": 453,
+        "scrollWidth": 453,
+        "placeholder": "예: 600,000원 또는 우승 트로피"
+      },
+      "totalPrizeWidth": 819,
+      "promoTitleWidth": 386.5,
+      "promoIntroWidth": 785,
+      "prizeLayout": "name, content and delete share one row",
+      "prizePlaceholderPixels": "Full cash-or-trophy example is visible in the screenshot."
+    }
+  ],
+  "confirmed": [
+    "Both switches are OFF initially and restored OFF per width. Their local ON state shows aria-checked=true and the knob ::after translateX18px; OFF is transform:none.",
+    "Track is46×28 CSSpx, knob22×22, button46×44. OFF light-gray/left and ON blue/right are visible in the safe crops.",
+    "Each enabled promotion exposes9 named text/number fields. OFF has none of these fields in the collected rendered-box field list; preview is collapsed in screenshot.",
+    "Mobile promo controls use a single column; tablet and desktop title/badge share a row while introduction takes full width.",
+    "No whole-pixel horizontal document overflow in the captured states.",
+    "Final step5 button remained disabled before the top exit link; final observed route is /admin/tournaments."
+  ],
+  "residualIssue1439": {
+    "status": "Partial improvement with mobile prize-width criterion still unmet",
+    "observed": "402px viewport retains three-column prize rows. Content width161.2875 versus full prize width328.8000; the full cash-or-trophy placeholder is not readable at once.",
+    "generalHelper": "The nearby general helper explicitly says trophies/gift certificates can be entered and remains available. This is not absence of all item guidance.",
+    "impact": "Reduced at-a-glance example readability and narrow editing space. No functional input/save failure was tested or inferred.",
+    "minimalSuggestion": "At mobile width put prize content on its own full-width row; keep name and delete together."
+  },
+  "acceptanceMapping": [
+    {
+      "condition": "OFF editing fields do not overwhelm main flow",
+      "result": "Observed improved across3widths; both bodies collapse."
+    },
+    {
+      "condition": "ON/OFF value preservation policy",
+      "result": "Not rerun; existing evidence retained separately."
+    },
+    {
+      "condition": "Important mobile input/preview width",
+      "result": "Residual for prize content; promo body295.2px versus328.8px outer input width. Full preview behavior beyond crops is not certified."
+    },
+    {
+      "condition": "Tablet/desktop alignment",
+      "result": "Observed consistent prize rows and responsive promotion grids in selected controls."
+    },
+    {
+      "condition": "Pre-publication final summary",
+      "result": "UNVERIFIED. Step5 was disabled and was not entered; no final summary, creation or publication was exercised."
+    }
+  ],
+  "limitations": [
+    "Browser zoom/window-resize yields actual CSS402×606,787×505,1181×757; not device emulation or mobile virtual keyboard.",
+    "fields collector uses nonzero box and visibility checks. It includes1×1 file inputs (type=file), so total23/13 is not a visible editable field count. Use9 named promo fields and exclude file inputs from edit-field claims. File/image controls were not activated.",
+    "Fields outside viewport are dimension observations only; screenshots show selected visible subsets. No full accessibility or screen-reader certification.",
+    "scrollWidth==clientWidth on an empty input does not prove its placeholder is fully readable. Placeholder truncation is a pixel observation, not overflow arithmetic.",
+    "All22 lockedStep5 snapshots contain one disabled button labelled 5단계 공개 확인 — 잠김. The separate exact role query immediately before exit also records one disabled step5 button. No step5 entry or final summary observation was performed.",
+    "Action ledger stores selected call bounds and descriptions, not an exhaustive authenticated event/network log. Native resize/scroll, some nonmutating heading clicks and the unsuccessful calendar Escape sequence are not fully logged.",
+    "First calendar attempt stayed blank after Escape; successful native date selection followed by clicking outside generated start2026-10-17T08:21 and deadline2026-10-14T23:59. No timezone conversion claim.",
+    "A CUA transport disconnect occurred after proof8. A subsequent recovery observation confirmed both switches remained OFF; this is UI state only, not a server-save or database audit.",
+    "Proof8 and9 tablet OFF screenshots partly clip the lower card by footer; excluded from public PNG set. Proof14 provides both switches fully visible.",
+    "No final create/save, Enter, upload, publication, notification or fixture mutation was performed. No network/DB audit was collected.",
+    "No previously entered prize/promo content was edited; test only used minimal synthetic local title/sport/date to navigate and toggle enabled flags.",
+    "Initial untouched navigation baseline was405px before native resize; measured step4 mobile rows are402px.",
+    "Pointer partially covers the tablet home-ON knob and some sample text. Its right-side white edge remains visible; full18px movement is supported by the pseudo-element transform records. Other ON crops show an unobscured knob.",
+    "All22 step4 DOM rows contain one disabled step5 record. The separate exact-role query before exit also reports one disabled button.",
+    "Exiting removed the wizard from view; storage cleanup, browser-history state and server persistence were not audited.",
+    "Source action timestamps bound selected collector calls. They do not measure UI response latency or authenticate a complete browser-event trace.",
+    "The title visible in promotion text controls is a placeholder derived from the synthetic local navigation title. The custom promotion title fields are empty in DOM; no entered promotion text retention test was performed.",
+    "Dates and exposure priority can be prefilled, and prize names are nonempty defaults. Do not describe every field as blank.",
+    "All18 safe images were inspected. Original full screenshots remain unpublished; original-to-crop equality is collector-attested.",
+    "Actual source rasters are402×605,787×504 and1181×757 pixels, while corresponding CSS viewports are402×606,787×505 and1181×757."
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "description": "Confirm blank wizard and enter only minimum local navigation fields",
+      "health": "Reached step4 without saving; first Escape-cancelled calendar selection stayed blank."
+    },
+    {
+      "step": 2,
+      "description": "Mobile prize and both promotion toggles/fields",
+      "health": "Collapsed promotion bodies and knob positions observed; narrow prize content remains."
+    },
+    {
+      "step": 3,
+      "description": "Tablet equivalent controls",
+      "health": "Full prize example and responsive field grid observed; two partial OFF source photos excluded."
+    },
+    {
+      "step": 4,
+      "description": "Desktop equivalent controls",
+      "health": "Full prize example and responsive field grid observed."
+    },
+    {
+      "step": 5,
+      "description": "Restore both toggles OFF and exit via list link",
+      "health": "Returned to tournament list; final wizard step5 remained locked and was never entered."
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "files": [
+    {
+      "file": "1439-desktop-home-fields.png",
+      "bytes": 86259,
+      "sha256": "5e7aa7500fcdf8f5075c27a2dfd539411b4df8e97653391aae1413a2b8b4fca2"
+    },
+    {
+      "file": "1439-desktop-home-on.png",
+      "bytes": 81190,
+      "sha256": "89fd51a6277fc46551357ddec5b7bddf006692e702b06e3af11fea8d49ef5748"
+    },
+    {
+      "file": "1439-desktop-list-fields.png",
+      "bytes": 84389,
+      "sha256": "a8a3b88f3f3d13d2e41516bddc6585c45211953160c3905722a421da55f093c5"
+    },
+    {
+      "file": "1439-desktop-list-on.png",
+      "bytes": 90563,
+      "sha256": "56dfc7ef21da90a1cd78b8cbd32105fbf200aac3050b4781639d954345835f6c"
+    },
+    {
+      "file": "1439-desktop-prize.png",
+      "bytes": 78016,
+      "sha256": "1f33ce3c8ca55505dc6454a7fc6f5d53c575946bed4db03249198c099ff115a6"
+    },
+    {
+      "file": "1439-desktop-promo-off.png",
+      "bytes": 62548,
+      "sha256": "91212e69ce5c192b350bb4db1f6053e5b574dde75d06aab36707cc9b50569994"
+    },
+    {
+      "file": "1439-mobile-home-fields.png",
+      "bytes": 41696,
+      "sha256": "281f05bfdb901fef259e8d322484ffbe9e03b3e3948544a20b9b1bce2c0aa9c1"
+    },
+    {
+      "file": "1439-mobile-home-on.png",
+      "bytes": 34725,
+      "sha256": "27ee874d476aa6a65a39c61d2276583ac0b368ea481b5c5f1ba5a9fc210ee1b0"
+    },
+    {
+      "file": "1439-mobile-list-fields.png",
+      "bytes": 42067,
+      "sha256": "6faf30658279983fac8e548d8b54d21f7f81be0c99201f3d770fd3725f111f9e"
+    },
+    {
+      "file": "1439-mobile-list-on.png",
+      "bytes": 42795,
+      "sha256": "bd14def7e6f5b80f290d89aa40c515fffc862bd4be870023925e19ce0ea54e98"
+    },
+    {
+      "file": "1439-mobile-prize.png",
+      "bytes": 64495,
+      "sha256": "0198c8e86d8e31c761f6d3114d8cacfcc6cc7c9f86e2750bbadd83bf4c94d9bf"
+    },
+    {
+      "file": "1439-mobile-promo-off.png",
+      "bytes": 59228,
+      "sha256": "7a41cc24a907d3508d1784c9a58cb3221c0e785901ba2e799ab335b5ba47be1d"
+    },
+    {
+      "file": "1439-tablet-both-off-restored.png",
+      "bytes": 61149,
+      "sha256": "1c350e5750b528d8fe2d0aee03e29212c93c4e5824dcc365757b4469824971ee"
+    },
+    {
+      "file": "1439-tablet-home-fields.png",
+      "bytes": 48542,
+      "sha256": "7b4be754167b36d0be448ad9cebbe54cf63fcc233323522ee7701cbac055d697"
+    },
+    {
+      "file": "1439-tablet-home-on.png",
+      "bytes": 77248,
+      "sha256": "70ba57add3a6816074abea2d32fa51c8a96db7b8b34a4321a26de4a0d3252d61"
+    },
+    {
+      "file": "1439-tablet-list-fields.png",
+      "bytes": 48545,
+      "sha256": "92d2a0576a334f2c5059c56f0795f22d9edd35d4785361aba4a807766fa6e629"
+    },
+    {
+      "file": "1439-tablet-list-on.png",
+      "bytes": 88572,
+      "sha256": "95e638fc83ca4263f9a212255727940dae934680d20bac4fbe877935a33ca878"
+    },
+    {
+      "file": "1439-tablet-prize.png",
+      "bytes": 77540,
+      "sha256": "f96f89894173d76dd8638decd166ab7a5f0030f94af56ab6a8030da3eab5a6c6"
+    },
+    {
+      "file": "README.md",
+      "bytes": 9495,
+      "sha256": "9c69a5cfae040a9b22156fa70c13e1d3c933038ad0832f33795327f9ef6b2ee8"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 5277,
+      "sha256": "87d56ba1b8aac15b12e8ad216c99927233399b494d6ca3f4a0454301d5f5c838"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 485,
+      "sha256": "3b8cf249f82a9aff4f36b8e4bd4fff02f3c6d10625d8628687d795b7efb20b16"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 295,
+      "sha256": "7399256aed1a53deb785ac020fc8189465507235c5ae83b553ff63d8a1bb45f7"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 1338,
+      "sha256": "a8dce17a70bb01f19d882f8f8a9374616be4fef53e9d3b56446505b43ef78336"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 266031,
+      "sha256": "5fdc6a6ce081d281aa1be648e4600fa96b0ba962a2f4d1b511dbc292116fdd46"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 23418,
+      "sha256": "c6264ac65ed63fc90dc6b396a0d52e8114276b92be4ab1e0d05cf3d7e75d6d0f"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 10490,
+      "sha256": "b322a63bf7618253151bd45a5729eead70f33a50478ec9ac392c5239bc9a34a7"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 17516,
+      "sha256": "03fb1d2f1cafc7b3c0c7006753421a7753b50189fd6bb7423ce328bd6989cfff"
+    }
+  ]
+}

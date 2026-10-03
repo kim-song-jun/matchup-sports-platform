@@ -1,0 +1,694 @@
+{
+  "verifiedUTC": "2026-10-03T15:39:15.277369+00:00",
+  "method": "Read-only safe artifact arithmetic and image inspection; no new UI run",
+  "counts": {
+    "proofDOM": 22,
+    "switchRecords": 44,
+    "ONSwitchRecords": 12,
+    "selectedActionRecords": 32,
+    "viewports": 3,
+    "safePNGs": 18,
+    "excludedSourcePNGs": 2,
+    "initialSnapshots": 1,
+    "navigationSnapshots": 2,
+    "exitSnapshots": 2
+  },
+  "rows": [
+    {
+      "proofIndex": 0,
+      "utc": "2026-10-03T15:22:56.788Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 1,
+      "utc": "2026-10-03T15:23:21.434Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 2,
+      "utc": "2026-10-03T15:24:00.679Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "true",
+        "false"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 3,
+      "utc": "2026-10-03T15:24:01.040Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "true",
+        "false"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 4,
+      "utc": "2026-10-03T15:24:17.217Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "false",
+        "true"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 5,
+      "utc": "2026-10-03T15:24:17.583Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "false",
+        "true"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 6,
+      "utc": "2026-10-03T15:24:32.067Z",
+      "widthCSS": 402,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 7,
+      "utc": "2026-10-03T15:24:59.040Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 8,
+      "utc": "2026-10-03T15:24:59.404Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 9,
+      "utc": "2026-10-03T15:26:43.150Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 10,
+      "utc": "2026-10-03T15:26:43.518Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "true",
+        "false"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 11,
+      "utc": "2026-10-03T15:27:12.842Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "true",
+        "false"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 12,
+      "utc": "2026-10-03T15:27:13.888Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "false",
+        "true"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 13,
+      "utc": "2026-10-03T15:27:33.113Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "false",
+        "true"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 14,
+      "utc": "2026-10-03T15:27:33.810Z",
+      "widthCSS": 787,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 15,
+      "utc": "2026-10-03T15:28:01.774Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 16,
+      "utc": "2026-10-03T15:28:02.141Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 17,
+      "utc": "2026-10-03T15:28:20.118Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "true",
+        "false"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 18,
+      "utc": "2026-10-03T15:28:20.496Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "true",
+        "false"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 19,
+      "utc": "2026-10-03T15:28:47.731Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "false",
+        "true"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 20,
+      "utc": "2026-10-03T15:28:48.110Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "false",
+        "true"
+      ],
+      "namedPromoFields": 9,
+      "fileInputs": 2,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 21,
+      "utc": "2026-10-03T15:28:48.467Z",
+      "widthCSS": 1181,
+      "switchChecked": [
+        "false",
+        "false"
+      ],
+      "namedPromoFields": 0,
+      "fileInputs": 1,
+      "step5Disabled": true
+    }
+  ],
+  "geometry": [
+    {
+      "prizeProofIndex": 0,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 402,
+        "scrollY": 945.5999755859376,
+        "width": 402
+      },
+      "threePrizeContentWidthsCSS": [
+        161.28750610351562,
+        161.28750610351562,
+        161.28750610351562
+      ],
+      "prizeContentHeightCSS": 44,
+      "totalPrizeWidthCSS": 328.8000183105469,
+      "promoFields": [
+        {
+          "proofIndex": 3,
+          "titleWidthCSS": 295.20001220703125,
+          "badgeWidthCSS": 295.20001220703125,
+          "introWidthCSS": 295.20001220703125,
+          "titleEmpty": true,
+          "badgeEmpty": true,
+          "introEmpty": true
+        },
+        {
+          "proofIndex": 5,
+          "titleWidthCSS": 295.20001220703125,
+          "badgeWidthCSS": 295.20001220703125,
+          "introWidthCSS": 295.20001220703125,
+          "titleEmpty": true,
+          "badgeEmpty": true,
+          "introEmpty": true
+        }
+      ],
+      "placeholderReadableClaim": "Pixel observation, not scrollWidth arithmetic"
+    },
+    {
+      "prizeProofIndex": 7,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "scrollY": 800,
+        "width": 787
+      },
+      "threePrizeContentWidthsCSS": [
+        373.2083435058594,
+        373.2083435058594,
+        373.2083435058594
+      ],
+      "prizeContentHeightCSS": 44,
+      "totalPrizeWidthCSS": 682,
+      "promoFields": [
+        {
+          "proofIndex": 11,
+          "titleWidthCSS": 318.3333435058594,
+          "badgeWidthCSS": 318.3333435058594,
+          "introWidthCSS": 648.6666870117188,
+          "titleEmpty": true,
+          "badgeEmpty": true,
+          "introEmpty": true
+        },
+        {
+          "proofIndex": 13,
+          "titleWidthCSS": 318.3333435058594,
+          "badgeWidthCSS": 318.3333435058594,
+          "introWidthCSS": 648.6666870117188,
+          "titleEmpty": true,
+          "badgeEmpty": true,
+          "introEmpty": true
+        }
+      ],
+      "placeholderReadableClaim": "Pixel observation, not scrollWidth arithmetic"
+    },
+    {
+      "prizeProofIndex": 15,
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1181,
+        "scrollY": 610,
+        "width": 1181
+      },
+      "threePrizeContentWidthsCSS": [
+        455.40625,
+        455.40625,
+        455.40625
+      ],
+      "prizeContentHeightCSS": 44,
+      "totalPrizeWidthCSS": 819,
+      "promoFields": [
+        {
+          "proofIndex": 18,
+          "titleWidthCSS": 386.5,
+          "badgeWidthCSS": 386.5,
+          "introWidthCSS": 785,
+          "titleEmpty": true,
+          "badgeEmpty": true,
+          "introEmpty": true
+        },
+        {
+          "proofIndex": 20,
+          "titleWidthCSS": 386.5,
+          "badgeWidthCSS": 386.5,
+          "introWidthCSS": 785,
+          "titleEmpty": true,
+          "badgeEmpty": true,
+          "introEmpty": true
+        }
+      ],
+      "placeholderReadableClaim": "Pixel observation, not scrollWidth arithmetic"
+    }
+  ],
+  "images": [
+    {
+      "file": "1439-mobile-prize.png",
+      "proofIndex": 0,
+      "domUTC": "2026-10-03T15:22:56.788Z",
+      "captureStartedUTC": "2026-10-03T15:22:56.792Z",
+      "captureCompletedUTC": "2026-10-03T15:22:56.825Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        346,
+        378
+      ],
+      "safeSHA256": "0198c8e86d8e31c761f6d3114d8cacfcc6cc7c9f86e2750bbadd83bf4c94d9bf"
+    },
+    {
+      "file": "1439-mobile-promo-off.png",
+      "proofIndex": 1,
+      "domUTC": "2026-10-03T15:23:21.434Z",
+      "captureStartedUTC": "2026-10-03T15:23:21.438Z",
+      "captureCompletedUTC": "2026-10-03T15:23:21.455Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        346,
+        243
+      ],
+      "safeSHA256": "7a41cc24a907d3508d1784c9a58cb3221c0e785901ba2e799ab335b5ba47be1d"
+    },
+    {
+      "file": "1439-mobile-home-on.png",
+      "proofIndex": 2,
+      "domUTC": "2026-10-03T15:24:00.679Z",
+      "captureStartedUTC": "2026-10-03T15:24:00.683Z",
+      "captureCompletedUTC": "2026-10-03T15:24:00.699Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        346,
+        147
+      ],
+      "safeSHA256": "27ee874d476aa6a65a39c61d2276583ac0b368ea481b5c5f1ba5a9fc210ee1b0"
+    },
+    {
+      "file": "1439-mobile-home-fields.png",
+      "proofIndex": 3,
+      "domUTC": "2026-10-03T15:24:01.040Z",
+      "captureStartedUTC": "2026-10-03T15:24:01.044Z",
+      "captureCompletedUTC": "2026-10-03T15:24:01.062Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        313,
+        286
+      ],
+      "safeSHA256": "281f05bfdb901fef259e8d322484ffbe9e03b3e3948544a20b9b1bce2c0aa9c1"
+    },
+    {
+      "file": "1439-mobile-list-on.png",
+      "proofIndex": 4,
+      "domUTC": "2026-10-03T15:24:17.217Z",
+      "captureStartedUTC": "2026-10-03T15:24:17.222Z",
+      "captureCompletedUTC": "2026-10-03T15:24:17.238Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        346,
+        229
+      ],
+      "safeSHA256": "bd14def7e6f5b80f290d89aa40c515fffc862bd4be870023925e19ce0ea54e98"
+    },
+    {
+      "file": "1439-mobile-list-fields.png",
+      "proofIndex": 5,
+      "domUTC": "2026-10-03T15:24:17.583Z",
+      "captureStartedUTC": "2026-10-03T15:24:17.594Z",
+      "captureCompletedUTC": "2026-10-03T15:24:17.610Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        313,
+        286
+      ],
+      "safeSHA256": "6faf30658279983fac8e548d8b54d21f7f81be0c99201f3d770fd3725f111f9e"
+    },
+    {
+      "file": "1439-tablet-prize.png",
+      "proofIndex": 7,
+      "domUTC": "2026-10-03T15:24:59.040Z",
+      "captureStartedUTC": "2026-10-03T15:24:59.044Z",
+      "captureCompletedUTC": "2026-10-03T15:24:59.067Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        699,
+        379
+      ],
+      "safeSHA256": "f96f89894173d76dd8638decd166ab7a5f0030f94af56ab6a8030da3eab5a6c6"
+    },
+    {
+      "file": "1439-tablet-both-off-restored.png",
+      "proofIndex": 14,
+      "domUTC": "2026-10-03T15:27:33.810Z",
+      "captureStartedUTC": "2026-10-03T15:27:33.815Z",
+      "captureCompletedUTC": "2026-10-03T15:27:33.837Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        700,
+        213
+      ],
+      "safeSHA256": "1c350e5750b528d8fe2d0aee03e29212c93c4e5824dcc365757b4469824971ee"
+    },
+    {
+      "file": "1439-tablet-home-on.png",
+      "proofIndex": 10,
+      "domUTC": "2026-10-03T15:26:43.518Z",
+      "captureStartedUTC": "2026-10-03T15:26:43.523Z",
+      "captureCompletedUTC": "2026-10-03T15:26:43.549Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        700,
+        165
+      ],
+      "safeSHA256": "70ba57add3a6816074abea2d32fa51c8a96db7b8b34a4321a26de4a0d3252d61"
+    },
+    {
+      "file": "1439-tablet-home-fields.png",
+      "proofIndex": 11,
+      "domUTC": "2026-10-03T15:27:12.842Z",
+      "captureStartedUTC": "2026-10-03T15:27:12.847Z",
+      "captureCompletedUTC": "2026-10-03T15:27:12.871Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        665,
+        208
+      ],
+      "safeSHA256": "7b4be754167b36d0be448ad9cebbe54cf63fcc233323522ee7701cbac055d697"
+    },
+    {
+      "file": "1439-tablet-list-on.png",
+      "proofIndex": 12,
+      "domUTC": "2026-10-03T15:27:13.888Z",
+      "captureStartedUTC": "2026-10-03T15:27:13.893Z",
+      "captureCompletedUTC": "2026-10-03T15:27:13.925Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        700,
+        238
+      ],
+      "safeSHA256": "95e638fc83ca4263f9a212255727940dae934680d20bac4fbe877935a33ca878"
+    },
+    {
+      "file": "1439-tablet-list-fields.png",
+      "proofIndex": 13,
+      "domUTC": "2026-10-03T15:27:33.113Z",
+      "captureStartedUTC": "2026-10-03T15:27:33.121Z",
+      "captureCompletedUTC": "2026-10-03T15:27:33.146Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        665,
+        208
+      ],
+      "safeSHA256": "92d2a0576a334f2c5059c56f0795f22d9edd35d4785361aba4a807766fa6e629"
+    },
+    {
+      "file": "1439-desktop-prize.png",
+      "proofIndex": 15,
+      "domUTC": "2026-10-03T15:28:01.774Z",
+      "captureStartedUTC": "2026-10-03T15:28:01.779Z",
+      "captureCompletedUTC": "2026-10-03T15:28:01.803Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        837,
+        396
+      ],
+      "safeSHA256": "1f33ce3c8ca55505dc6454a7fc6f5d53c575946bed4db03249198c099ff115a6"
+    },
+    {
+      "file": "1439-desktop-promo-off.png",
+      "proofIndex": 16,
+      "domUTC": "2026-10-03T15:28:02.141Z",
+      "captureStartedUTC": "2026-10-03T15:28:02.149Z",
+      "captureCompletedUTC": "2026-10-03T15:28:02.172Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        837,
+        214
+      ],
+      "safeSHA256": "91212e69ce5c192b350bb4db1f6053e5b574dde75d06aab36707cc9b50569994"
+    },
+    {
+      "file": "1439-desktop-home-on.png",
+      "proofIndex": 17,
+      "domUTC": "2026-10-03T15:28:20.118Z",
+      "captureStartedUTC": "2026-10-03T15:28:20.124Z",
+      "captureCompletedUTC": "2026-10-03T15:28:20.149Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        837,
+        157
+      ],
+      "safeSHA256": "89fd51a6277fc46551357ddec5b7bddf006692e702b06e3af11fea8d49ef5748"
+    },
+    {
+      "file": "1439-desktop-home-fields.png",
+      "proofIndex": 18,
+      "domUTC": "2026-10-03T15:28:20.496Z",
+      "captureStartedUTC": "2026-10-03T15:28:20.502Z",
+      "captureCompletedUTC": "2026-10-03T15:28:20.525Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        802,
+        316
+      ],
+      "safeSHA256": "5e7aa7500fcdf8f5075c27a2dfd539411b4df8e97653391aae1413a2b8b4fca2"
+    },
+    {
+      "file": "1439-desktop-list-on.png",
+      "proofIndex": 19,
+      "domUTC": "2026-10-03T15:28:47.731Z",
+      "captureStartedUTC": "2026-10-03T15:28:47.737Z",
+      "captureCompletedUTC": "2026-10-03T15:28:47.758Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        837,
+        240
+      ],
+      "safeSHA256": "56dfc7ef21da90a1cd78b8cbd32105fbf200aac3050b4781639d954345835f6c"
+    },
+    {
+      "file": "1439-desktop-list-fields.png",
+      "proofIndex": 20,
+      "domUTC": "2026-10-03T15:28:48.110Z",
+      "captureStartedUTC": "2026-10-03T15:28:48.115Z",
+      "captureCompletedUTC": "2026-10-03T15:28:48.140Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        802,
+        316
+      ],
+      "safeSHA256": "a8a3b88f3f3d13d2e41516bddc6585c45211953160c3905722a421da55f093c5"
+    }
+  ],
+  "limits": [
+    "DOM dimensions of offscreen controls do not prove viewport visibility.",
+    "Empty input scrollWidth equality does not establish placeholder readability.",
+    "Only local toggle states were exercised; no entered-promotion-value retention, keyboard/speech, save/create or step5 summary validation.",
+    "DOM rows8/9 retained, but their partially occluded screenshots excluded. Later proof14 supplies the tablet OFF crop."
+  ]
+}

@@ -1,0 +1,724 @@
+{
+  "scope": "Current-run step4 UI audit, not final publication/creation E2E",
+  "crops": [
+    {
+      "sourceBasename": "1439-mobile-prize.png",
+      "sourceSHA256": "2a81d4fe0a14aa2284d32b88a8a020df05a4336df9d9d3562f54f87b87abb915",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "outputBasename": "1439-mobile-prize.png",
+      "outputSHA256": "0198c8e86d8e31c761f6d3114d8cacfcc6cc7c9f86e2750bbadd83bf4c94d9bf",
+      "outputDimensions": [
+        346,
+        378
+      ],
+      "boundsPixels": [
+        28,
+        58,
+        374,
+        436
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-mobile-prize.png",
+        "startedUTC": "2026-10-03T15:22:56.792Z",
+        "completedUTC": "2026-10-03T15:22:56.825Z",
+        "domUTC": "2026-10-03T15:22:56.788Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 945.5999755859376,
+          "width": 402
+        }
+      },
+      "proofIndex": 0,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-mobile-promo-off.png",
+      "sourceSHA256": "1ae1f23f3f999262e590da8754085bccb0902f757dbb259b4c367eea5d0c3a7a",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "outputBasename": "1439-mobile-promo-off.png",
+      "outputSHA256": "7a41cc24a907d3508d1784c9a58cb3221c0e785901ba2e799ab335b5ba47be1d",
+      "outputDimensions": [
+        346,
+        243
+      ],
+      "boundsPixels": [
+        28,
+        292,
+        374,
+        535
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-mobile-promo-off.png",
+        "startedUTC": "2026-10-03T15:23:21.438Z",
+        "completedUTC": "2026-10-03T15:23:21.455Z",
+        "domUTC": "2026-10-03T15:23:21.434Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 2012,
+          "width": 402
+        }
+      },
+      "proofIndex": 1,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-mobile-home-on.png",
+      "sourceSHA256": "0a007c391e5b5ae5b9a1a347672e51b26e6311be5f14dce5c1a5dbe6a28c5cd3",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "outputBasename": "1439-mobile-home-on.png",
+      "outputSHA256": "27ee874d476aa6a65a39c61d2276583ac0b368ea481b5c5f1ba5a9fc210ee1b0",
+      "outputDimensions": [
+        346,
+        147
+      ],
+      "boundsPixels": [
+        28,
+        304,
+        374,
+        451
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-mobile-home-on.png",
+        "startedUTC": "2026-10-03T15:24:00.683Z",
+        "completedUTC": "2026-10-03T15:24:00.699Z",
+        "domUTC": "2026-10-03T15:24:00.679Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 2099.199951171875,
+          "width": 402
+        }
+      },
+      "proofIndex": 2,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-mobile-home-fields.png",
+      "sourceSHA256": "0a78c32145999a4e0af5ced142e5c98f5b938fb052d4fbb61b64e2ba7f62d90f",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "outputBasename": "1439-mobile-home-fields.png",
+      "outputSHA256": "281f05bfdb901fef259e8d322484ffbe9e03b3e3948544a20b9b1bce2c0aa9c1",
+      "outputDimensions": [
+        313,
+        286
+      ],
+      "boundsPixels": [
+        44,
+        248,
+        357,
+        534
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-mobile-home-fields.png",
+        "startedUTC": "2026-10-03T15:24:01.044Z",
+        "completedUTC": "2026-10-03T15:24:01.062Z",
+        "domUTC": "2026-10-03T15:24:01.040Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 2604.800048828125,
+          "width": 402
+        }
+      },
+      "proofIndex": 3,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-mobile-list-on.png",
+      "sourceSHA256": "a9d1cbfef89a54223f91de89bc1d931f81890f7a4d3ee76f532c4e6608b5bae9",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "outputBasename": "1439-mobile-list-on.png",
+      "outputSHA256": "bd14def7e6f5b80f290d89aa40c515fffc862bd4be870023925e19ce0ea54e98",
+      "outputDimensions": [
+        346,
+        229
+      ],
+      "boundsPixels": [
+        28,
+        303,
+        374,
+        532
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-mobile-list-on.png",
+        "startedUTC": "2026-10-03T15:24:17.222Z",
+        "completedUTC": "2026-10-03T15:24:17.238Z",
+        "domUTC": "2026-10-03T15:24:17.217Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 2099.199951171875,
+          "width": 402
+        }
+      },
+      "proofIndex": 4,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-mobile-list-fields.png",
+      "sourceSHA256": "4d18f6cdfebb7a5fac756ee7c2a3b5cb79ec2711a1e65d89d0448d2cdd4adb0c",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "outputBasename": "1439-mobile-list-fields.png",
+      "outputSHA256": "6faf30658279983fac8e548d8b54d21f7f81be0c99201f3d770fd3725f111f9e",
+      "outputDimensions": [
+        313,
+        286
+      ],
+      "boundsPixels": [
+        44,
+        248,
+        357,
+        534
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-mobile-list-fields.png",
+        "startedUTC": "2026-10-03T15:24:17.594Z",
+        "completedUTC": "2026-10-03T15:24:17.610Z",
+        "domUTC": "2026-10-03T15:24:17.583Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 2604,
+          "width": 402
+        }
+      },
+      "proofIndex": 5,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-tablet-prize.png",
+      "sourceSHA256": "faa0919165a1f4321d6f1831a431006e8d63afd153536aa3b95da5f1647b1df9",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "outputBasename": "1439-tablet-prize.png",
+      "outputSHA256": "f96f89894173d76dd8638decd166ab7a5f0030f94af56ab6a8030da3eab5a6c6",
+      "outputDimensions": [
+        699,
+        379
+      ],
+      "boundsPixels": [
+        44,
+        53,
+        743,
+        432
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-tablet-prize.png",
+        "startedUTC": "2026-10-03T15:24:59.044Z",
+        "completedUTC": "2026-10-03T15:24:59.067Z",
+        "domUTC": "2026-10-03T15:24:59.040Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 800,
+          "width": 787
+        }
+      },
+      "proofIndex": 7,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-tablet-both-off-restored.png",
+      "sourceSHA256": "aeb85d182781f68b53ee40cc1ae8aef270740654325d72508b284527ae2563e0",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "outputBasename": "1439-tablet-both-off-restored.png",
+      "outputSHA256": "1c350e5750b528d8fe2d0aee03e29212c93c4e5824dcc365757b4469824971ee",
+      "outputDimensions": [
+        700,
+        213
+      ],
+      "boundsPixels": [
+        44,
+        134,
+        744,
+        347
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-tablet-both-off-restored.png",
+        "startedUTC": "2026-10-03T15:27:33.815Z",
+        "completedUTC": "2026-10-03T15:27:33.837Z",
+        "domUTC": "2026-10-03T15:27:33.810Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 1668.6666259765625,
+          "width": 787
+        }
+      },
+      "proofIndex": 14,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-tablet-home-on.png",
+      "sourceSHA256": "3e8f2145cb79bac892f10e7962d0fb6443d764cf55331a9026da78bc1afbf370",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "outputBasename": "1439-tablet-home-on.png",
+      "outputSHA256": "70ba57add3a6816074abea2d32fa51c8a96db7b8b34a4321a26de4a0d3252d61",
+      "outputDimensions": [
+        700,
+        165
+      ],
+      "boundsPixels": [
+        44,
+        147,
+        744,
+        312
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-tablet-home-on.png",
+        "startedUTC": "2026-10-03T15:26:43.523Z",
+        "completedUTC": "2026-10-03T15:26:43.549Z",
+        "domUTC": "2026-10-03T15:26:43.518Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 1652.6666259765625,
+          "width": 787
+        }
+      },
+      "proofIndex": 10,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-tablet-home-fields.png",
+      "sourceSHA256": "a0608d80e3c946a2ae54b330616f4ca27a283be8e95bf18e5ec53632c20e3650",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "outputBasename": "1439-tablet-home-fields.png",
+      "outputSHA256": "7b4be754167b36d0be448ad9cebbe54cf63fcc233323522ee7701cbac055d697",
+      "outputDimensions": [
+        665,
+        208
+      ],
+      "boundsPixels": [
+        60,
+        200,
+        725,
+        408
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-tablet-home-fields.png",
+        "startedUTC": "2026-10-03T15:27:12.847Z",
+        "completedUTC": "2026-10-03T15:27:12.871Z",
+        "domUTC": "2026-10-03T15:27:12.842Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 2245.333251953125,
+          "width": 787
+        }
+      },
+      "proofIndex": 11,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-tablet-list-on.png",
+      "sourceSHA256": "4ffce5cf46ba429f7867bede2b5b2bd1f627984bd84b50075a4f90399fde8497",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "outputBasename": "1439-tablet-list-on.png",
+      "outputSHA256": "95e638fc83ca4263f9a212255727940dae934680d20bac4fbe877935a33ca878",
+      "outputDimensions": [
+        700,
+        238
+      ],
+      "boundsPixels": [
+        44,
+        72,
+        744,
+        310
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-tablet-list-on.png",
+        "startedUTC": "2026-10-03T15:27:13.893Z",
+        "completedUTC": "2026-10-03T15:27:13.925Z",
+        "domUTC": "2026-10-03T15:27:13.888Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 1728.6666259765625,
+          "width": 787
+        }
+      },
+      "proofIndex": 12,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-tablet-list-fields.png",
+      "sourceSHA256": "d2cd2f074fd9e78d4e8d3138fa27a4fbe9f1e89b47af579f585f431af02f0ba5",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "outputBasename": "1439-tablet-list-fields.png",
+      "outputSHA256": "92d2a0576a334f2c5059c56f0795f22d9edd35d4785361aba4a807766fa6e629",
+      "outputDimensions": [
+        665,
+        208
+      ],
+      "boundsPixels": [
+        60,
+        200,
+        725,
+        408
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-tablet-list-fields.png",
+        "startedUTC": "2026-10-03T15:27:33.121Z",
+        "completedUTC": "2026-10-03T15:27:33.146Z",
+        "domUTC": "2026-10-03T15:27:33.113Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 2035.3333740234375,
+          "width": 787
+        }
+      },
+      "proofIndex": 13,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-desktop-prize.png",
+      "sourceSHA256": "a0470cdf99ae0aeb5083bb31de9268aaee7b8cd02146d668fc5cead23c83e2be",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "1439-desktop-prize.png",
+      "outputSHA256": "1f33ce3c8ca55505dc6454a7fc6f5d53c575946bed4db03249198c099ff115a6",
+      "outputDimensions": [
+        837,
+        396
+      ],
+      "boundsPixels": [
+        292,
+        162,
+        1129,
+        558
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-desktop-prize.png",
+        "startedUTC": "2026-10-03T15:28:01.779Z",
+        "completedUTC": "2026-10-03T15:28:01.803Z",
+        "domUTC": "2026-10-03T15:28:01.774Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 610,
+          "width": 1181
+        }
+      },
+      "proofIndex": 15,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-desktop-promo-off.png",
+      "sourceSHA256": "3d8d72c462b2c5aecbeee7c27359df18ebfe113e8293950d05552adcd1f3c638",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "1439-desktop-promo-off.png",
+      "outputSHA256": "91212e69ce5c192b350bb4db1f6053e5b574dde75d06aab36707cc9b50569994",
+      "outputDimensions": [
+        837,
+        214
+      ],
+      "boundsPixels": [
+        292,
+        376,
+        1129,
+        590
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-desktop-promo-off.png",
+        "startedUTC": "2026-10-03T15:28:02.149Z",
+        "completedUTC": "2026-10-03T15:28:02.172Z",
+        "domUTC": "2026-10-03T15:28:02.141Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 1365,
+          "width": 1181
+        }
+      },
+      "proofIndex": 16,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-desktop-home-on.png",
+      "sourceSHA256": "aa32e14fbd64d431448ef8e3c9fd88aabe16fe4c2880691bae1718682dac4f8d",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "1439-desktop-home-on.png",
+      "outputSHA256": "89fd51a6277fc46551357ddec5b7bddf006692e702b06e3af11fea8d49ef5748",
+      "outputDimensions": [
+        837,
+        157
+      ],
+      "boundsPixels": [
+        292,
+        278,
+        1129,
+        435
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-desktop-home-on.png",
+        "startedUTC": "2026-10-03T15:28:20.124Z",
+        "completedUTC": "2026-10-03T15:28:20.149Z",
+        "domUTC": "2026-10-03T15:28:20.118Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 1464,
+          "width": 1181
+        }
+      },
+      "proofIndex": 17,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-desktop-home-fields.png",
+      "sourceSHA256": "c3fe77eeee8b79676ab829fa9ccb1f8355c325359b20507d8b4934b60e7c56b4",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "1439-desktop-home-fields.png",
+      "outputSHA256": "5e7aa7500fcdf8f5075c27a2dfd539411b4df8e97653391aae1413a2b8b4fca2",
+      "outputDimensions": [
+        802,
+        316
+      ],
+      "boundsPixels": [
+        309,
+        330,
+        1111,
+        646
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-desktop-home-fields.png",
+        "startedUTC": "2026-10-03T15:28:20.502Z",
+        "completedUTC": "2026-10-03T15:28:20.525Z",
+        "domUTC": "2026-10-03T15:28:20.496Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 2127,
+          "width": 1181
+        }
+      },
+      "proofIndex": 18,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-desktop-list-on.png",
+      "sourceSHA256": "92108d6f14fbe803eb31c028d01e8d9931037b2d3c50c563ec8b907dc8da0969",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "1439-desktop-list-on.png",
+      "outputSHA256": "56dfc7ef21da90a1cd78b8cbd32105fbf200aac3050b4781639d954345835f6c",
+      "outputDimensions": [
+        837,
+        240
+      ],
+      "boundsPixels": [
+        292,
+        199,
+        1129,
+        439
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-desktop-list-on.png",
+        "startedUTC": "2026-10-03T15:28:47.737Z",
+        "completedUTC": "2026-10-03T15:28:47.758Z",
+        "domUTC": "2026-10-03T15:28:47.731Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 1542,
+          "width": 1181
+        }
+      },
+      "proofIndex": 19,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    },
+    {
+      "sourceBasename": "1439-desktop-list-fields.png",
+      "sourceSHA256": "b7f3c06864edf47c23191ee1e63733e3069fabb9d6a2efb3b2c3d859cb01aa62",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "1439-desktop-list-fields.png",
+      "outputSHA256": "a8a3b88f3f3d13d2e41516bddc6585c45211953160c3905722a421da55f093c5",
+      "outputDimensions": [
+        802,
+        316
+      ],
+      "boundsPixels": [
+        309,
+        330,
+        1111,
+        646
+      ],
+      "sourceCropPixelEquality": true,
+      "sourceCapture": {
+        "file": "1439-desktop-list-fields.png",
+        "startedUTC": "2026-10-03T15:28:48.115Z",
+        "completedUTC": "2026-10-03T15:28:48.140Z",
+        "domUTC": "2026-10-03T15:28:48.110Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 1849,
+          "width": 1181
+        }
+      },
+      "proofIndex": 20,
+      "privacy": "Only synthetic local wizard form, UI labels, placeholders, switch chrome. No saved fixture/member content."
+    }
+  ],
+  "safeJSONSHA256": {
+    "1439-step4-initial.json": "7399256aed1a53deb785ac020fc8189465507235c5ae83b553ff63d8a1bb45f7",
+    "1439-step4-navigation.json": "a8dce17a70bb01f19d882f8f8a9374616be4fef53e9d3b56446505b43ef78336",
+    "1439-step4-proof.json": "5fdc6a6ce081d281aa1be648e4600fa96b0ba962a2f4d1b511dbc292116fdd46",
+    "1439-step4-actions.json": "87d56ba1b8aac15b12e8ad216c99927233399b494d6ca3f4a0454301d5f5c838",
+    "1439-step4-exit.json": "3b8cf249f82a9aff4f36b8e4bd4fff02f3c6d10625d8628687d795b7efb20b16",
+    "1439-step4-summary.json": "bf67a45ed408d19fd10e92553e48ea9ae9f37d7f0b7c55598bb4b38c6f22c4e4"
+  },
+  "excludedSourcePNGs": [
+    "1439-tablet-promo-off.png",
+    "1439-tablet-promo-off-visible.png"
+  ],
+  "exclusionReason": "Lower OFF card intersects viewport footer in those source frames; later proof14/crop shows both fully.",
+  "rawImagesShared": false,
+  "sourceInputFiles": [
+    {
+      "file": "1439-step4-initial.json",
+      "bytes": 295,
+      "sha256": "7399256aed1a53deb785ac020fc8189465507235c5ae83b553ff63d8a1bb45f7"
+    },
+    {
+      "file": "1439-step4-navigation.json",
+      "bytes": 1338,
+      "sha256": "a8dce17a70bb01f19d882f8f8a9374616be4fef53e9d3b56446505b43ef78336"
+    },
+    {
+      "file": "1439-step4-proof.json",
+      "bytes": 266031,
+      "sha256": "5fdc6a6ce081d281aa1be648e4600fa96b0ba962a2f4d1b511dbc292116fdd46"
+    },
+    {
+      "file": "1439-step4-actions.json",
+      "bytes": 5277,
+      "sha256": "87d56ba1b8aac15b12e8ad216c99927233399b494d6ca3f4a0454301d5f5c838"
+    },
+    {
+      "file": "1439-step4-exit.json",
+      "bytes": 485,
+      "sha256": "3b8cf249f82a9aff4f36b8e4bd4fff02f3c6d10625d8628687d795b7efb20b16"
+    },
+    {
+      "file": "1439-step4-summary.json",
+      "bytes": 10223,
+      "sha256": "bf67a45ed408d19fd10e92553e48ea9ae9f37d7f0b7c55598bb4b38c6f22c4e4"
+    },
+    {
+      "file": "1439-step4-provenance.json",
+      "bytes": 21795,
+      "sha256": "175252ee31f1e663f6665fd2c5bb22319e8c3541b746c39aad5c8dcf1a7095e6"
+    }
+  ],
+  "publicationProjection": "Source proof, initial/navigation observations, selected actions, exit and18 safe PNG bytes preserved. Summary removes unverified deployment/source-contract attribution and narrows conclusions. Source input files unchanged.",
+  "publisherReview": "All18 actual safe crops viewed. Hashes, JSON chronology, switch dimensions/state, named fields, crop dimensions and DOM-to-capture mappings independently verified; no original images or private payloads read."
+}

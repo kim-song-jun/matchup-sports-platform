@@ -1,0 +1,49 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3576,
+      "sha256": "d7e34423470cee7381e5ea39c3eb7b47504c4b984b454f6d9ef432c6586a011b"
+    },
+    {
+      "file": "card-count.png",
+      "bytes": 1589,
+      "sha256": "c734218c297e38c72ebe37309f58c082726519f6a0a8ce01d955d2b554348c88"
+    },
+    {
+      "file": "card-status-copy.png",
+      "bytes": 1358,
+      "sha256": "b292edf7ad556271905653b150c47e7662b60121c6096266ff1fc139cf760448"
+    },
+    {
+      "file": "card-title-status.png",
+      "bytes": 15554,
+      "sha256": "0d6001ad9c61272d7f2c69b2ff62a06f12c42d28a2269aa2f38fad80e8299556"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 1393,
+      "sha256": "022f01064d2ee9d72df19022ec0dba1dae7015131984ee03ffdf558cf63aa233"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 4496,
+      "sha256": "b462f2f20e4771581b0517999e1a826173e894507dedcc3440560c789df9bd44"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3670,
+      "sha256": "2404ebb898a4bf2744cd52f09cd062af9f97052e194be6d6a108c60a3fd81d8f"
+    },
+    {
+      "file": "title-supplement.json",
+      "bytes": 398,
+      "sha256": "3536d8af6c5eec0576d7329da742fe909985541f378f0edf88c95c65c87882a5"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 1982,
+      "sha256": "ef898bbad360a440810b37c5e1d2c2ca7b4413f19492f89d0c87ab9a7f24400c"
+    }
+  ]
+}

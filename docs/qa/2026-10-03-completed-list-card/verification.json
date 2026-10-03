@@ -1,0 +1,64 @@
+{
+  "verifiedUTC": "2026-10-03T17:43:15.856643+00:00",
+  "counts": {
+    "cards": 1,
+    "desktopViewports": 1,
+    "DOMReads": 2,
+    "sourceCaptures": 1,
+    "safeCrops": 3,
+    "priorDetailRowsCompared": 6
+  },
+  "cardRectInsideViewport": true,
+  "statusNodeRectsInsideCard": true,
+  "statusCopies": [
+    "종료",
+    "종료"
+  ],
+  "countText": "1/2명",
+  "oldRecruitmentCompleteTextPresent": false,
+  "detailNoticePhraseInList": false,
+  "listURLQueryEmpty": true,
+  "recordedSearchQueryEmpty": true,
+  "fixtureURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+  "priorPublicCommit": "53ea4bb37d5f0e2c065a7ece7dccd3a522453c61",
+  "priorPublicProofGitBlob": "a388b6c9295f8576066e79a96f70517d31e1bd2b",
+  "all6PriorPublicURLHashesMatch": true,
+  "all6PriorDetailCountsAndStatusLabelsMatch": true,
+  "mainDOMUTC": "2026-10-03T17:36:50.666Z",
+  "titleSupplementUTC": "2026-10-03T17:37:26.613Z",
+  "images": [
+    {
+      "file": "card-title-status.png",
+      "safeSHA256": "0d6001ad9c61272d7f2c69b2ff62a06f12c42d28a2269aa2f38fad80e8299556",
+      "safeRasterPixels": [
+        400,
+        49
+      ],
+      "captureStartedUTC": "2026-10-03T17:36:50.670Z",
+      "captureCompletedUTC": "2026-10-03T17:36:50.695Z"
+    },
+    {
+      "file": "card-count.png",
+      "safeSHA256": "c734218c297e38c72ebe37309f58c082726519f6a0a8ce01d955d2b554348c88",
+      "safeRasterPixels": [
+        35,
+        25
+      ],
+      "captureStartedUTC": "2026-10-03T17:36:50.670Z",
+      "captureCompletedUTC": "2026-10-03T17:36:50.695Z"
+    },
+    {
+      "file": "card-status-copy.png",
+      "safeSHA256": "b292edf7ad556271905653b150c47e7662b60121c6096266ff1fc139cf760448",
+      "safeRasterPixels": [
+        38,
+        28
+      ],
+      "captureStartedUTC": "2026-10-03T17:36:50.670Z",
+      "captureCompletedUTC": "2026-10-03T17:36:50.695Z"
+    }
+  ],
+  "runtimeServingSHA": "unknown",
+  "normalizedAPIStatus": "not_observed",
+  "viewerRole": "not_observed"
+}

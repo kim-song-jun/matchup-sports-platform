@@ -1,0 +1,59 @@
+{
+  "card": {
+    "completedNoticeTitlePresent": false,
+    "countText": "1/2명",
+    "hrefTemplate": "/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "oldRecruitmentCompleteTextPresent": false,
+    "rect": {
+      "bottom": 397,
+      "height": 131,
+      "right": 1126.5,
+      "width": 528,
+      "x": 598.5,
+      "y": 266
+    },
+    "resolvedHrefTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "searchQuery": "",
+    "statusNodes": [
+      {
+        "rect": {
+          "bottom": 322,
+          "height": 24,
+          "right": 762.25,
+          "width": 38.75,
+          "x": 723.5,
+          "y": 298
+        },
+        "tag": "SPAN",
+        "text": "종료"
+      },
+      {
+        "rect": {
+          "bottom": 384,
+          "height": 20,
+          "right": 1109.5,
+          "width": 22.484375,
+          "x": 1087.015625,
+          "y": 364
+        },
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "title": [],
+    "withinViewport": true
+  },
+  "normalizedAPIStatus": "not_observed",
+  "runtimeServingSHA": "unknown",
+  "url": "https://alpha.teameet.co.kr/matches",
+  "utc": "2026-10-03T17:36:50.666Z",
+  "viewerRole": "not_observed",
+  "viewport": {
+    "dpr": 1,
+    "height": 757,
+    "scrollWidth": 1181,
+    "scrollY": 788,
+    "width": 1181
+  }
+}

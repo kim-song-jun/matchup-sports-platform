@@ -1,0 +1,55 @@
+{
+  "issue": 1587,
+  "relatedPR": 1590,
+  "scope": "One desktop list-card comparison only. Prior detail3widths were not rerun.",
+  "listURL": "https://alpha.teameet.co.kr/matches",
+  "targetHrefTemplate": "/matches/{synthetic-fixture}",
+  "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+  "resolvedHrefTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+  "observedUTC": "2026-10-03T17:36:50.666Z",
+  "supplementUTC": "2026-10-03T17:37:26.613Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 757,
+    "scrollWidth": 1181,
+    "scrollY": 788,
+    "width": 1181
+  },
+  "evidence": {
+    "cardWithinViewport": true,
+    "statusCopies": [
+      "종료",
+      "종료"
+    ],
+    "countText": "1/2명",
+    "syntheticTitle": "(테스트) 1.0.3 QA 수명주기",
+    "searchQuery": "",
+    "oldRecruitmentCompleteTextPresent": false,
+    "detailNoticeTitlePresentInCard": false
+  },
+  "identityComparison": {
+    "method": "Exact resolved card href equals all6 previous detail observation URLs. No detail navigation was performed during this list check.",
+    "priorDetailProofSHA256": "024966e36b983a0f39aaee5345396b19c62de6c481ee8d79a7fa9ffdbef5773b",
+    "priorPublishedEvidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/53ea4bb37d5f0e2c065a7ece7dccd3a522453c61/docs/qa/2026-10-03-completed-match-after/README.md",
+    "sameHref": true
+  },
+  "outcome": "The list card matches the prior completed detail fixture, showing 종료 in its badge and status copy and1/2명. No list/detail status-text or count discrepancy is observed in this sample.",
+  "methods": [
+    "Read current /matches list DOM and locate exact target href.",
+    "Use normal native scroll to reveal the already-present target card.",
+    "Read only target anchor status/count/title metadata and capture the actual viewport. No search/filter/card click was needed."
+  ],
+  "limits": [
+    "Desktop1181×757 only; no new mobile/tablet list pass.",
+    "Original before viewer identity is unrecorded; do not claim historical viewer equivalence.",
+    "proof.card.title is an empty array because it collected only h1–h4; a later exact-title DIV observation is in title-supplement.json. The card title was not missing.",
+    "Status text 종료 is a UI observation, not inferred API status/displayState. The list does not contain the longer detail-specific 종료된 매치예요 phrase; that absence is not a defect.",
+    "Host name, other cards, venue and participant data are excluded from all safe crops. The raw viewport is private and not included.",
+    "No server/fixture/permission/role/result changes, application, save, or notification actions were performed.",
+    "The collector reports the existing /matches page remained from17:03:59 return; only native scrolling occurred before this check. There is no new navigation/reload record or runtime bundle identity.",
+    "normalized API status/displayState and viewer role were not observed. Queryless URL and empty recorded searchQuery establish the recorded list context, not an audit of every possible hidden filter.",
+    "The main card snapshot and screenshot precede the separate title DIV read by about36seconds; title[] is the earlier h1–h4 collector result, not a missing title.",
+    "Three safe crops come from one source screenshot and one capture call. Two DOM reads concern one card, not two cards or separate viewport runs.",
+    "List status/count matches earlier detail observations at a different time. List CTA behavior, link activation, list roundtrip, other cards, mobile/tablet list behavior and full issue acceptance are unverified."
+  ]
+}

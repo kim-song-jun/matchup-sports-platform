@@ -1,0 +1,17 @@
+{
+  "hrefTemplate": "/matches/{synthetic-fixture}",
+  "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+  "titleNodes": [
+    {
+      "rect": {
+        "height": 28,
+        "width": 189.890625,
+        "x": 770.25,
+        "y": 297
+      },
+      "tag": "DIV",
+      "text": "(테스트) 1.0.3 QA 수명주기"
+    }
+  ],
+  "utc": "2026-10-03T17:37:26.613Z"
+}

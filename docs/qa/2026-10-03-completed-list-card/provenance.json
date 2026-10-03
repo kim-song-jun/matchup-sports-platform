@@ -1,0 +1,140 @@
+{
+  "scope": "Safe list-card supplement only",
+  "crops": [
+    {
+      "sourceBasename": "target-card.png",
+      "sourceSHA256": "020ec510c350097c58bfe8a0ffcd0ff23e813e954df3cea22a53a0ab03872c5b",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "card-title-status.png",
+      "outputSHA256": "0d6001ad9c61272d7f2c69b2ff62a06f12c42d28a2269aa2f38fad80e8299556",
+      "outputDimensions": [
+        400,
+        49
+      ],
+      "boundsPixels": [
+        715,
+        277,
+        1115,
+        326
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "target-card.png",
+        "domUTC": "2026-10-03T17:36:50.666Z",
+        "startedUTC": "2026-10-03T17:36:50.670Z",
+        "url": "https://alpha.teameet.co.kr/matches",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 788,
+          "width": 1181
+        },
+        "completedUTC": "2026-10-03T17:36:50.695Z"
+      }
+    },
+    {
+      "sourceBasename": "target-card.png",
+      "sourceSHA256": "020ec510c350097c58bfe8a0ffcd0ff23e813e954df3cea22a53a0ab03872c5b",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "card-count.png",
+      "outputSHA256": "c734218c297e38c72ebe37309f58c082726519f6a0a8ce01d955d2b554348c88",
+      "outputDimensions": [
+        35,
+        25
+      ],
+      "boundsPixels": [
+        720,
+        362,
+        755,
+        387
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "target-card.png",
+        "domUTC": "2026-10-03T17:36:50.666Z",
+        "startedUTC": "2026-10-03T17:36:50.670Z",
+        "url": "https://alpha.teameet.co.kr/matches",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 788,
+          "width": 1181
+        },
+        "completedUTC": "2026-10-03T17:36:50.695Z"
+      }
+    },
+    {
+      "sourceBasename": "target-card.png",
+      "sourceSHA256": "020ec510c350097c58bfe8a0ffcd0ff23e813e954df3cea22a53a0ab03872c5b",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "outputBasename": "card-status-copy.png",
+      "outputSHA256": "b292edf7ad556271905653b150c47e7662b60121c6096266ff1fc139cf760448",
+      "outputDimensions": [
+        38,
+        28
+      ],
+      "boundsPixels": [
+        1077,
+        360,
+        1115,
+        388
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "target-card.png",
+        "domUTC": "2026-10-03T17:36:50.666Z",
+        "startedUTC": "2026-10-03T17:36:50.670Z",
+        "url": "https://alpha.teameet.co.kr/matches",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 788,
+          "width": 1181
+        },
+        "completedUTC": "2026-10-03T17:36:50.695Z"
+      }
+    }
+  ],
+  "safeJSONSHA256": {
+    "proof.json": "21c8420e6304b1437db7735b51233ee7cebb76e59576b79043c775f11f43563e",
+    "title-supplement.json": "8eb4b7446a944bd7fa93c7f748a2742ad90a0a240132b3fe39c5bd0919ae3c6f",
+    "summary.json": "9bb85a45c79c49107f99d3374b1bbb0a7b4b93becd88df8de70c42b0d942cf3c"
+  },
+  "privacy": "Only synthetic title, sport/level/gender labels, completed status and numeric count; no host/member names.",
+  "sourceInputFiles": [
+    {
+      "file": "proof.json",
+      "bytes": 1319,
+      "sha256": "21c8420e6304b1437db7735b51233ee7cebb76e59576b79043c775f11f43563e"
+    },
+    {
+      "file": "title-supplement.json",
+      "bytes": 317,
+      "sha256": "8eb4b7446a944bd7fa93c7f748a2742ad90a0a240132b3fe39c5bd0919ae3c6f"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3227,
+      "sha256": "9bb85a45c79c49107f99d3374b1bbb0a7b4b93becd88df8de70c42b0d942cf3c"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 3340,
+      "sha256": "9d062c0b82c30fc66e0009035b80c41e22346e2971ea7b3c0f6acfcb6cd3930f"
+    }
+  ],
+  "publicationProjection": "Opaque relative/resolved fixture hrefs projected to templates and the same resolvedURL SHA256 used by earlier public detail proof. DOM text, timing, geometry and3safePNG bytes preserved. Source inputs unchanged.",
+  "publisherReview": "All3safe crops viewed. Hashes, dimensions, one-capture mapping, card containment and exact identity against6prior local detail URLs and6remote immutable public URL hashes independently checked. Original screenshot not read; source-crop equality collector-attested."
+}

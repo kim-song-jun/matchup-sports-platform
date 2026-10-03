@@ -1,0 +1,1352 @@
+[
+  {
+    "applicationState": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 475.6000061035156,
+          "height": 16,
+          "right": 64.5,
+          "width": 44.5,
+          "x": 20,
+          "y": 459.6000061035156
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 521.6000061035156,
+          "height": 20,
+          "right": 382.4000205993652,
+          "width": 48.03750228881836,
+          "x": 334.3625183105469,
+          "y": 501.6000061035156
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      }
+    ],
+    "backLinks": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 56,
+          "height": 44,
+          "right": 56,
+          "width": 44,
+          "x": 12,
+          "y": 12
+        },
+        "rendered": true
+      }
+    ],
+    "body": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      },
+      {
+        "rect": {
+          "bottom": 792.7999877929688,
+          "height": 16,
+          "right": 365.6000175476074,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 776.7999877929688
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "buttons": [
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "text": "신청 불가"
+      },
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 382.3999938964844,
+          "width": 362.3999938964844,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "rendered": true,
+        "text": "신청 불가"
+      }
+    ],
+    "count": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "1/2명"
+      },
+      {
+        "rect": {
+          "bottom": 591.2500133514404,
+          "height": 23.30000114440918,
+          "right": 382.4000015258789,
+          "width": 44.212501525878906,
+          "x": 338.1875,
+          "y": 567.9500122070312
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "1/2명"
+      }
+    ],
+    "noticeTitle": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      },
+      {
+        "rect": {
+          "bottom": 772.7999877929688,
+          "height": 20,
+          "right": 141.54999923706055,
+          "width": 81.75,
+          "x": 59.79999923706055,
+          "y": 752.7999877929688
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      }
+    ],
+    "oldNoticeTitle": [],
+    "runtimeServingSHA": "unknown",
+    "statusBadge": [
+      {
+        "rect": {
+          "bottom": 240,
+          "height": 24,
+          "right": 255.03750228881836,
+          "width": 38.35000228881836,
+          "x": 216.6875,
+          "y": 216
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "utc": "2026-10-03T17:01:17.250Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "scrollY": 0,
+      "width": 402
+    },
+    "index": 0,
+    "step": "mobile header and disabled CTA"
+  },
+  {
+    "applicationState": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 15.599999994039536,
+          "height": 16,
+          "right": 64.5,
+          "width": 44.5,
+          "x": 20,
+          "y": -0.4000000059604645
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 521.6000061035156,
+          "height": 20,
+          "right": 382.4000205993652,
+          "width": 48.03750228881836,
+          "x": 334.3625183105469,
+          "y": 501.6000061035156
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      }
+    ],
+    "backLinks": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -404,
+          "height": 44,
+          "right": 56,
+          "width": 44,
+          "x": 12,
+          "y": -448
+        },
+        "rendered": true
+      }
+    ],
+    "body": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      },
+      {
+        "rect": {
+          "bottom": 332.8000183105469,
+          "height": 16,
+          "right": 365.6000175476074,
+          "width": 328.8000183105469,
+          "x": 36.79999923706055,
+          "y": 316.8000183105469
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "buttons": [
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "text": "신청 불가"
+      },
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 382.3999938964844,
+          "width": 362.3999938964844,
+          "x": 20,
+          "y": 533.6000366210938
+        },
+        "rendered": true,
+        "text": "신청 불가"
+      }
+    ],
+    "count": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "1/2명"
+      },
+      {
+        "rect": {
+          "bottom": 131.2500057220459,
+          "height": 23.30000114440918,
+          "right": 382.4000015258789,
+          "width": 44.212501525878906,
+          "x": 338.1875,
+          "y": 107.95000457763672
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "1/2명"
+      }
+    ],
+    "noticeTitle": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      },
+      {
+        "rect": {
+          "bottom": 312.8000183105469,
+          "height": 20,
+          "right": 141.54999923706055,
+          "width": 81.75,
+          "x": 59.79999923706055,
+          "y": 292.8000183105469
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      }
+    ],
+    "oldNoticeTitle": [],
+    "runtimeServingSHA": "unknown",
+    "statusBadge": [
+      {
+        "rect": {
+          "bottom": -220,
+          "height": 24,
+          "right": 255.03750228881836,
+          "width": 38.35000228881836,
+          "x": 216.6875,
+          "y": -244
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "utc": "2026-10-03T17:01:17.566Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "scrollY": 0,
+      "width": 402
+    },
+    "index": 1,
+    "step": "mobile count and completed notice"
+  },
+  {
+    "applicationState": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 463.6666870117187,
+          "height": 16,
+          "right": 158.1666717529297,
+          "width": 44.5,
+          "x": 113.66667175292967,
+          "y": 447.6666870117187
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 420.6666870117187,
+          "height": 20,
+          "right": 673.6666679382324,
+          "width": 48.04166793823242,
+          "x": 625.625,
+          "y": 400.6666870117187
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      }
+    ],
+    "backLinks": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 44,
+          "height": 44,
+          "right": 149.6666717529297,
+          "width": 44,
+          "x": 105.66667175292967,
+          "y": 0
+        },
+        "rendered": true
+      }
+    ],
+    "body": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      },
+      {
+        "rect": {
+          "bottom": 780.6666870117188,
+          "height": 16,
+          "right": 657.0000305175781,
+          "width": 526.6666870117188,
+          "x": 130.33334350585938,
+          "y": 764.6666870117188
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "buttons": [
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "text": "신청 불가"
+      },
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.6666717529297,
+          "width": 560,
+          "x": 113.66667175292967,
+          "y": 432.6666870117187
+        },
+        "rendered": true,
+        "text": "신청 불가"
+      }
+    ],
+    "count": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "1/2명"
+      },
+      {
+        "rect": {
+          "bottom": 579.5833339691162,
+          "height": 23.83333396911621,
+          "right": 673.6667098999023,
+          "width": 44.20833587646485,
+          "x": 629.4583740234375,
+          "y": 555.75
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "1/2명"
+      }
+    ],
+    "noticeTitle": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      },
+      {
+        "rect": {
+          "bottom": 760.6666870117188,
+          "height": 20,
+          "right": 235.07292938232425,
+          "width": 81.73958587646484,
+          "x": 153.33334350585938,
+          "y": 740.6666870117188
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      }
+    ],
+    "oldNoticeTitle": [],
+    "runtimeServingSHA": "unknown",
+    "statusBadge": [
+      {
+        "rect": {
+          "bottom": 228,
+          "height": 24,
+          "right": 347.6354293823242,
+          "width": 38.08333587646485,
+          "x": 309.5520935058594,
+          "y": 204
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "utc": "2026-10-03T17:02:09.391Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "scrollY": 0,
+      "width": 787
+    },
+    "index": 2,
+    "step": "tablet header and disabled CTA"
+  },
+  {
+    "applicationState": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": -35,
+          "height": 16,
+          "right": 158.1666717529297,
+          "width": 44.5,
+          "x": 113.66667175292967,
+          "y": -51
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 420.6666870117187,
+          "height": 20,
+          "right": 673.6666679382324,
+          "width": 48.04166793823242,
+          "x": 625.625,
+          "y": 400.6666870117187
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      }
+    ],
+    "backLinks": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -454.6666870117187,
+          "height": 44,
+          "right": 149.6666717529297,
+          "width": 44,
+          "x": 105.66667175292967,
+          "y": -498.6666870117187
+        },
+        "rendered": true
+      }
+    ],
+    "body": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      },
+      {
+        "rect": {
+          "bottom": 282,
+          "height": 16,
+          "right": 657.0000305175781,
+          "width": 526.6666870117188,
+          "x": 130.33334350585938,
+          "y": 266
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "buttons": [
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "text": "신청 불가"
+      },
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.6666717529297,
+          "width": 560,
+          "x": 113.66667175292967,
+          "y": 432.6666870117187
+        },
+        "rendered": true,
+        "text": "신청 불가"
+      }
+    ],
+    "count": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "1/2명"
+      },
+      {
+        "rect": {
+          "bottom": 80.91666984558105,
+          "height": 23.83333396911621,
+          "right": 673.6667098999023,
+          "width": 44.20833587646485,
+          "x": 629.4583740234375,
+          "y": 57.08333587646485
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "1/2명"
+      }
+    ],
+    "noticeTitle": [
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      },
+      {
+        "rect": {
+          "bottom": 262,
+          "height": 20,
+          "right": 235.07292938232425,
+          "width": 81.73958587646484,
+          "x": 153.33334350585938,
+          "y": 242
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      }
+    ],
+    "oldNoticeTitle": [],
+    "runtimeServingSHA": "unknown",
+    "statusBadge": [
+      {
+        "rect": {
+          "bottom": -270.66668701171875,
+          "height": 24,
+          "right": 347.6354293823242,
+          "width": 38.08333587646485,
+          "x": 309.5520935058594,
+          "y": -294.66668701171875
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "utc": "2026-10-03T17:02:09.720Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "scrollY": 0,
+      "width": 787
+    },
+    "index": 3,
+    "step": "tablet count and completed notice"
+  },
+  {
+    "applicationState": [
+      {
+        "rect": {
+          "bottom": 673.5,
+          "height": 16,
+          "right": 174.5,
+          "width": 120,
+          "x": 54.5,
+          "y": 657.5
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 577,
+          "height": 20,
+          "right": 1105.5,
+          "width": 48.046875,
+          "x": 1057.453125,
+          "y": 557
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      }
+    ],
+    "backLinks": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 132,
+          "height": 40,
+          "right": 94.5,
+          "width": 40,
+          "x": 54.5,
+          "y": 92
+        },
+        "rendered": true
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false
+      }
+    ],
+    "body": [
+      {
+        "rect": {
+          "bottom": 973,
+          "height": 16,
+          "right": 717.5,
+          "width": 646,
+          "x": 71.5,
+          "y": 957
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "buttons": [
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 656,
+          "height": 50,
+          "right": 1105.5,
+          "width": 318,
+          "x": 787.5,
+          "y": 606
+        },
+        "rendered": true,
+        "text": "신청 불가"
+      },
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "text": "신청 불가"
+      }
+    ],
+    "count": [
+      {
+        "rect": {
+          "bottom": 781.25,
+          "height": 23.5,
+          "right": 734.5,
+          "width": 44.203125,
+          "x": 690.296875,
+          "y": 757.75
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "1/2명"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "1/2명"
+      }
+    ],
+    "noticeTitle": [
+      {
+        "rect": {
+          "bottom": 953,
+          "height": 20,
+          "right": 176.25,
+          "width": 81.75,
+          "x": 94.5,
+          "y": 933
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      }
+    ],
+    "oldNoticeTitle": [],
+    "runtimeServingSHA": "unknown",
+    "statusBadge": [
+      {
+        "rect": {
+          "bottom": 432,
+          "height": 24,
+          "right": 311.140625,
+          "width": 38.75,
+          "x": 272.390625,
+          "y": 408
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "utc": "2026-10-03T17:03:04.122Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1181,
+      "scrollY": 0,
+      "width": 1181
+    },
+    "index": 4,
+    "step": "desktop header and disabled CTA"
+  },
+  {
+    "applicationState": [
+      {
+        "rect": {
+          "bottom": 125.5,
+          "height": 16,
+          "right": 174.5,
+          "width": 120,
+          "x": 54.5,
+          "y": 109.5
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 121,
+          "height": 20,
+          "right": 1105.5,
+          "width": 48.046875,
+          "x": 1057.453125,
+          "y": 101
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "신청 마감"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "SPAN",
+        "text": "신청 마감"
+      }
+    ],
+    "backLinks": [
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": -416,
+          "height": 40,
+          "right": 94.5,
+          "width": 40,
+          "x": 54.5,
+          "y": -456
+        },
+        "rendered": true
+      },
+      {
+        "href": "/matches",
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false
+      }
+    ],
+    "body": [
+      {
+        "rect": {
+          "bottom": 425,
+          "height": 16,
+          "right": 717.5,
+          "width": 646,
+          "x": 71.5,
+          "y": 409
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "buttons": [
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 200,
+          "height": 50,
+          "right": 1105.5,
+          "width": 318,
+          "x": 787.5,
+          "y": 150
+        },
+        "rendered": true,
+        "text": "신청 불가"
+      },
+      {
+        "ariaDisabled": null,
+        "disabled": true,
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "text": "신청 불가"
+      }
+    ],
+    "count": [
+      {
+        "rect": {
+          "bottom": 233.25,
+          "height": 23.5,
+          "right": 734.5,
+          "width": 44.203125,
+          "x": 690.296875,
+          "y": 209.75
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "1/2명"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "1/2명"
+      }
+    ],
+    "noticeTitle": [
+      {
+        "rect": {
+          "bottom": 405,
+          "height": 20,
+          "right": 176.25,
+          "width": 81.75,
+          "x": 94.5,
+          "y": 385
+        },
+        "rendered": true,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      },
+      {
+        "rect": {
+          "bottom": 0,
+          "height": 0,
+          "right": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "rendered": false,
+        "tag": "DIV",
+        "text": "종료된 매치예요"
+      }
+    ],
+    "oldNoticeTitle": [],
+    "runtimeServingSHA": "unknown",
+    "statusBadge": [
+      {
+        "rect": {
+          "bottom": -116,
+          "height": 24,
+          "right": 311.140625,
+          "width": 38.75,
+          "x": 272.390625,
+          "y": -140
+        },
+        "rendered": true,
+        "tag": "SPAN",
+        "text": "종료"
+      }
+    ],
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "utc": "2026-10-03T17:03:04.475Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1181,
+      "scrollY": 548,
+      "width": 1181
+    },
+    "index": 5,
+    "step": "desktop count and completed notice"
+  }
+]

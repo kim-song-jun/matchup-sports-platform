@@ -1,0 +1,89 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 5856,
+      "sha256": "22b0cce6bea6169320fbd01a802f17620ca71c8d22276e4c2688559c9b755739"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1072,
+      "sha256": "eaea75de40d9f1edff6b53a9626418dc01945cd43ab2f242634df9060e16168a"
+    },
+    {
+      "file": "desktop-badge.png",
+      "bytes": 10570,
+      "sha256": "d2ffef13adeed0db3782cf4628584c830a2d9a17066913d7b0ed724f4f63c83a"
+    },
+    {
+      "file": "desktop-count-notice.png",
+      "bytes": 30691,
+      "sha256": "5c5ce2e4ea3d77cb29ffe467e27be97816499e47cf70f4c16b3965e4803d988e"
+    },
+    {
+      "file": "desktop-cta.png",
+      "bytes": 7582,
+      "sha256": "a0f137477257d41e552da4dbc983b74b90c8f1cb8d8867620c48bf7eecbc4069"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 555,
+      "sha256": "edad9e16357f7906d6aa167d6b12c576ea9c19bacc129e8a9c27f334f81d98e1"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 342,
+      "sha256": "027ff01bb2d1c16fbe989880e6edba3a520a53a560fcad327f634198ff6a9ef4"
+    },
+    {
+      "file": "mobile-badge.png",
+      "bytes": 10188,
+      "sha256": "5ddefd95daf623fdc757a8fd59a5d111fc426ba64da0567140fe6fdee41ea8a6"
+    },
+    {
+      "file": "mobile-count-notice.png",
+      "bytes": 30121,
+      "sha256": "5de210c9644df2185e581763c1fcb62c7b59131a7eefb05536ffc1011ff2499d"
+    },
+    {
+      "file": "mobile-cta.png",
+      "bytes": 8402,
+      "sha256": "686ab7806b1f1a24803bb65590b51b3c94dbef26952cb59a2b3afd1b3ad015cf"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 29775,
+      "sha256": "0fc7bb7402732b0cb5c17e160867c94a900c9c9b76c90708158cff9c49efe1d6"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 12007,
+      "sha256": "36ffc4e5eb0e7727ae27a47384604796e9675ce978b5a4c37f439ec614f9bd7e"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 7487,
+      "sha256": "6e693d985cce7490042e020e32523e6c69f86e243b46b6fedd0ea5c8b0d49330"
+    },
+    {
+      "file": "tablet-badge.png",
+      "bytes": 9696,
+      "sha256": "4044f844a7797e966c3f6b47cbb52597a13c953c3a9b7b33c3090b133162520e"
+    },
+    {
+      "file": "tablet-count-notice.png",
+      "bytes": 30907,
+      "sha256": "2a8c2103b2d51ca119f40273e69f7d694a8c1a8befcef774f2f6556ada32c9fd"
+    },
+    {
+      "file": "tablet-cta.png",
+      "bytes": 7761,
+      "sha256": "698f1908b23ac66e565c3a985c240214855f9362c67d20d39540e2e1bbb105aa"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 8615,
+      "sha256": "2b19351735c89e139e7bcd809c0fd1acfaf1892792eee2e188c41f96236b337f"
+    }
+  ]
+}

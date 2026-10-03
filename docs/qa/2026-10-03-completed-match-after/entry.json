@@ -1,0 +1,9 @@
+{
+  "startedUTC": "2026-10-03T17:00:09.918Z",
+  "completedUTC": "2026-10-03T17:00:10.639Z",
+  "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+  "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+  "runtimeServingSHA": "unknown",
+  "viewerScope": "Collector reports authenticated admin-content access immediately before navigation. Match-specific role and historical viewer are unrecorded; same-persona equivalence is not established.",
+  "deploymentContextFile": "deployment-context.json"
+}

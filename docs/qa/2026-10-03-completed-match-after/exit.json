@@ -1,0 +1,12 @@
+{
+  "action": {
+    "name": "Return through visible detail back link after read-only regression",
+    "startedUTC": "2026-10-03T17:03:58.923Z",
+    "completedUTC": "2026-10-03T17:03:59.011Z"
+  },
+  "observation": {
+    "utc": "2026-10-03T17:03:59.270Z",
+    "url": "https://alpha.teameet.co.kr/matches",
+    "visibleDetailTitleCount": 0
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "issue": 1587,
+  "fixedByPR": 1590,
+  "scope": "Rendered completed-match notice title, badge, count and disabled CTA in one observed session across three widths; viewer identity equivalence and permission E2E unverified.",
+  "entry": {
+    "startedUTC": "2026-10-03T17:00:09.918Z",
+    "completedUTC": "2026-10-03T17:00:10.639Z",
+    "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+    "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "runtimeServingSHA": "unknown",
+    "viewerScope": "Collector reports authenticated admin-content access immediately before navigation. Match-specific role and historical viewer are unrecorded; same-persona equivalence is not established.",
+    "deploymentContextFile": "deployment-context.json"
+  },
+  "endedUTC": "2026-10-03T17:03:59.270Z",
+  "runtimeServingSHA": "unknown",
+  "counts": {
+    "DOMRows": 6,
+    "sourcePNGs": 6,
+    "safePNGs": 9
+  },
+  "before": "https://github.com/kim-song-jun/matchup-sports-platform/blob/877d4a4c0b4a495df88003ea78112981bcce1869/docs/qa/2026-10-03-individual-copy-candidates/README.md",
+  "results": [
+    {
+      "layout": "mobile",
+      "headerProofIndex": 0,
+      "noticeProofIndex": 1,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 402,
+        "scrollY": 0,
+        "width": 402
+      },
+      "noticeTitle": "종료된 매치예요",
+      "body": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요.",
+      "count": "1/2명",
+      "statusBadge": [
+        "종료"
+      ],
+      "renderedCTA": [
+        {
+          "ariaDisabled": null,
+          "disabled": true,
+          "rect": {
+            "bottom": 583.6000366210938,
+            "height": 50,
+            "right": 382.3999938964844,
+            "width": 362.3999938964844,
+            "x": 20,
+            "y": 533.6000366210938
+          },
+          "rendered": true,
+          "text": "신청 불가"
+        }
+      ],
+      "totalResponsiveCTANodes": 2,
+      "oldNoticeMatches": 0
+    },
+    {
+      "layout": "tablet",
+      "headerProofIndex": 2,
+      "noticeProofIndex": 3,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "scrollY": 0,
+        "width": 787
+      },
+      "noticeTitle": "종료된 매치예요",
+      "body": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요.",
+      "count": "1/2명",
+      "statusBadge": [
+        "종료"
+      ],
+      "renderedCTA": [
+        {
+          "ariaDisabled": null,
+          "disabled": true,
+          "rect": {
+            "bottom": 482.6666870117187,
+            "height": 50,
+            "right": 673.6666717529297,
+            "width": 560,
+            "x": 113.66667175292967,
+            "y": 432.6666870117187
+          },
+          "rendered": true,
+          "text": "신청 불가"
+        }
+      ],
+      "totalResponsiveCTANodes": 2,
+      "oldNoticeMatches": 0
+    },
+    {
+      "layout": "desktop",
+      "headerProofIndex": 4,
+      "noticeProofIndex": 5,
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1181,
+        "scrollY": 548,
+        "width": 1181
+      },
+      "noticeTitle": "종료된 매치예요",
+      "body": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요.",
+      "count": "1/2명",
+      "statusBadge": [
+        "종료"
+      ],
+      "renderedCTA": [
+        {
+          "ariaDisabled": null,
+          "disabled": true,
+          "rect": {
+            "bottom": 200,
+            "height": 50,
+            "right": 1105.5,
+            "width": 318,
+            "x": 787.5,
+            "y": 150
+          },
+          "rendered": true,
+          "text": "신청 불가"
+        }
+      ],
+      "totalResponsiveCTANodes": 2,
+      "oldNoticeMatches": 0
+    }
+  ],
+  "outcome": "At all3widths the rendered notice title is 종료된 매치예요, the old 모집 완료 notice has0 DOM matches, and badge 종료/count1/2명/unchanged body/one rendered disabled 신청 불가 CTA are observed.",
+  "steps": [
+    {
+      "step": 1,
+      "description": "Fresh read-only detail navigation after8ec deployment",
+      "health": "Fixture loaded in existing session; same historical viewer cannot be established."
+    },
+    {
+      "step": 2,
+      "description": "Mobile402×606",
+      "health": "Corrected title, completed badge and disabled CTA confirmed."
+    },
+    {
+      "step": 3,
+      "description": "Tablet787×505",
+      "health": "Same rendered status/copy/CTA confirmed."
+    },
+    {
+      "step": 4,
+      "description": "Desktop1181×757",
+      "health": "Rendered status/copy/CTA observed. Desktop page-heading duplication and PR1591 are outside this bundle."
+    },
+    {
+      "step": 5,
+      "description": "Exit via visible back link",
+      "health": "Returned to /matches without application, result or fixture mutations."
+    }
+  ],
+  "limitations": [
+    "Original before has no browser account/role or viewer identity. Current authenticated admin access was confirmed on admin content before this fresh navigation, but match-specific host/participant/viewer role was not exposed. Do not call this the same viewer.",
+    "Historical before CSS widths405/789/1183 differ slightly from current402/787/1181. This is a current3width after, not pixel-identical replay.",
+    "Mobile/tablet duplicate responsive DOM nodes include zero-sized hidden copies. Claims use rendered:true nodes and total counts remain recorded.",
+    "rendered means positive rectangle and display/visibility checks; within-viewport status is established by corresponding safe crop, not this Boolean alone.",
+    "DOM statusBadge text 종료 is a UI observation, not a newly captured status/displayState/API response. No backend permission/disabledReason claim.",
+    "Before desktop alone independently established disabled CTA; current3width disabled states are new observations.",
+    "Header badge and count/notice photos are separate points in time and scroll positions. Native viewport resizing and static heading/notice clicks only positioned the page; no action CTA was activated.",
+    "The pointer overlaps a few title glyphs in notice images. Exact full title is independently recorded in DOM.",
+    "Source mobile/tablet raster may round fractional CSS viewport dimensions. Preserve source raster metadata separately.",
+    "Successful fresh navigation after reported deployment is deployment context, not runtime servingSHA attestation. No runtime version identity was exposed.",
+    "No signup/save/payment/result-change/host action or server mutation was performed. No network/DB trace, other lifecycle fixture, new account or role switch was tested.",
+    "No PR1591/1592 coverage is implied.",
+    "No new H1/H2 identity or duplicate-title verification is included; PR1591/1592 are not certified.",
+    "Mobile/tablet notice geometry changes relative to the header while recorded window scrollY remains0. No inner scroll offset was collected; do not infer no scrolling or a scroll-restoration result from that field.",
+    "The body comparison is to the frozen08:49:01.785Z desktop DOM observation, not an assertion that all historical widths independently established the same CTA state.",
+    "Fixture URLs are minimized to a route template plusSHA256; the same URL was independently compared with the frozen before DOM source."
+  ]
+}

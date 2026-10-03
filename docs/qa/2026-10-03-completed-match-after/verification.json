@@ -1,0 +1,296 @@
+{
+  "verifiedUTC": "2026-10-03T17:20:34.713086+00:00",
+  "counts": {
+    "DOMRows": 6,
+    "responsiveWidths": 3,
+    "sourceCaptures": 6,
+    "safePNGs": 9,
+    "exitActionCalls": 1
+  },
+  "rows": [
+    {
+      "proofIndex": 0,
+      "utc": "2026-10-03T17:01:17.250Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 402,
+        "scrollY": 0,
+        "width": 402
+      },
+      "renderedNoticeTitle": "종료된 매치예요",
+      "oldNoticeMatches": 0,
+      "renderedCount": "1/2명",
+      "renderedStatusBadge": "종료",
+      "totalCTANodes": 2,
+      "renderedCTANodes": 1,
+      "renderedCTADisabled": true,
+      "bodyEqualsHistoricalDesktopDOM": true,
+      "picturedScope": "badge and CTA"
+    },
+    {
+      "proofIndex": 1,
+      "utc": "2026-10-03T17:01:17.566Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 402,
+        "scrollY": 0,
+        "width": 402
+      },
+      "renderedNoticeTitle": "종료된 매치예요",
+      "oldNoticeMatches": 0,
+      "renderedCount": "1/2명",
+      "renderedStatusBadge": "종료",
+      "totalCTANodes": 2,
+      "renderedCTANodes": 1,
+      "renderedCTADisabled": true,
+      "bodyEqualsHistoricalDesktopDOM": true,
+      "picturedScope": "count and notice"
+    },
+    {
+      "proofIndex": 2,
+      "utc": "2026-10-03T17:02:09.391Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "scrollY": 0,
+        "width": 787
+      },
+      "renderedNoticeTitle": "종료된 매치예요",
+      "oldNoticeMatches": 0,
+      "renderedCount": "1/2명",
+      "renderedStatusBadge": "종료",
+      "totalCTANodes": 2,
+      "renderedCTANodes": 1,
+      "renderedCTADisabled": true,
+      "bodyEqualsHistoricalDesktopDOM": true,
+      "picturedScope": "badge and CTA"
+    },
+    {
+      "proofIndex": 3,
+      "utc": "2026-10-03T17:02:09.720Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "scrollY": 0,
+        "width": 787
+      },
+      "renderedNoticeTitle": "종료된 매치예요",
+      "oldNoticeMatches": 0,
+      "renderedCount": "1/2명",
+      "renderedStatusBadge": "종료",
+      "totalCTANodes": 2,
+      "renderedCTANodes": 1,
+      "renderedCTADisabled": true,
+      "bodyEqualsHistoricalDesktopDOM": true,
+      "picturedScope": "count and notice"
+    },
+    {
+      "proofIndex": 4,
+      "utc": "2026-10-03T17:03:04.122Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1181,
+        "scrollY": 0,
+        "width": 1181
+      },
+      "renderedNoticeTitle": "종료된 매치예요",
+      "oldNoticeMatches": 0,
+      "renderedCount": "1/2명",
+      "renderedStatusBadge": "종료",
+      "totalCTANodes": 2,
+      "renderedCTANodes": 1,
+      "renderedCTADisabled": true,
+      "bodyEqualsHistoricalDesktopDOM": true,
+      "picturedScope": "badge and CTA"
+    },
+    {
+      "proofIndex": 5,
+      "utc": "2026-10-03T17:03:04.475Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1181,
+        "scrollY": 548,
+        "width": 1181
+      },
+      "renderedNoticeTitle": "종료된 매치예요",
+      "oldNoticeMatches": 0,
+      "renderedCount": "1/2명",
+      "renderedStatusBadge": "종료",
+      "totalCTANodes": 2,
+      "renderedCTANodes": 1,
+      "renderedCTADisabled": true,
+      "bodyEqualsHistoricalDesktopDOM": true,
+      "picturedScope": "count and notice"
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-badge.png",
+      "proofIndex": 0,
+      "domUTC": "2026-10-03T17:01:17.250Z",
+      "captureStartedUTC": "2026-10-03T17:01:17.256Z",
+      "captureCompletedUTC": "2026-10-03T17:01:17.270Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        247,
+        36
+      ],
+      "safeSHA256": "5ddefd95daf623fdc757a8fd59a5d111fc426ba64da0567140fe6fdee41ea8a6"
+    },
+    {
+      "file": "mobile-cta.png",
+      "proofIndex": 0,
+      "domUTC": "2026-10-03T17:01:17.250Z",
+      "captureStartedUTC": "2026-10-03T17:01:17.256Z",
+      "captureCompletedUTC": "2026-10-03T17:01:17.270Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        373,
+        89
+      ],
+      "safeSHA256": "686ab7806b1f1a24803bb65590b51b3c94dbef26952cb59a2b3afd1b3ad015cf"
+    },
+    {
+      "file": "mobile-count-notice.png",
+      "proofIndex": 1,
+      "domUTC": "2026-10-03T17:01:17.566Z",
+      "captureStartedUTC": "2026-10-03T17:01:17.570Z",
+      "captureCompletedUTC": "2026-10-03T17:01:17.587Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        370,
+        256
+      ],
+      "safeSHA256": "5de210c9644df2185e581763c1fcb62c7b59131a7eefb05536ffc1011ff2499d"
+    },
+    {
+      "file": "tablet-badge.png",
+      "proofIndex": 2,
+      "domUTC": "2026-10-03T17:02:09.391Z",
+      "captureStartedUTC": "2026-10-03T17:02:09.398Z",
+      "captureCompletedUTC": "2026-10-03T17:02:09.419Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        247,
+        33
+      ],
+      "safeSHA256": "4044f844a7797e966c3f6b47cbb52597a13c953c3a9b7b33c3090b133162520e"
+    },
+    {
+      "file": "tablet-cta.png",
+      "proofIndex": 2,
+      "domUTC": "2026-10-03T17:02:09.391Z",
+      "captureStartedUTC": "2026-10-03T17:02:09.398Z",
+      "captureCompletedUTC": "2026-10-03T17:02:09.419Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        572,
+        93
+      ],
+      "safeSHA256": "698f1908b23ac66e565c3a985c240214855f9362c67d20d39540e2e1bbb105aa"
+    },
+    {
+      "file": "tablet-count-notice.png",
+      "proofIndex": 3,
+      "domUTC": "2026-10-03T17:02:09.720Z",
+      "captureStartedUTC": "2026-10-03T17:02:09.723Z",
+      "captureCompletedUTC": "2026-10-03T17:02:09.743Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        572,
+        254
+      ],
+      "safeSHA256": "2a8c2103b2d51ca119f40273e69f7d694a8c1a8befcef774f2f6556ada32c9fd"
+    },
+    {
+      "file": "desktop-badge.png",
+      "proofIndex": 4,
+      "domUTC": "2026-10-03T17:03:04.122Z",
+      "captureStartedUTC": "2026-10-03T17:03:04.126Z",
+      "captureCompletedUTC": "2026-10-03T17:03:04.149Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        249,
+        36
+      ],
+      "safeSHA256": "d2ffef13adeed0db3782cf4628584c830a2d9a17066913d7b0ed724f4f63c83a"
+    },
+    {
+      "file": "desktop-cta.png",
+      "proofIndex": 4,
+      "domUTC": "2026-10-03T17:03:04.122Z",
+      "captureStartedUTC": "2026-10-03T17:03:04.126Z",
+      "captureCompletedUTC": "2026-10-03T17:03:04.149Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        332,
+        112
+      ],
+      "safeSHA256": "a0f137477257d41e552da4dbc983b74b90c8f1cb8d8867620c48bf7eecbc4069"
+    },
+    {
+      "file": "desktop-count-notice.png",
+      "proofIndex": 5,
+      "domUTC": "2026-10-03T17:03:04.475Z",
+      "captureStartedUTC": "2026-10-03T17:03:04.479Z",
+      "captureCompletedUTC": "2026-10-03T17:03:04.500Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        693,
+        242
+      ],
+      "safeSHA256": "5c5ce2e4ea3d77cb29ffe467e27be97816499e47cf70f4c16b3965e4803d988e"
+    }
+  ],
+  "historicalComparison": {
+    "source": "https://github.com/kim-song-jun/matchup-sports-platform/blob/877d4a4c0b4a495df88003ea78112981bcce1869/docs/qa/2026-10-03-individual-copy-candidates/individual-detail-copy-proof.json",
+    "sourceGitBlobSHA": "04e04e5eba3c83c0454dd5bdffff866f876b7d15",
+    "historicalDOMUTC": "2026-10-03T08:49:01.785Z",
+    "sameFixtureURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+    "beforeNoticeTitle": "모집 완료",
+    "afterNoticeTitle": "종료된 매치예요",
+    "bodyEqual": true,
+    "bodyText": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요.",
+    "beforeRenderedDisabledCTA": "신청 불가",
+    "historicalViewer": "unrecorded",
+    "currentViewer": "collector-reported admin session; match-specific role unrecorded"
+  },
+  "runtimeServingSHA": "unknown",
+  "limits": [
+    "Rendered is not the same as within viewport. Header badge/CTA and count/notice are separate observations.",
+    "No current API status or permission-cause validation; no application/host/payment/result action."
+  ]
+}

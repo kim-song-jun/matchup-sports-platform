@@ -1,0 +1,32 @@
+{
+  "source": "GitHub Actions REST run and jobs readback",
+  "checkedUTC": "2026-10-03T16:57:07Z",
+  "runs": [
+    {
+      "runId": 37137230471,
+      "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37137230471",
+      "headSHA": "8ec820cbb37f6d438cf1d8ca354cc9ad44675e8d",
+      "status": "completed",
+      "conclusion": "success",
+      "runUpdatedUTC": "2026-10-03T16:52:38Z",
+      "deployJob": [
+        {
+          "name": "deploy",
+          "startedUTC": "2026-10-03T16:45:30Z",
+          "completedUTC": "2026-10-03T16:52:37Z",
+          "conclusion": "success",
+          "publicIdentityStep": [
+            {
+              "name": "Verify public alpha release identity",
+              "status": "completed",
+              "conclusion": "success",
+              "started_at": "2026-10-03T16:52:27Z",
+              "completed_at": "2026-10-03T16:52:27Z"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "limit": "Workflow and job timing is deployment context only; the live QA page did not expose serving commit identity."
+}

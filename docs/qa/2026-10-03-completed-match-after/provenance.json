@@ -1,0 +1,383 @@
+{
+  "scope": "New completed-match title after, safe labels/counters/actions only",
+  "crops": [
+    {
+      "sourceBasename": "mobile-header.png",
+      "sourceSHA256": "06486b55c21d7dae06ddf420f05b99dfea38a158bac732da33275e1fa4e09a31",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "boundsPixels": [
+        12,
+        209,
+        259,
+        245
+      ],
+      "outputBasename": "mobile-badge.png",
+      "outputSHA256": "5ddefd95daf623fdc757a8fd59a5d111fc426ba64da0567140fe6fdee41ea8a6",
+      "outputDimensions": [
+        247,
+        36
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "mobile-header.png",
+        "domIndex": 0,
+        "domUTC": "2026-10-03T17:01:17.250Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 0,
+          "width": 402
+        },
+        "startedUTC": "2026-10-03T17:01:17.256Z",
+        "completedUTC": "2026-10-03T17:01:17.270Z"
+      },
+      "proofIndex": 0
+    },
+    {
+      "sourceBasename": "mobile-header.png",
+      "sourceSHA256": "06486b55c21d7dae06ddf420f05b99dfea38a158bac732da33275e1fa4e09a31",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "boundsPixels": [
+        15,
+        499,
+        388,
+        588
+      ],
+      "outputBasename": "mobile-cta.png",
+      "outputSHA256": "686ab7806b1f1a24803bb65590b51b3c94dbef26952cb59a2b3afd1b3ad015cf",
+      "outputDimensions": [
+        373,
+        89
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "mobile-header.png",
+        "domIndex": 0,
+        "domUTC": "2026-10-03T17:01:17.250Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 0,
+          "width": 402
+        },
+        "startedUTC": "2026-10-03T17:01:17.256Z",
+        "completedUTC": "2026-10-03T17:01:17.270Z"
+      },
+      "proofIndex": 0
+    },
+    {
+      "sourceBasename": "mobile-notice.png",
+      "sourceSHA256": "e8efa925f3297708543bb86d35ad445cce15ec0708839bc19cb9d30330af589e",
+      "sourceDimensions": [
+        402,
+        605
+      ],
+      "boundsPixels": [
+        16,
+        97,
+        386,
+        353
+      ],
+      "outputBasename": "mobile-count-notice.png",
+      "outputSHA256": "5de210c9644df2185e581763c1fcb62c7b59131a7eefb05536ffc1011ff2499d",
+      "outputDimensions": [
+        370,
+        256
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "mobile-notice.png",
+        "domIndex": 1,
+        "domUTC": "2026-10-03T17:01:17.566Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "scrollY": 0,
+          "width": 402
+        },
+        "startedUTC": "2026-10-03T17:01:17.570Z",
+        "completedUTC": "2026-10-03T17:01:17.587Z"
+      },
+      "proofIndex": 1
+    },
+    {
+      "sourceBasename": "tablet-header.png",
+      "sourceSHA256": "e4024b66193da3acbb309ee8e5084608de1998f495b785aeaee52d10d21898df",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "boundsPixels": [
+        105,
+        198,
+        352,
+        231
+      ],
+      "outputBasename": "tablet-badge.png",
+      "outputSHA256": "4044f844a7797e966c3f6b47cbb52597a13c953c3a9b7b33c3090b133162520e",
+      "outputDimensions": [
+        247,
+        33
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "tablet-header.png",
+        "domIndex": 2,
+        "domUTC": "2026-10-03T17:02:09.391Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 0,
+          "width": 787
+        },
+        "startedUTC": "2026-10-03T17:02:09.398Z",
+        "completedUTC": "2026-10-03T17:02:09.419Z"
+      },
+      "proofIndex": 2
+    },
+    {
+      "sourceBasename": "tablet-header.png",
+      "sourceSHA256": "e4024b66193da3acbb309ee8e5084608de1998f495b785aeaee52d10d21898df",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "boundsPixels": [
+        108,
+        396,
+        680,
+        489
+      ],
+      "outputBasename": "tablet-cta.png",
+      "outputSHA256": "698f1908b23ac66e565c3a985c240214855f9362c67d20d39540e2e1bbb105aa",
+      "outputDimensions": [
+        572,
+        93
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "tablet-header.png",
+        "domIndex": 2,
+        "domUTC": "2026-10-03T17:02:09.391Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 0,
+          "width": 787
+        },
+        "startedUTC": "2026-10-03T17:02:09.398Z",
+        "completedUTC": "2026-10-03T17:02:09.419Z"
+      },
+      "proofIndex": 2
+    },
+    {
+      "sourceBasename": "tablet-notice.png",
+      "sourceSHA256": "3adc7618d5010a2f8567652828ca1ce375af1d7c3934206256173805cfcd330d",
+      "sourceDimensions": [
+        787,
+        504
+      ],
+      "boundsPixels": [
+        108,
+        47,
+        680,
+        301
+      ],
+      "outputBasename": "tablet-count-notice.png",
+      "outputSHA256": "2a8c2103b2d51ca119f40273e69f7d694a8c1a8befcef774f2f6556ada32c9fd",
+      "outputDimensions": [
+        572,
+        254
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "tablet-notice.png",
+        "domIndex": 3,
+        "domUTC": "2026-10-03T17:02:09.720Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "scrollY": 0,
+          "width": 787
+        },
+        "startedUTC": "2026-10-03T17:02:09.723Z",
+        "completedUTC": "2026-10-03T17:02:09.743Z"
+      },
+      "proofIndex": 3
+    },
+    {
+      "sourceBasename": "desktop-header.png",
+      "sourceSHA256": "624d7a4252297f36a1d1775bfa3f6a6bdb51ee6b589549b5149f3ffba56723fc",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "boundsPixels": [
+        66,
+        402,
+        315,
+        438
+      ],
+      "outputBasename": "desktop-badge.png",
+      "outputSHA256": "d2ffef13adeed0db3782cf4628584c830a2d9a17066913d7b0ed724f4f63c83a",
+      "outputDimensions": [
+        249,
+        36
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "desktop-header.png",
+        "domIndex": 4,
+        "domUTC": "2026-10-03T17:03:04.122Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 0,
+          "width": 1181
+        },
+        "startedUTC": "2026-10-03T17:03:04.126Z",
+        "completedUTC": "2026-10-03T17:03:04.149Z"
+      },
+      "proofIndex": 4
+    },
+    {
+      "sourceBasename": "desktop-header.png",
+      "sourceSHA256": "624d7a4252297f36a1d1775bfa3f6a6bdb51ee6b589549b5149f3ffba56723fc",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "boundsPixels": [
+        780,
+        550,
+        1112,
+        662
+      ],
+      "outputBasename": "desktop-cta.png",
+      "outputSHA256": "a0f137477257d41e552da4dbc983b74b90c8f1cb8d8867620c48bf7eecbc4069",
+      "outputDimensions": [
+        332,
+        112
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "desktop-header.png",
+        "domIndex": 4,
+        "domUTC": "2026-10-03T17:03:04.122Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 0,
+          "width": 1181
+        },
+        "startedUTC": "2026-10-03T17:03:04.126Z",
+        "completedUTC": "2026-10-03T17:03:04.149Z"
+      },
+      "proofIndex": 4
+    },
+    {
+      "sourceBasename": "desktop-notice.png",
+      "sourceSHA256": "2fa59ca5ffe51a2890dac3e5b12a0f13b4a643743caa1f72339fb6e769fd2e1a",
+      "sourceDimensions": [
+        1181,
+        757
+      ],
+      "boundsPixels": [
+        48,
+        205,
+        741,
+        447
+      ],
+      "outputBasename": "desktop-count-notice.png",
+      "outputSHA256": "5c5ce2e4ea3d77cb29ffe467e27be97816499e47cf70f4c16b3965e4803d988e",
+      "outputDimensions": [
+        693,
+        242
+      ],
+      "sourceCropPixelEquality": true,
+      "capture": {
+        "file": "desktop-notice.png",
+        "domIndex": 5,
+        "domUTC": "2026-10-03T17:03:04.475Z",
+        "routeTemplate": "https://alpha.teameet.co.kr/matches/{synthetic-fixture}",
+        "sourceURLSHA256": "f1e57d56506c764aae0c00318e4091dbed950c0678793414b668c987839b2720",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1181,
+          "scrollY": 548,
+          "width": 1181
+        },
+        "startedUTC": "2026-10-03T17:03:04.479Z",
+        "completedUTC": "2026-10-03T17:03:04.500Z"
+      },
+      "proofIndex": 5
+    }
+  ],
+  "safeJSONSHA256": {
+    "entry.json": "728784458ee929165c193f1f7fee851a14bdb2b56d4e41db3255a09ea89dfe47",
+    "proof.json": "024966e36b983a0f39aaee5345396b19c62de6c481ee8d79a7fa9ffdbef5773b",
+    "exit.json": "027ff01bb2d1c16fbe989880e6edba3a520a53a560fcad327f634198ff6a9ef4",
+    "summary.json": "b6755e76ab5267954293ecde6679e48933634a8d2961169e577a358832319893"
+  },
+  "privacy": "All9safecrops reviewed: generic labels, status, counts and disabled CTA only. Participant, host, title, venue and account areas excluded. Opaque fixture URL projected to hash/template.",
+  "sourceInputFiles": [
+    {
+      "file": "entry.json",
+      "bytes": 682,
+      "sha256": "728784458ee929165c193f1f7fee851a14bdb2b56d4e41db3255a09ea89dfe47"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 29270,
+      "sha256": "024966e36b983a0f39aaee5345396b19c62de6c481ee8d79a7fa9ffdbef5773b"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 342,
+      "sha256": "027ff01bb2d1c16fbe989880e6edba3a520a53a560fcad327f634198ff6a9ef4"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 7137,
+      "sha256": "b6755e76ab5267954293ecde6679e48933634a8d2961169e577a358832319893"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 10008,
+      "sha256": "5a4a19e4c438336fb314dc818c59f018c94828abaaf18797875044545ca5a482"
+    }
+  ],
+  "publicationProjection": "Original proof values/UTC/geometry and crop pixels preserved; opaque detail URLs hashed. Internal deployment attribution replaced with independently retrieved workflow metadata. Source inputs unchanged.",
+  "publisherReview": "All9safe PNGs inspected, hashes/dimensions/crop mappings/chronology and rendered-versus-hidden controls independently checked. Full source images not read; original crop equality collector-attested."
+}

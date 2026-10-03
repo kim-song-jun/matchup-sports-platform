@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "e09eb83fa5a23bae840ca811e579591436908f1c32eb1a3305e8f68305d7cb25",
+      "bytes": 3621
+    },
+    {
+      "file": "desktop-detail-dates.png",
+      "sha256": "844ae3a54833a933f323beaf17f1d92eeb594cedafe800090777cb05cde128d8",
+      "bytes": 179874
+    },
+    {
+      "file": "desktop-videos-dates.png",
+      "sha256": "6ac68cb5395b84e418d94393b4effcceef0a34ec5ad516d22b44e24d779c1ff6",
+      "bytes": 128606
+    },
+    {
+      "file": "final-state.json",
+      "sha256": "6c4e6c4cfc355c3ed68dfea8f8ccffa732fcb4adae8411db6c592f82952fe7b6",
+      "bytes": 301
+    },
+    {
+      "file": "mobile-detail-dates.png",
+      "sha256": "c76240e4481e91ae1f0d8301ccbe489de7efec68b0ec45cd8f0ee202a192d8e3",
+      "bytes": 98123
+    },
+    {
+      "file": "mobile-videos-dates.png",
+      "sha256": "7fd3fa15a794ed5cd81067321fe3bf02ba0e4c63ec407963fdcc79e0b03b6be5",
+      "bytes": 124126
+    },
+    {
+      "file": "proof.json",
+      "sha256": "90958e2b49bd0686c9de855fa600585823ff59b64ab617edc49fc0d2a3fae715",
+      "bytes": 19883
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "sha256": "a7716bccf7e8d2daa780961571e55a5157645c1858e384f4f86987e620a472b7",
+      "bytes": 5129
+    },
+    {
+      "file": "summary.json",
+      "sha256": "27ea3ce24cc15f3478f9f965d1aeacaefe9087df38fee0d95b05b752ada4e9d8",
+      "bytes": 2236
+    },
+    {
+      "file": "tablet-detail-dates.png",
+      "sha256": "c0faaef5e491321651d4743be27933a212f06249761cf4843b3424cfeb0ddd8c",
+      "bytes": 119698
+    },
+    {
+      "file": "tablet-videos-dates.png",
+      "sha256": "dd4e4a233ad7ff60c433f028fa22b4ad733ee81e28143a9623233f5262c6097d",
+      "bytes": 134288
+    },
+    {
+      "file": "verification.json",
+      "sha256": "6f30f2360a2e8b2ca75a55c564b1848d6da737399413e1334594bbc079794bc6",
+      "bytes": 572
+    }
+  ]
+}

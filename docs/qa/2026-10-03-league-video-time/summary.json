@@ -1,0 +1,52 @@
+{
+  "candidate": "Existing league fixture times differ between admin detail and match video management",
+  "scope": "Read-only UI inconsistency, no assertion which time is canonical or why it differs",
+  "leagueId": "525bd67a-e54b-41ad-a9bb-31415b882ced",
+  "detailURL": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+  "videoURL": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+  "windowUTC": "2026-10-03T05:29:09.276Z–2026-10-03T05:30:25.842Z",
+  "observations": [
+    {
+      "fixture": "69017adb-98a1-4740-b9f9-9b8c83f36b1e",
+      "identity": "1주차 · 송파 유나이티드 vs 한강 로버스",
+      "detail": "9. 17. (목) 18:00",
+      "video": "2026.9.17 02:00"
+    },
+    {
+      "fixture": "e9235b90-c119-4e6b-8227-6aff827099e4",
+      "identity": "2주차 · 한강 로버스 vs 송파 유나이티드",
+      "detail": "9. 24. (목) 18:30",
+      "video": "2026.9.24 02:30"
+    }
+  ],
+  "widths": [
+    {
+      "width": 405,
+      "height": 606
+    },
+    {
+      "width": 789,
+      "height": 505
+    },
+    {
+      "width": 1183,
+      "height": 758
+    }
+  ],
+  "steps": [
+    "Open existing synthetic league detail",
+    "Follow the actual 경기 영상 관리 link",
+    "Compare matching league, week and team-pair date/time labels",
+    "Follow actual 리그 상세로 link; original detail times remain",
+    "Repeat in mobile, tablet and desktop CSS viewports"
+  ],
+  "allThreeWidthsSameMismatch": true,
+  "limits": [
+    "Video cards are identified by same parent league, week and opposing team labels; exact fixture UUID links are available on detail, not exposed on video cards. No hidden app data/API read.",
+    "No source timestamp, DB value, timezone conversion cause or deployment SHA was independently established in browser.",
+    "0 saved videos; playback, upload, save, edit, add and result actions untested and untouched.",
+    "Native desktop window size/browser zoom; not physical-device or screen-reader test.",
+    "Global page scrollWidth equals actual CSS width in all 9 observations.",
+    "UI-label inconsistency only; which time is canonical and the technical cause remain undetermined."
+  ]
+}

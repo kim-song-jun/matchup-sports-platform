@@ -1,0 +1,18 @@
+{
+  "domObservationCount": 9,
+  "actualLinkRoundtrips": 3,
+  "fixturesComparedPerWidth": 2,
+  "cssWidths": [
+    405,
+    789,
+    1183
+  ],
+  "matchingDetailTimesBeforeAndAfter": true,
+  "videoTimesDifferAtAllWidths": true,
+  "pngCount": 6,
+  "mainFieldCountInAllObservations": 0,
+  "documentScrollWidthEqualsCSSWidthInAllObservations": true,
+  "identityLimit": "Detail links expose fixture UUIDs. Video cards do not; cross-screen identity is matched by same league, week and opposing team labels.",
+  "canonicalTimeEstablished": false,
+  "rootCauseEstablished": false
+}

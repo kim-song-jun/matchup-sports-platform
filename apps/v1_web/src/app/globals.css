@@ -3132,7 +3132,13 @@ label.tm-btn:focus-within {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
+  margin-inline: -4px;
+  padding: 4px;
+}
+
+/* 키보드 보정 뒤 mandatory snap이 다른 카드로 되돌리지 않게 한다. */
+.tm-match-rail-h:has(> .tm-match-list-card:focus-visible) {
+  scroll-snap-type: none;
 }
 
 .tm-match-rail-h > * {

@@ -285,3 +285,8 @@ Approval scope is these four local release-binding updates and their focused ver
 - PASS: Web 225 focused tests; API 134 focused tests; API/Web tsc --noEmit. Committed LF schema digest remains the approved pin. Real PostgreSQL integration cannot run locally (no configured DB/Docker); the chat HTTP/backfill integration suite is committed for real-DB validation.
 - Expand-contract initially rejected the three data-backfill statements. Reviewed exact SQL pairs for missing-room/participant insert-only conflict no-ops and mandatory active creator rejoin; recorded existing-policy exceptions with rollback entitlement and message/preferences/team-exit preservation rationale. Gate self-test negative controls PASS; no generic SQL allowance added.
 - Normal GitHub CLI device login remains pending. DEV PR/CI/Copilot review, merge, migration deployment and actual alpha visual QA are not complete. No main/production mutation.
+
+### 2026-10-04 DEV push and CI correction
+
+- User explicitly instructed proceeding with already-validated work. Fast-forward pushed `2cd74043a` to DEV using configured Git authentication; main unchanged. CI run 37138835620 and Deploy Alpha run 37138835598 started.
+- Web CI lint found the photo text backing padding 6px/10px violates the four-pixel spacing grid. Reproduced with the unchanged pattern checker under Git Bash; corrected only this padding to 8px/12px. Earlier unit/types validation remains valid; rerun only the failing checker. Alpha still served predecessor 8ec820cbb while deployment waited on CI.

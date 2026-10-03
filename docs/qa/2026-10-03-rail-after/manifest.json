@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2561,
+      "sha256": "3413445f4ea1f7f9bffd21c04c965179a3cff7480ffa8035d2c2c98b016a7479"
+    },
+    {
+      "file": "rail-crop-provenance.json",
+      "bytes": 9503,
+      "sha256": "abed885835558d136c1bb82fcf52b2909e72d3cdf8bfef472949abc2f1f42b62"
+    },
+    {
+      "file": "rail-desktop-reverse-middle.png",
+      "bytes": 164705,
+      "sha256": "66d63c73ef89e606a1a23a2a51af2ee07b7ad272d8c90ac3a0c3b0342439e4dd"
+    },
+    {
+      "file": "rail-desktop-third.png",
+      "bytes": 163915,
+      "sha256": "897ed1f36f922ca22388d5c3a3f701d11ece2a3f9538e49fb14f82d2ee6e21aa"
+    },
+    {
+      "file": "rail-destinations.json",
+      "bytes": 1914,
+      "sha256": "f6adf079861fbf35de8c8f15fb63c80a3209d10b6073433f748359fdd265dfa6"
+    },
+    {
+      "file": "rail-mobile-forward-middle.png",
+      "bytes": 62165,
+      "sha256": "4934a500792b74fdeed89a9b6d928e303deac6e9f2f3b03913737d0af72d6d17"
+    },
+    {
+      "file": "rail-mobile-reverse-middle.png",
+      "bytes": 58013,
+      "sha256": "77b24b0817ca2f4b6aaa06e2d822db02eb5fda85c92d3438ed4a208c32651683"
+    },
+    {
+      "file": "rail-proof.json",
+      "bytes": 58894,
+      "sha256": "26df92485dff1e606f37e886718bc2b6db14c3a039760a5ccee198c820aafb47"
+    },
+    {
+      "file": "rail-tablet-forward-middle.png",
+      "bytes": 110796,
+      "sha256": "2c9ebef39cc5aefb2bd5ea905b26d6e18af95902e7da748010a3b9f06072fda8"
+    },
+    {
+      "file": "rail-tablet-reverse-middle.png",
+      "bytes": 81247,
+      "sha256": "10eb7b0d21a11bebf7e8b9c5fab849936a5011bcdf79188b901dc5d92e371024"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 9960,
+      "sha256": "cffcfcd8cdc714305c767cb71933ab11593421ca493565a20d3b22e18beff163"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 7123,
+      "sha256": "c15a98fca2f45307c652b7e4bdb165d5544c3ad96ec35e1d25ea31341425b68a"
+    }
+  ],
+  "scope": "All files except this manifest itself"
+}

@@ -1,0 +1,256 @@
+{
+  "scope": "Independent safe-only calculation and pixel review",
+  "focusMeasurements": [
+    {
+      "proofIndex": 1,
+      "step": "mobile Tab to rail1",
+      "utc": "2026-10-03T09:01:34.138Z",
+      "cssWidth": 405,
+      "cardIndex": 0,
+      "recomputedVisibleWidth": 276,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 2,
+      "step": "mobile Tab to rail2",
+      "utc": "2026-10-03T09:01:34.171Z",
+      "cssWidth": 405,
+      "cardIndex": 1,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 3,
+      "step": "mobile Tab to rail3",
+      "utc": "2026-10-03T09:01:48.538Z",
+      "cssWidth": 405,
+      "cardIndex": 2,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 4,
+      "step": "mobile ShiftTab to rail2",
+      "utc": "2026-10-03T09:01:48.570Z",
+      "cssWidth": 405,
+      "cardIndex": 1,
+      "recomputedVisibleWidth": 276,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 7,
+      "step": "tablet Tab to rail1",
+      "utc": "2026-10-03T09:02:47.176Z",
+      "cssWidth": 789,
+      "cardIndex": 0,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 8,
+      "step": "tablet Tab to rail2",
+      "utc": "2026-10-03T09:02:47.210Z",
+      "cssWidth": 789,
+      "cardIndex": 1,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 9,
+      "step": "tablet Tab to rail3",
+      "utc": "2026-10-03T09:02:47.486Z",
+      "cssWidth": 789,
+      "cardIndex": 2,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 10,
+      "step": "tablet ShiftTab to rail2",
+      "utc": "2026-10-03T09:02:47.517Z",
+      "cssWidth": 789,
+      "cardIndex": 1,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 11,
+      "step": "tablet Tab back to rail3 for Enter",
+      "utc": "2026-10-03T09:03:16.089Z",
+      "cssWidth": 789,
+      "cardIndex": 2,
+      "recomputedVisibleWidth": 276.0,
+      "cardWidth": 276,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 14,
+      "step": "desktop Tab to rail1",
+      "utc": "2026-10-03T09:03:46.417Z",
+      "cssWidth": 1183,
+      "cardIndex": 0,
+      "recomputedVisibleWidth": 320.0,
+      "cardWidth": 320,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 15,
+      "step": "desktop Tab to rail2",
+      "utc": "2026-10-03T09:03:46.504Z",
+      "cssWidth": 1183,
+      "cardIndex": 1,
+      "recomputedVisibleWidth": 320.0,
+      "cardWidth": 320,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 16,
+      "step": "desktop Tab to rail3",
+      "utc": "2026-10-03T09:03:46.541Z",
+      "cssWidth": 1183,
+      "cardIndex": 2,
+      "recomputedVisibleWidth": 320.0,
+      "cardWidth": 320,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 17,
+      "step": "desktop ShiftTab to rail2",
+      "utc": "2026-10-03T09:03:46.862Z",
+      "cssWidth": 1183,
+      "cardIndex": 1,
+      "recomputedVisibleWidth": 320.0,
+      "cardWidth": 320,
+      "fullHorizontalRectangleVisible": true
+    },
+    {
+      "proofIndex": 18,
+      "step": "desktop ShiftTab to rail1 for Enter",
+      "utc": "2026-10-03T09:03:47.128Z",
+      "cssWidth": 1183,
+      "cardIndex": 0,
+      "recomputedVisibleWidth": 320.0,
+      "cardWidth": 320,
+      "fullHorizontalRectangleVisible": true
+    }
+  ],
+  "activationAndReturn": [
+    {
+      "width": 405,
+      "proofIndices": [
+        0,
+        4,
+        5
+      ],
+      "EnterUTC": "2026-10-03T09:02:26.438Z",
+      "exactDestinationMatches": true,
+      "backURLAndSixOrderedMainURLsPreserved": true,
+      "returnFocus": "BODY"
+    },
+    {
+      "width": 789,
+      "proofIndices": [
+        6,
+        11,
+        12
+      ],
+      "EnterUTC": "2026-10-03T09:03:16.737Z",
+      "exactDestinationMatches": true,
+      "backURLAndSixOrderedMainURLsPreserved": true,
+      "returnFocus": "BODY"
+    },
+    {
+      "width": 1183,
+      "proofIndices": [
+        13,
+        18,
+        19
+      ],
+      "EnterUTC": "2026-10-03T09:04:19.955Z",
+      "exactDestinationMatches": true,
+      "backURLAndSixOrderedMainURLsPreserved": true,
+      "returnFocus": "BODY"
+    }
+  ],
+  "images": [
+    {
+      "file": "rail-mobile-forward-middle.png",
+      "sha256": "4934a500792b74fdeed89a9b6d928e303deac6e9f2f3b03913737d0af72d6d17",
+      "dimensions": [
+        374,
+        277
+      ],
+      "DOMMappingAndCropBoundsValid": true,
+      "actualPixelsViewed": true
+    },
+    {
+      "file": "rail-mobile-reverse-middle.png",
+      "sha256": "77b24b0817ca2f4b6aaa06e2d822db02eb5fda85c92d3438ed4a208c32651683",
+      "dimensions": [
+        374,
+        277
+      ],
+      "DOMMappingAndCropBoundsValid": true,
+      "actualPixelsViewed": true
+    },
+    {
+      "file": "rail-tablet-forward-middle.png",
+      "sha256": "2c9ebef39cc5aefb2bd5ea905b26d6e18af95902e7da748010a3b9f06072fda8",
+      "dimensions": [
+        574,
+        284
+      ],
+      "DOMMappingAndCropBoundsValid": true,
+      "actualPixelsViewed": true
+    },
+    {
+      "file": "rail-tablet-reverse-middle.png",
+      "sha256": "10eb7b0d21a11bebf7e8b9c5fab849936a5011bcdf79188b901dc5d92e371024",
+      "dimensions": [
+        574,
+        284
+      ],
+      "DOMMappingAndCropBoundsValid": true,
+      "actualPixelsViewed": true
+    },
+    {
+      "file": "rail-desktop-third.png",
+      "sha256": "897ed1f36f922ca22388d5c3a3f701d11ece2a3f9538e49fb14f82d2ee6e21aa",
+      "dimensions": [
+        992,
+        307
+      ],
+      "DOMMappingAndCropBoundsValid": true,
+      "actualPixelsViewed": true
+    },
+    {
+      "file": "rail-desktop-reverse-middle.png",
+      "sha256": "66d63c73ef89e606a1a23a2a51af2ee07b7ad272d8c90ac3a0c3b0342439e4dd",
+      "dimensions": [
+        992,
+        307
+      ],
+      "DOMMappingAndCropBoundsValid": true,
+      "actualPixelsViewed": true
+    }
+  ],
+  "recordCount": 20,
+  "focusedMeasurements": 14,
+  "EnterTargets": 3,
+  "privacy": "Host rows/names/photos are excluded from all6 crops. Synthetic match text, animal cover art and authorized product URLs remain. No contacts/account data/secrets found.",
+  "limits": [
+    "Horizontal card rectangles only; full vertical card/host content and floating create-button overlap not proven.",
+    "BODY focus after Back; no focus restoration claim.",
+    "Semantic sport identity follows recorded fixture setup; exact URL query is checked.",
+    "All times after2357307 workflow; no independently observed servingSHA or06d72/e0ac attribution.",
+    "Source-original pixel equality not independently checked by publisher."
+  ]
+}

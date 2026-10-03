@@ -1,0 +1,325 @@
+{
+  "scope": "PR1572 read-only featured-card focus reveal and activation regression in the original latest+futsal filter state.",
+  "deployment": {
+    "sha": "235730755db0e7393bec9e01014a6906effde6af",
+    "successUTC": "2026-10-03T07:30:13Z",
+    "source": "Successful Deploy Alpha workflow independently verified; browser serving identity not exposed.",
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761"
+  },
+  "observationWindow": {
+    "startUTC": "2026-10-03T09:01:34.068Z",
+    "endUTC": "2026-10-03T09:04:20.100Z"
+  },
+  "focusResult": "All measured focused card borders were fully inside the horizontal rail bounds. Mobile/tablet width276; desktop width320.",
+  "keyboardCoverage": [
+    "Each width: Tab from the known last sport link to rail1, then rail2, then rail3.",
+    "Each width: Shift+Tab from rail3 to rail2. Desktop additionally Shift+Tab to rail1.",
+    "Enter on mobile rail2, tablet rail3 and desktop rail1. No form Enter was used."
+  ],
+  "measurements": [
+    {
+      "step": "mobile Tab to rail1",
+      "utc": "2026-10-03T09:01:34.138Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "focusedIndex": 0,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 0
+    },
+    {
+      "step": "mobile Tab to rail2",
+      "utc": "2026-10-03T09:01:34.171Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "focusedIndex": 1,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 199.1999969482422
+    },
+    {
+      "step": "mobile Tab to rail3",
+      "utc": "2026-10-03T09:01:48.538Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "focusedIndex": 2,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 487.2000122070313
+    },
+    {
+      "step": "mobile ShiftTab to rail2",
+      "utc": "2026-10-03T09:01:48.570Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "focusedIndex": 1,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 288
+    },
+    {
+      "step": "tablet Tab to rail1",
+      "utc": "2026-10-03T09:02:47.176Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusedIndex": 0,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 0
+    },
+    {
+      "step": "tablet Tab to rail2",
+      "utc": "2026-10-03T09:02:47.210Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusedIndex": 1,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 4
+    },
+    {
+      "step": "tablet Tab to rail3",
+      "utc": "2026-10-03T09:02:47.486Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusedIndex": 2,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 292
+    },
+    {
+      "step": "tablet ShiftTab to rail2",
+      "utc": "2026-10-03T09:02:47.517Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusedIndex": 1,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 288
+    },
+    {
+      "step": "tablet Tab back to rail3 for Enter",
+      "utc": "2026-10-03T09:03:16.089Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusedIndex": 2,
+      "visibleWidth": 276,
+      "fullWidth": 276,
+      "scrollLeft": 292
+    },
+    {
+      "step": "desktop Tab to rail1",
+      "utc": "2026-10-03T09:03:46.417Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusedIndex": 0,
+      "visibleWidth": 320,
+      "fullWidth": 320,
+      "scrollLeft": 0
+    },
+    {
+      "step": "desktop Tab to rail2",
+      "utc": "2026-10-03T09:03:46.504Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusedIndex": 1,
+      "visibleWidth": 320,
+      "fullWidth": 320,
+      "scrollLeft": 0
+    },
+    {
+      "step": "desktop Tab to rail3",
+      "utc": "2026-10-03T09:03:46.541Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusedIndex": 2,
+      "visibleWidth": 320,
+      "fullWidth": 320,
+      "scrollLeft": 0
+    },
+    {
+      "step": "desktop ShiftTab to rail2",
+      "utc": "2026-10-03T09:03:46.862Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusedIndex": 1,
+      "visibleWidth": 320,
+      "fullWidth": 320,
+      "scrollLeft": 0
+    },
+    {
+      "step": "desktop ShiftTab to rail1 for Enter",
+      "utc": "2026-10-03T09:03:47.128Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusedIndex": 0,
+      "visibleWidth": 320,
+      "fullWidth": 320,
+      "scrollLeft": 0
+    }
+  ],
+  "destinations": [
+    {
+      "widthLabel": "mobile",
+      "action": "Enter on middle featured link",
+      "expectedHref": "/matches/4452982a-ef1d-45e8-b27b-15607647d288?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+      "backHref": [
+        "/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+      ],
+      "url": "https://alpha.teameet.co.kr/matches/4452982a-ef1d-45e8-b27b-15607647d288?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+      "utc": "2026-10-03T09:02:26.438Z",
+      "viewport": {
+        "height": 606,
+        "width": 405
+      },
+      "matchesExpectedHref": true
+    },
+    {
+      "widthLabel": "tablet",
+      "action": "Enter on third featured link",
+      "expectedHref": "/matches/59b656d9-a963-4f23-9aca-0b8ac75abcdf?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+      "backHref": [
+        "/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+      ],
+      "url": "https://alpha.teameet.co.kr/matches/59b656d9-a963-4f23-9aca-0b8ac75abcdf?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+      "utc": "2026-10-03T09:03:16.737Z",
+      "viewport": {
+        "height": 505,
+        "width": 789
+      },
+      "matchesExpectedHref": true
+    },
+    {
+      "widthLabel": "desktop",
+      "action": "Enter on first featured link",
+      "expectedHref": "/matches/529036e7-86b9-4ca6-b4ee-0c19aab12ca4?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+      "backHref": [
+        "/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151"
+      ],
+      "url": "https://alpha.teameet.co.kr/matches/529036e7-86b9-4ca6-b4ee-0c19aab12ca4?from=%2Fmatches%3Fsort%3Dlatest%26sportId%3Db60abf1d-0caf-477e-ba61-d51984e63151",
+      "utc": "2026-10-03T09:04:19.955Z",
+      "viewport": {
+        "height": 758,
+        "width": 1183
+      },
+      "matchesExpectedHref": true
+    }
+  ],
+  "returnResult": "In-app Back preserved exact latest+futsal URL and the six main-list match URLs at all widths. Rail/main duplicate links were excluded from mainCount.",
+  "returnChecks": [
+    {
+      "step": "mobile after in-app Back",
+      "utc": "2026-10-03T09:02:26.866Z",
+      "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+      "mainCount": 6,
+      "sameMainSequenceAsInitial": true,
+      "activeTag": "BODY",
+      "railScrollLeft": 4
+    },
+    {
+      "step": "tablet after in-app Back",
+      "utc": "2026-10-03T09:03:17.240Z",
+      "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+      "mainCount": 6,
+      "sameMainSequenceAsInitial": true,
+      "activeTag": "BODY",
+      "railScrollLeft": 4
+    },
+    {
+      "step": "desktop after in-app Back",
+      "utc": "2026-10-03T09:04:20.080Z",
+      "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+      "mainCount": 6,
+      "sameMainSequenceAsInitial": true,
+      "activeTag": "BODY",
+      "railScrollLeft": 0
+    }
+  ],
+  "beforeComparison": "Original mobile middle-card before: about76.8/276px visible in both directions. Current measured after:276/276px. Tablet before was272/276px; current276/276px.",
+  "limits": [
+    "This is rail-specific focus reveal, not whole-page keyboard order or full modal focus-trap certification.",
+    "Return focus remains BODY; no claim that focus return was repaired.",
+    "Six safe screenshots omit host rows; full-card vertical content and floating create-button overlap are not asserted fixed.",
+    "No application, payment, match edit or other server mutation.",
+    "Native window resizing/browser zoom simulates CSS widths; physical device behavior not tested.",
+    "Mobile forward-middle image capture starts14.319seconds after its linked focus DOM; do not describe them as simultaneous."
+  ],
+  "evidence": [
+    "rail-proof.json",
+    "rail-destinations.json",
+    "rail-crop-provenance.json"
+  ],
+  "finalState": {
+    "activeTag": "BODY",
+    "dialogs": 0,
+    "search": [
+      {
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?sort=latest&sportId=b60abf1d-0caf-477e-ba61-d51984e63151",
+    "utc": "2026-10-03T09:04:20.100Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    }
+  }
+}

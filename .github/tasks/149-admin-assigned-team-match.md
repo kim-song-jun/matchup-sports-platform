@@ -297,3 +297,8 @@ Approval scope is these four local release-binding updates and their focused ver
 - Reproduced new chat integration fixture failure against actual DB check v1_team_matches_friendly_required_ck (missing placeName/startAt; legacy fixture also missing regionId). Added required real persistence fields, leaving runtime constraints intact. RED 4/4 failed -> GREEN 4/4 passed for actual Nest HTTP/Prisma suite, including creator mandatory participation, team-manager access, two-run backfill/history/preferences/team-exit preservation and revoked/cancelled access denial.
 - Used a fresh process-owned PGlite instance and localhost-only socket (55439), complete real SQL schema and Prisma/HTTP requests; single-suite node environment avoids unsupported database-template cloning in WASM. It is supplemental evidence, not a substitute for Linux CI native PostgreSQL. Owned DB/socket closed after each run. No live DB touched, no env file read.
 - Added API/Web patch changesets for CI follow-up. Real alpha before captures: 9/9 public list/photographic detail/platform detail views at 390/768/1440; console/network errors 0 and overflow 0. Evidence under output/playwright/visual-audit/team-match-dev-deploy/before.
+
+### 2026-10-04 remaining native CI diagnostic
+
+- Latest DEV fe9578400 CI: Gates PASS, Web unit PASS/build in progress, API integration stage still fails. Local fresh PostgreSQL WASM chat 4/4 PASS does not establish native full-suite success. Alpha deployment remains blocked.
+- Public job-log download requires authentication (403); normal CLI login is absent. Existing integration command now writes JSON results and on failure annotates only suite/assertion names for diagnosis. Nonzero test still exits 1; no raw DB rows, secrets or request data published.

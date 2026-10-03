@@ -1,0 +1,31 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 1628,
+      "sha256": "b11ee6d4ecb8d503d6621d3d408e1769e4bedd64385a5045d111da370db84679"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 1137,
+      "sha256": "09dd1932109ca5db3b2d0d34903938e184a8b3fa627649ca83cf35bfb358dc8d"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 646,
+      "sha256": "4217cb51bf37e0096479c1c5edf1559c6bdc4b8632019358a1b0b0a2666a4ea6"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 1773,
+      "sha256": "b38bf65c4e9fdc016926dfed4ae9dca61cd916404288bfe227d7c9a22ad72c7f"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 795,
+      "sha256": "4b9d733523f4e0c78991634a3755080cd7ad875b0d23da3d2a460f06c46d0ca9"
+    }
+  ],
+  "hashAlgorithm": "SHA-256",
+  "manifestSelfExcluded": true
+}

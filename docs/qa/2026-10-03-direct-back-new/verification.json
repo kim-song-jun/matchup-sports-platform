@@ -1,0 +1,20 @@
+{
+  "sourceHashMatchesReported": true,
+  "recordCount": 2,
+  "orderedTimes": true,
+  "endpointDeltaSeconds": 26.959,
+  "actionCallDurationSeconds": 0.089,
+  "bothViewportExact": {
+    "width": 1180,
+    "height": 757,
+    "dpr": 1
+  },
+  "sourceQueryless": true,
+  "targetQueryless": true,
+  "observedBackLinks": 2,
+  "renderedBackLinks": 1,
+  "renderedBackTargetMatchesResult": true,
+  "targetHeading": "팀매치",
+  "privacyReview": "No credentials, contact details, account/profile fields or person names in the reviewed JSON. Exact synthetic fixture title and UUID route omitted from public projection.",
+  "limitations": "Action execution is collector-reported with CUA call bounds, independently checked for consistency against DOM endpoints; publisher did not run the browser action."
+}

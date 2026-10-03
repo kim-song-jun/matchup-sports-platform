@@ -1,0 +1,35 @@
+{
+  "scope": "Issue1568 queryless direct friendly-detail entry and default in-app Back; one new desktop execution",
+  "issueURL": "https://github.com/kim-song-jun/matchup-sports-platform/issues/1568",
+  "cohort": "post-reset-20261003-1322",
+  "newObservation": true,
+  "observationUTC": [
+    "2026-10-03T13:23:41.601Z",
+    "2026-10-03T13:24:08.560Z"
+  ],
+  "viewport": {
+    "dpr": 1,
+    "height": 757,
+    "width": 1180
+  },
+  "runtimeServingSHA": "unknown",
+  "result": "Observed rendered Back href and destination both /team-matches with no query parameters",
+  "observedEndpoints": 2,
+  "action": {
+    "method": "Actual visible link 뒤로가기 clicked through supported CUA Playwright locator",
+    "startedUTC": "2026-10-03T13:23:41.605Z",
+    "completedUTC": "2026-10-03T13:23:41.694Z"
+  },
+  "serverWriteActionsPerformed": 0,
+  "writeCountBasis": "Collector action report, not a network or persistence audit",
+  "limits": [
+    "DOM-only evidence; screenshots0 and no pixel claim.",
+    "Desktop1180×757 only; not the earlier1183px desktop or789px tablet observations.",
+    "Two DOM endpoints and collector-recorded CUA call bounds; no independent click-event log.",
+    "No card count, ordered item retention, scroll restoration, focus restoration, browser Back, other viewport, or full issue closure asserted.",
+    "This is a new execution. Unpublished earlier files lost with the prior environment are not reconstructed or counted.",
+    "Deployment metadata is not runtime identity; serving SHA was not exposed."
+  ],
+  "collectorReportedBackActions": 1,
+  "actionEvidenceBasis": "Collector report with CUA call bounds; DOM endpoints independently checked for consistency. Direct-entry history and click execution are not independently event-logged."
+}

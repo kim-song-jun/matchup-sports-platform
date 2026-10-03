@@ -1,0 +1,43 @@
+[
+  {
+    "backLinks": [
+      {
+        "href": "/team-matches",
+        "rendered": true
+      },
+      {
+        "href": "/team-matches",
+        "rendered": false
+      }
+    ],
+    "queryParams": [],
+    "utc": "2026-10-03T13:23:41.601Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-direct-friendly-queryless",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-fixture}",
+    "sourceHeadingSHA256": "2f5ea98a3d427d061b120b3143700045b035211809b2db5157e4367702e00ebe",
+    "headingClassification": "Synthetic alpha QA friendly-match title; exact title omitted"
+  },
+  {
+    "backLinks": [],
+    "h1": [
+      "팀매치"
+    ],
+    "queryParams": [],
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T13:24:08.560Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-default-team-list-after-app-back",
+    "runtimeServingSHA": "unknown"
+  }
+]

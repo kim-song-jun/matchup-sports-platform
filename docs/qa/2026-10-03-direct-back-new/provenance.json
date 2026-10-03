@@ -1,0 +1,16 @@
+{
+  "inputFiles": [
+    {
+      "file": "1568-direct-back-proof.json",
+      "sha256": "2d2520ad20cedec3181e16b3bc4639c096a7fc44461ee6d9d408fddd93f18485",
+      "bytes": 920
+    },
+    {
+      "file": "1568-direct-back-summary.json",
+      "sha256": "81c8a1bff2920a15d6db09663b115755c4bfe5310afd3411f187ac63131d1fda",
+      "bytes": 1285
+    }
+  ],
+  "publicationProjection": "Retains endpoint timestamps, viewport, rendered Back link records, action bounds and observed target; exact synthetic source title and opaque fixture URL are replaced with hashes and a route template. Original local inputs were not modified.",
+  "screenshotCount": 0
+}

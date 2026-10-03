@@ -38,11 +38,12 @@ import { extractErrorMessage } from '@/lib/error-message';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 
-function teamMatchBackgroundImage(imageUrl: string) {
+function teamMatchBackgroundImage(imageUrl: string, withTextOverlay = true) {
   const fallback = cssUrl(TEAM_MATCH_IMAGE_FALLBACK);
-  return imageUrl && imageUrl !== TEAM_MATCH_IMAGE_FALLBACK
-    ? `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${cssUrl(imageUrl)}, ${fallback}`
-    : `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${fallback}`;
+  const images = imageUrl && imageUrl !== TEAM_MATCH_IMAGE_FALLBACK
+    ? `${cssUrl(imageUrl)}, ${fallback}`
+    : fallback;
+  return withTextOverlay ? `linear-gradient(rgba(17, 24, 39, 0.58), rgba(17, 24, 39, 0.72)), ${images}` : images;
 }
 
 export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel }) {
@@ -1023,7 +1024,7 @@ function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: s
           같은 토글의 개인 탭은 131px·5.88장).
           그래서 개인 탭과 같은 행 카드(.tm-match-row)로 통일한다 — 새 카드 체계를 만들지 않고
           이미 배포된 규칙을 그대로 쓴다. */}
-      <div className={`tm-match-row-thumb${match.imageUrl ? '' : ' tm-match-media-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
+      <div className={`tm-match-row-thumb${match.imageUrl ? '' : ' tm-match-media-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl, false) } : undefined}>
         {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
       <div className="tm-match-row-main">

@@ -845,7 +845,7 @@ function MatchRowItem({ match, fromHref }: { match: MatchCardModel; fromHref?: s
       </div>
       <div className="tm-match-row-main">
         {/* 빈 값을 그대로 이으면 "풋살 · 3-5 · " 처럼 구분점만 남는다 — 있는 것만 잇는다. */}
-        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
+        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender, match.costNote ? `참가비 설명: ${match.costNote}` : null].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline">
           {stateBadge ? <span className={`tm-badge ${stateBadge.className} tm-card-closed-badge`}>{stateBadge.label}</span> : null}
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
@@ -961,7 +961,7 @@ function MatchCardItem({ match, fromHref }: { match: MatchCardModel; fromHref: s
         {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
             [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender, match.costNote ? `참가비 설명: ${match.costNote}` : null].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline" style={{ marginTop: 8 }}>
           {stateBadge ? <span className={`tm-badge ${stateBadge.className} tm-card-closed-badge`}>{stateBadge.label}</span> : null}
           <div className="tm-text-body-lg">{match.title}</div>

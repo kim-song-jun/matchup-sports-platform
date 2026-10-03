@@ -1,0 +1,128 @@
+[
+  {
+    "widthLabel": "mobile",
+    "kind": "in-app Back",
+    "beforeObservationUTC": "2026-10-03T08:55:00.493Z",
+    "afterObservationUTC": "2026-10-03T08:55:39.853Z",
+    "beforeCount": 68,
+    "afterCount": 68,
+    "beforeUnique": 68,
+    "afterUnique": 68,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": "/team-matches",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "widthLabel": "mobile",
+    "kind": "browser Back",
+    "beforeObservationUTC": "2026-10-03T08:56:08.073Z",
+    "afterObservationUTC": "2026-10-03T08:56:09.164Z",
+    "beforeCount": 68,
+    "afterCount": 68,
+    "beforeUnique": 68,
+    "afterUnique": 68,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": null,
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "widthLabel": "tablet",
+    "kind": "in-app Back",
+    "beforeObservationUTC": "2026-10-03T08:57:05.324Z",
+    "afterObservationUTC": "2026-10-03T08:57:36.275Z",
+    "beforeCount": 40,
+    "afterCount": 40,
+    "beforeUnique": 40,
+    "afterUnique": 40,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": "/team-matches",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "widthLabel": "tablet",
+    "kind": "browser Back",
+    "beforeObservationUTC": "2026-10-03T08:57:55.737Z",
+    "afterObservationUTC": "2026-10-03T08:57:57.021Z",
+    "beforeCount": 68,
+    "afterCount": 68,
+    "beforeUnique": 68,
+    "afterUnique": 68,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": null,
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "widthLabel": "desktop",
+    "kind": "in-app Back",
+    "beforeObservationUTC": "2026-10-03T08:58:18.768Z",
+    "afterObservationUTC": "2026-10-03T08:58:49.202Z",
+    "beforeCount": 40,
+    "afterCount": 40,
+    "beforeUnique": 40,
+    "afterUnique": 40,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": "/team-matches",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "widthLabel": "desktop",
+    "kind": "browser Back",
+    "beforeObservationUTC": "2026-10-03T08:58:50.330Z",
+    "afterObservationUTC": "2026-10-03T08:59:04.506Z",
+    "beforeCount": 68,
+    "afterCount": 68,
+    "beforeUnique": 68,
+    "afterUnique": 68,
+    "sameURLSequence": true,
+    "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": null,
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  }
+]

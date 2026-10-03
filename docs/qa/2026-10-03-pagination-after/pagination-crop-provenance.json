@@ -1,0 +1,357 @@
+{
+  "scope": "Header/count crops only. DOM comparisons, not screenshots, establish all six exact before/after URL sequences.",
+  "crops": [
+    {
+      "file": "mobile-app-before.png",
+      "observationUTC": "2026-10-03T08:55:00.493Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "captureStartUTC": "2026-10-03T08:55:00.923Z",
+      "captureEndUTC": "2026-10-03T08:55:00.952Z",
+      "sourceBasename": "mobile-app-before.png",
+      "outputBasename": "mobile-app-before.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "cropBoundsLTRB": [
+        20,
+        150,
+        386,
+        260
+      ],
+      "outputDimensions": [
+        366,
+        110
+      ],
+      "sourceSHA256": "b21feecfea54fc568c1f3b28cae3a9688de164be74cfa8ee8227633b0e7db52f",
+      "outputSHA256": "0ab3aa059c24930f3814100932ed544d688eaf7b8bbf9d9c2ac412da06e8b1d6",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "mobile-app-after.png",
+      "observationUTC": "2026-10-03T08:55:39.853Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "captureStartUTC": "2026-10-03T08:55:40.219Z",
+      "captureEndUTC": "2026-10-03T08:55:40.235Z",
+      "sourceBasename": "mobile-app-after.png",
+      "outputBasename": "mobile-app-after.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "cropBoundsLTRB": [
+        20,
+        150,
+        386,
+        260
+      ],
+      "outputDimensions": [
+        366,
+        110
+      ],
+      "sourceSHA256": "25a5a68bc036f348e1aeebc34b9d6cbe17e248363fddefbe49ff89e23775a1a4",
+      "outputSHA256": "0ab3aa059c24930f3814100932ed544d688eaf7b8bbf9d9c2ac412da06e8b1d6",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "mobile-browser-after.png",
+      "observationUTC": "2026-10-03T08:56:09.164Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "captureStartUTC": "2026-10-03T08:56:16.176Z",
+      "captureEndUTC": "2026-10-03T08:56:16.196Z",
+      "sourceBasename": "mobile-browser-after.png",
+      "outputBasename": "mobile-browser-after.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "cropBoundsLTRB": [
+        20,
+        150,
+        386,
+        260
+      ],
+      "outputDimensions": [
+        366,
+        110
+      ],
+      "sourceSHA256": "72ee1f713dad27d418b9f1fdb1cf6a1bf40b90b3abe02a0b7a69ba6cb07bc08f",
+      "outputSHA256": "9edbe3501706eabf6dbe865809cf56c2ac71bcf8f80a8db57e6e43c1caf58380",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tablet-app-before.png",
+      "observationUTC": "2026-10-03T08:57:05.324Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "captureStartUTC": "2026-10-03T08:57:05.646Z",
+      "captureEndUTC": "2026-10-03T08:57:05.685Z",
+      "sourceBasename": "tablet-app-before.png",
+      "outputBasename": "tablet-app-before.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "cropBoundsLTRB": [
+        114,
+        150,
+        676,
+        260
+      ],
+      "outputDimensions": [
+        562,
+        110
+      ],
+      "sourceSHA256": "634a9094b32cb2bbdd4edacfe3e0c5cce6225128288a5b4fa03ccbd27d7cf042",
+      "outputSHA256": "2063c6f4d12504738f8f04aa39ef940d4d03adebdfb9118d66bdd3b6131abbf4",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tablet-app-after.png",
+      "observationUTC": "2026-10-03T08:57:36.275Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "captureStartUTC": "2026-10-03T08:57:36.539Z",
+      "captureEndUTC": "2026-10-03T08:57:36.577Z",
+      "sourceBasename": "tablet-app-after.png",
+      "outputBasename": "tablet-app-after.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "cropBoundsLTRB": [
+        114,
+        150,
+        676,
+        260
+      ],
+      "outputDimensions": [
+        562,
+        110
+      ],
+      "sourceSHA256": "9c8bc9e8b60653fa4545e629a22ff04fcb457519c259a19f24dc1ba964d50ea4",
+      "outputSHA256": "74e25a7191dad6af08484df2cc91eee81a1e0ea5354465057174103812bc1c5e",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tablet-browser-before.png",
+      "observationUTC": "2026-10-03T08:57:55.737Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "captureStartUTC": "2026-10-03T08:57:56.075Z",
+      "captureEndUTC": "2026-10-03T08:57:56.106Z",
+      "sourceBasename": "tablet-browser-before.png",
+      "outputBasename": "tablet-browser-before.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "cropBoundsLTRB": [
+        114,
+        150,
+        676,
+        260
+      ],
+      "outputDimensions": [
+        562,
+        110
+      ],
+      "sourceSHA256": "1379ccfca2f2747ed5a891075a3e6d7d389771c2f393e8b4634787c6f3976e81",
+      "outputSHA256": "8f1032d9eea3078ab58928b4dd085ce5f68d5f77fab8a770f2db546d8c608cff",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tablet-browser-after.png",
+      "observationUTC": "2026-10-03T08:57:57.021Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "captureStartUTC": "2026-10-03T08:57:57.369Z",
+      "captureEndUTC": "2026-10-03T08:57:57.390Z",
+      "sourceBasename": "tablet-browser-after.png",
+      "outputBasename": "tablet-browser-after.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "cropBoundsLTRB": [
+        114,
+        150,
+        676,
+        260
+      ],
+      "outputDimensions": [
+        562,
+        110
+      ],
+      "sourceSHA256": "18919be9502e96fa55968056e250f2e066d5fee21a6e1b7a277b432d14b760fe",
+      "outputSHA256": "bf16738332475670f17657975cdbfd61b292e91c54927a7d8146a500187dcc8f",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "desktop-app-before.png",
+      "observationUTC": "2026-10-03T08:58:18.768Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "captureStartUTC": "2026-10-03T08:58:19.052Z",
+      "captureEndUTC": "2026-10-03T08:58:19.125Z",
+      "sourceBasename": "desktop-app-before.png",
+      "outputBasename": "desktop-app-before.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        271,
+        1129,
+        371
+      ],
+      "outputDimensions": [
+        1074,
+        100
+      ],
+      "sourceSHA256": "f947c06fa17a61336cb5ebc4350175370ace9b981bc35359766b300cce83ab80",
+      "outputSHA256": "b8f5eae5fe1a67b276a4070e6df69e9f20512af55bac51b0be40aac527d6dffc",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "desktop-app-after.png",
+      "observationUTC": "2026-10-03T08:58:49.202Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "captureStartUTC": "2026-10-03T08:58:49.474Z",
+      "captureEndUTC": "2026-10-03T08:58:49.501Z",
+      "sourceBasename": "desktop-app-after.png",
+      "outputBasename": "desktop-app-after.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        271,
+        1129,
+        371
+      ],
+      "outputDimensions": [
+        1074,
+        100
+      ],
+      "sourceSHA256": "8e13889eead485b44fa58ffb9dd4e987379606372acd13ddf36f43f9f33cf63b",
+      "outputSHA256": "b8f5eae5fe1a67b276a4070e6df69e9f20512af55bac51b0be40aac527d6dffc",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "desktop-browser-before.png",
+      "observationUTC": "2026-10-03T08:58:50.330Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "captureStartUTC": "2026-10-03T08:58:50.661Z",
+      "captureEndUTC": "2026-10-03T08:58:50.700Z",
+      "sourceBasename": "desktop-browser-before.png",
+      "outputBasename": "desktop-browser-before.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        271,
+        1129,
+        371
+      ],
+      "outputDimensions": [
+        1074,
+        100
+      ],
+      "sourceSHA256": "aa726444a0711e3827e9fd5c7c71549ec5992a8ffe8614736695a56522c97c3e",
+      "outputSHA256": "e17f51da686b36753501e544cc4d7af04c449d797aefb71c9cdd0840f4d790fc",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "desktop-browser-after.png",
+      "observationUTC": "2026-10-03T08:59:04.506Z",
+      "url": "https://alpha.teameet.co.kr/team-matches",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "captureStartUTC": "2026-10-03T08:59:04.839Z",
+      "captureEndUTC": "2026-10-03T08:59:04.866Z",
+      "sourceBasename": "desktop-browser-after.png",
+      "outputBasename": "desktop-browser-after.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        271,
+        1129,
+        371
+      ],
+      "outputDimensions": [
+        1074,
+        100
+      ],
+      "sourceSHA256": "c278fbe9a70802334a2d03297ae54457190f9ae52deaff45e7eddb2139c75df3",
+      "outputSHA256": "3593138baf899d86859f19650670d5b514a31d55118ad3b3857fd2d622be2c3d",
+      "sourceCollectorReportedPixelEquality": true
+    }
+  ]
+}

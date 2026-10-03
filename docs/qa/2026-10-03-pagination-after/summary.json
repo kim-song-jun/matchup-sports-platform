@@ -1,0 +1,162 @@
+{
+  "scope": "PR1570 bounded default-list pagination retention observation after the2357307 deployment workflow.",
+  "deployment": {
+    "sha": "235730755db0e7393bec9e01014a6906effde6af",
+    "run": "37105569761",
+    "successUTC": "2026-10-03T07:30:13Z",
+    "source": "Deploy Alpha workflow independently read back as successful. Browser UI did not expose an independent serving identity.",
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761"
+  },
+  "observationWindow": {
+    "startUTC": "2026-10-03T08:54:37.708Z",
+    "endUTC": "2026-10-03T08:59:04.506Z"
+  },
+  "screenshotWindow": {
+    "startUTC": "2026-10-03T08:55:00.923Z",
+    "endUTC": "2026-10-03T08:59:04.866Z"
+  },
+  "result": "All six tested Back combinations preserved actual count, uniqueness and full ordered match URL sequence.",
+  "comparisons": [
+    {
+      "widthLabel": "mobile",
+      "kind": "in-app Back",
+      "beforeObservationUTC": "2026-10-03T08:55:00.493Z",
+      "afterObservationUTC": "2026-10-03T08:55:39.853Z",
+      "beforeCount": 68,
+      "afterCount": 68,
+      "beforeUnique": 68,
+      "afterUnique": 68,
+      "sameURLSequence": true,
+      "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+      "afterURL": "https://alpha.teameet.co.kr/team-matches",
+      "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "backHref": "/team-matches",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      }
+    },
+    {
+      "widthLabel": "mobile",
+      "kind": "browser Back",
+      "beforeObservationUTC": "2026-10-03T08:56:08.073Z",
+      "afterObservationUTC": "2026-10-03T08:56:09.164Z",
+      "beforeCount": 68,
+      "afterCount": 68,
+      "beforeUnique": 68,
+      "afterUnique": 68,
+      "sameURLSequence": true,
+      "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+      "afterURL": "https://alpha.teameet.co.kr/team-matches",
+      "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "backHref": null,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      }
+    },
+    {
+      "widthLabel": "tablet",
+      "kind": "in-app Back",
+      "beforeObservationUTC": "2026-10-03T08:57:05.324Z",
+      "afterObservationUTC": "2026-10-03T08:57:36.275Z",
+      "beforeCount": 40,
+      "afterCount": 40,
+      "beforeUnique": 40,
+      "afterUnique": 40,
+      "sameURLSequence": true,
+      "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+      "afterURL": "https://alpha.teameet.co.kr/team-matches",
+      "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "backHref": "/team-matches",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      }
+    },
+    {
+      "widthLabel": "tablet",
+      "kind": "browser Back",
+      "beforeObservationUTC": "2026-10-03T08:57:55.737Z",
+      "afterObservationUTC": "2026-10-03T08:57:57.021Z",
+      "beforeCount": 68,
+      "afterCount": 68,
+      "beforeUnique": 68,
+      "afterUnique": 68,
+      "sameURLSequence": true,
+      "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+      "afterURL": "https://alpha.teameet.co.kr/team-matches",
+      "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "backHref": null,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      }
+    },
+    {
+      "widthLabel": "desktop",
+      "kind": "in-app Back",
+      "beforeObservationUTC": "2026-10-03T08:58:18.768Z",
+      "afterObservationUTC": "2026-10-03T08:58:49.202Z",
+      "beforeCount": 40,
+      "afterCount": 40,
+      "beforeUnique": 40,
+      "afterUnique": 40,
+      "sameURLSequence": true,
+      "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+      "afterURL": "https://alpha.teameet.co.kr/team-matches",
+      "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "backHref": "/team-matches",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      }
+    },
+    {
+      "widthLabel": "desktop",
+      "kind": "browser Back",
+      "beforeObservationUTC": "2026-10-03T08:58:50.330Z",
+      "afterObservationUTC": "2026-10-03T08:59:04.506Z",
+      "beforeCount": 68,
+      "afterCount": 68,
+      "beforeUnique": 68,
+      "afterUnique": 68,
+      "sameURLSequence": true,
+      "beforeURL": "https://alpha.teameet.co.kr/team-matches",
+      "afterURL": "https://alpha.teameet.co.kr/team-matches",
+      "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+      "backHref": null,
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      }
+    }
+  ],
+  "limits": [
+    "Current full-list count is 68; the previous run had 69. No reason for data change was inferred.",
+    "Mobile app/browser and tablet/desktop browser compare 68 to68; tablet/desktop app compare40 to40. No hardcoded69 baseline.",
+    "Pending loading observations are retained but excluded from comparisons.",
+    "Exact scroll position and focus restoration were not measured. Header screenshots were deliberately scrolled to top after count capture.",
+    "Default all-team list only; filtered pagination query combinations not rerun in this batch.",
+    "Resized and zoomed cloud Chromium, not physical mobile/tablet.",
+    "No server write, result mutation, message, role change or logout.",
+    "Mobile browser Back has both DOM endpoints but only an after screenshot. No app-before crop substitutes for its missing browser-before image."
+  ],
+  "evidence": [
+    "pagination-proof.json",
+    "back-comparison.json",
+    "pagination-crop-provenance.json"
+  ]
+}

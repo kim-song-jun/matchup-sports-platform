@@ -1,0 +1,90 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2764,
+      "sha256": "699fbd9dec554d35e3c89c5e1856292d41ec0aa9cf338491c1280ad577c30956"
+    },
+    {
+      "file": "back-comparison.json",
+      "bytes": 3912,
+      "sha256": "5a7e69869f75fe0931691361ff62add4f1c2667c576e5bed7015e8877b322f5f"
+    },
+    {
+      "file": "desktop-app-after.png",
+      "bytes": 27937,
+      "sha256": "b8f5eae5fe1a67b276a4070e6df69e9f20512af55bac51b0be40aac527d6dffc"
+    },
+    {
+      "file": "desktop-app-before.png",
+      "bytes": 27937,
+      "sha256": "b8f5eae5fe1a67b276a4070e6df69e9f20512af55bac51b0be40aac527d6dffc"
+    },
+    {
+      "file": "desktop-browser-after.png",
+      "bytes": 29081,
+      "sha256": "3593138baf899d86859f19650670d5b514a31d55118ad3b3857fd2d622be2c3d"
+    },
+    {
+      "file": "desktop-browser-before.png",
+      "bytes": 27981,
+      "sha256": "e17f51da686b36753501e544cc4d7af04c449d797aefb71c9cdd0840f4d790fc"
+    },
+    {
+      "file": "mobile-app-after.png",
+      "bytes": 28186,
+      "sha256": "0ab3aa059c24930f3814100932ed544d688eaf7b8bbf9d9c2ac412da06e8b1d6"
+    },
+    {
+      "file": "mobile-app-before.png",
+      "bytes": 28186,
+      "sha256": "0ab3aa059c24930f3814100932ed544d688eaf7b8bbf9d9c2ac412da06e8b1d6"
+    },
+    {
+      "file": "mobile-browser-after.png",
+      "bytes": 29346,
+      "sha256": "9edbe3501706eabf6dbe865809cf56c2ac71bcf8f80a8db57e6e43c1caf58380"
+    },
+    {
+      "file": "pagination-crop-provenance.json",
+      "bytes": 10382,
+      "sha256": "9c2177054567541efe4b5fa547f9d01b7cf3a9fc56d8af7ebccc906b97018d78"
+    },
+    {
+      "file": "pagination-proof.json",
+      "bytes": 71791,
+      "sha256": "6641b04bc56c56f5ca3be6f4b17a3a3cdb5bda25bb21d4f795e3981de80e88dc"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 6017,
+      "sha256": "ae83f3d365884be89ac5d8e5d5091d3003c979fd316480b6bf3b79e885903fe9"
+    },
+    {
+      "file": "tablet-app-after.png",
+      "bytes": 27963,
+      "sha256": "74e25a7191dad6af08484df2cc91eee81a1e0ea5354465057174103812bc1c5e"
+    },
+    {
+      "file": "tablet-app-before.png",
+      "bytes": 31632,
+      "sha256": "2063c6f4d12504738f8f04aa39ef940d4d03adebdfb9118d66bdd3b6131abbf4"
+    },
+    {
+      "file": "tablet-browser-after.png",
+      "bytes": 31812,
+      "sha256": "bf16738332475670f17657975cdbfd61b292e91c54927a7d8146a500187dcc8f"
+    },
+    {
+      "file": "tablet-browser-before.png",
+      "bytes": 31785,
+      "sha256": "8f1032d9eea3078ab58928b4dd085ce5f68d5f77fab8a770f2db546d8c608cff"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 6767,
+      "sha256": "82ff8e3110b3e2414916226efac458389215d144d8e7033dfdcdc9910fc0bca8"
+    }
+  ],
+  "scope": "All files except this manifest itself"
+}

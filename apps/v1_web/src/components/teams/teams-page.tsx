@@ -842,6 +842,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}팀` : null}
             />
           ) : null}
+          {mode === 'mine' ? (
+            <TeamRecordLinkCard
+              href={`/teams/${team.id}/schedules`}
+              title="팀 일정"
+              description="훈련·경기·이벤트 일정을 보고 참석을 체크해요."
+            />
+          ) : null}
         </div>
         {mode === 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         <TeamOperationsSection operations={model.operations} />

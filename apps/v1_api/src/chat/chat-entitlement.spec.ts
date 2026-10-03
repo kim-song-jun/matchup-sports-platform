@@ -3,14 +3,62 @@ import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } fro
 // 감사 결함 회귀 방지(2026-08-27): 팀매치 채팅방이 rooms() 목록에 뜨려면 이 where 를
 // 통과해야 한다. 예전엔 status:'matched' 로 exact-match 해서 결과 제출로 completed 로
 // 전이되는 순간 방이 목록에서 사라졌다 — 경기 종료 뒤에도 대화를 이어갈 수 있어야 하므로
-// matched/completed 둘 다 통과해야 한다.
-describe('currentChatEntitlementWhere — 팀매치 채팅 엔타이틀먼트는 matched/completed 둘 다 허용한다', () => {
-  it('team_match 분기의 status 필터가 matched 와 completed 를 모두 포함한다', () => {
+// matched/completed 둘 다 통과해야 한다. 플랫폼 주관 분기는 모집 중부터 열리지만
+// 일반 팀매치는 양 팀 확정과 활성 owner/manager 계약을 그대로 유지한다.
+describe('currentChatEntitlementWhere — 일반/플랫폼 팀매치 채팅 엔타이틀먼트', () => {
+  function teamMatchEntitlement() {
     const where = currentChatEntitlementWhere('user-1');
-    const teamMatchBranch = where.OR?.find((clause: any) => 'teamMatch' in clause) as any;
+    const relation = where.OR?.find((clause) => clause.teamMatch)?.teamMatch;
+    if (!relation || !('is' in relation) || !relation.is) {
+      throw new Error('Missing team-match room entitlement');
+    }
+    return relation.is;
+  }
 
-    expect(teamMatchBranch.teamMatch.is.status).toEqual({ in: ['matched', 'completed'] });
-    expect(teamMatchBranch.teamMatch.is.approvedApplicantTeamId).toEqual({ not: null });
+  const managers = {
+    some: { userId: 'user-1', status: 'active', role: { in: ['owner', 'manager'] } },
+  };
+
+  it('일반 팀매치는 양 팀이 확정된 matched/completed 경기의 활성 운영진만 허용한다', () => {
+    const entitlement = teamMatchEntitlement();
+    expect(entitlement.deletedAt).toBeNull();
+    expect(entitlement.OR).toHaveLength(2);
+    expect(entitlement.OR?.find((clause) => clause.platformManaged === false)).toEqual({
+      platformManaged: false,
+      status: { in: ['matched', 'completed'] },
+      hostTeamId: { not: null },
+      approvedApplicantTeamId: { not: null },
+      OR: [
+        { hostTeam: { is: { memberships: managers } } },
+        { approvedApplicantTeam: { is: { memberships: managers } } },
+      ],
+    });
+  });
+
+  it('플랫폼 모집은 팀 배정 전부터 현재 권한이 있는 생성 운영자 또는 배정 팀 운영진만 허용한다', () => {
+    const entitlement = teamMatchEntitlement();
+    expect(entitlement.deletedAt).toBeNull();
+    expect(entitlement.OR?.find((clause) => clause.platformManaged === true)).toEqual({
+      platformManaged: true,
+      status: { in: ['recruiting', 'closed', 'matched', 'completed'] },
+      OR: [
+        {
+          createdByUserId: 'user-1',
+          createdByUser: {
+            is: {
+              adminUser: {
+                is: {
+                  status: 'active', revokedAt: null, adminRole: { in: ['owner', 'ops'] },
+                  user: { accountStatus: 'active' },
+                },
+              },
+            },
+          },
+        },
+        { hostTeam: { is: { memberships: managers } } },
+        { approvedApplicantTeam: { is: { memberships: managers } } },
+      ],
+    });
   });
 });
 
@@ -84,6 +132,42 @@ describe('currentChatRecipientEntitlementWhere', () => {
     const some = where.user?.teamMemberships?.some;
     expect(some?.teamId).toEqual({ in: ['host', 'guest'] });
     expect(some?.role).toEqual({ in: ['owner', 'manager'] });
+  });
+
+  it('플랫폼 팀매치 수신자는 배정 팀 운영진과 현재 권한이 있는 생성 운영자로 좁힌다', () => {
+    const where = currentChatRecipientEntitlementWhere({
+      matchId: null,
+      teamId: null,
+      teamMatchId: 'tm-platform',
+      teamMatch: {
+        hostTeamId: null, approvedApplicantTeamId: 'guest',
+        platformManaged: true, createdByUserId: 'operator-1',
+      },
+      teamContactId: null,
+      teamContact: null,
+    });
+    expect(where).toEqual({
+      OR: [
+        {
+          user: {
+            teamMemberships: {
+              some: { teamId: { in: ['guest'] }, status: 'active', role: { in: ['owner', 'manager'] } },
+            },
+          },
+        },
+        {
+          userId: 'operator-1',
+          user: {
+            adminUser: {
+              is: {
+                status: 'active', revokedAt: null, adminRole: { in: ['owner', 'ops'] },
+                user: { accountStatus: 'active' },
+              },
+            },
+          },
+        },
+      ],
+    });
   });
 
   it('team_contact 방이면 양 팀의 owner/manager 로 좁힌다', () => {

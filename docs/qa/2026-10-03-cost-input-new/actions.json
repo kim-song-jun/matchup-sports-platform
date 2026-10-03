@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Fill only previously empty title with synthetic QA LOCAL 설명 연결 확인",
+    "startedUTC": "2026-10-03T13:53:32.684Z",
+    "completedUTC": "2026-10-03T13:53:32.719Z"
+  },
+  {
+    "name": "Click Next type=button to condition step; no Enter or final-create",
+    "startedUTC": "2026-10-03T13:53:32.853Z",
+    "completedUTC": "2026-10-03T13:53:33.129Z"
+  },
+  {
+    "name": "Return through Previous button to info",
+    "startedUTC": "2026-10-03T13:56:29.391Z",
+    "completedUTC": "2026-10-03T13:56:29.698Z"
+  },
+  {
+    "name": "Restore only QA-edited title to original empty string via visible input",
+    "startedUTC": "2026-10-03T13:56:29.965Z",
+    "completedUTC": "2026-10-03T13:56:29.993Z"
+  },
+  {
+    "name": "Leave using visible 뒤로가기 link after explicit title restoration",
+    "startedUTC": "2026-10-03T13:56:30.144Z",
+    "completedUTC": "2026-10-03T13:56:30.243Z"
+  },
+  {
+    "name": "Leave restored title through visible Back link",
+    "startedUTC": "2026-10-03T13:56:45.625Z",
+    "completedUTC": "2026-10-03T13:56:46.064Z"
+  }
+]

@@ -1,0 +1,176 @@
+[
+  {
+    "descriptionReferences": [
+      {
+        "ariaHidden": null,
+        "hiddenAncestor": false,
+        "id": "_r_7_-description",
+        "nodeCount": 1,
+        "rect": {
+          "height": 16,
+          "width": 176,
+          "x": 208,
+          "y": 376
+        },
+        "text": "신청하는 팀의 비용이에요"
+      }
+    ],
+    "opponentFee": {
+      "active": true,
+      "describedby": "_r_7_-description",
+      "focusVisible": true,
+      "id": "_r_7_",
+      "labels": [
+        "상대팀 부담금"
+      ],
+      "rect": {
+        "height": 24,
+        "width": 124.0250015258789,
+        "x": 224.8000030517578,
+        "y": 332
+      },
+      "type": "number",
+      "value": "0"
+    },
+    "totalCost": {
+      "describedby": null,
+      "id": "_r_6_",
+      "labels": [
+        "총비용"
+      ],
+      "value": "0"
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-03T13:54:56.810Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-opponent-fee-real-Tab-association",
+    "runtimeServingSHA": "unknown",
+    "exactAccessibleNameCount": 1,
+    "axRelevantLines": [
+      "  - spinbutton \"총비용\": \"0\"",
+      "  - spinbutton \"상대팀 부담금\" [active]: \"0\"",
+      "  - generic: 신청하는 팀의 비용이에요"
+    ]
+  },
+  {
+    "descriptionReferences": [
+      {
+        "ariaHidden": null,
+        "hiddenAncestor": false,
+        "id": "_r_7_-description",
+        "nodeCount": 1,
+        "rect": {
+          "height": 16,
+          "width": 274,
+          "x": 399.3333435058594,
+          "y": 312
+        },
+        "text": "신청하는 팀의 비용이에요"
+      }
+    ],
+    "opponentFee": {
+      "active": true,
+      "describedby": "_r_7_-description",
+      "focusVisible": true,
+      "id": "_r_7_",
+      "labels": [
+        "상대팀 부담금"
+      ],
+      "rect": {
+        "height": 24,
+        "width": 222.2916717529297,
+        "x": 416,
+        "y": 268
+      },
+      "type": "number",
+      "value": "0"
+    },
+    "totalCost": {
+      "describedby": null,
+      "id": "_r_6_",
+      "labels": [
+        "총비용"
+      ],
+      "value": "0"
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-03T13:55:58.712Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-opponent-fee-real-Tab-association",
+    "runtimeServingSHA": "unknown",
+    "exactAccessibleNameCount": 1,
+    "axRelevantLines": [
+      "  - spinbutton \"총비용\": \"0\"",
+      "  - spinbutton \"상대팀 부담금\" [active]: \"0\"",
+      "  - generic: 신청하는 팀의 비용이에요"
+    ]
+  },
+  {
+    "descriptionReferences": [
+      {
+        "ariaHidden": null,
+        "hiddenAncestor": false,
+        "id": "_r_7_-description",
+        "nodeCount": 1,
+        "rect": {
+          "height": 16,
+          "width": 254,
+          "x": 596,
+          "y": 410
+        },
+        "text": "신청하는 팀의 비용이에요"
+      }
+    ],
+    "opponentFee": {
+      "active": true,
+      "describedby": "_r_7_-description",
+      "focusVisible": true,
+      "id": "_r_7_",
+      "labels": [
+        "상대팀 부담금"
+      ],
+      "rect": {
+        "height": 24,
+        "width": 201.625,
+        "x": 613,
+        "y": 366
+      },
+      "type": "number",
+      "value": "0"
+    },
+    "totalCost": {
+      "describedby": null,
+      "id": "_r_6_",
+      "labels": [
+        "총비용"
+      ],
+      "value": "0"
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+    "utc": "2026-10-03T13:55:59.016Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-opponent-fee-real-Tab-association",
+    "runtimeServingSHA": "unknown",
+    "exactAccessibleNameCount": 1,
+    "axRelevantLines": [
+      "  - spinbutton \"총비용\": \"0\"",
+      "  - spinbutton \"상대팀 부담금\" [active]: \"0\"",
+      "  - generic: 신청하는 팀의 비용이에요"
+    ]
+  }
+]

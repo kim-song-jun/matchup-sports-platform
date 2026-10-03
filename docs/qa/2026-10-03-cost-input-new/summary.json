@@ -1,0 +1,126 @@
+{
+  "scope": "Issue1578 / PR1583: new three-width amount-input description association and bounded local-title restoration",
+  "cohort": "post-reset-20261003-1322",
+  "runtimeServingSHA": "unknown",
+  "observedUTC": [
+    "2026-10-03T13:53:32.681Z",
+    "2026-10-03T13:56:45.620Z"
+  ],
+  "exit": {
+    "utc": "2026-10-03T13:58:29.841Z",
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "qaTitleRestored": true,
+    "existingLocalDraftMayRemain": true,
+    "scope": "Only the QA title change was explicitly restored; exiting is not deletion of local draft."
+  },
+  "associationChecks": [
+    {
+      "index": 0,
+      "utc": "2026-10-03T13:54:56.810Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "inputId": "_r_7_",
+      "describedby": "_r_7_-description",
+      "exactAccessibleNameCount": 1,
+      "focusedByRealTab": true,
+      "focusVisible": true,
+      "descriptionCount": 1,
+      "descriptionText": "신청하는 팀의 비용이에요",
+      "descriptionHidden": false,
+      "totalCostDescribedby": null,
+      "observedUneditedValues": {
+        "total": "0",
+        "opponent": "0"
+      }
+    },
+    {
+      "index": 1,
+      "utc": "2026-10-03T13:55:58.712Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "inputId": "_r_7_",
+      "describedby": "_r_7_-description",
+      "exactAccessibleNameCount": 1,
+      "focusedByRealTab": true,
+      "focusVisible": true,
+      "descriptionCount": 1,
+      "descriptionText": "신청하는 팀의 비용이에요",
+      "descriptionHidden": false,
+      "totalCostDescribedby": null,
+      "observedUneditedValues": {
+        "total": "0",
+        "opponent": "0"
+      }
+    },
+    {
+      "index": 2,
+      "utc": "2026-10-03T13:55:59.016Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "inputId": "_r_7_",
+      "describedby": "_r_7_-description",
+      "exactAccessibleNameCount": 1,
+      "focusedByRealTab": true,
+      "focusVisible": true,
+      "descriptionCount": 1,
+      "descriptionText": "신청하는 팀의 비용이에요",
+      "descriptionHidden": false,
+      "totalCostDescribedby": null,
+      "observedUneditedValues": {
+        "total": "0",
+        "opponent": "0"
+      }
+    }
+  ],
+  "draftHandling": {
+    "baselineVisibleTitleEmpty": true,
+    "baselineDescriptionEmpty": true,
+    "onlyEditedField": "Previously empty title; temporary QA LOCAL 설명 연결 확인",
+    "returnBeforeRestoreTitleLength": 17,
+    "explicitRestoreConfirmed": true,
+    "reentryConfirmedEmpty": true,
+    "storageLimit": "No direct localStorage or network inspection. Previous leaves a17-character title; explicit clearing and fresh info reentry confirm empty title. Existing local draft may remain."
+  },
+  "limits": [
+    "Only DOM/AX description association and real Tab focus checked; no screen-reader speech session.",
+    "The inner numeric INPUT is24px high inside a larger visual control; this record does not assert overall44px pointer target dimensions.",
+    "Amounts were read, never changed; no allocation, price submission, payment or persistence-to-server claim.",
+    "Only visible title/description baseline and restored QA title were verified; not an assertion that all hidden draft fields were audited.",
+    "No team choice, image upload, final create, Enter, result or permission action was performed.",
+    "Action bounds are CUA call times, not independent browser event logs.",
+    "Stored draft records preserve title length and empty state, not the full title value before/after Previous.",
+    "No separate reentry action timestamp; fresh info reentry is a recorded DOM endpoint.",
+    "This is an input-description check with unchanged local defaults0/0; it does not establish cost-sharing mode or saved public fixture pricing.",
+    "No poster loading, full wizard, or whole-issue PASS is established."
+  ],
+  "counts": {
+    "draftDOMRecords": 5,
+    "controlAssociationDOMRecords": 3,
+    "collectorActionCallRecords": 6,
+    "images": 3,
+    "exitRecords": 1
+  },
+  "TabEvidenceBasis": "Collector reports actual Tab from total cost to opponent fee at each width. Stored endpoints show opponentFee active/focusVisible, but no separate Tab call bounds or preceding totalCost-active endpoint are included.",
+  "AXEvidenceBasis": "Stored AX excerpts expose one active opponent-fee spinbutton and helper text as a generic node. DOM aria-describedby links the unique helper node. No independently serialized computed-description field or spoken screen-reader output.",
+  "actionCallWindow": {
+    "startUTC": "2026-10-03T13:53:32.684Z",
+    "endUTC": "2026-10-03T13:56:46.064Z"
+  },
+  "associationObservationUTC": [
+    "2026-10-03T13:54:56.810Z",
+    "2026-10-03T13:55:58.712Z",
+    "2026-10-03T13:55:59.016Z"
+  ]
+}

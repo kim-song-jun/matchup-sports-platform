@@ -1,0 +1,151 @@
+{
+  "createdUTC": "2026-10-03T13:59:14.584561+00:00",
+  "scope": "Current-run amount-label/control/helper crops only; no roster or account pixels",
+  "crops": [
+    {
+      "file": "cost-input-mobile.png",
+      "sourceSHA256": "c9d056f4ad14b66fd2a1df7f65e00aab432043d0b1fd84e8127c4dabffd4a300",
+      "outputSHA256": "a0ef116f827ab5a5ad4b9feff799200687ed213ff6a84b886ac1f53d3dfd5130",
+      "sourceSize": [
+        404,
+        606
+      ],
+      "cropBox": [
+        16,
+        284,
+        392,
+        398
+      ],
+      "outputSize": [
+        376,
+        114
+      ],
+      "captureMetadata": {
+        "file": "cost-input-mobile.png",
+        "startedUTC": "2026-10-03T13:54:56.835Z",
+        "completedUTC": "2026-10-03T13:54:56.852Z",
+        "domUTC": "2026-10-03T13:54:56.810Z",
+        "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 404,
+          "width": 404
+        }
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "cost-input-tablet.png",
+      "sourceSHA256": "d2ff8bb37a6f02146472f756d1463adc0403c8c9c779d44ef0517510776ca87b",
+      "outputSHA256": "5d2b350a1d66284a61ca1c645f19c24516abedf20233aa503b7fdaff948394ac",
+      "sourceSize": [
+        787,
+        505
+      ],
+      "cropBox": [
+        106,
+        219,
+        682,
+        334
+      ],
+      "outputSize": [
+        576,
+        115
+      ],
+      "captureMetadata": {
+        "file": "cost-input-tablet.png",
+        "startedUTC": "2026-10-03T13:55:58.735Z",
+        "completedUTC": "2026-10-03T13:55:58.762Z",
+        "domUTC": "2026-10-03T13:55:58.712Z",
+        "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        }
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "cost-input-desktop.png",
+      "sourceSHA256": "6ede45f6302c0c2e0e0d2c959de78c1285afd6d702c89b3b0a45c9e7c05586a4",
+      "outputSHA256": "d4c0c94edc907e171493a708c329823ba1c99ad527d74cd03d3a42bd88af5aff",
+      "sourceSize": [
+        1180,
+        757
+      ],
+      "cropBox": [
+        324,
+        316,
+        859,
+        435
+      ],
+      "outputSize": [
+        535,
+        119
+      ],
+      "captureMetadata": {
+        "file": "cost-input-desktop.png",
+        "startedUTC": "2026-10-03T13:55:59.039Z",
+        "completedUTC": "2026-10-03T13:55:59.058Z",
+        "domUTC": "2026-10-03T13:55:59.016Z",
+        "url": "https://alpha.teameet.co.kr/team-matches/new/condition",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        }
+      },
+      "collectorPixelEquality": true
+    }
+  ],
+  "safeProofHashes": {
+    "cost-input-association-proof.json": "6816537f10869765cacde330cac61cd71104fa5bbc80608101d15e0400f13349",
+    "cost-input-association-actions.json": "382cab20a89b5af3537be9ec86aed81e11123b80a51c163016ee314df70f61d7",
+    "cost-input-associated-controls.json": "1bc775924b501ca078ebfff422b14611286404989626809a012dd6dad2c268cd",
+    "cost-input-association-exit.json": "8c467e2f5b0addb1a95cb8d19785a2231ac3b2fb1ab0be0d0b37d4f64091b9dc",
+    "cost-input-association-summary.json": "4619a8e9cfd96f0ae2deb2bc7ffce2f24777aee40c370eadfe05ffea07579343"
+  },
+  "limits": [
+    "DOM association is separate from visible pixel presentation.",
+    "Values0 were untouched local draft defaults in this observation; this is not public fixture pricing or a saved change.",
+    "All source crop bounds and times are from this new execution cohort."
+  ],
+  "sourceInputFiles": [
+    {
+      "file": "cost-input-association-proof.json",
+      "bytes": 2536,
+      "sha256": "6816537f10869765cacde330cac61cd71104fa5bbc80608101d15e0400f13349"
+    },
+    {
+      "file": "cost-input-association-actions.json",
+      "bytes": 1191,
+      "sha256": "382cab20a89b5af3537be9ec86aed81e11123b80a51c163016ee314df70f61d7"
+    },
+    {
+      "file": "cost-input-associated-controls.json",
+      "bytes": 4201,
+      "sha256": "1bc775924b501ca078ebfff422b14611286404989626809a012dd6dad2c268cd"
+    },
+    {
+      "file": "cost-input-association-summary.json",
+      "bytes": 3782,
+      "sha256": "4619a8e9cfd96f0ae2deb2bc7ffce2f24777aee40c370eadfe05ffea07579343"
+    },
+    {
+      "file": "cost-input-association-exit.json",
+      "bytes": 262,
+      "sha256": "8c467e2f5b0addb1a95cb8d19785a2231ac3b2fb1ab0be0d0b37d4f64091b9dc"
+    },
+    {
+      "file": "cost-input-association-provenance.json",
+      "bytes": 3825,
+      "sha256": "18fbd1e99cca11bcb49132db077655b8c23352d282532fc908980339d0cd3bde"
+    }
+  ],
+  "publicationProjection": "Original DOM, AX excerpts, capture timestamps and exit values retained. Summary and action labels separate direct observation from collector-reported interactions/storage context; unverified deployment attribution removed. Source local inputs unchanged.",
+  "publisherReview": "Actual safe pixels viewed; output hashes and PNG dimensions verified; source-relative crop bounds checked; each capture mapped to its exact control DOM UTC/viewport/URL. Original-to-crop pixel equality remains collector attestation."
+}

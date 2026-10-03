@@ -1,0 +1,95 @@
+{
+  "associationChecks": [
+    {
+      "utc": "2026-10-03T13:54:56.810Z",
+      "CSSWidth": 404,
+      "inputIdMatchesDescriptionReference": true,
+      "descriptionNodes": 1,
+      "descriptionText": "신청하는 팀의 비용이에요",
+      "hiddenAncestor": false,
+      "ariaHidden": null,
+      "exactAccessibleNameCount": 1,
+      "active": true,
+      "focusVisible": true,
+      "totalCostDescribedby": null,
+      "values": [
+        "0",
+        "0"
+      ],
+      "numericInputHeight": 24,
+      "inputRectangleWithinViewport": true,
+      "descriptionRectangleWithinViewport": true
+    },
+    {
+      "utc": "2026-10-03T13:55:58.712Z",
+      "CSSWidth": 787,
+      "inputIdMatchesDescriptionReference": true,
+      "descriptionNodes": 1,
+      "descriptionText": "신청하는 팀의 비용이에요",
+      "hiddenAncestor": false,
+      "ariaHidden": null,
+      "exactAccessibleNameCount": 1,
+      "active": true,
+      "focusVisible": true,
+      "totalCostDescribedby": null,
+      "values": [
+        "0",
+        "0"
+      ],
+      "numericInputHeight": 24,
+      "inputRectangleWithinViewport": true,
+      "descriptionRectangleWithinViewport": true
+    },
+    {
+      "utc": "2026-10-03T13:55:59.016Z",
+      "CSSWidth": 1180,
+      "inputIdMatchesDescriptionReference": true,
+      "descriptionNodes": 1,
+      "descriptionText": "신청하는 팀의 비용이에요",
+      "hiddenAncestor": false,
+      "ariaHidden": null,
+      "exactAccessibleNameCount": 1,
+      "active": true,
+      "focusVisible": true,
+      "totalCostDescribedby": null,
+      "values": [
+        "0",
+        "0"
+      ],
+      "numericInputHeight": 24,
+      "inputRectangleWithinViewport": true,
+      "descriptionRectangleWithinViewport": true
+    }
+  ],
+  "draftTitleLengthSequence": [
+    0,
+    17,
+    17,
+    0,
+    0
+  ],
+  "draftTitleEmptySequence": [
+    true,
+    false,
+    false,
+    true,
+    true
+  ],
+  "descriptionEmptyAllFiveDraftEndpoints": true,
+  "timestampsAndCallBoundsConsistent": true,
+  "sourceHashChecksPassed": true,
+  "cropHashDimensionBoundsMappingChecksPassed": true,
+  "actualSafePixelsViewed": 3,
+  "pixelFindings": "Each crop shows total cost0 and opponent fee0, the focused opponent control outline and the helper text. No personal/profile/roster/secret content.",
+  "collectorRealTabReported": true,
+  "independentTabEventLogIncluded": false,
+  "AXExcerptIncludesActiveSpinbuttonAndHelperGeneric": true,
+  "computedAccessibleDescriptionSerialized": false,
+  "screenReaderSpeechTested": false,
+  "overall44pxPointerTargetMeasured": false,
+  "allDraftStateAudited": false,
+  "serverPersistenceAudited": false,
+  "runtimeServingSHA": "unknown",
+  "collectorReportedTabMethod": "At each width: getByRole('spinbutton', {name:'총비용', exact:true}).press('Tab'), followed by DOM/AX and screenshot collection.",
+  "TabCallBoundsRecorded": false
+}

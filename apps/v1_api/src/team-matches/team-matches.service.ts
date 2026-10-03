@@ -26,6 +26,7 @@ import type {
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
+import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -213,11 +214,10 @@ export class TeamMatchesService {
         this.prisma.v1TeamMatch
           .findMany({
             ...groups[group],
-            take: page.take,
-            ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
+            ...resumeAfterCursorArgs(page.cursorId, page.take),
             include,
           })
-          .then((rows) => rows.map((row) => ({ ...row, state: group }))),
+          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
     });
 
     const pageItems = teamMatches.map((teamMatch) => {

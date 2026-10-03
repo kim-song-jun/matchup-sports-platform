@@ -696,8 +696,9 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.findMany.mock.calls[0][0]).toMatchObject({
       where: { AND: [expect.anything(), { startAt: { lt: expect.any(Date) } }] },
       cursor: { id: 'yesterday' },
-      skip: 1,
+      take: 5,
     });
+    expect(prisma.v1Match.findMany.mock.calls[0][0].skip).toBeUndefined();
   });
 
   describe('list: 구간 기준 시각은 첫 페이지에서 고정돼 커서로 이어진다', () => {
@@ -726,7 +727,8 @@ describe('MatchesService', () => {
 
       const [upcoming] = callsArgs();
       expect(upcoming.where.AND[1]).toEqual({ startAt: { gte: T0 } });
-      expect(upcoming).toMatchObject({ cursor: { id: 'a' }, skip: 1 });
+      expect(upcoming).toMatchObject({ cursor: { id: 'a' }, take: 3 });
+      expect(upcoming.skip).toBeUndefined();
     });
 
     it('이어받은 기준 시각은 구간 분할에만 쓰고 가시성 조건은 실제 현재 시각을 쓴다', async () => {
@@ -760,6 +762,25 @@ describe('MatchesService', () => {
       expect(callsArgs()[0].where.AND[1]).toEqual({ startAt: { gte: T0 } });
     });
 
+    it('커서 행이 그사이 where 를 벗어나도 아직 못 본 다음 행을 건너뛰지 않는다', async () => {
+      // Prisma 처럼 커서 행은 where 와 무관하게 id 로 찾아 그 위치부터 읽고, skip 만큼 버린다.
+      const dataset = ['a', 'b', 'c'];
+      const fellOut = new Set(['a']);
+      prisma.v1Match.findMany.mockImplementation(async ({ cursor, skip = 0, take }: { cursor?: { id: string }; skip?: number; take: number }) => {
+        const from = cursor ? dataset.indexOf(cursor.id) : 0;
+        return dataset
+          .slice(from)
+          .filter((id) => !fellOut.has(id))
+          .slice(skip, skip + take)
+          .map(row);
+      });
+
+      const result = await service.list(null, { limit: 1, cursor: `upcoming:a@${T0.getTime()}` });
+
+      expect(result.items.map((item: { matchId: string }) => item.matchId)).toEqual(['b']);
+      expect(result.pageInfo.hasNext).toBe(true);
+    });
+
     it('시각이 깨진 커서는 첫 페이지부터 다시 읽는다', async () => {
       await service.list(null, { limit: 1, cursor: 'upcoming:a@oops' });
 
@@ -773,7 +794,8 @@ describe('MatchesService', () => {
 
       const [upcoming] = callsArgs();
       expect(upcoming.where.AND[1]).toEqual({ startAt: { gte: T0 } });
-      expect(upcoming).toMatchObject({ cursor: { id: 'a' }, skip: 1 });
+      expect(upcoming).toMatchObject({ cursor: { id: 'a' }, take: 3 });
+      expect(upcoming.skip).toBeUndefined();
     });
 
     it('최신순 커서에는 기준 시각을 싣지 않는다', async () => {

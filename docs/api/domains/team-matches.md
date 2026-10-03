@@ -220,7 +220,7 @@ Rules:
 
 - `status`를 생략한 일반 탐색은 경기 시작 전인 `recruiting`, `closed`, `matched`를 포함한다.
 - 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에, 일정 미정(`startAt` null)을 `createdAt DESC` 로 맨 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
-- `pageInfo.nextCursor` 는 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`/`unscheduled:`, 최신순은 시각 없는 `latest:<id>`) 형태다 — 기준 시각 규칙(구간 분할에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값은 첫 페이지부터, 시각 없는 구형 커서는 요청 시각 기준)은 개인매치 목록과 같다.
+- `pageInfo.nextCursor` 는 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`/`unscheduled:`, 최신순은 시각 없는 `latest:<id>`) 형태다 — 기준 시각 규칙(구간 분할에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값은 첫 페이지부터, 시각 없는 구형 커서는 요청 시각 기준)은 개인매치 목록과 같다. 커서 행이 그사이 목록 조건을 벗어나도 다음 경기를 건너뛰지 않는 것도 같다.
 - 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함

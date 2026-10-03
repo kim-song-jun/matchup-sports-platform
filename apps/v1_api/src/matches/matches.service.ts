@@ -9,6 +9,7 @@ import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService } from '../chat/chat.service';
 import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
+import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -148,11 +149,10 @@ export class MatchesService {
         this.prisma.v1Match
           .findMany({
             ...groups[group],
-            take: page.take,
-            ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
+            ...resumeAfterCursorArgs(page.cursorId, page.take),
             include,
           })
-          .then((rows) => rows.map((row) => ({ ...row, state: group }))),
+          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
     });
 
     return {

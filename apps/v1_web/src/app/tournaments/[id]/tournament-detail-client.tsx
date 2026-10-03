@@ -719,7 +719,7 @@ export function TournamentDetailView({
             <Trophy size={24} color="var(--static-white)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상품 및 상금</div>
+            <div className="tm-text-caption" style={{ color: 'var(--grey700)', fontWeight: 700 }}>상품 및 상금</div>
             <div className="tm-text-body-lg" style={{ marginTop: 4, color: 'var(--orange700)', fontWeight: 800, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
               {prizeText}
             </div>

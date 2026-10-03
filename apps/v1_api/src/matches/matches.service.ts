@@ -8,6 +8,7 @@ import {
 import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService } from '../chat/chat.service';
+import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
 import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -56,6 +57,8 @@ export class MatchesService {
     const isDefaultDiscovery = query.status === undefined;
     const status = query.status ?? 'recruiting';
     const now = new Date();
+    // 구간 경계는 첫 페이지에서 정해 커서로 이어받는다. `now` 는 가시성 조건 전용이다.
+    const { cursor, referenceTime: splitAt } = decodeReferenceTimeCursor(query.cursor, now);
     const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1MatchWhereInput[] = [
       // 일반 탐색은 마감 글도 경기 전까지 남기지만, 추천순은 즉시 신청할 수 있는
@@ -133,14 +136,14 @@ export class MatchesService {
     // 구간별로 읽어 잇는다(커서는 "<구간>:<id>"). '최신순'을 고른 경우만 등록 최신순이다.
     const groups: Record<string, Pick<Prisma.V1MatchFindManyArgs, 'where' | 'orderBy'>> = {
       latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-      upcoming: { where: { AND: [where, { startAt: { gte: now } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-      past: { where: { AND: [where, { startAt: { lt: now } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
     };
     const include = this.matchInclude(user);
     const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
       stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'],
       limit,
-      cursor: query.cursor,
+      cursor,
       fetchGroup: (group, page) =>
         this.prisma.v1Match
           .findMany({
@@ -154,7 +157,8 @@ export class MatchesService {
 
     return {
       items: pageItems.map((match) => this.toListItem(match, user)),
-      pageInfo: { nextCursor, hasNext },
+      // 최신순은 구간이 없어 기준 시각이 필요 없다.
+      pageInfo: { nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt), hasNext },
     };
   }
 

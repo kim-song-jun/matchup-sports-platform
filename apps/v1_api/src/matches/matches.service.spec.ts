@@ -687,7 +687,7 @@ describe('MatchesService', () => {
     const first = await service.list(null, { limit: 3 });
 
     expect(first.items.map((item: { matchId: string }) => item.matchId)).toEqual(['soon', 'later', 'yesterday']);
-    expect(first.pageInfo).toEqual({ nextCursor: 'past:yesterday', hasNext: true });
+    expect(first.pageInfo).toEqual({ nextCursor: expect.stringMatching(/^past:yesterday@\d+$/), hasNext: true });
 
     prisma.v1Match.findMany.mockClear();
     await service.list(null, { limit: 3, cursor: first.pageInfo.nextCursor! });
@@ -697,6 +697,89 @@ describe('MatchesService', () => {
       where: { AND: [expect.anything(), { startAt: { lt: expect.any(Date) } }] },
       cursor: { id: 'yesterday' },
       skip: 1,
+    });
+  });
+
+  describe('list: 구간 기준 시각은 첫 페이지에서 고정돼 커서로 이어진다', () => {
+    const T0 = new Date('2026-10-03T12:00:00.000Z');
+    const DAY = 24 * 60 * 60 * 1000;
+    const row = (id: string) => matchRow({ id, sport: { id: 'sport-1', name: '풋살' }, region: null, participants: [], hostUser: { id: host.id, profile: null, reputationSummary: null } });
+    const callsArgs = () => prisma.v1Match.findMany.mock.calls.map(([args]: [any]) => args);
+
+    beforeEach(() => {
+      // Date 만 가짜로 돌린다 -- 나머지 타이머까지 가로채면 mock Promise 체인이 멈춘다.
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] });
+      jest.setSystemTime(T0);
+      prisma.v1Match.findMany.mockResolvedValue([row('a'), row('b')]);
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('1페이지 마지막 행이 시작해 버린 뒤에도 2페이지는 1페이지의 기준 시각으로 구간을 가른다', async () => {
+      const first = await service.list(null, { limit: 1 });
+      expect(first.pageInfo.nextCursor).toBe(`upcoming:a@${T0.getTime()}`);
+
+      jest.setSystemTime(new Date(T0.getTime() + 2 * 60 * 60 * 1000));
+      prisma.v1Match.findMany.mockClear();
+      await service.list(null, { limit: 1, cursor: first.pageInfo.nextCursor! });
+
+      const [upcoming] = callsArgs();
+      expect(upcoming.where.AND[1]).toEqual({ startAt: { gte: T0 } });
+      expect(upcoming).toMatchObject({ cursor: { id: 'a' }, skip: 1 });
+    });
+
+    it('이어받은 기준 시각은 구간 분할에만 쓰고 가시성 조건은 실제 현재 시각을 쓴다', async () => {
+      const later = new Date(T0.getTime() + 2 * 60 * 60 * 1000);
+      jest.setSystemTime(later);
+
+      await service.list(null, { limit: 1, cursor: `upcoming:a@${T0.getTime()}` });
+
+      const [upcoming] = callsArgs();
+      const visibility = upcoming.where.AND[0].OR[0].OR;
+      expect(visibility).toEqual([
+        { startAt: { gte: later } },
+        { endAt: { gte: new Date(later.getTime() - 7 * DAY) } },
+        { endAt: null, startAt: { gte: new Date(later.getTime() - 7 * DAY) } },
+      ]);
+    });
+
+    it('조작된 과거 시각은 구간만 옮길 뿐 공개 이력 범위(publicHistoryFrom)를 넓히지 못한다', async () => {
+      const tampered = new Date(T0.getTime() - 30 * DAY);
+
+      await service.list(null, { limit: 1, cursor: `past:a@${tampered.getTime()}` });
+
+      const [past] = callsArgs();
+      expect(past.where.AND[1]).toEqual({ startAt: { lt: tampered } });
+      expect(past.where.AND[0].OR[0].OR[1]).toEqual({ endAt: { gte: new Date(T0.getTime() - 7 * DAY) } });
+    });
+
+    it('미래 시각 커서는 현재 시각으로 내려 구간 경계를 앞당기지 못한다', async () => {
+      await service.list(null, { limit: 1, cursor: `upcoming:a@${T0.getTime() + 30 * DAY}` });
+
+      expect(callsArgs()[0].where.AND[1]).toEqual({ startAt: { gte: T0 } });
+    });
+
+    it('시각이 깨진 커서는 첫 페이지부터 다시 읽는다', async () => {
+      await service.list(null, { limit: 1, cursor: 'upcoming:a@oops' });
+
+      const [upcoming] = callsArgs();
+      expect(upcoming.cursor).toBeUndefined();
+      expect(upcoming.skip).toBeUndefined();
+    });
+
+    it('시각 없는 구형 커서는 실제 현재 시각을 기준으로 이어 읽는다', async () => {
+      await service.list(null, { limit: 1, cursor: 'upcoming:a' });
+
+      const [upcoming] = callsArgs();
+      expect(upcoming.where.AND[1]).toEqual({ startAt: { gte: T0 } });
+      expect(upcoming).toMatchObject({ cursor: { id: 'a' }, skip: 1 });
+    });
+
+    it('최신순 커서에는 기준 시각을 싣지 않는다', async () => {
+      const result = await service.list(null, { limit: 1, sort: 'latest' });
+
+      expect(result.pageInfo.nextCursor).toBe('latest:a');
     });
   });
 

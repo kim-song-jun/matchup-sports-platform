@@ -419,7 +419,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
 
     const page1 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2`).expect(200)).body.data;
     expect(page1.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, far]);
-    expect(page1.pageInfo).toEqual({ nextCursor: `upcoming:${far}`, hasNext: true });
+    expect(page1.pageInfo).toEqual({ nextCursor: expect.stringMatching(new RegExp(`^upcoming:${far}@\\d+$`)), hasNext: true });
 
     const page2 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=2&cursor=${page1.pageInfo.nextCursor}`).expect(200)).body.data;
     expect(page2.items.map((m: { matchId: string }) => m.matchId)).toEqual([ended]);
@@ -428,6 +428,33 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const latest = (await get(outsider, `/matches?sportId=${ownSportId}&sort=latest`).expect(200)).body.data;
     expect(latest.items.map((m: { matchId: string }) => m.matchId)).toEqual([near, ended, far]);
   });
+
+  it('목록을 넘기는 사이 1페이지의 마지막 경기가 시작해도 다음 경기를 건너뛰지 않는다', async () => {
+    const ownSportId = (await db.v1Sport.create({ data: { code: `cursor-${randomUUID()}`, name: '풋살' } })).id;
+    const at = (ms: number) => new Date(Date.now() + ms).toISOString();
+    const hour = 3600000;
+    // 가장 가까운 A 를 마지막에 만든다 -- 1페이지를 읽을 때까지 A 가 시작하지 않아야 한다.
+    const b = await createMatch({ sportId: ownSportId, title: '두 번째 경기', startsAt: at(2 * hour), endsAt: at(3 * hour) });
+    const c = await createMatch({ sportId: ownSportId, title: '세 번째 경기', startsAt: at(3 * hour), endsAt: at(4 * hour) });
+    const aStartsAt = Date.now() + 4000;
+    const a = await createMatch({ sportId: ownSportId, title: '첫 번째 경기', startsAt: new Date(aStartsAt).toISOString(), endsAt: at(hour) });
+
+    const page1 = (await get(outsider, `/matches?sportId=${ownSportId}&limit=1`).expect(200)).body.data;
+    expect(Date.now()).toBeLessThan(aStartsAt);
+    expect(page1.items.map((m: { matchId: string }) => m.matchId)).toEqual([a]);
+
+    // A 가 시작한 뒤에 나머지 페이지를 읽는다. A 는 종료 전이라 계속 공개 목록에 남는다.
+    await new Promise((resolve) => setTimeout(resolve, aStartsAt - Date.now() + 200));
+
+    const seen = [a];
+    let cursor: string | null = page1.pageInfo.nextCursor;
+    while (cursor) {
+      const page = (await get(outsider, `/matches?sportId=${ownSportId}&limit=1&cursor=${encodeURIComponent(cursor)}`).expect(200)).body.data;
+      seen.push(...page.items.map((m: { matchId: string }) => m.matchId));
+      cursor = page.pageInfo.nextCursor;
+    }
+    expect(seen).toEqual([a, b, c]);
+  }, 30000);
 
   it('참가자가 모두 철회된 보류 매치는 완료하지 않고 참여 이력을 늘리지 않는다', async () => {
     const id = await createMatch();

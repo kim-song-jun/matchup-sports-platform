@@ -145,6 +145,14 @@ function checkDispatchConditions(path) {
     }
   }
   console.log('[changeset-gate-base] if: 통과 — 게이트 3스텝이 workflow_dispatch(dev) 에서도 실행');
+  // 픽스처는 EVENT_NAME 을 직접 넣으므로, 워크플로가 그 값을 실제로 넘기는지는 여기서만 잡힌다.
+  const workflow = readFileSync(path, 'utf8');
+  if (!/EVENT_NAME: \$\{\{ github\.event_name \}\}/.test(workflow)) {
+    fail('"Verify release changeset" 에 EVENT_NAME 이 없다 — dispatch 에서 HEAD^ base 분기가 안 탄다.');
+  }
+  if (!/bash scripts\/qa\/test-select-matching-ci-run\.sh/.test(workflow)) {
+    fail('Gates 에서 test-select-matching-ci-run.sh 가 빠졌다 — alpha 의 CI 판정 규칙이 무검증이 된다.');
+  }
 }
 
 /**

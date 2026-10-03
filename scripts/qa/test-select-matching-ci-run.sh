@@ -97,6 +97,11 @@ expect 'push failure is not hidden by newer bot dispatch success' 'fail failure'
   "$(run_json 15 push completed failure "${SHA}" human "${T1}")" \
   "$(run_json 16 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")"
 
+# 같은 종류끼리는 가장 최근 run 이 판정한다(입력 순서는 상관없다).
+expect 'newest bot dispatch wins over older failed one' pass \
+  "$(run_json 21 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")" \
+  "$(run_json 22 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}")"
+
 # 인정되지 않는 run 은 더 최근이어도 판정에 끼어들지 못한다.
 expect 'newer human dispatch does not override push success' pass \
   "$(run_json 17 push completed success "${SHA}" human "${T1}")" \

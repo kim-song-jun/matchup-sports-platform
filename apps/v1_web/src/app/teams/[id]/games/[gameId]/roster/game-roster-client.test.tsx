@@ -322,3 +322,87 @@ describe('참가 명단으로 가는 한 줄(Task 180 R-1 C)', () => {
     expect(screen.queryByRole('link', { name: /참가 명단/ })).toBeNull();
   });
 });
+
+describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () => {
+  function leagueStatus(status: string, responseStatus = 200) {
+    mock.setCompetitionKind('LEAGUE');
+    server.use(http.get('*/api/v1/tournaments/:id', () => HttpResponse.json(
+      responseStatus === 200
+        ? { status: 'success', data: { id: GAME_ROSTER_MSW.tournamentId, kind: 'regular_league', status } }
+        : { status: 'error', statusCode: responseStatus, code: 'FORBIDDEN', message: '조회할 수 없어요.' },
+      { status: responseStatus },
+    )));
+  }
+  const readonlyName = '참가 명단 보기';
+  const editName = '참가 명단에서 선수 추가·빼기';
+
+  it('완료 리그의 종료 경기에서도 조회 링크/설명과 기존 중첩 from을 유지한다', async () => {
+    leagueStatus('completed');
+    mock.setGameState(G1.gameId, 'ENDED');
+    renderScreen();
+    const link = await screen.findByRole('link', { name: readonlyName });
+    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${encodeURIComponent('/teams/team-1/games/roster-game-1/roster')}`);
+    expect(screen.getByText('종료된 리그의 참가 명단은 조회만 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
+    expect(screen.queryByText(/바꾸면 시작 전 경기에 모두 반영/)).not.toBeInTheDocument();
+    expect(batchBodies()).toHaveLength(0);
+  });
+
+  it.each(['SCHEDULED', 'LIVE', 'ENDED'] as const)('진행 리그의 개별 %s 경기는 참가 명단 편집 안내를 유지한다', async (gameState) => {
+    leagueStatus('in_progress');
+    mock.setGameState(G1.gameId, gameState);
+    renderScreen();
+    expect(await screen.findByRole('link', { name: editName })).toBeInTheDocument();
+    expect(screen.getByText(/리그 참가 명단에서 바꿔요/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: readonlyName })).not.toBeInTheDocument();
+    expect(batchBodies()).toHaveLength(0);
+  });
+
+  it.each(['draft', 'open', 'closed'])('목적지가 허용하는 리그 %s도 경기 종료만으로 막지 않는다', async (status) => {
+    leagueStatus(status);
+    mock.setGameState(G1.gameId, 'ENDED');
+    renderScreen();
+    expect(await screen.findByRole('link', { name: editName })).toBeInTheDocument();
+  });
+
+  it('리그 상태를 받기 전에는 편집을 약속하지 않고 완료 응답 후 조회 안내로 바꾼다', async () => {
+    mock.setCompetitionKind('LEAGUE');
+    mock.setGameState(G1.gameId, 'ENDED');
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.get('*/api/v1/tournaments/:id', async () => {
+      await pending;
+      return HttpResponse.json({ status: 'success', data: { id: GAME_ROSTER_MSW.tournamentId, kind: 'regular_league', status: 'completed' } });
+    }));
+    renderScreen();
+    try {
+      expect(await screen.findByText('리그 상태를 확인하고 있어요. 참가 명단 화면에서 확인해 주세요.')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?from='));
+      expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
+      expect(batchBodies()).toHaveLength(0);
+    } finally {
+      release();
+    }
+    expect(await screen.findByRole('link', { name: '참가 명단 보기' })).toBeInTheDocument();
+    expect(screen.getByText('종료된 리그의 참가 명단은 조회만 할 수 있어요.')).toBeInTheDocument();
+    expect(batchBodies()).toHaveLength(0);
+  });
+
+  it('리그 상태 조회 실패는 편집 성공을 가정하지 않고 확인 링크를 유지한다', async () => {
+    leagueStatus('draft', 403);
+    renderScreen();
+    expect(await screen.findByText('리그 상태를 불러오지 못했어요. 조회할 수 없어요. 참가 명단 화면에서 확인해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?from='));
+    expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
+    expect(batchBodies()).toHaveLength(0);
+  });
+
+  it('완료 리그에 신청 명단이 없으면 기존 신청 허브를 조회로 안내한다', async () => {
+    leagueStatus('completed');
+    mock.useTeamMembersFallback();
+    mock.setGameState(G1.gameId, 'ENDED');
+    renderScreen();
+    expect(await screen.findByRole('link', { name: '신청 내역 보기' })).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/my?from=${encodeURIComponent('/teams/team-1/games/roster-game-1/roster')}`);
+    expect(screen.queryByRole('link', { name: '참가 명단 내러 가기' })).not.toBeInTheDocument();
+  });
+});

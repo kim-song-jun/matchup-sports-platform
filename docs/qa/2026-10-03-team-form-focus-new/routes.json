@@ -1,0 +1,22 @@
+[
+  {
+    "step": "mobile-cancel-list",
+    "url": "https://alpha.teameet.co.kr/teams",
+    "utc": "2026-10-03T14:25:07.957Z"
+  },
+  {
+    "step": "tablet-cancel-list",
+    "url": "https://alpha.teameet.co.kr/teams",
+    "utc": "2026-10-03T14:27:18.532Z"
+  },
+  {
+    "step": "desktop-cancel-list",
+    "url": "https://alpha.teameet.co.kr/teams",
+    "utc": "2026-10-03T14:28:02.298Z"
+  },
+  {
+    "step": "desktop-final-clean-list",
+    "url": "https://alpha.teameet.co.kr/teams",
+    "utc": "2026-10-03T14:28:03.013Z"
+  }
+]

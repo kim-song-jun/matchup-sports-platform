@@ -1,0 +1,147 @@
+{
+  "createdUTC": "2026-10-03T14:30:23.689012+00:00",
+  "scope": "Actual blank-form level-focus plus create-bar context; no member identity or uploads",
+  "crops": [
+    {
+      "file": "1534-team-form-mobile-level.png",
+      "proofIndex": 2,
+      "sourceSHA256": "3bf3725a3a0b07569e7cace6b662c417a6f8323b85e02cbed632653c992ae3f1",
+      "outputSHA256": "0bac4f2fa9a4ba76167225270169928f3f140e620e19ba5fe6974ade35dd2b7b",
+      "sourceSize": [
+        402,
+        606
+      ],
+      "cropBox": [
+        12,
+        231,
+        391,
+        596
+      ],
+      "outputSize": [
+        379,
+        365
+      ],
+      "captureMetadata": {
+        "file": "1534-team-form-mobile-level.png",
+        "startedUTC": "2026-10-03T14:22:37.491Z",
+        "completedUTC": "2026-10-03T14:22:37.508Z",
+        "domUTC": "2026-10-03T14:22:37.473Z",
+        "url": "https://alpha.teameet.co.kr/teams/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 402,
+          "width": 402
+        }
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "1534-team-form-tablet-level.png",
+      "proofIndex": 8,
+      "sourceSHA256": "ad5865368f24c8ccb2d810b0a525b5b9e4f4892190ac89dc08e3b5f23987d8db",
+      "outputSHA256": "9876c1c535106d321a255dc6c06a7a08fa3f731ebbebe6d0758e1a951802aaf4",
+      "sourceSize": [
+        787,
+        505
+      ],
+      "cropBox": [
+        104,
+        157,
+        684,
+        492
+      ],
+      "outputSize": [
+        580,
+        335
+      ],
+      "captureMetadata": {
+        "file": "1534-team-form-tablet-level.png",
+        "startedUTC": "2026-10-03T14:26:15.169Z",
+        "completedUTC": "2026-10-03T14:26:15.193Z",
+        "domUTC": "2026-10-03T14:26:15.147Z",
+        "url": "https://alpha.teameet.co.kr/teams/new",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        }
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "1534-team-form-desktop-level.png",
+      "proofIndex": 14,
+      "sourceSHA256": "da189809c45abd9e0d56ac755e9b1e39be80dd95004bdc2e4026fbc18750be24",
+      "outputSHA256": "9b688cf0c64c907306b180d8f8f47a1ab6c300f7d9a665d9a70cee33b833d18e",
+      "sourceSize": [
+        1180,
+        757
+      ],
+      "cropBox": [
+        44,
+        280,
+        975,
+        640
+      ],
+      "outputSize": [
+        931,
+        360
+      ],
+      "captureMetadata": {
+        "file": "1534-team-form-desktop-level.png",
+        "startedUTC": "2026-10-03T14:27:20.025Z",
+        "completedUTC": "2026-10-03T14:27:20.049Z",
+        "domUTC": "2026-10-03T14:27:20.007Z",
+        "url": "https://alpha.teameet.co.kr/teams/new",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        }
+      },
+      "collectorPixelEquality": true
+    }
+  ],
+  "safeProofHashes": {
+    "1534-team-form-focus-proof.json": "3df02eb4e145389f167565b491f65adf7fb1fb401786317e8e08ad15346913c0",
+    "1534-team-form-focus-actions.json": "aba08645517fec80b8ff739fc46c25f0c22c016b45c3bb0991d94ad41cfa265f",
+    "1534-team-form-routes.json": "17207f4d9442f45755dd281994ae510471380148e18f5ed1516f7535306e91ff",
+    "1534-team-form-summary.json": "5e25a13d8a343b6a965c650c9fb2dc3d711866952dfdfb105aa796959e0b30a9"
+  },
+  "limits": [
+    "DOM field rectangles, screenshot pixels and capture UTC are separate observations.",
+    "Default capacity and selection controls are visible but were not edited or submitted."
+  ],
+  "sourceInputFiles": [
+    {
+      "file": "1534-team-form-focus-proof.json",
+      "bytes": 25037,
+      "sha256": "3df02eb4e145389f167565b491f65adf7fb1fb401786317e8e08ad15346913c0"
+    },
+    {
+      "file": "1534-team-form-focus-actions.json",
+      "bytes": 3429,
+      "sha256": "aba08645517fec80b8ff739fc46c25f0c22c016b45c3bb0991d94ad41cfa265f"
+    },
+    {
+      "file": "1534-team-form-routes.json",
+      "bytes": 525,
+      "sha256": "17207f4d9442f45755dd281994ae510471380148e18f5ed1516f7535306e91ff"
+    },
+    {
+      "file": "1534-team-form-summary.json",
+      "bytes": 4899,
+      "sha256": "5e25a13d8a343b6a965c650c9fb2dc3d711866952dfdfb105aa796959e0b30a9"
+    },
+    {
+      "file": "1534-team-form-provenance.json",
+      "bytes": 3722,
+      "sha256": "a04d84ba2e52e2043928a06b0bb777920a647b5a7eb74f660039679348236ef1"
+    }
+  ],
+  "publicationProjection": "DOM records, source action labels, routes and crop pixels preserved. Summary narrows exit/reentry interpretation and removes unverified deployment attribution. Local inputs unchanged.",
+  "publisherReview": "Actual safe pixels viewed; PNG hashes/dimensions, crop bounds and focused-field containment checked; all capture metadata mapped to original DOM row UTC/viewport/URL. Original-to-crop equality is collector-reported."
+}

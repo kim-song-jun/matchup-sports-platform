@@ -1,0 +1,112 @@
+[
+  {
+    "name": "Open optional 더 꾸미기 section",
+    "startedUTC": "2026-10-03T14:22:36.616Z",
+    "completedUTC": "2026-10-03T14:22:36.912Z"
+  },
+  {
+    "name": "Focus blank 팀 소개 textarea by click; no input",
+    "startedUTC": "2026-10-03T14:22:36.967Z",
+    "completedUTC": "2026-10-03T14:22:37.245Z"
+  },
+  {
+    "name": "Native Tab from intro to level",
+    "startedUTC": "2026-10-03T14:22:37.327Z",
+    "completedUTC": "2026-10-03T14:22:37.396Z"
+  },
+  {
+    "name": "Native ShiftTab from level to intro",
+    "startedUTC": "2026-10-03T14:22:37.509Z",
+    "completedUTC": "2026-10-03T14:22:37.644Z"
+  },
+  {
+    "name": "Native Tab back to level",
+    "startedUTC": "2026-10-03T14:22:37.735Z",
+    "completedUTC": "2026-10-03T14:22:37.812Z"
+  },
+  {
+    "name": "Mobile cancel via visible Previous link to teams; no create or input",
+    "startedUTC": "2026-10-03T14:23:56.859Z",
+    "completedUTC": "2026-10-03T14:23:57.128Z"
+  },
+  {
+    "name": "Mobile reenter using visible team-create link",
+    "startedUTC": "2026-10-03T14:25:07.959Z",
+    "completedUTC": "2026-10-03T14:25:08.046Z"
+  },
+  {
+    "name": "Tablet open optional 더 꾸미기",
+    "startedUTC": "2026-10-03T14:26:14.289Z",
+    "completedUTC": "2026-10-03T14:26:14.564Z"
+  },
+  {
+    "name": "Tablet focus blank team intro; no input",
+    "startedUTC": "2026-10-03T14:26:14.615Z",
+    "completedUTC": "2026-10-03T14:26:14.889Z"
+  },
+  {
+    "name": "Tablet native Tab to level",
+    "startedUTC": "2026-10-03T14:26:15.006Z",
+    "completedUTC": "2026-10-03T14:26:15.075Z"
+  },
+  {
+    "name": "Tablet native ShiftTab to intro",
+    "startedUTC": "2026-10-03T14:26:15.193Z",
+    "completedUTC": "2026-10-03T14:26:15.329Z"
+  },
+  {
+    "name": "Tablet native Tab to level again",
+    "startedUTC": "2026-10-03T14:26:15.412Z",
+    "completedUTC": "2026-10-03T14:26:15.497Z"
+  },
+  {
+    "name": "Tablet cancel through visible Previous link",
+    "startedUTC": "2026-10-03T14:26:15.591Z",
+    "completedUTC": "2026-10-03T14:26:15.675Z"
+  },
+  {
+    "name": "Tablet reenter through visible team-create link",
+    "startedUTC": "2026-10-03T14:27:18.534Z",
+    "completedUTC": "2026-10-03T14:27:18.620Z"
+  },
+  {
+    "name": "Desktop open optional 더 꾸미기",
+    "startedUTC": "2026-10-03T14:27:19.139Z",
+    "completedUTC": "2026-10-03T14:27:19.435Z"
+  },
+  {
+    "name": "Desktop focus blank team intro; no input",
+    "startedUTC": "2026-10-03T14:27:19.499Z",
+    "completedUTC": "2026-10-03T14:27:19.766Z"
+  },
+  {
+    "name": "Desktop native Tab to level",
+    "startedUTC": "2026-10-03T14:27:19.861Z",
+    "completedUTC": "2026-10-03T14:27:19.930Z"
+  },
+  {
+    "name": "Desktop native ShiftTab to intro",
+    "startedUTC": "2026-10-03T14:27:20.050Z",
+    "completedUTC": "2026-10-03T14:27:20.186Z"
+  },
+  {
+    "name": "Desktop native Tab to level again",
+    "startedUTC": "2026-10-03T14:27:20.275Z",
+    "completedUTC": "2026-10-03T14:27:20.354Z"
+  },
+  {
+    "name": "Desktop cancel via visible Previous link",
+    "startedUTC": "2026-10-03T14:27:20.461Z",
+    "completedUTC": "2026-10-03T14:27:20.540Z"
+  },
+  {
+    "name": "Desktop reenter via visible team-create link",
+    "startedUTC": "2026-10-03T14:28:02.299Z",
+    "completedUTC": "2026-10-03T14:28:02.376Z"
+  },
+  {
+    "name": "Leave blank reentry through Previous link",
+    "startedUTC": "2026-10-03T14:28:02.670Z",
+    "completedUTC": "2026-10-03T14:28:02.752Z"
+  }
+]

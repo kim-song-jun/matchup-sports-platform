@@ -1,0 +1,1040 @@
+[
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "right": 401.6000061035156,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": "",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": true,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 605.5999908447266,
+          "height": 88.80000305175781,
+          "right": 401.6000061035156,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 516.7999877929688
+        },
+        "buttonRect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 381.6000061035156,
+          "width": 235.7375030517578,
+          "x": 145.8625030517578,
+          "y": 533.6000366210938
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:22:36.567Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "width": 402
+    },
+    "step": "mobile-402-initial-blank-collapsed",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [],
+    "focusComparisonApplicable": false
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 378,
+        "height": 96,
+        "right": 364.79999923706055,
+        "width": 328,
+        "x": 36.79999923706055,
+        "y": 282
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 605.5999908447266,
+          "height": 88.80000305175781,
+          "right": 401.6000061035156,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 516.7999877929688
+        },
+        "buttonRect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 381.6000061035156,
+          "width": 235.7375030517578,
+          "x": 145.8625030517578,
+          "y": 533.6000366210938
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:22:37.309Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "width": 402
+    },
+    "step": "mobile-intro-focus",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 485.2000122070313,
+        "height": 48,
+        "right": 194.8000030517578,
+        "width": 174.8000030517578,
+        "x": 20,
+        "y": 437.2000122070313
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 605.5999908447266,
+          "height": 88.80000305175781,
+          "right": 401.6000061035156,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 516.7999877929688
+        },
+        "buttonRect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 381.6000061035156,
+          "width": 235.7375030517578,
+          "x": 145.8625030517578,
+          "y": 533.6000366210938
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:22:37.473Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "width": 402
+    },
+    "step": "mobile-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 378,
+        "height": 96,
+        "right": 364.79999923706055,
+        "width": 328,
+        "x": 36.79999923706055,
+        "y": 282
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 605.5999908447266,
+          "height": 88.80000305175781,
+          "right": 401.6000061035156,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 516.7999877929688
+        },
+        "buttonRect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 381.6000061035156,
+          "width": 235.7375030517578,
+          "x": 145.8625030517578,
+          "y": 533.6000366210938
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:22:37.713Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "width": 402
+    },
+    "step": "mobile-ShiftTab-intro",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 485.2000122070313,
+        "height": 48,
+        "right": 194.8000030517578,
+        "width": 174.8000030517578,
+        "x": 20,
+        "y": 437.2000122070313
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 605.5999908447266,
+          "height": 88.80000305175781,
+          "right": 401.6000061035156,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 516.7999877929688
+        },
+        "buttonRect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 381.6000061035156,
+          "width": 235.7375030517578,
+          "x": 145.8625030517578,
+          "y": 533.6000366210938
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:22:37.902Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "width": 402
+    },
+    "step": "mobile-second-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 605.6000366210938,
+        "height": 605.6000366210938,
+        "right": 401.6000061035156,
+        "width": 401.6000061035156,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": "",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": true,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 605.5999908447266,
+          "height": 88.80000305175781,
+          "right": 401.6000061035156,
+          "width": 401.6000061035156,
+          "x": 0,
+          "y": 516.7999877929688
+        },
+        "buttonRect": {
+          "bottom": 583.6000366210938,
+          "height": 50,
+          "right": 381.6000061035156,
+          "width": 235.7375030517578,
+          "x": 145.8625030517578,
+          "y": 533.6000366210938
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:25:08.309Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "width": 402
+    },
+    "step": "mobile-reentry-blank",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [],
+    "focusComparisonApplicable": false
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "right": 786.6666870117188,
+        "width": 786.6666870117188,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": "",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": true,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:26:14.266Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-787-initial-blank",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [],
+    "focusComparisonApplicable": false
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 328,
+        "height": 96,
+        "right": 656.6666870117188,
+        "width": 526.6666870117188,
+        "x": 130,
+        "y": 232
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:26:14.957Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-intro-focus",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 412,
+        "height": 48,
+        "right": 387.3333358764648,
+        "width": 274,
+        "x": 113.33333587646484,
+        "y": 364
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:26:15.147Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 304.6666717529297,
+        "height": 96,
+        "right": 656.6666870117188,
+        "width": 526.6666870117188,
+        "x": 130,
+        "y": 208.6666717529297
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:26:15.394Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-ShiftTab-intro",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 412,
+        "height": 48,
+        "right": 387.3333358764648,
+        "width": 274,
+        "x": 113.33333587646484,
+        "y": 364
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:26:15.570Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-second-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "right": 786.6666870117188,
+        "width": 786.6666870117188,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": "",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": true,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:27:18.896Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-reentry-blank",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [],
+    "focusComparisonApplicable": false
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 943,
+        "height": 943,
+        "right": 1180,
+        "width": 1180,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": "",
+      "withinViewport": false
+    },
+    "activeOverlapsFixedCTA": true,
+    "ctas": [
+      {
+        "ancestorPosition": "sticky",
+        "ancestorRect": {
+          "bottom": 470.5,
+          "height": 318.5,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 152
+        },
+        "buttonRect": {
+          "bottom": 414.5,
+          "height": 50,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 364.5
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:27:19.115Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-1180-initial-blank",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [],
+    "focusComparisonApplicable": false
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 426,
+        "height": 96,
+        "right": 597,
+        "width": 526,
+        "x": 71,
+        "y": 330
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "sticky",
+        "ancestorRect": {
+          "bottom": 406.5,
+          "height": 318.5,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 88
+        },
+        "buttonRect": {
+          "bottom": 350.5,
+          "height": 50,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 300.5
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:27:19.841Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-intro-focus",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 533,
+        "height": 48,
+        "right": 326,
+        "width": 272,
+        "x": 54,
+        "y": 485
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "sticky",
+        "ancestorRect": {
+          "bottom": 406.5,
+          "height": 318.5,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 88
+        },
+        "buttonRect": {
+          "bottom": 350.5,
+          "height": 50,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 300.5
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:27:20.007Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 426,
+        "height": 96,
+        "right": 597,
+        "width": 526,
+        "x": 71,
+        "y": 330
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "sticky",
+        "ancestorRect": {
+          "bottom": 406.5,
+          "height": 318.5,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 88
+        },
+        "buttonRect": {
+          "bottom": 350.5,
+          "height": 50,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 300.5
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:27:20.257Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-ShiftTab-intro",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 533,
+        "height": 48,
+        "right": 326,
+        "width": 272,
+        "x": 54,
+        "y": 485
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "withinViewport": true
+    },
+    "activeOverlapsFixedCTA": false,
+    "ctas": [
+      {
+        "ancestorPosition": "sticky",
+        "ancestorRect": {
+          "bottom": 406.5,
+          "height": 318.5,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 88
+        },
+        "buttonRect": {
+          "bottom": 350.5,
+          "height": 50,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 300.5
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:27:20.435Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-second-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "focusComparisonApplicable": true
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 943,
+        "height": 943,
+        "right": 1180,
+        "width": 1180,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY",
+      "type": "",
+      "withinViewport": false
+    },
+    "activeOverlapsFixedCTA": true,
+    "ctas": [
+      {
+        "ancestorPosition": "sticky",
+        "ancestorRect": {
+          "bottom": 470.5,
+          "height": 318.5,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 152
+        },
+        "buttonRect": {
+          "bottom": 414.5,
+          "height": 50,
+          "right": 962,
+          "width": 320,
+          "x": 642,
+          "y": 364.5
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:28:02.635Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-reentry-blank",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [],
+    "focusComparisonApplicable": false
+  }
+]

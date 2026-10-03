@@ -1,0 +1,181 @@
+{
+  "fieldEndpoints": [
+    {
+      "proofIndex": 1,
+      "width": 402,
+      "tag": "TEXTAREA",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 138.79998779296875
+    },
+    {
+      "proofIndex": 2,
+      "width": 402,
+      "tag": "SELECT",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 31.599975585937443
+    },
+    {
+      "proofIndex": 3,
+      "width": 402,
+      "tag": "TEXTAREA",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 138.79998779296875
+    },
+    {
+      "proofIndex": 4,
+      "width": 402,
+      "tag": "SELECT",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 31.599975585937443
+    },
+    {
+      "proofIndex": 7,
+      "width": 787,
+      "tag": "TEXTAREA",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 88
+    },
+    {
+      "proofIndex": 8,
+      "width": 787,
+      "tag": "SELECT",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 4
+    },
+    {
+      "proofIndex": 9,
+      "width": 787,
+      "tag": "TEXTAREA",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 111.33332824707031
+    },
+    {
+      "proofIndex": 10,
+      "width": 787,
+      "tag": "SELECT",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "fixed",
+      "verticalGapForBottomFixedCTA": 4
+    },
+    {
+      "proofIndex": 13,
+      "width": 1180,
+      "tag": "TEXTAREA",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "sticky",
+      "verticalGapForBottomFixedCTA": null
+    },
+    {
+      "proofIndex": 14,
+      "width": 1180,
+      "tag": "SELECT",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0,
+      "buttonOverlapArea": 0,
+      "CTAAncestorPosition": "sticky",
+      "verticalGapForBottomFixedCTA": null
+    },
+    {
+      "proofIndex": 15,
+      "width": 1180,
+      "tag": "TEXTAREA",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0.0,
+      "buttonOverlapArea": 0.0,
+      "CTAAncestorPosition": "sticky",
+      "verticalGapForBottomFixedCTA": null
+    },
+    {
+      "proofIndex": 16,
+      "width": 1180,
+      "tag": "SELECT",
+      "focusVisible": true,
+      "withinViewport": true,
+      "ancestorOverlapArea": 0,
+      "buttonOverlapArea": 0,
+      "CTAAncestorPosition": "sticky",
+      "verticalGapForBottomFixedCTA": null
+    }
+  ],
+  "fieldEndpointCount": 12,
+  "bodyNARows": [
+    0,
+    5,
+    6,
+    11,
+    12,
+    17
+  ],
+  "bodyRowsOverlapTrueNotObstructionFinding": true,
+  "desktopBodyOutsideViewportNARows": [
+    12,
+    17
+  ],
+  "activeTagsPerWidth": [
+    "TEXTAREA",
+    "SELECT",
+    "TEXTAREA",
+    "SELECT"
+  ],
+  "selectHeight": 48,
+  "nativeAXComboboxName": "레벨",
+  "selectionValueComparisonPerformed": false,
+  "mobileLevelFooterClearancePx": 31.599975585937443,
+  "tabletLevelFooterClearancePx": 4,
+  "desktopCTALayout": "Sticky right panel x642,width320; use two-dimensional intersection, not vertical gap.",
+  "routesAndReentryOrdered": true,
+  "reentryIndices": [
+    5,
+    11,
+    17
+  ],
+  "reentryNameAndIntroEmpty": true,
+  "reentryOptionalCollapsed": true,
+  "postReentryKeyboardSequenceRecorded": false,
+  "inputHashChecksPassed": true,
+  "imageHashDimensionBoundsChecksPassed": true,
+  "captureProofMappings": [
+    2,
+    8,
+    14
+  ],
+  "actualSafePixelsViewed": 3,
+  "privacy": "Blank form labels, placeholders, default controls and navigation buttons only. No person/team name, roster, contact, credential or uploaded image content.",
+  "runtimeServingSHA": "unknown"
+}

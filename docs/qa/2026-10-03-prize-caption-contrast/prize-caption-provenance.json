@@ -1,0 +1,98 @@
+[
+  {
+    "file": "prize-caption-mobile.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T08:21:56.280Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "captureStartUTC": "2026-10-03T08:21:56.284Z",
+    "captureEndUTC": "2026-10-03T08:21:56.313Z",
+    "accepted": true,
+    "sourceFile": "39-tournament-detail-mobile-bottom.png",
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      20,
+      174,
+      385,
+      327
+    ],
+    "raster": [
+      365,
+      153
+    ],
+    "sha256": "881041521fcee2608f3694001a6e9679b80b036e937ed34eba532bac8dff097d",
+    "privacy": "Caption/prize notice only; no team roster, personal identity, contactinfo or sidebar. Original andsafe pixels inspected."
+  },
+  {
+    "file": "prize-caption-tablet.png",
+    "scrollY": 0,
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T08:24:28.211Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "captureStartUTC": "2026-10-03T08:24:28.218Z",
+    "captureEndUTC": "2026-10-03T08:24:28.274Z",
+    "accepted": true,
+    "sourceFile": "40-tournament-detail-tablet-prize.png",
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      114,
+      172,
+      675,
+      302
+    ],
+    "raster": [
+      561,
+      130
+    ],
+    "sha256": "d0332032fd4abf31b95f3333d56069ec24aff2e3262c0bbe8d734774db470ae5",
+    "privacy": "Caption/prize notice only; no team roster, personal identity, contactinfo or sidebar. Original andsafe pixels inspected."
+  },
+  {
+    "file": "prize-caption-desktop.png",
+    "scrollY": 622,
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T08:28:46.643Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "captureStartUTC": "2026-10-03T08:28:46.644Z",
+    "captureEndUTC": "2026-10-03T08:28:46.715Z",
+    "accepted": true,
+    "sourceFile": "45-tournament-detail-desktop-info.png",
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      106,
+      597,
+      706,
+      727
+    ],
+    "raster": [
+      600,
+      130
+    ],
+    "sha256": "2e128cc46a7c05b940481cfa904eb65b738edaf90c3ee46da4ece8b77122fa55",
+    "privacy": "Caption/prize notice only; no team roster, personal identity, contactinfo or sidebar. Original andsafe pixels inspected."
+  }
+]

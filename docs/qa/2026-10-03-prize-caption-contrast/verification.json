@@ -1,0 +1,219 @@
+{
+  "scope": "Independent safe-file/pixel and arithmetic review; no private originals or application changes.",
+  "reference": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+  "method": "Normalize each sRGB channel to 0–1. Use c/12.92 when c <= 0.04045, otherwise ((c + 0.055)/1.055)^2.4. Relative luminance is 0.2126R + 0.7152G + 0.0722B. Contrast is (lighter luminance + 0.05)/(darker luminance + 0.05). Do not round before comparing against the threshold.",
+  "originalCaptionChecks": [
+    {
+      "widthCSS": 405,
+      "UTC": "2026-10-03T08:23:02.339Z",
+      "ratio": 4.208740854651445,
+      "below4_5": true,
+      "chainStopsAtFirstOpaque": true
+    },
+    {
+      "widthCSS": 789,
+      "UTC": "2026-10-03T08:25:19.872Z",
+      "ratio": 4.208740854651445,
+      "below4_5": true,
+      "chainStopsAtFirstOpaque": true
+    },
+    {
+      "widthCSS": 1183,
+      "UTC": "2026-10-03T08:29:54.680Z",
+      "ratio": 4.208740854651445,
+      "below4_5": true,
+      "chainStopsAtFirstOpaque": true
+    }
+  ],
+  "fullChainChecks": [
+    {
+      "widthCSS": 405,
+      "UTC": "2026-10-03T08:37:48.969Z",
+      "nodesIncludingCaptionAndHTML": 13,
+      "allOpacityOne": true,
+      "allFiltersImagesNoneAndBlendNormal": true,
+      "withinViewport": false,
+      "stylePairSameAsOriginal": true
+    },
+    {
+      "widthCSS": 789,
+      "UTC": "2026-10-03T08:37:50.718Z",
+      "nodesIncludingCaptionAndHTML": 13,
+      "allOpacityOne": true,
+      "allFiltersImagesNoneAndBlendNormal": true,
+      "withinViewport": false,
+      "stylePairSameAsOriginal": true
+    },
+    {
+      "widthCSS": 1183,
+      "UTC": "2026-10-03T08:37:50.949Z",
+      "nodesIncludingCaptionAndHTML": 13,
+      "allOpacityOne": true,
+      "allFiltersImagesNoneAndBlendNormal": true,
+      "withinViewport": false,
+      "stylePairSameAsOriginal": true
+    }
+  ],
+  "originalMobileComparisonChecks": [
+    {
+      "text": "상품 및 상금",
+      "foregroundRGB": [
+        107.0,
+        118.0,
+        132.0
+      ],
+      "compositedBackgroundRGB": [
+        255.0,
+        243.0,
+        224.0
+      ],
+      "fontCSS": "12px",
+      "weight": "700",
+      "ratio": 4.208740854651445,
+      "meets4_5": false,
+      "observedUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile sample only; not all widths/states"
+    },
+    {
+      "text": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다.",
+      "foregroundRGB": [
+        150.0,
+        83.0,
+        0.0
+      ],
+      "compositedBackgroundRGB": [
+        255.0,
+        243.0,
+        224.0
+      ],
+      "fontCSS": "17px",
+      "weight": "800",
+      "ratio": 5.418226292948953,
+      "meets4_5": true,
+      "observedUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile sample only; not all widths/states"
+    },
+    {
+      "text": "1위",
+      "foregroundRGB": [
+        78.0,
+        89.0,
+        104.0
+      ],
+      "compositedBackgroundRGB": [
+        254.9,
+        233.9,
+        201.6
+      ],
+      "fontCSS": "12px",
+      "weight": "600",
+      "ratio": 6.046836134941208,
+      "meets4_5": true,
+      "observedUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile sample only; not all widths/states"
+    },
+    {
+      "text": "2위",
+      "foregroundRGB": [
+        78.0,
+        89.0,
+        104.0
+      ],
+      "compositedBackgroundRGB": [
+        254.9,
+        233.9,
+        201.6
+      ],
+      "fontCSS": "12px",
+      "weight": "600",
+      "ratio": 6.046836134941208,
+      "meets4_5": true,
+      "observedUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile sample only; not all widths/states"
+    },
+    {
+      "text": "3위",
+      "foregroundRGB": [
+        78.0,
+        89.0,
+        104.0
+      ],
+      "compositedBackgroundRGB": [
+        254.9,
+        233.9,
+        201.6
+      ],
+      "fontCSS": "12px",
+      "weight": "600",
+      "ratio": 6.046836134941208,
+      "meets4_5": true,
+      "observedUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile sample only; not all widths/states"
+    }
+  ],
+  "desktopTextEffectsCheck": {
+    "UTC": "2026-10-03T08:44:27.795Z",
+    "widthCSS": 1183,
+    "textShadow": "none",
+    "textStrokeWidth": "0px",
+    "textFillMatchesForeground": true,
+    "otherWidthsNotSeparatelyMeasured": true
+  },
+  "hypotheticalColor": {
+    "foregroundHex": "#4e5968",
+    "backgroundHex": "#fff3e0",
+    "ratio": 6.484924628224474,
+    "appliedOrBrowserTested": false
+  },
+  "imageChecks": [
+    {
+      "file": "prize-caption-mobile.png",
+      "sha256": "881041521fcee2608f3694001a6e9679b80b036e937ed34eba532bac8dff097d",
+      "dimensions": [
+        365,
+        153
+      ],
+      "declaredCropBoundsValid": true,
+      "decodedAndPixelsInspected": true,
+      "captureStartUTC": "2026-10-03T08:21:56.284Z",
+      "captureEndUTC": "2026-10-03T08:21:56.313Z",
+      "separateDOMUTC": "2026-10-03T08:23:02.339Z",
+      "DOMAfterCaptureEndSeconds": 66.026
+    },
+    {
+      "file": "prize-caption-tablet.png",
+      "sha256": "d0332032fd4abf31b95f3333d56069ec24aff2e3262c0bbe8d734774db470ae5",
+      "dimensions": [
+        561,
+        130
+      ],
+      "declaredCropBoundsValid": true,
+      "decodedAndPixelsInspected": true,
+      "captureStartUTC": "2026-10-03T08:24:28.218Z",
+      "captureEndUTC": "2026-10-03T08:24:28.274Z",
+      "separateDOMUTC": "2026-10-03T08:25:19.872Z",
+      "DOMAfterCaptureEndSeconds": 51.598
+    },
+    {
+      "file": "prize-caption-desktop.png",
+      "sha256": "2e128cc46a7c05b940481cfa904eb65b738edaf90c3ee46da4ece8b77122fa55",
+      "dimensions": [
+        600,
+        130
+      ],
+      "declaredCropBoundsValid": true,
+      "decodedAndPixelsInspected": true,
+      "captureStartUTC": "2026-10-03T08:28:46.644Z",
+      "captureEndUTC": "2026-10-03T08:28:46.715Z",
+      "separateDOMUTC": "2026-10-03T08:29:54.680Z",
+      "DOMAfterCaptureEndSeconds": 67.965
+    }
+  ],
+  "privacy": "Three crops show a synthetic QA prize notice and rank badges only. No person names, contact details, member rosters, human photos, accounts or credentials were observed.",
+  "limits": [
+    "Original-to-crop pixel equivalence and source capture times are source-provided provenance; publisher checked safe output bytes and declared crop bounds only.",
+    "No numerical ratio was derived from antialiased screenshot pixel colors.",
+    "CSS789 and sourcePNG788 are distinct.",
+    "The full-chain and text-effects supplements are later observations, not contemporaneous with the original screenshots."
+  ]
+}

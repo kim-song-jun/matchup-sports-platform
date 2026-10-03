@@ -1,0 +1,149 @@
+{
+  "sourceObservationUTC": "2026-10-03T08:23:02.339Z",
+  "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+  "scope": "Original CSS observation exported without changes; each chain ends at the first opaque background. This is not a full caption-to-HTML chain.",
+  "samples": [
+    {
+      "backgroundChain": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 243, 224)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        }
+      ],
+      "color": "rgb(107, 118, 132)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "text": "상품 및 상금"
+    },
+    {
+      "backgroundChain": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 243, 224)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        }
+      ],
+      "color": "rgb(150, 83, 0)",
+      "fontSize": "17px",
+      "fontWeight": "800",
+      "text": "QA 테스트용 대회입니다. 실제 경기·상금·상품은 없습니다."
+    },
+    {
+      "backgroundChain": [
+        {
+          "background": "rgba(254, 152, 0, 0.1)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 243, 224)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        }
+      ],
+      "color": "rgb(78, 89, 104)",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "text": "1위"
+    },
+    {
+      "backgroundChain": [
+        {
+          "background": "rgba(254, 152, 0, 0.1)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 243, 224)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        }
+      ],
+      "color": "rgb(78, 89, 104)",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "text": "2위"
+    },
+    {
+      "backgroundChain": [
+        {
+          "background": "rgba(254, 152, 0, 0.1)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "SPAN"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        },
+        {
+          "background": "rgb(255, 243, 224)",
+          "image": "none",
+          "opacity": "1",
+          "tag": "DIV"
+        }
+      ],
+      "color": "rgb(78, 89, 104)",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "text": "3위"
+    }
+  ]
+}

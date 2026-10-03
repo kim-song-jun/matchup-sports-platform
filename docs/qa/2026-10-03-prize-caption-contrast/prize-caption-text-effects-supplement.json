@@ -1,0 +1,20 @@
+{
+  "scope": "New desktop DOM observation only. Original screenshot and earlier style timestamps unchanged. getPropertyValue used for prefixed properties.",
+  "observation": {
+    "caption": {
+      "color": "rgb(107, 118, 132)",
+      "text": "상품 및 상금",
+      "textFillColor": "rgb(107, 118, 132)",
+      "textShadow": "none",
+      "textStrokeColor": "rgb(107, 118, 132)",
+      "textStrokeWidth": "0px"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T08:44:27.795Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    }
+  }
+}

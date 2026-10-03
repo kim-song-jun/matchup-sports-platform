@@ -1,0 +1,494 @@
+{
+  "scope": "New supplementary CSS observations. Original screenshot and CSS observation times remain unchanged. Caption may be below the fold; rendered styles, not screenshot position, are compared.",
+  "observations": [
+    {
+      "label": "mobile supplemental",
+      "caption": {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "fontWeight": "700",
+        "insideDisabledControl": false,
+        "text": "상품 및 상금",
+        "withinViewport": false
+      },
+      "chainToHTML": [
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 243, 224)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "SECTION",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "ARTICLE",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "MAIN",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "BODY",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "HTML",
+          "visibility": "visible"
+        }
+      ],
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "utc": "2026-10-03T08:37:48.969Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      }
+    },
+    {
+      "label": "tablet supplemental",
+      "caption": {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "fontWeight": "700",
+        "insideDisabledControl": false,
+        "text": "상품 및 상금",
+        "withinViewport": false
+      },
+      "chainToHTML": [
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 243, 224)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "SECTION",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "ARTICLE",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "MAIN",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "BODY",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "HTML",
+          "visibility": "visible"
+        }
+      ],
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "utc": "2026-10-03T08:37:50.718Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      }
+    },
+    {
+      "label": "desktop supplemental",
+      "caption": {
+        "color": "rgb(107, 118, 132)",
+        "fontSize": "12px",
+        "fontWeight": "700",
+        "insideDisabledControl": false,
+        "text": "상품 및 상금",
+        "withinViewport": false
+      },
+      "chainToHTML": [
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 243, 224)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "SECTION",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "grid",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "ARTICLE",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "MAIN",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "flex",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "DIV",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "BODY",
+          "visibility": "visible"
+        },
+        {
+          "backdropFilter": "none",
+          "background": "rgb(255, 255, 255)",
+          "backgroundImage": "none",
+          "display": "block",
+          "filter": "none",
+          "mixBlendMode": "normal",
+          "opacity": "1",
+          "tag": "HTML",
+          "visibility": "visible"
+        }
+      ],
+      "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+      "utc": "2026-10-03T08:37:50.949Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      }
+    }
+  ]
+}

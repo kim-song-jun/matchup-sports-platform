@@ -1,0 +1,153 @@
+[
+  {
+    "label": "mobile",
+    "utc": "2026-10-03T08:23:02.339Z",
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "viewport": {
+      "width": 405,
+      "height": 606,
+      "dpr": 1.25
+    },
+    "viewportEvidence": "Associated39capture records405x606; noresize occurred between that capture andthisCSSread. Not a positionalalignment claim.",
+    "caption": {
+      "text": "상품 및 상금",
+      "color": "rgb(107, 118, 132)",
+      "fontSize": "12px",
+      "fontWeight": "700"
+    },
+    "backgroundChain": [
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgb(255, 243, 224)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      }
+    ]
+  },
+  {
+    "label": "tablet",
+    "backgroundChain": [
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgb(255, 243, 224)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      }
+    ],
+    "caption": {
+      "ariaDisabled": null,
+      "color": "rgb(107, 118, 132)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "insideDisabledControl": false,
+      "rect": {
+        "bottom": 209.86459350585935,
+        "height": 16,
+        "left": 191,
+        "right": 653.6666870117188,
+        "top": 193.86459350585935,
+        "width": 462.6666870117187,
+        "x": 191,
+        "y": 193.86459350585935
+      },
+      "text": "상품 및 상금"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T08:25:19.872Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    }
+  },
+  {
+    "label": "desktop",
+    "backgroundChain": [
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgba(0, 0, 0, 0)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "background": "rgb(255, 243, 224)",
+        "image": "none",
+        "opacity": "1",
+        "tag": "DIV"
+      }
+    ],
+    "caption": {
+      "ariaDisabled": null,
+      "color": "rgb(107, 118, 132)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "insideDisabledControl": false,
+      "rect": {
+        "bottom": 634.1875,
+        "height": 16,
+        "left": 182.5,
+        "right": 684.5,
+        "top": 618.1875,
+        "width": 502,
+        "x": 182.5,
+        "y": 618.1875
+      },
+      "text": "상품 및 상금"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T08:29:54.680Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    }
+  }
+]

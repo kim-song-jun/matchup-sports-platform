@@ -1,0 +1,110 @@
+{
+  "title": "Tournament prize caption has 4.2087:1 contrast on its tinted background",
+  "scope": "One completed synthetic tournament detail at CSS widths 405, 789 and 1183. This is a component-level finding, not an assessment of whole-app conformance.",
+  "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+  "actual": {
+    "text": "상품 및 상금",
+    "foregroundRGB": [
+      107,
+      118,
+      132
+    ],
+    "foregroundHex": "#6b7684",
+    "backgroundRGB": [
+      255,
+      243,
+      224
+    ],
+    "backgroundHex": "#fff3e0",
+    "fontCSSpx": 12,
+    "weight": 700,
+    "contrastRatio": 4.208740854651445,
+    "allMeasuredWidthsSame": true
+  },
+  "criterion": {
+    "source": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+    "criterion": "WCAG 2.2 SC 1.4.3: at least 4.5:1 for normal text",
+    "whyRelevant": "The 12 CSS px, weight700 caption is informational normal-sized text. Original tablet/desktop and supplementary three-width observations report no disabled ancestor. It is not a logo or pure decoration."
+  },
+  "method": "Normalize each sRGB channel to 0–1. Use c/12.92 when c <= 0.04045, otherwise ((c + 0.055)/1.055)^2.4. Relative luminance is 0.2126R + 0.7152G + 0.0722B. Contrast is (lighter luminance + 0.05)/(darker luminance + 0.05). Do not round before comparing against the threshold.",
+  "assumptions": [
+    "Original background chains stop at the first opaque card. Separately timestamped supplementary chains reach HTML at all three widths and report opacity1, no background images/filters/backdrop filters, normal blending and visible styles.",
+    "Supplementary full-chain observations have withinViewport:false. They validate styles, not a new visible screenshot or identical scroll position.",
+    "The contrast calculation uses recorded CSS colors, not antialiased screenshot pixels.",
+    "Original screenshot/DOM times differ and remain unchanged. Mobile viewport identity uses the adjacent capture with no intervening resize, as reported."
+  ],
+  "healthyControls": [
+    {
+      "text": "main prize description",
+      "foreground": [
+        150,
+        83,
+        0
+      ],
+      "background": [
+        255,
+        243,
+        224
+      ],
+      "ratio": 5.418226292948953,
+      "source": "prize-caption-original-control-styles.json",
+      "sourceObservationUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile numeric comparison only; not whole-component/all-width acceptance"
+    },
+    {
+      "text": "rank badges",
+      "foreground": [
+        78,
+        89,
+        104
+      ],
+      "backgroundAfter10percentOrangeComposite": [
+        254.9,
+        233.9,
+        201.6
+      ],
+      "ratio": 6.046836134941208,
+      "source": "prize-caption-original-control-styles.json",
+      "sourceObservationUTC": "2026-10-03T08:23:02.339Z",
+      "scope": "Original mobile numeric comparison only; not whole-component/all-width acceptance"
+    }
+  ],
+  "minimalRecommendation": {
+    "change": "Darken only this caption, for example to the existing darker neutral color #4e5968. That gives 6.4849:1 on the same background. Preserve the main text, backgrounds, fees and award rules.",
+    "exampleForeground": [
+      78,
+      89,
+      104
+    ],
+    "exampleRatio": 6.484924628224474,
+    "status": "Hypothetical arithmetic example only; not applied, implemented or browser-tested."
+  },
+  "deployment": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761",
+    "headSHA": "235730755db0e7393bec9e01014a6906effde6af",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-03T07:30:13Z",
+    "workflowReadbackVerified": true,
+    "browserServingSHA": "Not exposed or independently established; no build-specific attribution."
+  },
+  "limits": [
+    "One synthetic tournament caption at three widths only, not a whole-app conformance audit.",
+    "No login/logout, submission, saving, prize/fee change, notification or result change reported.",
+    "Body and badge calculations meet4.5 for the original mobile samples; their full state/width coverage is not claimed. Unprovided winner-panel claims are excluded.",
+    "Text effects were independently read only in the later desktop observation: textShadow none, strokeWidth0px, textFillColor equal to caption foreground. This is not evidence that those properties were separately recorded at the original mobile/tablet capture times.",
+    "Three original safe PNGs only; no previous unrelated images or private original screenshots republished."
+  ],
+  "originalObservationWindowUTC": [
+    "2026-10-03T08:21:56.284Z",
+    "2026-10-03T08:29:54.680Z"
+  ],
+  "supplementaryObservationWindowUTC": [
+    "2026-10-03T08:37:48.969Z",
+    "2026-10-03T08:44:27.795Z"
+  ],
+  "supplementaryProofFiles": [
+    "prize-caption-original-control-styles.json",
+    "prize-caption-full-chain-supplement.json",
+    "prize-caption-text-effects-supplement.json"
+  ]
+}

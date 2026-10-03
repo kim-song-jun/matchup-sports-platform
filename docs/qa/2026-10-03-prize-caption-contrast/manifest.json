@@ -1,0 +1,60 @@
+{
+  "scope": "All published files except this manifest itself.",
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 4407,
+      "sha256": "57165fce44cc44638ad31557f8d3b0c2751efe5401fb5c6bd80c8045950fbc6f"
+    },
+    {
+      "file": "prize-caption-contrast-proof.json",
+      "bytes": 3583,
+      "sha256": "261923d4998b220df48da363de698fec99ffbf17279dc95763afbd063a184cd9"
+    },
+    {
+      "file": "prize-caption-desktop.png",
+      "bytes": 46180,
+      "sha256": "2e128cc46a7c05b940481cfa904eb65b738edaf90c3ee46da4ece8b77122fa55"
+    },
+    {
+      "file": "prize-caption-full-chain-supplement.json",
+      "bytes": 14227,
+      "sha256": "b2311e058ceb8f97497df6a53c57dcddb66c11c530c2a5b5ef80abc941af1cd2"
+    },
+    {
+      "file": "prize-caption-mobile.png",
+      "bytes": 42884,
+      "sha256": "881041521fcee2608f3694001a6e9679b80b036e937ed34eba532bac8dff097d"
+    },
+    {
+      "file": "prize-caption-original-control-styles.json",
+      "bytes": 3621,
+      "sha256": "71dce12c5e50bf1b823cc5b2d5779b7fe926332beef26056cf2c302ff4232d76"
+    },
+    {
+      "file": "prize-caption-provenance.json",
+      "bytes": 2620,
+      "sha256": "6e787a6427ffc23b4afe835cb61921a97c26ee4f15c7b8e671d5feed6ea117df"
+    },
+    {
+      "file": "prize-caption-tablet.png",
+      "bytes": 42439,
+      "sha256": "d0332032fd4abf31b95f3333d56069ec24aff2e3262c0bbe8d734774db470ae5"
+    },
+    {
+      "file": "prize-caption-text-effects-supplement.json",
+      "bytes": 639,
+      "sha256": "539544a86abee0b651f5c8673cdbe7a1d093f159733c9e854142c9d452eefdf0"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4991,
+      "sha256": "0e5c4564b362979b85ebd3d00a5c14fd7c0729d5f10647a828f61d95be6a66cd"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 6573,
+      "sha256": "ffccd4a84365a3cc1ada0824b8b1a2e42af17067c487821894005024d5c3dc03"
+    }
+  ]
+}

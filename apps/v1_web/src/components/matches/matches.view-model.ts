@@ -226,7 +226,7 @@ export function getMatchListViewModel(): MatchListViewModel {
       { label: '수영', count: 5 },
     ],
     summary: {
-      label: '서울 전체 · 개인 매치',
+      label: '개인 매치',
       count: 34,
       today: 7,
       urgent: 4,

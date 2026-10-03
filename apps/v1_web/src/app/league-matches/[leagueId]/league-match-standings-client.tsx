@@ -573,7 +573,10 @@ export default function LeagueMatchStandingsClient({
   leagueId: string;
   seed?: { league: V1PublicLeagueDetail | null; standings: V1LeagueStandingsResponse | null };
 }) {
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+  const upcomingFromUrl = searchParams.get('schedule') === 'upcoming';
+  const fromPath = sanitizeRedirectPath(searchParams.get('from'));
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
   const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId, { seed: seed?.league });
@@ -642,7 +645,21 @@ export default function LeagueMatchStandingsClient({
   // "우리 팀 다음 경기"를 찾으려면 이미 끝난 경기를 여러 개 지나야 한다(alpha 실측).
   // "예정만 보기" 필터로 지난 경기를 걷어내고, 필터를 안 켜도 다음 경기 행 자체에
   // 뱃지+강조 테두리를 얹어 스크롤 없이 눈에 띄게 한다.
-  const [showUpcomingOnly, setShowUpcomingOnly] = useState(false);
+  const [showUpcomingOnly, setUpcomingDraft] = useState(upcomingFromUrl);
+  useEffect(() => {
+    // 늦게 도착한 router snapshot이 연속 선택의 마지막 draft를 덮지 않게 한다.
+    if (query !== new URLSearchParams(window.location.search).toString()) return;
+    setUpcomingDraft(upcomingFromUrl);
+  }, [query, upcomingFromUrl, leagueId]);
+
+  function setShowUpcomingOnly(upcomingOnly: boolean) {
+    setUpcomingDraft(upcomingOnly);
+    // 최신 URL에서 이 필터만 수정한다. replace는 탐색 단계와 현재 스크롤을 유지한다.
+    const url = new URL(window.location.href);
+    if (upcomingOnly) url.searchParams.set('schedule', 'upcoming');
+    else url.searchParams.delete('schedule');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
   const fixtures = series?.fixtures ?? [];
   const visibleFixtures = showUpcomingOnly ? fixtures.filter(isUpcomingFixture) : fixtures;
   // 오름차순 정렬 전제이므로 필터링된 배열의 첫 항목이 곧 가장 가까운 다음 경기다.

@@ -1,0 +1,115 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 5035,
+      "sha256": "eb39d40bea207e76b56b5efb0f6f425e0bd2f319a4c5e10d903d3bec927adbb2"
+    },
+    {
+      "file": "modal-boundary-after-proof.json",
+      "bytes": 225888,
+      "sha256": "4c1d12cc586e8eab9f1d4d427c3130a7aa54f90008ddf888bccbe287f652f9e6"
+    },
+    {
+      "file": "modal-boundary-closed-proof.json",
+      "bytes": 3872,
+      "sha256": "9253a04836c5a195e8ebd24ca9bb64f568a9c1932d6df55c19b195b53509bb0d"
+    },
+    {
+      "file": "modal-boundary-final-state.json",
+      "bytes": 450,
+      "sha256": "164cfb4b4fddc3c2fa20bad4f9fbdbd25c236d6fcba689db4cbd9abf5a53e994"
+    },
+    {
+      "file": "modal-boundary-league-desktop-first.png",
+      "bytes": 3711,
+      "sha256": "52d4a0d48775bc14834fdb57f2e81ac7d05d413145ab09c14c0ab24334a29621"
+    },
+    {
+      "file": "modal-boundary-league-desktop-last.png",
+      "bytes": 5718,
+      "sha256": "56169f354088aead453acb776c1e747601ab3f50c0c8d913be2580b56b39989c"
+    },
+    {
+      "file": "modal-boundary-league-mobile-first.png",
+      "bytes": 3490,
+      "sha256": "1100cb085ffa6c0e8af2c02f32b8df94d804885b57f723b0f82f39f333b2bbc0"
+    },
+    {
+      "file": "modal-boundary-league-mobile-last.png",
+      "bytes": 5706,
+      "sha256": "2e0512b7cffe048b748881c1843019cc241d127a4e58c17ce1ec8ffb4d8b0188"
+    },
+    {
+      "file": "modal-boundary-league-tablet-first-settled.png",
+      "bytes": 3366,
+      "sha256": "913a5c0d8031fe27d53e3dc46dc2cd431b9dbc057c73c0614e4fe72183545998"
+    },
+    {
+      "file": "modal-boundary-league-tablet-last-supplement.png",
+      "bytes": 5674,
+      "sha256": "c905c66acb9f0a75c901298019e46e29f70ab95d94752872d7bca8695a9f68f4"
+    },
+    {
+      "file": "modal-boundary-reverse-supplement-provenance.json",
+      "bytes": 2812,
+      "sha256": "228b639fa8c2066c625ef346487de5c2118aff3cc8018c2e01d74c83fd1f4610"
+    },
+    {
+      "file": "modal-boundary-reverse-supplement.json",
+      "bytes": 5485,
+      "sha256": "1abf44b2a842fdd06ed58e894a51b66d39347372a6b5627e4f54dd4f8dd15395"
+    },
+    {
+      "file": "modal-boundary-tournament-desktop-first.png",
+      "bytes": 3711,
+      "sha256": "52d4a0d48775bc14834fdb57f2e81ac7d05d413145ab09c14c0ab24334a29621"
+    },
+    {
+      "file": "modal-boundary-tournament-desktop-last.png",
+      "bytes": 5718,
+      "sha256": "56169f354088aead453acb776c1e747601ab3f50c0c8d913be2580b56b39989c"
+    },
+    {
+      "file": "modal-boundary-tournament-mobile-first-settled.png",
+      "bytes": 3490,
+      "sha256": "1100cb085ffa6c0e8af2c02f32b8df94d804885b57f723b0f82f39f333b2bbc0"
+    },
+    {
+      "file": "modal-boundary-tournament-mobile-last-settled.png",
+      "bytes": 5706,
+      "sha256": "2e0512b7cffe048b748881c1843019cc241d127a4e58c17ce1ec8ffb4d8b0188"
+    },
+    {
+      "file": "modal-boundary-tournament-tablet-first.png",
+      "bytes": 3351,
+      "sha256": "bb466398ef2f92f686b458a58f9ead05b0818b57f2543f50da0a60825bc19cee"
+    },
+    {
+      "file": "modal-boundary-tournament-tablet-last.png",
+      "bytes": 5674,
+      "sha256": "c905c66acb9f0a75c901298019e46e29f70ab95d94752872d7bca8695a9f68f4"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 25017,
+      "sha256": "bd1cc4b5faee4ca2568beda85f28677281382084d8542c1676458fb367530a8a"
+    },
+    {
+      "file": "reverse-supplement-verification.json",
+      "bytes": 1212,
+      "sha256": "fab4beb95e2b7a11c83d13b425b1e9ee491bb5c3a401d179b0dd4b0fd2b38c23"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 49724,
+      "sha256": "20239f7ccca000405dec84d794be8512feb3accaffd2deee3dec69f0b14ba142"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 27737,
+      "sha256": "7e895241247e86d07bc3295444d43512b98e5dba448a080ec5b830eefadc44b0"
+    }
+  ],
+  "scope": "All files except manifest itself; original epoch and later reverse supplement are separately labeled"
+}

@@ -1,0 +1,138 @@
+[
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": true,
+    "triggerCount": 3,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:30:41.156Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "visibleModalCount": 0,
+    "step": "league-mobile-x-click-trigger-return",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": false,
+    "triggerCount": 3,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:31:33.974Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "visibleModalCount": 0,
+    "step": "league-tablet-x-click-trigger-return",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": true,
+    "triggerCount": 3,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:32:10.595Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "visibleModalCount": 0,
+    "step": "league-tablet-settled-x-click-trigger-return",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": true,
+    "triggerCount": 3,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:32:14.430Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "visibleModalCount": 0,
+    "step": "league-desktop-x-click-trigger-return",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": false,
+    "triggerCount": 2,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:33:27.445Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "visibleModalCount": 0,
+    "step": "tournament-mobile-x-click-trigger-return",
+    "sourceURLSHA256": "bbea789d644af75c8f75bc8c3d1ca4e2c6f6581f48339a7d41424b36f3af50a2",
+    "routeClass": "tournament registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": true,
+    "triggerCount": 2,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:34:04.089Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "visibleModalCount": 0,
+    "step": "tournament-mobile-settled-x-click-trigger-return",
+    "sourceURLSHA256": "bbea789d644af75c8f75bc8c3d1ca4e2c6f6581f48339a7d41424b36f3af50a2",
+    "routeClass": "tournament registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": true,
+    "triggerCount": 2,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:34:52.685Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "visibleModalCount": 0,
+    "step": "tournament-tablet-x-click-trigger-return",
+    "sourceURLSHA256": "bbea789d644af75c8f75bc8c3d1ca4e2c6f6581f48339a7d41424b36f3af50a2",
+    "routeClass": "tournament registrations"
+  },
+  {
+    "activeName": "명단 검토",
+    "activeTag": "BUTTON",
+    "focusVisible": true,
+    "triggerCount": 2,
+    "triggerIndex": 0,
+    "utc": "2026-10-03T12:34:56.486Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "visibleModalCount": 0,
+    "step": "tournament-desktop-x-click-trigger-return",
+    "sourceURLSHA256": "bbea789d644af75c8f75bc8c3d1ca4e2c6f6581f48339a7d41424b36f3af50a2",
+    "routeClass": "tournament registrations"
+  }
+]

@@ -1,0 +1,67 @@
+{
+  "frozenUTC": "2026-10-03T12:55:13.713Z",
+  "method": "Integer LTRB raster crop; right/bottom exclusive; no resize/edit/composite",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "runtimeServingSHA": "unknown",
+    "separateLaterObservation": true
+  },
+  "masterCaptureMetadataSHA256AtSnapshot": "17a82252c0ea0f7d7b715dc17ceccb730599bff13f7580b9f665f7b8947cebda",
+  "selectedCaptureMetadataSnapshot": [
+    {
+      "file": "modal-boundary-league-tablet-last-supplement.png",
+      "masterIndexAtSnapshot": 118,
+      "observationUTC": "2026-10-03T12:51:30.642Z",
+      "captureStartUTC": "2026-10-03T12:51:30.645Z",
+      "captureEndUTC": "2026-10-03T12:51:30.724Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "8e3abc46ebb90b9f9c2cb0a7af772566c4c6208abed21c9cae3f1634dbe62b86"
+    }
+  ],
+  "sanitizedSnapshotCanonicalSHA256": "87c943af7f43b4b5362639473f6ae16ca52a7affb60f9f1ca903e3e9a494db22",
+  "fullOriginalSelectedMetadataCanonicalSHA256": "7412192b05c3b69d2456895485fb7daeb19feb1bbd910d9db6e3297c318f150b",
+  "canonicalization": "UTF8 JSON ensure_ascii=false sort_keys=true compact separators; original URL hashed but not copied",
+  "crops": [
+    {
+      "sourceBasename": "modal-boundary-league-tablet-last-supplement.png",
+      "outputBasename": "modal-boundary-league-tablet-last-supplement.png",
+      "sourceProofIndex": 1,
+      "observationUTC": "2026-10-03T12:51:30.642Z",
+      "captureStartUTC": "2026-10-03T12:51:30.645Z",
+      "captureEndUTC": "2026-10-03T12:51:30.724Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "outputRasterDimensions": [
+        455,
+        59
+      ],
+      "cropBoundsLTRB": [
+        167,
+        418,
+        622,
+        477
+      ],
+      "sourceSHA256": "069e639f0bd3fd93ff6c5bb824debfc7fcdec95d23388b862a495626cd866be5",
+      "outputSHA256": "c905c66acb9f0a75c901298019e46e29f70ab95d94752872d7bca8695a9f68f4",
+      "scope": "Footer Close and full focus outline only. No title, roster, member information or surrounding content.",
+      "sourceCollectorReportedOriginalAndCropInspection": true
+    }
+  ],
+  "sourceInputJSONSHA256": {
+    "modal-boundary-reverse-supplement.json": "c977c2193f2724519d2c7c1a231fe3ac9c797c19d381371a83b9c4a6956996a7"
+  },
+  "publicationLimit": "Source input hashes precede public URL-to-hash projection. Publisher checked safe PNG and canonical safe metadata only; original pixel equality is collector-reported."
+}

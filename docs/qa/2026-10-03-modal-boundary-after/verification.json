@@ -1,0 +1,1101 @@
+{
+  "scope": "Independent safe-only calculations and11 actual safe PNGs",
+  "recordCounts": {
+    "focusDOM": 116,
+    "closedDOM": 8,
+    "finalStateDuplicatesClosedIndex": 7,
+    "settledForwardEndpoints": 90
+  },
+  "sixCombinations": [
+    {
+      "combination": "league-mobile",
+      "settledInitialIndex": 0,
+      "forwardProofIndexes": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "stableForwardCount": 15,
+      "forwardIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        0
+      ],
+      "reverseProofIndexes": [
+        0,
+        1,
+        2
+      ],
+      "reverseSourceCount": 15,
+      "reverseTargetCount": 15,
+      "reverseTargetWithinViewport": true,
+      "reverseSameOpeningAsSettledForward": true,
+      "closedProofIndex": 0,
+      "XReturnsTrigger0WithFocusVisible": true
+    },
+    {
+      "combination": "league-tablet",
+      "settledInitialIndex": 23,
+      "forwardProofIndexes": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38
+      ],
+      "stableForwardCount": 15,
+      "forwardIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        0
+      ],
+      "reverseProofIndexes": [
+        18,
+        19,
+        20
+      ],
+      "reverseSourceCount": 2,
+      "reverseTargetCount": 15,
+      "reverseTargetWithinViewport": false,
+      "reverseSameOpeningAsSettledForward": false,
+      "closedProofIndex": 2,
+      "XReturnsTrigger0WithFocusVisible": true
+    },
+    {
+      "combination": "league-desktop",
+      "settledInitialIndex": 39,
+      "forwardProofIndexes": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56
+      ],
+      "stableForwardCount": 15,
+      "forwardIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        0
+      ],
+      "reverseProofIndexes": [
+        39,
+        40,
+        41
+      ],
+      "reverseSourceCount": 15,
+      "reverseTargetCount": 15,
+      "reverseTargetWithinViewport": true,
+      "reverseSameOpeningAsSettledForward": true,
+      "closedProofIndex": 3,
+      "XReturnsTrigger0WithFocusVisible": true
+    },
+    {
+      "combination": "tournament-mobile",
+      "settledInitialIndex": 62,
+      "forwardProofIndexes": [
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79
+      ],
+      "stableForwardCount": 15,
+      "forwardIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        0
+      ],
+      "reverseProofIndexes": [
+        62,
+        63,
+        64
+      ],
+      "reverseSourceCount": 15,
+      "reverseTargetCount": 15,
+      "reverseTargetWithinViewport": true,
+      "reverseSameOpeningAsSettledForward": true,
+      "closedProofIndex": 5,
+      "XReturnsTrigger0WithFocusVisible": true
+    },
+    {
+      "combination": "tournament-tablet",
+      "settledInitialIndex": 80,
+      "forwardProofIndexes": [
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97
+      ],
+      "stableForwardCount": 15,
+      "forwardIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        0
+      ],
+      "reverseProofIndexes": [
+        80,
+        81,
+        82
+      ],
+      "reverseSourceCount": 15,
+      "reverseTargetCount": 15,
+      "reverseTargetWithinViewport": true,
+      "reverseSameOpeningAsSettledForward": true,
+      "closedProofIndex": 6,
+      "XReturnsTrigger0WithFocusVisible": true
+    },
+    {
+      "combination": "tournament-desktop",
+      "settledInitialIndex": 98,
+      "forwardProofIndexes": [
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115
+      ],
+      "stableForwardCount": 15,
+      "forwardIndices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        0
+      ],
+      "reverseProofIndexes": [
+        98,
+        99,
+        100
+      ],
+      "reverseSourceCount": 15,
+      "reverseTargetCount": 15,
+      "reverseTargetWithinViewport": true,
+      "reverseSameOpeningAsSettledForward": true,
+      "closedProofIndex": 7,
+      "XReturnsTrigger0WithFocusVisible": true
+    }
+  ],
+  "forwardEndpoints": [
+    {
+      "proofIndex": 3,
+      "activeIndex": 1,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 4,
+      "activeIndex": 2,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 5,
+      "activeIndex": 3,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 6,
+      "activeIndex": 4,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 7,
+      "activeIndex": 5,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 8,
+      "activeIndex": 6,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 9,
+      "activeIndex": 7,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 10,
+      "activeIndex": 8,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 11,
+      "activeIndex": 9,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 12,
+      "activeIndex": 10,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 13,
+      "activeIndex": 11,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 14,
+      "activeIndex": 12,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 15,
+      "activeIndex": 13,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 16,
+      "activeIndex": 14,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 17,
+      "activeIndex": 0,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 24,
+      "activeIndex": 1,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 25,
+      "activeIndex": 2,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 26,
+      "activeIndex": 3,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 27,
+      "activeIndex": 4,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 28,
+      "activeIndex": 5,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 29,
+      "activeIndex": 6,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 30,
+      "activeIndex": 7,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 31,
+      "activeIndex": 8,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 32,
+      "activeIndex": 9,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 33,
+      "activeIndex": 10,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 34,
+      "activeIndex": 11,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 35,
+      "activeIndex": 12,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 36,
+      "activeIndex": 13,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 37,
+      "activeIndex": 14,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 38,
+      "activeIndex": 0,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 42,
+      "activeIndex": 1,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 43,
+      "activeIndex": 2,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 44,
+      "activeIndex": 3,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 45,
+      "activeIndex": 4,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 46,
+      "activeIndex": 5,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 47,
+      "activeIndex": 6,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 48,
+      "activeIndex": 7,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 49,
+      "activeIndex": 8,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 50,
+      "activeIndex": 9,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 51,
+      "activeIndex": 10,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 52,
+      "activeIndex": 11,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 53,
+      "activeIndex": 12,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 54,
+      "activeIndex": 13,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 55,
+      "activeIndex": 14,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": false
+    },
+    {
+      "proofIndex": 56,
+      "activeIndex": 0,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 65,
+      "activeIndex": 1,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 66,
+      "activeIndex": 2,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 67,
+      "activeIndex": 3,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 68,
+      "activeIndex": 4,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 69,
+      "activeIndex": 5,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 70,
+      "activeIndex": 6,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 71,
+      "activeIndex": 7,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 72,
+      "activeIndex": 8,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 73,
+      "activeIndex": 9,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 74,
+      "activeIndex": 10,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 75,
+      "activeIndex": 11,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 76,
+      "activeIndex": 12,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 77,
+      "activeIndex": 13,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 78,
+      "activeIndex": 14,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 79,
+      "activeIndex": 0,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 83,
+      "activeIndex": 1,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 84,
+      "activeIndex": 2,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 85,
+      "activeIndex": 3,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 86,
+      "activeIndex": 4,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 87,
+      "activeIndex": 5,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 88,
+      "activeIndex": 6,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 89,
+      "activeIndex": 7,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 90,
+      "activeIndex": 8,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 91,
+      "activeIndex": 9,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 92,
+      "activeIndex": 10,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 93,
+      "activeIndex": 11,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 94,
+      "activeIndex": 12,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 95,
+      "activeIndex": 13,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 96,
+      "activeIndex": 14,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 97,
+      "activeIndex": 0,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 101,
+      "activeIndex": 1,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 102,
+      "activeIndex": 2,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 103,
+      "activeIndex": 3,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 104,
+      "activeIndex": 4,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 105,
+      "activeIndex": 5,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 106,
+      "activeIndex": 6,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 107,
+      "activeIndex": 7,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 108,
+      "activeIndex": 8,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 109,
+      "activeIndex": 9,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 110,
+      "activeIndex": 10,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 111,
+      "activeIndex": 11,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 112,
+      "activeIndex": 12,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 113,
+      "activeIndex": 13,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    },
+    {
+      "proofIndex": 114,
+      "activeIndex": 14,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": false
+    },
+    {
+      "proofIndex": 115,
+      "activeIndex": 0,
+      "insideDialogDOM": true,
+      "withinViewportGeometry": true,
+      "withinDialogOuterRect": true
+    }
+  ],
+  "settledForwardAndXReturnCombinations": 6,
+  "settledSourceVisibleReverseCombinations": 5,
+  "excludedFromSettledCycleProofIndexes": [
+    18,
+    21,
+    22,
+    57,
+    58,
+    59,
+    60,
+    61
+  ],
+  "limitedEarlierBoundaryIndexes": [
+    19,
+    20
+  ],
+  "desktopOuterRectOverhangCSS": 0.296875,
+  "images": [
+    {
+      "file": "modal-boundary-league-mobile-first.png",
+      "sha256": "1100cb085ffa6c0e8af2c02f32b8df94d804885b57f723b0f82f39f333b2bbc0",
+      "dimensions": [
+        58,
+        59
+      ],
+      "proofIndex": 17,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-league-mobile-last.png",
+      "sha256": "2e0512b7cffe048b748881c1843019cc241d127a4e58c17ce1ec8ffb4d8b0188",
+      "dimensions": [
+        347,
+        58
+      ],
+      "proofIndex": 1,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-league-tablet-first-settled.png",
+      "sha256": "913a5c0d8031fe27d53e3dc46dc2cd431b9dbc057c73c0614e4fe72183545998",
+      "dimensions": [
+        60,
+        59
+      ],
+      "proofIndex": 38,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-league-desktop-first.png",
+      "sha256": "52d4a0d48775bc14834fdb57f2e81ac7d05d413145ab09c14c0ab24334a29621",
+      "dimensions": [
+        60,
+        59
+      ],
+      "proofIndex": 56,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-league-desktop-last.png",
+      "sha256": "56169f354088aead453acb776c1e747601ab3f50c0c8d913be2580b56b39989c",
+      "dimensions": [
+        455,
+        61
+      ],
+      "proofIndex": 40,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-tournament-mobile-first-settled.png",
+      "sha256": "1100cb085ffa6c0e8af2c02f32b8df94d804885b57f723b0f82f39f333b2bbc0",
+      "dimensions": [
+        58,
+        59
+      ],
+      "proofIndex": 79,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-tournament-mobile-last-settled.png",
+      "sha256": "2e0512b7cffe048b748881c1843019cc241d127a4e58c17ce1ec8ffb4d8b0188",
+      "dimensions": [
+        347,
+        58
+      ],
+      "proofIndex": 63,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-tournament-tablet-first.png",
+      "sha256": "bb466398ef2f92f686b458a58f9ead05b0818b57f2543f50da0a60825bc19cee",
+      "dimensions": [
+        60,
+        59
+      ],
+      "proofIndex": 97,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-tournament-tablet-last.png",
+      "sha256": "c905c66acb9f0a75c901298019e46e29f70ab95d94752872d7bca8695a9f68f4",
+      "dimensions": [
+        455,
+        59
+      ],
+      "proofIndex": 81,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-tournament-desktop-first.png",
+      "sha256": "52d4a0d48775bc14834fdb57f2e81ac7d05d413145ab09c14c0ab24334a29621",
+      "dimensions": [
+        60,
+        59
+      ],
+      "proofIndex": 115,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "modal-boundary-tournament-desktop-last.png",
+      "sha256": "56169f354088aead453acb776c1e747601ab3f50c0c8d913be2580b56b39989c",
+      "dimensions": [
+        455,
+        61
+      ],
+      "proofIndex": 99,
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    }
+  ],
+  "safeSnapshotCanonicalHashVerified": true,
+  "limits": [
+    "15 refers to recorded focusable controls, not15 roster members. Only a forward cycle over these15 controls and the0↔14 boundary are supported; this is not all modal accessibility, selection or mutation validation.",
+    "League tablet initial loading row18 had2 controls. Earlier rows19/20 record15 controls and reverse target14→forward0, but the pre-ShiftTab source row18 still had2. The later settled opening23 and full cycle24–38 are separate observations, not one continuous fully-settled reverse/forward run.",
+    "League tablet selected last PNG was directly reviewed but has no footer in view. Corresponding DOM focus index14 lies below the viewport. It remains a focus-target record only; no footer visibility/outline PASS and no public crop.11 safe PNGs are delivered rather than inflating the requested12.",
+    "League tablet initial first.png is excluded: row22 is active index2 after only2 loop iterations. Tournament mobile initial rows57–61 and initial first/last PNGs are excluded because control counts change2→3→15. Selected mobile tournament images are settled replacements only.",
+    "Initial active index0 can have focusVisible=false. First-control PNGs here show the return to index0 after the full cycle, not the initial-opening focus appearance.",
+    "Earlier closed league-tablet row1 and tournament-mobile row4 have focusVisible=false while triggerIndex0 is restored. Later settled rows2/5 recordtrue; earlier rows are not retroactively relabeled.",
+    "Desktop full-forward footer active rectangles at proof55/114 end742.296875 while modal outer bottom is742. They are within viewport758 and insideDialog=true by DOM containment, but strict containment in the modal outer rectangle is false by0.296875CSSpx. This is separate from the selected reverse-footer images, whose outlines are fully visible. No new defect conclusion is made.",
+    "Intermediate focus targets are supported by DOM indices and pseudo-state. Only X/footer boundary pixels were inspected by the collector in originals, and by the publisher in safe crops; whole-roster screenshots remain private.",
+    "No server write or membership, qualification, add, remove, lock, save activation is reported. Collector performed Tab/ShiftTab and X close only in this scope; publication checks are offline.",
+    "Tablet CSS viewport789x505 atDPR1.5 differs from raster788x505. Exact observationUTC and captureUTC are distinct. Raster crops preserve original pixels without scaling.",
+    "Master shots metadata may append. Frozen provenance contains12 selected metadata snapshots including the reviewed-only excluded image, canonical full-selected hash and per-row hashes. Crops list contains only11 outputs.",
+    "Reported8167 deployment does not establish runtime serving SHA; it remainsunknown. Final observation is desktop tournament registrations with modal closed and trigger0 focused at12:34:56.486Z.",
+    "No team title, member name, date of birth, phone number, roster rows, account identity or personal profile URL is copied into the safe reports/crops.",
+    "Published proof replaces opaque fixture URLs with exact SHA256 and generic route classes after private safe-source equality checks; no roster names or row action labels are exposed.",
+    "The settled forward cycle and X return are supported6/6. Settled-source reverse-boundary plus visible-target evidence is5/6; league-tablet remains a loading-source, offscreen boundary observation."
+  ]
+}

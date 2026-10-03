@@ -1,0 +1,730 @@
+{
+  "frozenUTC": "2026-10-03T12:42:20.138Z",
+  "method": "Integer LTRB raster crops; right/bottom exclusive. No resize, pixel edit or composite.",
+  "masterCaptureMetadataSHA256AtSnapshot": "547742c7de6552157195c9c3b11bc6fe9a7abc5bfde25495bea3b81c1679713d",
+  "selectedCaptureMetadataSnapshot": [
+    {
+      "file": "modal-boundary-league-mobile-first.png",
+      "masterIndexAtSnapshot": 104,
+      "observationUTC": "2026-10-03T12:30:40.943Z",
+      "captureStartUTC": "2026-10-03T12:30:40.946Z",
+      "captureEndUTC": "2026-10-03T12:30:40.989Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "fullOriginalRowCanonicalSHA256": "d5bf50f49d9476c776faf3fe305d9dca4faa11152bfccf67a333f35f3567ac10",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-league-mobile-last.png",
+      "masterIndexAtSnapshot": 103,
+      "observationUTC": "2026-10-03T12:30:01.842Z",
+      "captureStartUTC": "2026-10-03T12:30:01.844Z",
+      "captureEndUTC": "2026-10-03T12:30:01.873Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "fullOriginalRowCanonicalSHA256": "a6da0232892491bf62d7f10f24b0f533a87de2f452e6db962565444f76cc23f0",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-league-tablet-first-settled.png",
+      "masterIndexAtSnapshot": 107,
+      "observationUTC": "2026-10-03T12:32:10.376Z",
+      "captureStartUTC": "2026-10-03T12:32:10.380Z",
+      "captureEndUTC": "2026-10-03T12:32:10.454Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "656274ea15af245df4ed3925d2c0e5a7685fa3c3dbea5463bf34c518d2223e46",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-league-tablet-last.png",
+      "masterIndexAtSnapshot": 105,
+      "observationUTC": "2026-10-03T12:31:33.156Z",
+      "captureStartUTC": "2026-10-03T12:31:33.160Z",
+      "captureEndUTC": "2026-10-03T12:31:33.218Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "14be72e994965c7d54b99622b5385e5c3e161699023f3935255c2702f2d14c42",
+      "reviewUse": "original reviewed only; no public crop"
+    },
+    {
+      "file": "modal-boundary-league-desktop-first.png",
+      "masterIndexAtSnapshot": 109,
+      "observationUTC": "2026-10-03T12:32:14.225Z",
+      "captureStartUTC": "2026-10-03T12:32:14.229Z",
+      "captureEndUTC": "2026-10-03T12:32:14.309Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "fullOriginalRowCanonicalSHA256": "350b7ff1177618a650e8833da6a64364bb92d50321b5eacf046bf9b195a09be5",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-league-desktop-last.png",
+      "masterIndexAtSnapshot": 108,
+      "observationUTC": "2026-10-03T12:32:11.308Z",
+      "captureStartUTC": "2026-10-03T12:32:11.317Z",
+      "captureEndUTC": "2026-10-03T12:32:11.385Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "fullOriginalRowCanonicalSHA256": "452a8c2857377d717505c31089242ad8a3a8cffdf618b7730351b29496672cee",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-tournament-mobile-first-settled.png",
+      "masterIndexAtSnapshot": 113,
+      "observationUTC": "2026-10-03T12:34:03.939Z",
+      "captureStartUTC": "2026-10-03T12:34:03.943Z",
+      "captureEndUTC": "2026-10-03T12:34:03.978Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "fullOriginalRowCanonicalSHA256": "880f98060dd027b918e6805a0253295cc0f7fe30edbb7716bf5f05e75650e1bd",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-tournament-mobile-last-settled.png",
+      "masterIndexAtSnapshot": 112,
+      "observationUTC": "2026-10-03T12:34:01.206Z",
+      "captureStartUTC": "2026-10-03T12:34:01.211Z",
+      "captureEndUTC": "2026-10-03T12:34:01.244Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "fullOriginalRowCanonicalSHA256": "297bf57258ed2e93eebe20d75f05fd1ebae6d1936e3689e9bcefebfb18371fba",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-tournament-tablet-first.png",
+      "masterIndexAtSnapshot": 115,
+      "observationUTC": "2026-10-03T12:34:52.483Z",
+      "captureStartUTC": "2026-10-03T12:34:52.489Z",
+      "captureEndUTC": "2026-10-03T12:34:52.557Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "996a77d39e65ef113a9b79c87a2207dc63f4f68e829c6c43f9d7db8bf37068c9",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-tournament-tablet-last.png",
+      "masterIndexAtSnapshot": 114,
+      "observationUTC": "2026-10-03T12:34:49.736Z",
+      "captureStartUTC": "2026-10-03T12:34:49.741Z",
+      "captureEndUTC": "2026-10-03T12:34:49.786Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "aa3b0826b4a5cc3ba2c070a10a32df2643e82d61877db5886a8d4c612eccaffc",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-tournament-desktop-first.png",
+      "masterIndexAtSnapshot": 117,
+      "observationUTC": "2026-10-03T12:34:56.283Z",
+      "captureStartUTC": "2026-10-03T12:34:56.292Z",
+      "captureEndUTC": "2026-10-03T12:34:56.358Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "fullOriginalRowCanonicalSHA256": "c5d2ad60c9e6ae84d18ae09d902d88ae346fb9d3b2ac278e0f87327a8b832b3b",
+      "reviewUse": "safe crop"
+    },
+    {
+      "file": "modal-boundary-tournament-desktop-last.png",
+      "masterIndexAtSnapshot": 116,
+      "observationUTC": "2026-10-03T12:34:53.432Z",
+      "captureStartUTC": "2026-10-03T12:34:53.439Z",
+      "captureEndUTC": "2026-10-03T12:34:53.495Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "fullOriginalRowCanonicalSHA256": "70db0a651215ad0b0133f478d94b41a4da1e038c56c3ad2c2f894de19d4ba388",
+      "reviewUse": "safe crop"
+    }
+  ],
+  "sanitizedSnapshotCanonicalSHA256": "bb2ba17547dfb819ad579eba6b8c66ee0f8324d94cdd5bd11deec490bb468957",
+  "fullOriginalSelectedMetadataCanonicalSHA256": "f4c0236ff622803afaa7cb317c4702807225617c4ecf6a946d3db7059967d94c",
+  "canonicalization": "UTF8 JSON ensure_ascii=false sort_keys=true compact separators. Original selected rows in listed order include private URLs in hash, but embedded snapshot excludes URL values.",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read successful Deploy Alpha; runtime identity unknown",
+    "runtimeServingSHA": "unknown"
+  },
+  "crops": [
+    {
+      "sourceBasename": "modal-boundary-league-mobile-first.png",
+      "proofIndex": 17,
+      "shotsJSONIndex": 104,
+      "observationUTC": "2026-10-03T12:30:40.943Z",
+      "captureStartUTC": "2026-10-03T12:30:40.946Z",
+      "captureEndUTC": "2026-10-03T12:30:40.989Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "sourceSHA256": "1747136e78597b144a74af4fe2cb13874675c3ae839fe8a799f5c316388e1f64",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-league-mobile-first.png",
+      "outputRasterDimensions": [
+        58,
+        59
+      ],
+      "cropBoundsLTRB": [
+        318,
+        25,
+        376,
+        84
+      ],
+      "outputSHA256": "1100cb085ffa6c0e8af2c02f32b8df94d804885b57f723b0f82f39f333b2bbc0",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.003,
+      "visualScope": "X close button and complete focus outline only; no modal title or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-league-mobile-last.png",
+      "proofIndex": 1,
+      "shotsJSONIndex": 103,
+      "observationUTC": "2026-10-03T12:30:01.842Z",
+      "captureStartUTC": "2026-10-03T12:30:01.844Z",
+      "captureEndUTC": "2026-10-03T12:30:01.873Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "sourceSHA256": "545f13769caf2ad6f25e69b9d887c95c9799db36ed0fdccf783ef3d6a5a55cf4",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-league-mobile-last.png",
+      "outputRasterDimensions": [
+        347,
+        58
+      ],
+      "cropBoundsLTRB": [
+        29,
+        519,
+        376,
+        577
+      ],
+      "outputSHA256": "2e0512b7cffe048b748881c1843019cc241d127a4e58c17ce1ec8ffb4d8b0188",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.002,
+      "visualScope": "Footer close button and complete focus outline only; no roster, title, selector or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-league-tablet-first-settled.png",
+      "proofIndex": 38,
+      "shotsJSONIndex": 107,
+      "observationUTC": "2026-10-03T12:32:10.376Z",
+      "captureStartUTC": "2026-10-03T12:32:10.380Z",
+      "captureEndUTC": "2026-10-03T12:32:10.454Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "sourceSHA256": "d120612985ba738640a5866a13860c49a0a931cf026a303be92a0599896fb704",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-league-tablet-first-settled.png",
+      "outputRasterDimensions": [
+        60,
+        59
+      ],
+      "cropBoundsLTRB": [
+        562,
+        25,
+        622,
+        84
+      ],
+      "outputSHA256": "913a5c0d8031fe27d53e3dc46dc2cd431b9dbc057c73c0614e4fe72183545998",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.004,
+      "visualScope": "X close button and complete focus outline only; no modal title or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-league-desktop-first.png",
+      "proofIndex": 56,
+      "shotsJSONIndex": 109,
+      "observationUTC": "2026-10-03T12:32:14.225Z",
+      "captureStartUTC": "2026-10-03T12:32:14.229Z",
+      "captureEndUTC": "2026-10-03T12:32:14.309Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "sourceSHA256": "995bd47041c4aa75af94b8885f35d5ebbc3276ecaa31465bdea02379a2ce5fc5",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-league-desktop-first.png",
+      "outputRasterDimensions": [
+        60,
+        59
+      ],
+      "cropBoundsLTRB": [
+        760,
+        25,
+        820,
+        84
+      ],
+      "outputSHA256": "52d4a0d48775bc14834fdb57f2e81ac7d05d413145ab09c14c0ab24334a29621",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.004,
+      "visualScope": "X close button and complete focus outline only; no modal title or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-league-desktop-last.png",
+      "proofIndex": 40,
+      "shotsJSONIndex": 108,
+      "observationUTC": "2026-10-03T12:32:11.308Z",
+      "captureStartUTC": "2026-10-03T12:32:11.317Z",
+      "captureEndUTC": "2026-10-03T12:32:11.385Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "sourceSHA256": "7420247b94647ebf29f6b3eac0caf9d08a2378d10f382ce2509275af09965076",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-league-desktop-last.png",
+      "outputRasterDimensions": [
+        455,
+        61
+      ],
+      "cropBoundsLTRB": [
+        364,
+        670,
+        819,
+        731
+      ],
+      "outputSHA256": "56169f354088aead453acb776c1e747601ab3f50c0c8d913be2580b56b39989c",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.009,
+      "visualScope": "Footer close button and complete focus outline only; no roster, title, selector or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-tournament-mobile-first-settled.png",
+      "proofIndex": 79,
+      "shotsJSONIndex": 113,
+      "observationUTC": "2026-10-03T12:34:03.939Z",
+      "captureStartUTC": "2026-10-03T12:34:03.943Z",
+      "captureEndUTC": "2026-10-03T12:34:03.978Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "sourceSHA256": "415fb13b2dfd6b258e7597c90059e9f7e3a531d31062d0b5e9df1f706e30692c",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-tournament-mobile-first-settled.png",
+      "outputRasterDimensions": [
+        58,
+        59
+      ],
+      "cropBoundsLTRB": [
+        318,
+        25,
+        376,
+        84
+      ],
+      "outputSHA256": "1100cb085ffa6c0e8af2c02f32b8df94d804885b57f723b0f82f39f333b2bbc0",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.004,
+      "visualScope": "X close button and complete focus outline only; no modal title or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-tournament-mobile-last-settled.png",
+      "proofIndex": 63,
+      "shotsJSONIndex": 112,
+      "observationUTC": "2026-10-03T12:34:01.206Z",
+      "captureStartUTC": "2026-10-03T12:34:01.211Z",
+      "captureEndUTC": "2026-10-03T12:34:01.244Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "sourceSHA256": "7d727111b034fb15321e9140c0eec1fb27ef1841b72a22adba08550387d3f006",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-tournament-mobile-last-settled.png",
+      "outputRasterDimensions": [
+        347,
+        58
+      ],
+      "cropBoundsLTRB": [
+        29,
+        519,
+        376,
+        577
+      ],
+      "outputSHA256": "2e0512b7cffe048b748881c1843019cc241d127a4e58c17ce1ec8ffb4d8b0188",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.005,
+      "visualScope": "Footer close button and complete focus outline only; no roster, title, selector or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-tournament-tablet-first.png",
+      "proofIndex": 97,
+      "shotsJSONIndex": 115,
+      "observationUTC": "2026-10-03T12:34:52.483Z",
+      "captureStartUTC": "2026-10-03T12:34:52.489Z",
+      "captureEndUTC": "2026-10-03T12:34:52.557Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "sourceSHA256": "12779bfc5e19aa9700ff020be029b769c9e949344a5ebfc663f31b415867c3c5",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-tournament-tablet-first.png",
+      "outputRasterDimensions": [
+        60,
+        59
+      ],
+      "cropBoundsLTRB": [
+        562,
+        25,
+        622,
+        84
+      ],
+      "outputSHA256": "bb466398ef2f92f686b458a58f9ead05b0818b57f2543f50da0a60825bc19cee",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.006,
+      "visualScope": "X close button and complete focus outline only; no modal title or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-tournament-tablet-last.png",
+      "proofIndex": 81,
+      "shotsJSONIndex": 114,
+      "observationUTC": "2026-10-03T12:34:49.736Z",
+      "captureStartUTC": "2026-10-03T12:34:49.741Z",
+      "captureEndUTC": "2026-10-03T12:34:49.786Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "sourceSHA256": "9505a7a0f60a23b276e0eb401760cd5ef37f72b9d0efda9b9c3949bca2fd6424",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-tournament-tablet-last.png",
+      "outputRasterDimensions": [
+        455,
+        59
+      ],
+      "cropBoundsLTRB": [
+        167,
+        418,
+        622,
+        477
+      ],
+      "outputSHA256": "c905c66acb9f0a75c901298019e46e29f70ab95d94752872d7bca8695a9f68f4",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.005,
+      "visualScope": "Footer close button and complete focus outline only; no roster, title, selector or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-tournament-desktop-first.png",
+      "proofIndex": 115,
+      "shotsJSONIndex": 117,
+      "observationUTC": "2026-10-03T12:34:56.283Z",
+      "captureStartUTC": "2026-10-03T12:34:56.292Z",
+      "captureEndUTC": "2026-10-03T12:34:56.358Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "sourceSHA256": "64e59ae5f2101966589b2ff72381f32a9103b1cca6e8f7a7005a10d2f01d58e1",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-tournament-desktop-first.png",
+      "outputRasterDimensions": [
+        60,
+        59
+      ],
+      "cropBoundsLTRB": [
+        760,
+        25,
+        820,
+        84
+      ],
+      "outputSHA256": "52d4a0d48775bc14834fdb57f2e81ac7d05d413145ab09c14c0ab24334a29621",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.009,
+      "visualScope": "X close button and complete focus outline only; no modal title or member content.",
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceBasename": "modal-boundary-tournament-desktop-last.png",
+      "proofIndex": 99,
+      "shotsJSONIndex": 116,
+      "observationUTC": "2026-10-03T12:34:53.432Z",
+      "captureStartUTC": "2026-10-03T12:34:53.439Z",
+      "captureEndUTC": "2026-10-03T12:34:53.495Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "sourceSHA256": "dec2e467d29d3802cd26a554849f31c164e14aab8733d2325f8a0a7f0854c6ad",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true,
+        "activeExpectedBoundaryIndex": true
+      },
+      "outputBasename": "modal-boundary-tournament-desktop-last.png",
+      "outputRasterDimensions": [
+        455,
+        61
+      ],
+      "cropBoundsLTRB": [
+        364,
+        670,
+        819,
+        731
+      ],
+      "outputSHA256": "56169f354088aead453acb776c1e747601ab3f50c0c8d913be2580b56b39989c",
+      "cropInspectedDirectly": true,
+      "observationToCaptureSeconds": 0.007,
+      "visualScope": "Footer close button and complete focus outline only; no roster, title, selector or member content.",
+      "runtimeServingSHA": "unknown"
+    }
+  ],
+  "reviewedOnlyNoCrop": [
+    {
+      "sourceBasename": "modal-boundary-league-tablet-last.png",
+      "proofIndex": 19,
+      "shotsJSONIndex": 105,
+      "observationUTC": "2026-10-03T12:31:33.156Z",
+      "captureStartUTC": "2026-10-03T12:31:33.160Z",
+      "captureEndUTC": "2026-10-03T12:31:33.218Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "sourceSHA256": "2471630bf113000c874639c522c330983adc7a9a87444e319f8367f2e15d9935",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true
+      },
+      "outputBasename": null,
+      "exclusionReason": "Footer close is absent from the original viewport. DOM index14 is focused but y606.8646240234375/bottom650.8646240234375 exceed viewport height505. No footer-focus/outline crop can be made. No replacement chrome-only image was produced.",
+      "activeRectCSS": {
+        "bottom": 650.8646240234375,
+        "height": 44,
+        "width": 440,
+        "x": 174.33334350585938,
+        "y": 606.8646240234375
+      }
+    }
+  ],
+  "publicationLimit": "Publisher reads11 safe PNGs only; original source equality and reviewed-only excluded capture remain collector reported. Safe snapshot canonical hash was recomputed."
+}

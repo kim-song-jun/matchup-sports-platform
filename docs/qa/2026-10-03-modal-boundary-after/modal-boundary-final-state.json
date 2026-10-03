@@ -1,0 +1,17 @@
+{
+  "activeName": "명단 검토",
+  "activeTag": "BUTTON",
+  "focusVisible": true,
+  "triggerCount": 2,
+  "triggerIndex": 0,
+  "utc": "2026-10-03T12:34:56.486Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 758,
+    "width": 1183
+  },
+  "visibleModalCount": 0,
+  "step": "tournament-desktop-x-click-trigger-return",
+  "sourceURLSHA256": "bbea789d644af75c8f75bc8c3d1ca4e2c6f6581f48339a7d41424b36f3af50a2",
+  "routeClass": "tournament registrations"
+}

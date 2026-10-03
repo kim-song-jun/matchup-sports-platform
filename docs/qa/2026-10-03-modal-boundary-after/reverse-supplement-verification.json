@@ -1,0 +1,36 @@
+{
+  "DOMRecords": 4,
+  "focusableCount": 15,
+  "activeIndexSequence": [
+    0,
+    14,
+    0
+  ],
+  "targetWithinViewportAndDialog": true,
+  "targetRectCSS": {
+    "bottom": 469.53125,
+    "height": 44,
+    "width": 440,
+    "x": 174.33334350585938,
+    "y": 425.53125
+  },
+  "viewportCSS": {
+    "dpr": 1.5,
+    "height": 505,
+    "width": 789
+  },
+  "reviewButtonFocusedAfterClose": true,
+  "exactClosedTriggerIndexRecorded": false,
+  "closedFocusVisibleRecorded": false,
+  "safePNGHashVerified": true,
+  "actualSafePNGViewed": true,
+  "safeSnapshotCanonicalHashVerified": true,
+  "oldFocusDOMRecordCount": 116,
+  "limits": [
+    "Separate12:50:41.401–12:51:31.035UTC epoch; earlier offscreen boundary record/image remains unchanged and unpassed.",
+    "New supplement checks settled baseline and0→14→0 only, not a new full forward cycle.",
+    "New closed row records review-button focus and modal0 but omits exact triggerIndex, focusVisible and viewport. Those fields cannot be borrowed from the earlier closed records.",
+    "Initial focusVisible=false; reverse and followingTab focusVisible=true.",
+    "CSS789/DPR1.5 versus raster788 preserved; full source pixel equality collector-reported."
+  ]
+}

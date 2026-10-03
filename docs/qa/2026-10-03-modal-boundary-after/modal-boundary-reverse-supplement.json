@@ -1,0 +1,223 @@
+[
+  {
+    "active": {
+      "focusVisible": false,
+      "index": 0,
+      "insideDialog": true,
+      "name": "모달 닫기",
+      "rect": {
+        "bottom": 76.16666793823242,
+        "height": 44,
+        "width": 44,
+        "x": 570.3333740234375,
+        "y": 32.16666793823242
+      },
+      "role": null,
+      "tag": "BUTTON",
+      "type": "button"
+    },
+    "dialogPresent": true,
+    "dialogRect": {
+      "height": 473,
+      "width": 480,
+      "x": 154.33334350585938,
+      "y": 16.166667938232422
+    },
+    "focusables": [
+      {
+        "index": 0,
+        "name": "모달 닫기",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 1,
+        "optionCount": 3,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 2,
+        "name": "[row action label omitted]",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 3,
+        "optionCount": 3,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 4,
+        "name": "[row action label omitted]",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 5,
+        "optionCount": 3,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 6,
+        "name": "[row action label omitted]",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 7,
+        "optionCount": 3,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 8,
+        "name": "[row action label omitted]",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 9,
+        "optionCount": 3,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 10,
+        "name": "[row action label omitted]",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 11,
+        "optionCount": 3,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 12,
+        "name": "[row action label omitted]",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      },
+      {
+        "index": 13,
+        "optionCount": 15,
+        "role": null,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "index": 14,
+        "name": "닫기",
+        "role": null,
+        "tag": "BUTTON",
+        "type": "button"
+      }
+    ],
+    "utc": "2026-10-03T12:50:41.401Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "league-tablet-settled-reverse-supplement-baseline",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; distinct later tablet observation; runtime unknown.",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "index": 14,
+      "insideDialog": true,
+      "name": "닫기",
+      "rect": {
+        "bottom": 469.53125,
+        "height": 44,
+        "width": 440,
+        "x": 174.33334350585938,
+        "y": 425.53125
+      },
+      "tag": "BUTTON"
+    },
+    "dialogRect": {
+      "height": 473,
+      "width": 480,
+      "x": 154.33334350585938,
+      "y": 16.166667938232422
+    },
+    "focusableCount": 15,
+    "utc": "2026-10-03T12:51:30.642Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "league-tablet-settled-reverse-supplement-first-to-last",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; distinct later tablet observation; runtime unknown.",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "index": 0,
+      "insideDialog": true,
+      "name": "모달 닫기",
+      "rect": {
+        "bottom": 76.16666793823242,
+        "height": 44,
+        "width": 44,
+        "x": 570.3333740234375,
+        "y": 32.16666793823242
+      },
+      "tag": "BUTTON"
+    },
+    "dialogRect": {
+      "height": 473,
+      "width": 480,
+      "x": 154.33334350585938,
+      "y": 16.166667938232422
+    },
+    "focusableCount": 15,
+    "utc": "2026-10-03T12:51:30.894Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "league-tablet-settled-reverse-supplement-last-to-first",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; distinct later tablet observation; runtime unknown.",
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  },
+  {
+    "step": "league-tablet-supplement-x-return",
+    "activeTag": "BUTTON",
+    "activeText": "명단 검토",
+    "utc": "2026-10-03T12:51:31.035Z",
+    "visibleModalCount": 0,
+    "sourceURLSHA256": "db0d300e7661a03836c44d20fa65e7991115fb5e9a001065c5cf1aecb61b8a4c",
+    "routeClass": "league registrations"
+  }
+]

@@ -1,0 +1,1455 @@
+{
+  "createdUTC": "2026-10-03T12:42:20.188Z",
+  "result": "MODAL_FOCUS_BOUNDARY_AND_FORWARD_CYCLE_SUPPORTED_WITH_CAPTURE_LIMITS",
+  "issueScope": "1564: roster-review modal focus loop, first/last boundaries and X return to trigger",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read successful Deploy Alpha; runtime identity unknown",
+    "runtimeServingSHA": "unknown"
+  },
+  "sourceFiles": [
+    "modal-boundary-after-proof.json",
+    "modal-boundary-closed-proof.json",
+    "modal-boundary-final-state.json"
+  ],
+  "sixCombinations": [
+    {
+      "combination": "league-mobile",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "focusableControlCountDOM": 15,
+      "settledInitial": {
+        "proofIndex": 0,
+        "utc": "2026-10-03T12:30:01.555Z",
+        "activeIndex": 0,
+        "focusVisible": false
+      },
+      "reverseBoundary": {
+        "sourceProofIndex": 0,
+        "sourceUTC": "2026-10-03T12:30:01.555Z",
+        "sourceControlCount": 15,
+        "targetProofIndex": 1,
+        "targetUTC": "2026-10-03T12:30:01.842Z",
+        "targetActiveIndex": 14,
+        "targetControlCount": 15,
+        "targetRectCSS": {
+          "bottom": 570.2999877929688,
+          "height": 44,
+          "width": 332.8000183105469,
+          "x": 36,
+          "y": 526.2999877929688
+        },
+        "targetWithinViewportGeometry": true,
+        "followTabProofIndex": 2,
+        "followTabUTC": "2026-10-03T12:30:02.044Z",
+        "followTabActiveIndex": 0,
+        "sameOpeningAsSettledCycle": true
+      },
+      "forwardCycle": [
+        {
+          "proofIndex": 3,
+          "utc": "2026-10-03T12:30:38.529Z",
+          "activeIndex": 1,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 4,
+          "utc": "2026-10-03T12:30:38.696Z",
+          "activeIndex": 2,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 5,
+          "utc": "2026-10-03T12:30:38.856Z",
+          "activeIndex": 3,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 6,
+          "utc": "2026-10-03T12:30:39.033Z",
+          "activeIndex": 4,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 7,
+          "utc": "2026-10-03T12:30:39.218Z",
+          "activeIndex": 5,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 8,
+          "utc": "2026-10-03T12:30:39.385Z",
+          "activeIndex": 6,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 9,
+          "utc": "2026-10-03T12:30:39.551Z",
+          "activeIndex": 7,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 10,
+          "utc": "2026-10-03T12:30:39.728Z",
+          "activeIndex": 8,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 11,
+          "utc": "2026-10-03T12:30:39.897Z",
+          "activeIndex": 9,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 12,
+          "utc": "2026-10-03T12:30:40.082Z",
+          "activeIndex": 10,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 13,
+          "utc": "2026-10-03T12:30:40.269Z",
+          "activeIndex": 11,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 14,
+          "utc": "2026-10-03T12:30:40.426Z",
+          "activeIndex": 12,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 15,
+          "utc": "2026-10-03T12:30:40.593Z",
+          "activeIndex": 13,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 16,
+          "utc": "2026-10-03T12:30:40.766Z",
+          "activeIndex": 14,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 17,
+          "utc": "2026-10-03T12:30:40.943Z",
+          "activeIndex": 0,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        }
+      ],
+      "closeReturn": {
+        "closedProofIndex": 0,
+        "utc": "2026-10-03T12:30:41.156Z",
+        "visibleModalCount": 0,
+        "triggerIndex": 0,
+        "triggerCountDOM": 3,
+        "focusVisible": true
+      },
+      "checks": {
+        "settledInitial15Controls": true,
+        "settledInitialActive0": true,
+        "forward15Steps": true,
+        "forwardIndices1Through14Then0": true,
+        "stable15ControlLists": true,
+        "stableControlTypes": true,
+        "allForwardInsideDialogDOM": true,
+        "allForwardFocusVisibleDOM": true,
+        "allForwardActiveHeight44": true,
+        "allForwardActiveWithinViewportGeometry": true,
+        "reverseTarget14And15Controls": true,
+        "followingTabReturns0": true,
+        "boundarySourceWas0": true,
+        "forwardChronological": true,
+        "closeAfterCycle": true,
+        "closedVisibleModal0": true,
+        "trigger0Restored": true,
+        "settledClosedFocusVisible": true,
+        "sameSourceRoute": true,
+        "unknownRuntimeSHA": true
+      }
+    },
+    {
+      "combination": "league-tablet",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusableControlCountDOM": 15,
+      "settledInitial": {
+        "proofIndex": 23,
+        "utc": "2026-10-03T12:32:07.860Z",
+        "activeIndex": 0,
+        "focusVisible": false
+      },
+      "reverseBoundary": {
+        "sourceProofIndex": 18,
+        "sourceUTC": "2026-10-03T12:31:32.911Z",
+        "sourceControlCount": 2,
+        "targetProofIndex": 19,
+        "targetUTC": "2026-10-03T12:31:33.156Z",
+        "targetActiveIndex": 14,
+        "targetControlCount": 15,
+        "targetRectCSS": {
+          "bottom": 650.8646240234375,
+          "height": 44,
+          "width": 440,
+          "x": 174.33334350585938,
+          "y": 606.8646240234375
+        },
+        "targetWithinViewportGeometry": false,
+        "followTabProofIndex": 20,
+        "followTabUTC": "2026-10-03T12:31:33.406Z",
+        "followTabActiveIndex": 0,
+        "sameOpeningAsSettledCycle": false
+      },
+      "forwardCycle": [
+        {
+          "proofIndex": 24,
+          "utc": "2026-10-03T12:32:08.014Z",
+          "activeIndex": 1,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 25,
+          "utc": "2026-10-03T12:32:08.182Z",
+          "activeIndex": 2,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 26,
+          "utc": "2026-10-03T12:32:08.353Z",
+          "activeIndex": 3,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 27,
+          "utc": "2026-10-03T12:32:08.524Z",
+          "activeIndex": 4,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 28,
+          "utc": "2026-10-03T12:32:08.694Z",
+          "activeIndex": 5,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 29,
+          "utc": "2026-10-03T12:32:08.861Z",
+          "activeIndex": 6,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 30,
+          "utc": "2026-10-03T12:32:09.032Z",
+          "activeIndex": 7,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 31,
+          "utc": "2026-10-03T12:32:09.189Z",
+          "activeIndex": 8,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 32,
+          "utc": "2026-10-03T12:32:09.361Z",
+          "activeIndex": 9,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 33,
+          "utc": "2026-10-03T12:32:09.537Z",
+          "activeIndex": 10,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 34,
+          "utc": "2026-10-03T12:32:09.703Z",
+          "activeIndex": 11,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 35,
+          "utc": "2026-10-03T12:32:09.867Z",
+          "activeIndex": 12,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 36,
+          "utc": "2026-10-03T12:32:10.035Z",
+          "activeIndex": 13,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 37,
+          "utc": "2026-10-03T12:32:10.212Z",
+          "activeIndex": 14,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 38,
+          "utc": "2026-10-03T12:32:10.376Z",
+          "activeIndex": 0,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        }
+      ],
+      "closeReturn": {
+        "closedProofIndex": 2,
+        "utc": "2026-10-03T12:32:10.595Z",
+        "visibleModalCount": 0,
+        "triggerIndex": 0,
+        "triggerCountDOM": 3,
+        "focusVisible": true
+      },
+      "checks": {
+        "settledInitial15Controls": true,
+        "settledInitialActive0": true,
+        "forward15Steps": true,
+        "forwardIndices1Through14Then0": true,
+        "stable15ControlLists": true,
+        "stableControlTypes": true,
+        "allForwardInsideDialogDOM": true,
+        "allForwardFocusVisibleDOM": true,
+        "allForwardActiveHeight44": true,
+        "allForwardActiveWithinViewportGeometry": true,
+        "reverseTarget14And15Controls": true,
+        "followingTabReturns0": true,
+        "boundarySourceWas0": true,
+        "forwardChronological": true,
+        "closeAfterCycle": true,
+        "closedVisibleModal0": true,
+        "trigger0Restored": true,
+        "settledClosedFocusVisible": true,
+        "sameSourceRoute": true,
+        "unknownRuntimeSHA": true
+      }
+    },
+    {
+      "combination": "league-desktop",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusableControlCountDOM": 15,
+      "settledInitial": {
+        "proofIndex": 39,
+        "utc": "2026-10-03T12:32:11.072Z",
+        "activeIndex": 0,
+        "focusVisible": true
+      },
+      "reverseBoundary": {
+        "sourceProofIndex": 39,
+        "sourceUTC": "2026-10-03T12:32:11.072Z",
+        "sourceControlCount": 15,
+        "targetProofIndex": 40,
+        "targetUTC": "2026-10-03T12:32:11.308Z",
+        "targetActiveIndex": 14,
+        "targetControlCount": 15,
+        "targetRectCSS": {
+          "bottom": 722.296875,
+          "height": 44,
+          "width": 440,
+          "x": 371.5,
+          "y": 678.296875
+        },
+        "targetWithinViewportGeometry": true,
+        "followTabProofIndex": 41,
+        "followTabUTC": "2026-10-03T12:32:11.554Z",
+        "followTabActiveIndex": 0,
+        "sameOpeningAsSettledCycle": true
+      },
+      "forwardCycle": [
+        {
+          "proofIndex": 42,
+          "utc": "2026-10-03T12:32:11.723Z",
+          "activeIndex": 1,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 43,
+          "utc": "2026-10-03T12:32:11.893Z",
+          "activeIndex": 2,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 44,
+          "utc": "2026-10-03T12:32:12.060Z",
+          "activeIndex": 3,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 45,
+          "utc": "2026-10-03T12:32:12.240Z",
+          "activeIndex": 4,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 46,
+          "utc": "2026-10-03T12:32:12.435Z",
+          "activeIndex": 5,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 47,
+          "utc": "2026-10-03T12:32:12.643Z",
+          "activeIndex": 6,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 48,
+          "utc": "2026-10-03T12:32:12.827Z",
+          "activeIndex": 7,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 49,
+          "utc": "2026-10-03T12:32:12.993Z",
+          "activeIndex": 8,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 50,
+          "utc": "2026-10-03T12:32:13.163Z",
+          "activeIndex": 9,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 51,
+          "utc": "2026-10-03T12:32:13.341Z",
+          "activeIndex": 10,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 52,
+          "utc": "2026-10-03T12:32:13.503Z",
+          "activeIndex": 11,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 53,
+          "utc": "2026-10-03T12:32:13.679Z",
+          "activeIndex": 12,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 54,
+          "utc": "2026-10-03T12:32:13.859Z",
+          "activeIndex": 13,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 55,
+          "utc": "2026-10-03T12:32:14.044Z",
+          "activeIndex": 14,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": false
+        },
+        {
+          "proofIndex": 56,
+          "utc": "2026-10-03T12:32:14.225Z",
+          "activeIndex": 0,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        }
+      ],
+      "closeReturn": {
+        "closedProofIndex": 3,
+        "utc": "2026-10-03T12:32:14.430Z",
+        "visibleModalCount": 0,
+        "triggerIndex": 0,
+        "triggerCountDOM": 3,
+        "focusVisible": true
+      },
+      "checks": {
+        "settledInitial15Controls": true,
+        "settledInitialActive0": true,
+        "forward15Steps": true,
+        "forwardIndices1Through14Then0": true,
+        "stable15ControlLists": true,
+        "stableControlTypes": true,
+        "allForwardInsideDialogDOM": true,
+        "allForwardFocusVisibleDOM": true,
+        "allForwardActiveHeight44": true,
+        "allForwardActiveWithinViewportGeometry": true,
+        "reverseTarget14And15Controls": true,
+        "followingTabReturns0": true,
+        "boundarySourceWas0": true,
+        "forwardChronological": true,
+        "closeAfterCycle": true,
+        "closedVisibleModal0": true,
+        "trigger0Restored": true,
+        "settledClosedFocusVisible": true,
+        "sameSourceRoute": true,
+        "unknownRuntimeSHA": true
+      }
+    },
+    {
+      "combination": "tournament-mobile",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "focusableControlCountDOM": 15,
+      "settledInitial": {
+        "proofIndex": 62,
+        "utc": "2026-10-03T12:34:00.954Z",
+        "activeIndex": 0,
+        "focusVisible": false
+      },
+      "reverseBoundary": {
+        "sourceProofIndex": 62,
+        "sourceUTC": "2026-10-03T12:34:00.954Z",
+        "sourceControlCount": 15,
+        "targetProofIndex": 63,
+        "targetUTC": "2026-10-03T12:34:01.206Z",
+        "targetActiveIndex": 14,
+        "targetControlCount": 15,
+        "targetRectCSS": {
+          "bottom": 570.2999877929688,
+          "height": 44,
+          "width": 332.8000183105469,
+          "x": 36,
+          "y": 526.2999877929688
+        },
+        "targetWithinViewportGeometry": true,
+        "followTabProofIndex": 64,
+        "followTabUTC": "2026-10-03T12:34:01.398Z",
+        "followTabActiveIndex": 0,
+        "sameOpeningAsSettledCycle": true
+      },
+      "forwardCycle": [
+        {
+          "proofIndex": 65,
+          "utc": "2026-10-03T12:34:01.568Z",
+          "activeIndex": 1,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 66,
+          "utc": "2026-10-03T12:34:01.725Z",
+          "activeIndex": 2,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 67,
+          "utc": "2026-10-03T12:34:01.903Z",
+          "activeIndex": 3,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 68,
+          "utc": "2026-10-03T12:34:02.066Z",
+          "activeIndex": 4,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 69,
+          "utc": "2026-10-03T12:34:02.233Z",
+          "activeIndex": 5,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 70,
+          "utc": "2026-10-03T12:34:02.400Z",
+          "activeIndex": 6,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 71,
+          "utc": "2026-10-03T12:34:02.576Z",
+          "activeIndex": 7,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 72,
+          "utc": "2026-10-03T12:34:02.747Z",
+          "activeIndex": 8,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 73,
+          "utc": "2026-10-03T12:34:02.917Z",
+          "activeIndex": 9,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 74,
+          "utc": "2026-10-03T12:34:03.092Z",
+          "activeIndex": 10,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 75,
+          "utc": "2026-10-03T12:34:03.276Z",
+          "activeIndex": 11,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 76,
+          "utc": "2026-10-03T12:34:03.446Z",
+          "activeIndex": 12,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 77,
+          "utc": "2026-10-03T12:34:03.599Z",
+          "activeIndex": 13,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 78,
+          "utc": "2026-10-03T12:34:03.780Z",
+          "activeIndex": 14,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 79,
+          "utc": "2026-10-03T12:34:03.939Z",
+          "activeIndex": 0,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        }
+      ],
+      "closeReturn": {
+        "closedProofIndex": 5,
+        "utc": "2026-10-03T12:34:04.089Z",
+        "visibleModalCount": 0,
+        "triggerIndex": 0,
+        "triggerCountDOM": 2,
+        "focusVisible": true
+      },
+      "checks": {
+        "settledInitial15Controls": true,
+        "settledInitialActive0": true,
+        "forward15Steps": true,
+        "forwardIndices1Through14Then0": true,
+        "stable15ControlLists": true,
+        "stableControlTypes": true,
+        "allForwardInsideDialogDOM": true,
+        "allForwardFocusVisibleDOM": true,
+        "allForwardActiveHeight44": true,
+        "allForwardActiveWithinViewportGeometry": true,
+        "reverseTarget14And15Controls": true,
+        "followingTabReturns0": true,
+        "boundarySourceWas0": true,
+        "forwardChronological": true,
+        "closeAfterCycle": true,
+        "closedVisibleModal0": true,
+        "trigger0Restored": true,
+        "settledClosedFocusVisible": true,
+        "sameSourceRoute": true,
+        "unknownRuntimeSHA": true
+      }
+    },
+    {
+      "combination": "tournament-tablet",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "focusableControlCountDOM": 15,
+      "settledInitial": {
+        "proofIndex": 80,
+        "utc": "2026-10-03T12:34:23.694Z",
+        "activeIndex": 0,
+        "focusVisible": false
+      },
+      "reverseBoundary": {
+        "sourceProofIndex": 80,
+        "sourceUTC": "2026-10-03T12:34:23.694Z",
+        "sourceControlCount": 15,
+        "targetProofIndex": 81,
+        "targetUTC": "2026-10-03T12:34:49.736Z",
+        "targetActiveIndex": 14,
+        "targetControlCount": 15,
+        "targetRectCSS": {
+          "bottom": 469.53125,
+          "height": 44,
+          "width": 440,
+          "x": 174.33334350585938,
+          "y": 425.53125
+        },
+        "targetWithinViewportGeometry": true,
+        "followTabProofIndex": 82,
+        "followTabUTC": "2026-10-03T12:34:49.956Z",
+        "followTabActiveIndex": 0,
+        "sameOpeningAsSettledCycle": true
+      },
+      "forwardCycle": [
+        {
+          "proofIndex": 83,
+          "utc": "2026-10-03T12:34:50.120Z",
+          "activeIndex": 1,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 84,
+          "utc": "2026-10-03T12:34:50.290Z",
+          "activeIndex": 2,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 85,
+          "utc": "2026-10-03T12:34:50.453Z",
+          "activeIndex": 3,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 86,
+          "utc": "2026-10-03T12:34:50.622Z",
+          "activeIndex": 4,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 87,
+          "utc": "2026-10-03T12:34:50.800Z",
+          "activeIndex": 5,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 88,
+          "utc": "2026-10-03T12:34:50.969Z",
+          "activeIndex": 6,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 89,
+          "utc": "2026-10-03T12:34:51.139Z",
+          "activeIndex": 7,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 90,
+          "utc": "2026-10-03T12:34:51.306Z",
+          "activeIndex": 8,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 91,
+          "utc": "2026-10-03T12:34:51.471Z",
+          "activeIndex": 9,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 92,
+          "utc": "2026-10-03T12:34:51.643Z",
+          "activeIndex": 10,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 93,
+          "utc": "2026-10-03T12:34:51.809Z",
+          "activeIndex": 11,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 94,
+          "utc": "2026-10-03T12:34:51.983Z",
+          "activeIndex": 12,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 95,
+          "utc": "2026-10-03T12:34:52.156Z",
+          "activeIndex": 13,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 96,
+          "utc": "2026-10-03T12:34:52.322Z",
+          "activeIndex": 14,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 97,
+          "utc": "2026-10-03T12:34:52.483Z",
+          "activeIndex": 0,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        }
+      ],
+      "closeReturn": {
+        "closedProofIndex": 6,
+        "utc": "2026-10-03T12:34:52.685Z",
+        "visibleModalCount": 0,
+        "triggerIndex": 0,
+        "triggerCountDOM": 2,
+        "focusVisible": true
+      },
+      "checks": {
+        "settledInitial15Controls": true,
+        "settledInitialActive0": true,
+        "forward15Steps": true,
+        "forwardIndices1Through14Then0": true,
+        "stable15ControlLists": true,
+        "stableControlTypes": true,
+        "allForwardInsideDialogDOM": true,
+        "allForwardFocusVisibleDOM": true,
+        "allForwardActiveHeight44": true,
+        "allForwardActiveWithinViewportGeometry": true,
+        "reverseTarget14And15Controls": true,
+        "followingTabReturns0": true,
+        "boundarySourceWas0": true,
+        "forwardChronological": true,
+        "closeAfterCycle": true,
+        "closedVisibleModal0": true,
+        "trigger0Restored": true,
+        "settledClosedFocusVisible": true,
+        "sameSourceRoute": true,
+        "unknownRuntimeSHA": true
+      }
+    },
+    {
+      "combination": "tournament-desktop",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "focusableControlCountDOM": 15,
+      "settledInitial": {
+        "proofIndex": 98,
+        "utc": "2026-10-03T12:34:53.176Z",
+        "activeIndex": 0,
+        "focusVisible": true
+      },
+      "reverseBoundary": {
+        "sourceProofIndex": 98,
+        "sourceUTC": "2026-10-03T12:34:53.176Z",
+        "sourceControlCount": 15,
+        "targetProofIndex": 99,
+        "targetUTC": "2026-10-03T12:34:53.432Z",
+        "targetActiveIndex": 14,
+        "targetControlCount": 15,
+        "targetRectCSS": {
+          "bottom": 722.296875,
+          "height": 44,
+          "width": 440,
+          "x": 371.5,
+          "y": 678.296875
+        },
+        "targetWithinViewportGeometry": true,
+        "followTabProofIndex": 100,
+        "followTabUTC": "2026-10-03T12:34:53.668Z",
+        "followTabActiveIndex": 0,
+        "sameOpeningAsSettledCycle": true
+      },
+      "forwardCycle": [
+        {
+          "proofIndex": 101,
+          "utc": "2026-10-03T12:34:53.844Z",
+          "activeIndex": 1,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 102,
+          "utc": "2026-10-03T12:34:54.032Z",
+          "activeIndex": 2,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 103,
+          "utc": "2026-10-03T12:34:54.212Z",
+          "activeIndex": 3,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 104,
+          "utc": "2026-10-03T12:34:54.392Z",
+          "activeIndex": 4,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 105,
+          "utc": "2026-10-03T12:34:54.571Z",
+          "activeIndex": 5,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 106,
+          "utc": "2026-10-03T12:34:54.748Z",
+          "activeIndex": 6,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 107,
+          "utc": "2026-10-03T12:34:54.915Z",
+          "activeIndex": 7,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 108,
+          "utc": "2026-10-03T12:34:55.088Z",
+          "activeIndex": 8,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 109,
+          "utc": "2026-10-03T12:34:55.252Z",
+          "activeIndex": 9,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 110,
+          "utc": "2026-10-03T12:34:55.430Z",
+          "activeIndex": 10,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 111,
+          "utc": "2026-10-03T12:34:55.592Z",
+          "activeIndex": 11,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 112,
+          "utc": "2026-10-03T12:34:55.766Z",
+          "activeIndex": 12,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 113,
+          "utc": "2026-10-03T12:34:55.926Z",
+          "activeIndex": 13,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        },
+        {
+          "proofIndex": 114,
+          "utc": "2026-10-03T12:34:56.118Z",
+          "activeIndex": 14,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": false
+        },
+        {
+          "proofIndex": 115,
+          "utc": "2026-10-03T12:34:56.283Z",
+          "activeIndex": 0,
+          "focusableCount": 15,
+          "insideDialogDOM": true,
+          "focusVisibleDOM": true,
+          "activeWithinViewportGeometry": true,
+          "activeWithinDialogOuterRectGeometry": true
+        }
+      ],
+      "closeReturn": {
+        "closedProofIndex": 7,
+        "utc": "2026-10-03T12:34:56.486Z",
+        "visibleModalCount": 0,
+        "triggerIndex": 0,
+        "triggerCountDOM": 2,
+        "focusVisible": true
+      },
+      "checks": {
+        "settledInitial15Controls": true,
+        "settledInitialActive0": true,
+        "forward15Steps": true,
+        "forwardIndices1Through14Then0": true,
+        "stable15ControlLists": true,
+        "stableControlTypes": true,
+        "allForwardInsideDialogDOM": true,
+        "allForwardFocusVisibleDOM": true,
+        "allForwardActiveHeight44": true,
+        "allForwardActiveWithinViewportGeometry": true,
+        "reverseTarget14And15Controls": true,
+        "followingTabReturns0": true,
+        "boundarySourceWas0": true,
+        "forwardChronological": true,
+        "closeAfterCycle": true,
+        "closedVisibleModal0": true,
+        "trigger0Restored": true,
+        "settledClosedFocusVisible": true,
+        "sameSourceRoute": true,
+        "unknownRuntimeSHA": true
+      }
+    }
+  ],
+  "excludedEarlyAttempts": [
+    {
+      "proofIndexes": [
+        18,
+        21,
+        22
+      ],
+      "image": "modal-boundary-league-tablet-first.png",
+      "reason": "Initial count2 and incomplete2-Tab loop; later rows23–38 supply settled cycle. Rows19/20 retain limited boundary-target evidence."
+    },
+    {
+      "proofIndexes": [
+        57,
+        58,
+        59,
+        60,
+        61
+      ],
+      "images": [
+        "modal-boundary-tournament-mobile-first.png",
+        "modal-boundary-tournament-mobile-last.png"
+      ],
+      "reason": "Loading2/3/15 controls; replaced by settled62–79."
+    }
+  ],
+  "reviewedOnlyCapture": [
+    {
+      "sourceBasename": "modal-boundary-league-tablet-last.png",
+      "proofIndex": 19,
+      "shotsJSONIndex": 105,
+      "observationUTC": "2026-10-03T12:31:33.156Z",
+      "captureStartUTC": "2026-10-03T12:31:33.160Z",
+      "captureEndUTC": "2026-10-03T12:31:33.218Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "sourceSHA256": "2471630bf113000c874639c522c330983adc7a9a87444e319f8367f2e15d9935",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true
+      },
+      "outputBasename": null,
+      "exclusionReason": "Footer close is absent from the original viewport. DOM index14 is focused but y606.8646240234375/bottom650.8646240234375 exceed viewport height505. No footer-focus/outline crop can be made. No replacement chrome-only image was produced.",
+      "activeRectCSS": {
+        "bottom": 650.8646240234375,
+        "height": 44,
+        "width": 440,
+        "x": 174.33334350585938,
+        "y": 606.8646240234375
+      }
+    }
+  ],
+  "finalState": {
+    "utc": "2026-10-03T12:34:56.486Z",
+    "viewportCSS": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "routeKind": "Tournament registrations; fixture identity omitted",
+    "visibleModalCount": 0,
+    "triggerIndex": 0,
+    "focusVisibleDOM": true
+  },
+  "safeFiles": [
+    "modal-boundary-league-mobile-first.png",
+    "modal-boundary-league-mobile-last.png",
+    "modal-boundary-league-tablet-first-settled.png",
+    "modal-boundary-league-desktop-first.png",
+    "modal-boundary-league-desktop-last.png",
+    "modal-boundary-tournament-mobile-first-settled.png",
+    "modal-boundary-tournament-mobile-last-settled.png",
+    "modal-boundary-tournament-tablet-first.png",
+    "modal-boundary-tournament-tablet-last.png",
+    "modal-boundary-tournament-desktop-first.png",
+    "modal-boundary-tournament-desktop-last.png",
+    "summary.json",
+    "provenance.json",
+    "modal-boundary-after-proof.json",
+    "modal-boundary-closed-proof.json",
+    "modal-boundary-final-state.json",
+    "verification.json",
+    "manifest.json",
+    "README.md"
+  ],
+  "safePNGCount": 11,
+  "limitations": [
+    "15 refers to recorded focusable controls, not15 roster members. Only a forward cycle over these15 controls and the0↔14 boundary are supported; this is not all modal accessibility, selection or mutation validation.",
+    "League tablet initial loading row18 had2 controls. Earlier rows19/20 record15 controls and reverse target14→forward0, but the pre-ShiftTab source row18 still had2. The later settled opening23 and full cycle24–38 are separate observations, not one continuous fully-settled reverse/forward run.",
+    "League tablet selected last PNG was directly reviewed but has no footer in view. Corresponding DOM focus index14 lies below the viewport. It remains a focus-target record only; no footer visibility/outline PASS and no public crop.11 safe PNGs are delivered rather than inflating the requested12.",
+    "League tablet initial first.png is excluded: row22 is active index2 after only2 loop iterations. Tournament mobile initial rows57–61 and initial first/last PNGs are excluded because control counts change2→3→15. Selected mobile tournament images are settled replacements only.",
+    "Initial active index0 can have focusVisible=false. First-control PNGs here show the return to index0 after the full cycle, not the initial-opening focus appearance.",
+    "Earlier closed league-tablet row1 and tournament-mobile row4 have focusVisible=false while triggerIndex0 is restored. Later settled rows2/5 recordtrue; earlier rows are not retroactively relabeled.",
+    "Desktop full-forward footer active rectangles at proof55/114 end742.296875 while modal outer bottom is742. They are within viewport758 and insideDialog=true by DOM containment, but strict containment in the modal outer rectangle is false by0.296875CSSpx. This is separate from the selected reverse-footer images, whose outlines are fully visible. No new defect conclusion is made.",
+    "Intermediate focus targets are supported by DOM indices and pseudo-state. Only X/footer boundary pixels were inspected by the collector in originals, and by the publisher in safe crops; whole-roster screenshots remain private.",
+    "No server write or membership, qualification, add, remove, lock, save activation is reported. Collector performed Tab/ShiftTab and X close only in this scope; publication checks are offline.",
+    "Tablet CSS viewport789x505 atDPR1.5 differs from raster788x505. Exact observationUTC and captureUTC are distinct. Raster crops preserve original pixels without scaling.",
+    "Master shots metadata may append. Frozen provenance contains12 selected metadata snapshots including the reviewed-only excluded image, canonical full-selected hash and per-row hashes. Crops list contains only11 outputs.",
+    "Reported8167 deployment does not establish runtime serving SHA; it remainsunknown. Final observation is desktop tournament registrations with modal closed and trigger0 focused at12:34:56.486Z.",
+    "No team title, member name, date of birth, phone number, roster rows, account identity or personal profile URL is copied into the safe reports/crops.",
+    "Published proof replaces opaque fixture URLs with exact SHA256 and generic route classes after private safe-source equality checks; no roster names or row action labels are exposed.",
+    "The settled forward cycle and X return are supported6/6. Settled-source reverse-boundary plus visible-target evidence is5/6; league-tablet remains a loading-source, offscreen boundary observation."
+  ],
+  "collectorReportedServerWrites": 0,
+  "recordCounts": {
+    "focusDOM": 116,
+    "closedDOM": 8,
+    "finalStateDuplicatesClosedIndex": 7,
+    "settledForwardEndpoints": 90
+  },
+  "observedWindowUTC": [
+    "2026-10-03T12:30:01.555Z",
+    "2026-10-03T12:34:56.486Z"
+  ]
+}

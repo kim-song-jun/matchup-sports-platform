@@ -1,0 +1,53 @@
+{
+  "title": "관리자 개인 어워드의 빈 항목을 추가하면 모바일 가로 넘침으로 삭제 버튼이 잘림",
+  "severityCandidate": "P2 mobile usability candidate",
+  "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+  "environment": "Existing administrator session; cloud Chromium; actual CSS405×606,789×505,1183×758, native window resize and zoom",
+  "steps": [
+    "Open current synthetic tournament personal awards; baseline has0 awards and document width405",
+    "Click + 항목 추가 once to open an unsaved empty row",
+    "Observe title input row and partially offscreen 항목 삭제 button",
+    "Focus title input then Tab, without activating Delete",
+    "Navigate to statistics, then back to awards;0 rows returns without Save"
+  ],
+  "observed": {
+    "mobile": {
+      "viewport": 405,
+      "baselineScrollWidth": 405,
+      "rowScrollWidth": 434,
+      "deleteRectX": [
+        389.6000061035156,
+        433.6000061035156
+      ],
+      "deleteWidth": 44,
+      "visibleHorizontalPixels": 15.399993896484375,
+      "outsideRightPixels": 28.600006103515625,
+      "keyboard": "Tab focuses delete; x bounds remain unchanged and icon/focus boundary remain clipped. Keyboard reachability exists; do not describe as wholly inaccessible."
+    },
+    "tablet": {
+      "viewport": 789,
+      "scrollWidth": 789,
+      "deleteRectX": [
+        692,
+        736
+      ]
+    },
+    "desktop": {
+      "viewport": 1183,
+      "scrollWidth": 1183,
+      "deleteRectX": [
+        1078,
+        1122
+      ]
+    }
+  },
+  "repetition": "Observed original mobile flow04:12–04:14 and independent fresh blank-page→row repeat04:19:07.166Z→04:19:07.516Z. Keyboard proof04:19:07.599Z.",
+  "expected": "Empty award-title row and its44px delete control should fit the viewport; focus should be visible without page-level horizontal clipping.",
+  "rootCause": "Not determined; no source inspection or deployed fix claim.",
+  "limits": [
+    "Only local row and picker UI. No Save/Delete/awardee selection/assignment/permission/result writes. One local team option was staged on mobile to inspect recipient picker; recipient never selected. Navigating away restored0 awards.",
+    "No actual mobile hardware, touch or screen-reader check.",
+    "Placeholder-only award title/note controls also observed without programmatic labels; not independently triaged/filed in this candidate.",
+    "Screenshots are real alpha; safe crops only; the QA deployment report references dbb6468, without an independently browser-verified SHA."
+  ]
+}

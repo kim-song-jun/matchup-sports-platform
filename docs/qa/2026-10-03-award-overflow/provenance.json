@@ -1,0 +1,118 @@
+[
+  {
+    "file": "awards-mobile-local-row.png",
+    "startUTC": "2026-10-03T04:12:35.771Z",
+    "endUTC": "2026-10-03T04:12:35.787Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      0,
+      0,
+      405,
+      606
+    ],
+    "outputRaster": [
+      405,
+      606
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "68b3fa5297a206a7e0428ffc140c86cf8b2416d9570ff166fe10225532bc3547",
+    "inspection": "Published safe image visually inspected. No personal names, roster identities, masked email addresses, phone numbers, birth dates, profile identifiers, credentials, or sidebar account information are present. Mobile images contain only empty local draft and synthetic tournament controls.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "awards-tablet-local-row.png",
+    "startUTC": "2026-10-03T04:16:36.061Z",
+    "endUTC": "2026-10-03T04:16:36.136Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      32,
+      230,
+      756,
+      505
+    ],
+    "outputRaster": [
+      724,
+      275
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "8421505a97b108677cac4f1bfd5108bbb9359373304ce8e3e766632c4a123dd8",
+    "inspection": "Published safe image visually inspected. No personal names, roster identities, masked email addresses, phone numbers, birth dates, profile identifiers, credentials, or sidebar account information are present. Mobile images contain only empty local draft and synthetic tournament controls.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "awards-desktop-local-row.png",
+    "startUTC": "2026-10-03T04:17:44.635Z",
+    "endUTC": "2026-10-03T04:17:44.713Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      480,
+      330,
+      1150,
+      758
+    ],
+    "outputRaster": [
+      670,
+      428
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "ad9aadff2116033ee3b0e5dafdc202540053232fd73a3c1f0d597c61efbaaa62",
+    "inspection": "Published safe image visually inspected. No personal names, roster identities, masked email addresses, phone numbers, birth dates, profile identifiers, credentials, or sidebar account information are present. Mobile images contain only empty local draft and synthetic tournament controls.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "awards-mobile-delete-focus.png",
+    "startUTC": "2026-10-03T04:19:07.606Z",
+    "endUTC": "2026-10-03T04:19:07.623Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      0,
+      0,
+      405,
+      606
+    ],
+    "outputRaster": [
+      405,
+      606
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "863e0f8dd6e87ccd3b7ceeee09513d9c3739d997afbbafdaba14e4d277721cc9",
+    "inspection": "Published safe image visually inspected. No personal names, roster identities, masked email addresses, phone numbers, birth dates, profile identifiers, credentials, or sidebar account information are present. Mobile images contain only empty local draft and synthetic tournament controls.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  }
+]

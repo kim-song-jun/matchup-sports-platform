@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "0a27efb850e71c439de8309cd54e58bfda1029063bc8f96f7895dfb6dfefb86e",
+      "bytes": 3982
+    },
+    {
+      "file": "awards-desktop-local-row.png",
+      "sha256": "ad9aadff2116033ee3b0e5dafdc202540053232fd73a3c1f0d597c61efbaaa62",
+      "bytes": 80826
+    },
+    {
+      "file": "awards-mobile-delete-focus.png",
+      "sha256": "863e0f8dd6e87ccd3b7ceeee09513d9c3739d997afbbafdaba14e4d277721cc9",
+      "bytes": 96447
+    },
+    {
+      "file": "awards-mobile-local-row.png",
+      "sha256": "68b3fa5297a206a7e0428ffc140c86cf8b2416d9570ff166fe10225532bc3547",
+      "bytes": 110864
+    },
+    {
+      "file": "awards-tablet-local-row.png",
+      "sha256": "8421505a97b108677cac4f1bfd5108bbb9359373304ce8e3e766632c4a123dd8",
+      "bytes": 54959
+    },
+    {
+      "file": "candidate.json",
+      "sha256": "9d298d78f80163686049bd084d994a82a1b0e0691e65a66c8a926fe2258e15ca",
+      "bytes": 2606
+    },
+    {
+      "file": "proof.json",
+      "sha256": "b808aa0c441abc0310b26d6d4447aaa6a93eaac28134870e5ab633c40199592c",
+      "bytes": 23842
+    },
+    {
+      "file": "provenance.json",
+      "sha256": "3d00a015b3abc31c8a132c3b9fdb53f1ae440f3730dbd6191f0da7b47160741c",
+      "bytes": 4293
+    }
+  ]
+}

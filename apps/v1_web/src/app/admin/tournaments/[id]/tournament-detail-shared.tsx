@@ -6,6 +6,7 @@ import { formatEntryFee } from '@/lib/date-utils';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { FOCUSABLE_SELECTOR } from '@/components/v1-ui/use-modal-a11y';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -178,15 +179,23 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
   const previousFocusRef = useRef<Element | null>(null);
 
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
+    if (!open) {
+      previousFocusRef.current = null;
+      return;
+    }
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.contains(document.activeElement)) {
+      // StrictMode setup 재실행에서도 최초 trigger를 내부 control로 덮지 않는다.
+      previousFocusRef.current ??= document.activeElement;
+      (dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? dialog).focus({ preventScroll: true });
+    }
+    return () => {
       const el = previousFocusRef.current;
       if (el && typeof (el as HTMLElement).focus === 'function') {
         (el as HTMLElement).focus();
       }
-      previousFocusRef.current = null;
-    }
+    };
   }, [open]);
 
   useOverlayHistory({ open, onClose, locked: pending });
@@ -196,12 +205,10 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
     const trap = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) { e.preventDefault(); dialog.focus(); return; }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey) {
@@ -229,6 +236,7 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
       <div
         ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="bg-[var(--card-surface)] rounded-2xl overflow-hidden shadow-[var(--shadow-dropdown)] w-full max-w-[480px] flex flex-col max-h-[calc(var(--teameet-visual-viewport-height,100dvh)-2rem)]"

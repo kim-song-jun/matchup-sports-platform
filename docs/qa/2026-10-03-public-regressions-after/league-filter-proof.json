@@ -1,0 +1,408 @@
+[
+  {
+    "step": "mobile upcoming-only before awards",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming%26from%3D%252Fmy%252Fleagues"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?from=%2Fmy%2Fleagues&schedule=upcoming",
+    "utc": "2026-10-03T09:11:15.195Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "mobile awards destination",
+    "awardLink": [],
+    "emptyText": [],
+    "filters": [],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming%26from%3D%252Fmy%252Fleagues",
+    "utc": "2026-10-03T09:11:58.573Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "mobile browser Back preserves upcoming",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming%26from%3D%252Fmy%252Fleagues"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?from=%2Fmy%2Fleagues&schedule=upcoming",
+    "utc": "2026-10-03T09:11:58.781Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "mobile browser Forward awards retains from",
+    "awardLink": [],
+    "emptyText": [],
+    "filters": [],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming%26from%3D%252Fmy%252Fleagues",
+    "utc": "2026-10-03T09:11:58.849Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "mobile app Back preserves upcoming",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming%26from%3D%252Fmy%252Fleagues"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming&from=%2Fmy%2Fleagues",
+    "utc": "2026-10-03T09:11:59.093Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "tablet upcoming-only before awards",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+    "utc": "2026-10-03T09:12:56.980Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "tablet awards destination",
+    "awardLink": [],
+    "emptyText": [],
+    "filters": [],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming",
+    "utc": "2026-10-03T09:12:57.704Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "tablet browser Back preserves upcoming",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+    "utc": "2026-10-03T09:12:57.911Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "tablet browser Forward awards retains from",
+    "awardLink": [],
+    "emptyText": [],
+    "filters": [],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming",
+    "utc": "2026-10-03T09:13:15.382Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "tablet app Back preserves upcoming",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+    "utc": "2026-10-03T09:13:15.638Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "desktop upcoming-only before awards",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+    "utc": "2026-10-03T09:13:17.409Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop awards destination",
+    "awardLink": [],
+    "emptyText": [],
+    "filters": [],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming",
+    "utc": "2026-10-03T09:13:42.567Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop browser Back preserves upcoming",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+    "utc": "2026-10-03T09:13:42.751Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop browser Forward awards retains from",
+    "awardLink": [],
+    "emptyText": [],
+    "filters": [],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming",
+    "utc": "2026-10-03T09:13:42.809Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop app Back preserves upcoming",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb%3Fschedule%3Dupcoming"
+    ],
+    "emptyText": [
+      "예정된 경기가 없어요"
+    ],
+    "filters": [
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+    "utc": "2026-10-03T09:13:43.030Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop All reset restores completed fixture",
+    "awardLink": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/awards?from=%2Fleague-matches%2Fc1f2ff15-9363-4915-9c11-8179e57369cb"
+    ],
+    "emptyText": [],
+    "filters": [
+      {
+        "pressed": "true",
+        "role": null,
+        "text": "전체"
+      },
+      {
+        "pressed": "false",
+        "role": null,
+        "text": "예정만"
+      }
+    ],
+    "fixtureURLs": [
+      "/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/fixtures/3054516f-a173-4775-9e35-7ea4acb652a9"
+    ],
+    "searchInputs": [],
+    "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb",
+    "utc": "2026-10-03T09:14:20.202Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  }
+]

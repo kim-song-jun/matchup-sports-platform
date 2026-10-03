@@ -1,0 +1,105 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3436,
+      "sha256": "041325b6ebda35537db5c1e286e7a34a0ad3c67f25943521c9abb5f14b06fb90"
+    },
+    {
+      "file": "individual-region-desktop-filter.png",
+      "bytes": 53925,
+      "sha256": "341686763fb1a1fcbdca020fa0b3ee07b51478293ee3dd7f69c1d51205e9eb32"
+    },
+    {
+      "file": "individual-region-desktop-result.png",
+      "bytes": 92979,
+      "sha256": "3775ba1e6ddd31b4720e52cf2a6c529a23b2d3879cd8ceb874c1bcba56bea256"
+    },
+    {
+      "file": "individual-region-mobile-filter.png",
+      "bytes": 48425,
+      "sha256": "1be5d86abee86c6848e97a9c9093848d451ab391e4acb91d3574a766d3ff9c01"
+    },
+    {
+      "file": "individual-region-mobile-result.png",
+      "bytes": 71453,
+      "sha256": "1abab9b2c637b8f200efd56fc670da4d94b3548f991446eb36f1dd8b6fe00027"
+    },
+    {
+      "file": "individual-region-proof.json",
+      "bytes": 6288,
+      "sha256": "b2130282b6708bb49c5850a7dfe5d29a3ff8bf1c1a844acfab1bc009feaf1ff3"
+    },
+    {
+      "file": "individual-region-tablet-filter.png",
+      "bytes": 55841,
+      "sha256": "fe2876b4600847cc935a681c9400af19cb37acbe372746a0638e8f95c67f8761"
+    },
+    {
+      "file": "individual-region-tablet-result.png",
+      "bytes": 26072,
+      "sha256": "4a77a4d7380a668178a2b948a887f1f8ed9d098ac074a7a055f91d307c56f150"
+    },
+    {
+      "file": "league-filter-desktop-after.png",
+      "bytes": 65572,
+      "sha256": "48392b7cbf368a58e4ecf2c17615d3916d6eb469f539fb0b90846ada3e2decff"
+    },
+    {
+      "file": "league-filter-mobile-after.png",
+      "bytes": 21608,
+      "sha256": "01b9a0c28c528bd7eb9b07483350bcfeaeb7967fed84812023174ca1b34a24e8"
+    },
+    {
+      "file": "league-filter-mobile-controls-after.png",
+      "bytes": 13432,
+      "sha256": "e4fd547be0af729b3919b2a89e67be2a1e88ce2344a4d967c8aba0b840565bbe"
+    },
+    {
+      "file": "league-filter-proof.json",
+      "bytes": 11422,
+      "sha256": "304e443c8bb8348f38ebd667c555a20e517cf1af5148d438211f4279517fc31a"
+    },
+    {
+      "file": "league-filter-tablet-after.png",
+      "bytes": 14526,
+      "sha256": "448684d34919992abb99b5e26913ae62916bddd21fca94cb22de0ffe33c0405f"
+    },
+    {
+      "file": "public-after-crop-provenance.json",
+      "bytes": 13829,
+      "sha256": "81f6bdfab359148e71fa2de4cc33e1b196f41c60e32c582e08abf535d41e173c"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3537,
+      "sha256": "44866a97d29f4f4f6074690705e148513bdf5c1a06328b098437b9144f71abfb"
+    },
+    {
+      "file": "tournament-label-desktop-completed.png",
+      "bytes": 50674,
+      "sha256": "54b9465538395bee9e5cc0b49787c875bb7d2dbfe3a1b3f9451c70be15686267"
+    },
+    {
+      "file": "tournament-label-mobile-completed.png",
+      "bytes": 16642,
+      "sha256": "515dad1cdf3607b3e6770f78f0bacbd4d37fa8686d994f1c7839e3bff98c1886"
+    },
+    {
+      "file": "tournament-label-proof.json",
+      "bytes": 11515,
+      "sha256": "d6f8981d4357c95e04eb8240c56b597f9a283b56a0756300ad8184cda874cfd9"
+    },
+    {
+      "file": "tournament-label-tablet-completed.png",
+      "bytes": 15728,
+      "sha256": "822fe8518a89b6f4b40bc84bfd4aac328c7d87ecd6e4505b291ae49b59c69f47"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 5429,
+      "sha256": "549da8a714662eb34da8e06026a0b618a9f0ca7ca9a239198287bae2fa4d9784"
+    }
+  ],
+  "scope": "All files except this manifest itself"
+}

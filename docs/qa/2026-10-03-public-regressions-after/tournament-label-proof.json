@@ -1,0 +1,414 @@
+[
+  {
+    "step": "mobile empty tournament all statuses",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male",
+    "utc": "2026-10-03T09:15:04.466Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "mobile empty tournament draft",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1",
+    "utc": "2026-10-03T09:15:34.168Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:15:34.179Z"
+    },
+    "excluded": true,
+    "exclusion": "Navigation not yet settled: URL still shows the prior status. Step intent does not establish observed status."
+  },
+  {
+    "step": "mobile empty tournament in_progress",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 진행 중 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=in_progress"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=in_progress",
+    "utc": "2026-10-03T09:15:34.469Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:15:34.479Z"
+    }
+  },
+  {
+    "step": "mobile empty tournament completed filter open",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 진행 중 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=in_progress"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=in_progress",
+    "utc": "2026-10-03T09:15:34.912Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:15:34.923Z"
+    },
+    "excluded": true,
+    "exclusion": "Navigation not yet settled: URL still shows the prior status. Step intent does not establish observed status."
+  },
+  {
+    "step": "mobile empty tournament completed settled",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 종료 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=completed"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=completed",
+    "utc": "2026-10-03T09:16:01.897Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:16:01.911Z"
+    }
+  },
+  {
+    "step": "mobile empty tournament draft settled",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 준비 중 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=draft"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&filter=1&status=draft",
+    "utc": "2026-10-03T09:16:02.523Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:16:02.535Z"
+    }
+  },
+  {
+    "step": "mobile empty tournament completed closed settled",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 종료 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 156.10000610351562
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+    "utc": "2026-10-03T09:16:03.475Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:16:03.487Z"
+    }
+  },
+  {
+    "step": "mobile league completed accessible name",
+    "empty": [],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 종료",
+        "href": "/tournaments?kind=league&status=completed&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 509.2000122070313,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 356.1000061035156
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?kind=league&status=completed",
+    "utc": "2026-10-03T09:16:39.296Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:16:39.309Z"
+    }
+  },
+  {
+    "step": "mobile league draft accessible name",
+    "empty": [],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 준비 중",
+        "href": "/tournaments?kind=league&status=draft&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 1964,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 363.1000061035156
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?kind=league&status=draft&filter=1",
+    "utc": "2026-10-03T09:16:43.598Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:16:43.609Z"
+    }
+  },
+  {
+    "step": "tablet empty tournament completed settled",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 종료 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 600,
+        "x": 94.33333587646484,
+        "y": 155.83334350585938
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+    "utc": "2026-10-03T09:17:21.067Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:17:21.083Z"
+    }
+  },
+  {
+    "step": "desktop empty tournament completed settled",
+    "empty": [
+      "조건에 맞는 대회가 없어요"
+    ],
+    "filterLink": [
+      {
+        "aria": "필터 열기 — 현재 종료 · 수영 · 남성부",
+        "href": "/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed&filter=1"
+      }
+    ],
+    "list": {
+      "ariaLabel": null,
+      "ariaLabelledby": "tournament-list-heading",
+      "rect": {
+        "height": 567.5,
+        "width": 1072,
+        "x": 55.5,
+        "y": 244.5
+      },
+      "role": null,
+      "tag": "SECTION"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+    "utc": "2026-10-03T09:17:22.945Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "accessibleNameResolution": {
+      "labelledbyText": [
+        "대회 목록"
+      ],
+      "utc": "2026-10-03T09:17:22.957Z"
+    }
+  }
+]

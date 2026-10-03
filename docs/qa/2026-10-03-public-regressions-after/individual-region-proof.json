@@ -1,0 +1,244 @@
+[
+  {
+    "step": "mobile Busan result after apply",
+    "empty": [
+      "조건에 맞는 매치가 없어요"
+    ],
+    "filterCloseCount": 0,
+    "headings": [
+      "매치",
+      "개인 매치"
+    ],
+    "mainMatchCount": 0,
+    "regionOptions": [],
+    "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+    "utc": "2026-10-03T09:19:04.674Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "mobile reopen confirms Busan selection",
+    "empty": [
+      "조건에 맞는 매치가 없어요"
+    ],
+    "filterCloseCount": 1,
+    "headings": [
+      "매치",
+      "개인 매치"
+    ],
+    "mainMatchCount": 0,
+    "regionOptions": [
+      {
+        "ariaCurrent": null,
+        "ariaPressed": null,
+        "background": "rgb(255, 255, 255)",
+        "class": "tm-chip ",
+        "color": "rgb(107, 118, 132)",
+        "href": "/matches?regionId=33a1452c-1da7-4cf4-bee0-29fd3bb92033&filter=1",
+        "text": "서울"
+      },
+      {
+        "ariaCurrent": "true",
+        "ariaPressed": null,
+        "background": "rgb(49, 130, 246)",
+        "class": "tm-chip tm-chip-active",
+        "color": "rgb(255, 255, 255)",
+        "href": "/matches?filter=1",
+        "text": "부산"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+    "utc": "2026-10-03T09:19:05.327Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    }
+  },
+  {
+    "step": "tablet Busan result after reload",
+    "empty": [
+      "조건에 맞는 매치가 없어요"
+    ],
+    "filterCloseCount": 0,
+    "headings": [
+      "매치",
+      "개인 매치"
+    ],
+    "mainMatchCount": 0,
+    "regionOptions": [],
+    "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+    "utc": "2026-10-03T09:20:04.407Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "tablet reopen confirms Busan selection",
+    "empty": [
+      "조건에 맞는 매치가 없어요"
+    ],
+    "filterCloseCount": 1,
+    "headings": [
+      "매치",
+      "개인 매치"
+    ],
+    "mainMatchCount": 0,
+    "regionOptions": [
+      {
+        "ariaCurrent": null,
+        "ariaPressed": null,
+        "background": "rgb(255, 255, 255)",
+        "class": "tm-chip ",
+        "color": "rgb(107, 118, 132)",
+        "href": "/matches?regionId=33a1452c-1da7-4cf4-bee0-29fd3bb92033&filter=1",
+        "text": "서울"
+      },
+      {
+        "ariaCurrent": "true",
+        "ariaPressed": null,
+        "background": "rgb(49, 130, 246)",
+        "class": "tm-chip tm-chip-active",
+        "color": "rgb(255, 255, 255)",
+        "href": "/matches?filter=1",
+        "text": "부산"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+    "utc": "2026-10-03T09:20:05.099Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    }
+  },
+  {
+    "step": "desktop Busan result after reload",
+    "empty": [
+      "조건에 맞는 매치가 없어요"
+    ],
+    "filterCloseCount": 0,
+    "headings": [
+      "매치",
+      "개인 매치"
+    ],
+    "mainMatchCount": 0,
+    "regionOptions": [],
+    "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+    "utc": "2026-10-03T09:20:06.974Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop reopen confirms Busan selection",
+    "empty": [
+      "조건에 맞는 매치가 없어요"
+    ],
+    "filterCloseCount": 1,
+    "headings": [
+      "매치",
+      "개인 매치"
+    ],
+    "mainMatchCount": 0,
+    "regionOptions": [
+      {
+        "ariaCurrent": null,
+        "ariaPressed": null,
+        "background": "rgb(255, 255, 255)",
+        "class": "tm-chip ",
+        "color": "rgb(107, 118, 132)",
+        "href": "/matches?regionId=33a1452c-1da7-4cf4-bee0-29fd3bb92033&filter=1",
+        "text": "서울"
+      },
+      {
+        "ariaCurrent": "true",
+        "ariaPressed": null,
+        "background": "rgb(49, 130, 246)",
+        "class": "tm-chip tm-chip-active",
+        "color": "rgb(255, 255, 255)",
+        "href": "/matches?filter=1",
+        "text": "부산"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+    "utc": "2026-10-03T09:20:33.568Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop filter reset removes selected region",
+    "empty": [],
+    "filterCloseCount": 1,
+    "headings": [
+      "매치",
+      "개인 매치",
+      "눈에 띄는 매치"
+    ],
+    "mainMatchCount": 8,
+    "regionOptions": [
+      {
+        "ariaCurrent": null,
+        "ariaPressed": null,
+        "background": "rgb(255, 255, 255)",
+        "class": "tm-chip ",
+        "color": "rgb(107, 118, 132)",
+        "href": "/matches?filter=1&regionId=33a1452c-1da7-4cf4-bee0-29fd3bb92033",
+        "text": "서울"
+      },
+      {
+        "ariaCurrent": null,
+        "ariaPressed": null,
+        "background": "rgb(255, 255, 255)",
+        "class": "tm-chip ",
+        "color": "rgb(107, 118, 132)",
+        "href": "/matches?filter=1&regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+        "text": "부산"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/matches?filter=1",
+    "utc": "2026-10-03T09:20:34.360Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  {
+    "step": "desktop reset returns unfiltered main list",
+    "empty": [],
+    "filterCloseCount": 0,
+    "headings": [
+      "매치",
+      "개인 매치",
+      "눈에 띄는 매치"
+    ],
+    "mainMatchCount": 8,
+    "regionOptions": [],
+    "url": "https://alpha.teameet.co.kr/matches",
+    "utc": "2026-10-03T09:20:34.827Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  }
+]

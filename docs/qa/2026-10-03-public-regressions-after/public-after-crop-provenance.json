@@ -1,0 +1,426 @@
+{
+  "scope": "Minimum UI crops; original screenshots remain private. DOM observation and screenshot capture UTC are separate.",
+  "crops": [
+    {
+      "file": "league-filter-mobile-after.png",
+      "observationUTC": "2026-10-03T09:11:59.093Z",
+      "captureStartUTC": "2026-10-03T09:11:59.157Z",
+      "captureEndUTC": "2026-10-03T09:11:59.199Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming&from=%2Fmy%2Fleagues",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "scene": "Empty-state body only; selected filter is above crop.",
+      "sourceBasename": "league-filter-mobile-after.png",
+      "outputBasename": "league-filter-mobile-after.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        374,
+        139
+      ],
+      "cropBoundsLTRB": [
+        16,
+        190,
+        390,
+        329
+      ],
+      "sourceSHA256": "e2f0df0332668919fb1d69b1a067144ea794507517cece19821e61fbc6916fda",
+      "outputSHA256": "01b9a0c28c528bd7eb9b07483350bcfeaeb7967fed84812023174ca1b34a24e8",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "league-filter-mobile-controls-after.png",
+      "observationUTC": "2026-10-03T09:11:59.093Z",
+      "captureStartUTC": "2026-10-03T09:12:31.020Z",
+      "captureEndUTC": "2026-10-03T09:12:31.041Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming&from=%2Fmy%2Fleagues",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceBasename": "league-filter-mobile-controls-after.png",
+      "outputBasename": "league-filter-mobile-controls-after.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        377,
+        55
+      ],
+      "cropBoundsLTRB": [
+        16,
+        268,
+        393,
+        323
+      ],
+      "sourceSHA256": "93bb41a7c6cd6830af4d349eab282668799a846c9cde087e9897b3e02f48b46d",
+      "outputSHA256": "e4fd547be0af729b3919b2a89e67be2a1e88ce2344a4d967c8aba0b840565bbe",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "league-filter-tablet-after.png",
+      "observationUTC": "2026-10-03T09:13:15.638Z",
+      "captureStartUTC": "2026-10-03T09:13:15.841Z",
+      "captureEndUTC": "2026-10-03T09:13:15.868Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceBasename": "league-filter-tablet-after.png",
+      "outputBasename": "league-filter-tablet-after.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        575,
+        66
+      ],
+      "cropBoundsLTRB": [
+        108,
+        212,
+        683,
+        278
+      ],
+      "sourceSHA256": "1d0caf767963f4eff09b3770a41ccd0c37e5010a0d3fb008bcaf96ccadb3f6f5",
+      "outputSHA256": "448684d34919992abb99b5e26913ae62916bddd21fca94cb22de0ffe33c0405f",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "league-filter-desktop-after.png",
+      "observationUTC": "2026-10-03T09:13:43.030Z",
+      "captureStartUTC": "2026-10-03T09:13:43.236Z",
+      "captureEndUTC": "2026-10-03T09:13:43.257Z",
+      "url": "https://alpha.teameet.co.kr/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb?schedule=upcoming",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceBasename": "league-filter-desktop-after.png",
+      "outputBasename": "league-filter-desktop-after.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        876,
+        412
+      ],
+      "cropBoundsLTRB": [
+        155,
+        338,
+        1031,
+        750
+      ],
+      "sourceSHA256": "be52adaf0e7e823ed4e84608e795a79be2b8ef65a1c34a13eede7a16695e1c1d",
+      "outputSHA256": "48392b7cbf368a58e4ecf2c17615d3916d6eb469f539fb0b90846ada3e2decff",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tournament-label-mobile-completed.png",
+      "observationUTC": "2026-10-03T09:16:03.475Z",
+      "captureStartUTC": "2026-10-03T09:16:03.488Z",
+      "captureEndUTC": "2026-10-03T09:16:03.508Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceBasename": "tournament-label-mobile-completed.png",
+      "outputBasename": "tournament-label-mobile-completed.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        373,
+        148
+      ],
+      "cropBoundsLTRB": [
+        16,
+        152,
+        389,
+        300
+      ],
+      "sourceSHA256": "009111842f653a96294e0e20c16e8713ba2ea6cc00d7bb611ae67c830591a204",
+      "outputSHA256": "515dad1cdf3607b3e6770f78f0bacbd4d37fa8686d994f1c7839e3bff98c1886",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tournament-label-tablet-completed.png",
+      "observationUTC": "2026-10-03T09:17:21.067Z",
+      "captureStartUTC": "2026-10-03T09:17:21.086Z",
+      "captureEndUTC": "2026-10-03T09:17:21.126Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceBasename": "tournament-label-tablet-completed.png",
+      "outputBasename": "tournament-label-tablet-completed.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        570,
+        148
+      ],
+      "cropBoundsLTRB": [
+        109,
+        152,
+        679,
+        300
+      ],
+      "sourceSHA256": "3e94e04ff93a9156be10de38d16a8e323d764fdb3b9fcf6a9056ff1aec4721f5",
+      "outputSHA256": "822fe8518a89b6f4b40bc84bfd4aac328c7d87ecd6e4505b291ae49b59c69f47",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "tournament-label-desktop-completed.png",
+      "observationUTC": "2026-10-03T09:17:22.945Z",
+      "captureStartUTC": "2026-10-03T09:17:22.958Z",
+      "captureEndUTC": "2026-10-03T09:17:22.979Z",
+      "url": "https://alpha.teameet.co.kr/tournaments?sportId=10fe8a75-9824-4a09-824a-385b37266fff&genderCategory=male&status=completed",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceBasename": "tournament-label-desktop-completed.png",
+      "outputBasename": "tournament-label-desktop-completed.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        1077,
+        506
+      ],
+      "cropBoundsLTRB": [
+        53,
+        244,
+        1130,
+        750
+      ],
+      "sourceSHA256": "814f8ad595a7795f3bc2d5f0d3ef8ef8b5cf9fa5c157803d1de1dcbe5901cbd1",
+      "outputSHA256": "54b9465538395bee9e5cc0b49787c875bb7d2dbfe3a1b3f9451c70be15686267",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "individual-region-mobile-result.png",
+      "observationUTC": "2026-10-03T09:19:04.674Z",
+      "captureStartUTC": "2026-10-03T09:19:04.679Z",
+      "captureEndUTC": "2026-10-03T09:19:04.697Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceBasename": "individual-region-mobile-result.png",
+      "outputBasename": "individual-region-mobile-result.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        373,
+        374
+      ],
+      "cropBoundsLTRB": [
+        16,
+        150,
+        389,
+        524
+      ],
+      "sourceSHA256": "31adb06d9f92a000f1798222fe23d609f878c8e415d91e1d23be6917ae8a9e36",
+      "outputSHA256": "1abab9b2c637b8f200efd56fc670da4d94b3548f991446eb36f1dd8b6fe00027",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "individual-region-mobile-filter.png",
+      "observationUTC": "2026-10-03T09:19:05.327Z",
+      "captureStartUTC": "2026-10-03T09:19:05.332Z",
+      "captureEndUTC": "2026-10-03T09:19:05.364Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceBasename": "individual-region-mobile-filter.png",
+      "outputBasename": "individual-region-mobile-filter.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        405,
+        286
+      ],
+      "cropBoundsLTRB": [
+        0,
+        68,
+        405,
+        354
+      ],
+      "sourceSHA256": "b1a120bc4feb1eacc2ec14dbac98d9887a93634bf07532d85740098c0bbff57a",
+      "outputSHA256": "1be5d86abee86c6848e97a9c9093848d451ab391e4acb91d3574a766d3ff9c01",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "individual-region-tablet-result.png",
+      "observationUTC": "2026-10-03T09:20:04.407Z",
+      "captureStartUTC": "2026-10-03T09:20:04.411Z",
+      "captureEndUTC": "2026-10-03T09:20:04.440Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceBasename": "individual-region-tablet-result.png",
+      "outputBasename": "individual-region-tablet-result.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        570,
+        112
+      ],
+      "cropBoundsLTRB": [
+        109,
+        150,
+        679,
+        262
+      ],
+      "sourceSHA256": "37b69885b1bc67ee511bd4a663cac00b3af104e49ee3ac190ac8ce6cba1b3b86",
+      "outputSHA256": "4a77a4d7380a668178a2b948a887f1f8ed9d098ac074a7a055f91d307c56f150",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "individual-region-tablet-filter.png",
+      "observationUTC": "2026-10-03T09:20:05.099Z",
+      "captureStartUTC": "2026-10-03T09:20:05.116Z",
+      "captureEndUTC": "2026-10-03T09:20:05.145Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceBasename": "individual-region-tablet-filter.png",
+      "outputBasename": "individual-region-tablet-filter.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        599,
+        233
+      ],
+      "cropBoundsLTRB": [
+        95,
+        38,
+        694,
+        271
+      ],
+      "sourceSHA256": "7a05c87145a4db80b526547242b3b24290ebeffc37409318a08a223fc5aecd85",
+      "outputSHA256": "fe2876b4600847cc935a681c9400af19cb37acbe372746a0638e8f95c67f8761",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "individual-region-desktop-result.png",
+      "observationUTC": "2026-10-03T09:20:06.974Z",
+      "captureStartUTC": "2026-10-03T09:20:06.978Z",
+      "captureEndUTC": "2026-10-03T09:20:07.021Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceBasename": "individual-region-desktop-result.png",
+      "outputBasename": "individual-region-desktop-result.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        1076,
+        474
+      ],
+      "cropBoundsLTRB": [
+        53,
+        272,
+        1129,
+        746
+      ],
+      "sourceSHA256": "4ad7ad4b2628d2c1ab005ca1bc5b296104427c86ab9c071b2dc5f52762635e1a",
+      "outputSHA256": "3775ba1e6ddd31b4720e52cf2a6c529a23b2d3879cd8ceb874c1bcba56bea256",
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "file": "individual-region-desktop-filter.png",
+      "observationUTC": "2026-10-03T09:20:33.568Z",
+      "captureStartUTC": "2026-10-03T09:20:33.574Z",
+      "captureEndUTC": "2026-10-03T09:20:33.619Z",
+      "url": "https://alpha.teameet.co.kr/matches?regionId=a75f6cce-70da-4082-88fc-8f28a62c0aa2&filter=1",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceBasename": "individual-region-desktop-filter.png",
+      "outputBasename": "individual-region-desktop-filter.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        440,
+        287
+      ],
+      "cropBoundsLTRB": [
+        372,
+        95,
+        812,
+        382
+      ],
+      "sourceSHA256": "46f56e57ead6824766777a671e7fc89c5cafb39b5d2cd75e955ccc8e77e648b3",
+      "outputSHA256": "341686763fb1a1fcbdca020fa0b3ee07b51478293ee3dd7f69c1d51205e9eb32",
+      "sourceCollectorReportedPixelEquality": true
+    }
+  ],
+  "limits": [
+    "Original-to-crop equality is collector-reported; publication review reads approved safe images only.",
+    "Mobile controls capture and empty-state capture use separate scroll states; DOM is not a simultaneous screenshot timestamp."
+  ]
+}

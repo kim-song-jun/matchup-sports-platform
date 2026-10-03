@@ -1,0 +1,52 @@
+{
+  "scope": "Read-only public regressions for PR1536,1548,1550 using original fixtures/filters and current admin-authorized session.",
+  "deployment": {
+    "sha": "235730755db0e7393bec9e01014a6906effde6af",
+    "successUTC": "2026-10-03T07:30:13Z",
+    "source": "Successful Deploy Alpha workflow independently read; browser serving identity is not exposed.",
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761"
+  },
+  "observationWindow": {
+    "startUTC": "2026-10-03T09:11:15.195Z",
+    "endUTC": "2026-10-03T09:20:34.827Z"
+  },
+  "pr1536": {
+    "verified": "At405/789/1183 CSS widths, upcoming-only schedule filter survives season awards → browser Back; browser Forward to awards and in-app Back preserve it too. Upcoming true, All false, no completed fixture, correct empty-state copy. Desktop All reset restores one completed fixture.",
+    "originalFixture": "c1f2ff15-9363-4915-9c11-8179e57369cb",
+    "originalIssue": 1533,
+    "limits": [
+      "Current admin visited the public league route; Original captain-role My-leagues entry not retested.",
+      "No schedule q search input exists in this one-fixture page, so q branch is unverified.",
+      "Browser/app return URL query order can differ; schedule semantics and from context are verified."
+    ],
+    "proof": "league-filter-proof.json"
+  },
+  "pr1548": {
+    "verified": "Eight accepted resolved-name records identify the neutral 대회 목록 heading: mobile in_progress, completed (open/closed), draft and league completed/draft, plus completed swimming+male at tablet/desktop. Initial all-status record contains the label reference only.",
+    "originalIssue": 1543,
+    "limits": [
+      "Two early status-transition observations retain previous URLs and are explicitly excluded.",
+      "The initial all-status neutral name is supported by the tool AX snapshot; its first DOM row records the label reference without resolved text.",
+      "This confirms neutral naming matches the visible heading, not screen-reader speech on physical devices.",
+      "Initial all-status resolved AX name is a collector-reported tool observation absent from this file bundle; it is excluded from independently resolved-name counts."
+    ],
+    "proof": "tournament-label-proof.json"
+  },
+  "pr1550": {
+    "verified": "After selecting Busan through the actual filter, all three widths show0 main matches and visible H2 개인 매치 without a fixed Seoul label. Reopening shows Busan aria-current=true; tablet/desktop reload preserves the condition. Desktop reset removes region selection and restores8 main matches.",
+    "originalIssue": 1544,
+    "limits": [
+      "Neutral title removes misleading Seoul context; it does not newly promise the title itself includes Busan.",
+      "No fixture creation or geographic data validation.",
+      "Reset mainMatchCount=8 is a stored DOM count, without an enumerated eight-URL list in this scope."
+    ],
+    "proof": "individual-region-proof.json"
+  },
+  "safety": [
+    "No server write, application, result entry, notification, upload, logout or permission change.",
+    "Widths are resized/zoomed cloud Chromium, not physical mobile/tablet devices.",
+    "No broad E2E or accessibility compliance pass.",
+    "Mobile filter-controls image capture begins31.927seconds after its linked DOM and a different scroll position from the empty-state crop; images are not simultaneous and are not used to compare geometry."
+  ],
+  "provenance": "public-after-crop-provenance.json"
+}

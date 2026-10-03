@@ -1,0 +1,212 @@
+{
+  "scope": "Independent safe-only record calculation and actual-pixel review",
+  "recordCounts": {
+    "league-filter-proof.json": 16,
+    "tournament-label-proof.json": 11,
+    "individual-region-proof.json": 8
+  },
+  "leagueBackChecks": [
+    {
+      "beforeIndex": 0,
+      "returnIndex": 2,
+      "width": 405,
+      "querySemanticsAndFiltersPreserved": true
+    },
+    {
+      "beforeIndex": 0,
+      "returnIndex": 4,
+      "width": 405,
+      "querySemanticsAndFiltersPreserved": true
+    },
+    {
+      "beforeIndex": 5,
+      "returnIndex": 7,
+      "width": 789,
+      "querySemanticsAndFiltersPreserved": true
+    },
+    {
+      "beforeIndex": 5,
+      "returnIndex": 9,
+      "width": 789,
+      "querySemanticsAndFiltersPreserved": true
+    },
+    {
+      "beforeIndex": 10,
+      "returnIndex": 12,
+      "width": 1183,
+      "querySemanticsAndFiltersPreserved": true
+    },
+    {
+      "beforeIndex": 10,
+      "returnIndex": 14,
+      "width": 1183,
+      "querySemanticsAndFiltersPreserved": true
+    }
+  ],
+  "resolvedNeutralNameProofIndexes": [
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "excludedTournamentProofIndexes": [
+    1,
+    3
+  ],
+  "BusanChecks": [
+    {
+      "resultIndex": 0,
+      "filterIndex": 1,
+      "width": 405,
+      "BusanSelected": true,
+      "neutralHeading": true,
+      "recordedMainMatchCount": 0
+    },
+    {
+      "resultIndex": 2,
+      "filterIndex": 3,
+      "width": 789,
+      "BusanSelected": true,
+      "neutralHeading": true,
+      "recordedMainMatchCount": 0
+    },
+    {
+      "resultIndex": 4,
+      "filterIndex": 5,
+      "width": 1183,
+      "BusanSelected": true,
+      "neutralHeading": true,
+      "recordedMainMatchCount": 0
+    }
+  ],
+  "images": [
+    {
+      "file": "league-filter-mobile-after.png",
+      "sha256": "01b9a0c28c528bd7eb9b07483350bcfeaeb7967fed84812023174ca1b34a24e8",
+      "dimensions": [
+        374,
+        139
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "league-filter-mobile-controls-after.png",
+      "sha256": "e4fd547be0af729b3919b2a89e67be2a1e88ce2344a4d967c8aba0b840565bbe",
+      "dimensions": [
+        377,
+        55
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "league-filter-tablet-after.png",
+      "sha256": "448684d34919992abb99b5e26913ae62916bddd21fca94cb22de0ffe33c0405f",
+      "dimensions": [
+        575,
+        66
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "league-filter-desktop-after.png",
+      "sha256": "48392b7cbf368a58e4ecf2c17615d3916d6eb469f539fb0b90846ada3e2decff",
+      "dimensions": [
+        876,
+        412
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "tournament-label-mobile-completed.png",
+      "sha256": "515dad1cdf3607b3e6770f78f0bacbd4d37fa8686d994f1c7839e3bff98c1886",
+      "dimensions": [
+        373,
+        148
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "tournament-label-tablet-completed.png",
+      "sha256": "822fe8518a89b6f4b40bc84bfd4aac328c7d87ecd6e4505b291ae49b59c69f47",
+      "dimensions": [
+        570,
+        148
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "tournament-label-desktop-completed.png",
+      "sha256": "54b9465538395bee9e5cc0b49787c875bb7d2dbfe3a1b3f9451c70be15686267",
+      "dimensions": [
+        1077,
+        506
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "individual-region-mobile-result.png",
+      "sha256": "1abab9b2c637b8f200efd56fc670da4d94b3548f991446eb36f1dd8b6fe00027",
+      "dimensions": [
+        373,
+        374
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "individual-region-mobile-filter.png",
+      "sha256": "1be5d86abee86c6848e97a9c9093848d451ab391e4acb91d3574a766d3ff9c01",
+      "dimensions": [
+        405,
+        286
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "individual-region-tablet-result.png",
+      "sha256": "4a77a4d7380a668178a2b948a887f1f8ed9d098ac074a7a055f91d307c56f150",
+      "dimensions": [
+        570,
+        112
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "individual-region-tablet-filter.png",
+      "sha256": "fe2876b4600847cc935a681c9400af19cb37acbe372746a0638e8f95c67f8761",
+      "dimensions": [
+        599,
+        233
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "individual-region-desktop-result.png",
+      "sha256": "3775ba1e6ddd31b4720e52cf2a6c529a23b2d3879cd8ceb874c1bcba56bea256",
+      "dimensions": [
+        1076,
+        474
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    },
+    {
+      "file": "individual-region-desktop-filter.png",
+      "sha256": "341686763fb1a1fcbdca020fa0b3ee07b51478293ee3dd7f69c1d51205e9eb32",
+      "dimensions": [
+        440,
+        287
+      ],
+      "safeDOMAndCaptureMappingValid": true
+    }
+  ],
+  "limits": [
+    "Initial all-status resolved AX name is not independently represented in the file bundle.",
+    "Reset 8 main matches is a stored DOM count only.",
+    "Focus, screen-reader speech and physical-device behavior are not verified.",
+    "Crops show approved UI controls/empty states, without account/host/member identities.",
+    "Deploy2357307 time context does not independently establish runtime servingSHA."
+  ]
+}

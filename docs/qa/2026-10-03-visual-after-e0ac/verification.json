@@ -1,0 +1,276 @@
+{
+  "scope": "Independent safe-only arithmetic, style, timeline and actual-pixel verification",
+  "photoChecks": [
+    {
+      "width": 405,
+      "UTC": "2026-10-03T10:45:50.854Z",
+      "thumb96x96Opacity1FilterNone": true,
+      "twoDuplicateAnchorSamplesNotFullChain": true
+    },
+    {
+      "width": 789,
+      "UTC": "2026-10-03T10:44:58.369Z",
+      "thumb96x96Opacity1FilterNone": true,
+      "twoDuplicateAnchorSamplesNotFullChain": true
+    },
+    {
+      "width": 1183,
+      "UTC": "2026-10-03T10:45:15.267Z",
+      "thumb96x96Opacity1FilterNone": true,
+      "twoDuplicateAnchorSamplesNotFullChain": true
+    }
+  ],
+  "newPhotoFunctionChecks": [
+    {
+      "UTC": "2026-10-03T11:11:26.130Z",
+      "cssWidth": 405,
+      "functionNames": [
+        "url",
+        "url"
+      ],
+      "gradientAbsent": true,
+      "textLength": 0,
+      "rectCSS": [
+        96,
+        96
+      ],
+      "separateFromOriginalCapture": true
+    },
+    {
+      "UTC": "2026-10-03T11:11:40.026Z",
+      "cssWidth": 789,
+      "functionNames": [
+        "url",
+        "url"
+      ],
+      "gradientAbsent": true,
+      "textLength": 0,
+      "rectCSS": [
+        96,
+        96
+      ],
+      "separateFromOriginalCapture": true
+    },
+    {
+      "UTC": "2026-10-03T11:11:41.461Z",
+      "cssWidth": 1183,
+      "functionNames": [
+        "url",
+        "url"
+      ],
+      "gradientAbsent": true,
+      "textLength": 0,
+      "rectCSS": [
+        96,
+        96
+      ],
+      "separateFromOriginalCapture": true
+    }
+  ],
+  "costChecks": [
+    {
+      "width": 405,
+      "UTC": "2026-10-03T10:46:44.077Z",
+      "exactLabels": [
+        "비용",
+        "상대팀 부담금",
+        "신청하는 팀의 비용이에요",
+        "25,000",
+        "총비용",
+        "50,000"
+      ],
+      "inputCount": 0,
+      "inputDescriptionAssociationVerified": false
+    },
+    {
+      "width": 789,
+      "UTC": "2026-10-03T10:47:15.637Z",
+      "exactLabels": [
+        "비용",
+        "상대팀 부담금",
+        "신청하는 팀의 비용이에요",
+        "25,000",
+        "총비용",
+        "50,000"
+      ],
+      "inputCount": 0,
+      "inputDescriptionAssociationVerified": false
+    },
+    {
+      "width": 1183,
+      "UTC": "2026-10-03T10:47:17.236Z",
+      "exactLabels": [
+        "비용",
+        "상대팀 부담금",
+        "신청하는 팀의 비용이에요",
+        "25,000",
+        "총비용",
+        "50,000"
+      ],
+      "inputCount": 0,
+      "inputDescriptionAssociationVerified": false
+    }
+  ],
+  "captionChecks": [
+    {
+      "width": 405,
+      "captionUTC": "2026-10-03T10:48:47.276Z",
+      "separateEffectsUTC": "2026-10-03T10:49:05.861Z",
+      "fullChain13Verified": true,
+      "properTextEffectsVerified": true,
+      "CSSContrast": 6.484924628224474,
+      "meets4_5": true
+    },
+    {
+      "width": 789,
+      "captionUTC": "2026-10-03T10:49:44.378Z",
+      "separateEffectsUTC": "2026-10-03T10:49:44.399Z",
+      "fullChain13Verified": true,
+      "properTextEffectsVerified": true,
+      "CSSContrast": 6.484924628224474,
+      "meets4_5": true
+    },
+    {
+      "width": 1183,
+      "captionUTC": "2026-10-03T10:49:56.274Z",
+      "separateEffectsUTC": "2026-10-03T10:49:56.293Z",
+      "fullChain13Verified": true,
+      "properTextEffectsVerified": true,
+      "CSSContrast": 6.484924628224474,
+      "meets4_5": true
+    }
+  ],
+  "rasterObservations": [
+    {
+      "widthLabel": "mobile",
+      "dominantRGB": [
+        255,
+        242,
+        223
+      ],
+      "dominantPixelCount": 22938,
+      "exactCSSBackgroundPixels": 98,
+      "exactCSSTextPixels": 0
+    },
+    {
+      "widthLabel": "tablet",
+      "dominantRGB": [
+        255,
+        242,
+        223
+      ],
+      "dominantPixelCount": 36594,
+      "exactCSSBackgroundPixels": 79,
+      "exactCSSTextPixels": 0
+    },
+    {
+      "widthLabel": "desktop",
+      "dominantRGB": [
+        255,
+        242,
+        223
+      ],
+      "dominantPixelCount": 43738,
+      "exactCSSBackgroundPixels": 43,
+      "exactCSSTextPixels": 0
+    }
+  ],
+  "imageChecks": [
+    {
+      "file": "photo-mobile-visible.png",
+      "sha256": "f7a0fe1ee40db7aba931a683697f02854335076c3383ad14c1752afed558a3a6",
+      "dimensions": [
+        98,
+        98
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "photo-tablet-visible.png",
+      "sha256": "0a97eae76055378463b9c46840a33c699131b2f581c187706143d10112ed6191",
+      "dimensions": [
+        98,
+        98
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "photo-desktop.png",
+      "sha256": "dc4b642b8e46e1ee166ef017acc809e0471d45078d8ea19c92f34ad1d1b264a5",
+      "dimensions": [
+        98,
+        98
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "cost-mobile-visible.png",
+      "sha256": "bbe0b41cb8fac45c0ef2b92a2c54a6d08755134aa3f21bbe4d10b0b725ba72dd",
+      "dimensions": [
+        366,
+        190
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "cost-tablet-visible.png",
+      "sha256": "2607832b4ba75cd938190a84be84ba0bea96d583dcfe5639abbc5b4005672e76",
+      "dimensions": [
+        561,
+        190
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "cost-desktop.png",
+      "sha256": "999398458c1a2b40762cd02fe6a8bd49956eee38cdc72a20469d9a824a71ac72",
+      "dimensions": [
+        625,
+        188
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "caption-mobile.png",
+      "sha256": "e291c58d057bc1b3d8af5fe6e43291972f9e2debadea9c2c4d9e989141dd837d",
+      "dimensions": [
+        366,
+        137
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "caption-tablet.png",
+      "sha256": "f4c08d2cf74790b61c09a4326efad5eb8fddedf0f0b64181cfbf8b9484007290",
+      "dimensions": [
+        561,
+        130
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    },
+    {
+      "file": "caption-desktop.png",
+      "sha256": "b96736be8cb0eb90b91f2f3a28b58ec05a9714e8285a3e0313c6d4e57213184f",
+      "dimensions": [
+        602,
+        131
+      ],
+      "cropBoundsAndDOMMappingValid": true,
+      "pixelsViewed": true
+    }
+  ],
+  "captionBeforeRGBArithmeticOnly": 4.208740854651445,
+  "CSSFormula": "Normalize sRGB by255, c<=0.04045?c/12.92:((c+0.055)/1.055)^2.4; luminance0.2126R+0.7152G+0.0722B; ratio(Lmax+0.05)/(Lmin+0.05).",
+  "criterionReference": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+  "costAssociationVerified": false,
+  "originalSourcePixelsRechecked": false,
+  "runtimeServingSHAVerified": false
+}

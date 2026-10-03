@@ -1,0 +1,20 @@
+{
+  "descriptionLinkedInputs": [],
+  "heading": "팀매치 만들기",
+  "inputIDs": [
+    "field-title",
+    ""
+  ],
+  "url": "https://alpha.teameet.co.kr/team-matches/new/info",
+  "utc": "2026-10-03T10:51:41.245Z",
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "width": 405
+  },
+  "visibleStep": [],
+  "status": "unverified",
+  "limit": "Create flow remains team-selection prerequisite after actual step3 navigation control. No team choice changed, no input or next-step action used; account-owned teams not established synthetic. No applicable cost input observed.",
+  "excluded": true,
+  "exclusionReason": "Intermediate route before asynchronous step3 navigation settled; later actual /new/info shows successful navigation. Not a valid prerequisite blocker."
+}

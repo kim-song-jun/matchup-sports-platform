@@ -1,0 +1,53 @@
+[
+  {
+    "effects": {
+      "-webkit-text-fill-color": "rgb(78, 89, 104)",
+      "-webkit-text-stroke-color": "rgb(78, 89, 104)",
+      "-webkit-text-stroke-width": "0px",
+      "color": "rgb(78, 89, 104)",
+      "text-shadow": "none"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T10:49:05.861Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "label": "mobile"
+  },
+  {
+    "effects": {
+      "-webkit-text-fill-color": "rgb(78, 89, 104)",
+      "-webkit-text-stroke-color": "rgb(78, 89, 104)",
+      "-webkit-text-stroke-width": "0px",
+      "color": "rgb(78, 89, 104)",
+      "text-shadow": "none"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T10:49:44.399Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "label": "tablet"
+  },
+  {
+    "effects": {
+      "-webkit-text-fill-color": "rgb(78, 89, 104)",
+      "-webkit-text-stroke-color": "rgb(78, 89, 104)",
+      "-webkit-text-stroke-width": "0px",
+      "color": "rgb(78, 89, 104)",
+      "text-shadow": "none"
+    },
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T10:49:56.293Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "label": "desktop"
+  }
+]

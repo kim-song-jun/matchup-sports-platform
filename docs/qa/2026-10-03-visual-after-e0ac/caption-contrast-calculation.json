@@ -1,0 +1,22 @@
+{
+  "method": "WCAG relative luminance sRGB piecewise transform; (Llighter+0.05)/(Ldarker+0.05)",
+  "backgroundRGB": [
+    255,
+    243,
+    224
+  ],
+  "beforeRGB": [
+    107,
+    118,
+    132
+  ],
+  "afterRGB": [
+    78,
+    89,
+    104
+  ],
+  "beforeRatio": 4.208740854651445,
+  "afterRatio": 6.484924628224474,
+  "normalTextThreshold": 4.5,
+  "scope": "12px 700 caption on observed opaque background. Full-chain opacity/filter/blend and text-effect observations must support calculation. No whole-page accessibility certification."
+}

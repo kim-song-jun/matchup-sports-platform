@@ -1,0 +1,64 @@
+{
+  "scope": "Bounded three-width photo/cost/caption observations after e0ac workflow; related fixes1580/1583/1584. Not full-app acceptance.",
+  "deployment": {
+    "SHA": "e0ac9c6e5501b99bff9765532adec4c907f1b51e",
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37115477778",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-03T10:37:05Z",
+    "independentlyReadBack": true,
+    "runtimeServingSHA": "unknown",
+    "entryReported": "Fresh navigation/reload after deployment; earlier2357307/06d72 observations remain distinct"
+  },
+  "originalSelectedObservationWindowUTC": [
+    "2026-10-03T10:44:58.369Z",
+    "2026-10-03T10:49:56.348Z"
+  ],
+  "photoSourceDOMAlsoIncludesEarlierUTC": "2026-10-03T10:43:52.192Z",
+  "costAssociationLimitUTC": "2026-10-03T10:52:37.713Z",
+  "newPhotoFunctionWindowUTC": [
+    "2026-10-03T11:11:26.130Z",
+    "2026-10-03T11:11:41.461Z"
+  ],
+  "photo": {
+    "actual": "Cow photo visible in three safe98x98 raster crops; original DOM thumb96x96 CSS, opacity1/filter none, no pseudo content/image.",
+    "functionSupplement": "New three-width observations show exactly two url() functions, no gradient functions,96x96 CSS and textLength0. Only URL arguments are redacted.",
+    "limits": "Supplement is later than original screenshots; original two ancestor records duplicate one anchor sample, not a full ancestor chain. No comparison to original source image bytes/brightness."
+  },
+  "cost": {
+    "actual": "All3 widths retain 상대팀 부담금 and add 신청하는 팀의 비용이에요, with25,000원 and50,000원 total.",
+    "limits": "No payment/allocation/persistence test. Applicable cost input not exposed; aria-describedby remains unverified. Excluded async observation is retained separately. Required copy does not equal native required=true."
+  },
+  "caption": {
+    "actual": "All3 widths12px/700 #4e5968 on #fff3e0, recomputed6.484924628224474:1. Full13-node chain and separate proper text-effect reads support the CSS pair.",
+    "threshold": 4.5,
+    "limits": "Computed CSS contrast, not exact raster-pixel contrast. Dominant PNG background(255,242,223) differs slightly; cause unknown. Mobile panel top/corners clipped, caption text remains visible. Blank initial camelCase properties are incomplete, superseded by proper property reads."
+  },
+  "excludedIntermediateImages": [
+    {
+      "sourceBasename": "photo-mobile.png",
+      "reason": "Capture-excluded intermediate partial/scroll-transition capture; not selected and not used as layout-failure evidence."
+    },
+    {
+      "sourceBasename": "photo-tablet.png",
+      "reason": "Capture-excluded intermediate partial/scroll-transition capture; not selected and not used as layout-failure evidence."
+    },
+    {
+      "sourceBasename": "cost-mobile.png",
+      "reason": "Capture-excluded intermediate partial/scroll-transition capture; not selected and not used as layout-failure evidence."
+    },
+    {
+      "sourceBasename": "cost-tablet.png",
+      "reason": "Capture-excluded intermediate partial/scroll-transition capture; not selected and not used as layout-failure evidence."
+    }
+  ],
+  "safeImageCount": 9,
+  "limits": [
+    "Only requested9 safe images; raw screenshots, host/member identities and account data omitted.",
+    "Product UUID URLs are retained only in structured proof for reproducibility.",
+    "DOM and capture times separate; no coordinate identity across smooth scroll.",
+    "Tablet CSS789/sourcePNG788 remain distinct; physical devices not tested.",
+    "Source report indicates no writes; publication adds evidence only.",
+    "Historical before state linked separately, not reobserved in this batch."
+  ]
+}

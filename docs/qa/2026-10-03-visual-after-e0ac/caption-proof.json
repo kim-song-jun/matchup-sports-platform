@@ -1,0 +1,461 @@
+[
+  {
+    "caption": {
+      "color": "rgb(78, 89, 104)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "insideDisabledControl": false,
+      "rect": {
+        "bottom": 160.8000030517578,
+        "height": 16,
+        "left": 96.8000030517578,
+        "right": 364.00001525878906,
+        "top": 144.8000030517578,
+        "width": 267.20001220703125,
+        "x": 96.8000030517578,
+        "y": 144.8000030517578
+      },
+      "text": "상품 및 상금",
+      "textFillColor": "",
+      "textShadow": "none",
+      "textStrokeColor": "",
+      "textStrokeWidth": "",
+      "withinViewport": true
+    },
+    "fullChain": [
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 243, 224)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "SECTION"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "ARTICLE"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "MAIN"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "BODY"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "HTML"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T10:48:47.276Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "label": "mobile",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e reported  success10:37:05Z; fresh navigation/reload"
+  },
+  {
+    "caption": {
+      "color": "rgb(78, 89, 104)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "insideDisabledControl": false,
+      "rect": {
+        "bottom": 297.8645935058594,
+        "height": 16,
+        "left": 191,
+        "right": 653.6666870117188,
+        "top": 281.8645935058594,
+        "width": 462.6666870117187,
+        "x": 191,
+        "y": 281.8645935058594
+      },
+      "text": "상품 및 상금",
+      "textFillColor": "",
+      "textShadow": "none",
+      "textStrokeColor": "",
+      "textStrokeWidth": "",
+      "withinViewport": true
+    },
+    "fullChain": [
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 243, 224)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "SECTION"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "ARTICLE"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "MAIN"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "BODY"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "HTML"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T10:49:44.378Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "label": "tablet",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e reported  success10:37:05Z; fresh navigation/reload"
+  },
+  {
+    "caption": {
+      "color": "rgb(78, 89, 104)",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "insideDisabledControl": false,
+      "rect": {
+        "bottom": 416.1875,
+        "height": 16,
+        "left": 182.5,
+        "right": 684.5,
+        "top": 400.1875,
+        "width": 502,
+        "x": 182.5,
+        "y": 400.1875
+      },
+      "text": "상품 및 상금",
+      "textFillColor": "",
+      "textShadow": "none",
+      "textStrokeColor": "",
+      "textStrokeWidth": "",
+      "withinViewport": true
+    },
+    "fullChain": [
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 243, 224)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "SECTION"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "ARTICLE"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgba(0, 0, 0, 0)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "MAIN"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "DIV"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "BODY"
+      },
+      {
+        "backdropFilter": "none",
+        "background": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "mixBlendMode": "normal",
+        "opacity": "1",
+        "tag": "HTML"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1",
+    "utc": "2026-10-03T10:49:56.274Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "label": "desktop",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e reported  success10:37:05Z; fresh navigation/reload"
+  }
+]

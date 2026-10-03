@@ -1,0 +1,391 @@
+{
+  "createdUTC": "2026-10-03T10:52:20.793Z",
+  "method": "Integer LTRB raster crops, right/bottom exclusive. No resizing, pixel editing or compositing. CSS viewport metadata is not converted to crop bounds.",
+  "sourceCaptureMetadataSHA256": "92d75857064e5e584603213b81fae9ae0047b3734d1d888a570df5308360df08",
+  "selectedCaptureMetadataCanonicalSHA256": "36e8f227185442f40eff9e9167386bbff4cdd6d540fce51bb91ffd915a9f87e0",
+  "canonicalization": "Historical source metadata snapshot; safe product proof files retain necessary product URLs. Private original metadata is not published.",
+  "crops": [
+    {
+      "branch": "photo",
+      "widthLabel": "mobile",
+      "sourceBasename": "photo-mobile-visible.png",
+      "outputBasename": "photo-mobile-visible.png",
+      "sourceProof": "photo-proof.json",
+      "proofIndex": 4,
+      "shotsJSONIndex": 4,
+      "domUTC": "2026-10-03T10:45:50.854Z",
+      "captureStartUTC": "2026-10-03T10:45:50.859Z",
+      "captureEndUTC": "2026-10-03T10:45:50.888Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollY": 0,
+        "width": 405
+      },
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        98,
+        98
+      ],
+      "cropBoundsLTRB": [
+        36,
+        252,
+        134,
+        350
+      ],
+      "sourceSHA256": "62c174737af945f6686c932d1b684bd589ba807db33d16fbcdaff09077db4d8f",
+      "outputSHA256": "f7a0fe1ee40db7aba931a683697f02854335076c3383ad14c1752afed558a3a6",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Cow thumbnail only; all adjacent names excluded.",
+      "domToCaptureSeconds": 0.005,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "photo",
+      "widthLabel": "tablet",
+      "sourceBasename": "photo-tablet-visible.png",
+      "outputBasename": "photo-tablet-visible.png",
+      "sourceProof": "photo-proof.json",
+      "proofIndex": 2,
+      "shotsJSONIndex": 2,
+      "domUTC": "2026-10-03T10:44:58.369Z",
+      "captureStartUTC": "2026-10-03T10:44:58.375Z",
+      "captureEndUTC": "2026-10-03T10:44:58.400Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollY": 0,
+        "width": 789
+      },
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        98,
+        98
+      ],
+      "cropBoundsLTRB": [
+        130,
+        199,
+        228,
+        297
+      ],
+      "sourceSHA256": "19012ba1d519bc6b477e0bf6c8fe10e91a2dc083f77172533552fbb2ce7d2628",
+      "outputSHA256": "0a97eae76055378463b9c46840a33c699131b2f581c187706143d10112ed6191",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Cow thumbnail only; all adjacent names excluded.",
+      "domToCaptureSeconds": 0.006,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "photo",
+      "widthLabel": "desktop",
+      "sourceBasename": "photo-desktop.png",
+      "outputBasename": "photo-desktop.png",
+      "sourceProof": "photo-proof.json",
+      "proofIndex": 3,
+      "shotsJSONIndex": 3,
+      "domUTC": "2026-10-03T10:45:15.267Z",
+      "captureStartUTC": "2026-10-03T10:45:15.272Z",
+      "captureEndUTC": "2026-10-03T10:45:15.329Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollY": 0,
+        "width": 1183
+      },
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        98,
+        98
+      ],
+      "cropBoundsLTRB": [
+        616,
+        400,
+        714,
+        498
+      ],
+      "sourceSHA256": "1a71f1cc69a5231d64da6e235a77dd3055ede67f1a1e76aa64931a0d533d9bd5",
+      "outputSHA256": "dc4b642b8e46e1ee166ef017acc809e0471d45078d8ea19c92f34ad1d1b264a5",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Cow thumbnail only; all adjacent names excluded.",
+      "domToCaptureSeconds": 0.005,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "cost",
+      "widthLabel": "mobile",
+      "sourceBasename": "cost-mobile-visible.png",
+      "outputBasename": "cost-mobile-visible.png",
+      "sourceProof": "cost-proof.json",
+      "proofIndex": 1,
+      "shotsJSONIndex": 6,
+      "domUTC": "2026-10-03T10:46:44.077Z",
+      "captureStartUTC": "2026-10-03T10:46:44.080Z",
+      "captureEndUTC": "2026-10-03T10:46:44.112Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        366,
+        190
+      ],
+      "cropBoundsLTRB": [
+        20,
+        269,
+        386,
+        459
+      ],
+      "sourceSHA256": "cfa0983eac8df508e9560288b88eda79ae84b1d4cf4cae0ea0a1ec25faa5f26b",
+      "outputSHA256": "bbe0b41cb8fac45c0ef2b92a2c54a6d08755134aa3f21bbe4d10b0b725ba72dd",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Cost panel only.",
+      "domToCaptureSeconds": 0.003,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "cost",
+      "widthLabel": "tablet",
+      "sourceBasename": "cost-tablet-visible.png",
+      "outputBasename": "cost-tablet-visible.png",
+      "sourceProof": "cost-proof.json",
+      "proofIndex": 3,
+      "shotsJSONIndex": 8,
+      "domUTC": "2026-10-03T10:47:15.637Z",
+      "captureStartUTC": "2026-10-03T10:47:15.640Z",
+      "captureEndUTC": "2026-10-03T10:47:15.686Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        561,
+        190
+      ],
+      "cropBoundsLTRB": [
+        114,
+        115,
+        675,
+        305
+      ],
+      "sourceSHA256": "370a609d67a5a182c4c5609e6d2322c957bfa7f01143384caa5c4a085c08094c",
+      "outputSHA256": "2607832b4ba75cd938190a84be84ba0bea96d583dcfe5639abbc5b4005672e76",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Cost panel only.",
+      "domToCaptureSeconds": 0.003,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "cost",
+      "widthLabel": "desktop",
+      "sourceBasename": "cost-desktop.png",
+      "outputBasename": "cost-desktop.png",
+      "sourceProof": "cost-proof.json",
+      "proofIndex": 4,
+      "shotsJSONIndex": 9,
+      "domUTC": "2026-10-03T10:47:17.236Z",
+      "captureStartUTC": "2026-10-03T10:47:17.240Z",
+      "captureEndUTC": "2026-10-03T10:47:17.270Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        625,
+        188
+      ],
+      "cropBoundsLTRB": [
+        55,
+        311,
+        680,
+        499
+      ],
+      "sourceSHA256": "6b28862ac3c52dfc1ea0a637701129e3c2da63f3e65310a19603cc3b66877701",
+      "outputSHA256": "999398458c1a2b40762cd02fe6a8bd49956eee38cdc72a20469d9a824a71ac72",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Cost panel only.",
+      "domToCaptureSeconds": 0.004,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "caption",
+      "widthLabel": "mobile",
+      "sourceBasename": "caption-mobile.png",
+      "outputBasename": "caption-mobile.png",
+      "sourceProof": "caption-proof.json",
+      "proofIndex": 0,
+      "shotsJSONIndex": 10,
+      "domUTC": "2026-10-03T10:48:47.276Z",
+      "captureStartUTC": "2026-10-03T10:48:47.282Z",
+      "captureEndUTC": "2026-10-03T10:48:47.296Z",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "outputDimensions": [
+        366,
+        137
+      ],
+      "cropBoundsLTRB": [
+        20,
+        141,
+        386,
+        278
+      ],
+      "sourceSHA256": "ce3ed0685bd5ef464c25f373c271ec1be9767db7572aa9323164194cba763eab",
+      "outputSHA256": "e291c58d057bc1b3d8af5fe6e43291972f9e2debadea9c2c4d9e989141dd837d",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Visible prize panel only; mobile upper edge is clipped in original screenshot.",
+      "domToCaptureSeconds": 0.006,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "caption",
+      "widthLabel": "tablet",
+      "sourceBasename": "caption-tablet.png",
+      "outputBasename": "caption-tablet.png",
+      "sourceProof": "caption-proof.json",
+      "proofIndex": 1,
+      "shotsJSONIndex": 11,
+      "domUTC": "2026-10-03T10:49:44.378Z",
+      "captureStartUTC": "2026-10-03T10:49:44.402Z",
+      "captureEndUTC": "2026-10-03T10:49:44.439Z",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "outputDimensions": [
+        561,
+        130
+      ],
+      "cropBoundsLTRB": [
+        114,
+        200,
+        675,
+        330
+      ],
+      "sourceSHA256": "c2bedd0f9fc9c178ec6b243d2e02a809e39fda1dcc7f996e1bbc06a7e980882b",
+      "outputSHA256": "f4c08d2cf74790b61c09a4326efad5eb8fddedf0f0b64181cfbf8b9484007290",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Prize panel only.",
+      "domToCaptureSeconds": 0.024,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "branch": "caption",
+      "widthLabel": "desktop",
+      "sourceBasename": "caption-desktop.png",
+      "outputBasename": "caption-desktop.png",
+      "sourceProof": "caption-proof.json",
+      "proofIndex": 2,
+      "shotsJSONIndex": 12,
+      "domUTC": "2026-10-03T10:49:56.274Z",
+      "captureStartUTC": "2026-10-03T10:49:56.296Z",
+      "captureEndUTC": "2026-10-03T10:49:56.348Z",
+      "viewport": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "outputDimensions": [
+        602,
+        131
+      ],
+      "cropBoundsLTRB": [
+        105,
+        378,
+        707,
+        509
+      ],
+      "sourceSHA256": "4fe3c07100c6aecde3bdedcecc2011ce4948a4ccc283fd8bf755647a8a90e4c7",
+      "outputSHA256": "b96736be8cb0eb90b91f2f3a28b58ec05a9714e8285a3e0313c6d4e57213184f",
+      "runtimeServingSHA": "unknown",
+      "cropGeometrySource": "Selected directly from original screenshot pixels. DOM rectangles are separate earlier observations; smooth scrolling may move elements before capture.",
+      "scope": "Prize panel only.",
+      "domToCaptureSeconds": 0.022,
+      "sourceCollectorReportedOriginalInspected": true,
+      "publisherInspectedSafeCrop": true
+    }
+  ],
+  "finalReviewUTC": "2026-10-03T10:57:05.497Z",
+  "reviewCaptureMetadataSHA256": "92d75857064e5e584603213b81fae9ae0047b3734d1d888a570df5308360df08",
+  "selectedMetadataUnchangedAtReview": true,
+  "deploymentContext": {
+    "attribution": "Reported deployment report; fresh navigation/reload per surface and width is reported QA procedure",
+    "reportedSHA": "e0ac9c6e5501b99bff9765532adec4c907f1b51e",
+    "run": "37115477778",
+    "healthyUTC": "2026-10-03T10:36:27.906Z",
+    "successUTC": "2026-10-03T10:37:05Z",
+    "runtimeServingSHA": "unknown",
+    "directoryNameIsRuntimeAttestation": false,
+    "serverWrites": {
+      "count": 0,
+      "source": "Capture procedure report"
+    }
+  },
+  "publisherScope": "Publisher checked safe bytes/pixels and declared bounds only; original-to-crop equality remains source collector evidence.",
+  "supplementarySourceSnapshots": [
+    {
+      "file": "photo-functions-supplement.json",
+      "sourceSHA256": "2129b4212dc55171f54e8d192fed200fb9409e08b5d7efd4a0e5ba3607d831a8",
+      "observationWindowUTC": [
+        "2026-10-03T11:11:26.130Z",
+        "2026-10-03T11:11:41.461Z"
+      ],
+      "originalImagesAndDOMUnchanged": true
+    }
+  ]
+}

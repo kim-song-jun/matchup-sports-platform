@@ -1,0 +1,92 @@
+[
+  {
+    "backgroundImage": {
+      "expressionWithOnlyURLArgumentsRedacted": "url([omitted]), url([omitted])",
+      "functionNamesAfterURLRedaction": [
+        "url",
+        "url"
+      ],
+      "hasGradient": false,
+      "hasLinearGradient": false,
+      "hasRadialGradient": false,
+      "urlFunctionCount": 2
+    },
+    "fixturePath": "/team-matches/87328d95-dae5-4548-918f-7954a24b7fcd",
+    "redaction": "Only url(...) contents replaced; no gradient/function removal.",
+    "thumbnail": {
+      "height": 96,
+      "textLength": 0,
+      "width": 96
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T11:11:26.130Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "label": "mobile",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e reported 10:37:05Z success; new independent DOM time; not old image timestamp"
+  },
+  {
+    "backgroundImage": {
+      "expressionWithOnlyURLArgumentsRedacted": "url([omitted]), url([omitted])",
+      "functionNamesAfterURLRedaction": [
+        "url",
+        "url"
+      ],
+      "hasGradient": false,
+      "hasLinearGradient": false,
+      "hasRadialGradient": false,
+      "urlFunctionCount": 2
+    },
+    "fixturePath": "/team-matches/87328d95-dae5-4548-918f-7954a24b7fcd",
+    "redaction": "Only url(...) contents replaced; no gradient/function removal.",
+    "thumbnail": {
+      "height": 96,
+      "textLength": 0,
+      "width": 96
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T11:11:40.026Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "label": "tablet",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e reported 10:37:05Z success; new independent DOM time; not old image timestamp"
+  },
+  {
+    "backgroundImage": {
+      "expressionWithOnlyURLArgumentsRedacted": "url([omitted]), url([omitted])",
+      "functionNamesAfterURLRedaction": [
+        "url",
+        "url"
+      ],
+      "hasGradient": false,
+      "hasLinearGradient": false,
+      "hasRadialGradient": false,
+      "urlFunctionCount": 2
+    },
+    "fixturePath": "/team-matches/87328d95-dae5-4548-918f-7954a24b7fcd",
+    "redaction": "Only url(...) contents replaced; no gradient/function removal.",
+    "thumbnail": {
+      "height": 96,
+      "textLength": 0,
+      "width": 96
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T11:11:41.461Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "label": "desktop",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e reported 10:37:05Z success; new independent DOM time; not old image timestamp"
+  }
+]

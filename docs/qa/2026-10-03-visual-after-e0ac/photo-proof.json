@@ -1,0 +1,647 @@
+[
+  {
+    "ancestorStyles": [
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 571.6000061035156,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 384.8000183105469,
+          "top": 428,
+          "width": 364.8000183105469,
+          "x": 20,
+          "y": 428
+        },
+        "tag": "A",
+        "textLength": 89
+      },
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 571.6000061035156,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 384.8000183105469,
+          "top": 428,
+          "width": 364.8000183105469,
+          "x": 20,
+          "y": 428
+        },
+        "tag": "A",
+        "textLength": 89
+      }
+    ],
+    "cardRect": {
+      "bottom": 571.6000061035156,
+      "height": 143.60000610351562,
+      "left": 20,
+      "right": 384.8000183105469,
+      "top": 428,
+      "width": 364.8000183105469,
+      "x": 20,
+      "y": 428
+    },
+    "thumb": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundImage": "[image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "pseudo": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::before"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::after"
+        }
+      ],
+      "rect": {
+        "bottom": 536.8000183105469,
+        "height": 96,
+        "left": 36.79999923706055,
+        "right": 132.79999923706055,
+        "top": 440.8000183105469,
+        "width": 96,
+        "x": 36.79999923706055,
+        "y": 440.8000183105469
+      },
+      "tag": "DIV",
+      "textLength": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T10:43:52.192Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollY": 0,
+      "width": 405
+    },
+    "label": "mobile",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e5501b99bff9765532adec4c907f1b51e reported  deployed10:37:05Z; fresh navigation",
+    "mainTeamMatchPrefixLinkCount": 21,
+    "linkCountLimit": "Prefix count includes create link; not a match card count"
+  },
+  {
+    "ancestorStyles": [
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 570.6666870117188,
+          "height": 143.33334350585938,
+          "left": 114.33333587646484,
+          "right": 674.3333358764648,
+          "top": 427.3333435058594,
+          "width": 560,
+          "x": 114.33333587646484,
+          "y": 427.3333435058594
+        },
+        "tag": "A",
+        "textLength": 89
+      },
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 570.6666870117188,
+          "height": 143.33334350585938,
+          "left": 114.33333587646484,
+          "right": 674.3333358764648,
+          "top": 427.3333435058594,
+          "width": 560,
+          "x": 114.33333587646484,
+          "y": 427.3333435058594
+        },
+        "tag": "A",
+        "textLength": 89
+      }
+    ],
+    "cardRect": {
+      "bottom": 570.6666870117188,
+      "height": 143.33334350585938,
+      "left": 114.33333587646484,
+      "right": 674.3333358764648,
+      "top": 427.3333435058594,
+      "width": 560,
+      "x": 114.33333587646484,
+      "y": 427.3333435058594
+    },
+    "thumb": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundImage": "[image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "pseudo": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::before"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::after"
+        }
+      ],
+      "rect": {
+        "bottom": 536,
+        "height": 96,
+        "left": 131,
+        "right": 227,
+        "top": 440,
+        "width": 96,
+        "x": 131,
+        "y": 440
+      },
+      "tag": "DIV",
+      "textLength": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T10:44:43.161Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollY": 0,
+      "width": 789
+    },
+    "label": "tablet",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e5501b99bff9765532adec4c907f1b51e reported  deployed10:37:05Z; fresh navigation",
+    "mainTeamMatchPrefixLinkCount": 21,
+    "linkCountLimit": "Prefix count includes create link; not a match card count"
+  },
+  {
+    "ancestorStyles": [
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 143.33334350585938,
+          "left": 114.33333587646484,
+          "right": 674.3333358764648,
+          "top": 187.33334350585935,
+          "width": 560,
+          "x": 114.33333587646484,
+          "y": 187.33334350585935
+        },
+        "tag": "A",
+        "textLength": 89
+      },
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 330.66668701171875,
+          "height": 143.33334350585938,
+          "left": 114.33333587646484,
+          "right": 674.3333358764648,
+          "top": 187.33334350585935,
+          "width": 560,
+          "x": 114.33333587646484,
+          "y": 187.33334350585935
+        },
+        "tag": "A",
+        "textLength": 89
+      }
+    ],
+    "cardRect": {
+      "bottom": 330.66668701171875,
+      "height": 143.33334350585938,
+      "left": 114.33333587646484,
+      "right": 674.3333358764648,
+      "top": 187.33334350585935,
+      "width": 560,
+      "x": 114.33333587646484,
+      "y": 187.33334350585935
+    },
+    "thumb": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundImage": "[image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "pseudo": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::before"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::after"
+        }
+      ],
+      "rect": {
+        "bottom": 296,
+        "height": 96,
+        "left": 131,
+        "right": 227,
+        "top": 200,
+        "width": 96,
+        "x": 131,
+        "y": 200
+      },
+      "tag": "DIV",
+      "textLength": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T10:44:58.369Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollY": 0,
+      "width": 789
+    },
+    "label": "tablet-visible-photo",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e5501b99bff9765532adec4c907f1b51e reported  deployed10:37:05Z; fresh navigation",
+    "mainTeamMatchPrefixLinkCount": 21,
+    "linkCountLimit": "Prefix count includes create link; not a match card count"
+  },
+  {
+    "ancestorStyles": [
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 532,
+          "height": 144,
+          "left": 599.5,
+          "right": 1127.5,
+          "top": 388,
+          "width": 528,
+          "x": 599.5,
+          "y": 388
+        },
+        "tag": "A",
+        "textLength": 89
+      },
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 532,
+          "height": 144,
+          "left": 599.5,
+          "right": 1127.5,
+          "top": 388,
+          "width": 528,
+          "x": 599.5,
+          "y": 388
+        },
+        "tag": "A",
+        "textLength": 89
+      }
+    ],
+    "cardRect": {
+      "bottom": 532,
+      "height": 144,
+      "left": 599.5,
+      "right": 1127.5,
+      "top": 388,
+      "width": 528,
+      "x": 599.5,
+      "y": 388
+    },
+    "thumb": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundImage": "[image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "pseudo": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::before"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::after"
+        }
+      ],
+      "rect": {
+        "bottom": 497,
+        "height": 96,
+        "left": 616.5,
+        "right": 712.5,
+        "top": 401,
+        "width": 96,
+        "x": 616.5,
+        "y": 401
+      },
+      "tag": "DIV",
+      "textLength": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T10:45:15.267Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollY": 0,
+      "width": 1183
+    },
+    "label": "desktop",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e5501b99bff9765532adec4c907f1b51e reported  deployed10:37:05Z; fresh navigation",
+    "mainTeamMatchPrefixLinkCount": 21,
+    "linkCountLimit": "Prefix count includes create link; not a match card count"
+  },
+  {
+    "ancestorStyles": [
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 393.2000122070313,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 384.8000183105469,
+          "top": 249.6000061035156,
+          "width": 364.8000183105469,
+          "x": 20,
+          "y": 249.6000061035156
+        },
+        "tag": "A",
+        "textLength": 89
+      },
+      {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "backgroundImage": "none",
+        "filter": "none",
+        "opacity": "1",
+        "pseudo": [
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::before"
+          },
+          {
+            "background": "rgba(0, 0, 0, 0)",
+            "content": "none",
+            "image": "none",
+            "opacity": "1",
+            "which": "::after"
+          }
+        ],
+        "rect": {
+          "bottom": 393.2000122070313,
+          "height": 143.60000610351562,
+          "left": 20,
+          "right": 384.8000183105469,
+          "top": 249.6000061035156,
+          "width": 364.8000183105469,
+          "x": 20,
+          "y": 249.6000061035156
+        },
+        "tag": "A",
+        "textLength": 89
+      }
+    ],
+    "cardRect": {
+      "bottom": 393.2000122070313,
+      "height": 143.60000610351562,
+      "left": 20,
+      "right": 384.8000183105469,
+      "top": 249.6000061035156,
+      "width": 364.8000183105469,
+      "x": 20,
+      "y": 249.6000061035156
+    },
+    "thumb": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "backgroundImage": "[image URL omitted], [image URL omitted]",
+      "filter": "none",
+      "opacity": "1",
+      "pseudo": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::before"
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "content": "none",
+          "image": "none",
+          "opacity": "1",
+          "which": "::after"
+        }
+      ],
+      "rect": {
+        "bottom": 358.3999938964844,
+        "height": 96,
+        "left": 36.79999923706055,
+        "right": 132.79999923706055,
+        "top": 262.3999938964844,
+        "width": 96,
+        "x": 36.79999923706055,
+        "y": 262.3999938964844
+      },
+      "tag": "DIV",
+      "textLength": 0
+    },
+    "url": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T10:45:50.854Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollY": 0,
+      "width": 405
+    },
+    "label": "mobile-visible-photo-supplement",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "e0ac9c6e5501b99bff9765532adec4c907f1b51e reported  deployed10:37:05Z; fresh navigation",
+    "mainTeamMatchPrefixLinkCount": 21,
+    "linkCountLimit": "Prefix count includes create link; not a match card count"
+  }
+]

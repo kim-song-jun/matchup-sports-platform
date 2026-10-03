@@ -1,0 +1,19 @@
+{
+  "activeStage": [
+    "1단계 기본 정보 — 완료",
+    "2단계 일정·장소 — 진행 중",
+    "3단계 참가 조건",
+    "4단계 상금·홍보",
+    "5단계 공개 확인 — 잠김"
+  ],
+  "registration": "2026-10-07T23:59",
+  "scheduled": "2026-10-10T12:00",
+  "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+  "utc": "2026-10-03T12:00:13.899Z",
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "width": 405
+  },
+  "method": "Native calendar icon; day2026-10-10; minute00; scroll hour column to12; afternoon; outsideclick. Deadline populated automatically D-3 23:59. No Enter, DOM mutation or API call."
+}

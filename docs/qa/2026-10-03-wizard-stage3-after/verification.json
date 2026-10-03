@@ -1,0 +1,115 @@
+{
+  "scope": "Independent safe-only checks; no browser replay",
+  "recordCount": 6,
+  "widthPairs": [
+    {
+      "width": 405,
+      "headingIndex": 0,
+      "firstTabIndex": 1,
+      "activeH2ThenTeamCount": true,
+      "inputHeightCSS": 44,
+      "inputBottomCSS": 228.9750061035156,
+      "footerTopCSS": 537.6000366210938,
+      "clearanceCSS": 308.6250305175781,
+      "inputFullyInsideViewportAndAboveFooter": true
+    },
+    {
+      "width": 789,
+      "headingIndex": 2,
+      "firstTabIndex": 3,
+      "activeH2ThenTeamCount": true,
+      "inputHeightCSS": 44,
+      "inputBottomCSS": 228.6666717529297,
+      "footerTopCSS": 436.6666870117187,
+      "clearanceCSS": 208.000015258789,
+      "inputFullyInsideViewportAndAboveFooter": true
+    },
+    {
+      "width": 1183,
+      "headingIndex": 4,
+      "firstTabIndex": 5,
+      "activeH2ThenTeamCount": true,
+      "inputHeightCSS": 44,
+      "inputBottomCSS": 553,
+      "footerTopCSS": 689,
+      "clearanceCSS": 136,
+      "inputFullyInsideViewportAndAboveFooter": true
+    }
+  ],
+  "dateAndCleanupChronologyVerified": true,
+  "images": [
+    {
+      "file": "tournament-wizard-mobile-heading.png",
+      "sha256": "7f6148eda5cad9461797aec4b5b536fb36685b2ac2bc4529103b51aae9d07c41",
+      "dimensions": [
+        339,
+        174
+      ],
+      "hashBoundsDOMAndUTCVerified": true,
+      "actualSafePixelsViewed": true
+    },
+    {
+      "file": "tournament-wizard-mobile-team-count.png",
+      "sha256": "50d111753cd764ed682b00891950f2021cb381ce8202717fe3b0d1d7ac102737",
+      "dimensions": [
+        339,
+        174
+      ],
+      "hashBoundsDOMAndUTCVerified": true,
+      "actualSafePixelsViewed": true
+    },
+    {
+      "file": "tournament-wizard-tablet-heading.png",
+      "sha256": "2b00e7e7d7d5cd25a2755f004b3a2548a26f3f692005e26607884bbc9dd4f535",
+      "dimensions": [
+        224,
+        174
+      ],
+      "hashBoundsDOMAndUTCVerified": true,
+      "actualSafePixelsViewed": true
+    },
+    {
+      "file": "tournament-wizard-tablet-team-count.png",
+      "sha256": "03caf664dcda0603549e219b8c6873d65bfabcf8a65a970995ae5bf3b3687a90",
+      "dimensions": [
+        224,
+        174
+      ],
+      "hashBoundsDOMAndUTCVerified": true,
+      "actualSafePixelsViewed": true
+    },
+    {
+      "file": "tournament-wizard-desktop-heading.png",
+      "sha256": "909bfbe1cc6aa727975a6cdd6de5d2ae6d03bda8eb03b8cc6c203a50b422c248",
+      "dimensions": [
+        271,
+        194
+      ],
+      "hashBoundsDOMAndUTCVerified": true,
+      "actualSafePixelsViewed": true
+    },
+    {
+      "file": "tournament-wizard-desktop-team-count.png",
+      "sha256": "fd2dacb7282972867d5e80cb258f71686126ad194edc18f90b1bd198f66dc118",
+      "dimensions": [
+        271,
+        194
+      ],
+      "hashBoundsDOMAndUTCVerified": true,
+      "actualSafePixelsViewed": true
+    }
+  ],
+  "privacy": "Six crops show only generic heading, helper text and numeric first control. No member/host identity, account sidebar or financial input values are included.",
+  "limits": [
+    "Only stage3 entry/reentry and one Tab at each width; no whole wizard, submission, complete keyboard order or physical-device PASS.",
+    "Heading focusVisible=false is recorded; DOM establishes active H2, not a visible outline.",
+    "Mobile is initial entry; tablet and desktop are reentries. Calendar prerequisite is one mobile procedure, not three independently repeated date entries.",
+    "Native calendar procedure and automatic D-3 deadline are collector reported; DOM independently records resultant local form strings without timezone offsets.",
+    "Bank, fee, quota and team count changes and final creation were not performed per collection report; team count remains8 in all six records. No network audit or server persistence test.",
+    "Footer clearance is calculated from DOM. Crops show heading/first input only and do not include footer.",
+    "Blank reentry proves title/sport empty and later stages unmounted, not that every prior hidden field was reread empty.",
+    "One footer Cancel attempt on blank reentry did not navigate; header list link ultimately exited. That Cancel attempt is neither PASS nor a confirmed new defect.",
+    "Earlier2357307 fill-tool blocked observations remain unverified; this later8167 calendar success cannot retroactively pass them.",
+    "Tablet CSS789x505 uses source PNG788x505. Capture and DOM times are separately preserved. Runtime servingSHA unknown."
+  ]
+}

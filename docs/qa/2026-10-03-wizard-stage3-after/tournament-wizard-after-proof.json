@@ -1,0 +1,572 @@
+[
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "rect": {
+        "bottom": 88.17499923706055,
+        "height": 28,
+        "left": 36.79999923706055,
+        "right": 368.0000114440918,
+        "top": 60.17499923706055,
+        "width": 331.20001220703125,
+        "x": 36.79999923706055,
+        "y": 60.17499923706055
+      },
+      "tag": "H2",
+      "text": "참가 조건"
+    },
+    "activeFullyAboveFooter": true,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 606.4000396728516,
+        "height": 68.80000305175781,
+        "left": 0,
+        "right": 404.8000183105469,
+        "top": 537.6000366210938,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 537.6000366210938
+      }
+    },
+    "heading": {
+      "rect": {
+        "bottom": 88.17499923706055,
+        "height": 28,
+        "left": 36.79999923706055,
+        "right": 368.0000114440918,
+        "top": 60.17499923706055,
+        "width": 331.20001220703125,
+        "x": 36.79999923706055,
+        "y": 60.17499923706055
+      },
+      "tabIndex": -1,
+      "text": "참가 조건"
+    },
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": {
+      "labels": [
+        "참가 팀 수* (필수)"
+      ],
+      "rect": {
+        "bottom": 228.9750061035156,
+        "height": 44,
+        "left": 36.79999923706055,
+        "right": 368.0000114440918,
+        "top": 184.9750061035156,
+        "width": 331.20001220703125,
+        "x": 36.79999923706055,
+        "y": 184.9750061035156
+      },
+      "value": "8"
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T12:00:56.133Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-stage3-initial-heading",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16Z; fresh wizard entry; runtime identity unexposed."
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "team-count",
+      "rect": {
+        "bottom": 228.9750061035156,
+        "height": 44,
+        "left": 36.79999923706055,
+        "right": 368.0000114440918,
+        "top": 184.9750061035156,
+        "width": 331.20001220703125,
+        "x": 36.79999923706055,
+        "y": 184.9750061035156
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "activeFullyAboveFooter": true,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 606.4000396728516,
+        "height": 68.80000305175781,
+        "left": 0,
+        "right": 404.8000183105469,
+        "top": 537.6000366210938,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 537.6000366210938
+      }
+    },
+    "heading": {
+      "rect": {
+        "bottom": 88.17499923706055,
+        "height": 28,
+        "left": 36.79999923706055,
+        "right": 368.0000114440918,
+        "top": 60.17499923706055,
+        "width": 331.20001220703125,
+        "x": 36.79999923706055,
+        "y": 60.17499923706055
+      },
+      "tabIndex": -1,
+      "text": "참가 조건"
+    },
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": {
+      "labels": [
+        "참가 팀 수* (필수)"
+      ],
+      "rect": {
+        "bottom": 228.9750061035156,
+        "height": 44,
+        "left": 36.79999923706055,
+        "right": 368.0000114440918,
+        "top": 184.9750061035156,
+        "width": 331.20001220703125,
+        "x": 36.79999923706055,
+        "y": 184.9750061035156
+      },
+      "value": "8"
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T12:00:56.282Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-stage3-first-Tab",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16Z; fresh wizard entry; runtime identity unexposed."
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "rect": {
+        "bottom": 88,
+        "height": 28,
+        "left": 52.66666793823242,
+        "right": 736.0000419616699,
+        "top": 60,
+        "width": 683.3333740234375,
+        "x": 52.66666793823242,
+        "y": 60
+      },
+      "tag": "H2",
+      "text": "참가 조건"
+    },
+    "activeFullyAboveFooter": true,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 505.3333587646485,
+        "height": 68.66667175292969,
+        "left": 0,
+        "right": 788.6666870117188,
+        "top": 436.6666870117187,
+        "width": 788.6666870117188,
+        "x": 0,
+        "y": 436.6666870117187
+      }
+    },
+    "heading": {
+      "rect": {
+        "bottom": 88,
+        "height": 28,
+        "left": 52.66666793823242,
+        "right": 736.0000419616699,
+        "top": 60,
+        "width": 683.3333740234375,
+        "x": 52.66666793823242,
+        "y": 60
+      },
+      "tabIndex": -1,
+      "text": "참가 조건"
+    },
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": {
+      "labels": [
+        "참가 팀 수* (필수)"
+      ],
+      "rect": {
+        "bottom": 228.6666717529297,
+        "height": 44,
+        "left": 52.66666793823242,
+        "right": 269.7708396911621,
+        "top": 184.6666717529297,
+        "width": 217.1041717529297,
+        "x": 52.66666793823242,
+        "y": 184.6666717529297
+      },
+      "value": "8"
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T12:01:18.540Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-stage3-reentry-heading",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16Z; fresh wizard entry; runtime identity unexposed."
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "team-count",
+      "rect": {
+        "bottom": 228.6666717529297,
+        "height": 44,
+        "left": 52.66666793823242,
+        "right": 269.7708396911621,
+        "top": 184.6666717529297,
+        "width": 217.1041717529297,
+        "x": 52.66666793823242,
+        "y": 184.6666717529297
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "activeFullyAboveFooter": true,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 505.3333587646485,
+        "height": 68.66667175292969,
+        "left": 0,
+        "right": 788.6666870117188,
+        "top": 436.6666870117187,
+        "width": 788.6666870117188,
+        "x": 0,
+        "y": 436.6666870117187
+      }
+    },
+    "heading": {
+      "rect": {
+        "bottom": 88,
+        "height": 28,
+        "left": 52.66666793823242,
+        "right": 736.0000419616699,
+        "top": 60,
+        "width": 683.3333740234375,
+        "x": 52.66666793823242,
+        "y": 60
+      },
+      "tabIndex": -1,
+      "text": "참가 조건"
+    },
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": {
+      "labels": [
+        "참가 팀 수* (필수)"
+      ],
+      "rect": {
+        "bottom": 228.6666717529297,
+        "height": 44,
+        "left": 52.66666793823242,
+        "right": 269.7708396911621,
+        "top": 184.6666717529297,
+        "width": 217.1041717529297,
+        "x": 52.66666793823242,
+        "y": 184.6666717529297
+      },
+      "value": "8"
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T12:01:18.686Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-stage3-first-Tab",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16Z; fresh wizard entry; runtime identity unexposed."
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "",
+      "rect": {
+        "bottom": 412,
+        "height": 28,
+        "left": 301,
+        "right": 1122,
+        "top": 384,
+        "width": 821,
+        "x": 301,
+        "y": 384
+      },
+      "tag": "H2",
+      "text": "참가 조건"
+    },
+    "activeFullyAboveFooter": true,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 758,
+        "height": 69,
+        "left": 0,
+        "right": 1183,
+        "top": 689,
+        "width": 1183,
+        "x": 0,
+        "y": 689
+      }
+    },
+    "heading": {
+      "rect": {
+        "bottom": 412,
+        "height": 28,
+        "left": 301,
+        "right": 1122,
+        "top": 384,
+        "width": 821,
+        "x": 301,
+        "y": 384
+      },
+      "tabIndex": -1,
+      "text": "참가 조건"
+    },
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": {
+      "labels": [
+        "참가 팀 수* (필수)"
+      ],
+      "rect": {
+        "bottom": 553,
+        "height": 44,
+        "left": 301,
+        "right": 564,
+        "top": 509,
+        "width": 263,
+        "x": 301,
+        "y": 509
+      },
+      "value": "8"
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T12:01:39.169Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-stage3-reentry-heading",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16Z; fresh wizard entry; runtime identity unexposed."
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "team-count",
+      "rect": {
+        "bottom": 553,
+        "height": 44,
+        "left": 301,
+        "right": 564,
+        "top": 509,
+        "width": 263,
+        "x": 301,
+        "y": 509
+      },
+      "tag": "INPUT",
+      "text": null
+    },
+    "activeFullyAboveFooter": true,
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 758,
+        "height": 69,
+        "left": 0,
+        "right": 1183,
+        "top": 689,
+        "width": 1183,
+        "x": 0,
+        "y": 689
+      }
+    },
+    "heading": {
+      "rect": {
+        "bottom": 412,
+        "height": 28,
+        "left": 301,
+        "right": 1122,
+        "top": 384,
+        "width": 821,
+        "x": 301,
+        "y": 384
+      },
+      "tabIndex": -1,
+      "text": "참가 조건"
+    },
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": {
+      "labels": [
+        "참가 팀 수* (필수)"
+      ],
+      "rect": {
+        "bottom": 553,
+        "height": 44,
+        "left": 301,
+        "right": 564,
+        "top": 509,
+        "width": 263,
+        "x": 301,
+        "y": 509
+      },
+      "value": "8"
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T12:01:39.325Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-stage3-first-Tab",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16Z; fresh wizard entry; runtime identity unexposed."
+  }
+]

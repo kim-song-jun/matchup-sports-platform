@@ -1,0 +1,300 @@
+{
+  "createdUTC": "2026-10-03T12:07:22.301Z",
+  "method": "Integer LTRB raster crops; right/bottom exclusive. No resizing, pixel modification or compositing.",
+  "sourceCaptureMetadataSHA256": "a80f37b2bcfe8820318bf2aa5fa3cef7da5034bb5926fe9e0ebaa04f5fe796b0",
+  "selectedCaptureMetadataCanonicalSHA256": "fdd925f7bb474e4e5be8d2de1a6f3ddb6151b12bd039e4b92b1e8a935a642224",
+  "canonicalization": "Full original selected shots rows in crop order; UTF8 JSON ensure_ascii=false sort_keys=true compact separators; private URL values hashed but not copied.",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "conclusion": "success",
+    "updatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read Deploy Alpha workflow metadata",
+    "runtimeServingSHA": "unknown"
+  },
+  "crops": [
+    {
+      "sourceBasename": "tournament-wizard-mobile-heading.png",
+      "outputBasename": "tournament-wizard-mobile-heading.png",
+      "proofIndex": 0,
+      "shotsJSONIndex": 91,
+      "observationUTC": "2026-10-03T12:00:56.133Z",
+      "captureStartUTC": "2026-10-03T12:00:56.137Z",
+      "captureEndUTC": "2026-10-03T12:00:56.157Z",
+      "observationToCaptureSeconds": 0.004,
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "outputRasterDimensions": [
+        339,
+        174
+      ],
+      "cropBoundsLTRB": [
+        33,
+        59,
+        372,
+        233
+      ],
+      "sourceSHA256": "89b4ead8c7428eb2e6bbe57098ae68d90fbac8363a6ff7b3155bb77274f1e50d",
+      "outputSHA256": "7f6148eda5cad9461797aec4b5b536fb36685b2ac2bc4529103b51aae9d07c41",
+      "cropInspectedDirectly": true,
+      "runtimeServingSHA": "unknown",
+      "visualScope": "Stage3 heading and unchanged first team-count field only; focus outline and selected8 visible after Tab. Footer is intentionally outside this minimum crop; full original inspection and separately recorded DOM rectangles support clearance. Initial H2 focus is DOM evidence, not an outline claim.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "uniqueMetadata": true,
+        "metadataObservationUTC": true,
+        "metadataViewport": true,
+        "samePrivateRoute": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "tournament-wizard-mobile-team-count.png",
+      "outputBasename": "tournament-wizard-mobile-team-count.png",
+      "proofIndex": 1,
+      "shotsJSONIndex": 92,
+      "observationUTC": "2026-10-03T12:00:56.282Z",
+      "captureStartUTC": "2026-10-03T12:00:56.285Z",
+      "captureEndUTC": "2026-10-03T12:00:56.303Z",
+      "observationToCaptureSeconds": 0.003,
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "outputRasterDimensions": [
+        339,
+        174
+      ],
+      "cropBoundsLTRB": [
+        33,
+        59,
+        372,
+        233
+      ],
+      "sourceSHA256": "0740ea65d4eadff00890c25e1764964857e0452ae54fbdfb4ffcd37f83829c58",
+      "outputSHA256": "50d111753cd764ed682b00891950f2021cb381ce8202717fe3b0d1d7ac102737",
+      "cropInspectedDirectly": true,
+      "runtimeServingSHA": "unknown",
+      "visualScope": "Stage3 heading and unchanged first team-count field only; focus outline and selected8 visible after Tab. Footer is intentionally outside this minimum crop; full original inspection and separately recorded DOM rectangles support clearance. Initial H2 focus is DOM evidence, not an outline claim.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "uniqueMetadata": true,
+        "metadataObservationUTC": true,
+        "metadataViewport": true,
+        "samePrivateRoute": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "tournament-wizard-tablet-heading.png",
+      "outputBasename": "tournament-wizard-tablet-heading.png",
+      "proofIndex": 2,
+      "shotsJSONIndex": 93,
+      "observationUTC": "2026-10-03T12:01:18.540Z",
+      "captureStartUTC": "2026-10-03T12:01:18.542Z",
+      "captureEndUTC": "2026-10-03T12:01:18.564Z",
+      "observationToCaptureSeconds": 0.002,
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "outputRasterDimensions": [
+        224,
+        174
+      ],
+      "cropBoundsLTRB": [
+        49,
+        59,
+        273,
+        233
+      ],
+      "sourceSHA256": "43013a61f81c658bdc7435a4b526b8b45e9c0b9d8cc0d7590bd306ad8e17f494",
+      "outputSHA256": "2b00e7e7d7d5cd25a2755f004b3a2548a26f3f692005e26607884bbc9dd4f535",
+      "cropInspectedDirectly": true,
+      "runtimeServingSHA": "unknown",
+      "visualScope": "Stage3 heading and unchanged first team-count field only; focus outline and selected8 visible after Tab. Footer is intentionally outside this minimum crop; full original inspection and separately recorded DOM rectangles support clearance. Initial H2 focus is DOM evidence, not an outline claim.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "uniqueMetadata": true,
+        "metadataObservationUTC": true,
+        "metadataViewport": true,
+        "samePrivateRoute": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "tournament-wizard-tablet-team-count.png",
+      "outputBasename": "tournament-wizard-tablet-team-count.png",
+      "proofIndex": 3,
+      "shotsJSONIndex": 94,
+      "observationUTC": "2026-10-03T12:01:18.686Z",
+      "captureStartUTC": "2026-10-03T12:01:18.689Z",
+      "captureEndUTC": "2026-10-03T12:01:18.716Z",
+      "observationToCaptureSeconds": 0.003,
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "outputRasterDimensions": [
+        224,
+        174
+      ],
+      "cropBoundsLTRB": [
+        49,
+        59,
+        273,
+        233
+      ],
+      "sourceSHA256": "f7c0008f14ba89d327d454226c580ba4a98d76b64bcf8292e46b021b599dde30",
+      "outputSHA256": "03caf664dcda0603549e219b8c6873d65bfabcf8a65a970995ae5bf3b3687a90",
+      "cropInspectedDirectly": true,
+      "runtimeServingSHA": "unknown",
+      "visualScope": "Stage3 heading and unchanged first team-count field only; focus outline and selected8 visible after Tab. Footer is intentionally outside this minimum crop; full original inspection and separately recorded DOM rectangles support clearance. Initial H2 focus is DOM evidence, not an outline claim.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "uniqueMetadata": true,
+        "metadataObservationUTC": true,
+        "metadataViewport": true,
+        "samePrivateRoute": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "tournament-wizard-desktop-heading.png",
+      "outputBasename": "tournament-wizard-desktop-heading.png",
+      "proofIndex": 4,
+      "shotsJSONIndex": 95,
+      "observationUTC": "2026-10-03T12:01:39.169Z",
+      "captureStartUTC": "2026-10-03T12:01:39.171Z",
+      "captureEndUTC": "2026-10-03T12:01:39.195Z",
+      "observationToCaptureSeconds": 0.002,
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "outputRasterDimensions": [
+        271,
+        194
+      ],
+      "cropBoundsLTRB": [
+        297,
+        363,
+        568,
+        557
+      ],
+      "sourceSHA256": "62723b8c7902bb0bf20ae69afdfce304df938663082412005234efca8aa7c17a",
+      "outputSHA256": "909bfbe1cc6aa727975a6cdd6de5d2ae6d03bda8eb03b8cc6c203a50b422c248",
+      "cropInspectedDirectly": true,
+      "runtimeServingSHA": "unknown",
+      "visualScope": "Stage3 heading and unchanged first team-count field only; focus outline and selected8 visible after Tab. Footer is intentionally outside this minimum crop; full original inspection and separately recorded DOM rectangles support clearance. Initial H2 focus is DOM evidence, not an outline claim.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "uniqueMetadata": true,
+        "metadataObservationUTC": true,
+        "metadataViewport": true,
+        "samePrivateRoute": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "tournament-wizard-desktop-team-count.png",
+      "outputBasename": "tournament-wizard-desktop-team-count.png",
+      "proofIndex": 5,
+      "shotsJSONIndex": 96,
+      "observationUTC": "2026-10-03T12:01:39.325Z",
+      "captureStartUTC": "2026-10-03T12:01:39.327Z",
+      "captureEndUTC": "2026-10-03T12:01:39.350Z",
+      "observationToCaptureSeconds": 0.002,
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "outputRasterDimensions": [
+        271,
+        194
+      ],
+      "cropBoundsLTRB": [
+        297,
+        363,
+        568,
+        557
+      ],
+      "sourceSHA256": "0003ab784d6d333db299691ece3baf8c5eb50edd524092b0d8c22c2ccee03343",
+      "outputSHA256": "fd2dacb7282972867d5e80cb258f71686126ad194edc18f90b1bd198f66dc118",
+      "cropInspectedDirectly": true,
+      "runtimeServingSHA": "unknown",
+      "visualScope": "Stage3 heading and unchanged first team-count field only; focus outline and selected8 visible after Tab. Footer is intentionally outside this minimum crop; full original inspection and separately recorded DOM rectangles support clearance. Initial H2 focus is DOM evidence, not an outline claim.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "uniqueMetadata": true,
+        "metadataObservationUTC": true,
+        "metadataViewport": true,
+        "samePrivateRoute": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "outputDimensions": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    }
+  ],
+  "publicationReviewLimit": "Raw original images and selected source metadata were not read by publisher; original-to-crop equality remains source-collector reported. Footer is outside all six safe crops."
+}

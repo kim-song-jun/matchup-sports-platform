@@ -1,0 +1,75 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3076,
+      "sha256": "7454ff4dafdea598710dce784706fd751eb149e975c94a4a4aa0e35e39b32927"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 11445,
+      "sha256": "25a6b5e59deb4cf419c072134d316b05fb72be7a4c2893103b1bfe60bb236d6d"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 3520,
+      "sha256": "92b84d5a9219830806b1592e5b8b75d148eef94a01adba10490f96027e31af97"
+    },
+    {
+      "file": "tournament-wizard-after-proof.json",
+      "bytes": 13770,
+      "sha256": "2e9e1df7fa52f45d86b6e6d915ba9e5ed59011cd691720e13fc1e4082dd32b58"
+    },
+    {
+      "file": "tournament-wizard-desktop-heading.png",
+      "bytes": 16091,
+      "sha256": "909bfbe1cc6aa727975a6cdd6de5d2ae6d03bda8eb03b8cc6c203a50b422c248"
+    },
+    {
+      "file": "tournament-wizard-desktop-team-count.png",
+      "bytes": 19909,
+      "sha256": "fd2dacb7282972867d5e80cb258f71686126ad194edc18f90b1bd198f66dc118"
+    },
+    {
+      "file": "tournament-wizard-discard-proof.json",
+      "bytes": 258,
+      "sha256": "781dcef57af4aa814e5757a758b6d63df0f6235687ecd583be23c29b9856c66e"
+    },
+    {
+      "file": "tournament-wizard-final-state.json",
+      "bytes": 450,
+      "sha256": "e4e230d91b6eeab03b505431a127299bc5c87f7d4d15faa3937f3763e90069cb"
+    },
+    {
+      "file": "tournament-wizard-mobile-heading.png",
+      "bytes": 12653,
+      "sha256": "7f6148eda5cad9461797aec4b5b536fb36685b2ac2bc4529103b51aae9d07c41"
+    },
+    {
+      "file": "tournament-wizard-mobile-team-count.png",
+      "bytes": 15667,
+      "sha256": "50d111753cd764ed682b00891950f2021cb381ce8202717fe3b0d1d7ac102737"
+    },
+    {
+      "file": "tournament-wizard-native-date-proof.json",
+      "bytes": 647,
+      "sha256": "a802ccbc9e765dbf73429b4f399f1e8162ff78b13dd5940bec047b492299044f"
+    },
+    {
+      "file": "tournament-wizard-tablet-heading.png",
+      "bytes": 12822,
+      "sha256": "2b00e7e7d7d5cd25a2755f004b3a2548a26f3f692005e26607884bbc9dd4f535"
+    },
+    {
+      "file": "tournament-wizard-tablet-team-count.png",
+      "bytes": 15682,
+      "sha256": "03caf664dcda0603549e219b8c6873d65bfabcf8a65a970995ae5bf3b3687a90"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 4451,
+      "sha256": "48257604ddc475bfaf954a3062362075731fdfa83547eb6a48e918fb1e8daaa0"
+    }
+  ],
+  "scope": "All files except manifest itself"
+}

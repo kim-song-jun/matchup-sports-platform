@@ -1,0 +1,12 @@
+{
+  "url": "https://alpha.teameet.co.kr/admin/tournaments",
+  "utc": "2026-10-03T12:02:51.948Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 758,
+    "width": 1183
+  },
+  "wizardDateFields": 0,
+  "wizardTitleInputPresent": false,
+  "exitMethod": "After blank reentry, footerCancel did not navigate in observed attempt and no dialog appeared; actual header 대회 목록으로 link returned to list. No defect conclusion from single cancel attempt."
+}

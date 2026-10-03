@@ -28,6 +28,7 @@ describe('platform team match chat with PostgreSQL', () => {
     awayTeamId = away.id;
     const match = await prisma.v1TeamMatch.create({ data: {
       title: 'Platform chat QA', sportId: home.sportId, regionId: home.regionId,
+      placeName: 'Chat QA Court', startAt: new Date('2030-01-01T12:00:00Z'),
       platformManaged: true, createdByUserId: ids.outsider,
     } });
     matchId = match.id;
@@ -82,6 +83,8 @@ describe('platform team match chat with PostgreSQL', () => {
     const legacy = await prisma.v1TeamMatch.create({ data: {
       title: 'Legacy platform chat QA', sportId: (await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: matchId } })).sportId,
       platformManaged: true, createdByUserId: ids.outsider, hostTeamId: ids.team, approvedApplicantTeamId: awayTeamId, status: 'completed',
+      regionId: (await prisma.v1Team.findUniqueOrThrow({ where: { id: ids.team } })).regionId,
+      placeName: 'Legacy Chat QA Court', startAt: new Date('2026-01-01T12:00:00Z'),
     } });
     const sql = readFileSync(resolve(__dirname, '../../prisma/migrations/20261002110000_v1_platform_team_match_chat_backfill/migration.sql'), 'utf8');
     const statements = sql.replace(/^\s*--.*$/gm, '').split(';').map((s) => s.trim()).filter((s) => s && !['BEGIN', 'COMMIT'].includes(s));

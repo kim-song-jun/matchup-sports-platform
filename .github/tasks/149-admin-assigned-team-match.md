@@ -290,3 +290,10 @@ Approval scope is these four local release-binding updates and their focused ver
 
 - User explicitly instructed proceeding with already-validated work. Fast-forward pushed `2cd74043a` to DEV using configured Git authentication; main unchanged. CI run 37138835620 and Deploy Alpha run 37138835598 started.
 - Web CI lint found the photo text backing padding 6px/10px violates the four-pixel spacing grid. Reproduced with the unchanged pattern checker under Git Bash; corrected only this padding to 8px/12px. Earlier unit/types validation remains valid; rerun only the failing checker. Alpha still served predecessor 8ec820cbb while deployment waited on CI.
+
+### 2026-10-04 CI failures resolved with isolated PostgreSQL evidence
+
+- Complete 191-migration replay PASS in fresh PostgreSQL WASM with committed LF SQL bytes. Windows CRLF raw SQL caused canonical content-hash guards to fail; normalizing to Git/CI LF fixes those baseline artifacts without modifying migrations.
+- Reproduced new chat integration fixture failure against actual DB check v1_team_matches_friendly_required_ck (missing placeName/startAt; legacy fixture also missing regionId). Added required real persistence fields, leaving runtime constraints intact. RED 4/4 failed -> GREEN 4/4 passed for actual Nest HTTP/Prisma suite, including creator mandatory participation, team-manager access, two-run backfill/history/preferences/team-exit preservation and revoked/cancelled access denial.
+- Used a fresh process-owned PGlite instance and localhost-only socket (55439), complete real SQL schema and Prisma/HTTP requests; single-suite node environment avoids unsupported database-template cloning in WASM. It is supplemental evidence, not a substitute for Linux CI native PostgreSQL. Owned DB/socket closed after each run. No live DB touched, no env file read.
+- Added API/Web patch changesets for CI follow-up. Real alpha before captures: 9/9 public list/photographic detail/platform detail views at 390/768/1440; console/network errors 0 and overflow 0. Evidence under output/playwright/visual-audit/team-match-dev-deploy/before.

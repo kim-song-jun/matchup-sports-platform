@@ -1,0 +1,22 @@
+{
+  "inputFiles": [
+    {
+      "file": "1404-video-keyboard-proof.json",
+      "bytes": 6305,
+      "sha256": "ede70bc81a7b02aa7690d55fb605b1c8336377e1d2d297618ec7136df7e52551"
+    },
+    {
+      "file": "1404-video-keyboard-actions.json",
+      "bytes": 1548,
+      "sha256": "c8508f26b3260aa36fefeabfeb1481003d3bb90833f073bd44ca822ddb2cf80b"
+    },
+    {
+      "file": "1404-video-keyboard-summary.json",
+      "bytes": 3378,
+      "sha256": "c42fd19d5f4aa3412c6744a4ab3eeb794075836458a9083b1e9b80788449bd5c"
+    }
+  ],
+  "publicationProjection": "Opaque tournament page URL replaced with SHA256 and a route template. Generic product media href and settled destination URL are retained for exact comparison. Original local files unchanged.",
+  "images": 0,
+  "privacy": "Only generic video-item names, product media path, numeric tab IDs, focus flags and timestamps. No people, account details, private tab URLs, tokens or secrets."
+}

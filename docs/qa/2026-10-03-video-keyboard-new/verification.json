@@ -1,0 +1,61 @@
+{
+  "DOMSnapshots": 5,
+  "EnterActivationRecords": 2,
+  "viewport": {
+    "width": 1180,
+    "height": 757,
+    "dpr": 1
+  },
+  "activeTagSequence": [
+    "BUTTON",
+    "A",
+    "A",
+    "A",
+    "A"
+  ],
+  "activeAnchorFocusVisible": [
+    true,
+    true,
+    true,
+    true
+  ],
+  "itemsAtEverySnapshot": 2,
+  "videoItemButtonsAtEverySnapshot": 0,
+  "distinctItemNames": 2,
+  "distinctHrefCount": 1,
+  "bothTargetBlank": true,
+  "bothRelNoreferrer": true,
+  "nativeTabCallBoundsIncluded": false,
+  "activationChecks": [
+    {
+      "itemIndex": 0,
+      "sourceDOMIndex": 1,
+      "postCloseDOMIndex": 2,
+      "expectedHrefMatchesSettledURL": true,
+      "newTabId": "3",
+      "newTabNotInBeforeInventory": true,
+      "initialTabURLBlank": true,
+      "originalTabPreservedInRemainingInventory": true,
+      "callAndObservationOrderValid": true
+    },
+    {
+      "itemIndex": 1,
+      "sourceDOMIndex": 3,
+      "postCloseDOMIndex": 4,
+      "expectedHrefMatchesSettledURL": true,
+      "newTabId": "4",
+      "newTabNotInBeforeInventory": true,
+      "initialTabURLBlank": true,
+      "originalTabPreservedInRemainingInventory": true,
+      "callAndObservationOrderValid": true
+    }
+  ],
+  "sourcePageUnchangedAcrossFiveDOMRows": true,
+  "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+  "sourceHashesVerified": true,
+  "SpaceVideoItemButtonBranch": "Not applicable: recorded video items have tagA and button count0. Panel-button and player controls outside scope.",
+  "staticListItemAndAXRoleCheckRepeated": false,
+  "playbackOrMediaHeadersVerified": false,
+  "documentHasFocusVerified": false,
+  "runtimeServingSHA": "unknown"
+}

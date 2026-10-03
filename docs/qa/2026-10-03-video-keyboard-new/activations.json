@@ -1,0 +1,58 @@
+[
+  {
+    "itemIndex": 0,
+    "key": "Return",
+    "startedUTC": "2026-10-03T14:37:41.982Z",
+    "expectedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+    "beforeTabIds": [
+      "2"
+    ],
+    "completedUTC": "2026-10-03T14:37:42.052Z",
+    "newTabs": [
+      {
+        "id": "3",
+        "url": ""
+      }
+    ],
+    "settledNewTab": {
+      "utc": "2026-10-03T14:38:36.555Z",
+      "id": "3",
+      "url": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "title": "alpha.teameet.co.kr/mock/generated/tournament-highlight.webm"
+    },
+    "matchesHref": true,
+    "closeStartedUTC": "2026-10-03T14:38:36.560Z",
+    "closeCompletedUTC": "2026-10-03T14:38:36.566Z",
+    "remainingTabIds": [
+      "2"
+    ]
+  },
+  {
+    "itemIndex": 1,
+    "key": "Return",
+    "startedUTC": "2026-10-03T14:39:33.808Z",
+    "expectedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+    "beforeTabIds": [
+      "2"
+    ],
+    "completedUTC": "2026-10-03T14:39:33.882Z",
+    "newTabs": [
+      {
+        "id": "4",
+        "url": ""
+      }
+    ],
+    "settledNewTab": {
+      "utc": "2026-10-03T14:39:57.376Z",
+      "id": "4",
+      "url": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "title": "alpha.teameet.co.kr/mock/generated/tournament-highlight.webm"
+    },
+    "matchesHref": true,
+    "closeStartedUTC": "2026-10-03T14:39:57.381Z",
+    "closeCompletedUTC": "2026-10-03T14:39:57.384Z",
+    "remainingTabIds": [
+      "2"
+    ]
+  }
+]

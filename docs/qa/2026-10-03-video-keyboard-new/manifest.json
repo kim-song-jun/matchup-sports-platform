@@ -1,0 +1,36 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3267,
+      "sha256": "19296996d70cd94b6a28beb8d2f7fb75a8f69ebe7604bda105a9482900734fd6"
+    },
+    {
+      "file": "activations.json",
+      "bytes": 1549,
+      "sha256": "a38d34cdcf331590266ad4dd321ef40434b9e684916c892266860d8ec73c7078"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 6766,
+      "sha256": "c69e03f9e9120945de428fccf7c6d23d0b9a2f5b0f42ee2979a3a85a30027587"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 938,
+      "sha256": "d040a80d98fd48f7f4d5aa546db29e7326686c00d4e3dcfe9f888eacbf9c82f3"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4292,
+      "sha256": "e37a88a18e2a8d6e765e356f06cfca80851ec196ae3f6e25203fc1f0aa55767d"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 1682,
+      "sha256": "572abf961930387885774b93d33803c95448459d55e6967ed3e276953f5a07e6"
+    }
+  ],
+  "hashAlgorithm": "SHA-256",
+  "manifestSelfExcluded": true
+}

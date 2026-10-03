@@ -1,0 +1,108 @@
+{
+  "scope": "Issue1404 two observed video item anchors: actual Tab→Enter activation and newly opened tab URL comparison",
+  "cohort": "post-reset-20261003-1322",
+  "runtimeServingSHA": "unknown",
+  "viewport": {
+    "dpr": 1,
+    "height": 757,
+    "width": 1180
+  },
+  "observedUTC": [
+    "2026-10-03T14:37:23.277Z",
+    "2026-10-03T14:39:57.445Z"
+  ],
+  "focusSequence": [
+    {
+      "index": 0,
+      "step": "desktop-video-panel-selected",
+      "tag": "BUTTON",
+      "name": "경기 영상 2",
+      "focusVisible": false
+    },
+    {
+      "index": 1,
+      "step": "desktop-native-Tab-first-video",
+      "tag": "A",
+      "name": "결승 하이라이트 보기 (새 창)",
+      "focusVisible": true
+    },
+    {
+      "index": 2,
+      "step": "desktop-after-first-QA-tab-closed",
+      "tag": "A",
+      "name": "결승 하이라이트 보기 (새 창)",
+      "focusVisible": true
+    },
+    {
+      "index": 3,
+      "step": "desktop-native-Tab-second-video",
+      "tag": "A",
+      "name": "우승 세리머니 보기 (새 창)",
+      "focusVisible": true
+    },
+    {
+      "index": 4,
+      "step": "desktop-after-second-QA-tab-closed",
+      "tag": "A",
+      "name": "우승 세리머니 보기 (새 창)",
+      "focusVisible": true
+    }
+  ],
+  "activations": [
+    {
+      "itemIndex": 0,
+      "expectedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "newTabId": "3",
+      "actualURL": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "observedUTC": "2026-10-03T14:38:36.555Z",
+      "matchesHref": true,
+      "remainingTabIdsAfterClose": [
+        "2"
+      ]
+    },
+    {
+      "itemIndex": 1,
+      "expectedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "newTabId": "4",
+      "actualURL": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "observedUTC": "2026-10-03T14:39:57.376Z",
+      "matchesHref": true,
+      "remainingTabIdsAfterClose": [
+        "2"
+      ]
+    }
+  ],
+  "spaceTest": {
+    "status": "NOT_APPLICABLE_TO_OBSERVED_VIDEO_ITEMS",
+    "reason": "Both tested item controls are native A links, not buttons. The panel tab button and native media-player controls are outside this item-activation condition."
+  },
+  "final": {
+    "activeItem": "우승 세리머니 보기 (새 창)",
+    "remainingTabIds": [
+      "2"
+    ],
+    "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+    "pageRouteTemplate": "https://alpha.teameet.co.kr/tournaments/{synthetic-fixture}/results"
+  },
+  "limits": [
+    "One desktop1180px sequence only; earlier three-width role/name checks were not repeated.",
+    "Initial new-tab inventory URLs were blank while opening; final URL claims use later settled tab.url observations.",
+    "Both observed fixture links exposed the same mock media href; fixture-content intent was not determined and no duplicate-content defect is inferred.",
+    "Actual native Tab calls are collector execution; saved DOM records the resulting active anchor. Enter and QA-tab close call times are recorded separately.",
+    "No playback-duration/content-quality, network-method, MIME-header or screen-reader speech claim.",
+    "Only tabs newly created by these two Enter actions were closed; original tab2 retained.",
+    "A document.hasFocus diagnostic was unavailable in the supported read scope and contributed no observation.",
+    "The new files record element tags and names, not explicit role attributes, list-item wrappers or AX-role snapshots. Those static semantics are separate evidence.",
+    "The settled URL observations occur54.503 and23.494 seconds after Enter-call completion. These are observation gaps, not measured navigation or media-load latency.",
+    "An activeElement in the original document does not independently establish native window focus or document.hasFocus."
+  ],
+  "counts": {
+    "DOMSnapshots": 5,
+    "EnterActivationRecords": 2,
+    "QAOpenedTabs": 2,
+    "QAClosedTabsReported": 2,
+    "distinctMediaURLs": 1,
+    "images": 0
+  },
+  "actionCallBoundsBasis": "Enter and QA-tab close ranges are collector CUA call bounds; two native Tab calls are reported by the collector but have no separately stored call bounds."
+}

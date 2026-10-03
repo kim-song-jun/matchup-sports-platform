@@ -1,0 +1,197 @@
+[
+  {
+    "active": {
+      "focusVisible": false,
+      "href": null,
+      "name": "경기 영상 2",
+      "resolvedHref": null,
+      "tag": "BUTTON",
+      "target": null
+    },
+    "utc": "2026-10-03T14:37:23.277Z",
+    "videoItemButtonCount": 0,
+    "videoItems": [
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "결승 하이라이트 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      },
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "우승 세리머니 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      }
+    ],
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-video-panel-selected",
+    "runtimeServingSHA": "unknown",
+    "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+    "pageRouteTemplate": "https://alpha.teameet.co.kr/tournaments/{synthetic-fixture}/results"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/mock/generated/tournament-highlight.webm",
+      "name": "결승 하이라이트 보기 (새 창)",
+      "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "tag": "A",
+      "target": "_blank"
+    },
+    "utc": "2026-10-03T14:37:23.393Z",
+    "videoItemButtonCount": 0,
+    "videoItems": [
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "결승 하이라이트 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      },
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "우승 세리머니 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      }
+    ],
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-native-Tab-first-video",
+    "runtimeServingSHA": "unknown",
+    "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+    "pageRouteTemplate": "https://alpha.teameet.co.kr/tournaments/{synthetic-fixture}/results"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/mock/generated/tournament-highlight.webm",
+      "name": "결승 하이라이트 보기 (새 창)",
+      "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "tag": "A",
+      "target": "_blank"
+    },
+    "utc": "2026-10-03T14:38:45.715Z",
+    "videoItemButtonCount": 0,
+    "videoItems": [
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "결승 하이라이트 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      },
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "우승 세리머니 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      }
+    ],
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-after-first-QA-tab-closed",
+    "runtimeServingSHA": "unknown",
+    "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+    "pageRouteTemplate": "https://alpha.teameet.co.kr/tournaments/{synthetic-fixture}/results"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/mock/generated/tournament-highlight.webm",
+      "name": "우승 세리머니 보기 (새 창)",
+      "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "tag": "A",
+      "target": "_blank"
+    },
+    "utc": "2026-10-03T14:38:45.826Z",
+    "videoItemButtonCount": 0,
+    "videoItems": [
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "결승 하이라이트 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      },
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "우승 세리머니 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      }
+    ],
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-native-Tab-second-video",
+    "runtimeServingSHA": "unknown",
+    "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+    "pageRouteTemplate": "https://alpha.teameet.co.kr/tournaments/{synthetic-fixture}/results"
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "href": "/mock/generated/tournament-highlight.webm",
+      "name": "우승 세리머니 보기 (새 창)",
+      "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+      "tag": "A",
+      "target": "_blank"
+    },
+    "utc": "2026-10-03T14:39:57.445Z",
+    "videoItemButtonCount": 0,
+    "videoItems": [
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "결승 하이라이트 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      },
+      {
+        "href": "/mock/generated/tournament-highlight.webm",
+        "name": "우승 세리머니 보기 (새 창)",
+        "rel": "noreferrer",
+        "resolvedHref": "https://alpha.teameet.co.kr/mock/generated/tournament-highlight.webm",
+        "tag": "A",
+        "target": "_blank"
+      }
+    ],
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "width": 1180
+    },
+    "step": "desktop-after-second-QA-tab-closed",
+    "runtimeServingSHA": "unknown",
+    "sourcePageURLSHA256": "2be1c449928618c55ae4891cc8c6bdf72c3fe0aa8b628d47fdec31819a4dad34",
+    "pageRouteTemplate": "https://alpha.teameet.co.kr/tournaments/{synthetic-fixture}/results"
+  }
+]

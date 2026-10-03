@@ -1,0 +1,7226 @@
+[
+  {
+    "active": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 260.3000030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 216.3000030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 216.3000030517578
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 348.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 304.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 304.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 436.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 392.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 392.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 524.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 480.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 480.3000183105469
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 753.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 709.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 709.8500366210938
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 841.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 797.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 797.8500366210938
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 949.8375244140624,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 905.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 905.8375244140624
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1037.8375244140625,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 993.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 993.8375244140624
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:00.411Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile initial unchanged baseline"
+  },
+  {
+    "active": {
+      "id": "series-tier-count",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": true,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 0,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 260.3000030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 216.3000030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 216.3000030517578
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": ""
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 348.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 304.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 304.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 436.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 392.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 392.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 524.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 480.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 480.3000183105469
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 753.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 709.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 709.8500366210938
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 841.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 797.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 797.8500366210938
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 949.8375244140624,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 905.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 905.8375244140624
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1037.8375244140625,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 993.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 993.8375244140624
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:00.629Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile blank name blur"
+  },
+  {
+    "active": {
+      "id": "series-title",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 100,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 260.3000030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 216.3000030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 216.3000030517578
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 348.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 304.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 304.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 436.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 392.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 392.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 524.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 480.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 480.3000183105469
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 753.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 709.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 709.8500366210938
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 841.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 797.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 797.8500366210938
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 949.8375244140624,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 905.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 905.8375244140624
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1037.8375244140625,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 993.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 993.8375244140624
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:00.765Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile title100 then101st typed"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -495.7000122070313,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -539.7000122070312,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -539.7000122070312
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -407.7000122070313,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -451.7000122070313,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -451.7000122070313
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -319.70001220703125,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -363.7000122070313,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -363.7000122070313
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -231.70001220703125,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -275.70001220703125,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -275.70001220703125
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -2.1500015258789062,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -46.150001525878906,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -46.150001525878906
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 1,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 85.85000228881836,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 41.85000228881836,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 41.85000228881836
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 193.83750915527344,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 149.83750915527344,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 149.83750915527344
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 281.83750915527344,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 237.83750915527344,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 237.83750915527344
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:00.905Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile lower-invalid draft ratio0 min0"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -256.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -300.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -300.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -168.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -212.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -212.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -80.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -124.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -124.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 7.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -36.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -36.5
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 237.0500030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 193.0500030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 193.0500030517578
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 50 이하여야 합니다.",
+        "rect": {
+          "bottom": 325.0500183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 281.0500183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 281.0500183105469
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": true,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "51"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 433.0375061035156,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 389.0375061035156,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 389.0375061035156
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 521.0375061035156,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 477.0375061035156,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 477.0375061035156
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:01.010Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile ratio51 upper boundary"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -256.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -300.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -300.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -168.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -212.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -212.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -80.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -124.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -124.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 7.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -36.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -36.5
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 237.0500030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 193.0500030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 193.0500030517578
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 325.0500183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 281.0500183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 281.0500183105469
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "50"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 433.0375061035156,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 389.0375061035156,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 389.0375061035156
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 521.0375061035156,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 477.0375061035156,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 477.0375061035156
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요\n2부\n→\n! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요\n티어마다 8팀일 때\n1부\n→\n강등 4팀\n2부\n→\n승격 4팀\n티어마다 12팀일 때\n1부\n→\n강등 6팀\n2부\n→\n승격 6팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:26.283Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile exact upper50 min1 preview"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -256.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -300.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -300.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -168.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -212.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -212.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -80.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -124.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -124.5
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 7.5,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": -36.5,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": -36.5
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 237.0500030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 193.0500030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 193.0500030517578
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 1,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 325.0500183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 281.0500183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 281.0500183105469
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 433.0375061035156,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 389.0375061035156,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 389.0375061035156
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 521.0375061035156,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 477.0375061035156,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 477.0375061035156
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 12팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:26.397Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile exact lower1 min1 preview"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 260.3000030517578,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 216.3000030517578,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 216.3000030517578
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 348.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 304.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 304.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 436.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 392.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 392.3000183105469
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 524.3000183105469,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 480.3000183105469,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 480.3000183105469
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 753.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 709.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 709.8500366210938
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 841.8500366210938,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 797.8500366210938,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 797.8500366210938
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 949.8375244140624,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 905.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 905.8375244140624
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1037.8375244140625,
+          "height": 44,
+          "left": 32.79999923706055,
+          "right": 372.0000114440918,
+          "top": 993.8375244140624,
+          "width": 339.20001220703125,
+          "x": 32.79999923706055,
+          "y": 993.8375244140624
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:53.807Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "series mobile Cancel/reentry baseline restored"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 275.6666717529297,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 231.6666717529297,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 231.6666717529297
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 363.6666870117187,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 319.66668701171875,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 319.66668701171875
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 363.6666870117187,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 319.66668701171875,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 319.66668701171875
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 451.6666870117187,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 407.6666870117187,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 407.6666870117187
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 649,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 605,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 605
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 649,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 605,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 605
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 757,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 713,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 713
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 757,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 713,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 713
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:55.687Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet baseline"
+  },
+  {
+    "active": {
+      "id": "series-tier-count",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": true,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 0,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 230.33334350585935,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": ""
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 362.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 318.3333435058594,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 318.3333435058594
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 362.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 318.3333435058594,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 318.3333435058594
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 450.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 406.3333435058594,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 406.3333435058594
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 647.6666870117188,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 603.6666870117188,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 603.6666870117188
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 647.6666870117188,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 603.6666870117188,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 603.6666870117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 755.6666870117188,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 711.6666870117188,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 711.6666870117188
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 755.6666870117188,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 711.6666870117188,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 711.6666870117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:55.791Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet blank title Save disabled"
+  },
+  {
+    "active": {
+      "id": "series-title",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 100,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 230.33334350585935,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 362.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 318.3333435058594,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 318.3333435058594
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 362.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 318.3333435058594,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 318.3333435058594
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 450.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 406.3333435058594,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 406.3333435058594
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 647.6666870117188,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 603.6666870117188,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 603.6666870117188
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 647.6666870117188,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 603.6666870117188,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 603.6666870117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 755.6666870117188,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 711.6666870117188,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 711.6666870117188
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 755.6666870117188,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 711.6666870117188,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 711.6666870117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:55.923Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet title100 typed101st blocked"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -325,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": -369,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": -369
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -237,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": -281,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": -281
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -237,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": -281,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": -281
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -149,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": -193,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": -193
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 48.33333349227905,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 4.333333492279053,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 4.333333492279053
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 1,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 48.33333349227905,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 4.333333492279053,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 4.333333492279053
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 156.33333587646484,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 112.33333587646484,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 112.33333587646484
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 156.33333587646484,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 112.33333587646484,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 112.33333587646484
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:56.087Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet lower-invalid ratio0 min0"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -99,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": -143,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": -143
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -11,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": -55,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": -55
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -11,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": -55,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": -55
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 77,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 33,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 33
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 230.33334350585935,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 50 이하여야 합니다.",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 230.33334350585935,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": true,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "51"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 382.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 338.3333435058594,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 338.3333435058594
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 382.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 338.3333435058594,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 338.3333435058594
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:49:56.172Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet ratio51 upper invalid"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -99,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": -143,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": -143
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -11,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": -55,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": -55
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -11,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": -55,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": -55
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 77,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 33,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 33
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 230.33334350585935,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 230.33334350585935,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "50"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 382.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 338.3333435058594,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 338.3333435058594
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 382.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 338.3333435058594,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 338.3333435058594
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요\n2부\n→\n! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요\n티어마다 8팀일 때\n1부\n→\n강등 4팀\n2부\n→\n승격 4팀\n티어마다 12팀일 때\n1부\n→\n강등 6팀\n2부\n→\n승격 6팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:30.947Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet exact upper50 min1"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -99,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": -143,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": -143
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -11,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": -55,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": -55
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -11,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": -55,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": -55
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 77,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 33,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 33
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 230.33334350585935,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 1,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 274.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 230.33334350585935,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 230.33334350585935
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 382.3333435058594,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 338.3333435058594,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 338.3333435058594
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 382.3333435058594,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 338.3333435058594,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 338.3333435058594
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 12팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:31.020Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet exact lower1 min1"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 275.6666717529297,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 231.6666717529297,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 231.6666717529297
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 363.6666870117187,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 319.66668701171875,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 319.66668701171875
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 363.6666870117187,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 319.66668701171875,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 319.66668701171875
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 451.6666870117187,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 407.6666870117187,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 407.6666870117187
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 649,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 605,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 605
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 649,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 605,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 605
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 757,
+          "height": 44,
+          "left": 40.66666793823242,
+          "right": 386.3333549499512,
+          "top": 713,
+          "width": 345.66668701171875,
+          "x": 40.66666793823242,
+          "y": 713
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 757,
+          "height": 44,
+          "left": 402.3333435058594,
+          "right": 748.0000305175781,
+          "top": 713,
+          "width": 345.66668701171875,
+          "x": 402.3333435058594,
+          "y": 713
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:32.273Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "series tablet Cancel/reentry baseline restored"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 232,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 188,
+          "width": 845,
+          "x": 289,
+          "y": 188
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 276,
+          "width": 414.5,
+          "x": 289,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 276,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 408,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 364,
+          "width": 845,
+          "x": 289,
+          "y": 364
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 562,
+          "width": 414.5,
+          "x": 289,
+          "y": 562
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 562,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 562
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 670,
+          "width": 414.5,
+          "x": 289,
+          "y": 670
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 670,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 670
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:32.474Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop baseline"
+  },
+  {
+    "active": {
+      "id": "series-tier-count",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": true,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 0,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 232,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 188,
+          "width": 845,
+          "x": 289,
+          "y": 188
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": ""
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 276,
+          "width": 414.5,
+          "x": 289,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 276,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 408,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 364,
+          "width": 845,
+          "x": 289,
+          "y": 364
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 562,
+          "width": 414.5,
+          "x": 289,
+          "y": 562
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 562,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 562
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 670,
+          "width": 414.5,
+          "x": 289,
+          "y": 670
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 670,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 670
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:32.554Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop blank title Save disabled"
+  },
+  {
+    "active": {
+      "id": "series-title",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 100,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 232,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 188,
+          "width": 845,
+          "x": 289,
+          "y": 188
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 276,
+          "width": 414.5,
+          "x": 289,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 276,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 408,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 364,
+          "width": 845,
+          "x": 289,
+          "y": 364
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 562,
+          "width": 414.5,
+          "x": 289,
+          "y": 562
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 562,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 562
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 670,
+          "width": 414.5,
+          "x": 289,
+          "y": 670
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 670,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 670
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:32.707Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop title100 typed101st blocked"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -81,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": -125,
+          "width": 845,
+          "x": 289,
+          "y": -125
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 7,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": -37,
+          "width": 414.5,
+          "x": 289,
+          "y": -37
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 7,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": -37,
+          "width": 414.5,
+          "x": 719.5,
+          "y": -37
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 95,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 51,
+          "width": 845,
+          "x": 289,
+          "y": 51
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 293,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 249,
+          "width": 414.5,
+          "x": 289,
+          "y": 249
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 1,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 293,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 249,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 249
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 357,
+          "width": 414.5,
+          "x": 289,
+          "y": 357
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 357,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 357
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:32.821Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop lower-invalid ratio0 min0"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 27,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": -17,
+          "width": 845,
+          "x": 289,
+          "y": -17
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 115,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 71,
+          "width": 414.5,
+          "x": 289,
+          "y": 71
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 115,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 71,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 71
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 203,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 159,
+          "width": 845,
+          "x": 289,
+          "y": 159
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 357,
+          "width": 414.5,
+          "x": 289,
+          "y": 357
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 50 이하여야 합니다.",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 357,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 357
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": true,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "51"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 465,
+          "width": 414.5,
+          "x": 289,
+          "y": 465
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 465,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 465
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:50:32.907Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop ratio51 upper invalid"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 27,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": -17,
+          "width": 845,
+          "x": 289,
+          "y": -17
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 115,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 71,
+          "width": 414.5,
+          "x": 289,
+          "y": 71
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 115,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 71,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 71
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 203,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 159,
+          "width": 845,
+          "x": 289,
+          "y": 159
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 357,
+          "width": 414.5,
+          "x": 289,
+          "y": 357
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 357,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 357
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "50"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 465,
+          "width": 414.5,
+          "x": 289,
+          "y": 465
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 465,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 465
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요\n2부\n→\n! 잔류 팀이 과반에 못 미쳐 승강을 건너뛰어요\n티어마다 8팀일 때\n1부\n→\n강등 4팀\n2부\n→\n승격 4팀\n티어마다 12팀일 때\n1부\n→\n강등 6팀\n2부\n→\n승격 6팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:51:13.590Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop exact upper50 min1"
+  },
+  {
+    "active": {
+      "id": "promotion-rounding",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 27,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": -17,
+          "width": 845,
+          "x": 289,
+          "y": -17
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 115,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 71,
+          "width": 414.5,
+          "x": 289,
+          "y": 71
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 115,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 71,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 71
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 203,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 159,
+          "width": 845,
+          "x": 289,
+          "y": 159
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 357,
+          "width": 414.5,
+          "x": 289,
+          "y": 357
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 1,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 401,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 357,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 357
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 465,
+          "width": 414.5,
+          "x": 289,
+          "y": 465
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 465,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 465
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 12팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:51:13.676Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop exact lower1 min1"
+  },
+  {
+    "active": {
+      "id": "",
+      "tag": "BODY"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-title",
+        "labels": [
+          "이름"
+        ],
+        "length": 16,
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 232,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 188,
+          "width": 845,
+          "x": 289,
+          "y": 188
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) A-L 시즌티어검증"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-sport",
+        "labels": [
+          "종목"
+        ],
+        "length": 2,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 276,
+          "width": 414.5,
+          "x": 289,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "풋살"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": true,
+        "id": "series-region",
+        "labels": [
+          "지역"
+        ],
+        "length": 3,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 320,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 276,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 276
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "송파구"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "series-tier-count",
+        "labels": [
+          "티어 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 408,
+          "height": 44,
+          "left": 289,
+          "right": 1134,
+          "top": 364,
+          "width": 845,
+          "x": 289,
+          "y": 364
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-mode",
+        "labels": [
+          "기준"
+        ],
+        "length": 5,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 562,
+          "width": 414.5,
+          "x": 289,
+          "y": 562
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ratio"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-ratio",
+        "labels": [
+          "비율 (%)"
+        ],
+        "length": 2,
+        "max": "50",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 606,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 562,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 562
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "20"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-rounding",
+        "labels": [
+          "소수점 처리"
+        ],
+        "length": 4,
+        "max": "",
+        "maxLength": -1,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 289,
+          "right": 703.5,
+          "top": 670,
+          "width": 414.5,
+          "x": 289,
+          "y": 670
+        },
+        "required": false,
+        "type": "select-one",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "ceil"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "disabled": false,
+        "id": "promotion-min",
+        "labels": [
+          "최소 승강 팀 수"
+        ],
+        "length": 1,
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 714,
+          "height": 44,
+          "left": 719.5,
+          "right": 1134,
+          "top": 670,
+          "width": 414.5,
+          "x": 719.5,
+          "y": 670
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      }
+    ],
+    "previewText": "티어마다 5팀일 때\n1부\n→\n강등 1팀\n2부\n→\n승격 1팀\n티어마다 8팀일 때\n1부\n→\n강등 2팀\n2부\n→\n승격 2팀\n티어마다 12팀일 때\n1부\n→\n강등 3팀\n2부\n→\n승격 3팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "utc": "2026-10-03T04:51:14.838Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "series desktop Cancel/reentry baseline restored"
+  }
+]

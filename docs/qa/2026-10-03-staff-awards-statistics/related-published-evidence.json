@@ -1,0 +1,14 @@
+{
+  "previouslyPublishedAwardEvidence": {
+    "report": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/README.md",
+    "candidate": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/candidate.json",
+    "proof": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/proof.json",
+    "provenance": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/provenance.json",
+    "images": {
+      "awards-mobile-local-row.png": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/awards-mobile-local-row.png",
+      "awards-mobile-delete-focus.png": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/awards-mobile-delete-focus.png",
+      "awards-tablet-local-row.png": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/awards-tablet-local-row.png",
+      "awards-desktop-local-row.png": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/awards-desktop-local-row.png"
+    }
+  }
+}

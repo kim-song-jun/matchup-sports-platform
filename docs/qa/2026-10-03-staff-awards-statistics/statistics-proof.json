@@ -1,0 +1,230 @@
+[
+  {
+    "emptyCount": 0,
+    "fixedMatchCount": "1",
+    "searchFields": 0,
+    "tables": [
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 614.5750350952148,
+          "height": 101.4749984741211,
+          "left": 32.79999923706055,
+          "right": 392.79999923706055,
+          "top": 513.1000366210938,
+          "width": 360,
+          "x": 32.79999923706055,
+          "y": 513.1000366210938
+        },
+        "rowCount": 1
+      },
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 874.7375335693359,
+          "height": 163.7624969482422,
+          "left": 32.79999923706055,
+          "right": 392.79999923706055,
+          "top": 710.9750366210938,
+          "width": 360,
+          "x": 32.79999923706055,
+          "y": 710.9750366210938
+        },
+        "rowCount": 2
+      },
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 1134.9000091552734,
+          "height": 163.7624969482422,
+          "left": 32.79999923706055,
+          "right": 392.79999923706055,
+          "top": 971.1375122070312,
+          "width": 360,
+          "x": 32.79999923706055,
+          "y": 971.1375122070312
+        },
+        "rowCount": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/statistics",
+    "utc": "2026-10-03T04:15:16.968Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "completed stats mobile: populated, no table detail link"
+  },
+  {
+    "emptyCount": 3,
+    "fixedMatchCount": "0",
+    "searchFields": 0,
+    "tables": [],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/statistics",
+    "utc": "2026-10-03T04:16:38.145Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "ongoing stats tablet zero"
+  },
+  {
+    "emptyCount": 0,
+    "fixedMatchCount": "1",
+    "searchFields": 0,
+    "tables": [
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 629.8333740234375,
+          "height": 101.5,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 528.3333740234375,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 528.3333740234375
+        },
+        "rowCount": 1
+      },
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 889.5000457763672,
+          "height": 163.6666717529297,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 725.8333740234375,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 725.8333740234375
+        },
+        "rowCount": 2
+      },
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 1149.1666717529297,
+          "height": 163.6666717529297,
+          "left": 40.66666793823242,
+          "right": 748.0000419616699,
+          "top": 985.5,
+          "width": 707.3333740234375,
+          "x": 40.66666793823242,
+          "y": 985.5
+        },
+        "rowCount": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/statistics",
+    "utc": "2026-10-03T04:17:01.924Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "completed stats tablet populated no table detail link"
+  },
+  {
+    "emptyCount": 3,
+    "fixedMatchCount": "0",
+    "searchFields": 0,
+    "tables": [],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/statistics",
+    "utc": "2026-10-03T04:18:32.208Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "ongoing stats desktop zero"
+  },
+  {
+    "emptyCount": 0,
+    "fixedMatchCount": "1",
+    "searchFields": 0,
+    "tables": [
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 522.5,
+          "height": 101.5,
+          "left": 497,
+          "right": 1134,
+          "top": 421,
+          "width": 637,
+          "x": 497,
+          "y": 421
+        },
+        "rowCount": 1
+      },
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 783.5,
+          "height": 164,
+          "left": 497,
+          "right": 1134,
+          "top": 619.5,
+          "width": 637,
+          "x": 497,
+          "y": 619.5
+        },
+        "rowCount": 2
+      },
+      {
+        "buttonCount": 0,
+        "linkCount": 0,
+        "rect": {
+          "bottom": 1044.5,
+          "height": 164,
+          "left": 497,
+          "right": 1134,
+          "top": 880.5,
+          "width": 637,
+          "x": 497,
+          "y": 880.5
+        },
+        "rowCount": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/statistics",
+    "utc": "2026-10-03T04:18:35.476Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "completed stats desktop populated no table detail links"
+  },
+  {
+    "emptyCount": 3,
+    "fixedMatchCount": "0",
+    "searchFields": 0,
+    "tables": [],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/statistics",
+    "utc": "2026-10-03T04:20:02.646Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "ongoing stats mobile cleanup zero"
+  }
+]

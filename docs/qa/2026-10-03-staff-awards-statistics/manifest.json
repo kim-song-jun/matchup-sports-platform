@@ -1,0 +1,84 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "4bdd16bf506d7a927c81b40a50112fd27ac190f0984c2db1a9c92e66e2a6b597",
+      "bytes": 4099
+    },
+    {
+      "file": "awards-proof.json",
+      "sha256": "ecd32578af1d17cf809f26b496a4b20dde196be90943b66fd8aba6934545e5ac",
+      "bytes": 128282
+    },
+    {
+      "file": "console-summary.json",
+      "sha256": "f5e229644c18f9240b189a7c6cc2cbdb45d3e8b891b287291955b865ae3a272e",
+      "bytes": 182
+    },
+    {
+      "file": "final-state.json",
+      "sha256": "b804fd471f6b7dbae5e60a6e6f3b0dc7022ca4812ea92e934e9f2ec4fb97fb05",
+      "bytes": 338
+    },
+    {
+      "file": "related-published-evidence.json",
+      "sha256": "8f527d57f6d0a85bc6e35071dbd3e582b31222b4db68cdcace81eca27757f6e4",
+      "bytes": 1563
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "sha256": "cbbf8d71ff8aea6f86c740dccfe03a6f5780bd5c599abf090d7f9be1553ab925",
+      "bytes": 4681
+    },
+    {
+      "file": "staff-desktop-empty.png",
+      "sha256": "46e22b138015b6b1bb7fef5783c31c357e92d8070aed572c0da9278e62b763e8",
+      "bytes": 97569
+    },
+    {
+      "file": "staff-mobile-empty.png",
+      "sha256": "3d38af2482cfbfe869e1835fb28f2f13ae1b84ac20e5695f2660f2acfa44ffda",
+      "bytes": 93591
+    },
+    {
+      "file": "staff-mobile-proof.json",
+      "sha256": "72d396c2e96be0dded177ba28ff75cd777bfdbf4a0a3c151baa63ce1df6a3086",
+      "bytes": 20297
+    },
+    {
+      "file": "staff-proof.json",
+      "sha256": "4d2732c58e227347da44022ea540de0ca7ce5af5063dbbbdbe5d47f396e6bb4a",
+      "bytes": 46664
+    },
+    {
+      "file": "staff-tablet-empty.png",
+      "sha256": "eb45866f3f3383bb2f8efb7c7dd92681cd3a28d120beb7e53858cd7134ed86ce",
+      "bytes": 76321
+    },
+    {
+      "file": "staff-tablet-expiry-focus.png",
+      "sha256": "732fea9b7ddc19fb3334ccfc92f9365284312521a90a362fb3531bcdcfe3a73c",
+      "bytes": 87159
+    },
+    {
+      "file": "statistics-desktop-empty.png",
+      "sha256": "d232801720107ec76bdf18b9925c09a4bd5ef8e4d6fa75e000fb41df3020e483",
+      "bytes": 35246
+    },
+    {
+      "file": "statistics-proof.json",
+      "sha256": "cfd73b47769ea45d650f71da1598b581da51b11e3f07d02c336b25dbc16a1b24",
+      "bytes": 5850
+    },
+    {
+      "file": "summary.json",
+      "sha256": "d6011b83ca40c375b813295585afe0c707aa84e0744a29f20359ad74790f1471",
+      "bytes": 4138
+    },
+    {
+      "file": "verification.json",
+      "sha256": "e64836add759eccaaa77a9347b62e6d93e9ebfd976b3cf978832a6d5579b3714",
+      "bytes": 196
+    }
+  ]
+}

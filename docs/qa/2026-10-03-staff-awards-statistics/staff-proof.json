@@ -1,0 +1,2039 @@
+[
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 184.1666717529297,
+        "height": 44,
+        "left": 194.33334350585935,
+        "right": 594.3333435058594,
+        "top": 140.1666717529297,
+        "width": 400,
+        "x": 194.33334350585935,
+        "y": 140.1666717529297
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 550.3333740234375,
+          "right": 594.3333740234375,
+          "top": 32,
+          "width": 44,
+          "x": 550.3333740234375,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.1666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 140.1666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 140.1666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 297.6666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 253.6666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 253.6666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 385.1666870117187,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 341.16668701171875,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 341.16668701171875
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 194.33334350585935,
+          "right": 390.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 194.33334350585935,
+          "y": 421.3333435058594
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 398.3333435058594,
+          "right": 594.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 398.3333435058594,
+          "y": 421.3333435058594
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "",
+    "rect": {
+      "bottom": 489.3333435058594,
+      "height": 473.3333435058594,
+      "left": 174.33334350585938,
+      "right": 614.3333435058594,
+      "top": 16,
+      "width": 440,
+      "x": 174.33334350585938,
+      "y": 16
+    },
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:15:56.029Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet initial"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 184.1666717529297,
+        "height": 44,
+        "left": 194.33334350585935,
+        "right": 594.3333435058594,
+        "top": 140.1666717529297,
+        "width": 400,
+        "x": 194.33334350585935,
+        "y": 140.1666717529297
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 550.3333740234375,
+          "right": 594.3333740234375,
+          "top": 32,
+          "width": 44,
+          "x": 550.3333740234375,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.1666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 140.1666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 140.1666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 350.5,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 306.5,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 306.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 438,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 394,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 394
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 194.33334350585935,
+          "right": 390.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 194.33334350585935,
+          "y": 421.3333435058594
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 398.3333435058594,
+          "right": 594.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 398.3333435058594,
+          "y": 421.3333435058594
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "QA-NOMATCH-20261003-CHECK",
+    "rect": {
+      "bottom": 489.3333435058594,
+      "height": 473.3333435058594,
+      "left": 174.33334350585938,
+      "right": 614.3333435058594,
+      "top": 16,
+      "width": 440,
+      "x": 174.33334350585938,
+      "y": 16
+    },
+    "resultButtons": 0,
+    "resultCount": "0",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:15:56.836Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet settled zero"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 184.1666717529297,
+        "height": 44,
+        "left": 194.33334350585935,
+        "right": 594.3333435058594,
+        "top": 140.1666717529297,
+        "width": 400,
+        "x": 194.33334350585935,
+        "y": 140.1666717529297
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 550.3333740234375,
+          "right": 594.3333740234375,
+          "top": 32,
+          "width": 44,
+          "x": 550.3333740234375,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.1666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 140.1666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 140.1666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 507,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 463,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 463
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 594.5,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 550.5,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 550.5
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 194.33334350585935,
+          "right": 390.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 194.33334350585935,
+          "y": 421.3333435058594
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 398.3333435058594,
+          "right": 594.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 398.3333435058594,
+          "y": 421.3333435058594
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "E2E",
+    "rect": {
+      "bottom": 489.3333435058594,
+      "height": 473.3333435058594,
+      "left": 174.33334350585938,
+      "right": 614.3333435058594,
+      "top": 16,
+      "width": 440,
+      "x": 174.33334350585938,
+      "y": 16
+    },
+    "resultButtons": 10,
+    "resultCount": "10",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:15:57.513Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet settled ten"
+  },
+  {
+    "active": {
+      "candidateIndex": 0,
+      "id": "",
+      "label": "candidate",
+      "rect": {
+        "bottom": 246.83334350585935,
+        "height": 54,
+        "left": 195,
+        "right": 593.6666870117188,
+        "top": 192.83334350585935,
+        "width": 398.6666870117187,
+        "x": 195,
+        "y": 192.83334350585935
+      },
+      "tag": "BUTTON"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 550.3333740234375,
+          "right": 594.3333740234375,
+          "top": 32,
+          "width": 44,
+          "x": 550.3333740234375,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.1666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 140.1666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 140.1666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 507,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 463,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 463
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 594.5,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 550.5,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 550.5
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 194.33334350585935,
+          "right": 390.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 194.33334350585935,
+          "y": 421.3333435058594
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 398.3333435058594,
+          "right": 594.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 398.3333435058594,
+          "y": 421.3333435058594
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "E2E",
+    "rect": {
+      "bottom": 489.3333435058594,
+      "height": 473.3333435058594,
+      "left": 174.33334350585938,
+      "right": 614.3333435058594,
+      "top": 16,
+      "width": 440,
+      "x": 174.33334350585938,
+      "y": 16
+    },
+    "resultButtons": 10,
+    "resultCount": "10",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:15:57.729Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet Tab first candidate"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "",
+      "label": "스태프 배정",
+      "rect": {
+        "bottom": 180,
+        "height": 44,
+        "left": 635.5104370117188,
+        "right": 764.6666870117188,
+        "top": 136,
+        "width": 129.15625,
+        "x": 635.5104370117188,
+        "y": 136
+      },
+      "tag": "BUTTON"
+    },
+    "controls": [],
+    "dialog": false,
+    "expiry": null,
+    "query": null,
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": null,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:15:57.923Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet Escape returns trigger"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 184.1666717529297,
+        "height": 44,
+        "left": 194.33334350585935,
+        "right": 594.3333435058594,
+        "top": 140.1666717529297,
+        "width": 400,
+        "x": 194.33334350585935,
+        "y": 140.1666717529297
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 550.3333740234375,
+          "right": 594.3333740234375,
+          "top": 32,
+          "width": 44,
+          "x": 550.3333740234375,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.1666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 140.1666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 140.1666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 297.6666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 253.6666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 253.6666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 385.1666870117187,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 341.16668701171875,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 341.16668701171875
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 194.33334350585935,
+          "right": 390.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 194.33334350585935,
+          "y": 421.3333435058594
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 398.3333435058594,
+          "right": 594.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 398.3333435058594,
+          "y": 421.3333435058594
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "",
+    "rect": {
+      "bottom": 489.3333435058594,
+      "height": 473.3333435058594,
+      "left": 174.33334350585938,
+      "right": 614.3333435058594,
+      "top": 16,
+      "width": 440,
+      "x": 174.33334350585938,
+      "y": 16
+    },
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:15:58.230Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet reopen clears query"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 281.25,
+        "height": 44,
+        "left": 391.5,
+        "right": 791.5,
+        "top": 237.25,
+        "width": 400,
+        "x": 391.5,
+        "y": 237.25
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 172.75,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 128.75,
+          "width": 44,
+          "x": 747.5,
+          "y": 128.75
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 281.25,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 237.25,
+          "width": 400,
+          "x": 391.5,
+          "y": 237.25
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 394.75,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 350.75,
+          "width": 400,
+          "x": 391.5,
+          "y": 350.75
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 482.25,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 438.25,
+          "width": 400,
+          "x": 391.5,
+          "y": 438.25
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 625.25,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 577.25,
+          "width": 196,
+          "x": 391.5,
+          "y": 577.25
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 625.25,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 577.25,
+          "width": 196,
+          "x": 595.5,
+          "y": 577.25
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "",
+    "rect": {
+      "bottom": 645.25,
+      "height": 532.5,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 112.75,
+      "width": 440,
+      "x": 371.5,
+      "y": 112.75
+    },
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:03.625Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop initial"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 254.5,
+        "height": 44,
+        "left": 391.5,
+        "right": 791.5,
+        "top": 210.5,
+        "width": 400,
+        "x": 391.5,
+        "y": 210.5
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 146,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 102,
+          "width": 44,
+          "x": 747.5,
+          "y": 102
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 254.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 210.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 210.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 421.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 377.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 377.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 465,
+          "width": 400,
+          "x": 391.5,
+          "y": 465
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 652,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 604,
+          "width": 196,
+          "x": 391.5,
+          "y": 604
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 652,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 604,
+          "width": 196,
+          "x": 595.5,
+          "y": 604
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "QA-NOMATCH-20261003-CHECK",
+    "rect": {
+      "bottom": 672,
+      "height": 586,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 86,
+      "width": 440,
+      "x": 371.5,
+      "y": 86
+    },
+    "resultButtons": 0,
+    "resultCount": "0",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:04.242Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop settled zero"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 184.5,
+        "height": 44,
+        "left": 391.5,
+        "right": 791.5,
+        "top": 140.5,
+        "width": 400,
+        "x": 391.5,
+        "y": 140.5
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 32,
+          "width": 44,
+          "x": 747.5,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 140.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 140.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 508,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 464,
+          "width": 400,
+          "x": 391.5,
+          "y": 464
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 595.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 551.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 551.5
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 674,
+          "width": 196,
+          "x": 391.5,
+          "y": 674
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 674,
+          "width": 196,
+          "x": 595.5,
+          "y": 674
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "E2E",
+    "rect": {
+      "bottom": 742,
+      "height": 726,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 16,
+      "width": 440,
+      "x": 371.5,
+      "y": 16
+    },
+    "resultButtons": 10,
+    "resultCount": "10",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:41.020Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop settled ten"
+  },
+  {
+    "active": {
+      "candidateIndex": 0,
+      "id": "",
+      "label": "candidate",
+      "rect": {
+        "bottom": 247.5,
+        "height": 54,
+        "left": 392.5,
+        "right": 790.5,
+        "top": 193.5,
+        "width": 398,
+        "x": 392.5,
+        "y": 193.5
+      },
+      "tag": "BUTTON"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 32,
+          "width": 44,
+          "x": 747.5,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 140.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 140.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 508,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 464,
+          "width": 400,
+          "x": 391.5,
+          "y": 464
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 595.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 551.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 551.5
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 674,
+          "width": 196,
+          "x": 391.5,
+          "y": 674
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 674,
+          "width": 196,
+          "x": 595.5,
+          "y": 674
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "E2E",
+    "rect": {
+      "bottom": 742,
+      "height": 726,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 16,
+      "width": 440,
+      "x": 371.5,
+      "y": 16
+    },
+    "resultButtons": 10,
+    "resultCount": "10",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:41.273Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop first candidate Tab"
+  },
+  {
+    "active": {
+      "candidateIndex": 9,
+      "id": "",
+      "label": "candidate",
+      "rect": {
+        "bottom": 393.5,
+        "height": 54,
+        "left": 392.5,
+        "right": 790.5,
+        "top": 339.5,
+        "width": 398,
+        "x": 392.5,
+        "y": 339.5
+      },
+      "tag": "BUTTON"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 32,
+          "width": 44,
+          "x": 747.5,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 140.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 140.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 508,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 464,
+          "width": 400,
+          "x": 391.5,
+          "y": 464
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 595.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 551.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 551.5
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 674,
+          "width": 196,
+          "x": 391.5,
+          "y": 674
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 674,
+          "width": 196,
+          "x": 595.5,
+          "y": 674
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "E2E",
+    "rect": {
+      "bottom": 742,
+      "height": 726,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 16,
+      "width": 440,
+      "x": 371.5,
+      "y": 16
+    },
+    "resultButtons": 10,
+    "resultCount": "10",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:41.587Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop Tab reaches tenth candidate without activation"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-role",
+      "label": "대회 디렉터필드 담당자지원(조회 전용)",
+      "rect": {
+        "bottom": 508,
+        "height": 44,
+        "left": 391.5,
+        "right": 791.5,
+        "top": 464,
+        "width": 400,
+        "x": 391.5,
+        "y": 464
+      },
+      "tag": "SELECT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 32,
+          "width": 44,
+          "x": 747.5,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 184.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 140.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 140.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 508,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 464,
+          "width": 400,
+          "x": 391.5,
+          "y": 464
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 595.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 551.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 551.5
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 674,
+          "width": 196,
+          "x": 391.5,
+          "y": 674
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 722,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 674,
+          "width": 196,
+          "x": 595.5,
+          "y": 674
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "E2E",
+    "rect": {
+      "bottom": 742,
+      "height": 726,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 16,
+      "width": 440,
+      "x": 371.5,
+      "y": 16
+    },
+    "resultButtons": 10,
+    "resultCount": "10",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:41.804Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop Tab reveals role control, value unchanged"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "",
+      "label": "스태프 배정",
+      "rect": {
+        "bottom": 136,
+        "height": 44,
+        "left": 1021.84375,
+        "right": 1151,
+        "top": 92,
+        "width": 129.15625,
+        "x": 1021.84375,
+        "y": 92
+      },
+      "tag": "BUTTON"
+    },
+    "controls": [],
+    "dialog": false,
+    "expiry": null,
+    "query": null,
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": null,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:42.041Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop Escape returns trigger"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-user-search",
+      "label": "",
+      "rect": {
+        "bottom": 281.25,
+        "height": 44,
+        "left": 391.5,
+        "right": 791.5,
+        "top": 237.25,
+        "width": 400,
+        "x": 391.5,
+        "y": 237.25
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 172.75,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 128.75,
+          "width": 44,
+          "x": 747.5,
+          "y": 128.75
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 281.25,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 237.25,
+          "width": 400,
+          "x": 391.5,
+          "y": 237.25
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 394.75,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 350.75,
+          "width": 400,
+          "x": 391.5,
+          "y": 350.75
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 482.25,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 438.25,
+          "width": 400,
+          "x": 391.5,
+          "y": 438.25
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 625.25,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 577.25,
+          "width": 196,
+          "x": 391.5,
+          "y": 577.25
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 625.25,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 577.25,
+          "width": 196,
+          "x": 595.5,
+          "y": 577.25
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "",
+    "rect": {
+      "bottom": 645.25,
+      "height": 532.5,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 112.75,
+      "width": 440,
+      "x": 371.5,
+      "y": 112.75
+    },
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:17:42.322Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop reopen empty query and unchanged defaults"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-expires",
+      "label": "",
+      "rect": {
+        "bottom": 427.1000061035156,
+        "height": 44,
+        "left": 36,
+        "right": 368.8000183105469,
+        "top": 383.1000061035156,
+        "width": 332.8000183105469,
+        "x": 36,
+        "y": 383.1000061035156
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 324.8000183105469,
+          "right": 368.8000183105469,
+          "top": 32,
+          "width": 44,
+          "x": 324.8000183105469,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 135.5,
+          "height": 44,
+          "left": 36,
+          "right": 368.8000183105469,
+          "top": 91.5,
+          "width": 332.8000183105469,
+          "x": 36,
+          "y": 91.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 339.6000061035156,
+          "height": 44,
+          "left": 36,
+          "right": 368.8000183105469,
+          "top": 295.6000061035156,
+          "width": 332.8000183105469,
+          "x": 36,
+          "y": 295.6000061035156
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 427.1000061035156,
+          "height": 44,
+          "left": 36,
+          "right": 368.8000183105469,
+          "top": 383.1000061035156,
+          "width": 332.8000183105469,
+          "x": 36,
+          "y": 383.1000061035156
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 570.4000244140625,
+          "height": 48,
+          "left": 36,
+          "right": 198.40000915527344,
+          "top": 522.4000244140625,
+          "width": 162.40000915527344,
+          "x": 36,
+          "y": 522.4000244140625
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 570.4000244140625,
+          "height": 48,
+          "left": 206.40000915527344,
+          "right": 368.8000183105469,
+          "top": 522.4000244140625,
+          "width": 162.40000915527344,
+          "x": 206.40000915527344,
+          "y": 522.4000244140625
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "QA-NOMATCH-20261003-CHECK",
+    "rect": {
+      "bottom": 590.4000244140625,
+      "height": 574.4000244140625,
+      "left": 16,
+      "right": 388.8000183105469,
+      "top": 16,
+      "width": 372.8000183105469,
+      "x": 16,
+      "y": 16
+    },
+    "resultButtons": 0,
+    "resultCount": "0",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:20:59.531Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "staff mobile Tab to expiry reveals field above footer without value change"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-expires",
+      "label": "",
+      "rect": {
+        "bottom": 364.6666870117187,
+        "height": 44,
+        "left": 194.33334350585935,
+        "right": 594.3333435058594,
+        "top": 320.66668701171875,
+        "width": 400,
+        "x": 194.33334350585935,
+        "y": 320.66668701171875
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 76,
+          "height": 44,
+          "left": 550.3333740234375,
+          "right": 594.3333740234375,
+          "top": 32,
+          "width": 44,
+          "x": 550.3333740234375,
+          "y": 32
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 110.83333587646484,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 66.83333587646484,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 66.83333587646484
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 277.1666717529297,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 233.1666717529297,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 233.1666717529297
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 364.6666870117187,
+          "height": 44,
+          "left": 194.33334350585935,
+          "right": 594.3333435058594,
+          "top": 320.66668701171875,
+          "width": 400,
+          "x": 194.33334350585935,
+          "y": 320.66668701171875
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 194.33334350585935,
+          "right": 390.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 194.33334350585935,
+          "y": 421.3333435058594
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 469.3333435058594,
+          "height": 48,
+          "left": 398.3333435058594,
+          "right": 594.3333435058594,
+          "top": 421.3333435058594,
+          "width": 196,
+          "x": 398.3333435058594,
+          "y": 421.3333435058594
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "QA-NOMATCH-20261003-CHECK",
+    "rect": {
+      "bottom": 489.3333435058594,
+      "height": 473.3333435058594,
+      "left": 174.33334350585938,
+      "right": 614.3333435058594,
+      "top": 16,
+      "width": 440,
+      "x": 174.33334350585938,
+      "y": 16
+    },
+    "resultButtons": 0,
+    "resultCount": "0",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:21:02.116Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "staff tablet Tab to expiry reveals field above footer without value change"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "grant-staff-expires",
+      "label": "",
+      "rect": {
+        "bottom": 509,
+        "height": 44,
+        "left": 391.5,
+        "right": 791.5,
+        "top": 465,
+        "width": 400,
+        "x": 391.5,
+        "y": 465
+      },
+      "tag": "INPUT"
+    },
+    "controls": [
+      {
+        "id": "",
+        "rect": {
+          "bottom": 146,
+          "height": 44,
+          "left": 747.5,
+          "right": 791.5,
+          "top": 102,
+          "width": 44,
+          "x": 747.5,
+          "y": 102
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "id": "grant-staff-user-search",
+        "rect": {
+          "bottom": 254.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 210.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 210.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-role",
+        "rect": {
+          "bottom": 421.5,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 377.5,
+          "width": 400,
+          "x": 391.5,
+          "y": 377.5
+        },
+        "text": null
+      },
+      {
+        "id": "grant-staff-expires",
+        "rect": {
+          "bottom": 509,
+          "height": 44,
+          "left": 391.5,
+          "right": 791.5,
+          "top": 465,
+          "width": 400,
+          "x": 391.5,
+          "y": 465
+        },
+        "text": null
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 652,
+          "height": 48,
+          "left": 391.5,
+          "right": 587.5,
+          "top": 604,
+          "width": 196,
+          "x": 391.5,
+          "y": 604
+        },
+        "text": "취소"
+      },
+      {
+        "id": "",
+        "rect": {
+          "bottom": 652,
+          "height": 48,
+          "left": 595.5,
+          "right": 791.5,
+          "top": 604,
+          "width": 196,
+          "x": 595.5,
+          "y": 604
+        },
+        "text": "배정하기"
+      }
+    ],
+    "dialog": true,
+    "expiry": "",
+    "query": "QA-NOMATCH-20261003-CHECK",
+    "rect": {
+      "bottom": 672,
+      "height": 586,
+      "left": 371.5,
+      "right": 811.5,
+      "top": 86,
+      "width": 440,
+      "x": 371.5,
+      "y": 86
+    },
+    "resultButtons": 0,
+    "resultCount": "0",
+    "roleIndex": 0,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:21:20.219Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff desktop expiry focus width control, unchanged empty value"
+  },
+  {
+    "active": {
+      "candidateIndex": -1,
+      "id": "",
+      "label": "스태프 배정",
+      "rect": {
+        "bottom": 136,
+        "height": 44,
+        "left": 1021.84375,
+        "right": 1151,
+        "top": 92,
+        "width": 129.15625,
+        "x": 1021.84375,
+        "y": 92
+      },
+      "tag": "BUTTON"
+    },
+    "controls": [],
+    "dialog": false,
+    "expiry": null,
+    "query": null,
+    "resultButtons": 0,
+    "resultCount": null,
+    "roleIndex": null,
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:21:20.445Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "staff final clean no dialog"
+  }
+]

@@ -1,0 +1,1145 @@
+[
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": ""
+      }
+    ],
+    "dialog": true,
+    "fields": [],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:06:32.763Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "league six-player review: no jersey/required input, six live qualification selects skipped",
+    "excluded": true,
+    "reason": "Matched offscreen mobile navigation dialog, not roster modal; not evidence for stated step"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:06:52.008Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "league empty roster mobile baseline, required selection Add disabled"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 1,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:06:52.076Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "league empty roster mobile local member selection, no Add click"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [],
+    "dialog": false,
+    "fields": [],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:06:57.287Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "league mobile Escape closes and restores review trigger"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:06:57.512Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "league mobile reopen reset, roster remains empty"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:07:32.494Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament one-player mobile controls only, no autosave-risk selection touched"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 1,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:07:41.394Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile local member selection Add enabled"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:07:41.820Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile Close/reopen resets local selection"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:07:51.279Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet baseline"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:07:51.367Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet local selection"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:07:51.799Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet Escape/reopen resets"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:09.910Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "league tablet baseline"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:10.014Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "league tablet local selection"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:10.379Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "league tablet Close/reopen resets"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:21.566Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "league desktop baseline"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 3,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:21.641Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "league desktop local selection"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 7,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 8,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:21.990Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "league desktop X/reopen resets"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 0,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 7,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:22.628Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "league six-player desktop actual form: six qualification selects, no numeric/text inputs, no eligible members",
+    "excluded": true,
+    "reason": "Roster rows still loading; member options arrived first"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 2,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 0,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 7,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "utc": "2026-10-03T04:08:37.826Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "league six-player desktop settled: seven selects only"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:08:40.563Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop baseline"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": false,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 1,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:08:40.684Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop local selection"
+  },
+  {
+    "active": {
+      "label": "명단 검토",
+      "tag": "BUTTON"
+    },
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "label": "제외"
+      },
+      {
+        "disabled": true,
+        "label": "추가"
+      },
+      {
+        "disabled": false,
+        "label": "닫기"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 3,
+        "id": "",
+        "max": "",
+        "min": "",
+        "optionCount": 3,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      },
+      {
+        "disabled": false,
+        "enabledNonemptyOptionCount": 2,
+        "id": "admin-roster-member",
+        "max": "",
+        "min": "",
+        "optionCount": 4,
+        "required": false,
+        "selectedIndex": 0,
+        "tag": "SELECT",
+        "type": "select-one"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:08:41.088Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop X/reopen reset"
+  }
+]

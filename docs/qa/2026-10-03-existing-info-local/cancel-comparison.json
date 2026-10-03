@@ -1,0 +1,68 @@
+[
+  {
+    "step": "tournament mobile Cancel/reopen restores baseline after invalid drafts",
+    "utc": "2026-10-03T04:33:46.812Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "allObservedFieldsMatchBaseline": true
+  },
+  {
+    "step": "tournament tablet Escape/reopen restores baseline",
+    "utc": "2026-10-03T04:34:51.895Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "allObservedFieldsMatchBaseline": true
+  },
+  {
+    "step": "tournament desktop X/reopen restores baseline",
+    "utc": "2026-10-03T04:35:21.531Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "allObservedFieldsMatchBaseline": true
+  },
+  {
+    "step": "series mobile Cancel/reentry baseline restored",
+    "utc": "2026-10-03T04:49:53.807Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "allObservedFieldsMatchBaseline": true
+  },
+  {
+    "step": "series tablet Cancel/reentry baseline restored",
+    "utc": "2026-10-03T04:50:32.273Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "allObservedFieldsMatchBaseline": true
+  },
+  {
+    "step": "series desktop Cancel/reentry baseline restored",
+    "utc": "2026-10-03T04:51:14.838Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "allObservedFieldsMatchBaseline": true
+  }
+]

@@ -1,0 +1,69 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "184a8da994c8ee534898f8ab42711dee0d2c4b22dabebd89c3c40580d011581a",
+      "bytes": 2896
+    },
+    {
+      "file": "console-summary.json",
+      "sha256": "5aec5dd0aa087f110c921fee917f97c9f2333bb0fed1911228f7a87564cbae64",
+      "bytes": 194
+    },
+    {
+      "file": "duplicate-member-restriction.json",
+      "sha256": "7bdb993184deafc9f3762e2cc70f8b3ca1bcb72f77fbec25f6fa28d62c7c014d",
+      "bytes": 1062
+    },
+    {
+      "file": "league-desktop-empty-reset.png",
+      "sha256": "4aa68ea1977011b805a0ad8925e2bb9f7a6f2bef565da6a859cb2f941c281860",
+      "bytes": 48326
+    },
+    {
+      "file": "league-mobile-empty-reset.png",
+      "sha256": "d6499b4cfaa87601cbc9462b9e24273810a165963ac0b8b6e62b02a96bd2d455",
+      "bytes": 45794
+    },
+    {
+      "file": "league-tablet-empty-reset.png",
+      "sha256": "c2a23f862d46f0622a445bdd5d6dac741c932bcd02fa9667bd6995807d1728ed",
+      "bytes": 41633
+    },
+    {
+      "file": "proof.json",
+      "sha256": "093590dc9b3987bd5bc431c53478d5fd7aab0b8d748329545d5e1dccb9cad2d2",
+      "bytes": 25540
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "sha256": "b224756ce88bdb73afe711a96964e77d40d37866dd78ac4fe0502489685f217f",
+      "bytes": 4264
+    },
+    {
+      "file": "summary.json",
+      "sha256": "8414d25db137ae36d1e68cdc543d027866b258e07423a54b8094b3ea0147d4ad",
+      "bytes": 3951
+    },
+    {
+      "file": "tournament-desktop-reset.png",
+      "sha256": "3f3b1d6cedc094fd085b010d160fb1cc4a1f1064cc2dd88267b532d62f48a0e0",
+      "bytes": 28648
+    },
+    {
+      "file": "tournament-duplicate-member-restriction.json",
+      "sha256": "897fa7461f3fafbf4ebaa8189f6fa0ca7de5a9cdc16475127ddc87db1cba466f",
+      "bytes": 660
+    },
+    {
+      "file": "tournament-tablet-reset.png",
+      "sha256": "1e2706ed036ede79597fa57de2666c226ba97d2a7f68f580da9dadc8cc16d380",
+      "bytes": 35214
+    },
+    {
+      "file": "verification.json",
+      "sha256": "9aae2f64fff31473d1d3518ec7a2d11fe91ef9b02458cf8cc3223653a3ad6a4b",
+      "bytes": 928
+    }
+  ]
+}

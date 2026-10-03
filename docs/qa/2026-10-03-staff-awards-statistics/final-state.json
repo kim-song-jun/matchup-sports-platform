@@ -1,0 +1,15 @@
+{
+  "active": {
+    "label": "스태프 배정",
+    "tag": "BUTTON"
+  },
+  "fieldName": "",
+  "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+  "utc": "2026-10-03T04:21:20.468Z",
+  "viewport": {
+    "documentScrollWidth": 1183,
+    "height": 758,
+    "width": 1183
+  },
+  "visibleDialogs": 0
+}

@@ -1,0 +1,60 @@
+{
+  "scope": "Admin league/tournament roster local member-selection requirement and cancel recovery",
+  "windowUTC": "2026-10-03T04:05:55.008Z–2026-10-03T04:09:12.755Z",
+  "browser": "Cloud Chromium; supported browser DOM observations and native window resize/browser zoom",
+  "viewports": [
+    {
+      "width": 405,
+      "height": 606,
+      "dpr": 1.25
+    },
+    {
+      "width": 789,
+      "height": 505,
+      "dpr": 1.5
+    },
+    {
+      "width": 1183,
+      "height": 758,
+      "dpr": 1
+    }
+  ],
+  "auth": "Existing administrator shell rendered; no sign-in/out or role change",
+  "leagueURL": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+  "tournamentURL": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+  "passes": [
+    "League empty registration has seven eligible choices. At each of three widths: placeholder selected and Add disabled; local member choice enables Add; reopen after dismissal resets placeholder/Add disabled and roster stays empty.",
+    "League dismissal matrix: mobile Escape; tablet footer Close; desktop X. Focus returns to original review trigger.",
+    "Tournament one-player registration has two eligible choices. Same local selection/Add gate/reset at each width; mobile footer Close, tablet Escape, desktop X. No addition confirmed; same one-player row observed after reopen.",
+    "Existing-player duplicate restriction: all six existing league members disabled in option list with already-in-roster reason; tournament existing one member disabled while two other members remain eligible. This validates member dedup availability, not duplicate jersey-number validation.",
+    "Latest50 captured warn/error sample:50 browser-extension metadata errors and0 application-origin entries. Not full network/health proof."
+  ],
+  "findings": "No new independent defect. Known initial focus staying on background review trigger remains observed; not duplicated.",
+  "limits": [
+    "Admin review forms expose member picker and per-player qualification selects; no real-name, phone, birthday or jersey inputs. Required-field presence is implemented by disabled Add with no native required attr; this is not classified as defect.",
+    "Jersey min/max and duplicate-jersey local validation cannot be exercised through these administrator review forms. Existing prior app-roster jersey100 test had four other missing required fields and cannot establish isolated range validation. It was not repeated.",
+    "Qualification selects have no separate Save control; treated as immediate-write risk and never changed. No claim that autosave implementation was technically verified.",
+    "No Save/Add/Exclude/lock/exception/status/result/permission/notification controls activated. No QA179, new fixture, application flow, paid/closed application retry, file upload or export.",
+    "Individual-match roster input form was not newly opened in this bounded continuation; attendance draft/cancel was already covered in previous batch.",
+    "No physical mobile/tablet, virtual keyboard, screen reader or cross-browser check.",
+    "Two proof observations are explicitly excluded: offscreen navigation dialog matched instead of roster; row-loading state captured before settled data. Later valid observations supply evidence."
+  ],
+  "evidence": {
+    "proof": "proof.json",
+    "duplicates": [
+      "duplicate-member-restriction.json",
+      "tournament-duplicate-member-restriction.json"
+    ],
+    "images": "Five inspected safe crops with screenshot-call UTC bounds in screenshot-provenance.json"
+  },
+  "finalState": {
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "utc": "2026-10-03T04:09:12.755Z",
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    },
+    "visibleRosterModal": false,
+    "localSelectionDraft": false
+  }
+}

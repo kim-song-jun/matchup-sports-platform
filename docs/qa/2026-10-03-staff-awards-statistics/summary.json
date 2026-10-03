@@ -1,0 +1,51 @@
+{
+  "scope": "Read-only staff search/cancel, staged award picker, statistics availability, three actual CSS widths",
+  "windowUTC": "2026-10-03T04:11:31Z–2026-10-03T04:21:20.468Z",
+  "viewports": [
+    "405×606 @1.25",
+    "789×505 @1.5",
+    "1183×758 @1"
+  ],
+  "finding": "관리자 개인 어워드의 빈 항목을 추가하면 모바일 가로 넘침으로 삭제 버튼이 잘림",
+  "findingEvidence": "https://github.com/kim-song-jun/matchup-sports-platform/blob/124d731effba624e32b95a12bccd36a5c92a007e/docs/qa/2026-10-03-award-overflow/README.md",
+  "staffPasses": [
+    "All3 widths: initial search focus; synthetic no-match query returns0, E2E returns10 actual candidate buttons; Tab moves to first candidate without selecting; Escape restores original trigger; reopening clears query and keeps original role/empty expiry.",
+    "Desktop additionally Tab traversed all10 candidates then role. No candidate, role, expiry or assignment changed.",
+    "Tablet initial no-match screen partly clips expiry under fixed footer; Tab into expiry auto-scrolls it fully above footer. Mobile same keyboard reveal works; desktop responsive continuation fits. This is not evidence of permanently inaccessible expiry.",
+    "Mobile1-character Q shows help without result list; no inference about backend request count."
+  ],
+  "awardsPasses": [
+    "All3 widths: staged empty row opens; team query0 returns explicit empty; Escape closes and clears query. Default4-team options were observed on initial mobile open and tablet/desktop reopen. ArrowDown highlights an available option while focus stays on combobox (mobile filtered1 option; tablet/desktop4 options).",
+    "Mobile additionally exact team query reduces4→1; staged local team choice reveals1 recipient option; nonexistent recipient query0 shows 명단에 없는 선수예요; Escape clears query; no recipient selected.",
+    "Leaving to statistics and returning discards unsaved row at each width: mobile/desktop section links; tablet browserBack. All return0 persisted awards. No explicit Cancel control in award page was asserted."
+  ],
+  "statisticsObserved": [
+    "Ongoing synthetic tournament:0 finalized matches,3 distinct empty sections,0 search fields,0 tables at all3 widths.",
+    "Completed QA tournament:1 finalized match, actual table data rows1/2/2 at all3 widths. Each table has0 links and0 buttons. No statistic-row detail roundtrip exists to execute on these screens.",
+    "No statistics query/filter UI offered; search-empty/reset not applicable. No result creation or state reopening used to force fixture coverage."
+  ],
+  "limits": [
+    "No permission assignment/revocation, award Save, Delete, sends, role mutation, notification, upload, export, campaign action, official result change or fixture creation.",
+    "No claim server validation/persistence/real screen reader or physical device PASS.",
+    "Current title/note award inputs have placeholders but no label/aria-label; AX reports unnamed textfields. Observation retained, not separately filed.",
+    "One recipient no-result wait used wrong expected text and timed out; next DOM observed actual 명단에 없는 선수예요 and0 options. This was test-selector mismatch, not application failure.",
+    "Initial award team fill snapshots were transient; only settled wait+snapshot observations used. One predicted Escape step label was corrected to clears query from actual empty input snapshot."
+  ],
+  "privacy": "Only sanitized count/control evidence and inspected crops are included; candidate identities, raw DOM and full originals are excluded.",
+  "console": "Latest50 warning/error sample contains50 extension entries and0 application-origin entries; not full health/network certification.",
+  "finalState": {
+    "active": {
+      "label": "스태프 배정",
+      "tag": "BUTTON"
+    },
+    "fieldName": "",
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "utc": "2026-10-03T04:21:20.468Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "height": 758,
+      "width": 1183
+    },
+    "visibleDialogs": 0
+  }
+}

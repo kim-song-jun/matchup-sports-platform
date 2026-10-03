@@ -1,0 +1,63 @@
+{
+  "totalObservations": 22,
+  "excluded": 2,
+  "usable": 20,
+  "sixCombinations": [
+    {
+      "kind": "league",
+      "width": 405,
+      "selectedIndexes": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "kind": "league",
+      "width": 789,
+      "selectedIndexes": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "kind": "league",
+      "width": 1183,
+      "selectedIndexes": [
+        0,
+        3,
+        0
+      ]
+    },
+    {
+      "kind": "tournament",
+      "width": 405,
+      "selectedIndexes": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "kind": "tournament",
+      "width": 789,
+      "selectedIndexes": [
+        0,
+        2,
+        0
+      ]
+    },
+    {
+      "kind": "tournament",
+      "width": 1183,
+      "selectedIndexes": [
+        0,
+        1,
+        0
+      ]
+    }
+  ],
+  "existingDisabledLeagueMembers": 6,
+  "existingDisabledTournamentMembers": 1
+}

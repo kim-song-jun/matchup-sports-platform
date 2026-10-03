@@ -1,0 +1,147 @@
+[
+  {
+    "file": "staff-mobile-empty.png",
+    "startUTC": "2026-10-03T04:12:01.103Z",
+    "endUTC": "2026-10-03T04:12:01.132Z",
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      16,
+      16,
+      389,
+      590
+    ],
+    "outputRaster": [
+      373,
+      574
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "3d38af2482cfbfe869e1835fb28f2f13ae1b84ac20e5695f2660f2acfa44ffda",
+    "inspection": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "staff-tablet-empty.png",
+    "startUTC": "2026-10-03T04:15:56.839Z",
+    "endUTC": "2026-10-03T04:15:56.880Z",
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      174,
+      16,
+      615,
+      489
+    ],
+    "outputRaster": [
+      441,
+      473
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "eb45866f3f3383bb2f8efb7c7dd92681cd3a28d120beb7e53858cd7134ed86ce",
+    "inspection": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "staff-desktop-empty.png",
+    "startUTC": "2026-10-03T04:17:04.245Z",
+    "endUTC": "2026-10-03T04:17:04.291Z",
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      372,
+      86,
+      812,
+      672
+    ],
+    "outputRaster": [
+      440,
+      586
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "46e22b138015b6b1bb7fef5783c31c357e92d8070aed572c0da9278e62b763e8",
+    "inspection": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "statistics-desktop-empty.png",
+    "startUTC": "2026-10-03T04:18:32.211Z",
+    "endUTC": "2026-10-03T04:18:32.253Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/statistics",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      488,
+      332,
+      1144,
+      713
+    ],
+    "outputRaster": [
+      656,
+      381
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "d232801720107ec76bdf18b9925c09a4bd5ef8e4d6fa75e000fb41df3020e483",
+    "inspection": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  },
+  {
+    "file": "staff-tablet-expiry-focus.png",
+    "startUTC": "2026-10-03T04:21:02.120Z",
+    "endUTC": "2026-10-03T04:21:02.181Z",
+    "url": "https://alpha.teameet.co.kr/admin/live/aa100000-0000-4000-8000-000000000004/staff",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      174,
+      16,
+      615,
+      489
+    ],
+    "outputRaster": [
+      441,
+      473
+    ],
+    "method": "Pixel-preserving crop; no retouch/rescale",
+    "sha256": "732fea9b7ddc19fb3334ccfc92f9365284312521a90a362fb3531bcdcfe3a73c",
+    "inspection": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded.",
+    "captureUTCNote": "Exact screenshot is bounded by startUTC/endUTC; neither DOM UTC substituted nor point instant inferred"
+  }
+]

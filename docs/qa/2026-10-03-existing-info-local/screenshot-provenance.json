@@ -1,0 +1,176 @@
+[
+  {
+    "file": "tournament-info-mobile-title-empty.png",
+    "startUTC": "2026-10-03T04:33:11.828Z",
+    "endUTC": "2026-10-03T04:33:11.863Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      16,
+      32,
+      389,
+      574
+    ],
+    "outputRaster": [
+      373,
+      542
+    ],
+    "sha256": "dedb4ba0e9c9b1d7ebb5c5aa290f684d303b818db5bc092b107df390f893cb14",
+    "method": "Pixel-preserving crop; no retouch or rescale",
+    "captureUTCNote": "Screenshot call bounded by startUTC/endUTC; DOM time not substituted",
+    "privacy": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded."
+  },
+  {
+    "file": "tournament-info-tablet-title-empty.png",
+    "startUTC": "2026-10-03T04:34:50.479Z",
+    "endUTC": "2026-10-03T04:34:50.541Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      154,
+      17,
+      634,
+      488
+    ],
+    "outputRaster": [
+      480,
+      471
+    ],
+    "sha256": "b998a5875e4b2b0a8dceadde2b3ce58386a7417fb7166927bbab1f0bf9b1d408",
+    "method": "Pixel-preserving crop; no retouch or rescale",
+    "captureUTCNote": "Screenshot call bounded by startUTC/endUTC; DOM time not substituted",
+    "privacy": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded."
+  },
+  {
+    "file": "tournament-info-desktop-title-empty.png",
+    "startUTC": "2026-10-03T04:35:20.152Z",
+    "endUTC": "2026-10-03T04:35:20.214Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      352,
+      55,
+      832,
+      703
+    ],
+    "outputRaster": [
+      480,
+      648
+    ],
+    "sha256": "53392f6d43ee9a249c687f42d70773737e16d277146faebdc38d1f67ead053be",
+    "method": "Pixel-preserving crop; no retouch or rescale",
+    "captureUTCNote": "Screenshot call bounded by startUTC/endUTC; DOM time not substituted",
+    "privacy": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded."
+  },
+  {
+    "file": "series-mobile-ratio51.png",
+    "startUTC": "2026-10-03T04:49:01.015Z",
+    "endUTC": "2026-10-03T04:49:01.035Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      16,
+      77,
+      389,
+      551
+    ],
+    "outputRaster": [
+      373,
+      474
+    ],
+    "sha256": "63591a0f8cfc14733108ab53ac26bc45741b98189fffc4455d7ca9553e8739fc",
+    "method": "Pixel-preserving crop; no retouch or rescale",
+    "captureUTCNote": "Screenshot call bounded by startUTC/endUTC; DOM time not substituted",
+    "privacy": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded."
+  },
+  {
+    "file": "series-tablet-ratio51.png",
+    "startUTC": "2026-10-03T04:49:56.178Z",
+    "endUTC": "2026-10-03T04:49:56.217Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      24,
+      130,
+      764,
+      403
+    ],
+    "outputRaster": [
+      740,
+      273
+    ],
+    "sha256": "df02f8ba9005ca4eb51905796bf0695c8e6b78dff7972b8b24c5049de3d5bd45",
+    "method": "Pixel-preserving crop; no retouch or rescale",
+    "captureUTCNote": "Screenshot call bounded by startUTC/endUTC; DOM time not substituted",
+    "privacy": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded."
+  },
+  {
+    "file": "series-desktop-ratio51.png",
+    "startUTC": "2026-10-03T04:50:32.913Z",
+    "endUTC": "2026-10-03T04:50:32.959Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      272,
+      256,
+      1151,
+      524
+    ],
+    "outputRaster": [
+      879,
+      268
+    ],
+    "sha256": "807512a22db451f8f45e0b8fb00874dc1acc580282846730641f78e5be03f420",
+    "method": "Pixel-preserving crop; no retouch or rescale",
+    "captureUTCNote": "Screenshot call bounded by startUTC/endUTC; DOM time not substituted",
+    "privacy": "Published pixels inspected. Personal identities, roster names, phones, birth dates, financial fields, credentials and sidebar account information are excluded."
+  }
+]

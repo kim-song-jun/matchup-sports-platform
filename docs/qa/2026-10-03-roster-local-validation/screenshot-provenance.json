@@ -1,0 +1,142 @@
+[
+  {
+    "file": "league-mobile-empty-reset.png",
+    "startUTC": "2026-10-03T04:07:15.673Z",
+    "endUTC": "2026-10-03T04:07:15.704Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "sourceRaster": [
+      405,
+      606
+    ],
+    "cropPixels": [
+      16,
+      103,
+      389,
+      503
+    ],
+    "outputRaster": [
+      373,
+      400
+    ],
+    "method": "Pixel-preserving crop only; no retouch or rescale",
+    "sha256": "d6499b4cfaa87601cbc9462b9e24273810a165963ac0b8b6e62b02a96bd2d455",
+    "privacyInspection": "Published safe crop visually inspected; excludes personal names, birth dates, phone numbers, identity rows and sidebar account details. League crops show an empty roster."
+  },
+  {
+    "file": "tournament-tablet-reset.png",
+    "startUTC": "2026-10-03T04:08:06.920Z",
+    "endUTC": "2026-10-03T04:08:06.969Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      174,
+      249,
+      614,
+      445
+    ],
+    "outputRaster": [
+      440,
+      196
+    ],
+    "method": "Pixel-preserving crop only; no retouch or rescale",
+    "sha256": "1e2706ed036ede79597fa57de2666c226ba97d2a7f68f580da9dadc8cc16d380",
+    "privacyInspection": "Published safe crop visually inspected; excludes personal names, birth dates, phone numbers, identity rows and sidebar account details. League crops show an empty roster."
+  },
+  {
+    "file": "league-tablet-empty-reset.png",
+    "startUTC": "2026-10-03T04:08:10.383Z",
+    "endUTC": "2026-10-03T04:08:10.449Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "sourceRaster": [
+      788,
+      505
+    ],
+    "cropPixels": [
+      155,
+      79,
+      634,
+      426
+    ],
+    "outputRaster": [
+      479,
+      347
+    ],
+    "method": "Pixel-preserving crop only; no retouch or rescale",
+    "sha256": "c2a23f862d46f0622a445bdd5d6dac741c932bcd02fa9667bd6995807d1728ed",
+    "privacyInspection": "Published safe crop visually inspected; excludes personal names, birth dates, phone numbers, identity rows and sidebar account details. League crops show an empty roster."
+  },
+  {
+    "file": "league-desktop-empty-reset.png",
+    "startUTC": "2026-10-03T04:08:21.993Z",
+    "endUTC": "2026-10-03T04:08:22.036Z",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      352,
+      205,
+      832,
+      553
+    ],
+    "outputRaster": [
+      480,
+      348
+    ],
+    "method": "Pixel-preserving crop only; no retouch or rescale",
+    "sha256": "4aa68ea1977011b805a0ad8925e2bb9f7a6f2bef565da6a859cb2f941c281860",
+    "privacyInspection": "Published safe crop visually inspected; excludes personal names, birth dates, phone numbers, identity rows and sidebar account details. League crops show an empty roster."
+  },
+  {
+    "file": "tournament-desktop-reset.png",
+    "startUTC": "2026-10-03T04:09:12.427Z",
+    "endUTC": "2026-10-03T04:09:12.545Z",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "sourceRaster": [
+      1183,
+      758
+    ],
+    "cropPixels": [
+      372,
+      376,
+      812,
+      572
+    ],
+    "outputRaster": [
+      440,
+      196
+    ],
+    "method": "Pixel-preserving crop only; no retouch or rescale",
+    "sha256": "3f3b1d6cedc094fd085b010d160fb1cc4a1f1064cc2dd88267b532d62f48a0e0",
+    "privacyInspection": "Published safe crop visually inspected; excludes personal names, birth dates, phone numbers, identity rows and sidebar account details. League crops show an empty roster."
+  }
+]

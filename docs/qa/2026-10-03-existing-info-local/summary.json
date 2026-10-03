@@ -1,0 +1,143 @@
+{
+  "scope": "Existing tournament information edit modal plus existing league-series edit page; local unsaved validation only",
+  "windowUTC": [
+    "2026-10-03T04:26:24Z–04:36:50Z",
+    "2026-10-03T04:48:08.142Z–04:51:15.403Z"
+  ],
+  "browser": "Cloud Chromium; supported browser interaction and native window resize/browser zoom",
+  "viewports": [
+    {
+      "width": 405,
+      "height": 606,
+      "dpr": 1.25
+    },
+    {
+      "width": 789,
+      "height": 505,
+      "dpr": 1.5
+    },
+    {
+      "width": 1183,
+      "height": 758,
+      "dpr": 1
+    }
+  ],
+  "writeBoundaryEvidence": {
+    "source": "Code-reading evidence at dbb6468d81809649026e6a9c193d5a982f8a57b6, reported at2026-10-03T04:31:25Z; UI independently shows explicit Cancel/Save",
+    "tournament": "tournaments/[id]/info-section.tsx: title705,venue751,teamCount796,minPlayers809,maxPlayers822 onChange local state; handleEditSubmit209→updateTournament.mutate390/PATCH. form680 and submit1132 permit Enter; none used.",
+    "leagueSeries": "Code-reading evidence describes local fields with submit-only writes. Enter/Save were not used.",
+    "distinction": "Code-reading evidence and observed operations; no network interception or server-write measurement was performed in this browser pass."
+  },
+  "paths": {
+    "tournament": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "series": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113/edit"
+  },
+  "observedPasses": [
+    "Tournament3widths: clearing required title and blurring disables Save, sets native valueMissing; restoring title re-enables Save.100 chars accepted;101st typed character blocked.",
+    "Tournament3widths: team1,minPlayers0,maxPlayers0 trigger native rangeUnderflow; exact lower values2,1,1 are native-valid. No Save/Enter used to test submission.",
+    "Tournament3widths: relevant field labels connect correctly; title and venue maxLength100; parking maxLength500 was read only. Mobile fields stack, tablet/desktop pair numeric fields without page horizontal overflow. Tab reveals minimum-player field in scrollable modal.",
+    "Tournament cancel matrix: mobile Cancel, tablet Escape, desktop X; reopen restores every observed baseline field. Separate close operations restore original Edit trigger. Three tournament cancel comparisons are recorded.",
+    "Mobile additional: optional venue empty remains native-valid;100-char venue blocks101st key; minPlayers13/maxPlayers12 have no pre-submit custom error/native cross-field constraint. This is not classified as a defect without submission-path validation.",
+    "League-series3widths: empty name disables Save despite no native required attribute.100 chars accepted;101st typed character blocked. All eight visible controls have associated labels; disabled sport/region remain unchanged.",
+    "League-series3widths: ratio0/minPromotion0 are native-underflow; ratio51 native-overflow; exact ratio1 and50 with min1 are native-valid. Inputs never submit.",
+    "League-series3widths: valid local ratio changes update explanatory preview. At50%,5-team example shows skip warning;8/12-team examples show4/6 promoted/demoted. At1%,each example shows1. No actual promotion calculation/confirmation button activated.",
+    "League-series3widths: Cancel returns detail showing original20% minimum1; reenter restores all eight baseline field values."
+  ],
+  "newDefects": "None independently confirmed in this bounded validation pass.",
+  "knownObservations": [
+    "Initial tournament modal focus stays on background Edit trigger; linked to existing modal-focus observation, not new issue.",
+    "Sport helper says immediately reflected, but the reviewed source confirms Save is required. No sport change performed; copy ambiguity only.",
+    "Numbers below limits leave Save enabled while native validity is false. Browser/server submission rejection deliberately untested; not treated as failed validation."
+  ],
+  "leagueScopeLimit": "General league instance list/detail has no information edit entry observed. Expanded detail only offers team/fixture/regeneration actions, excluded. League-series edit was reached by actual league management→series tab→synthetic series detail→Edit link, not guessed URL. This is not a claim ordinary league-instance info form was validated.",
+  "limits": [
+    "No Save, Enter, upload, registration open/close, state changes, bank/fee/legal text edits, promotion mode/tier changes, notifications, result changes, QA179 or create wizard.",
+    "No inline error was observed before submit; proof nativeValidationMessage fields are DOM properties, not claims that a browser validation bubble was displayed.",
+    "Cross-field bounds, server rejection and persistence of saved changes remain untested.",
+    "Interrupted before series local edits;04:48:08UTC re-observation confirmed baseline unchanged and dialogs0 before continuing.",
+    "One exact-label selector for title omitted visible asterisk and matched0; no input occurred. Retargeted observed #edit-title.",
+    "Only actual CSS windows/zoom, no touch/virtual keyboard/screen reader/cross-browser.",
+    "Latest50 captured warn/error entries were extension metadata errors,0 app-origin in sample; not full-health proof."
+  ],
+  "cancelComparisons": [
+    {
+      "step": "tournament mobile Cancel/reopen restores baseline after invalid drafts",
+      "utc": "2026-10-03T04:33:46.812Z",
+      "viewport": {
+        "documentScrollWidth": 405,
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "allObservedFieldsMatchBaseline": true
+    },
+    {
+      "step": "tournament tablet Escape/reopen restores baseline",
+      "utc": "2026-10-03T04:34:51.895Z",
+      "viewport": {
+        "documentScrollWidth": 789,
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "allObservedFieldsMatchBaseline": true
+    },
+    {
+      "step": "tournament desktop X/reopen restores baseline",
+      "utc": "2026-10-03T04:35:21.531Z",
+      "viewport": {
+        "documentScrollWidth": 1183,
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "allObservedFieldsMatchBaseline": true
+    },
+    {
+      "step": "series mobile Cancel/reentry baseline restored",
+      "utc": "2026-10-03T04:49:53.807Z",
+      "viewport": {
+        "documentScrollWidth": 405,
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "allObservedFieldsMatchBaseline": true
+    },
+    {
+      "step": "series tablet Cancel/reentry baseline restored",
+      "utc": "2026-10-03T04:50:32.273Z",
+      "viewport": {
+        "documentScrollWidth": 789,
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "allObservedFieldsMatchBaseline": true
+    },
+    {
+      "step": "series desktop Cancel/reentry baseline restored",
+      "utc": "2026-10-03T04:51:14.838Z",
+      "viewport": {
+        "documentScrollWidth": 1183,
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "allObservedFieldsMatchBaseline": true
+    }
+  ],
+  "privacy": "Six inspected safe crops and sanitized field-only JSON. No personal identities, roster identities, financial fields, or credentials published.",
+  "finalState": {
+    "mainInputs": 0,
+    "mainText": "리그 체계\n\n(테스트) A-L 시즌티어검증\n\n1부 · 2부 · 팀 수의 20% (최소 1팀) 승격·강등\n\n활성\n수정\n1시즌\n승강 후보 계산\n\n아직 끝나지 않은 리그가 있어요. 모든 티어가 종료돼야 승강을 계산할 수 있어요.\n\n1부\n활성\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀\n\n2부\n초안\n(테스트) A-L 시즌티어검증 1시즌 2부\n\n2팀",
+    "url": "https://alpha.teameet.co.kr/admin/league-series/bf138cc7-0147-4d5f-b1a9-5d9805c59113",
+    "utc": "2026-10-03T04:51:15.403Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "height": 758,
+      "width": 1183
+    },
+    "visibleDialogs": 0
+  }
+}

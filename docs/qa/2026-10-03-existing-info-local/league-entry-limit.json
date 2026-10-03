@@ -1,0 +1,17 @@
+{
+  "list": {
+    "editActions": [],
+    "searchFields": 0,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches",
+    "utc": "2026-10-03T04:29:16.259Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    }
+  },
+  "detailObservation": {
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe",
+    "utc": "2026-10-03T04:28:12Z",
+    "observed": "Detail and expanded management expose team add, single fixture add, regenerate schedule; no league information edit entry. No write controls activated."
+  }
+}

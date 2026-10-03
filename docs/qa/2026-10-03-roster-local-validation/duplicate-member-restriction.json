@@ -1,0 +1,52 @@
+{
+  "memberOptions": [
+    {
+      "disabled": false,
+      "emptyValue": true,
+      "index": 0,
+      "reason": "no eligible members"
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 1,
+      "reason": "already in roster"
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 2,
+      "reason": "already in roster"
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 3,
+      "reason": "already in roster"
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 4,
+      "reason": "already in roster"
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 5,
+      "reason": "already in roster"
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 6,
+      "reason": "already in roster"
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/admin/league-matches/167a131d-9c45-475f-bdab-b1dce78bdffe/registrations",
+  "utc": "2026-10-03T04:08:37.839Z",
+  "viewport": {
+    "height": 758,
+    "width": 1183
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "efc2b575ee1a970bdabd02b3a8a8fe0c12a6685440b50850707eb64d2f41fc95",
+      "bytes": 3647
+    },
+    {
+      "file": "cancel-comparison.json",
+      "sha256": "1b3e40413ef57f9bb949670524831415d0e6dda45be5458f74b332cf355b8b21",
+      "bytes": 1651
+    },
+    {
+      "file": "console-summary.json",
+      "sha256": "62fbe20fab03354a0fa43eb2f46d7c0c2bc115399678e0dcfd1733b36ab30c37",
+      "bytes": 165
+    },
+    {
+      "file": "final-state.json",
+      "sha256": "cc1ac718d4c9d445ce0ab199d10d8c841b329a27afa3335166255ba4e1f58c80",
+      "bytes": 709
+    },
+    {
+      "file": "league-entry-limit.json",
+      "sha256": "ed31a0a4aefa9abf74c56befc28f682f74644a51452155388e096c79ccbbe172",
+      "bytes": 566
+    },
+    {
+      "file": "proof.json",
+      "sha256": "7f231c02ecae53956d2a73cb8d355d9e9f9f98d7dc311bbc0b95354c29b31b5b",
+      "bytes": 130936
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "sha256": "54b97a76c740ae0c6de66a4ea53ce0408acc642b806e077fad41c8deb571b9a7",
+      "bytes": 5482
+    },
+    {
+      "file": "series-desktop-ratio51.png",
+      "sha256": "807512a22db451f8f45e0b8fb00874dc1acc580282846730641f78e5be03f420",
+      "bytes": 56980
+    },
+    {
+      "file": "series-mobile-ratio51.png",
+      "sha256": "63591a0f8cfc14733108ab53ac26bc45741b98189fffc4455d7ca9553e8739fc",
+      "bytes": 60215
+    },
+    {
+      "file": "series-proof.json",
+      "sha256": "6fd4d4530ec5ecec4a2e9a2ae47e601fbe23748d5103adf6bb837ddea465257b",
+      "bytes": 184219
+    },
+    {
+      "file": "series-tablet-ratio51.png",
+      "sha256": "df02f8ba9005ca4eb51905796bf0695c8e6b78dff7972b8b24c5049de3d5bd45",
+      "bytes": 54589
+    },
+    {
+      "file": "summary.json",
+      "sha256": "bc457bacae064d19a983ea44d7ddd8400590a4283e29c303a620109f0962fb71",
+      "bytes": 8037
+    },
+    {
+      "file": "tournament-info-desktop-title-empty.png",
+      "sha256": "53392f6d43ee9a249c687f42d70773737e16d277146faebdc38d1f67ead053be",
+      "bytes": 74458
+    },
+    {
+      "file": "tournament-info-mobile-title-empty.png",
+      "sha256": "dedb4ba0e9c9b1d7ebb5c5aa290f684d303b818db5bc092b107df390f893cb14",
+      "bytes": 64664
+    },
+    {
+      "file": "tournament-info-tablet-title-empty.png",
+      "sha256": "b998a5875e4b2b0a8dceadde2b3ce58386a7417fb7166927bbab1f0bf9b1d408",
+      "bytes": 53844
+    },
+    {
+      "file": "verification.json",
+      "sha256": "0fa47a5fa3dc69d2f6cebf2b15349718240df947d764a4cffe81648d91ed960d",
+      "bytes": 706
+    }
+  ]
+}

@@ -1,0 +1,5216 @@
+[
+  {
+    "active": {
+      "id": "",
+      "label": "대회 정보 수정",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 92.5625,
+          "height": 44,
+          "left": 324.8000183105469,
+          "right": 368.8000183105469,
+          "top": 48.5625,
+          "width": 44,
+          "x": 324.8000183105469,
+          "y": 48.5625
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 549.8374938964844,
+          "height": 44,
+          "left": 36,
+          "right": 180.40000915527344,
+          "top": 505.8374938964844,
+          "width": 144.40000915527344,
+          "x": 36,
+          "y": 505.8374938964844
+        },
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 549.8374938964844,
+          "height": 44,
+          "left": 188.40000915527344,
+          "right": 364.8000183105469,
+          "top": 505.8374938964844,
+          "width": 176.40000915527344,
+          "x": 188.40000915527344,
+          "y": 505.8374938964844
+        },
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 314.3625183105469,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 270.3625183105469,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 270.3625183105469
+        },
+        "required": true,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 739.8624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 695.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 695.8624877929688
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-parking-info",
+        "labels": [
+          "주차 안내"
+        ],
+        "max": "",
+        "maxLength": 500,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 827.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 783.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 783.3624877929688
+        },
+        "required": false,
+        "type": "textarea",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "주차와 입장 동선은 지도에서 확인해요."
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1042.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 998.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 998.3624877929688
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1125.862548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1081.862548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1081.862548828125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1209.362548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1165.362548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1165.362548828125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12"
+      }
+    ],
+    "rect": {
+      "bottom": 573.8375244140625,
+      "height": 541.2750244140625,
+      "left": 16,
+      "right": 388.8000183105469,
+      "top": 32.5625,
+      "width": 372.8000183105469,
+      "x": 16,
+      "y": 32.5625
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:27:36.672Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile read-only field boundaries before local-edit authorization proof"
+  },
+  {
+    "active": {
+      "id": "edit-min-players",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 92.5625,
+          "height": 44,
+          "left": 324.8000183105469,
+          "right": 368.8000183105469,
+          "top": 48.5625,
+          "width": 44,
+          "x": 324.8000183105469,
+          "y": 48.5625
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 549.8374938964844,
+          "height": 44,
+          "left": 36,
+          "right": 180.40000915527344,
+          "top": 505.8374938964844,
+          "width": 144.40000915527344,
+          "x": 36,
+          "y": 505.8374938964844
+        },
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 549.8374938964844,
+          "height": 44,
+          "left": 188.40000915527344,
+          "right": 364.8000183105469,
+          "top": 505.8374938964844,
+          "width": 176.40000915527344,
+          "x": 188.40000915527344,
+          "y": 505.8374938964844
+        },
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": -364.0375061035156,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -408.0375061035156,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -408.0375061035156
+        },
+        "required": true,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 61.46249961853027,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 17.462499618530273,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 17.462499618530273
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-parking-info",
+        "labels": [
+          "주차 안내"
+        ],
+        "max": "",
+        "maxLength": 500,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 148.9625015258789,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 104.9625015258789,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 104.9625015258789
+        },
+        "required": false,
+        "type": "textarea",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "주차와 입장 동선은 지도에서 확인해요."
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "minLength": -1,
+        "rect": {
+          "bottom": 363.9624938964844,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 319.9624938964844,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 319.9624938964844
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 447.4624938964844,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 403.4624938964844,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 403.4624938964844
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 530.9624938964844,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 486.9624938964844,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 486.9624938964844
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12"
+      }
+    ],
+    "rect": {
+      "bottom": 573.8375244140625,
+      "height": 541.2750244140625,
+      "left": 16,
+      "right": 388.8000183105469,
+      "top": 32.5625,
+      "width": 372.8000183105469,
+      "x": 16,
+      "y": 32.5625
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:27:56.527Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile keyboard focus on minimum players, no edits"
+  },
+  {
+    "active": {
+      "id": "",
+      "label": "대회 정보 수정",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 77.46875,
+          "height": 44,
+          "left": 570.3333740234375,
+          "right": 614.3333740234375,
+          "top": 33.46875,
+          "width": 44,
+          "x": 570.3333740234375,
+          "y": 33.46875
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 463.8645935058594,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 372.3333435058594,
+          "top": 419.8645935058594,
+          "width": 198,
+          "x": 174.33334350585938,
+          "y": 419.8645935058594
+        },
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 463.8645935058594,
+          "height": 44,
+          "left": 380.3333435058594,
+          "right": 610.3333435058594,
+          "top": 419.8645935058594,
+          "width": 230,
+          "x": 380.3333435058594,
+          "y": 419.8645935058594
+        },
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 299.1354217529297,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 255.1354217529297,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 255.1354217529297
+        },
+        "required": true,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 724.6354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 680.6354370117188,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 680.6354370117188
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-parking-info",
+        "labels": [
+          "주차 안내"
+        ],
+        "max": "",
+        "maxLength": 500,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 812.1354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 768.1354370117188,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 768.1354370117188
+        },
+        "required": false,
+        "type": "textarea",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "주차와 입장 동선은 지도에서 확인해요."
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "minLength": -1,
+        "rect": {
+          "bottom": 925.6354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 881.6354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 881.6354370117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12"
+      }
+    ],
+    "rect": {
+      "bottom": 487.8645935058594,
+      "height": 470.3958435058594,
+      "left": 154.33334350585938,
+      "right": 634.3333435058594,
+      "top": 17.46875,
+      "width": 480,
+      "x": 154.33334350585938,
+      "y": 17.46875
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:29:20.484Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet read-only field bounds and labels"
+  },
+  {
+    "active": {
+      "id": "edit-min-players",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 77.46875,
+          "height": 44,
+          "left": 570.3333740234375,
+          "right": 614.3333740234375,
+          "top": 33.46875,
+          "width": 44,
+          "x": 570.3333740234375,
+          "y": 33.46875
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 463.8645935058594,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 372.3333435058594,
+          "top": 419.8645935058594,
+          "width": 198,
+          "x": 174.33334350585938,
+          "y": 419.8645935058594
+        },
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 463.8645935058594,
+          "height": 44,
+          "left": 380.3333435058594,
+          "right": 610.3333435058594,
+          "top": 419.8645935058594,
+          "width": 230,
+          "x": 380.3333435058594,
+          "y": 419.8645935058594
+        },
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": -313.53125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": -357.53125,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": -357.53125
+        },
+        "required": true,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 111.96875,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 67.96875,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 67.96875
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-parking-info",
+        "labels": [
+          "주차 안내"
+        ],
+        "max": "",
+        "maxLength": 500,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 199.46875,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 155.46875,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 155.46875
+        },
+        "required": false,
+        "type": "textarea",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "주차와 입장 동선은 지도에서 확인해요."
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "minLength": -1,
+        "rect": {
+          "bottom": 312.96875,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 268.96875,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 268.96875
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 396.46875,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": 352.46875,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": 352.46875
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 396.46875,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 352.46875,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 352.46875
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12"
+      }
+    ],
+    "rect": {
+      "bottom": 487.8645935058594,
+      "height": 470.3958435058594,
+      "left": 154.33334350585938,
+      "right": 634.3333435058594,
+      "top": 17.46875,
+      "width": 480,
+      "x": 154.33334350585938,
+      "y": 17.46875
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:29:20.696Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet keyboard focus minimum, unchanged values"
+  },
+  {
+    "active": {
+      "id": "",
+      "label": "대회 정보 수정",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 115.203125,
+          "height": 44,
+          "left": 767.5,
+          "right": 811.5,
+          "top": 71.203125,
+          "width": 44,
+          "x": 767.5,
+          "y": 71.203125
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 678.796875,
+          "height": 44,
+          "left": 371.5,
+          "right": 569.5,
+          "top": 634.796875,
+          "width": 198,
+          "x": 371.5,
+          "y": 634.796875
+        },
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 678.796875,
+          "height": 44,
+          "left": 577.5,
+          "right": 807.5,
+          "top": 634.796875,
+          "width": 230,
+          "x": 577.5,
+          "y": 634.796875
+        },
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 337.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 293.203125,
+          "width": 436,
+          "x": 371.5,
+          "y": 293.203125
+        },
+        "required": true,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 762.703125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 718.703125,
+          "width": 436,
+          "x": 371.5,
+          "y": 718.703125
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-parking-info",
+        "labels": [
+          "주차 안내"
+        ],
+        "max": "",
+        "maxLength": 500,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 850.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 806.203125,
+          "width": 436,
+          "x": 371.5,
+          "y": 806.203125
+        },
+        "required": false,
+        "type": "textarea",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "주차와 입장 동선은 지도에서 확인해요."
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "minLength": -1,
+        "rect": {
+          "bottom": 963.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 919.703125,
+          "width": 212,
+          "x": 595.5,
+          "y": 919.703125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12"
+      }
+    ],
+    "rect": {
+      "bottom": 702.796875,
+      "height": 647.59375,
+      "left": 351.5,
+      "right": 831.5,
+      "top": 55.203125,
+      "width": 480,
+      "x": 351.5,
+      "y": 55.203125
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:29:39.361Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop read-only field bounds and labels"
+  },
+  {
+    "active": {
+      "id": "edit-min-players",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 115.203125,
+          "height": 44,
+          "left": 767.5,
+          "right": 811.5,
+          "top": 71.203125,
+          "width": 44,
+          "x": 767.5,
+          "y": 71.203125
+        },
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 678.796875,
+          "height": 44,
+          "left": 371.5,
+          "right": 569.5,
+          "top": 634.796875,
+          "width": 198,
+          "x": 371.5,
+          "y": 634.796875
+        },
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 678.796875,
+          "height": 44,
+          "left": 577.5,
+          "right": 807.5,
+          "top": 634.796875,
+          "width": 230,
+          "x": 577.5,
+          "y": 634.796875
+        },
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": -186.796875,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": -230.796875,
+          "width": 436,
+          "x": 371.5,
+          "y": -230.796875
+        },
+        "required": true,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 238.703125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 194.703125,
+          "width": 436,
+          "x": 371.5,
+          "y": 194.703125
+        },
+        "required": false,
+        "type": "text",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-parking-info",
+        "labels": [
+          "주차 안내"
+        ],
+        "max": "",
+        "maxLength": 500,
+        "min": "",
+        "minLength": -1,
+        "rect": {
+          "bottom": 326.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 282.203125,
+          "width": 436,
+          "x": 371.5,
+          "y": 282.203125
+        },
+        "required": false,
+        "type": "textarea",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "주차와 입장 동선은 지도에서 확인해요."
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "minLength": -1,
+        "rect": {
+          "bottom": 439.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 395.703125,
+          "width": 212,
+          "x": 595.5,
+          "y": 395.703125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 523.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 479.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 479.203125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1"
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "minLength": -1,
+        "rect": {
+          "bottom": 523.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 479.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 479.203125
+        },
+        "required": false,
+        "type": "number",
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12"
+      }
+    ],
+    "rect": {
+      "bottom": 702.796875,
+      "height": 647.59375,
+      "left": 351.5,
+      "right": 831.5,
+      "top": 55.203125,
+      "width": 480,
+      "x": 351.5,
+      "y": 55.203125
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:29:39.610Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop keyboard minimum focus, unchanged values"
+  },
+  {
+    "active": {
+      "id": "edit-scheduled-at",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": true,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "이 입력란을 작성하세요.",
+        "rect": {
+          "bottom": 314.3625183105469,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 270.3625183105469,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 270.3625183105469
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": true
+        },
+        "value": "",
+        "valueLength": 0
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 739.8624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 695.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 695.8624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1042.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 998.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 998.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1125.862548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1081.862548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1081.862548828125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1209.362548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1165.362548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1165.362548828125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:11.819Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile required empty blurred, native validity only no submit"
+  },
+  {
+    "active": {
+      "id": "edit-title",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 314.3625183105469,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 270.3625183105469,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 270.3625183105469
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "valueLength": 100
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 739.8624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 695.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 695.8624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1042.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 998.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 998.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1125.862548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1081.862548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1081.862548828125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1209.362548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1165.362548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1165.362548828125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:12.057Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile title100 then typed101st char"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -901.6375122070312,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -945.6375122070312,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -945.6375122070312
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -476.1375122070313,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -520.1375122070312,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -520.1375122070312
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "값은 2 이상이어야 합니다.",
+        "rect": {
+          "bottom": -173.6374969482422,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -217.6374969482422,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -217.6374969482422
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": -90.1374969482422,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -134.1374969482422,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -134.1374969482422
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": -6.637500762939453,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -50.63750076293945,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -50.63750076293945
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0",
+        "valueLength": 1
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:12.320Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile team1 min0 max0 native lower bounds, blur only"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -901.6375122070312,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -945.6375122070312,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -945.6375122070312
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -476.1375122070313,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -520.1375122070312,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -520.1375122070312
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -173.6374969482422,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -217.6374969482422,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -217.6374969482422
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -90.1374969482422,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -134.1374969482422,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -134.1374969482422
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -6.637500762939453,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -50.63750076293945,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -50.63750076293945
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:45.836Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile exact lower bounds team2 min1 max1"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -901.6375122070312,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -945.6375122070312,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -945.6375122070312
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -476.1375122070313,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -520.1375122070312,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -520.1375122070312
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -173.6374969482422,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -217.6374969482422,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -217.6374969482422
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -90.1374969482422,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -134.1374969482422,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -134.1374969482422
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "13",
+        "valueLength": 2
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -6.637500762939453,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -50.63750076293945,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -50.63750076293945
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:46.035Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile cross-field min13 max12, pre-submit behavior only"
+  },
+  {
+    "active": {
+      "id": "edit-venue",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -61.63750457763672,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -105.63750457763672,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -105.63750457763672
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 363.8625183105469,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 319.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 319.8625183105469
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+        "valueLength": 100
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 666.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 622.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 622.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 749.8624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 705.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 705.8624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "13",
+        "valueLength": 2
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 833.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 789.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 789.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:46.181Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile venue100 then typed101st char"
+  },
+  {
+    "active": {
+      "id": "edit-parking-info",
+      "label": "주차와 입장 동선은 지도에서 확인해요.",
+      "tag": "TEXTAREA"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -61.63750457763672,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": -105.63750457763672,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": -105.63750457763672
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 363.8625183105469,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 319.8625183105469,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 319.8625183105469
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "",
+        "valueLength": 0
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 666.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 622.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 622.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 749.8624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 705.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 705.8624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "13",
+        "valueLength": 2
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 833.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 789.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 789.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:46.344Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile optional venue empty"
+  },
+  {
+    "active": {
+      "id": "",
+      "label": "대회 정보 수정",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 314.3625183105469,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 270.3625183105469,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 270.3625183105469
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 739.8624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 695.8624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 695.8624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1042.3624877929688,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 998.3624877929688,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 998.3624877929688
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1125.862548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1081.862548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1081.862548828125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1209.362548828125,
+          "height": 44,
+          "left": 36,
+          "right": 364.8000183105469,
+          "top": 1165.362548828125,
+          "width": 328.8000183105469,
+          "x": 36,
+          "y": 1165.362548828125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:33:46.812Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "step": "tournament mobile Cancel/reopen restores baseline after invalid drafts"
+  },
+  {
+    "active": {
+      "id": "edit-scheduled-at",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": true,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "이 입력란을 작성하세요.",
+        "rect": {
+          "bottom": 299.1354217529297,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 255.1354217529297,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 255.1354217529297
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": true
+        },
+        "value": "",
+        "valueLength": 0
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 724.6354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 680.6354370117188,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 680.6354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 925.6354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 881.6354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 881.6354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:34:50.471Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet required empty blurred"
+  },
+  {
+    "active": {
+      "id": "edit-title",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 299.1354217529297,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 255.1354217529297,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 255.1354217529297
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "valueLength": 100
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 724.6354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 680.6354370117188,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 680.6354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 925.6354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 881.6354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 881.6354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:34:50.721Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet title100 typed101st blocked"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -713.53125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": -757.53125,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": -757.53125
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -288.03125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": -332.03125,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": -332.03125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "값은 2 이상이어야 합니다.",
+        "rect": {
+          "bottom": -87.03125,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": -131.03125,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": -131.03125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": -3.53125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": -47.53125,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": -47.53125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": -3.53125,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": -47.53125,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": -47.53125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0",
+        "valueLength": 1
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:34:51.023Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet below lower bounds"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -713.53125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": -757.53125,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": -757.53125
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -288.03125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": -332.03125,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": -332.03125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -87.03125,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": -131.03125,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": -131.03125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -3.53125,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": -47.53125,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": -47.53125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -3.53125,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": -47.53125,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": -47.53125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:34:51.359Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet exact lower bounds"
+  },
+  {
+    "active": {
+      "id": "",
+      "label": "대회 정보 수정",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 299.1354217529297,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 255.1354217529297,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 255.1354217529297
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 724.6354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 610.3333435058594,
+          "top": 680.6354370117188,
+          "width": 436,
+          "x": 174.33334350585938,
+          "y": 680.6354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 925.6354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 881.6354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 881.6354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 174.33334350585938,
+          "right": 386.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 174.33334350585938,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1009.1354370117188,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 610.3333435058594,
+          "top": 965.1354370117188,
+          "width": 212,
+          "x": 398.3333435058594,
+          "y": 965.1354370117188
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:34:51.895Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "step": "tournament tablet Escape/reopen restores baseline"
+  },
+  {
+    "active": {
+      "id": "edit-scheduled-at",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": true,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "이 입력란을 작성하세요.",
+        "rect": {
+          "bottom": 337.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 293.203125,
+          "width": 436,
+          "x": 371.5,
+          "y": 293.203125
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": true
+        },
+        "value": "",
+        "valueLength": 0
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 762.703125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 718.703125,
+          "width": 436,
+          "x": 371.5,
+          "y": 718.703125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 963.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 919.703125,
+          "width": 212,
+          "x": 595.5,
+          "y": 919.703125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:35:20.137Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop required empty blurred"
+  },
+  {
+    "active": {
+      "id": "edit-title",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 337.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 293.203125,
+          "width": 436,
+          "x": 371.5,
+          "y": 293.203125
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "valueLength": 100
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 762.703125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 718.703125,
+          "width": 436,
+          "x": 371.5,
+          "y": 718.703125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 963.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 919.703125,
+          "width": 212,
+          "x": 595.5,
+          "y": 919.703125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:35:20.415Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop title100 typed101st blocked"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -586.796875,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": -630.796875,
+          "width": 436,
+          "x": 371.5,
+          "y": -630.796875
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -161.296875,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": -205.296875,
+          "width": 436,
+          "x": 371.5,
+          "y": -205.296875
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "값은 2 이상이어야 합니다.",
+        "rect": {
+          "bottom": 39.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": -4.296875,
+          "width": 212,
+          "x": 595.5,
+          "y": -4.296875
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 123.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 79.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 79.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "값은 1 이상이어야 합니다.",
+        "rect": {
+          "bottom": 123.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 79.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 79.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": true,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": false,
+          "valueMissing": false
+        },
+        "value": "0",
+        "valueLength": 1
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:35:20.664Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop below lower bounds"
+  },
+  {
+    "active": {
+      "id": "edit-gender-category",
+      "label": "성별 구분 없음 (기존)혼성남성부여성부",
+      "tag": "SELECT"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -586.796875,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": -630.796875,
+          "width": 436,
+          "x": 371.5,
+          "y": -630.796875
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": -161.296875,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": -205.296875,
+          "width": 436,
+          "x": 371.5,
+          "y": -205.296875
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 39.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": -4.296875,
+          "width": 212,
+          "x": 595.5,
+          "y": -4.296875
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "2",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 123.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 79.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 79.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 123.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 79.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 79.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:35:21.012Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop exact lower bounds"
+  },
+  {
+    "active": {
+      "id": "",
+      "label": "대회 정보 수정",
+      "tag": "BUTTON"
+    },
+    "alerts": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "모달 닫기"
+      },
+      {
+        "disabled": false,
+        "text": "취소"
+      },
+      {
+        "disabled": false,
+        "text": "저장"
+      }
+    ],
+    "dialog": true,
+    "fields": [
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-title",
+        "labels": [
+          "대회명 *"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 337.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 293.203125,
+          "width": 436,
+          "x": 371.5,
+          "y": 293.203125
+        },
+        "required": true,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "(테스트) 현재 경기 중 챔피언십",
+        "valueLength": 18
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-venue",
+        "labels": [
+          "장소"
+        ],
+        "max": "",
+        "maxLength": 100,
+        "min": "",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 762.703125,
+          "height": 44,
+          "left": 371.5,
+          "right": 807.5,
+          "top": 718.703125,
+          "width": 436,
+          "x": 371.5,
+          "y": 718.703125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "서울 송파 풋살파크",
+        "valueLength": 10
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-team-count",
+        "labels": [
+          "팀 수"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "2",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 963.703125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 919.703125,
+          "width": 212,
+          "x": 595.5,
+          "y": 919.703125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "4",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-min-players",
+        "labels": [
+          "최소 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 371.5,
+          "right": 583.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 371.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "1",
+        "valueLength": 1
+      },
+      {
+        "ariaInvalid": null,
+        "describedby": null,
+        "id": "edit-max-players",
+        "labels": [
+          "최대 선수 (등록 명단)"
+        ],
+        "max": "",
+        "maxLength": -1,
+        "min": "1",
+        "nativeValidationMessage": "",
+        "rect": {
+          "bottom": 1047.203125,
+          "height": 44,
+          "left": 595.5,
+          "right": 807.5,
+          "top": 1003.203125,
+          "width": 212,
+          "x": 595.5,
+          "y": 1003.203125
+        },
+        "required": false,
+        "validity": {
+          "rangeOverflow": false,
+          "rangeUnderflow": false,
+          "stepMismatch": false,
+          "tooLong": false,
+          "valid": true,
+          "valueMissing": false
+        },
+        "value": "12",
+        "valueLength": 2
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/info",
+    "utc": "2026-10-03T04:35:21.531Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "step": "tournament desktop X/reopen restores baseline"
+  }
+]

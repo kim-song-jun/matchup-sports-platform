@@ -1,0 +1,34 @@
+{
+  "memberOptions": [
+    {
+      "disabled": false,
+      "emptyValue": true,
+      "index": 0,
+      "reason": null
+    },
+    {
+      "disabled": false,
+      "emptyValue": false,
+      "index": 1,
+      "reason": null
+    },
+    {
+      "disabled": false,
+      "emptyValue": false,
+      "index": 2,
+      "reason": null
+    },
+    {
+      "disabled": true,
+      "emptyValue": false,
+      "index": 3,
+      "reason": "already in roster"
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/registrations",
+  "utc": "2026-10-03T04:09:12.587Z",
+  "viewport": {
+    "height": 758,
+    "width": 1183
+  }
+}

@@ -1,0 +1,5195 @@
+[
+  {
+    "step": "awards mobile settled team search zero",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:10.519Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 241.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 201.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 201.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 317.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 273.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 273.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 206.40000915527344,
+          "right": 360.00001525878906,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 206.40000915527344,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": "QA-NOMATCH-20261003-CHECK"
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -93.8000030517578,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -93.8000030517578
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -93.8000030517578,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -93.8000030517578
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 165.2500038146973,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 115.6500015258789,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 115.6500015258789
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 243.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 199.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 199.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": true,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile Escape collapses picker and clears query",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:10.730Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "originalStepLabel": "awards mobile Escape collapses picker retains query",
+    "labelCorrection": "Input snapshot value is empty, so original predicted label was wrong; observation unchanged.",
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 241.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 201.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 201.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 317.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 273.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 273.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 206.40000915527344,
+          "right": 360.00001525878906,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 206.40000915527344,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -93.8000030517578,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -93.8000030517578
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -93.8000030517578,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -93.8000030517578
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 165.2500038146973,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 115.6500015258789,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 115.6500015258789
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 243.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 199.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 199.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile settled matching team query",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:35.653Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 241.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 201.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 201.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 317.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 273.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 273.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 206.40000915527344,
+          "right": 360.00001525878906,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 206.40000915527344,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": "알파 레드"
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -93.8000030517578,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -93.8000030517578
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -93.8000030517578,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -93.8000030517578
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 165.2500038146973,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 115.6500015258789,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 115.6500015258789
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 243.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 199.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 199.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 440.3000183105469,
+          "height": 44,
+          "left": 207.1999969482422,
+          "right": 359.1999969482422,
+          "top": 396.3000183105469,
+          "width": 152,
+          "x": 207.1999969482422,
+          "y": 396.3000183105469
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 1,
+    "options": [
+      {
+        "index": 0,
+        "selected": "false",
+        "rect": {
+          "bottom": 440.3000183105469,
+          "height": 44,
+          "left": 207.1999969482422,
+          "right": 359.1999969482422,
+          "top": 396.3000183105469,
+          "width": 152,
+          "x": 207.1999969482422,
+          "y": 396.3000183105469
+        }
+      }
+    ],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile ArrowDown highlights option",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:35.846Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 241.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 201.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 201.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 317.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 273.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 273.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": "award-team-0-menu-opt-0",
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 391.5,
+          "height": 44,
+          "left": 206.40000915527344,
+          "right": 360.00001525878906,
+          "top": 347.5,
+          "width": 153.60000610351562,
+          "x": 206.40000915527344,
+          "y": 347.5
+        },
+        "type": "search",
+        "value": "알파 레드"
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -93.8000030517578,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -93.8000030517578
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -49.80000305175781,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -93.8000030517578,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -93.8000030517578
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 165.2500038146973,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 115.6500015258789,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 115.6500015258789
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 243.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 199.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 199.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 440.3000183105469,
+          "height": 44,
+          "left": 207.1999969482422,
+          "right": 359.1999969482422,
+          "top": 396.3000183105469,
+          "width": 152,
+          "x": 207.1999969482422,
+          "y": 396.3000183105469
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 1,
+    "options": [
+      {
+        "index": 0,
+        "selected": "true",
+        "rect": {
+          "bottom": 440.3000183105469,
+          "height": 44,
+          "left": 207.1999969482422,
+          "right": 359.1999969482422,
+          "top": 396.3000183105469,
+          "width": 152,
+          "x": 207.1999969482422,
+          "y": 396.3000183105469
+        }
+      }
+    ],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile local team selection staged, no save",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:36.163Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 281.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 241.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 241.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 357.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 313.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 313.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 387.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 387.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -53.79999923706055,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -53.79999923706055
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -53.79999923706055,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -53.79999923706055
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 205.2500114440918,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 155.65000915527344,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 155.65000915527344
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 283.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 239.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 239.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 303.20001220703125,
+          "right": 347.20001220703125,
+          "top": 387.5,
+          "width": 44,
+          "x": 303.20001220703125,
+          "y": 387.5
+        },
+        "text": "선택 해제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "BODY",
+      "tag": "BODY"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile recipient picker one existing roster option",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:50.186Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 281.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 241.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 241.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 357.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 313.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 313.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 387.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 387.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -53.79999923706055,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -53.79999923706055
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -53.79999923706055,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -53.79999923706055
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 205.2500114440918,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 155.65000915527344,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 155.65000915527344
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 283.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 239.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 239.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 480.3000183105469,
+          "height": 44,
+          "left": 45.60000228881836,
+          "right": 197.60000228881836,
+          "top": 436.3000183105469,
+          "width": 152,
+          "x": 45.60000228881836,
+          "y": 436.3000183105469
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 303.20001220703125,
+          "right": 347.20001220703125,
+          "top": 387.5,
+          "width": 44,
+          "x": 303.20001220703125,
+          "y": 387.5
+        },
+        "text": "선택 해제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 1,
+    "options": [
+      {
+        "index": 0,
+        "selected": "false",
+        "rect": {
+          "bottom": 480.3000183105469,
+          "height": 44,
+          "left": 45.60000228881836,
+          "right": 197.60000228881836,
+          "top": 436.3000183105469,
+          "width": 152,
+          "x": 45.60000228881836,
+          "y": 436.3000183105469
+        }
+      }
+    ],
+    "active": {
+      "id": "award-recipient-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile recipient settled query after no-match-text wait mismatch",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:13:58.035Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 281.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 241.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 241.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 357.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 313.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 313.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 387.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 387.5
+        },
+        "type": "search",
+        "value": "QA-NOMATCH-20261003-CHECK"
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -53.79999923706055,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -53.79999923706055
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -53.79999923706055,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -53.79999923706055
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 205.2500114440918,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 155.65000915527344,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 155.65000915527344
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 283.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 239.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 239.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 303.20001220703125,
+          "right": 347.20001220703125,
+          "top": 387.5,
+          "width": 44,
+          "x": 303.20001220703125,
+          "y": 387.5
+        },
+        "text": "선택 해제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-recipient-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": true,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile recipient Escape resets query",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:14:02.857Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 281.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 241.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 241.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 357.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 313.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 313.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 387.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 387.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 481.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 439.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 439.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -53.79999923706055,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -53.79999923706055
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -9.799999237060549,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -53.79999923706055,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -53.79999923706055
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 205.2500114440918,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 155.65000915527344,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 155.65000915527344
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 283.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 239.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 239.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 431.5,
+          "height": 44,
+          "left": 303.20001220703125,
+          "right": 347.20001220703125,
+          "top": 387.5,
+          "width": 44,
+          "x": 303.20001220703125,
+          "y": 387.5
+        },
+        "text": "선택 해제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 570.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 526.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 526.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-recipient-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "statistics mobile settled initial",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/statistics",
+    "utc": "2026-10-03T04:14:08.299Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": 251,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": 251
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": 251,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": 251
+        },
+        "text": "취소하기"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "통계",
+      "tag": "A"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards mobile return shows zero persisted awards and no row",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:14:32.876Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": 251,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": 251
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": 251,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": 251
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 510.0500144958496,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 460.4500122070313,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 460.4500122070313
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 691.4000244140625,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 647.4000244140625,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 647.4000244140625
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "개인 어워드",
+      "tag": "A"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "statistics completed tournament mobile populated control",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/statistics",
+    "utc": "2026-10-03T04:14:35.469Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [],
+    "buttons": [],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "메뉴 열기",
+      "tag": "BUTTON"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards tablet baseline zero",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:35.688Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 291,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": 247,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": 247
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 291,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": 247,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": 247
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 490.25,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 454.25,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 454.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 669,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 625,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 625
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "개인 어워드",
+      "tag": "A"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards tablet local row geometry",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:36.054Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 360.16668701171875,
+          "height": 40,
+          "left": 52.66666793823242,
+          "right": 684.0000419616699,
+          "top": 320.16668701171875,
+          "width": 631.3333740234375,
+          "x": 52.66666793823242,
+          "y": 320.16668701171875
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 436.1666870117187,
+          "height": 44,
+          "left": 104.66667175292967,
+          "right": 736.0000457763672,
+          "top": 392.1666870117187,
+          "width": 631.3333740234375,
+          "x": 104.66667175292967,
+          "y": 392.1666870117187
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 510.1666870117187,
+          "height": 44,
+          "left": 52.66666793823242,
+          "right": 390.3333549499512,
+          "top": 466.1666870117187,
+          "width": 337.66668701171875,
+          "x": 52.66666793823242,
+          "y": 466.1666870117187
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 510.1666870117187,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 736.0000305175781,
+          "top": 466.1666870117187,
+          "width": 337.66668701171875,
+          "x": 398.3333435058594,
+          "y": 466.1666870117187
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 581.5000228881836,
+          "height": 41.33333587646485,
+          "left": 52.66666793823242,
+          "right": 736.0000419616699,
+          "top": 540.1666870117188,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 540.1666870117188
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 87,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": 43,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": 43
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 87,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": 43,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": 43
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 286.25,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 250.25,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 250.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 362.1666870117187,
+          "height": 44,
+          "left": 692,
+          "right": 736,
+          "top": 318.16668701171875,
+          "width": 44,
+          "x": 692,
+          "y": 318.16668701171875
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 670.8333740234375,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 626.8333740234375,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 626.8333740234375
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "+ 항목 추가",
+      "tag": "BUTTON"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards tablet settled team zero",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:36.563Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 154.83333587646484,
+          "height": 40,
+          "left": 52.66666793823242,
+          "right": 684.0000419616699,
+          "top": 114.83333587646484,
+          "width": 631.3333740234375,
+          "x": 52.66666793823242,
+          "y": 114.83333587646484
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 230.83334350585935,
+          "height": 44,
+          "left": 104.66667175292967,
+          "right": 736.0000457763672,
+          "top": 186.83334350585935,
+          "width": 631.3333740234375,
+          "x": 104.66667175292967,
+          "y": 186.83334350585935
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 52.66666793823242,
+          "right": 390.3333549499512,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 52.66666793823242,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 736.0000305175781,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 398.3333435058594,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": "QA-NOMATCH-20261003-CHECK"
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 376.1666793823242,
+          "height": 41.33333587646485,
+          "left": 52.66666793823242,
+          "right": 736.0000419616699,
+          "top": 334.8333435058594,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 334.8333435058594
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": -162.33334350585938,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": -162.33334350585938
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": -162.33334350585938,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": -162.33334350585938
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 80.91666793823242,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 44.91666793823242,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 44.91666793823242
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 156.83333587646484,
+          "height": 44,
+          "left": 692,
+          "right": 736,
+          "top": 112.83333587646484,
+          "width": 44,
+          "x": 692,
+          "y": 112.83333587646484
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 465.5,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 421.5,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 421.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": true,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards tablet Escape closes and clears query",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:36.759Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 154.83333587646484,
+          "height": 40,
+          "left": 52.66666793823242,
+          "right": 684.0000419616699,
+          "top": 114.83333587646484,
+          "width": 631.3333740234375,
+          "x": 52.66666793823242,
+          "y": 114.83333587646484
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 230.83334350585935,
+          "height": 44,
+          "left": 104.66667175292967,
+          "right": 736.0000457763672,
+          "top": 186.83334350585935,
+          "width": 631.3333740234375,
+          "x": 104.66667175292967,
+          "y": 186.83334350585935
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 52.66666793823242,
+          "right": 390.3333549499512,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 52.66666793823242,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 736.0000305175781,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 398.3333435058594,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 376.1666793823242,
+          "height": 41.33333587646485,
+          "left": 52.66666793823242,
+          "right": 736.0000419616699,
+          "top": 334.8333435058594,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 334.8333435058594
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": -162.33334350585938,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": -162.33334350585938
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": -162.33334350585938,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": -162.33334350585938
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 80.91666793823242,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 44.91666793823242,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 44.91666793823242
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 156.83333587646484,
+          "height": 44,
+          "left": 692,
+          "right": 736,
+          "top": 112.83333587646484,
+          "width": 44,
+          "x": 692,
+          "y": 112.83333587646484
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 465.5,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 421.5,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 421.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards tablet reopen shows four team options",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:37.067Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 154.83333587646484,
+          "height": 40,
+          "left": 52.66666793823242,
+          "right": 684.0000419616699,
+          "top": 114.83333587646484,
+          "width": 631.3333740234375,
+          "x": 52.66666793823242,
+          "y": 114.83333587646484
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 230.83334350585935,
+          "height": 44,
+          "left": 104.66667175292967,
+          "right": 736.0000457763672,
+          "top": 186.83334350585935,
+          "width": 631.3333740234375,
+          "x": 104.66667175292967,
+          "y": 186.83334350585935
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 52.66666793823242,
+          "right": 390.3333549499512,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 52.66666793823242,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 736.0000305175781,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 398.3333435058594,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 376.1666793823242,
+          "height": 41.33333587646485,
+          "left": 52.66666793823242,
+          "right": 736.0000419616699,
+          "top": 334.8333435058594,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 334.8333435058594
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": -162.33334350585938,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": -162.33334350585938
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": -162.33334350585938,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": -162.33334350585938
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 80.91666793823242,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 44.91666793823242,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 44.91666793823242
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 156.83333587646484,
+          "height": 44,
+          "left": 692,
+          "right": 736,
+          "top": 112.83333587646484,
+          "width": 44,
+          "x": 692,
+          "y": 112.83333587646484
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 353.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 309.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 309.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 397.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 353.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 353.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 441.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 397.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 397.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 485.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 441.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 441.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 465.5,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 421.5,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 421.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 4,
+    "options": [
+      {
+        "index": 0,
+        "selected": "false",
+        "rect": {
+          "bottom": 353.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 309.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 309.5
+        }
+      },
+      {
+        "index": 1,
+        "selected": "false",
+        "rect": {
+          "bottom": 397.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 353.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 353.5
+        }
+      },
+      {
+        "index": 2,
+        "selected": "false",
+        "rect": {
+          "bottom": 441.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 397.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 397.5
+        }
+      },
+      {
+        "index": 3,
+        "selected": "false",
+        "rect": {
+          "bottom": 485.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 441.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 441.5
+        }
+      }
+    ],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards tablet ArrowDown highlight",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:37.266Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 154.83333587646484,
+          "height": 40,
+          "left": 52.66666793823242,
+          "right": 684.0000419616699,
+          "top": 114.83333587646484,
+          "width": 631.3333740234375,
+          "x": 52.66666793823242,
+          "y": 114.83333587646484
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 230.83334350585935,
+          "height": 44,
+          "left": 104.66667175292967,
+          "right": 736.0000457763672,
+          "top": 186.83334350585935,
+          "width": 631.3333740234375,
+          "x": 104.66667175292967,
+          "y": 186.83334350585935
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 52.66666793823242,
+          "right": 390.3333549499512,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 52.66666793823242,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": "award-team-0-menu-opt-0",
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 304.8333435058594,
+          "height": 44,
+          "left": 398.3333435058594,
+          "right": 736.0000305175781,
+          "top": 260.8333435058594,
+          "width": 337.66668701171875,
+          "x": 398.3333435058594,
+          "y": 260.8333435058594
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 376.1666793823242,
+          "height": 41.33333587646485,
+          "left": 52.66666793823242,
+          "right": 736.0000419616699,
+          "top": 334.8333435058594,
+          "width": 683.3333740234375,
+          "x": 52.66666793823242,
+          "y": 334.8333435058594
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": -162.33334350585938,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": -162.33334350585938
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": -118.33334350585938,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": -162.33334350585938,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": -162.33334350585938
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 80.91666793823242,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 44.91666793823242,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 44.91666793823242
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 156.83333587646484,
+          "height": 44,
+          "left": 692,
+          "right": 736,
+          "top": 112.83333587646484,
+          "width": 44,
+          "x": 692,
+          "y": 112.83333587646484
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 353.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 309.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 309.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 397.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 353.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 353.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 441.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 397.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 397.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 485.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 441.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 441.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 465.5,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 421.5,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 421.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 4,
+    "options": [
+      {
+        "index": 0,
+        "selected": "true",
+        "rect": {
+          "bottom": 353.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 309.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 309.5
+        }
+      },
+      {
+        "index": 1,
+        "selected": "false",
+        "rect": {
+          "bottom": 397.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 353.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 353.5
+        }
+      },
+      {
+        "index": 2,
+        "selected": "false",
+        "rect": {
+          "bottom": 441.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 397.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 397.5
+        }
+      },
+      {
+        "index": 3,
+        "selected": "false",
+        "rect": {
+          "bottom": 485.5,
+          "height": 44,
+          "left": 399,
+          "right": 735.3333435058594,
+          "top": 441.5,
+          "width": 336.3333435058594,
+          "x": 399,
+          "y": 441.5
+        }
+      }
+    ],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards tablet browserBack shows no saved row",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:16:59.411Z",
+    "viewport": {
+      "documentScrollWidth": 789,
+      "dpr": 1.5,
+      "height": 505,
+      "width": 789
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 170.33333587646484,
+          "height": 44,
+          "left": 24,
+          "right": 142.98958587646484,
+          "top": 126.33333587646484,
+          "width": 118.98958587646484,
+          "x": 24,
+          "y": 126.33333587646484
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 170.33333587646484,
+          "height": 44,
+          "left": 150.98959350585938,
+          "right": 239.63542938232425,
+          "top": 126.33333587646484,
+          "width": 88.64583587646484,
+          "x": 150.98959350585938,
+          "y": 126.33333587646484
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 369.5833435058594,
+          "height": 36,
+          "left": 649.9583740234375,
+          "right": 748.6667098999023,
+          "top": 333.5833435058594,
+          "width": 98.70833587646484,
+          "x": 649.9583740234375,
+          "y": 333.5833435058594
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 548.3333435058594,
+          "height": 44,
+          "left": 40,
+          "right": 748.6666870117188,
+          "top": 504.3333435058594,
+          "width": 708.6666870117188,
+          "x": 40,
+          "y": 504.3333435058594
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "통계",
+      "tag": "A"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards desktop baseline zero",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:17:44.301Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 247,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 203,
+          "width": 118.984375,
+          "x": 272,
+          "y": 203
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 247,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 203,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 203
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 382.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 346.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 346.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 562,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 518,
+          "width": 639,
+          "x": 496,
+          "y": 518
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "개인 어워드",
+      "tag": "A"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards desktop local row geometry",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:17:44.630Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 456.5,
+          "height": 40,
+          "left": 509,
+          "right": 1070,
+          "top": 416.5,
+          "width": 561,
+          "x": 509,
+          "y": 416.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 532.5,
+          "height": 44,
+          "left": 561,
+          "right": 1122,
+          "top": 488.5,
+          "width": 561,
+          "x": 561,
+          "y": 488.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 606.5,
+          "height": 44,
+          "left": 509,
+          "right": 811.5,
+          "top": 562.5,
+          "width": 302.5,
+          "x": 509,
+          "y": 562.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 606.5,
+          "height": 44,
+          "left": 819.5,
+          "right": 1122,
+          "top": 562.5,
+          "width": 302.5,
+          "x": 819.5,
+          "y": 562.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 678.5,
+          "height": 42,
+          "left": 509,
+          "right": 1122,
+          "top": 636.5,
+          "width": 613,
+          "x": 509,
+          "y": 636.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 247,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 203,
+          "width": 118.984375,
+          "x": 272,
+          "y": 203
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 247,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 203,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 203
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 382.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 346.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 346.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 458.5,
+          "height": 44,
+          "left": 1078,
+          "right": 1122,
+          "top": 414.5,
+          "width": 44,
+          "x": 1078,
+          "y": 414.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 768.5,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 724.5,
+          "width": 639,
+          "x": 496,
+          "y": 724.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "+ 항목 추가",
+      "tag": "BUTTON"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards desktop settled team zero",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:18:30.405Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 269.5,
+          "height": 40,
+          "left": 509,
+          "right": 1070,
+          "top": 229.5,
+          "width": 561,
+          "x": 509,
+          "y": 229.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 345.5,
+          "height": 44,
+          "left": 561,
+          "right": 1122,
+          "top": 301.5,
+          "width": 561,
+          "x": 561,
+          "y": 301.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 509,
+          "right": 811.5,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 509,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 819.5,
+          "right": 1122,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 819.5,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": "QA-NOMATCH-20261003-CHECK"
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 491.5,
+          "height": 42,
+          "left": 509,
+          "right": 1122,
+          "top": 449.5,
+          "width": 613,
+          "x": 509,
+          "y": 449.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 16,
+          "width": 118.984375,
+          "x": 272,
+          "y": 16
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 16,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 16
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 195.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 159.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 159.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 1078,
+          "right": 1122,
+          "top": 227.5,
+          "width": 44,
+          "x": 1078,
+          "y": 227.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 581.5,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 537.5,
+          "width": 639,
+          "x": 496,
+          "y": 537.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": true,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards desktop Escape resets query",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:18:30.624Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 269.5,
+          "height": 40,
+          "left": 509,
+          "right": 1070,
+          "top": 229.5,
+          "width": 561,
+          "x": 509,
+          "y": 229.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 345.5,
+          "height": 44,
+          "left": 561,
+          "right": 1122,
+          "top": 301.5,
+          "width": 561,
+          "x": 561,
+          "y": 301.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 509,
+          "right": 811.5,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 509,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 819.5,
+          "right": 1122,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 819.5,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 491.5,
+          "height": 42,
+          "left": 509,
+          "right": 1122,
+          "top": 449.5,
+          "width": 613,
+          "x": 509,
+          "y": 449.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 16,
+          "width": 118.984375,
+          "x": 272,
+          "y": 16
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 16,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 16
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 195.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 159.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 159.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 1078,
+          "right": 1122,
+          "top": 227.5,
+          "width": 44,
+          "x": 1078,
+          "y": 227.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 581.5,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 537.5,
+          "width": 639,
+          "x": 496,
+          "y": 537.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards desktop reopen four options",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:18:30.969Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 269.5,
+          "height": 40,
+          "left": 509,
+          "right": 1070,
+          "top": 229.5,
+          "width": 561,
+          "x": 509,
+          "y": 229.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 345.5,
+          "height": 44,
+          "left": 561,
+          "right": 1122,
+          "top": 301.5,
+          "width": 561,
+          "x": 561,
+          "y": 301.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 509,
+          "right": 811.5,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 509,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 819.5,
+          "right": 1122,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 819.5,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 491.5,
+          "height": 42,
+          "left": 509,
+          "right": 1122,
+          "top": 449.5,
+          "width": 613,
+          "x": 509,
+          "y": 449.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 16,
+          "width": 118.984375,
+          "x": 272,
+          "y": 16
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 16,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 16
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 195.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 159.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 159.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 1078,
+          "right": 1122,
+          "top": 227.5,
+          "width": 44,
+          "x": 1078,
+          "y": 227.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 468.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 424.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 424.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 512.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 468.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 468.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 556.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 512.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 512.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 600.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 556.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 556.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 581.5,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 537.5,
+          "width": 639,
+          "x": 496,
+          "y": 537.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 4,
+    "options": [
+      {
+        "index": 0,
+        "selected": "false",
+        "rect": {
+          "bottom": 468.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 424.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 424.5
+        }
+      },
+      {
+        "index": 1,
+        "selected": "false",
+        "rect": {
+          "bottom": 512.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 468.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 468.5
+        }
+      },
+      {
+        "index": 2,
+        "selected": "false",
+        "rect": {
+          "bottom": 556.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 512.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 512.5
+        }
+      },
+      {
+        "index": 3,
+        "selected": "false",
+        "rect": {
+          "bottom": 600.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 556.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 556.5
+        }
+      }
+    ],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards desktop ArrowDown highlight",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:18:31.166Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 269.5,
+          "height": 40,
+          "left": 509,
+          "right": 1070,
+          "top": 229.5,
+          "width": 561,
+          "x": 509,
+          "y": 229.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 345.5,
+          "height": 44,
+          "left": 561,
+          "right": 1122,
+          "top": 301.5,
+          "width": 561,
+          "x": 561,
+          "y": 301.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 509,
+          "right": 811.5,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 509,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": "award-team-0-menu-opt-0",
+        "ariaLabel": null,
+        "expanded": "true",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 419.5,
+          "height": 44,
+          "left": 819.5,
+          "right": 1122,
+          "top": 375.5,
+          "width": 302.5,
+          "x": 819.5,
+          "y": 375.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 491.5,
+          "height": 42,
+          "left": 509,
+          "right": 1122,
+          "top": 449.5,
+          "width": 613,
+          "x": 509,
+          "y": 449.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 16,
+          "width": 118.984375,
+          "x": 272,
+          "y": 16
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 60,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 16,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 16
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 195.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 159.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 159.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 271.5,
+          "height": 44,
+          "left": 1078,
+          "right": 1122,
+          "top": 227.5,
+          "width": 44,
+          "x": 1078,
+          "y": 227.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 468.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 424.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 424.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 512.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 468.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 468.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 556.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 512.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 512.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 600.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 556.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 556.5
+        },
+        "text": "picker option"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 581.5,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 537.5,
+          "width": 639,
+          "x": 496,
+          "y": 537.5
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 4,
+    "options": [
+      {
+        "index": 0,
+        "selected": "true",
+        "rect": {
+          "bottom": 468.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 424.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 424.5
+        }
+      },
+      {
+        "index": 1,
+        "selected": "false",
+        "rect": {
+          "bottom": 512.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 468.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 468.5
+        }
+      },
+      {
+        "index": 2,
+        "selected": "false",
+        "rect": {
+          "bottom": 556.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 512.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 512.5
+        }
+      },
+      {
+        "index": 3,
+        "selected": "false",
+        "rect": {
+          "bottom": 600.5,
+          "height": 44,
+          "left": 820.5,
+          "right": 1121,
+          "top": 556.5,
+          "width": 300.5,
+          "x": 820.5,
+          "y": 556.5
+        }
+      }
+    ],
+    "active": {
+      "id": "award-team-0",
+      "label": "",
+      "tag": "INPUT"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards desktop return has zero saved rows",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:18:32.940Z",
+    "viewport": {
+      "documentScrollWidth": 1183,
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 247,
+          "height": 44,
+          "left": 272,
+          "right": 390.984375,
+          "top": 203,
+          "width": 118.984375,
+          "x": 272,
+          "y": 203
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 247,
+          "height": 44,
+          "left": 398.984375,
+          "right": 488.296875,
+          "top": 203,
+          "width": 89.3125,
+          "x": 398.984375,
+          "y": 203
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 382.25,
+          "height": 36,
+          "left": 1035.625,
+          "right": 1135,
+          "top": 346.25,
+          "width": 99.375,
+          "x": 1035.625,
+          "y": 346.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 562,
+          "height": 44,
+          "left": 496,
+          "right": 1135,
+          "top": 518,
+          "width": 639,
+          "x": 496,
+          "y": 518
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "개인 어워드",
+      "tag": "A"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards mobile repeat zero baseline",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:19:07.166Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": 251,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": 251
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": 251,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": 251
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 510.0500144958496,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 460.4500122070313,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 460.4500122070313
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 691.4000244140625,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 647.4000244140625,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 647.4000244140625
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "메뉴 열기",
+      "tag": "BUTTON"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  },
+  {
+    "step": "awards mobile repeat blank row overflow",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:19:07.516Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 465.5,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 425.5,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 425.5
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 541.5,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 497.5,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 497.5
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 615.5,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 571.5,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 571.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 615.5,
+          "height": 44,
+          "left": 206.40000915527344,
+          "right": 360.00001525878906,
+          "top": 571.5,
+          "width": 153.60000610351562,
+          "x": 206.40000915527344,
+          "y": 571.5
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 705.1000022888184,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 663.5,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 663.5
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 174.1999969482422,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": 130.1999969482422,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": 130.1999969482422
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 174.1999969482422,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": 130.1999969482422,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": 130.1999969482422
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 389.24999618530273,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 339.6499938964844,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 339.6499938964844
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 467.5,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 423.5,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 423.5
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 794.7000122070312,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 750.7000122070312,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 750.7000122070312
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "+ 항목 추가",
+      "tag": "BUTTON"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards mobile keyboard focuses partially clipped delete without activating",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:19:07.599Z",
+    "viewport": {
+      "documentScrollWidth": 434,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "어워드명 (예: MVP)",
+        "rect": {
+          "bottom": 323.1000061035156,
+          "height": 40,
+          "left": 44.79999923706055,
+          "right": 381.6000175476074,
+          "top": 283.1000061035156,
+          "width": 336.8000183105469,
+          "x": 44.79999923706055,
+          "y": 283.1000061035156
+        },
+        "type": "text",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "award-icon-0",
+        "labels": [
+          "아이콘"
+        ],
+        "placeholder": null,
+        "rect": {
+          "bottom": 399.1000061035156,
+          "height": 44,
+          "left": 96.8000030517578,
+          "right": 360.00001525878906,
+          "top": 355.1000061035156,
+          "width": 263.20001220703125,
+          "x": 96.8000030517578,
+          "y": 355.1000061035156
+        },
+        "type": "select-one",
+        "value": 0
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-recipient-0",
+        "labels": [
+          "수상자 이름 *"
+        ],
+        "placeholder": "명단에서 선택",
+        "rect": {
+          "bottom": 473.1000061035156,
+          "height": 44,
+          "left": 44.79999923706055,
+          "right": 198.40000534057617,
+          "top": 429.1000061035156,
+          "width": 153.60000610351562,
+          "x": 44.79999923706055,
+          "y": 429.1000061035156
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": "false",
+        "id": "award-team-0",
+        "labels": [
+          "소속 팀 *"
+        ],
+        "placeholder": "참가 팀에서 선택",
+        "rect": {
+          "bottom": 473.1000061035156,
+          "height": 44,
+          "left": 206.40000915527344,
+          "right": 360.00001525878906,
+          "top": 429.1000061035156,
+          "width": 153.60000610351562,
+          "x": 206.40000915527344,
+          "y": 429.1000061035156
+        },
+        "type": "search",
+        "value": ""
+      },
+      {
+        "activeDescendant": null,
+        "ariaLabel": null,
+        "expanded": null,
+        "id": "",
+        "labels": [],
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)",
+        "rect": {
+          "bottom": 562.7000389099121,
+          "height": 41.60000228881836,
+          "left": 44.79999923706055,
+          "right": 360.0000114440918,
+          "top": 521.1000366210938,
+          "width": 315.20001220703125,
+          "x": 44.79999923706055,
+          "y": 521.1000366210938
+        },
+        "type": "text",
+        "value": ""
+      }
+    ],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 31.800000190734863,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": -12.199999809265137,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": -12.199999809265137
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 31.800000190734863,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": -12.199999809265137,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": -12.199999809265137
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 246.85000228881836,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 197.25,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 197.25
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 325.1000061035156,
+          "height": 44,
+          "left": 389.6000061035156,
+          "right": 433.6000061035156,
+          "top": 281.1000061035156,
+          "width": 44,
+          "x": 389.6000061035156,
+          "y": 281.1000061035156
+        },
+        "text": "항목 삭제"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 652.2999877929688,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 608.2999877929688,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 608.2999877929688
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "항목 삭제",
+      "tag": "BUTTON"
+    },
+    "emptyAwards": false,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 1
+  },
+  {
+    "step": "awards final clean state after repeat, no local row",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T04:20:03.187Z",
+    "viewport": {
+      "documentScrollWidth": 405,
+      "dpr": 1.25,
+      "height": 606,
+      "width": 405
+    },
+    "inputs": [],
+    "buttons": [
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 16,
+          "right": 134.9875030517578,
+          "top": 251,
+          "width": 118.9875030517578,
+          "x": 16,
+          "y": 251
+        },
+        "text": "대회 완료하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 295,
+          "height": 44,
+          "left": 142.9875030517578,
+          "right": 231.9000015258789,
+          "top": 251,
+          "width": 88.9124984741211,
+          "x": 142.9875030517578,
+          "y": 251
+        },
+        "text": "취소하기"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 510.0500144958496,
+          "height": 49.60000228881836,
+          "left": 296.2250061035156,
+          "right": 372.80001068115234,
+          "top": 460.4500122070313,
+          "width": 76.57500457763672,
+          "x": 296.2250061035156,
+          "y": 460.4500122070313
+        },
+        "text": "+ 항목 추가"
+      },
+      {
+        "disabled": false,
+        "rect": {
+          "bottom": 691.4000244140625,
+          "height": 44,
+          "left": 32,
+          "right": 372.8000183105469,
+          "top": 647.4000244140625,
+          "width": 340.8000183105469,
+          "x": 32,
+          "y": 647.4000244140625
+        },
+        "text": "어워드 저장"
+      }
+    ],
+    "optionCount": 0,
+    "options": [],
+    "active": {
+      "id": "",
+      "label": "개인 어워드",
+      "tag": "A"
+    },
+    "emptyAwards": true,
+    "emptySearch": false,
+    "noRosterMatch": false,
+    "awardRowCount": 0
+  }
+]

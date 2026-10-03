@@ -89,11 +89,11 @@ expect 'completed failure fails' 'fail failure' \
 expect 'completed cancelled fails' 'fail cancelled' \
   "$(run_json 12 workflow_dispatch completed cancelled "${SHA}" "${BOT}" "${T1}")"
 
-# push 와 dispatch 가 함께 있으면 가장 최근 run 이 판정한다(입력 순서는 상관없다).
-expect 'newest of push+dispatch decides (dispatch pending)' wait \
+# push run 이 있으면 push 가 판정한다 — 더 최근의 bot dispatch(좁은 HEAD^ 범위)가 덮지 못한다.
+expect 'push decides over newer bot dispatch (dispatch pending)' pass \
   "$(run_json 13 workflow_dispatch in_progress null "${SHA}" "${BOT}" "${T2}")" \
   "$(run_json 14 push completed success "${SHA}" human "${T1}")"
-expect 'newest of push+dispatch decides (dispatch success)' pass \
+expect 'push failure is not hidden by newer bot dispatch success' 'fail failure' \
   "$(run_json 15 push completed failure "${SHA}" human "${T1}")" \
   "$(run_json 16 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")"
 

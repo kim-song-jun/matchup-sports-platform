@@ -13,7 +13,9 @@
 #     dispatch 주체는 actor 로만 본다: 사람이 `gh run rerun` 하면 triggering_actor 만 사람으로
 #     바뀌고 actor 는 원래 dispatch 주체(bot)로 남으므로, triggering_actor 를 보면 flaky 재실행이 막힌다.
 # pull_request run 도 head_branch 가 dev 로 찍히므로 event 로 걸러야 한다.
-# 여러 run 이 맞으면 가장 최근 것으로 판정한다.
+# push run 이 하나라도 있으면 push run(가장 최근)만으로 판정한다 — bot dispatch 는 HEAD^ 기준이라
+# 여러 커밋 push 의 실패를 더 좁은 범위의 성공으로 덮을 수 있다. push run 이 없을 때만
+# (버전 커밋) bot dispatch 중 가장 최근 것으로 판정한다.
 
 set -Eeuo pipefail
 
@@ -28,6 +30,8 @@ jq -er --arg sha "${release_sha}" '
             and .actor.login == "github-actions[bot]")
       )
   ]
+  | (map(select(.event == "push")) | if length > 0 then . else null end) as $push
+  | ($push // .)
   | sort_by([.created_at, .id])
   | last
   | if . == null then "wait"

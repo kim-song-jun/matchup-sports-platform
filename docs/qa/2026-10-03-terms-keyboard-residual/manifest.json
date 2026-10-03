@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3561,
+      "sha256": "5c33461f4da91009e6dd470e2c0dfc14737b9c36073678df79178f85b64be586"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 12545,
+      "sha256": "1b84f78a20e82a575a358c214b0f4fc69b9cb95d902b9b140921461c529e2941"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 17286,
+      "sha256": "c5c3715d6706ab8d0fa3a023e96e30a393d49f4f0bff567b4da3920722777e87"
+    },
+    {
+      "file": "terms-keyboard-after-proof.json",
+      "bytes": 77973,
+      "sha256": "9524975f9966cb614ca6ea4d9b299d6fa528f19cd623929707ab2f6c5d34b533"
+    },
+    {
+      "file": "terms-keyboard-desktop-exposure-changed.png",
+      "bytes": 15552,
+      "sha256": "ebfaa81ab49d5357118ffee46d5a85604a2e9428f1f28c0e1fc59f171b0846ee"
+    },
+    {
+      "file": "terms-keyboard-desktop-order.png",
+      "bytes": 20592,
+      "sha256": "1de8aaa0225100857513eed3de03319aeec8168f6fed3837305090f499fe315c"
+    },
+    {
+      "file": "terms-keyboard-final-state.json",
+      "bytes": 1847,
+      "sha256": "5108791b7534f72b30efaf3a6c1922b6ceabf7786c20dab092fb476ff25e5267"
+    },
+    {
+      "file": "terms-keyboard-mobile-exposure.png",
+      "bytes": 19400,
+      "sha256": "a6f30898d9b0c86addb7b6f835ec9841d319e9eeec5df5cf15014d10bcbb4e2e"
+    },
+    {
+      "file": "terms-keyboard-mobile-order.png",
+      "bytes": 20988,
+      "sha256": "e45a8da4757815d737434352179b7c45154f7ffa077494d3205dc3e3e7e2cf0c"
+    },
+    {
+      "file": "terms-keyboard-tablet-exposure-changed.png",
+      "bytes": 15089,
+      "sha256": "bfe89bcc3f63e4dbef4e6bba906b3cfed404e166dd1a08bd7a172647b29a25ad"
+    },
+    {
+      "file": "terms-keyboard-tablet-order.png",
+      "bytes": 18695,
+      "sha256": "9421009abc40cae77aaa39802cb165ac2ffa3a420ca311fd3d39f63a987dc477"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 7971,
+      "sha256": "1a27318d79d2e6ac9d59f5d290f189e044738414c75af7a0a905064055d0c996"
+    }
+  ],
+  "scope": "All files except manifest itself"
+}

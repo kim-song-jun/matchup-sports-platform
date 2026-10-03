@@ -1,0 +1,442 @@
+{
+  "createdUTC": "2026-10-03T12:29:07.071Z",
+  "result": "TERMS_EXPOSURE_FOCUS_LOSS_OBSERVED_AT_THREE_WIDTHS",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read successful Deploy Alpha workflow; browser runtime not identified",
+    "runtimeServingSHA": "unknown"
+  },
+  "sourceFiles": [
+    "terms-keyboard-after-proof.json",
+    "terms-keyboard-final-state.json"
+  ],
+  "exposureFocusLoss": [
+    {
+      "widthLabel": "mobile",
+      "observations": [
+        {
+          "proofIndex": 7,
+          "utc": "2026-10-03T12:21:25.530Z",
+          "step": "mobile-shifttab-exposure",
+          "exposureValue": "signup",
+          "activeTag": "SELECT",
+          "insideEditor": true
+        },
+        {
+          "proofIndex": 8,
+          "utc": "2026-10-03T12:21:25.692Z",
+          "step": "mobile-exposure-arrow-down",
+          "exposureValue": "tournament_application",
+          "activeTag": "BODY",
+          "insideEditor": false
+        },
+        {
+          "proofIndex": 9,
+          "utc": "2026-10-03T12:21:25.872Z",
+          "step": "mobile-exposure-arrow-up-attempt-focus-lost-not-restored",
+          "exposureValue": "tournament_application",
+          "activeTag": "BODY",
+          "insideEditor": false
+        },
+        {
+          "proofIndex": 10,
+          "utc": "2026-10-03T12:21:50.790Z",
+          "step": "mobile-exposure-refocus",
+          "exposureValue": "tournament_application",
+          "activeTag": "SELECT",
+          "insideEditor": true
+        },
+        {
+          "proofIndex": 11,
+          "utc": "2026-10-03T12:21:50.953Z",
+          "step": "mobile-exposure-refocus-arrow-up-original-value",
+          "exposureValue": "signup",
+          "activeTag": "BODY",
+          "insideEditor": false
+        }
+      ],
+      "fieldVerticalDeltaAfterUnfocusedArrowUpCSS": 32.0,
+      "scrollEvidenceScope": "Field and BODY geometry move after ArrowUp; page scroll is collector-observed. Scroll offset is not directly stored.",
+      "checks": {
+        "initialExposureFocusedSignup": true,
+        "downChangesToTournamentApplication": true,
+        "downLosesFocusToBody": true,
+        "upAttemptKeepsChangedValue": true,
+        "upAttemptStillBody": true,
+        "afterRefocusUpRestoresSignup": true,
+        "restorationAgainLeavesBody": true,
+        "consentOrderUnchanged": true,
+        "chronological": true
+      },
+      "finding": "Exposure selection changes value but drops focus to BODY. ArrowUp then fails to restore selection; refocusing permits value restoration but focus is lost again."
+    },
+    {
+      "widthLabel": "tablet",
+      "observations": [
+        {
+          "proofIndex": 13,
+          "utc": "2026-10-03T12:22:20.787Z",
+          "step": "tablet-tab-exposure",
+          "exposureValue": "signup",
+          "activeTag": "SELECT",
+          "insideEditor": true
+        },
+        {
+          "proofIndex": 14,
+          "utc": "2026-10-03T12:22:20.957Z",
+          "step": "tablet-exposure-arrow-down-focus",
+          "exposureValue": "tournament_application",
+          "activeTag": "BODY",
+          "insideEditor": false
+        },
+        {
+          "proofIndex": 15,
+          "utc": "2026-10-03T12:22:21.149Z",
+          "step": "tablet-arrow-up-after-exposure-change",
+          "exposureValue": "tournament_application",
+          "activeTag": "BODY",
+          "insideEditor": false
+        },
+        {
+          "proofIndex": 16,
+          "utc": "2026-10-03T12:22:32.940Z",
+          "step": "tablet-exposure-refocus-restored",
+          "exposureValue": "signup",
+          "activeTag": "BODY",
+          "insideEditor": false
+        }
+      ],
+      "fieldVerticalDeltaAfterUnfocusedArrowUpCSS": 26.666656494140625,
+      "scrollEvidenceScope": "Field and BODY geometry move after ArrowUp; page scroll is collector-observed. Scroll offset is not directly stored.",
+      "checks": {
+        "initialExposureFocusedSignup": true,
+        "downChangesToTournamentApplication": true,
+        "downLosesFocusToBody": true,
+        "upAttemptKeepsChangedValue": true,
+        "upAttemptStillBody": true,
+        "afterRefocusUpRestoresSignup": true,
+        "restorationAgainLeavesBody": true,
+        "consentOrderUnchanged": true,
+        "chronological": true
+      },
+      "finding": "Exposure selection changes value but drops focus to BODY. ArrowUp then fails to restore selection; refocusing permits value restoration but focus is lost again."
+    },
+    {
+      "widthLabel": "desktop",
+      "observations": [
+        {
+          "proofIndex": 23,
+          "utc": "2026-10-03T12:23:15.495Z",
+          "step": "desktop-tab-exposure",
+          "exposureValue": "signup",
+          "activeTag": "SELECT",
+          "insideEditor": true
+        },
+        {
+          "proofIndex": 24,
+          "utc": "2026-10-03T12:23:15.660Z",
+          "step": "desktop-exposure-arrow-down-focus",
+          "exposureValue": "tournament_application",
+          "activeTag": "BODY",
+          "insideEditor": false
+        },
+        {
+          "proofIndex": 25,
+          "utc": "2026-10-03T12:23:15.851Z",
+          "step": "desktop-arrow-up-after-exposure-change",
+          "exposureValue": "tournament_application",
+          "activeTag": "BODY",
+          "insideEditor": false
+        },
+        {
+          "proofIndex": 26,
+          "utc": "2026-10-03T12:23:16.460Z",
+          "step": "desktop-exposure-refocus-restored",
+          "exposureValue": "signup",
+          "activeTag": "BODY",
+          "insideEditor": false
+        }
+      ],
+      "fieldVerticalDeltaAfterUnfocusedArrowUpCSS": 40,
+      "scrollEvidenceScope": "Field and BODY geometry move after ArrowUp; page scroll is collector-observed. Scroll offset is not directly stored.",
+      "checks": {
+        "initialExposureFocusedSignup": true,
+        "downChangesToTournamentApplication": true,
+        "downLosesFocusToBody": true,
+        "upAttemptKeepsChangedValue": true,
+        "upAttemptStillBody": true,
+        "afterRefocusUpRestoresSignup": true,
+        "restorationAgainLeavesBody": true,
+        "consentOrderUnchanged": true,
+        "chronological": true
+      },
+      "finding": "Exposure selection changes value but drops focus to BODY. ArrowUp then fails to restore selection; refocusing permits value restoration but focus is lost again."
+    }
+  ],
+  "consentArrowBehavior": [
+    {
+      "widthLabel": "mobile",
+      "downProofIndex": 5,
+      "downUTC": "2026-10-03T12:20:58.256Z",
+      "upProofIndex": 6,
+      "upUTC": "2026-10-03T12:20:58.434Z",
+      "checks": {
+        "downOptional": true,
+        "upRequired": true,
+        "focusRetainedBoth": true,
+        "exposureOrderUnchanged": true,
+        "chronological": true
+      },
+      "spaceEscapeProofIndex": 4,
+      "spaceEscapeUTC": "2026-10-03T12:20:58.071Z",
+      "spaceEscapeEvidence": "Post-action DOM records retained required/select focus; popup pixels were observed by collector tool output only."
+    },
+    {
+      "widthLabel": "tablet",
+      "downProofIndex": 19,
+      "downUTC": "2026-10-03T12:22:57.516Z",
+      "upProofIndex": 20,
+      "upUTC": "2026-10-03T12:22:57.692Z",
+      "checks": {
+        "downOptional": true,
+        "upRequired": true,
+        "focusRetainedBoth": true,
+        "exposureOrderUnchanged": true,
+        "chronological": true
+      },
+      "spaceEscapeProofIndex": null,
+      "spaceEscapeUTC": null,
+      "spaceEscapeEvidence": "Collector reports native popup Space/Escape and unchanged value; no dedicated tablet-consent-space-escape DOM row or durable popup PNG is present."
+    },
+    {
+      "widthLabel": "desktop",
+      "downProofIndex": 29,
+      "downUTC": "2026-10-03T12:23:33.976Z",
+      "upProofIndex": 30,
+      "upUTC": "2026-10-03T12:23:34.147Z",
+      "checks": {
+        "downOptional": true,
+        "upRequired": true,
+        "focusRetainedBoth": true,
+        "exposureOrderUnchanged": true,
+        "chronological": true
+      },
+      "spaceEscapeProofIndex": 31,
+      "spaceEscapeUTC": "2026-10-03T12:23:34.530Z",
+      "spaceEscapeEvidence": "Post-action DOM records retained required/select focus; popup pixels were observed by collector tool output only."
+    }
+  ],
+  "tabOrderAndVisibility": [
+    {
+      "widthLabel": "mobile",
+      "endpointProofIndexes": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "endpointUTCs": [
+        "2026-10-03T12:11:48.407Z",
+        "2026-10-03T12:11:48.550Z",
+        "2026-10-03T12:11:48.720Z",
+        "2026-10-03T12:11:48.953Z"
+      ],
+      "orderRectCSS": {
+        "bottom": 606.4249877929688,
+        "height": 44,
+        "left": 44.79999923706055,
+        "right": 360.0000114440918,
+        "top": 562.4249877929688,
+        "width": 315.20001220703125,
+        "x": 44.79999923706055,
+        "y": 562.4249877929688
+      },
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "strictlyFullyWithinViewport": false,
+      "verticalBottomOverflowCSS": 0.42498779296875,
+      "checks": {
+        "exposureEndpoint": true,
+        "consentEndpoint": true,
+        "orderTabEndpoint": true,
+        "shiftTabConsentEndpoint": true,
+        "order44CSS": true,
+        "focusVisibleAndInEditor": true,
+        "withinViewportFlagMatchesStrictGeometry": true,
+        "expectedStrictVisibility": true
+      },
+      "scope": "Recorded Tab/ShiftTab endpoints; other arrow/popup checks occur between some endpoints. Not a full keyboard-cycle PASS."
+    },
+    {
+      "widthLabel": "tablet",
+      "endpointProofIndexes": [
+        17,
+        18,
+        21,
+        22
+      ],
+      "endpointUTCs": [
+        "2026-10-03T12:22:57.189Z",
+        "2026-10-03T12:22:57.355Z",
+        "2026-10-03T12:22:58.243Z",
+        "2026-10-03T12:22:58.495Z"
+      ],
+      "orderRectCSS": {
+        "bottom": 406.3333435058594,
+        "height": 44,
+        "right": 674.25,
+        "width": 90,
+        "x": 584.25,
+        "y": 362.3333435058594
+      },
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "strictlyFullyWithinViewport": true,
+      "verticalBottomOverflowCSS": 0,
+      "checks": {
+        "exposureEndpoint": true,
+        "consentEndpoint": true,
+        "orderTabEndpoint": true,
+        "shiftTabConsentEndpoint": true,
+        "order44CSS": true,
+        "focusVisibleAndInEditor": true,
+        "withinViewportFlagMatchesStrictGeometry": true,
+        "expectedStrictVisibility": true
+      },
+      "scope": "Recorded Tab/ShiftTab endpoints; other arrow/popup checks occur between some endpoints. Not a full keyboard-cycle PASS."
+    },
+    {
+      "widthLabel": "desktop",
+      "endpointProofIndexes": [
+        27,
+        28,
+        32,
+        33
+      ],
+      "endpointUTCs": [
+        "2026-10-03T12:23:33.646Z",
+        "2026-10-03T12:23:33.808Z",
+        "2026-10-03T12:23:34.704Z",
+        "2026-10-03T12:23:34.967Z"
+      ],
+      "orderRectCSS": {
+        "bottom": 533,
+        "height": 44,
+        "right": 1060.25,
+        "width": 90,
+        "x": 970.25,
+        "y": 489
+      },
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "strictlyFullyWithinViewport": true,
+      "verticalBottomOverflowCSS": 0,
+      "checks": {
+        "exposureEndpoint": true,
+        "consentEndpoint": true,
+        "orderTabEndpoint": true,
+        "shiftTabConsentEndpoint": true,
+        "order44CSS": true,
+        "focusVisibleAndInEditor": true,
+        "withinViewportFlagMatchesStrictGeometry": true,
+        "expectedStrictVisibility": true
+      },
+      "scope": "Recorded Tab/ShiftTab endpoints; other arrow/popup checks occur between some endpoints. Not a full keyboard-cycle PASS."
+    }
+  ],
+  "finalRestoration": {
+    "utc": "2026-10-03T12:24:06.364Z",
+    "viewportCSS": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "fieldValues": [
+      "signup",
+      "required",
+      "0"
+    ],
+    "editableTextFieldNonemptyCount": 0,
+    "evidenceScope": "Desktop local editor defaults, not save/persistence"
+  },
+  "safeCrops": [
+    {
+      "file": "terms-keyboard-mobile-order.png",
+      "proofIndex": 2,
+      "observationUTC": "2026-10-03T12:11:48.720Z",
+      "visualScope": "Order focus visible. Original and crop end at viewport bottom; DOM control bottom exceeds606 by0.42498779296875CSSpx. Do not mark fully visible."
+    },
+    {
+      "file": "terms-keyboard-mobile-exposure.png",
+      "proofIndex": 12,
+      "observationUTC": "2026-10-03T12:22:18.575Z",
+      "visualScope": "Later signup exposure refocus after Space/Escape, not the focus-loss event. Order bottom is clipped by original viewport."
+    },
+    {
+      "file": "terms-keyboard-tablet-exposure-changed.png",
+      "proofIndex": 14,
+      "observationUTC": "2026-10-03T12:22:20.957Z",
+      "visualScope": "Changed exposure label and no select focus outline visible. BODY focus is separately supported by DOM."
+    },
+    {
+      "file": "terms-keyboard-tablet-order.png",
+      "proofIndex": 21,
+      "observationUTC": "2026-10-03T12:22:58.243Z",
+      "visualScope": "Defaults restored and order focus outline visible."
+    },
+    {
+      "file": "terms-keyboard-desktop-exposure-changed.png",
+      "proofIndex": 24,
+      "observationUTC": "2026-10-03T12:23:15.660Z",
+      "visualScope": "Changed exposure label and no select focus outline visible. BODY focus comes from DOM."
+    },
+    {
+      "file": "terms-keyboard-desktop-order.png",
+      "proofIndex": 32,
+      "observationUTC": "2026-10-03T12:23:34.704Z",
+      "visualScope": "Defaults restored and order focus outline visible."
+    }
+  ],
+  "limitations": [
+    "The exposure focus-loss sequence is recorded at all3 widths. Cause and duplicate status are not independently investigated here. This package is linked to existing issue1464; no new-issue determination or fix verification is included.",
+    "Mobile exposure PNG is the later restored signup/select-focused state, not a screenshot of BODY focus loss. Tablet/desktop changed-state PNGs show the changed value; activeBODY is established by DOM rather than absence of a painted outline alone.",
+    "Mobile order active bottom606.4249877929688 exceeds viewport606 by0.42498779296875CSSpx. withinViewport=false is preserved. Input height44 and visible focus do not establish strict full visibility. No global all-width visibility PASS.",
+    "The corrected mobile up-attempt label at proof9 is interpreted from actual fields: tournament_application and BODY. No restoration is inferred from the earlier mistaken name.",
+    "Consent Down optional/Up required retains select focus at all3 widths. Space/Escape native popup pixels were collector tool-output observations, not durable selected PNGs. Tablet has no dedicated consent-Space/Escape row; that specific action/value-retention claim remains collector-procedure evidence.",
+    "Exposure Space/Escape endpoints are recorded at12/17/27 with signup and select focus. Popup opening itself is not independently pixel-reviewed from these six closed-control PNGs.",
+    "After the unfocused ArrowUp, field y changes32/26.666656494140625/40CSSpx, consistent with collector-observed page scroll. No actual scrollY sample or remount root-cause diagnosis is stored.",
+    "Associated label strings include option text in the collector. They are preserved as collector data, not a complete AX-name or accessibility audit.",
+    "All35 records report editableTextFieldNonemptyCount0 for the collector scope. Final defaults are signup/required/order0; this is local restoration only, not server persistence. Save/Enter/write0 is collector-reported and no browser operation was run by this reviewer.",
+    "Tablet CSS viewport789x505 atDPR1.5 and raster788x505 are distinct; crops use original raster coordinates without scaling. ObservationUTC and captureUTC are separately preserved.",
+    "The master shots file remains appendable. Provenance embeds a frozen selected metadata snapshot and per-row plus full-selected canonical hashes; later master appends do not invalidate these selected rows.",
+    "No personal identity, existing policy text, agreement counts, account sidebar or personal profile URL is retained in these new minimal crops/reports. Runtime servingSHA remains unknown despite collector-reported8167 context.",
+    "35 DOM observations are included.",
+    "Tablet/desktop refocus restoration is recorded as the resulting signup/BODY endpoint; the intervening refocus/ArrowUp procedure is collector reported without a dedicated pre-restoration SELECT row."
+  ],
+  "issueScope": "Existing issue1464 residual keyboard evidence, not a new-issue determination",
+  "collectorReportedActions": {
+    "saveActivations": 0,
+    "enterPresses": 0,
+    "serverWrites": 0
+  },
+  "recordCount": 35,
+  "observationWindowUTC": [
+    "2026-10-03T12:11:48.407Z",
+    "2026-10-03T12:24:06.364Z"
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "active": {
+    "focusVisible": true,
+    "insideEditor": true,
+    "labels": [
+      "동의 유형필수선택"
+    ],
+    "rect": {
+      "bottom": 533,
+      "height": 44,
+      "right": 962.25,
+      "width": 324.625,
+      "x": 637.625,
+      "y": 489
+    },
+    "tag": "SELECT",
+    "type": "select-one",
+    "value": "required",
+    "withinViewport": true
+  },
+  "editableTextFieldNonemptyCount": 0,
+  "fields": [
+    {
+      "labels": [
+        "노출 위치회원가입대회 신청하단 메뉴"
+      ],
+      "rect": {
+        "bottom": 533,
+        "height": 44,
+        "right": 629.625,
+        "width": 324.625,
+        "x": 305,
+        "y": 489
+      },
+      "selectedIndex": 0,
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "signup"
+    },
+    {
+      "labels": [
+        "동의 유형필수선택"
+      ],
+      "rect": {
+        "bottom": 533,
+        "height": 44,
+        "right": 962.25,
+        "width": 324.625,
+        "x": 637.625,
+        "y": 489
+      },
+      "selectedIndex": 0,
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "required"
+    },
+    {
+      "labels": [
+        "노출 순서"
+      ],
+      "rect": {
+        "bottom": 533,
+        "height": 44,
+        "right": 1060.25,
+        "width": 90,
+        "x": 970.25,
+        "y": 489
+      },
+      "selectedIndex": -1,
+      "tag": "INPUT",
+      "type": "number",
+      "value": "0"
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/admin/content?tab=terms",
+  "utc": "2026-10-03T12:24:06.364Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 758,
+    "scrollWidth": 1183,
+    "width": 1183
+  },
+  "step": "desktop-final-defaults-restored",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; fresh terms editor collection; runtime identity unknown."
+}

@@ -1,0 +1,204 @@
+{
+  "scope": "Independent safe-only proof arithmetic and pixel review",
+  "DOMRecords": 35,
+  "exposureSequences": [
+    {
+      "width": 405,
+      "proofIndexes": [
+        7,
+        8,
+        9,
+        11
+      ],
+      "beforeValue": "signup",
+      "downValue": "tournament_application",
+      "downAndSubsequentUpActive": "BODY",
+      "subsequentUpValueUnchanged": true,
+      "restoredValue": "signup",
+      "restoredActive": "BODY",
+      "fieldVerticalDeltaCSS": 32.0,
+      "scrollYMeasured": false,
+      "refocusProcedureLimit": "Mobile has separate refocused SELECT row10; tablet/desktop restore endpoints lack a dedicated pre-restoration SELECT row."
+    },
+    {
+      "width": 789,
+      "proofIndexes": [
+        13,
+        14,
+        15,
+        16
+      ],
+      "beforeValue": "signup",
+      "downValue": "tournament_application",
+      "downAndSubsequentUpActive": "BODY",
+      "subsequentUpValueUnchanged": true,
+      "restoredValue": "signup",
+      "restoredActive": "BODY",
+      "fieldVerticalDeltaCSS": 26.666656494140625,
+      "scrollYMeasured": false,
+      "refocusProcedureLimit": "Mobile has separate refocused SELECT row10; tablet/desktop restore endpoints lack a dedicated pre-restoration SELECT row."
+    },
+    {
+      "width": 1183,
+      "proofIndexes": [
+        23,
+        24,
+        25,
+        26
+      ],
+      "beforeValue": "signup",
+      "downValue": "tournament_application",
+      "downAndSubsequentUpActive": "BODY",
+      "subsequentUpValueUnchanged": true,
+      "restoredValue": "signup",
+      "restoredActive": "BODY",
+      "fieldVerticalDeltaCSS": 40,
+      "scrollYMeasured": false,
+      "refocusProcedureLimit": "Mobile has separate refocused SELECT row10; tablet/desktop restore endpoints lack a dedicated pre-restoration SELECT row."
+    }
+  ],
+  "consentSequences": [
+    {
+      "width": 405,
+      "proofIndexes": [
+        5,
+        6
+      ],
+      "optionalThenRequired": true,
+      "selectFocusRetained": true
+    },
+    {
+      "width": 789,
+      "proofIndexes": [
+        19,
+        20
+      ],
+      "optionalThenRequired": true,
+      "selectFocusRetained": true
+    },
+    {
+      "width": 1183,
+      "proofIndexes": [
+        29,
+        30
+      ],
+      "optionalThenRequired": true,
+      "selectFocusRetained": true
+    }
+  ],
+  "orderVisibility": [
+    {
+      "proofIndex": 2,
+      "width": 405,
+      "heightCSS": 44,
+      "bottomCSS": 606.4249877929688,
+      "viewportHeightCSS": 606,
+      "bottomOverflowCSS": 0.42498779296875,
+      "fullyWithinViewport": false
+    },
+    {
+      "proofIndex": 21,
+      "width": 789,
+      "heightCSS": 44,
+      "bottomCSS": 406.3333435058594,
+      "viewportHeightCSS": 505,
+      "bottomOverflowCSS": 0,
+      "fullyWithinViewport": true
+    },
+    {
+      "proofIndex": 32,
+      "width": 1183,
+      "heightCSS": 44,
+      "bottomCSS": 533,
+      "viewportHeightCSS": 758,
+      "bottomOverflowCSS": 0,
+      "fullyWithinViewport": true
+    }
+  ],
+  "finalDefaults": [
+    "signup",
+    "required",
+    "0"
+  ],
+  "allRecordedNonemptyEditableTextCounts": 0,
+  "saveAndWriteCountEvidence": "Collector report only: Save0, Enter0, serverWrites0; no network or persistence audit",
+  "safeSnapshotCanonicalHashVerified": true,
+  "images": [
+    {
+      "file": "terms-keyboard-mobile-order.png",
+      "sha256": "e45a8da4757815d737434352179b7c45154f7ffa077494d3205dc3e3e7e2cf0c",
+      "dimensions": [
+        325,
+        217
+      ],
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "terms-keyboard-mobile-exposure.png",
+      "sha256": "a6f30898d9b0c86addb7b6f835ec9841d319e9eeec5df5cf15014d10bcbb4e2e",
+      "dimensions": [
+        325,
+        214
+      ],
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "terms-keyboard-tablet-exposure-changed.png",
+      "sha256": "bfe89bcc3f63e4dbef4e6bba906b3cfed404e166dd1a08bd7a172647b29a25ad",
+      "dimensions": [
+        624,
+        71
+      ],
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "terms-keyboard-tablet-order.png",
+      "sha256": "9421009abc40cae77aaa39802cb165ac2ffa3a420ca311fd3d39f63a987dc477",
+      "dimensions": [
+        624,
+        71
+      ],
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "terms-keyboard-desktop-exposure-changed.png",
+      "sha256": "ebfaa81ab49d5357118ffee46d5a85604a2e9428f1f28c0e1fc59f171b0846ee",
+      "dimensions": [
+        763,
+        71
+      ],
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    },
+    {
+      "file": "terms-keyboard-desktop-order.png",
+      "sha256": "1de8aaa0225100857513eed3de03319aeec8168f6fed3837305090f499fe315c",
+      "dimensions": [
+        763,
+        71
+      ],
+      "actualSafePixelsViewed": true,
+      "hashBoundsDOMUTCSnapshotVerified": true
+    }
+  ],
+  "limits": [
+    "The exposure focus-loss sequence is recorded at all3 widths. Cause and duplicate status are not independently investigated here. This package is linked to existing issue1464; no new-issue determination or fix verification is included.",
+    "Mobile exposure PNG is the later restored signup/select-focused state, not a screenshot of BODY focus loss. Tablet/desktop changed-state PNGs show the changed value; activeBODY is established by DOM rather than absence of a painted outline alone.",
+    "Mobile order active bottom606.4249877929688 exceeds viewport606 by0.42498779296875CSSpx. withinViewport=false is preserved. Input height44 and visible focus do not establish strict full visibility. No global all-width visibility PASS.",
+    "The corrected mobile up-attempt label at proof9 is interpreted from actual fields: tournament_application and BODY. No restoration is inferred from the earlier mistaken name.",
+    "Consent Down optional/Up required retains select focus at all3 widths. Space/Escape native popup pixels were collector tool-output observations, not durable selected PNGs. Tablet has no dedicated consent-Space/Escape row; that specific action/value-retention claim remains collector-procedure evidence.",
+    "Exposure Space/Escape endpoints are recorded at12/17/27 with signup and select focus. Popup opening itself is not independently pixel-reviewed from these six closed-control PNGs.",
+    "After the unfocused ArrowUp, field y changes32/26.666656494140625/40CSSpx, consistent with collector-observed page scroll. No actual scrollY sample or remount root-cause diagnosis is stored.",
+    "Associated label strings include option text in the collector. They are preserved as collector data, not a complete AX-name or accessibility audit.",
+    "All35 records report editableTextFieldNonemptyCount0 for the collector scope. Final defaults are signup/required/order0; this is local restoration only, not server persistence. Save/Enter/write0 is collector-reported and no browser operation was run by this reviewer.",
+    "Tablet CSS viewport789x505 atDPR1.5 and raster788x505 are distinct; crops use original raster coordinates without scaling. ObservationUTC and captureUTC are separately preserved.",
+    "The master shots file remains appendable. Provenance embeds a frozen selected metadata snapshot and per-row plus full-selected canonical hashes; later master appends do not invalidate these selected rows.",
+    "No personal identity, existing policy text, agreement counts, account sidebar or personal profile URL is retained in these new minimal crops/reports. Runtime servingSHA remains unknown despite collector-reported8167 context.",
+    "35 DOM observations are included.",
+    "Tablet/desktop refocus restoration is recorded as the resulting signup/BODY endpoint; the intervening refocus/ArrowUp procedure is collector reported without a dedicated pre-restoration SELECT row."
+  ]
+}

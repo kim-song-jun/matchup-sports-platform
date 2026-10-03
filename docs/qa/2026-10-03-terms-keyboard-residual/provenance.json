@@ -1,0 +1,362 @@
+{
+  "frozenUTC": "2026-10-03T12:29:07.042Z",
+  "method": "Integer LTRB raster crops, right/bottom exclusive. No resizing, pixel edits or composites.",
+  "masterCaptureMetadataSHA256AtSnapshot": "b237f87d000a40e8a5c1b8900a7190720d38c439e148c946999592ad7309b070",
+  "selectedCaptureMetadataSnapshot": [
+    {
+      "file": "terms-keyboard-mobile-order.png",
+      "masterIndexAtSnapshot": 97,
+      "observationUTC": "2026-10-03T12:11:48.720Z",
+      "captureStartUTC": "2026-10-03T12:11:48.724Z",
+      "captureEndUTC": "2026-10-03T12:11:48.757Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "fullOriginalRowCanonicalSHA256": "6db224069d5ffabf3e87c327d781455af23404a1b439405c2625a1220aecd89e"
+    },
+    {
+      "file": "terms-keyboard-mobile-exposure.png",
+      "masterIndexAtSnapshot": 98,
+      "observationUTC": "2026-10-03T12:22:18.575Z",
+      "captureStartUTC": "2026-10-03T12:22:18.578Z",
+      "captureEndUTC": "2026-10-03T12:22:18.597Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "fullOriginalRowCanonicalSHA256": "e2645286fefc8748049c98e5b1c7b1449b8cfa9e6e72447b373c5b44268c8bf1"
+    },
+    {
+      "file": "terms-keyboard-tablet-exposure-changed.png",
+      "masterIndexAtSnapshot": 99,
+      "observationUTC": "2026-10-03T12:22:20.957Z",
+      "captureStartUTC": "2026-10-03T12:22:20.960Z",
+      "captureEndUTC": "2026-10-03T12:22:20.983Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "365f0ee5551a5c7ab37852fbc7dde07fb11942b24d73d8295bac7c4580290bc0"
+    },
+    {
+      "file": "terms-keyboard-tablet-order.png",
+      "masterIndexAtSnapshot": 100,
+      "observationUTC": "2026-10-03T12:22:58.243Z",
+      "captureStartUTC": "2026-10-03T12:22:58.246Z",
+      "captureEndUTC": "2026-10-03T12:22:58.268Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "fullOriginalRowCanonicalSHA256": "cdc770eea02bae08b5b4badbae64874dcd6c592e17d0a2c2b6fb17948d749e51"
+    },
+    {
+      "file": "terms-keyboard-desktop-exposure-changed.png",
+      "masterIndexAtSnapshot": 101,
+      "observationUTC": "2026-10-03T12:23:15.660Z",
+      "captureStartUTC": "2026-10-03T12:23:15.662Z",
+      "captureEndUTC": "2026-10-03T12:23:15.688Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "fullOriginalRowCanonicalSHA256": "bb6a9c0f0a09d18cff16bf4daef05651783321b26f904cc6c7dd0f68d470c59b"
+    },
+    {
+      "file": "terms-keyboard-desktop-order.png",
+      "masterIndexAtSnapshot": 102,
+      "observationUTC": "2026-10-03T12:23:34.704Z",
+      "captureStartUTC": "2026-10-03T12:23:34.707Z",
+      "captureEndUTC": "2026-10-03T12:23:34.739Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "fullOriginalRowCanonicalSHA256": "f32f37469c7ceff89204e5170e8f09c38ad09b2cbb9072f6ce37f0985da9a964"
+    }
+  ],
+  "sanitizedSnapshotCanonicalSHA256": "88581d2e82f087c74bfb6d694174b1e426eafd1e557e1110d57881cc40404ddd",
+  "fullOriginalSelectedMetadataCanonicalSHA256": "84e219609a71afb4b423291c155d6309bd6148a193e59fe63719bcd6e6057ec7",
+  "canonicalization": "UTF8 JSON ensure_ascii=false sort_keys=true compact separators. Selected original rows are hashed in crop order including URLs; embedded safe snapshot excludes URLs and records each full-row hash.",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read successful Deploy Alpha workflow; browser runtime not identified",
+    "runtimeServingSHA": "unknown"
+  },
+  "crops": [
+    {
+      "sourceBasename": "terms-keyboard-mobile-order.png",
+      "outputBasename": "terms-keyboard-mobile-order.png",
+      "proofIndex": 2,
+      "shotsJSONIndex": 97,
+      "observationUTC": "2026-10-03T12:11:48.720Z",
+      "captureStartUTC": "2026-10-03T12:11:48.724Z",
+      "captureEndUTC": "2026-10-03T12:11:48.757Z",
+      "observationToCaptureSeconds": 0.004,
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "outputRasterDimensions": [
+        325,
+        217
+      ],
+      "cropBoundsLTRB": [
+        40,
+        389,
+        365,
+        606
+      ],
+      "sourceSHA256": "9fdb42858cd82460fa22174319c767c81dfd2683248dd97cb06798163991e1ed",
+      "outputSHA256": "e45a8da4757815d737434352179b7c45154f7ffa077494d3205dc3e3e7e2cf0c",
+      "cropInspectedDirectly": true,
+      "visualScope": "Order focus visible. Original and crop end at viewport bottom; DOM control bottom exceeds606 by0.42498779296875CSSpx. Do not mark fully visible.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "sizeMatchesBounds": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "terms-keyboard-mobile-exposure.png",
+      "outputBasename": "terms-keyboard-mobile-exposure.png",
+      "proofIndex": 12,
+      "shotsJSONIndex": 98,
+      "observationUTC": "2026-10-03T12:22:18.575Z",
+      "captureStartUTC": "2026-10-03T12:22:18.578Z",
+      "captureEndUTC": "2026-10-03T12:22:18.597Z",
+      "observationToCaptureSeconds": 0.003,
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceRasterDimensions": [
+        405,
+        606
+      ],
+      "outputRasterDimensions": [
+        325,
+        214
+      ],
+      "cropBoundsLTRB": [
+        40,
+        392,
+        365,
+        606
+      ],
+      "sourceSHA256": "ee19490fc6a958adf700a42bdfab22d57442a156ebad8c8735dd9feb2bce8515",
+      "outputSHA256": "a6f30898d9b0c86addb7b6f835ec9841d319e9eeec5df5cf15014d10bcbb4e2e",
+      "cropInspectedDirectly": true,
+      "visualScope": "Later signup exposure refocus after Space/Escape, not the focus-loss event. Order bottom is clipped by original viewport.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "sizeMatchesBounds": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "terms-keyboard-tablet-exposure-changed.png",
+      "outputBasename": "terms-keyboard-tablet-exposure-changed.png",
+      "proofIndex": 14,
+      "shotsJSONIndex": 99,
+      "observationUTC": "2026-10-03T12:22:20.957Z",
+      "captureStartUTC": "2026-10-03T12:22:20.960Z",
+      "captureEndUTC": "2026-10-03T12:22:20.983Z",
+      "observationToCaptureSeconds": 0.003,
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "outputRasterDimensions": [
+        624,
+        71
+      ],
+      "cropBoundsLTRB": [
+        52,
+        340,
+        676,
+        411
+      ],
+      "sourceSHA256": "bb6bc48739b9047bae58d5b8a5b41ee3005fbeb08cb4cfadd32eb338fd41e992",
+      "outputSHA256": "bfe89bcc3f63e4dbef4e6bba906b3cfed404e166dd1a08bd7a172647b29a25ad",
+      "cropInspectedDirectly": true,
+      "visualScope": "Changed exposure label and no select focus outline visible. BODY focus is separately supported by DOM.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "sizeMatchesBounds": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "terms-keyboard-tablet-order.png",
+      "outputBasename": "terms-keyboard-tablet-order.png",
+      "proofIndex": 21,
+      "shotsJSONIndex": 100,
+      "observationUTC": "2026-10-03T12:22:58.243Z",
+      "captureStartUTC": "2026-10-03T12:22:58.246Z",
+      "captureEndUTC": "2026-10-03T12:22:58.268Z",
+      "observationToCaptureSeconds": 0.003,
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceRasterDimensions": [
+        788,
+        505
+      ],
+      "outputRasterDimensions": [
+        624,
+        71
+      ],
+      "cropBoundsLTRB": [
+        52,
+        340,
+        676,
+        411
+      ],
+      "sourceSHA256": "12ffb627ac21918c2aa52479235b37d534534febf84c2b2d37439409f211a914",
+      "outputSHA256": "9421009abc40cae77aaa39802cb165ac2ffa3a420ca311fd3d39f63a987dc477",
+      "cropInspectedDirectly": true,
+      "visualScope": "Defaults restored and order focus outline visible.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "sizeMatchesBounds": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "terms-keyboard-desktop-exposure-changed.png",
+      "outputBasename": "terms-keyboard-desktop-exposure-changed.png",
+      "proofIndex": 24,
+      "shotsJSONIndex": 101,
+      "observationUTC": "2026-10-03T12:23:15.660Z",
+      "captureStartUTC": "2026-10-03T12:23:15.662Z",
+      "captureEndUTC": "2026-10-03T12:23:15.688Z",
+      "observationToCaptureSeconds": 0.002,
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "outputRasterDimensions": [
+        763,
+        71
+      ],
+      "cropBoundsLTRB": [
+        301,
+        467,
+        1064,
+        538
+      ],
+      "sourceSHA256": "e742822d0a817333cb37cf6365645b7a9779ca4d64107477cc0fc1ad1c50370f",
+      "outputSHA256": "ebfaa81ab49d5357118ffee46d5a85604a2e9428f1f28c0e1fc59f171b0846ee",
+      "cropInspectedDirectly": true,
+      "visualScope": "Changed exposure label and no select focus outline visible. BODY focus comes from DOM.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "sizeMatchesBounds": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    },
+    {
+      "sourceBasename": "terms-keyboard-desktop-order.png",
+      "outputBasename": "terms-keyboard-desktop-order.png",
+      "proofIndex": 32,
+      "shotsJSONIndex": 102,
+      "observationUTC": "2026-10-03T12:23:34.704Z",
+      "captureStartUTC": "2026-10-03T12:23:34.707Z",
+      "captureEndUTC": "2026-10-03T12:23:34.739Z",
+      "observationToCaptureSeconds": 0.003,
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceRasterDimensions": [
+        1183,
+        758
+      ],
+      "outputRasterDimensions": [
+        763,
+        71
+      ],
+      "cropBoundsLTRB": [
+        301,
+        467,
+        1064,
+        538
+      ],
+      "sourceSHA256": "5d2840ff924307046671828e06d8f40a27d498223b671edd582fbf569c01ad0a",
+      "outputSHA256": "1de8aaa0225100857513eed3de03319aeec8168f6fed3837305090f499fe315c",
+      "cropInspectedDirectly": true,
+      "visualScope": "Defaults restored and order focus outline visible.",
+      "sourceCollectorReportedOriginalInspection": true,
+      "sourceCollectorReportedChecks": {
+        "metadataMatchesProof": true,
+        "timestampOrder": true,
+        "boundsValid": true,
+        "sizeMatchesBounds": true,
+        "pixelEquality": true,
+        "noPNGMetadata": true
+      }
+    }
+  ],
+  "publicationLimit": "Publisher verified safe snapshot canonical hash and six approved PNGs, without reading original screenshots or original full metadata. Full-original hashes/pixel equality remain collector assertions."
+}

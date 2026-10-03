@@ -25,6 +25,8 @@ import type {
 } from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { formatKstMonthDayTime } from '../common/kst-datetime';
+import { decodeReferenceTimeCursor, encodeReferenceTimeCursor } from '../common/pagination/reference-time-cursor';
+import { dropCursorRow, resumeAfterCursorArgs } from '../common/pagination/resume-after-cursor';
 import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -112,6 +114,8 @@ export class TeamMatchesService {
     const isDefaultDiscovery = query.status === undefined;
     const status = query.status ?? 'recruiting';
     const now = new Date();
+    // 구간 경계는 첫 페이지에서 정해 커서로 이어받는다. `now` 는 가시성 조건 전용이다.
+    const { cursor, referenceTime: splitAt } = decodeReferenceTimeCursor(query.cursor, now);
     const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1TeamMatchWhereInput[] = [
       // 추천순의 모집 글에는 신청 마감을 적용한다. 확정 경기는 진행 중에도 찾을 수 있게 남긴다.
@@ -193,28 +197,27 @@ export class TeamMatchesService {
     // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기를 그 뒤에 최근
     // 것부터, 일정 미정(startAt null — 리그 대진 등)은 맨 뒤. startAt asc 한 줄로 두면 기간 제한
     // 없이 실리는 matched·최근 완료 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는
-    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>",
+    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>",
     // matches.service.ts list() 와 같은 규칙). '최신순'을 고른 경우만 등록 최신순이다.
     const groups: Record<string, Pick<Prisma.V1TeamMatchFindManyArgs, 'where' | 'orderBy'>> = {
       latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-      upcoming: { where: { AND: [where, { startAt: { gte: now } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
-      past: { where: { AND: [where, { startAt: { lt: now } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      upcoming: { where: { AND: [where, { startAt: { gte: splitAt } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      past: { where: { AND: [where, { startAt: { lt: splitAt } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
       unscheduled: { where: { AND: [where, { startAt: null }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
     };
     const include = this.teamMatchInclude(user);
     const { items: teamMatches, hasNext, nextCursor } = await paginateByStatePriority({
       stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past', 'unscheduled'],
       limit,
-      cursor: query.cursor,
+      cursor,
       fetchGroup: (group, page) =>
         this.prisma.v1TeamMatch
           .findMany({
             ...groups[group],
-            take: page.take,
-            ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
+            ...resumeAfterCursorArgs(page.cursorId, page.take),
             include,
           })
-          .then((rows) => rows.map((row) => ({ ...row, state: group }))),
+          .then((rows) => dropCursorRow(rows, page.cursorId, page.take).map((row) => ({ ...row, state: group }))),
     });
 
     const pageItems = teamMatches.map((teamMatch) => {
@@ -244,7 +247,8 @@ export class TeamMatchesService {
       items: pageItems.map((teamMatch) =>
         this.toListItem(teamMatch, user, teamMatch.hostTeamId ? winsByHostTeam.get(teamMatch.hostTeamId) ?? 0 : 0),
       ),
-      pageInfo: { nextCursor, hasNext },
+      // 최신순은 구간이 없어 기준 시각이 필요 없다.
+      pageInfo: { nextCursor: query.sort === 'latest' ? nextCursor : encodeReferenceTimeCursor(nextCursor, splitAt), hasNext },
     };
   }
 

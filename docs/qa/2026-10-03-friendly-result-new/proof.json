@@ -1,0 +1,488 @@
+[
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "false",
+      "name": "득점 기록 보기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 370.3999938964844,
+        "x": 16.80000114440918,
+        "y": 306.6000061035156
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "minuteTokens": [],
+      "present": false,
+      "profileLinkCount": 0,
+      "rectHeight": 0
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:06:33.279Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-before-goal-expand",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "true",
+      "name": "득점 기록 접기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 370.3999938964844,
+        "x": 16.80000114440918,
+        "y": 280.20001220703125
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "ariaHidden": null,
+      "hidden": false,
+      "minuteTokens": [
+        "2′"
+      ],
+      "present": true,
+      "profileLinkCount": 0,
+      "rectHeight": 44
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:06:33.597Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-goal-expanded",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "true",
+      "name": "득점 기록 접기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 370.3999938964844,
+        "x": 16.80000114440918,
+        "y": 280.20001220703125
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "ariaHidden": null,
+      "hidden": false,
+      "minuteTokens": [
+        "2′"
+      ],
+      "present": true,
+      "profileLinkCount": 0,
+      "rectHeight": 44
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:27.152Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-expanded-photo-observation",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "false",
+      "name": "득점 기록 보기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 370.3999938964844,
+        "x": 16.80000114440918,
+        "y": 280.20001220703125
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "minuteTokens": [],
+      "present": false,
+      "profileLinkCount": 0,
+      "rectHeight": 0
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:27.490Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-goal-collapsed-again",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "false",
+      "name": "득점 기록 보기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 542.6666870117188,
+        "x": 122,
+        "y": 292.16668701171875
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "minuteTokens": [],
+      "present": false,
+      "profileLinkCount": 0,
+      "rectHeight": 0
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:56.288Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-before-goal-expand",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "true",
+      "name": "득점 기록 접기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 542.6666870117188,
+        "x": 122,
+        "y": 229.5
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "ariaHidden": null,
+      "hidden": false,
+      "minuteTokens": [
+        "2′"
+      ],
+      "present": true,
+      "profileLinkCount": 0,
+      "rectHeight": 44
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:56.600Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-goal-expanded",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "false",
+      "name": "득점 기록 보기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 542.6666870117188,
+        "x": 122,
+        "y": 229.5
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": false
+      },
+      {
+        "disabled": true,
+        "rendered": true
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "minuteTokens": [],
+      "present": false,
+      "profileLinkCount": 0,
+      "rectHeight": 0
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:56.926Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-goal-collapsed-again",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "false",
+      "name": "득점 기록 보기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 566,
+        "x": 83,
+        "y": 447.5
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": true
+      },
+      {
+        "disabled": true,
+        "rendered": false
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "minuteTokens": [],
+      "present": false,
+      "profileLinkCount": 0,
+      "rectHeight": 0
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:57.133Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-before-goal-expand",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "true",
+      "name": "득점 기록 접기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 566,
+        "x": 83,
+        "y": 355.5
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": true
+      },
+      {
+        "disabled": true,
+        "rendered": false
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "ariaHidden": null,
+      "hidden": false,
+      "minuteTokens": [
+        "2′"
+      ],
+      "present": true,
+      "profileLinkCount": 0,
+      "rectHeight": 44
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:57.471Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-goal-expanded",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  },
+  {
+    "accordion": {
+      "controls": "_r_2_",
+      "expanded": "false",
+      "name": "득점 기록 보기 (1)",
+      "rect": {
+        "height": 45,
+        "width": 566,
+        "x": 83,
+        "y": 355.5
+      }
+    },
+    "applyButtons": [
+      {
+        "disabled": true,
+        "rendered": true
+      },
+      {
+        "disabled": true,
+        "rendered": false
+      }
+    ],
+    "confirmedResultCopy": true,
+    "displayedScoreEnds": [
+      "0",
+      "1"
+    ],
+    "region": {
+      "minuteTokens": [],
+      "present": false,
+      "profileLinkCount": 0,
+      "rectHeight": 0
+    },
+    "resultEntryLinkCount": 0,
+    "utc": "2026-10-03T14:07:57.816Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1180,
+      "width": 1180
+    },
+    "step": "desktop-goal-collapsed-again",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "routeTemplate": "https://alpha.teameet.co.kr/team-matches/{synthetic-friendly-fixture}",
+    "fixtureAlias": "F1"
+  }
+]

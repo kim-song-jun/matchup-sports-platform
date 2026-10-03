@@ -1,0 +1,144 @@
+{
+  "createdUTC": "2026-10-03T14:10:24.287390+00:00",
+  "scope": "Accordion control crops only; player and team identity pixels omitted",
+  "crops": [
+    {
+      "file": "friendly-result-mobile-expanded.png",
+      "proofIndex": 2,
+      "sourceSHA256": "47085b72b641e7d97732c53be5c75049d657ce0c658034875851024d6f0708b9",
+      "outputSHA256": "455defe8b41e7dd3f2dc39cb46b63f3711fa1986a1a750a17ccd15d88ad960bb",
+      "sourceSize": [
+        404,
+        606
+      ],
+      "cropBox": [
+        13,
+        277,
+        391,
+        329
+      ],
+      "outputSize": [
+        378,
+        52
+      ],
+      "captureMetadata": {
+        "file": "friendly-result-mobile-expanded.png",
+        "startedUTC": "2026-10-03T14:07:27.154Z",
+        "completedUTC": "2026-10-03T14:07:27.170Z",
+        "domUTC": "2026-10-03T14:07:27.152Z",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 404,
+          "width": 404
+        },
+        "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+        "fixtureAlias": "F1"
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "friendly-result-tablet-expanded.png",
+      "proofIndex": 5,
+      "sourceSHA256": "d4ba82fae8e52181492a38e9c1f7c913172e12de0e91d7acd2c6190c7469f2ae",
+      "outputSHA256": "d051ab9b1b5f9dd9788c3239d2c11fdac8060d88c67e69d5693b1cbb25270a04",
+      "sourceSize": [
+        787,
+        505
+      ],
+      "cropBox": [
+        119,
+        226,
+        668,
+        278
+      ],
+      "outputSize": [
+        549,
+        52
+      ],
+      "captureMetadata": {
+        "file": "friendly-result-tablet-expanded.png",
+        "startedUTC": "2026-10-03T14:07:56.603Z",
+        "completedUTC": "2026-10-03T14:07:56.624Z",
+        "domUTC": "2026-10-03T14:07:56.600Z",
+        "viewport": {
+          "dpr": 1.5,
+          "height": 505,
+          "scrollWidth": 787,
+          "width": 787
+        },
+        "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+        "fixtureAlias": "F1"
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "friendly-result-desktop-expanded.png",
+      "proofIndex": 8,
+      "sourceSHA256": "8d96656dd0d3c5f6686f5ba2d13b876ccbd304da8e2714b5e06fe29e831b8431",
+      "outputSHA256": "9f527bef17bc1cb15b8e2ec51114ce1b4f6f7b9b2453a6f0c23ec41711c2c978",
+      "sourceSize": [
+        1180,
+        757
+      ],
+      "cropBox": [
+        80,
+        352,
+        652,
+        404
+      ],
+      "outputSize": [
+        572,
+        52
+      ],
+      "captureMetadata": {
+        "file": "friendly-result-desktop-expanded.png",
+        "startedUTC": "2026-10-03T14:07:57.474Z",
+        "completedUTC": "2026-10-03T14:07:57.494Z",
+        "domUTC": "2026-10-03T14:07:57.471Z",
+        "viewport": {
+          "dpr": 1,
+          "height": 757,
+          "scrollWidth": 1180,
+          "width": 1180
+        },
+        "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+        "fixtureAlias": "F1"
+      },
+      "collectorPixelEquality": true
+    }
+  ],
+  "safeProofHashes": {
+    "friendly-result-proof.json": "e5391687ad9696ed315fe84b4eada1025447b7064d22ff4767cfc18b3d2ca93d",
+    "friendly-result-actions.json": "21ae2386b4c7c85b38dcbd2ddc99732e1a688d30d1dc772f6268b4cde62f6175",
+    "friendly-result-summary.json": "abe0cb325b536fd120c9b46ab2b0e310e88057d6527a327efa43dc658e0c4d04"
+  },
+  "limits": [
+    "CSS viewport and PNG dimensions may differ at browser zoom; no equality assumption.",
+    "DOM and capture UTC are separate."
+  ],
+  "sourceInputFiles": [
+    {
+      "file": "friendly-result-proof.json",
+      "bytes": 10113,
+      "sha256": "e5391687ad9696ed315fe84b4eada1025447b7064d22ff4767cfc18b3d2ca93d"
+    },
+    {
+      "file": "friendly-result-actions.json",
+      "bytes": 868,
+      "sha256": "21ae2386b4c7c85b38dcbd2ddc99732e1a688d30d1dc772f6268b4cde62f6175"
+    },
+    {
+      "file": "friendly-result-summary.json",
+      "bytes": 3186,
+      "sha256": "abe0cb325b536fd120c9b46ab2b0e310e88057d6527a327efa43dc658e0c4d04"
+    },
+    {
+      "file": "friendly-result-provenance.json",
+      "bytes": 3697,
+      "sha256": "e2bebfd5e426998716cf54d953c464467aedd3412daf75162ad4ce3947a3e2d7"
+    }
+  ],
+  "publicationProjection": "Opaque fixture URLs replaced by route template/alias and SHA256; account alias and unverified deployment wording omitted. DOM values, chronology and crop pixels retained. Original local inputs unchanged.",
+  "publisherReview": "Safe control-only pixels viewed, output SHA256 and PNG dimensions verified, crop bounds and button containment checked, capture metadata mapped to exact DOM rows. Original-to-crop equality is collector-attested."
+}

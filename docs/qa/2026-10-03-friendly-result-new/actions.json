@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Mobile expand goal record",
+    "startedUTC": "2026-10-03T14:06:33.282Z",
+    "completedUTC": "2026-10-03T14:06:33.558Z"
+  },
+  {
+    "name": "Mobile collapse goal record",
+    "startedUTC": "2026-10-03T14:07:27.171Z",
+    "completedUTC": "2026-10-03T14:07:27.445Z"
+  },
+  {
+    "name": "Tablet expand goal record",
+    "startedUTC": "2026-10-03T14:07:56.290Z",
+    "completedUTC": "2026-10-03T14:07:56.560Z"
+  },
+  {
+    "name": "Tablet collapse goal record",
+    "startedUTC": "2026-10-03T14:07:56.624Z",
+    "completedUTC": "2026-10-03T14:07:56.888Z"
+  },
+  {
+    "name": "Desktop expand goal record",
+    "startedUTC": "2026-10-03T14:07:57.135Z",
+    "completedUTC": "2026-10-03T14:07:57.422Z"
+  },
+  {
+    "name": "Desktop collapse goal record",
+    "startedUTC": "2026-10-03T14:07:57.494Z",
+    "completedUTC": "2026-10-03T14:07:57.771Z"
+  }
+]

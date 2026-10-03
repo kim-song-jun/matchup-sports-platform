@@ -1,0 +1,157 @@
+{
+  "scope": "Existing completed-friendly F1 read-only score/goal disclosure branch at three current widths",
+  "cohort": "post-reset-20261003-1322",
+  "runtimeServingSHA": "unknown",
+  "observedUTC": [
+    "2026-10-03T14:06:33.279Z",
+    "2026-10-03T14:07:57.816Z"
+  ],
+  "cases": [
+    {
+      "beforeIndex": 0,
+      "expandedIndex": 1,
+      "afterIndex": 3,
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 404,
+        "width": 404
+      },
+      "scoreAtEach": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expandedStates": [
+        "false",
+        "true",
+        "false"
+      ],
+      "regionPresence": [
+        false,
+        true,
+        false
+      ],
+      "goalMinuteWhenExpanded": [
+        "2′"
+      ],
+      "buttonHeight": 45
+    },
+    {
+      "beforeIndex": 4,
+      "expandedIndex": 5,
+      "afterIndex": 6,
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      },
+      "scoreAtEach": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expandedStates": [
+        "false",
+        "true",
+        "false"
+      ],
+      "regionPresence": [
+        false,
+        true,
+        false
+      ],
+      "goalMinuteWhenExpanded": [
+        "2′"
+      ],
+      "buttonHeight": 45
+    },
+    {
+      "beforeIndex": 7,
+      "expandedIndex": 8,
+      "afterIndex": 9,
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1180,
+        "width": 1180
+      },
+      "scoreAtEach": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expandedStates": [
+        "false",
+        "true",
+        "false"
+      ],
+      "regionPresence": [
+        false,
+        true,
+        false
+      ],
+      "goalMinuteWhenExpanded": [
+        "2′"
+      ],
+      "buttonHeight": 45
+    }
+  ],
+  "final": {
+    "collapsed": true,
+    "score": [
+      "0",
+      "1"
+    ],
+    "sourceURLSHA256": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+    "fixtureAlias": "F1"
+  },
+  "limits": [
+    "Collector reports the current admin-access session; no account or role switch. No participant-specific UI or server-authorization test.",
+    "Recorded resultEntryLinkCount=0 and disabled application-button flags are UI measurements only; no permission conclusion.",
+    "No result reopen/edit, review posting, roster change, application, notification, save or other server-write action.",
+    "Score numbers extracted from the ends of the two displayed score-line sides; team/player names not retained.",
+    "Goal minute is DOM evidence. Public crops show only accordion controls, never player records.",
+    "Only click expansion/collapse tested; no screen-reader or full keyboard-flow certification.",
+    "Mobile proof row2 is a later observation of the same expanded state for the screenshot, not another cycle.",
+    "CUA action-call bounds are collector reports, not independent browser-event timestamps.",
+    "The profileLinkCount field applies only to the controlled goal region, not the whole page.",
+    "No goalkeeper/scorer identity, roster row, team name, or account data is included."
+  ],
+  "counts": {
+    "DOMRecords": 10,
+    "collectorClickCalls": 6,
+    "expandCollapseCycles": 3,
+    "images": 3,
+    "fixtures": 1
+  },
+  "controlledRegionQueryBasis": "Collector reports querying document.getElementById(button aria-controls); present is Boolean(region)."
+}

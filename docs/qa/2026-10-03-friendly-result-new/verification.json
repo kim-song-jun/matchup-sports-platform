@@ -1,0 +1,136 @@
+{
+  "recordCount": 10,
+  "collectorClickCallRecords": 6,
+  "cycles": [
+    {
+      "indices": [
+        0,
+        1,
+        3
+      ],
+      "width": 404,
+      "expanded": [
+        "false",
+        "true",
+        "false"
+      ],
+      "controlledRegionPresent": [
+        false,
+        true,
+        false
+      ],
+      "scoreEnds": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expandedMinuteTokens": [
+        "2′"
+      ]
+    },
+    {
+      "indices": [
+        4,
+        5,
+        6
+      ],
+      "width": 787,
+      "expanded": [
+        "false",
+        "true",
+        "false"
+      ],
+      "controlledRegionPresent": [
+        false,
+        true,
+        false
+      ],
+      "scoreEnds": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expandedMinuteTokens": [
+        "2′"
+      ]
+    },
+    {
+      "indices": [
+        7,
+        8,
+        9
+      ],
+      "width": 1180,
+      "expanded": [
+        "false",
+        "true",
+        "false"
+      ],
+      "controlledRegionPresent": [
+        false,
+        true,
+        false
+      ],
+      "scoreEnds": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ],
+        [
+          "0",
+          "1"
+        ]
+      ],
+      "expandedMinuteTokens": [
+        "2′"
+      ]
+    }
+  ],
+  "allTenScoreEnds": [
+    "0",
+    "1"
+  ],
+  "allTenConfirmedResultCopy": true,
+  "allTenButtonHeight": 45,
+  "oneFixtureURLHash": "45d2f1fbb0c9bc687cb085b124aec5456d8f5d4e4b11bb173af9bd561de576ca",
+  "mobilePhotoObservationIndex": 2,
+  "mobilePhotoIsAdditionalCycle": false,
+  "sourceHashChecks": true,
+  "cropHashesAndDimensions": true,
+  "cropContainsRecordedButtonRectangle": true,
+  "safeActualPixelsViewed": 3,
+  "captureDOMMappings": [
+    2,
+    5,
+    8
+  ],
+  "captureEndBeforeOrEqualCollapseCallStart": true,
+  "tabletAndDesktopCaptureEndEqualCollapseCallStart": true,
+  "underlyingMatchResultPersistenceChecked": false,
+  "serverAuthorizationChecked": false,
+  "participantRoleChecked": false,
+  "keyboardOrScreenReaderChecked": false,
+  "privacyReview": "Control-only images and numeric/boolean DOM fields; no team/player names, contact details, profile URLs, roster content or secrets."
+}

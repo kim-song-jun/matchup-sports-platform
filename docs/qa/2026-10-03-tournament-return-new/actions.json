@@ -1,0 +1,33 @@
+[
+  {
+    "name": "Click actual link 팀밋 대회 보기",
+    "startedUTC": "2026-10-03T13:26:28.732Z",
+    "completedUTC": "2026-10-03T13:26:33.672Z"
+  },
+  {
+    "name": "Browser Back from events to filtered empty list",
+    "startedUTC": "2026-10-03T13:26:40.414Z",
+    "completedUTC": "2026-10-03T13:26:40.453Z"
+  },
+  {
+    "name": "Open actual filter link 수영 · 남성부",
+    "startedUTC": "2026-10-03T13:27:11.402Z",
+    "completedUTC": "2026-10-03T13:27:11.686Z"
+  },
+  {
+    "name": "Click actual filter 초기화 link",
+    "startedUTC": "2026-10-03T13:27:38.325Z",
+    "completedUTC": "2026-10-03T13:27:38.604Z"
+  },
+  {
+    "name": "Click actual first rendered result link",
+    "startedUTC": "2026-10-03T13:28:25.079Z",
+    "completedUTC": "2026-10-03T13:28:25.175Z",
+    "targetPathSHA256": "5a1c5e116dfcb57a3eefc2e2cef2f6655b66b9926b66cbc998dd3a49e2b20aa3"
+  },
+  {
+    "name": "Browser Back from result detail to unfiltered list",
+    "startedUTC": "2026-10-03T13:28:31.193Z",
+    "completedUTC": "2026-10-03T13:28:31.210Z"
+  }
+]

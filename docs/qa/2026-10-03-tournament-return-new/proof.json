@@ -1,0 +1,286 @@
+[
+  {
+    "cta": [
+      {
+        "href": "/events",
+        "name": "팀밋 대회 보기"
+      }
+    ],
+    "emptyText": [],
+    "h1": [
+      "스포츠 대회"
+    ],
+    "labelledby": "tournament-list-heading",
+    "resolvedName": "대회 목록",
+    "status": "all",
+    "utc": "2026-10-03T13:26:05.486Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-all-status-filtered-empty",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "3cf85d29e48fe745e5ae1d8f97267564ab2579ea7b8c276ec8c345f9bcfdc529",
+    "pathTemplate": "/tournaments",
+    "query": {
+      "sportId": "sha256:dc675eecf8a67be6a26689c6a781f40e97082f5da4ba355080e927aff93fde28",
+      "genderCategory": "male"
+    },
+    "detailHrefSHA256s": [],
+    "detailHrefCount": 0,
+    "uniqueDetailHrefCount": 0
+  },
+  {
+    "cta": [
+      {
+        "href": "/events",
+        "name": "팀밋 대회 보기"
+      }
+    ],
+    "emptyText": [],
+    "h1": [
+      "스포츠 대회"
+    ],
+    "labelledby": "tournament-list-heading",
+    "resolvedName": "대회 목록",
+    "status": "all",
+    "utc": "2026-10-03T13:26:05.552Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-empty-cta-visible",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "3cf85d29e48fe745e5ae1d8f97267564ab2579ea7b8c276ec8c345f9bcfdc529",
+    "pathTemplate": "/tournaments",
+    "query": {
+      "sportId": "sha256:dc675eecf8a67be6a26689c6a781f40e97082f5da4ba355080e927aff93fde28",
+      "genderCategory": "male"
+    },
+    "detailHrefSHA256s": [],
+    "detailHrefCount": 0,
+    "uniqueDetailHrefCount": 0
+  },
+  {
+    "cta": [],
+    "emptyText": [],
+    "h1": [
+      "팀밋이 여는 대회"
+    ],
+    "status": "all",
+    "utc": "2026-10-03T13:26:40.412Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-actual-empty-CTA-destination-events",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "5bce08d6321dfe40a6cd1a4bb208afc7d7b83229973cd8e8ef6db416b5f859b0",
+    "pathTemplate": "/events",
+    "query": {},
+    "detailHrefSHA256s": [],
+    "detailHrefCount": 0,
+    "uniqueDetailHrefCount": 0
+  },
+  {
+    "cta": [
+      {
+        "href": "/events",
+        "name": "팀밋 대회 보기"
+      }
+    ],
+    "emptyText": [],
+    "h1": [
+      "스포츠 대회"
+    ],
+    "labelledby": "tournament-list-heading",
+    "resolvedName": "대회 목록",
+    "status": "all",
+    "utc": "2026-10-03T13:27:11.398Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-CTA-browser-back-filter-restored",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "3cf85d29e48fe745e5ae1d8f97267564ab2579ea7b8c276ec8c345f9bcfdc529",
+    "pathTemplate": "/tournaments",
+    "query": {
+      "sportId": "sha256:dc675eecf8a67be6a26689c6a781f40e97082f5da4ba355080e927aff93fde28",
+      "genderCategory": "male"
+    },
+    "detailHrefSHA256s": [],
+    "detailHrefCount": 0,
+    "uniqueDetailHrefCount": 0
+  },
+  {
+    "cta": [],
+    "emptyText": [],
+    "h1": [
+      "스포츠 대회"
+    ],
+    "labelledby": "tournament-list-heading",
+    "resolvedName": "대회 목록",
+    "status": "all",
+    "utc": "2026-10-03T13:27:46.241Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-reset-unfiltered-results",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "dd523518986865164c2ae135b827b90d550499130ef1a69ffbbaa45e4ddc0aa9",
+    "pathTemplate": "/tournaments",
+    "query": {},
+    "detailHrefSHA256s": [
+      "5a1c5e116dfcb57a3eefc2e2cef2f6655b66b9926b66cbc998dd3a49e2b20aa3",
+      "7fcc319c5d9a525ee0463961f04f089c6b594696833e2d351a2b9341d6a2d879",
+      "f707030984570803fe00595b3fb2812f331b578734ddbb15a25753e8aedfc77d",
+      "ba4d674348c28214034bfe106ca90a5ee21d189ec25a64679e5b4d64f2f78e28",
+      "c57538e181606c8d679d6071e46dd3c174688e54b7c3f967dab7c4857d09d060",
+      "1e96cd690e6664257d86ae59e21321561467cc21a4a644debbaba38b300dcb71",
+      "b2707a07ac0c935803e55ce3b0ea9857e2a6b5e12a7a175761bd97d8590e080a",
+      "a1e2aa774cb00f25b354820441cd04ee1c20b5ec5053c7f834cda6c84ed8ebc9",
+      "205660cebbb1232594edb4d40590e014bfe8596968f72ec7b027caeccefbb834",
+      "2cd53c23882a783f57f97d17382857d09a46074bd321c41e1df7708d498de271",
+      "352ccb5b4423da5a1ea5d587ddfb4740f8535a73ceb966ba4d3af67eb90f0443",
+      "a628e78e4c2d73323a8d37a4b8e00775d05f69dbda39e77e8460904f870f95fb",
+      "fc258fe3f959202d966edb2584ccf09a5718a1a7c7981ed4ad147ec607b1a1bd",
+      "4529654cc96861c8f17362f5ec151def33fea240fc71a82fb43ae1d2da3dd254",
+      "7a20ef624fc2d6ba8cd3b7bf5d6319e84763213eb55029e58a1851ba5f35d895",
+      "d4a1b58191155c75f39805f2b6afa515fb1ddb8deda973d8bc360d5d91a91c12",
+      "b805964bcab400bec7c59826ade2630c1ef916e3155c9061099454007c14f3fa",
+      "a963b70454418b7486b35b02686ee8fbb1ba788b2896bcd4ad1239df39d212cb",
+      "31bcb808954a3cd39a26ff07945fb42331a56526b1911b6552ce0e10728c6145",
+      "6226e753af801157b2ec61306fd3142276eb19e99a46f4a8637e540234a83540"
+    ],
+    "detailHrefCount": 20,
+    "uniqueDetailHrefCount": 20
+  },
+  {
+    "cta": [],
+    "emptyText": [],
+    "h1": [
+      "스포츠 대회"
+    ],
+    "labelledby": "tournament-list-heading",
+    "resolvedName": "대회 목록",
+    "status": "all",
+    "utc": "2026-10-03T13:28:14.564Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-result-card-visible-before-click",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "dd523518986865164c2ae135b827b90d550499130ef1a69ffbbaa45e4ddc0aa9",
+    "pathTemplate": "/tournaments",
+    "query": {},
+    "detailHrefSHA256s": [
+      "5a1c5e116dfcb57a3eefc2e2cef2f6655b66b9926b66cbc998dd3a49e2b20aa3",
+      "7fcc319c5d9a525ee0463961f04f089c6b594696833e2d351a2b9341d6a2d879",
+      "f707030984570803fe00595b3fb2812f331b578734ddbb15a25753e8aedfc77d",
+      "ba4d674348c28214034bfe106ca90a5ee21d189ec25a64679e5b4d64f2f78e28",
+      "c57538e181606c8d679d6071e46dd3c174688e54b7c3f967dab7c4857d09d060",
+      "1e96cd690e6664257d86ae59e21321561467cc21a4a644debbaba38b300dcb71",
+      "b2707a07ac0c935803e55ce3b0ea9857e2a6b5e12a7a175761bd97d8590e080a",
+      "a1e2aa774cb00f25b354820441cd04ee1c20b5ec5053c7f834cda6c84ed8ebc9",
+      "205660cebbb1232594edb4d40590e014bfe8596968f72ec7b027caeccefbb834",
+      "2cd53c23882a783f57f97d17382857d09a46074bd321c41e1df7708d498de271",
+      "352ccb5b4423da5a1ea5d587ddfb4740f8535a73ceb966ba4d3af67eb90f0443",
+      "a628e78e4c2d73323a8d37a4b8e00775d05f69dbda39e77e8460904f870f95fb",
+      "fc258fe3f959202d966edb2584ccf09a5718a1a7c7981ed4ad147ec607b1a1bd",
+      "4529654cc96861c8f17362f5ec151def33fea240fc71a82fb43ae1d2da3dd254",
+      "7a20ef624fc2d6ba8cd3b7bf5d6319e84763213eb55029e58a1851ba5f35d895",
+      "d4a1b58191155c75f39805f2b6afa515fb1ddb8deda973d8bc360d5d91a91c12",
+      "b805964bcab400bec7c59826ade2630c1ef916e3155c9061099454007c14f3fa",
+      "a963b70454418b7486b35b02686ee8fbb1ba788b2896bcd4ad1239df39d212cb",
+      "31bcb808954a3cd39a26ff07945fb42331a56526b1911b6552ce0e10728c6145",
+      "6226e753af801157b2ec61306fd3142276eb19e99a46f4a8637e540234a83540"
+    ],
+    "detailHrefCount": 20,
+    "uniqueDetailHrefCount": 20
+  },
+  {
+    "cta": [],
+    "emptyText": [],
+    "h1": [
+      "(목업) 1002-0515 전용 경기 QA 2026-10-02T05:15"
+    ],
+    "status": "all",
+    "utc": "2026-10-03T13:28:31.191Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-actual-result-card-detail",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "d46b356b0ba50a480e5ab49a265382196057f291ef5f0e67c719ffb6c50c697a",
+    "pathTemplate": "/tournaments/{synthetic-fixture}",
+    "query": {},
+    "detailHrefSHA256s": [],
+    "detailHrefCount": 0,
+    "uniqueDetailHrefCount": 0,
+    "detailPathSHA256": "5a1c5e116dfcb57a3eefc2e2cef2f6655b66b9926b66cbc998dd3a49e2b20aa3"
+  },
+  {
+    "cta": [],
+    "emptyText": [],
+    "h1": [
+      "스포츠 대회"
+    ],
+    "labelledby": "tournament-list-heading",
+    "resolvedName": "대회 목록",
+    "status": "all",
+    "utc": "2026-10-03T13:29:20.775Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-result-browser-back-same-list",
+    "runtimeServingSHA": "unknown",
+    "sourceURLSHA256": "dd523518986865164c2ae135b827b90d550499130ef1a69ffbbaa45e4ddc0aa9",
+    "pathTemplate": "/tournaments",
+    "query": {},
+    "detailHrefSHA256s": [
+      "5a1c5e116dfcb57a3eefc2e2cef2f6655b66b9926b66cbc998dd3a49e2b20aa3",
+      "7fcc319c5d9a525ee0463961f04f089c6b594696833e2d351a2b9341d6a2d879",
+      "f707030984570803fe00595b3fb2812f331b578734ddbb15a25753e8aedfc77d",
+      "ba4d674348c28214034bfe106ca90a5ee21d189ec25a64679e5b4d64f2f78e28",
+      "c57538e181606c8d679d6071e46dd3c174688e54b7c3f967dab7c4857d09d060",
+      "1e96cd690e6664257d86ae59e21321561467cc21a4a644debbaba38b300dcb71",
+      "b2707a07ac0c935803e55ce3b0ea9857e2a6b5e12a7a175761bd97d8590e080a",
+      "a1e2aa774cb00f25b354820441cd04ee1c20b5ec5053c7f834cda6c84ed8ebc9",
+      "205660cebbb1232594edb4d40590e014bfe8596968f72ec7b027caeccefbb834",
+      "2cd53c23882a783f57f97d17382857d09a46074bd321c41e1df7708d498de271",
+      "352ccb5b4423da5a1ea5d587ddfb4740f8535a73ceb966ba4d3af67eb90f0443",
+      "a628e78e4c2d73323a8d37a4b8e00775d05f69dbda39e77e8460904f870f95fb",
+      "fc258fe3f959202d966edb2584ccf09a5718a1a7c7981ed4ad147ec607b1a1bd",
+      "4529654cc96861c8f17362f5ec151def33fea240fc71a82fb43ae1d2da3dd254",
+      "7a20ef624fc2d6ba8cd3b7bf5d6319e84763213eb55029e58a1851ba5f35d895",
+      "d4a1b58191155c75f39805f2b6afa515fb1ddb8deda973d8bc360d5d91a91c12",
+      "b805964bcab400bec7c59826ade2630c1ef916e3155c9061099454007c14f3fa",
+      "a963b70454418b7486b35b02686ee8fbb1ba788b2896bcd4ad1239df39d212cb",
+      "31bcb808954a3cd39a26ff07945fb42331a56526b1911b6552ce0e10728c6145",
+      "6226e753af801157b2ec61306fd3142276eb19e99a46f4a8637e540234a83540"
+    ],
+    "detailHrefCount": 20,
+    "uniqueDetailHrefCount": 20
+  }
+]

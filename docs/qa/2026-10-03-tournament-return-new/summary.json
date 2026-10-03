@@ -1,0 +1,50 @@
+{
+  "scope": "Issue1543 new mobile all-status empty/result list name and two navigation round trips",
+  "cohort": "post-reset-20261003-1322",
+  "observationUTC": [
+    "2026-10-03T13:26:05.486Z",
+    "2026-10-03T13:29:20.775Z"
+  ],
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "scrollWidth": 404,
+    "width": 404
+  },
+  "runtimeServingSHA": "unknown",
+  "records": 8,
+  "collectorActionCalls": 6,
+  "roundTrips": 2,
+  "results": {
+    "listResolvedName": "대회 목록",
+    "listNameRows": [
+      0,
+      1,
+      3,
+      4,
+      5,
+      7
+    ],
+    "filteredResultHrefCount": 0,
+    "CTA": "팀밋 대회 보기",
+    "CTADestination": "/events",
+    "filteredURLRestored": true,
+    "resetAndReturnCount": 20,
+    "uniqueResultHrefCount": 20,
+    "orderedHrefsUnchangedAfterDetail": true,
+    "detailMatchesFirstResult": true
+  },
+  "images": 2,
+  "serverWriteActionsPerformed": 0,
+  "writeCountBasis": "Collector report, not a network or persistence audit",
+  "limits": [
+    "Mobile404×606 only, not old405px/402px observations or other widths.",
+    "New observation; does not reconstruct lost files or replace prior timestamps.",
+    "Source emptyText arrays are all empty because a limited descendant selector was used; empty-state wording is supported by PNG pixels, not this field.",
+    "Destination rows2 and6 have no list labelledby/resolvedName; empty href arrays there are not zero-result-list findings.",
+    "Resolved DOM name is not an AX snapshot or screen-reader test.",
+    "Screenshot capture bounds differ from DOM observation and action call bounds.",
+    "Tool-call times and action execution are collector reports; not independent browser event timestamps.",
+    "No whole issue/app PASS, registration or result mutation, focus/scroll restoration, or other statuses asserted."
+  ]
+}

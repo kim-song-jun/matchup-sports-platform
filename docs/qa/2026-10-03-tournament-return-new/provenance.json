@@ -1,0 +1,114 @@
+{
+  "createdUTC": "2026-10-03T13:29:55.299353+00:00",
+  "scope": "Two current-run mobile screenshots, plain crops only; original source remains private",
+  "crops": [
+    {
+      "file": "1543-empty-cta.png",
+      "sourceSHA256": "c45e976728df8cb302cdb7f73f6381c31bf65579ab47289cb8ac82d2ff832261",
+      "outputSHA256": "0951b9896968b01bbd15127f7f1883bd9e888ed2263fd8cc92fecc416f696957",
+      "sourceSize": [
+        404,
+        606
+      ],
+      "cropBox": [
+        69,
+        187,
+        340,
+        322
+      ],
+      "outputSize": [
+        271,
+        135
+      ],
+      "captureMetadata": {
+        "file": "1543-empty-cta.png",
+        "startedUTC": "2026-10-03T13:26:05.557Z",
+        "completedUTC": "2026-10-03T13:26:05.576Z",
+        "domUTC": "2026-10-03T13:26:05.552Z",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 404,
+          "width": 404
+        },
+        "sourceURLSHA256": "3cf85d29e48fe745e5ae1d8f97267564ab2579ea7b8c276ec8c345f9bcfdc529"
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "1543-result-card.png",
+      "sourceSHA256": "65052bce7aa4efdc2cff905bf640886a1d488a78097813aa163a2d611c71aaa8",
+      "outputSHA256": "f9abb1355e91ebbc648cf4ecfbe406098973df67c576d2299d25e4cb84c83145",
+      "sourceSize": [
+        404,
+        606
+      ],
+      "cropBox": [
+        24,
+        141,
+        375,
+        298
+      ],
+      "outputSize": [
+        351,
+        157
+      ],
+      "captureMetadata": {
+        "file": "1543-result-card.png",
+        "startedUTC": "2026-10-03T13:28:14.567Z",
+        "completedUTC": "2026-10-03T13:28:14.589Z",
+        "domUTC": "2026-10-03T13:28:14.564Z",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 404,
+          "width": 404
+        },
+        "sourceURLSHA256": "dd523518986865164c2ae135b827b90d550499130ef1a69ffbbaa45e4ddc0aa9"
+      },
+      "collectorPixelEquality": true
+    }
+  ],
+  "safeProofHashes": {
+    "1543-tournament-proof.json": "bb6753e599092968edb44586c8ec7ef4bbbeaa7ded2b3ca20f5da3b1b3268c02",
+    "1543-tournament-actions.json": "db01bd5386ec5ce9a39a047640a24f933a58b5ab6db6ce184147639f9e539274",
+    "1543-tournament-summary.json": "f1f29872e5fdd5e4fd53a36520b2ca7944481512c3719d6298005523a4fcc04f"
+  },
+  "limits": [
+    "DOM UTC and screenshot capture bounds are distinct.",
+    "Pixel equality is collector validation; publisher independent checks remain separate."
+  ],
+  "finalizedUTC": "2026-10-03T13:31:28.935Z",
+  "priorProofHashSnapshots": [
+    {
+      "file": "1543-tournament-summary.json",
+      "sha256": "ef449500fbb324d3aa25f8a70af905735fa6e1bd2a5b60e12c9d777258277212",
+      "snapshotUTC": "not separately recorded",
+      "reason": "Original provenance snapshot before adding the emptyText selector limitation; PNGs, source hashes, proof DOM rows and capture times did not change."
+    }
+  ],
+  "currentSummaryHashReason": "Current hash includes only the appended limitation explaining that emptyText selected p/h2/h3; empty wording is supported by PNG, not this empty array.",
+  "sourceInputFiles": [
+    {
+      "file": "1543-tournament-proof.json",
+      "sha256": "bb6753e599092968edb44586c8ec7ef4bbbeaa7ded2b3ca20f5da3b1b3268c02",
+      "bytes": 7948
+    },
+    {
+      "file": "1543-tournament-actions.json",
+      "sha256": "db01bd5386ec5ce9a39a047640a24f933a58b5ab6db6ce184147639f9e539274",
+      "bytes": 1011
+    },
+    {
+      "file": "1543-tournament-summary.json",
+      "sha256": "f1f29872e5fdd5e4fd53a36520b2ca7944481512c3719d6298005523a4fcc04f",
+      "bytes": 1697
+    },
+    {
+      "file": "1543-tournament-provenance.json",
+      "sha256": "82042e232fd74ec134d14682ef301ea3690835d636aaf70d525822da0138d18d",
+      "bytes": 3184
+    }
+  ],
+  "publisherReview": "Safe crop pixels viewed, SHA256 and PNG dimensions verified, crop bounds validated, DOM/capture timestamp and viewport mapping checked. Original-to-crop equality is collector-reported."
+}

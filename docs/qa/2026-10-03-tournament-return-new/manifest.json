@@ -1,0 +1,46 @@
+{
+  "files": [
+    {
+      "file": "1543-empty-cta.png",
+      "bytes": 26486,
+      "sha256": "0951b9896968b01bbd15127f7f1883bd9e888ed2263fd8cc92fecc416f696957"
+    },
+    {
+      "file": "1543-result-card.png",
+      "bytes": 41434,
+      "sha256": "f9abb1355e91ebbc648cf4ecfbe406098973df67c576d2299d25e4cb84c83145"
+    },
+    {
+      "file": "README.md",
+      "bytes": 2470,
+      "sha256": "04045bb1360838170e4b4f9de38e81615c828e47f817a99ba949fc74d28cb988"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 1054,
+      "sha256": "58403572eafc1d8b3525fc710a27680273b86b6028b75c6896f92eaaaed3cbb4"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 10351,
+      "sha256": "035090b3eee6a298481bad0cab468dbed71662e0ff0c90fbf41fd60704b8315a"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 4008,
+      "sha256": "89f15df1d367ece041a9ff8ee88b56feaae9255405a346a8d463c0fde973d28a"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 1829,
+      "sha256": "33f9b6b61b57581add740fbbea4ff95e4df6b466913bd614df8a1c86c179cd19"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 1432,
+      "sha256": "534e922dde7a5a85321a7e2e14c32bc11f927ee9a95539adecb6e9a4ba793f07"
+    }
+  ],
+  "hashAlgorithm": "SHA-256",
+  "manifestSelfExcluded": true
+}

@@ -1,0 +1,54 @@
+{
+  "recordCount": 8,
+  "uniqueTimes": 8,
+  "CSSWidth": 404,
+  "zeroBasedListRows": [
+    0,
+    1,
+    3,
+    4,
+    5,
+    7
+  ],
+  "listResolvedNameCorrect": true,
+  "destinationRowsWithoutList": [
+    2,
+    6
+  ],
+  "filteredListSameURLRows": [
+    0,
+    1,
+    3
+  ],
+  "detailHrefCountsByRow": [
+    0,
+    0,
+    0,
+    0,
+    20,
+    20,
+    0,
+    20
+  ],
+  "orderedEqualityRows": [
+    4,
+    5,
+    7
+  ],
+  "uniqueHrefCountEach": 20,
+  "orderedSequenceSHA256": "c2e09974b84f71337a4f9f829295b1be9348a23c811361ae64dc14c28756cb82",
+  "sequenceHashMethod": "SHA256 over UTF-8 compact JSON original ordered href array; no trailing newline",
+  "firstHrefMatchesDetail": true,
+  "CTAExactDestination": true,
+  "allActionBoundsBetweenRelevantDOMEndpoints": true,
+  "actualSafePixelsViewed": [
+    "1543-empty-cta.png",
+    "1543-result-card.png"
+  ],
+  "pixelFindings": [
+    "Empty crop visibly contains the neutral empty title, helper copy and 팀밋 대회 보기 CTA.",
+    "Result crop contains a synthetic QA title, 진행 중 badge, 풋살, 성별 구분 없음, date and mock venue; no person or contact data."
+  ],
+  "pixelLimit": "Publisher views only safe crops. Original-to-crop equality is collector-attested, not independently repeated.",
+  "privacyProjection": "Opaque sportId/fixture routes are hashes; synthetic product title/copy remains. No personal names, contacts, credentials or account fields found."
+}

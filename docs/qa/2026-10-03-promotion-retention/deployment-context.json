@@ -1,0 +1,20 @@
+{
+  "source": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37143395492",
+  "metadataSource": "https://api.github.com/repos/kim-song-jun/matchup-sports-platform/actions/runs/37143395492",
+  "commit": "27a021fc7650672d5af25217108b101dc856c8d5",
+  "status": "completed",
+  "conclusion": "success",
+  "runUpdatedUTC": "2026-10-03T18:31:28Z",
+  "jobStartedUTC": "2026-10-03T18:13:41Z",
+  "jobCompletedUTC": "2026-10-03T18:31:27Z",
+  "publicIdentityStep": [
+    {
+      "name": "Verify public alpha release identity",
+      "conclusion": "success",
+      "started_at": "2026-10-03T18:30:56Z",
+      "completed_at": "2026-10-03T18:30:56Z"
+    }
+  ],
+  "runtimeServingSHA": "unknown",
+  "limit": "Workflow metadata establishes a deployment time boundary, not the identity of the browser document or its assets."
+}

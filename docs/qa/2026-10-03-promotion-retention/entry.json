@@ -1,0 +1,10 @@
+{
+  "startUTC": "2026-10-03T19:18:26.376Z",
+  "requestedURL": "https://alpha.teameet.co.kr/admin/tournaments/new",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown"
+  },
+  "runtimeServingSHA": "unknown",
+  "endUTC": "2026-10-03T19:18:26.927Z"
+}

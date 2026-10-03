@@ -1,0 +1,19 @@
+{
+  "fields": [
+    {
+      "id": "sport-id",
+      "value": ""
+    },
+    {
+      "id": "title",
+      "value": ""
+    }
+  ],
+  "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+  "utc": "2026-10-03T19:18:57.556Z",
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "width": 402
+  }
+}

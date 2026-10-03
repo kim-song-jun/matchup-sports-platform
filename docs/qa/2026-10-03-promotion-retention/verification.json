@@ -1,0 +1,243 @@
+{
+  "verifiedUTC": "2026-10-03T19:31:52.130287+00:00",
+  "method": "Read-only artifact/source verification; no new browser run",
+  "counts": {
+    "currentViewports": 1,
+    "currentListTitleValuesExercised": 1,
+    "currentHomeRetentionRuns": 0,
+    "DOMProofRows": 7,
+    "selectedActionRecords": 23,
+    "safePNGs": 5,
+    "historicalPublicImagesReadButNotRepublished": 4
+  },
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "width": 402
+  },
+  "sequence": [
+    {
+      "proofIndex": 0,
+      "utc": "2026-10-03T19:20:35.154Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "titleValue": "",
+      "titleUnavailableWhenUnmounted": false,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 1,
+      "utc": "2026-10-03T19:20:35.276Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "titleValue": "QA 목록 보존 1919",
+      "titleUnavailableWhenUnmounted": false,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 2,
+      "utc": "2026-10-03T19:20:35.642Z",
+      "listEnabled": "false",
+      "listSummary": "꺼짐 · 입력한 항목 1개 보관 중",
+      "mountedFieldCount": 0,
+      "titleValue": null,
+      "titleUnavailableWhenUnmounted": true,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 3,
+      "utc": "2026-10-03T19:20:55.730Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "titleValue": "QA 목록 보존 1919",
+      "titleUnavailableWhenUnmounted": false,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 4,
+      "utc": "2026-10-03T19:20:56.878Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "titleValue": "QA 목록 보존 1919",
+      "titleUnavailableWhenUnmounted": false,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 5,
+      "utc": "2026-10-03T19:21:57.840Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "titleValue": "",
+      "titleUnavailableWhenUnmounted": false,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    },
+    {
+      "proofIndex": 6,
+      "utc": "2026-10-03T19:21:58.177Z",
+      "listEnabled": "false",
+      "listSummary": "꺼짐",
+      "mountedFieldCount": 0,
+      "titleValue": null,
+      "titleUnavailableWhenUnmounted": true,
+      "homeOff": true,
+      "homeMountedFields": 0,
+      "step5Disabled": true
+    }
+  ],
+  "exactTitleProofIndices": [
+    1,
+    3,
+    4
+  ],
+  "exactTitle": "QA 목록 보존 1919",
+  "initial9Values": {
+    "카드 제목": "",
+    "배지": "",
+    "소개 문구": "",
+    "날짜 문구": "10월 17일 (토)",
+    "강조 문구": "",
+    "장소 문구": "",
+    "상금 문구": "",
+    "노출 우선순위": "0",
+    "홍보 이미지": ""
+  },
+  "all9RestoredAtProof5": true,
+  "other8ValuesUnchangedAcrossMountedStates": true,
+  "stepAway": {
+    "promoSwitchCount": 0,
+    "stepHeading": [
+      "참가 조건"
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T19:20:56.112Z"
+  },
+  "finalExit": {
+    "promotionSwitches": 0,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T19:21:58.930Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "wizardTitlePresent": false
+  },
+  "images": [
+    {
+      "file": "list-on-entered.png",
+      "proofIndex": 1,
+      "domUTC": "2026-10-03T19:20:35.276Z",
+      "captureStartedUTC": "2026-10-03T19:20:35.281Z",
+      "captureCompletedUTC": "2026-10-03T19:20:35.303Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        327,
+        271
+      ],
+      "safeSHA256": "ce1d53d55edf4a692896f506888007e40ee8aee7983a5251cb7a4aa4e1dafc77"
+    },
+    {
+      "file": "list-off-retained.png",
+      "proofIndex": 2,
+      "domUTC": "2026-10-03T19:20:35.642Z",
+      "captureStartedUTC": "2026-10-03T19:20:35.645Z",
+      "captureCompletedUTC": "2026-10-03T19:20:35.670Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        327,
+        149
+      ],
+      "safeSHA256": "41bbe30b71dfd664f4f85a4f01892e440ca2e18fe7867623853898a4231535ec"
+    },
+    {
+      "file": "list-reenabled-retained.png",
+      "proofIndex": 3,
+      "domUTC": "2026-10-03T19:20:55.730Z",
+      "captureStartedUTC": "2026-10-03T19:20:55.736Z",
+      "captureCompletedUTC": "2026-10-03T19:20:55.756Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        327,
+        304
+      ],
+      "safeSHA256": "cc0fb5c75bcf87a32ffaf099aef3d2a87dd280aeb301daf7a2cd172259c3b350"
+    },
+    {
+      "file": "list-stepper-retained.png",
+      "proofIndex": 4,
+      "domUTC": "2026-10-03T19:20:56.878Z",
+      "captureStartedUTC": "2026-10-03T19:20:56.887Z",
+      "captureCompletedUTC": "2026-10-03T19:20:56.913Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        327,
+        304
+      ],
+      "safeSHA256": "e7774a3cd8326f772da779f3bb74c4b1de818e572a73e3793a2d2b9ca10e8c03"
+    },
+    {
+      "file": "both-off-restored.png",
+      "proofIndex": 6,
+      "domUTC": "2026-10-03T19:21:58.177Z",
+      "captureStartedUTC": "2026-10-03T19:21:58.184Z",
+      "captureCompletedUTC": "2026-10-03T19:21:58.202Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        327,
+        149
+      ],
+      "safeSHA256": "5deb90f11952f4dda11f2a8133012d8c326784e49e09f9a310ec82f9a3944855"
+    }
+  ],
+  "historicalReport": {
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/pull/1492#issuecomment-5941415210",
+    "postedUTC": "2026-10-01T21:53:17Z",
+    "updatedUTC": "2026-10-01T21:53:17Z",
+    "observedClaim": "Original report describes entered title retained through OFF/ON, with three OFF images and one mobile ON image. It supplies no exact entered value or per-action timestamps."
+  },
+  "staticFunctionComparisons": [
+    {
+      "function": "export function tournamentCreateReducer",
+      "identical": true,
+      "UTF8SHA256": "ddafdf66136b9ed3d8d836bc2b74a9254dbebacdbb2db54d63f98d8e8a8e9de6"
+    },
+    {
+      "function": "function withPromoValue",
+      "identical": true,
+      "UTF8SHA256": "031a011825ce77bae23c75a6bf3dbe2778b22098dbc5c80dce9504c9d9964475"
+    }
+  ],
+  "runtimeServingSHA": "unknown"
+}

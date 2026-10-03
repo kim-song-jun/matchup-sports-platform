@@ -1,0 +1,95 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 9328,
+      "sha256": "4feddc38098dd3e31dad29e96c918c66badd4025ec9ed01a42ee5cade3309db7"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 3723,
+      "sha256": "a94515d738bfcd72b6911fca700cc1e33c8ffe3e95b2d08c17757f54968cdc78"
+    },
+    {
+      "file": "both-off-restored.png",
+      "bytes": 18254,
+      "sha256": "5deb90f11952f4dda11f2a8133012d8c326784e49e09f9a310ec82f9a3944855"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 831,
+      "sha256": "57432ed05aa5ad0fe62217394d2f4fb59138cac441e00dd5c5903f593994d67f"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 299,
+      "sha256": "73b25630658202f91e9cb441b829a44dc74bc3006ca496f78c62f075175d0b63"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 587,
+      "sha256": "3d6affb944ef98b217330a6610fa29f19567a66da8fe987e23c9461bf15c6876"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 300,
+      "sha256": "64dfd4fa510fd6422b358d53bae4d4bf75842788e19d5c90f2fb8128639ffbe6"
+    },
+    {
+      "file": "list-off-retained.png",
+      "bytes": 23427,
+      "sha256": "41bbe30b71dfd664f4f85a4f01892e440ca2e18fe7867623853898a4231535ec"
+    },
+    {
+      "file": "list-on-entered.png",
+      "bytes": 53984,
+      "sha256": "ce1d53d55edf4a692896f506888007e40ee8aee7983a5251cb7a4aa4e1dafc77"
+    },
+    {
+      "file": "list-reenabled-retained.png",
+      "bytes": 59865,
+      "sha256": "cc0fb5c75bcf87a32ffaf099aef3d2a87dd280aeb301daf7a2cd172259c3b350"
+    },
+    {
+      "file": "list-stepper-retained.png",
+      "bytes": 59414,
+      "sha256": "e7774a3cd8326f772da779f3bb74c4b1de818e572a73e3793a2d2b9ca10e8c03"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 443,
+      "sha256": "a108adc5248f8ad84f1e43b21f46a5b982aab7f5c0df33c035b672da967d12d2"
+    },
+    {
+      "file": "prior-evidence-and-contract.json",
+      "bytes": 8495,
+      "sha256": "7fa25aa70ebe2336a3225b3ae77843f391efd331f72e4d6710dec00da453d28a"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 23914,
+      "sha256": "ddb045c9dc58cb63c9e1dbf6dc5053750b253cc80e3e9a579cd2637b854beed0"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 7266,
+      "sha256": "074eee4e7adac59b6fe83b2786806651e7116c00ff87fe4be34867db1c7008cd"
+    },
+    {
+      "file": "step-away.json",
+      "bytes": 170,
+      "sha256": "7d7fadb872a1d0c6eadfcb3b900db1aed0a5c1a37f11aea3040e542cda8900a3"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4908,
+      "sha256": "0211d65e8705cd255ee7a94eed31cea346d6000a9d3afcdb6f5ed3cf54696363"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 7085,
+      "sha256": "123bd752323d69c49e02088df1eda1c4058d65d198dec0870e8a19bcd41d8c92"
+    }
+  ],
+  "note": "Public-file SHA256 values; this manifest excludes its own hash. Original safe source snapshot hashes are separately retained in provenance.json."
+}

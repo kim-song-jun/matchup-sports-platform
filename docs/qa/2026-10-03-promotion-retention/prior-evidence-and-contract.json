@@ -1,0 +1,150 @@
+{
+  "issue": 1439,
+  "priorHomeReport": {
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/pull/1492#issuecomment-5941415210",
+    "commentPostedUTC": "2026-10-01T21:53:17Z",
+    "reportedCommit": "c2c1501f3870e8544bf65f8df1f07f721c195d5c",
+    "claim": "Original QA report says a title was entered, OFF showed one retained item, and turning ON retained it.",
+    "imagesBase": "https://github.com/kim-song-jun/matchup-sports-platform/blob/b772e9b6eb077ac9286a054c527fbb6b57789a8f/.screenshots/alpha-qa-1001/",
+    "imageFiles": [
+      "1492-promo-off-390.png",
+      "1492-promo-off-768.png",
+      "1492-promo-off-1440.png",
+      "1492-promo-on-390.png"
+    ],
+    "independentPixelScope": "OFF images show one retained item for Home, simple OFF for List. ON390 shows Home preview text but the actual title input is outside the image, so exact input value versus fallback is unresolved.",
+    "limits": [
+      "No per-action UTC or exact entered string in the old comment.",
+      "No per-card/per-width exact-value retention matrix or DOM/action JSON.",
+      "Prior Home retention report is reused as a historical report, not a new27a021 execution."
+    ],
+    "publisherVerification": {
+      "comment": {
+        "url": "https://github.com/kim-song-jun/matchup-sports-platform/pull/1492#issuecomment-5941415210",
+        "postedUTC": "2026-10-01T21:53:17Z",
+        "updatedUTC": "2026-10-01T21:53:17Z",
+        "observedClaim": "Original report describes entered title retained through OFF/ON, with three OFF images and one mobile ON image. It supplies no exact entered value or per-action timestamps."
+      },
+      "images": [
+        {
+          "file": "1492-promo-off-390.png",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/b772e9b6eb077ac9286a054c527fbb6b57789a8f/.screenshots/alpha-qa-1001/1492-promo-off-390.png",
+          "gitBlobSHA": "f00597431371b0861248cfe6da28a19d89313d5e",
+          "sha256": "735caa2ee50b38549c3690d0882e3cf1b5f18bb0647367b6e5d6a85c019e531b",
+          "rasterPixels": [
+            390,
+            844
+          ],
+          "inspection": "Home retained-one summary visible; List plain OFF."
+        },
+        {
+          "file": "1492-promo-off-768.png",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/b772e9b6eb077ac9286a054c527fbb6b57789a8f/.screenshots/alpha-qa-1001/1492-promo-off-768.png",
+          "gitBlobSHA": "dbaaa78a4437146f76caa5c5a4a501625a2a3a4c",
+          "sha256": "eb03bd3b661e100428afc73713102dc76663759ad3485202ca45ad53b8cbdd77",
+          "rasterPixels": [
+            768,
+            1024
+          ],
+          "inspection": "Home retained-one summary visible; List plain OFF."
+        },
+        {
+          "file": "1492-promo-off-1440.png",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/b772e9b6eb077ac9286a054c527fbb6b57789a8f/.screenshots/alpha-qa-1001/1492-promo-off-1440.png",
+          "gitBlobSHA": "a8963bbd4f5c4d8b0fbe150dd7b39ef3e8d39111",
+          "sha256": "b6281c0f6f6ad68fbf3e328720cbbe1493d5e441f61f0893d6eda0824cc98cee",
+          "rasterPixels": [
+            1440,
+            600
+          ],
+          "inspection": "Home retained-one summary visible; List plain OFF."
+        },
+        {
+          "file": "1492-promo-on-390.png",
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/b772e9b6eb077ac9286a054c527fbb6b57789a8f/.screenshots/alpha-qa-1001/1492-promo-on-390.png",
+          "gitBlobSHA": "9f32ee810f4fc7f16183ba2d07a2a64ba0d682c6",
+          "sha256": "5bae648ff7b2202fe4c54ba143a82cfe7f27f6ec60ac952d6acb2907351c0de6",
+          "rasterPixels": [
+            390,
+            844
+          ],
+          "inspection": "Home preview text visible, actual custom-title input outside image. Exact input versus fallback cannot be established from this image."
+        }
+      ],
+      "currentRunsAdded": 0,
+      "limits": [
+        "Comment is a historical reported result with no exact entered string or per-action UTC.",
+        "Three historical OFF images do not establish three complete value-retention runs.",
+        "No old image is republished in this evidence tree."
+      ]
+    }
+  },
+  "currentSourceContract": {
+    "commit": "27a021fc7650672d5af25217108b101dc856c8d5",
+    "paths": [
+      "apps/v1_web/src/components/admin/tournaments/promo-card-fields.tsx",
+      "apps/v1_web/src/app/admin/tournaments/new/page.tsx",
+      "apps/v1_web/src/app/admin/tournaments/new/tournament-create-model.ts",
+      "apps/v1_web/src/lib/query-persist.ts"
+    ],
+    "localChange": "In the inspected component, text/toggle updates spread the previous value; the creation-page callback dispatches set-promo; reducer/withPromoValue update local state. No autosave or localStorage write occurs in those inspected update bodies. This is bounded static source evidence, not runtime network/storage inspection.",
+    "globalStorageLimit": "Application query persistence does use localStorage, with admin/auth/me queries and mutations excluded. Do not claim global storage is absent.",
+    "mutationBoundaries": [
+      "The inspected form submit handler calls create or update mutations; neither was activated in this QA run according to the collector. Exact HTTP methods are not asserted by this publisher source check.",
+      "Image selection invokes an upload mutation before final save; no image selection was exercised.",
+      "Start-registration invokes a separate status mutation after confirmation; this was not exercised."
+    ],
+    "comparison": "Immutable c2c1501f→27a021 promo-card-fields difference is toggle visual markup; value spread/update/collapse behavior unchanged. Reducer and withPromoValue text unchanged.",
+    "verification": {
+      "sourceRefs": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/27a021fc7650672d5af25217108b101dc856c8d5/apps/v1_web/src/components/admin/tournaments/promo-card-fields.tsx",
+          "gitBlobSHA": "63e897bd2ebd71937acfdfe71ac6baad558b6b8f"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/27a021fc7650672d5af25217108b101dc856c8d5/apps/v1_web/src/app/admin/tournaments/new/page.tsx",
+          "gitBlobSHA": "a8d60be018c9a0e090620b4a2c1d173947490d18"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/27a021fc7650672d5af25217108b101dc856c8d5/apps/v1_web/src/app/admin/tournaments/new/tournament-create-model.ts",
+          "gitBlobSHA": "46a610c5fc158732637a7831728fbdce52ead280"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/27a021fc7650672d5af25217108b101dc856c8d5/apps/v1_web/src/lib/query-persist.ts",
+          "gitBlobSHA": "8e2ae6efdad84228dcce74c6679f784ddc90a664"
+        }
+      ],
+      "historicSourceRefs": [
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/c2c1501f3870e8544bf65f8df1f07f721c195d5c/apps/v1_web/src/components/admin/tournaments/promo-card-fields.tsx",
+          "gitBlobSHA": "ea25c0bad830952ae9839e01c828b4977352f07c"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/c2c1501f3870e8544bf65f8df1f07f721c195d5c/apps/v1_web/src/app/admin/tournaments/new/page.tsx",
+          "gitBlobSHA": "c139cc351709939d761704eafb4329463a22be2c"
+        },
+        {
+          "url": "https://github.com/kim-song-jun/matchup-sports-platform/blob/c2c1501f3870e8544bf65f8df1f07f721c195d5c/apps/v1_web/src/app/admin/tournaments/new/tournament-create-model.ts",
+          "gitBlobSHA": "2fce4dc9577ed7b59d6c031704c98eb65bbf26b5"
+        }
+      ],
+      "functions": [
+        {
+          "function": "export function tournamentCreateReducer",
+          "identical": true,
+          "UTF8SHA256": "ddafdf66136b9ed3d8d836bc2b74a9254dbebacdbb2db54d63f98d8e8a8e9de6"
+        },
+        {
+          "function": "function withPromoValue",
+          "identical": true,
+          "UTF8SHA256": "031a011825ce77bae23c75a6bf3dbe2778b22098dbc5c80dce9504c9d9964475"
+        }
+      ],
+      "promoCardDiff": "Only toggle visual markup differs between the two immutable files; update/fold/kept-count logic is unchanged.",
+      "limitations": [
+        "No provider-wide or whole-application absence audit.",
+        "Static source commit is not verified browser runtime identity."
+      ]
+    }
+  }
+}

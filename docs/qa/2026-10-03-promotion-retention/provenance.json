@@ -1,0 +1,207 @@
+{
+  "captureMetadataSHA256": "56717e1c3850499dafefda848fd3ddcb9a8016d0a0476f3e30772ef3de897cb9",
+  "crops": [
+    {
+      "name": "list-on-entered",
+      "proofIndex": 1,
+      "startUTC": "2026-10-03T19:20:35.281Z",
+      "endUTC": "2026-10-03T19:20:35.303Z",
+      "sourceFile": "list-on-entered.png",
+      "sourceSHA256": "9725fda5a4c2cfe43c7d60011181bf889046087de871878b93558d6cce8f2469",
+      "bounds": [
+        38,
+        52,
+        365,
+        323
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        327,
+        271
+      ],
+      "outputFile": "list-on-entered.png",
+      "outputSHA256": "ce1d53d55edf4a692896f506888007e40ee8aee7983a5251cb7a4aa4e1dafc77",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T19:20:35.276Z"
+    },
+    {
+      "name": "list-off-retained",
+      "proofIndex": 2,
+      "startUTC": "2026-10-03T19:20:35.645Z",
+      "endUTC": "2026-10-03T19:20:35.670Z",
+      "sourceFile": "list-off-retained.png",
+      "sourceSHA256": "998faf08378bd5704202bc2301cfae2db41844facef058d603f58a903a9e77e5",
+      "bounds": [
+        38,
+        303,
+        365,
+        452
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        327,
+        149
+      ],
+      "outputFile": "list-off-retained.png",
+      "outputSHA256": "41bbe30b71dfd664f4f85a4f01892e440ca2e18fe7867623853898a4231535ec",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T19:20:35.642Z"
+    },
+    {
+      "name": "list-reenabled-retained",
+      "proofIndex": 3,
+      "startUTC": "2026-10-03T19:20:55.736Z",
+      "endUTC": "2026-10-03T19:20:55.756Z",
+      "sourceFile": "list-reenabled-retained.png",
+      "sourceSHA256": "4d478b6f344f380a453f26f37982e5ac7dabd5d44b27010b9baea90d5e2368cc",
+      "bounds": [
+        38,
+        55,
+        365,
+        359
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        327,
+        304
+      ],
+      "outputFile": "list-reenabled-retained.png",
+      "outputSHA256": "cc0fb5c75bcf87a32ffaf099aef3d2a87dd280aeb301daf7a2cd172259c3b350",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T19:20:55.730Z"
+    },
+    {
+      "name": "list-stepper-retained",
+      "proofIndex": 4,
+      "startUTC": "2026-10-03T19:20:56.887Z",
+      "endUTC": "2026-10-03T19:20:56.913Z",
+      "sourceFile": "list-stepper-retained.png",
+      "sourceSHA256": "4a82412b3d47e3df2538982e3f4e7d01b81141e4b1245cd07de095efd72fb89b",
+      "bounds": [
+        38,
+        55,
+        365,
+        359
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        327,
+        304
+      ],
+      "outputFile": "list-stepper-retained.png",
+      "outputSHA256": "e7774a3cd8326f772da779f3bb74c4b1de818e572a73e3793a2d2b9ca10e8c03",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T19:20:56.878Z"
+    },
+    {
+      "name": "both-off-restored",
+      "proofIndex": 6,
+      "startUTC": "2026-10-03T19:21:58.184Z",
+      "endUTC": "2026-10-03T19:21:58.202Z",
+      "sourceFile": "both-off-restored.png",
+      "sourceSHA256": "81369fa3c17fca37cc270fa718d34ab9d341b99b3d8d99730b6219790a26d400",
+      "bounds": [
+        38,
+        303,
+        365,
+        452
+      ],
+      "sourceSize": [
+        402,
+        605
+      ],
+      "outputSize": [
+        327,
+        149
+      ],
+      "outputFile": "both-off-restored.png",
+      "outputSHA256": "5deb90f11952f4dda11f2a8133012d8c326784e49e09f9a310ec82f9a3944855",
+      "sourceHashVerified": true,
+      "collectorPixelEquality": true,
+      "proofUTC": "2026-10-03T19:21:58.177Z"
+    }
+  ],
+  "safeJSONHashes": {
+    "actions.json": "a94515d738bfcd72b6911fca700cc1e33c8ffe3e95b2d08c17757f54968cdc78",
+    "entry.json": "b93c70de4bac1ee2d07863f737209b9471ad74b7073dedf4aa104f257e33b495",
+    "exit.json": "3d6affb944ef98b217330a6610fa29f19567a66da8fe987e23c9461bf15c6876",
+    "initial.json": "64dfd4fa510fd6422b358d53bae4d4bf75842788e19d5c90f2fb8128639ffbe6",
+    "navigation.json": "a108adc5248f8ad84f1e43b21f46a5b982aab7f5c0df33c035b672da967d12d2",
+    "prior-evidence-and-contract.json": "c8dee20b483bf8b2c7cd4e7378bbf60cb5c3143b8671b64a2f52825eb2271ce2",
+    "proof.json": "ddb045c9dc58cb63c9e1dbf6dc5053750b253cc80e3e9a579cd2637b854beed0",
+    "step-away.json": "7d7fadb872a1d0c6eadfcb3b900db1aed0a5c1a37f11aea3040e542cda8900a3",
+    "summary.json": "b8df0788b2b73df77c94b818cc9c88a12b5e42dfae65bbbe7a32126c496fd318"
+  },
+  "privacy": "Safe crops contain generic promotion controls and synthetic local QA titles; no member/account/roster data or image URLs. Full source screenshots are excluded.",
+  "sourceInputFiles": [
+    {
+      "file": "actions.json",
+      "bytes": 3723,
+      "sha256": "a94515d738bfcd72b6911fca700cc1e33c8ffe3e95b2d08c17757f54968cdc78"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 285,
+      "sha256": "b93c70de4bac1ee2d07863f737209b9471ad74b7073dedf4aa104f257e33b495"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 587,
+      "sha256": "3d6affb944ef98b217330a6610fa29f19567a66da8fe987e23c9461bf15c6876"
+    },
+    {
+      "file": "initial.json",
+      "bytes": 300,
+      "sha256": "64dfd4fa510fd6422b358d53bae4d4bf75842788e19d5c90f2fb8128639ffbe6"
+    },
+    {
+      "file": "navigation.json",
+      "bytes": 443,
+      "sha256": "a108adc5248f8ad84f1e43b21f46a5b982aab7f5c0df33c035b672da967d12d2"
+    },
+    {
+      "file": "prior-evidence-and-contract.json",
+      "bytes": 2359,
+      "sha256": "c8dee20b483bf8b2c7cd4e7378bbf60cb5c3143b8671b64a2f52825eb2271ce2"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 23914,
+      "sha256": "ddb045c9dc58cb63c9e1dbf6dc5053750b253cc80e3e9a579cd2637b854beed0"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 4832,
+      "sha256": "8fd5f7f51b9d4b9a0674ec294796860d5b15c73d59f5aac12150bcef49ce0a77"
+    },
+    {
+      "file": "step-away.json",
+      "bytes": 170,
+      "sha256": "7d7fadb872a1d0c6eadfcb3b900db1aed0a5c1a37f11aea3040e542cda8900a3"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4436,
+      "sha256": "b8df0788b2b73df77c94b818cc9c88a12b5e42dfae65bbbe7a32126c496fd318"
+    }
+  ],
+  "publicationProjection": "Original source inputs unchanged. Entry/summary use independently retrieved workflow context and bounded scope clarifications. Historical/source-contract notes are independently checked and narrowed. Proof/actions/initial/navigation/step-away/exit and five safe PNG bytes unchanged. safeJSONHashes describe original source snapshots; manifest.json covers public bytes.",
+  "publisherReview": "Five current safe images and four already-public historical images viewed. Current output hashes/dimensions/bounds/proof mappings and DOM/action/value comparisons independently checked. Historical images are linked only. Original private screenshots were not opened or published; source-to-crop equality remains collector-attested.",
+  "captureMetadataScopeNote": "Original capture-metadata file was not read here; its recorded digest remains provenance, not independent timestamp verification."
+}

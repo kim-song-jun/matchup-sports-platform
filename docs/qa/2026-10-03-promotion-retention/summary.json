@@ -1,0 +1,130 @@
+{
+  "issue": 1439,
+  "scope": "List promotion custom title retention in local creation step4; prior Home report reused separately",
+  "observedStartUTC": "2026-10-03T19:20:35.154Z",
+  "observedEndUTC": "2026-10-03T19:21:58.930Z",
+  "firstNavigationUTC": "2026-10-03T19:18:26.376Z",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": {
+    "reference": "deployment-context.json",
+    "runtimeServingSHA": "unknown"
+  },
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "width": 402
+  },
+  "sequence": [
+    {
+      "proofIndex": 0,
+      "state": "list-on-initial-blank-title",
+      "utc": "2026-10-03T19:20:35.154Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "title": ""
+    },
+    {
+      "proofIndex": 1,
+      "state": "list-on-title-entered",
+      "utc": "2026-10-03T19:20:35.276Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "title": "QA 목록 보존 1919"
+    },
+    {
+      "proofIndex": 2,
+      "state": "list-off-retention-summary",
+      "utc": "2026-10-03T19:20:35.642Z",
+      "listEnabled": "false",
+      "listSummary": "꺼짐 · 입력한 항목 1개 보관 중",
+      "mountedFieldCount": 0,
+      "title": "UNMOUNTED"
+    },
+    {
+      "proofIndex": 3,
+      "state": "list-reenabled-exact-title-retained",
+      "utc": "2026-10-03T19:20:55.730Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "title": "QA 목록 보존 1919"
+    },
+    {
+      "proofIndex": 4,
+      "state": "stepper-return-list-enabled-title-retained",
+      "utc": "2026-10-03T19:20:56.878Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "title": "QA 목록 보존 1919"
+    },
+    {
+      "proofIndex": 5,
+      "state": "list-title-explicitly-restored-blank",
+      "utc": "2026-10-03T19:21:57.840Z",
+      "listEnabled": "true",
+      "listSummary": "저장 전에 실제 카드 형태를 확인할 수 있어요.",
+      "mountedFieldCount": 9,
+      "title": ""
+    },
+    {
+      "proofIndex": 6,
+      "state": "both-off-no-retained-custom-item",
+      "utc": "2026-10-03T19:21:58.177Z",
+      "listEnabled": "false",
+      "listSummary": "꺼짐",
+      "mountedFieldCount": 0,
+      "title": "UNMOUNTED"
+    }
+  ],
+  "result": "Exact input value QA 목록 보존 1919 is equal before OFF, after ON, and after step4→step3→step4. OFF shows one retained item and unmounts nine text/number fields.",
+  "restoration": {
+    "all9ObservedListValuesMatchInitialAfterTitleCleared": true,
+    "other8FieldsStayedEqual": {
+      "배지": true,
+      "소개 문구": true,
+      "날짜 문구": true,
+      "강조 문구": true,
+      "장소 문구": true,
+      "상금 문구": true,
+      "노출 우선순위": true,
+      "홍보 이미지": true
+    },
+    "homeUntouchedAllRowsOff": true,
+    "finalBothOff": true,
+    "finalBothSummaries": "꺼짐",
+    "wizardTitleSportExplicitlyRestored": "blank; see exit.json",
+    "finalRoute": "/admin/tournaments"
+  },
+  "counts": {
+    "DOMRows": 7,
+    "selectedActionRecords": 23,
+    "safePNGs": 5
+  },
+  "notPerformed": [
+    "Save",
+    "finalCreate",
+    "step5",
+    "Enter",
+    "upload",
+    "publication",
+    "external messaging",
+    "Home value retest",
+    "tablet/desktop value retest",
+    "network/database audit"
+  ],
+  "limitations": [
+    "One representative custom title on List at402px. Does not establish every field/type or each width.",
+    "Home retention relies on bounded historic QA report and images, not current execution or exact-value raw trace.",
+    "OFF fields are unmounted: retained title is established by re-ON input value, not hidden application state inspection.",
+    "Date/time inputs were minimal local navigation data; their strings are not timezone assertions.",
+    "Title/sport and changed promotion text were explicitly restored; local dates were not rechecked after cancelling. UI exit does not directly audit storage.",
+    "Query cache localStorage exists; no global-storage-absence claim.",
+    "Runtime commit not exposed. Deployment context is external evidence.",
+    "The nine fields are mounted DOM records, not nine simultaneously visible fields. Several are outside the viewport; screenshots cover only the titled input/preview and collapsed summaries.",
+    "The input label:null in active metadata does not erase the named field-level input.value evidence. This run is not an accessible-name or keyboard-route audit.",
+    "Dates are not rechecked after Cancel; actual list exit and removal of the wizard are observed, not storage erasure."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "basicRestored": {
+    "fields": [
+      {
+        "id": "sport-id",
+        "value": ""
+      },
+      {
+        "id": "title",
+        "value": ""
+      }
+    ],
+    "step5": [
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "utc": "2026-10-03T19:21:58.667Z"
+  },
+  "exit": {
+    "promotionSwitches": 0,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T19:21:58.930Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "width": 402
+    },
+    "wizardTitlePresent": false
+  }
+}

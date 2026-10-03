@@ -1,0 +1,140 @@
+[
+  {
+    "index": 0,
+    "label": "native mobile resize and125 zoom",
+    "startUTC": "2026-10-03T19:18:51.042Z",
+    "endUTC": "2026-10-03T19:18:57.509Z"
+  },
+  {
+    "index": 1,
+    "label": "select local sport풋살",
+    "startUTC": "2026-10-03T19:18:57.564Z",
+    "endUTC": "2026-10-03T19:18:57.594Z"
+  },
+  {
+    "index": 2,
+    "label": "enter synthetic local wizard title",
+    "startUTC": "2026-10-03T19:18:57.628Z",
+    "endUTC": "2026-10-03T19:18:57.657Z"
+  },
+  {
+    "index": 3,
+    "label": "open schedule step",
+    "startUTC": "2026-10-03T19:18:57.690Z",
+    "endUTC": "2026-10-03T19:18:57.967Z"
+  },
+  {
+    "index": 4,
+    "label": "focus native start date",
+    "startUTC": "2026-10-03T19:18:58.014Z",
+    "endUTC": "2026-10-03T19:18:58.317Z"
+  },
+  {
+    "index": 5,
+    "label": "open visible native date picker",
+    "startUTC": "2026-10-03T19:19:07.603Z",
+    "endUTC": "2026-10-03T19:19:07.701Z"
+  },
+  {
+    "index": 6,
+    "label": "choose October17 then dismiss calendar by heading click",
+    "startUTC": "2026-10-03T19:19:22.965Z",
+    "endUTC": "2026-10-03T19:19:23.407Z"
+  },
+  {
+    "index": 7,
+    "label": "open local step4",
+    "startUTC": "2026-10-03T19:19:23.476Z",
+    "endUTC": "2026-10-03T19:19:23.761Z"
+  },
+  {
+    "index": 8,
+    "label": "focus list promotion switch without toggling yet",
+    "startUTC": "2026-10-03T19:19:23.817Z",
+    "endUTC": "2026-10-03T19:19:24.095Z"
+  },
+  {
+    "index": 9,
+    "label": "enable list promotion locally",
+    "startUTC": "2026-10-03T19:19:43.551Z",
+    "endUTC": "2026-10-03T19:19:43.822Z"
+  },
+  {
+    "index": 10,
+    "label": "enter synthetic list promotion title only",
+    "startUTC": "2026-10-03T19:20:35.159Z",
+    "endUTC": "2026-10-03T19:20:35.192Z"
+  },
+  {
+    "index": 11,
+    "label": "turn list promotion OFF locally",
+    "startUTC": "2026-10-03T19:20:35.304Z",
+    "endUTC": "2026-10-03T19:20:35.581Z"
+  },
+  {
+    "index": 12,
+    "label": "turn list promotion ON again locally",
+    "startUTC": "2026-10-03T19:20:55.006Z",
+    "endUTC": "2026-10-03T19:20:55.291Z"
+  },
+  {
+    "index": 13,
+    "label": "focus retained list title without typing",
+    "startUTC": "2026-10-03T19:20:55.363Z",
+    "endUTC": "2026-10-03T19:20:55.642Z"
+  },
+  {
+    "index": 14,
+    "label": "stepper leave promotion for participant conditions",
+    "startUTC": "2026-10-03T19:20:55.757Z",
+    "endUTC": "2026-10-03T19:20:56.047Z"
+  },
+  {
+    "index": 15,
+    "label": "stepper return to promotion step",
+    "startUTC": "2026-10-03T19:20:56.116Z",
+    "endUTC": "2026-10-03T19:20:56.427Z"
+  },
+  {
+    "index": 16,
+    "label": "focus list title after stepper return",
+    "startUTC": "2026-10-03T19:20:56.507Z",
+    "endUTC": "2026-10-03T19:20:56.808Z"
+  },
+  {
+    "index": 17,
+    "label": "restore only changed list title to original blank",
+    "startUTC": "2026-10-03T19:21:52.399Z",
+    "endUTC": "2026-10-03T19:21:57.759Z"
+  },
+  {
+    "index": 18,
+    "label": "restore list promotion OFF",
+    "startUTC": "2026-10-03T19:21:57.844Z",
+    "endUTC": "2026-10-03T19:21:58.126Z"
+  },
+  {
+    "index": 19,
+    "label": "return first step for safe Cancel",
+    "startUTC": "2026-10-03T19:21:58.203Z",
+    "endUTC": "2026-10-03T19:21:58.479Z"
+  },
+  {
+    "index": 20,
+    "label": "restore synthetic wizard title blank",
+    "startUTC": "2026-10-03T19:21:58.537Z",
+    "endUTC": "2026-10-03T19:21:58.559Z"
+  },
+  {
+    "index": 21,
+    "label": "restore sport to placeholder",
+    "startUTC": "2026-10-03T19:21:58.600Z",
+    "endUTC": "2026-10-03T19:21:58.615Z"
+  },
+  {
+    "index": 22,
+    "label": "Cancel local wizard using visible link",
+    "startUTC": "2026-10-03T19:21:58.670Z",
+    "endUTC": "2026-10-03T19:21:58.758Z"
+  }
+]

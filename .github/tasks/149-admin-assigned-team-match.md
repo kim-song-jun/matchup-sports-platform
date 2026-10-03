@@ -302,3 +302,8 @@ Approval scope is these four local release-binding updates and their focused ver
 
 - Latest DEV fe9578400 CI: Gates PASS, Web unit PASS/build in progress, API integration stage still fails. Local fresh PostgreSQL WASM chat 4/4 PASS does not establish native full-suite success. Alpha deployment remains blocked.
 - Public job-log download requires authentication (403); normal CLI login is absent. Existing integration command now writes JSON results and on failure annotates only suite/assertion names for diagnosis. Nonzero test still exits 1; no raw DB rows, secrets or request data published.
+
+### 2026-10-04 exact native failure identified
+
+- Public GitHub job HTML exposes the failure annotations despite REST anonymous rate limiting. Exact remaining failure: games/game-schema.integration-spec.ts / refuses source snapshot mutation before migration verification.
+- Root cause: game-schema.fixture.ts binds the entire schema source and still pins predecessor eef298..., whereas the user-approved nullable listImageUrl schema is 614e051.... Updated only current-schema fixture pin and explanation; historical game migration remains 6bd7fa.... Guard and mutation rejection stay intact.

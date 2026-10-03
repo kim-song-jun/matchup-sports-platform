@@ -1,5 +1,13 @@
 # v1_web
 
+## 1.1.4
+
+### Patch Changes
+
+- 4b67ad8: Explain that the existing team-match opponent contribution is the applying team's cost and connect the input explanation to its accessible description, preserving known amounts, unknown values and free-invitation semantics.
+- def2d00: Remove the dark overlay from text-free team-match list photos while preserving detail hero contrast and image fallback.
+- 855c0ff: Improve the tournament prize caption's light-theme contrast on its existing orange background without changing surrounding prize content or badges.
+
 ## 1.1.3
 
 ## 1.1.2

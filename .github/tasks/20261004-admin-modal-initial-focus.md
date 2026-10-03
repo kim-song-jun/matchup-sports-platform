@@ -60,6 +60,7 @@ SimpleModal 직접 사용8곳에 초기 focus가 적용된다. 기존 trap/histo
 - 수정 후2 suites: **26/26 PASS**(공용11 + 실제 RosterModal15), Vitest 최소 worker1 직렬. 제품 focus/history/모달은 mock하지 않았다. 기존 명단 훅의 합성 테스트만 사용하며 실제 alpha mutation0.
 - frontend lint/typecheck·v1 patterns, 필수 aggregate6/6, Changeset policy, diff check·touched debt grep PASS. 신규 debt marker나 untracked 제품 dependency가 없다.
 - committed-head 독립 리뷰/CI 진행 중. alpha after는 승인된 배포 대기. 테스트·lint 프로세스 종료; 소유 dependency symlink2개만 target 일치를 확인하고 커밋 전 제거한다.
+- 독립5/5 committed-tree 리뷰에서 `d9daad2f720616da3115a4f0232de6614b759595`의 pending 해제 후 panel→Shift+Tab 배경 이탈 P2를 발견했다. 실제 조수정 caller의 실패 후 모달 유지 경로와 교차검증했다. 추가 초점1case RED(배경 경기별 명단 focus)→경계 수정 후2 suites **26/26 PASS**. panel을 양방향 Tab 시작 경계로만 처리하며 이후 lint·정확한 새 head CI·독립 재리뷰로 이전 head와 구분한다.
 
 ## Owned / Forbidden Files
 Owned: 이 task, `.changeset/admin-modal-initial-focus.md`, `tournament-detail-shared.tsx`, `tournament-detail-shared.test.tsx`, `tournament-roster-modal.test.tsx`(모두 apps/v1_web의 해당 admin/tournaments/[id]).

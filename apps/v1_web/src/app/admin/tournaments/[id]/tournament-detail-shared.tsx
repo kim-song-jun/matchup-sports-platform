@@ -212,9 +212,9 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        if (document.activeElement === first || document.activeElement === dialog) { e.preventDefault(); last.focus(); }
       } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        if (document.activeElement === last || document.activeElement === dialog) { e.preventDefault(); first.focus(); }
       }
     };
     document.addEventListener('keydown', trap);

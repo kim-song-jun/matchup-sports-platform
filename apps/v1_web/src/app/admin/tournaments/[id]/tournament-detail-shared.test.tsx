@@ -114,6 +114,10 @@ describe('SimpleModal 초기 focus와 기존 탐색/닫기 계약', () => {
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '모달 닫기' })).toBeDisabled();
     view.rerender(<ModalHarness />);
+    await user.tab({ shift: true });
+    expect(within(dialog).getByRole('button', { name: '본문 닫기' })).toHaveFocus();
+    await user.tab();
+    expect(within(dialog).getByRole('button', { name: '모달 닫기' })).toHaveFocus();
     await user.keyboard('{Escape}');
     await act(async () => { await settleHistory(); });
     expect(trigger).toHaveFocus();

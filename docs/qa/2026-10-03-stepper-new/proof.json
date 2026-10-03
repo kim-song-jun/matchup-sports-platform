@@ -1,0 +1,365 @@
+[
+  {
+    "active": {
+      "name": "메뉴 열기",
+      "tabIndex": 0,
+      "tag": "BUTTON"
+    },
+    "h2": [
+      "기본 정보"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": "",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:33:06.358Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-fresh-blank-initial",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "empty",
+    "sportValueSHA256": null
+  },
+  {
+    "active": {
+      "name": null,
+      "tabIndex": 0,
+      "tag": "INPUT"
+    },
+    "h2": [
+      "기본 정보"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": "QA LOCAL STEPPER 저장하지않음",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:33:06.472Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-local-fields-filled",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "selected",
+    "sportValueSHA256": "77779779d1984a75fa49955ff28a21d1139f0abef790e74c19db66bfbf6f9043"
+  },
+  {
+    "active": {
+      "name": "일정·장소",
+      "tabIndex": -1,
+      "tag": "H2"
+    },
+    "h2": [
+      "일정·장소"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:33:06.823Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-direct-stepper-2",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "unmounted",
+    "sportValueSHA256": null
+  },
+  {
+    "active": {
+      "name": "일정·장소",
+      "tabIndex": -1,
+      "tag": "H2"
+    },
+    "h2": [
+      "일정·장소"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:33:42.225Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-step2-photo-observation",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "unmounted",
+    "sportValueSHA256": null
+  },
+  {
+    "active": {
+      "name": "기본 정보",
+      "tabIndex": -1,
+      "tag": "H2"
+    },
+    "h2": [
+      "기본 정보"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": "QA LOCAL STEPPER 저장하지않음",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:33:42.569Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-direct-stepper-1-retained",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "selected",
+    "sportValueSHA256": "77779779d1984a75fa49955ff28a21d1139f0abef790e74c19db66bfbf6f9043"
+  },
+  {
+    "active": {
+      "name": "일정·장소",
+      "tabIndex": -1,
+      "tag": "H2"
+    },
+    "h2": [
+      "일정·장소"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:33:42.968Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-direct-stepper-2-again",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "unmounted",
+    "sportValueSHA256": null
+  },
+  {
+    "active": {
+      "name": null,
+      "tabIndex": -1,
+      "tag": "BODY"
+    },
+    "h2": [
+      "목업 대회 생성 (alpha 전용)"
+    ],
+    "stepper": [],
+    "titleValue": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T13:34:08.959Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-after-header-list-exit",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "unmounted",
+    "sportValueSHA256": null
+  },
+  {
+    "active": {
+      "name": "메뉴 열기",
+      "tabIndex": 0,
+      "tag": "BUTTON"
+    },
+    "h2": [
+      "기본 정보"
+    ],
+    "stepper": [
+      {
+        "disabled": false,
+        "name": "1단계 기본 정보 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "name": "2단계 일정·장소"
+      },
+      {
+        "disabled": false,
+        "name": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "name": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "name": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "titleValue": "",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T13:34:10.689Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-reentry-blank-after-discard",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "empty",
+    "sportValueSHA256": null
+  },
+  {
+    "active": {
+      "name": null,
+      "tabIndex": -1,
+      "tag": "BODY"
+    },
+    "h2": [
+      "목업 대회 생성 (alpha 전용)"
+    ],
+    "stepper": [],
+    "titleValue": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments",
+    "utc": "2026-10-03T13:34:39.975Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "step": "mobile-final-safe-list",
+    "runtimeServingSHA": "unknown",
+    "sportValueState": "unmounted",
+    "sportValueSHA256": null
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Local select 풋살 and local title QA LOCAL STEPPER 저장하지않음",
+    "startedUTC": "2026-10-03T13:33:06.362Z",
+    "completedUTC": "2026-10-03T13:33:06.426Z"
+  },
+  {
+    "name": "Click actual stepper button 2단계 일정·장소; not Next",
+    "startedUTC": "2026-10-03T13:33:06.475Z",
+    "completedUTC": "2026-10-03T13:33:06.767Z"
+  },
+  {
+    "name": "Click observed stepper 1단계 기본 정보 — 완료; not Previous",
+    "startedUTC": "2026-10-03T13:33:42.246Z",
+    "completedUTC": "2026-10-03T13:33:42.524Z"
+  },
+  {
+    "name": "Click observed stepper 2단계 일정·장소 again; not Next",
+    "startedUTC": "2026-10-03T13:33:42.602Z",
+    "completedUTC": "2026-10-03T13:33:42.907Z"
+  },
+  {
+    "name": "Discard local draft by actual header link 대회 목록으로",
+    "startedUTC": "2026-10-03T13:33:42.971Z",
+    "completedUTC": "2026-10-03T13:33:43.094Z"
+  },
+  {
+    "name": "Exit blank reentry via actual header list link",
+    "startedUTC": "2026-10-03T13:34:10.691Z",
+    "completedUTC": "2026-10-03T13:34:10.973Z"
+  }
+]

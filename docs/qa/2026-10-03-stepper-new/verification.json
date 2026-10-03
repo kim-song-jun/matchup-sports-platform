@@ -1,0 +1,37 @@
+{
+  "recordCount": 9,
+  "actionRecords": 6,
+  "allCSSViewport": {
+    "width": 404,
+    "height": 606,
+    "dpr": 1.25
+  },
+  "directStepperDOMIndices": [
+    2,
+    4,
+    5
+  ],
+  "activeH2MatchesDestination": true,
+  "retainedTitleSportIndices": [
+    1,
+    4
+  ],
+  "retainedValuesEqual": true,
+  "stage2NullIsNotClearingEvidence": true,
+  "blankReentryIndex": 7,
+  "finalListIndex": 8,
+  "DOMTimesStrictlyIncreasing": true,
+  "stepperPostCallDeltaMilliseconds": [
+    56,
+    45,
+    61
+  ],
+  "actualSafeImagesViewed": 2,
+  "imageHashAndDimensionChecks": true,
+  "privacy": "Only generic form labels, empty inputs, and an explicit synthetic local title are visible. No personal names, contacts, credentials, financial values or participant rows.",
+  "limits": [
+    "No scrollY, geometry or focus-visible measurement. Active H2 does not prove focus-ring appearance.",
+    "No final Create or server write reported; no independent network audit.",
+    "This is new mobile evidence, not earlier tablet evidence or a complete issue1437 regression suite."
+  ]
+}

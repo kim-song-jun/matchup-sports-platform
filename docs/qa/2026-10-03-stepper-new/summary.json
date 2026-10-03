@@ -1,0 +1,45 @@
+{
+  "scope": "Issue1437 one new mobile direct stepper2→1→2 with local field retention and header-link discard",
+  "cohort": "post-reset-20261003-1322",
+  "reason": "New execution after loss of unpublished earlier files; no prior timestamp or viewport is reconstructed.",
+  "observedUTC": [
+    "2026-10-03T13:33:06.358Z",
+    "2026-10-03T13:34:39.975Z"
+  ],
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "scrollWidth": 404,
+    "width": 404
+  },
+  "runtimeServingSHA": "unknown",
+  "checks": {
+    "directStep2": true,
+    "directStep1": true,
+    "step2Again": true,
+    "titleRetained": true,
+    "sportRetained": true,
+    "reentryBlank": true,
+    "finalList": true
+  },
+  "limits": [
+    "Mobile404px only; no claim for tablet/desktop in this new cohort.",
+    "Null title/sport on step2 means fields not mounted, not evidence of value loss.",
+    "H2 activeElement recorded; no geometry, scroll-position restoration or focus-visible DOM measurement.",
+    "No dates, fees, bank details, stage3–5 or final Create tested; no Enter or save.",
+    "Action UTC bounds are CUA tool-call bounds, not an independent browser-event log.",
+    "The crop pointer obscures part of the title; full string retention is established by the two stage1 DOM observations.",
+    "Header-list exit and blank stage1 reentry do not prove every hidden field or server state was reset.",
+    "Reentry navigation itself has no separate action-bound record; the reentry DOM endpoint is recorded."
+  ],
+  "serverWriteActionsPerformed": 0,
+  "inputFiles": [
+    "1437-stepper-proof.json",
+    "1437-stepper-actions.json"
+  ],
+  "observedDOMRecords": 9,
+  "collectorActionCalls": 6,
+  "stepperTransitions": 3,
+  "screenshots": 2,
+  "writeCountBasis": "Collector action declaration, not independent network/persistence audit"
+}

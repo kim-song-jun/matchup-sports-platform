@@ -1,0 +1,106 @@
+{
+  "createdUTC": "2026-10-03T13:35:19.816636+00:00",
+  "scope": "New mobile run, plain crops only",
+  "crops": [
+    {
+      "file": "1437-step2.png",
+      "sourceSHA256": "411fd0f5c75401c87e336e1291ae43d94954d11b29453e2350f45b791dcb76a1",
+      "outputSHA256": "cfee245375a518d38ddc2c3a291a7fe0f14ba82a295344b57d705db438bf6c9b",
+      "sourceSize": [
+        404,
+        606
+      ],
+      "cropBox": [
+        17,
+        53,
+        388,
+        343
+      ],
+      "outputSize": [
+        371,
+        290
+      ],
+      "captureMetadata": {
+        "file": "1437-step2.png",
+        "startedUTC": "2026-10-03T13:33:42.228Z",
+        "completedUTC": "2026-10-03T13:33:42.245Z",
+        "domUTC": "2026-10-03T13:33:42.225Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 404,
+          "width": 404
+        }
+      },
+      "collectorPixelEquality": true
+    },
+    {
+      "file": "1437-step1-retained.png",
+      "sourceSHA256": "fb0a8363152a6d935d5d042dea865140212c82343583fa1b752c4edbb7b355f7",
+      "outputSHA256": "429e6d5e75589fb0e456a91b8da1026f8310c535e30dff41d7927fbf111a6239",
+      "sourceSize": [
+        404,
+        606
+      ],
+      "cropBox": [
+        17,
+        62,
+        388,
+        329
+      ],
+      "outputSize": [
+        371,
+        267
+      ],
+      "captureMetadata": {
+        "file": "1437-step1-retained.png",
+        "startedUTC": "2026-10-03T13:33:42.572Z",
+        "completedUTC": "2026-10-03T13:33:42.601Z",
+        "domUTC": "2026-10-03T13:33:42.569Z",
+        "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+        "viewport": {
+          "dpr": 1.25,
+          "height": 606,
+          "scrollWidth": 404,
+          "width": 404
+        }
+      },
+      "collectorPixelEquality": true
+    }
+  ],
+  "safeProofHashes": {
+    "1437-stepper-proof.json": "dd48edb981f2fd48d74fc5d4faaf9eb853ddadc35ee78f95317ec5328d798cdf",
+    "1437-stepper-actions.json": "153878a27ee4f1765b43d967ead61aabefe519ecda5ad4783f3a5ebb7ee919fa",
+    "1437-stepper-summary.json": "e13241481cf82fd4bcffb6945d87cdfa7b9c575effc0562f087d7c3a172b58b4"
+  },
+  "limits": [
+    "Pointer obscures a small part of the local title in the second image; complete title retention is DOM evidence.",
+    "Active H2 focus is DOM evidence; crop alone does not prove the navigation control used.",
+    "Capture and DOM times are separate; action ranges are CUA call bounds."
+  ],
+  "sourceInputFiles": [
+    {
+      "file": "1437-stepper-proof.json",
+      "sha256": "dd48edb981f2fd48d74fc5d4faaf9eb853ddadc35ee78f95317ec5328d798cdf",
+      "bytes": 7865
+    },
+    {
+      "file": "1437-stepper-actions.json",
+      "sha256": "153878a27ee4f1765b43d967ead61aabefe519ecda5ad4783f3a5ebb7ee919fa",
+      "bytes": 1078
+    },
+    {
+      "file": "1437-stepper-summary.json",
+      "sha256": "e13241481cf82fd4bcffb6945d87cdfa7b9c575effc0562f087d7c3a172b58b4",
+      "bytes": 1370
+    },
+    {
+      "file": "1437-stepper-provenance.json",
+      "sha256": "f5081a71a5ce2713753c88d164e74ad2081b0f0a0373c0080ba93b2b66b047a5",
+      "bytes": 2590
+    }
+  ],
+  "publicationProjection": "Opaque sport values are represented as state plus SHA256; timestamps, synthetic local title and other DOM evidence are preserved. Original local inputs were not edited.",
+  "publisherReview": "Safe crop pixels viewed; hashes, PNG dimensions, crop bounds and DOM/capture mapping validated. Original-to-crop equality is collector attestation."
+}

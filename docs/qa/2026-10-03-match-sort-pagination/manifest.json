@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "09b863ac5292562f406b0f6858892379f402c8157f649fdf50528efa5e5906bc",
+      "bytes": 4892
+    },
+    {
+      "file": "back-comparison-safe.json",
+      "sha256": "b59696d2571215e8d85db7295b6f1c741866cf4ce36e57c194aeac700b961806",
+      "bytes": 2764
+    },
+    {
+      "file": "back-desktop-after20.png",
+      "sha256": "aeb6a26168e1ea027296af4dc423e8f494db88488026bdc47642eb0bb77954d9",
+      "bytes": 58191
+    },
+    {
+      "file": "back-desktop-before69.png",
+      "sha256": "9fca3fb39eb58fb8e74e3aa78d59f51d25f9745528b8fb3201c21dae8326bfc3",
+      "bytes": 56920
+    },
+    {
+      "file": "back-mobile-after20.png",
+      "sha256": "92452a6381bd1c3505e70dc101efc5aa8562ee434b731a2949f58fc6eacb0d34",
+      "bytes": 45718
+    },
+    {
+      "file": "back-mobile-before69.png",
+      "sha256": "f3023154752fe125efddb3519408a07726a88308f379954eaea401fa5cbca0c5",
+      "bytes": 43150
+    },
+    {
+      "file": "back-tablet-after20.png",
+      "sha256": "6bea2650e1de37fb3cb273126e27e3246384e12696c747ea3e64cdb4bf157bac",
+      "bytes": 46146
+    },
+    {
+      "file": "back-tablet-before69.png",
+      "sha256": "c601ca1ca75f20829697473a36d2068ac90ebde6c3e27b89ee35ad63fc7b1a03",
+      "bytes": 46253
+    },
+    {
+      "file": "console-summary.json",
+      "sha256": "1b4a26af3743de4136235d5d848cee194347e0679e6b0f24cdf1565854e3ad32",
+      "bytes": 93
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "sha256": "be9e3df536cd38fea739a059733a4254941849456f141f7a41d87f2255c10ead",
+      "bytes": 4195
+    },
+    {
+      "file": "sort-sanitized-proof.json",
+      "sha256": "a349de3c089c2a59814d6458c27b501ede7e83980d4b9cb70d87938f91f02db0",
+      "bytes": 294895
+    },
+    {
+      "file": "summary.json",
+      "sha256": "8717b9e8b34791af3e4d7976337f78abc76bf884c8f7a9c71a32b82e17f49027",
+      "bytes": 6872
+    }
+  ]
+}

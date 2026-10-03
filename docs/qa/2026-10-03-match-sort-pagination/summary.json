@@ -1,0 +1,119 @@
+{
+  "scope": "PR1563 actual alpha list sorting, filters, pagination and detail Back; read-only",
+  "windowUTC": "2026-10-03T03:17:18Z–2026-10-03T03:40:37Z",
+  "deploymentEvidence": {
+    "sha": "dbb6468d81809649026e6a9c193d5a982f8a57b6",
+    "run": "37091460871",
+    "successUTC": "2026-10-03T03:09:59Z",
+    "source": "GitHub Deploy Alpha run metadata confirms the listed commit and successful completion. Browser QA did not expose an independent build SHA.",
+    "url": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37091460871"
+  },
+  "viewportsCSS": [
+    [
+      405,
+      606
+    ],
+    [
+      789,
+      505
+    ],
+    [
+      1183,
+      758
+    ]
+  ],
+  "observedPasses": [
+    "Team default:20→40→60→69, no duplicate URLs; exact final69-ID sequence identical on mobile, tablet and desktop and after repeat pagination.",
+    "Team default UI availability grouping remains primary: recruiting2 (10/6→10/9), then other-status future31 (10/4→11/15), then past36 (10/2→9/16) within that group. Do not call overall screen purely chronological.",
+    "Team latest:20→40→60→69, same69-ID set as default, no duplicates; same latest69-ID sequence across widths. Desktop latest check preserved loaded tablet data through resize; desktop default was separately loaded.",
+    "Team latest+friendly filter:29 unique cards, no regular-league label. In-app Back retains sort=latest&kind=friendly but resets loaded29→20.",
+    "Individual main list8, with separate featured rail3. Rail duplicates are excluded from main-list duplicate and sorting calculations.",
+    "Individual default: non-final group4 (completion-pending/held) recent-to-old displayed start dates, then ended group4 recent-to-old. Same8-ID order across widths and after reset.",
+    "Individual latest order differs from start-date order and is identical across widths. Latest+futsal6 → detail → in-app Back preserves query and6-ID sequence. Swimming0 shows empty state; All resets to original8.",
+    "Sampled document scrollWidth equals viewport width. Real screenshots rendered app content without framework overlay.",
+    "At03:34:21UTC the latest50 warning/error console entries were all browser-extension metadata errors; no app-origin item in that sample."
+  ],
+  "finding": {
+    "title": "Team list loses loaded pages after detail Back",
+    "reproduction": "Open/team-matches, load additional pages to40 or69, open completed friendly cb3442a3-3cb1-49e3-97ad-0410e4280349, return using in-app Back or browser Back",
+    "actual": "Returns20 cards with More. Four cases lose49 loaded cards; tablet and desktop in-app Back cases lose20 from the actually captured40 baseline.",
+    "testedMatrix": "Mobile in-app/browser, tablet browser, desktop browser:69→20. Tablet in-app and desktop in-app:40→20. All six lose loaded-pagination state.",
+    "classification": "Observed UX/state-loss defect; no before-build comparison demonstrates introduction by PR #1563.",
+    "queryState": "Sorting/kind query retained in combined-filter case; reset concerns loaded pagination state.",
+    "scrollLimit": "Exact before/after scrollY was not measured. This evidence supports loss of loaded pagination state only; scroll-position restoration is unverified.",
+    "safeProof": "back-comparison-safe.json and sanitized DOM records cover all six combinations. Six header-count crops illustrate mobile in-app Back, tablet browser Back, and desktop browser Back only."
+  },
+  "comparisons": [
+    {
+      "first": "team mobile default page4 settled",
+      "second": "team mobile repeat all69 after Back",
+      "sameIDSequence": true
+    },
+    {
+      "first": "team mobile default page4 settled",
+      "second": "team tablet default all69",
+      "sameIDSequence": true
+    },
+    {
+      "first": "team mobile default page4 settled",
+      "second": "team desktop default all69",
+      "sameIDSequence": true
+    },
+    {
+      "first": "team mobile latest page4 settled",
+      "second": "team tablet latest all69",
+      "sameIDSequence": true
+    },
+    {
+      "first": "team mobile latest page4 settled",
+      "second": "team desktop latest all69 responsive",
+      "sameIDSequence": true
+    },
+    {
+      "first": "individual mobile default main8",
+      "second": "individual mobile reset default repeat",
+      "sameIDSequence": true
+    },
+    {
+      "first": "individual mobile default main8",
+      "second": "individual tablet default main8",
+      "sameIDSequence": true
+    },
+    {
+      "first": "individual mobile default main8",
+      "second": "individual desktop default main8",
+      "sameIDSequence": true
+    },
+    {
+      "first": "individual mobile latest main8",
+      "second": "individual tablet latest main8",
+      "sameIDSequence": true
+    },
+    {
+      "first": "individual mobile latest main8",
+      "second": "individual desktop latest main8",
+      "sameIDSequence": true
+    },
+    {
+      "first": "individual mobile latest futsal main6",
+      "second": "individual mobile in-app Back latest futsal",
+      "sameIDSequence": true
+    }
+  ],
+  "unverified": [
+    "Latest registration/creation timestamp ordering: cards expose scheduled date only, not creation time, so different and stable order observed but creation-order semantics not proven.",
+    "Team schedule-null tail: no schedule-undetermined card in observed69.",
+    "Individual future-date sorting and individual More: all8 main cards are past dates and no More control exists.",
+    "Minute-boundary cursor omission: no live boundary fixture; no clock/DB manipulation or mutation.",
+    "Deadline-sort branch was not exercised; default/recommended and latest were the focus.",
+    "No exhaustive cross-product of every filter and viewport; combined-filter roundtrips were mobile, ordering sequences were three widths.",
+    "No before-build comparison. This sorting/pagination pass does not validate unrelated repair PRs.",
+    "An early navigation attempted a non-rendered later-page card while More was still hydrating. No action occurred; waited for settled More and repeated successfully. Pending observations are marked and excluded."
+  ],
+  "privacy": "Safe proof strips titles, hosts, personal names and images; includes match URLs, UI dates/status labels, counts and exact observation UTC only. Original screenshots/DOM remain private.",
+  "correctionNote": {
+    "utc": "2026-10-03T03:44Z",
+    "issue": "The earlier summary/comparison hardcoded69 for tablet/desktop in-app Back; source observations actually contain40. Corrected from existing evidence, without extra UI retest. Original step labels retained as metadata; row values/UTC unchanged.",
+    "screenshotScope": "Six before/after crops show genuine69→20 examples: mobile in-app, tablet browser, desktop browser. They do not prove69 baselines for the two40→20 cases."
+  }
+}

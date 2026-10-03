@@ -1,0 +1,142 @@
+{
+  "host": "https://alpha.teameet.co.kr",
+  "method": "Pixel-preserving crops of inspected real alpha viewport screenshots; same list header before and after detail Back. Capture UTC bounds bracket screenshot call, not inferred from DOM observation time.",
+  "privacy": "Crops contain search/filter/count controls only, no member/host names or photos. Full originals remain private.",
+  "viewportMethod": "Cloud Chromium native window resize and browser zoom. CSS405×606,789×505,1183×758. Not physical device emulation.",
+  "images": [
+    {
+      "file": "back-mobile-before69.png",
+      "cropPixels": [
+        0,
+        0,
+        405,
+        260
+      ],
+      "captureStartUTC": "2026-10-03T03:36:07.311Z",
+      "captureEndUTC": "2026-10-03T03:36:07.332Z",
+      "sourceContext": {
+        "height": 606,
+        "url": "https://alpha.teameet.co.kr/team-matches",
+        "width": 405
+      },
+      "sha256": "f3023154752fe125efddb3519408a07726a88308f379954eaea401fa5cbca0c5",
+      "rasterPixels": [
+        405,
+        260
+      ],
+      "scenario": "in-app Back"
+    },
+    {
+      "file": "back-mobile-after20.png",
+      "cropPixels": [
+        0,
+        0,
+        405,
+        260
+      ],
+      "captureStartUTC": "2026-10-03T03:36:31.738Z",
+      "captureEndUTC": "2026-10-03T03:36:31.769Z",
+      "sourceContext": {
+        "height": 606,
+        "url": "https://alpha.teameet.co.kr/team-matches",
+        "width": 405
+      },
+      "sha256": "92452a6381bd1c3505e70dc101efc5aa8562ee434b731a2949f58fc6eacb0d34",
+      "rasterPixels": [
+        405,
+        260
+      ],
+      "scenario": "in-app Back"
+    },
+    {
+      "file": "back-tablet-before69.png",
+      "cropPixels": [
+        114,
+        0,
+        675,
+        260
+      ],
+      "captureStartUTC": "2026-10-03T03:37:02.673Z",
+      "captureEndUTC": "2026-10-03T03:37:02.695Z",
+      "sourceContext": {
+        "height": 505,
+        "url": "https://alpha.teameet.co.kr/team-matches",
+        "width": 789
+      },
+      "sha256": "c601ca1ca75f20829697473a36d2068ac90ebde6c3e27b89ee35ad63fc7b1a03",
+      "rasterPixels": [
+        561,
+        260
+      ],
+      "scenario": "browser Back"
+    },
+    {
+      "file": "back-tablet-after20.png",
+      "cropPixels": [
+        114,
+        0,
+        675,
+        260
+      ],
+      "captureStartUTC": "2026-10-03T03:37:03.732Z",
+      "captureEndUTC": "2026-10-03T03:37:03.753Z",
+      "sourceContext": {
+        "height": 505,
+        "url": "https://alpha.teameet.co.kr/team-matches",
+        "width": 789
+      },
+      "sha256": "6bea2650e1de37fb3cb273126e27e3246384e12696c747ea3e64cdb4bf157bac",
+      "rasterPixels": [
+        561,
+        260
+      ],
+      "scenario": "browser Back"
+    },
+    {
+      "file": "back-desktop-before69.png",
+      "cropPixels": [
+        56,
+        85,
+        1128,
+        375
+      ],
+      "captureStartUTC": "2026-10-03T03:37:30.454Z",
+      "captureEndUTC": "2026-10-03T03:37:30.476Z",
+      "sourceContext": {
+        "height": 758,
+        "url": "https://alpha.teameet.co.kr/team-matches",
+        "width": 1183
+      },
+      "sha256": "9fca3fb39eb58fb8e74e3aa78d59f51d25f9745528b8fb3201c21dae8326bfc3",
+      "rasterPixels": [
+        1072,
+        290
+      ],
+      "scenario": "browser Back"
+    },
+    {
+      "file": "back-desktop-after20.png",
+      "cropPixels": [
+        56,
+        85,
+        1128,
+        375
+      ],
+      "captureStartUTC": "2026-10-03T03:37:58.798Z",
+      "captureEndUTC": "2026-10-03T03:37:58.835Z",
+      "sourceContext": {
+        "height": 758,
+        "url": "https://alpha.teameet.co.kr/team-matches",
+        "width": 1183
+      },
+      "sha256": "aeb6a26168e1ea027296af4dc423e8f494db88488026bdc47642eb0bb77954d9",
+      "rasterPixels": [
+        1072,
+        290
+      ],
+      "scenario": "browser Back"
+    }
+  ],
+  "cropCoordinates": "cropPixels are left, top, right, bottom coordinates in the original raster; published PNG dimensions are rasterPixels.",
+  "viewportLimit": "CSS789 is the measured tablet viewport width; full screenshot raster width can differ by rounding. The published tablet image is a561-pixel header crop and is not a full viewport."
+}

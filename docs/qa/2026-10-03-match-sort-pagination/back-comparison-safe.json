@@ -1,0 +1,85 @@
+[
+  {
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "type": "in-app Back",
+    "beforeCount": 69,
+    "afterCount": 20,
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": "/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T03:36:31.478Z"
+  },
+  {
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "type": "browser Back",
+    "beforeCount": 69,
+    "afterCount": 20,
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T03:37:03.506Z"
+  },
+  {
+    "viewport": {
+      "height": 505,
+      "width": 789
+    },
+    "type": "in-app Back",
+    "beforeCount": 40,
+    "afterCount": 20,
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": "/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T03:37:27.994Z",
+    "beforeObservationUTC": "2026-10-03T03:37:26.711Z",
+    "beforeSourceStep": "team tablet appBack before40 observed",
+    "correction": "Corrected from69 to actual captured40; no additional UI retest performed."
+  },
+  {
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    },
+    "type": "browser Back",
+    "beforeCount": 69,
+    "afterCount": 20,
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T03:37:58.567Z",
+    "inAppBack": "Separately verified visible and exercised at desktop"
+  },
+  {
+    "viewport": {
+      "height": 758,
+      "width": 1183
+    },
+    "type": "in-app Back",
+    "beforeCount": 40,
+    "afterCount": 20,
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "backHref": "/team-matches",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T03:39:07.637Z",
+    "beforeObservationUTC": "2026-10-03T03:38:31.875Z",
+    "beforeSourceStep": "team desktop appBack before40 observed",
+    "correction": "Corrected from69 to actual captured40; no additional UI retest performed."
+  },
+  {
+    "viewport": {
+      "height": 606,
+      "width": 405
+    },
+    "type": "browser Back",
+    "beforeCount": 69,
+    "afterCount": 20,
+    "targetURL": "https://alpha.teameet.co.kr/team-matches/cb3442a3-3cb1-49e3-97ad-0410e4280349",
+    "afterURL": "https://alpha.teameet.co.kr/team-matches",
+    "utc": "2026-10-03T03:21:30.740Z",
+    "sourceStep": "Earlier same-session main sorting pass; preceding all69 snapshot 03:20:20.526Z"
+  }
+]

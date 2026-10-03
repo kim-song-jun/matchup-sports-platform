@@ -1,0 +1,88 @@
+{
+  "scope": "Historical read-only UI wording and hierarchy observations; three narrow candidates, no confirmed payment or stored-data defect.",
+  "evidenceWindow": {
+    "startUTC": "2026-10-03T08:45:06.371Z",
+    "endUTC": "2026-10-03T08:49:01.785Z"
+  },
+  "findings": [
+    {
+      "id": "individual-price-format",
+      "classification": "Product-copy candidate",
+      "url": "https://alpha.teameet.co.kr/matches",
+      "observedWidths": [
+        789,
+        1183
+      ],
+      "observation": "Three sampled list metadata placements at tablet789/desktop1183 show10000 without a comma or currency unit in that cropped line.",
+      "minimumChange": "Proposed only: clarify the intended meaning of this free-form displayed value. Any numeric currency formatting must first respect the actual field semantics; no formatter implementation was inspected.",
+      "limits": [
+        "Mobile price text was not fully captured in this run.",
+        "No payment, pricing contract or stored amount was tested.",
+        "No costNote field or backend semantics inspected; this is not evidence of a payment error.",
+        "Three placements/captures at two widths, not three distinct fixtures or a prevalence estimate."
+      ],
+      "safeImages": [
+        "individual-price-tablet.png",
+        "individual-price-desktop-featured.png",
+        "individual-price-desktop-row.png"
+      ]
+    },
+    {
+      "id": "closed-match-copy",
+      "classification": "Product-copy candidate",
+      "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "observedWidths": [
+        405,
+        789,
+        1183
+      ],
+      "observation": "One synthetic fixture shows1/2명 with 모집 완료 at three widths. Separate mobile/desktop title crops show 종료. A later desktop-only DOM read records one rendered disabled 신청 불가 button.",
+      "minimumChange": "Proposed only: align closure wording with the actual ended state, or use a neutral closing label if several reasons share the notice; confirm intended business semantics first.",
+      "limits": [
+        "Not a claim of incorrect capacity, saved status or business rules.",
+        "No application or host action was attempted.",
+        "No mobile/tablet disabled-button state is independently established by these selected artifacts.",
+        "Tablet 종료 badge is not visible in the selected crop. Closing reason is not independently established."
+      ],
+      "safeImages": [
+        "individual-title-mobile.png",
+        "individual-closed-mobile.png",
+        "individual-closed-tablet.png",
+        "individual-closed-desktop.png"
+      ]
+    },
+    {
+      "id": "desktop-duplicate-title",
+      "classification": "Low-priority hierarchy improvement.",
+      "observedWidths": [
+        1183
+      ],
+      "observation": "One desktop crop visibly repeats the same synthetic title above/below the illustration; separate desktop DOM records H1 and H2.",
+      "minimumChange": "Keep one title and the contextual back affordance.",
+      "limits": [
+        "Both DOM heading and screenshot support repetition. Hidden responsive controls do not count as visible duplicates.",
+        "Mobile selected title crop shows one title only within that crop; no full mobile/tablet uniqueness claim.",
+        "No tablet-title crop is included."
+      ],
+      "safeImages": [
+        "individual-title-mobile.png",
+        "individual-title-desktop-duplicate.png"
+      ]
+    }
+  ],
+  "provenance": "individual-copy-crops-provenance.json",
+  "domProof": "individual-detail-copy-proof.json",
+  "privacy": "All eight safe crops were pixel-reviewed and exclude host names and participant lists.",
+  "captureWindowUTC": {
+    "startUTC": "2026-10-03T08:45:06.372Z",
+    "endUTC": "2026-10-03T08:48:19.190Z"
+  },
+  "runtimeServingSHA": "unknown",
+  "limits": [
+    "All timestamps are historical08:45–08:49UTC; no current serving identity, subsequent deployment retest or code cause inferred.",
+    "headingObservation.notice=[] is an empty extraction, not proof that the visible notice was absent.",
+    "Unfiltered DOM control counts include responsive hidden controls; rendered-controls observation is authoritative only at desktop.",
+    "Capture times and separate heading/control DOM reads are not simultaneous.",
+    "Selected output images are checked; original-to-crop equality remains collector-reported."
+  ]
+}

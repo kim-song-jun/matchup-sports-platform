@@ -1,0 +1,70 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3209,
+      "sha256": "942706f5dbcb26642c2bbd5618fe3cbdadb054a65f376faa3db72924cadcab26"
+    },
+    {
+      "file": "individual-closed-desktop.png",
+      "bytes": 26596,
+      "sha256": "ce1a08eea15c5981e914fddc8ff4aa3f6dfe6de88a2d126f0ed96f96c72d2ea3"
+    },
+    {
+      "file": "individual-closed-mobile.png",
+      "bytes": 25645,
+      "sha256": "18083267c03de28909be21a4b36e2fab3c73cfc844ad487f9f1b3b674d5577df"
+    },
+    {
+      "file": "individual-closed-tablet.png",
+      "bytes": 30539,
+      "sha256": "9f369aadfb8d454cfae6248be4ae8868d70d19fca04cd9274ce9ad5cb3d0dfe8"
+    },
+    {
+      "file": "individual-copy-crops-provenance.json",
+      "bytes": 7955,
+      "sha256": "6c9d60e709a1f283dee50596395fcfa92ab133f869d234d1d77712527a837af1"
+    },
+    {
+      "file": "individual-detail-copy-proof.json",
+      "bytes": 1620,
+      "sha256": "04a461b724fca9c9e8ca4bc20e8f7b92f90980689730330ccd0a185444fbfe52"
+    },
+    {
+      "file": "individual-price-desktop-featured.png",
+      "bytes": 9230,
+      "sha256": "bb9328bdd86f1cf1c213b66f7754e3dfb06ad79f010f869b89a5f8b34f51b167"
+    },
+    {
+      "file": "individual-price-desktop-row.png",
+      "bytes": 25990,
+      "sha256": "fc1b7bcf797c8cf20a1b277c3980fc353c55f491a8f46efedff66546a5e0bbf6"
+    },
+    {
+      "file": "individual-price-tablet.png",
+      "bytes": 9976,
+      "sha256": "62f3b9d8737cf5591d1e57d033e6f0b6e41c1056a5596cbc21601b5acaa166c8"
+    },
+    {
+      "file": "individual-title-desktop-duplicate.png",
+      "bytes": 80847,
+      "sha256": "5c279e7ec6e6132152f75c5f1529ed0ff8f7a1a4c9ad881079ae42605b401160"
+    },
+    {
+      "file": "individual-title-mobile.png",
+      "bytes": 23983,
+      "sha256": "d574f60f340c824f75464aed836acd68d5b864e16b662937629d5bd051dd191d"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4422,
+      "sha256": "e4eda244b8eff7d5f922891f33dacfb99f08d6be5af0c4014cbeb26ebeb7b560"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 4022,
+      "sha256": "2f64edefeb50f71acf9469f7f9264667dce86b42409086d2755a2151df6ddf7a"
+    }
+  ],
+  "scope": "All files except manifest itself"
+}

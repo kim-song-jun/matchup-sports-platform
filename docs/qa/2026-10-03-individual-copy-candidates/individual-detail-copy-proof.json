@@ -1,0 +1,68 @@
+{
+  "headingObservation": {
+    "backLinks": [
+      {
+        "href": "/matches",
+        "label": "뒤로가기"
+      },
+      {
+        "href": "/matches",
+        "label": "뒤로가기"
+      }
+    ],
+    "disabledButtons": [
+      "신청 불가",
+      "신청 불가"
+    ],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "(테스트) 1.0.3 QA 수명주기"
+      },
+      {
+        "tag": "H2",
+        "text": "(테스트) 1.0.3 QA 수명주기"
+      }
+    ],
+    "notice": [],
+    "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+    "utc": "2026-10-03T08:48:18.949Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    }
+  },
+  "visibleControlObservation": {
+    "notice": [
+      {
+        "tag": "DIV",
+        "text": "모집 완료"
+      },
+      {
+        "tag": "DIV",
+        "text": "이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요."
+      }
+    ],
+    "renderedBackLinks": [
+      {
+        "href": "/matches",
+        "label": "뒤로가기"
+      }
+    ],
+    "renderedDisabledButtons": [
+      "신청 불가"
+    ],
+    "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+    "utc": "2026-10-03T08:49:01.785Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "width": 1183
+    }
+  },
+  "limits": [
+    "Unfiltered DOM counts in headingObservation include responsive hidden duplicates; visibleControlObservation is authoritative for rendered controls. Heading repetition is directly visible in screenshot57."
+  ]
+}

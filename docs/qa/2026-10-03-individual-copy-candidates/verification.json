@@ -1,0 +1,131 @@
+{
+  "scope": "Independent safe-only JSON, pixel, hash and crop arithmetic review",
+  "images": [
+    {
+      "file": "individual-price-tablet.png",
+      "sha256": "62f3b9d8737cf5591d1e57d033e6f0b6e41c1056a5596cbc21601b5acaa166c8",
+      "dimensions": [
+        277,
+        66
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-price-desktop-featured.png",
+      "sha256": "bb9328bdd86f1cf1c213b66f7754e3dfb06ad79f010f869b89a5f8b34f51b167",
+      "dimensions": [
+        320,
+        67
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-price-desktop-row.png",
+      "sha256": "fc1b7bcf797c8cf20a1b277c3980fc353c55f491a8f46efedff66546a5e0bbf6",
+      "dimensions": [
+        529,
+        96
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-closed-mobile.png",
+      "sha256": "18083267c03de28909be21a4b36e2fab3c73cfc844ad487f9f1b3b674d5577df",
+      "dimensions": [
+        366,
+        250
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-closed-tablet.png",
+      "sha256": "9f369aadfb8d454cfae6248be4ae8868d70d19fca04cd9274ce9ad5cb3d0dfe8",
+      "dimensions": [
+        561,
+        255
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-closed-desktop.png",
+      "sha256": "ce1a08eea15c5981e914fddc8ff4aa3f6dfe6de88a2d126f0ed96f96c72d2ea3",
+      "dimensions": [
+        682,
+        247
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-title-mobile.png",
+      "sha256": "d574f60f340c824f75464aed836acd68d5b864e16b662937629d5bd051dd191d",
+      "dimensions": [
+        373,
+        71
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    },
+    {
+      "file": "individual-title-desktop-duplicate.png",
+      "sha256": "5c279e7ec6e6132152f75c5f1529ed0ff8f7a1a4c9ad881079ae42605b401160",
+      "dimensions": [
+        1073,
+        395
+      ],
+      "safeActualPixelsViewed": true,
+      "boundsUTCAndURLVerified": true
+    }
+  ],
+  "sampleDenominators": {
+    "pricePlacements": 3,
+    "priceCSSWidths": [
+      789,
+      1183
+    ],
+    "closedFixtureCount": 1,
+    "closedCSSWidths": [
+      405,
+      789,
+      1183
+    ],
+    "duplicateTitleDesktopCrops": 1,
+    "renderedControlsDOMWidth": 1183
+  },
+  "urlPrivacy": {
+    "allowedURLs": [
+      "https://alpha.teameet.co.kr/matches",
+      "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3"
+    ],
+    "noQueriesFragmentsCredentials": true
+  },
+  "emptyExtractionLimit": "headingObservation.notice=[] does not establish absence; visible-control read and three crops show the notice.",
+  "renderedDisabledButtonsDesktop": 1,
+  "desktopHeadings": [
+    "H1",
+    "H2"
+  ],
+  "titleSameText": true,
+  "historicalObservationWindowUTC": [
+    "2026-10-03T08:45:06.371Z",
+    "2026-10-03T08:49:01.785Z"
+  ],
+  "captureWindowUTC": {
+    "startUTC": "2026-10-03T08:45:06.372Z",
+    "endUTC": "2026-10-03T08:48:19.190Z"
+  },
+  "tabletCSSVsRaster": "789 CSSpx versus788 source rasterpx; not evidence of overflow.",
+  "rawSourceEquality": "Collector reported, not publisher re-read",
+  "limits": [
+    "All timestamps are historical08:45–08:49UTC; no current serving identity, subsequent deployment retest or code cause inferred.",
+    "headingObservation.notice=[] is an empty extraction, not proof that the visible notice was absent.",
+    "Unfiltered DOM control counts include responsive hidden controls; rendered-controls observation is authoritative only at desktop.",
+    "Capture times and separate heading/control DOM reads are not simultaneous.",
+    "Selected output images are checked; original-to-crop equality remains collector-reported."
+  ]
+}

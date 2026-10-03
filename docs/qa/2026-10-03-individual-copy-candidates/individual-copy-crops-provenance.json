@@ -1,0 +1,254 @@
+{
+  "scope": "Minimum crops only; source screenshots remain private. Caption/price observations are not financial-data validation. No participant list or host names in intended crop bounds.",
+  "crops": [
+    {
+      "sourceBasename": "49-individual-list-tablet-rail-rows.png",
+      "outputBasename": "individual-price-tablet.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "cropBoundsLTRB": [
+        398,
+        127,
+        675,
+        193
+      ],
+      "outputDimensions": [
+        277,
+        66
+      ],
+      "sourceSHA256": "16d8d7bbe0f8512941cba863380a72faf3712ea862ab352fafd284428ae37c34",
+      "outputSHA256": "62f3b9d8737cf5591d1e57d033e6f0b6e41c1056a5596cbc21601b5acaa166c8",
+      "url": "https://alpha.teameet.co.kr/matches",
+      "domObservationUTC": "2026-10-03T08:45:06.371Z",
+      "captureStartUTC": "2026-10-03T08:45:06.372Z",
+      "captureEndUTC": "2026-10-03T08:45:06.429Z",
+      "actualCSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "50-individual-list-desktop-rail-rows.png",
+      "outputBasename": "individual-price-desktop-featured.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        389,
+        598,
+        709,
+        665
+      ],
+      "outputDimensions": [
+        320,
+        67
+      ],
+      "sourceSHA256": "9b9ba0bb677ef17961ddf727932efd678beb36255dd091d30f5d634ddc070393",
+      "outputSHA256": "bb9328bdd86f1cf1c213b66f7754e3dfb06ad79f010f869b89a5f8b34f51b167",
+      "url": "https://alpha.teameet.co.kr/matches",
+      "domObservationUTC": "2026-10-03T08:45:24.721Z",
+      "captureStartUTC": "2026-10-03T08:45:24.728Z",
+      "captureEndUTC": "2026-10-03T08:45:24.792Z",
+      "actualCSSViewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "51-individual-list-desktop-main-rows.png",
+      "outputBasename": "individual-price-desktop-row.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        444,
+        584,
+        540
+      ],
+      "outputDimensions": [
+        529,
+        96
+      ],
+      "sourceSHA256": "f08db7dabe62224bc4ecf0444e6f9448d46fb0f79faa2a3fca31c3a5e2a9ddf2",
+      "outputSHA256": "fc1b7bcf797c8cf20a1b277c3980fc353c55f491a8f46efedff66546a5e0bbf6",
+      "url": "https://alpha.teameet.co.kr/matches",
+      "domObservationUTC": "2026-10-03T08:45:49.574Z",
+      "captureStartUTC": "2026-10-03T08:45:49.576Z",
+      "captureEndUTC": "2026-10-03T08:45:49.613Z",
+      "actualCSSViewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "52-individual-detail-mobile-top.png",
+      "outputBasename": "individual-closed-mobile.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "cropBoundsLTRB": [
+        20,
+        184,
+        386,
+        434
+      ],
+      "outputDimensions": [
+        366,
+        250
+      ],
+      "sourceSHA256": "c3107ded65fa1132aeaed801f0a47025eba67f2b7b88a816318d185603f28d31",
+      "outputSHA256": "18083267c03de28909be21a4b36e2fab3c73cfc844ad487f9f1b3b674d5577df",
+      "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "domObservationUTC": "2026-10-03T08:46:15.918Z",
+      "captureStartUTC": "2026-10-03T08:46:15.919Z",
+      "captureEndUTC": "2026-10-03T08:46:15.932Z",
+      "actualCSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "56-individual-detail-tablet-closed-state.png",
+      "outputBasename": "individual-closed-tablet.png",
+      "sourceDimensions": [
+        788,
+        505
+      ],
+      "cropBoundsLTRB": [
+        114,
+        100,
+        675,
+        355
+      ],
+      "outputDimensions": [
+        561,
+        255
+      ],
+      "sourceSHA256": "2e9c84143ebb8d002c9b7fb0ab456bdf9306740ab7d48e723f4ce20653cbae61",
+      "outputSHA256": "9f369aadfb8d454cfae6248be4ae8868d70d19fca04cd9274ce9ad5cb3d0dfe8",
+      "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "domObservationUTC": "2026-10-03T08:47:29.010Z",
+      "captureStartUTC": "2026-10-03T08:47:29.011Z",
+      "captureEndUTC": "2026-10-03T08:47:29.029Z",
+      "actualCSSViewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "58-individual-detail-desktop-info.png",
+      "outputBasename": "individual-closed-desktop.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        197,
+        737,
+        444
+      ],
+      "outputDimensions": [
+        682,
+        247
+      ],
+      "sourceSHA256": "0d4bff5f3db4ab6faa3a87cc2336b5ab143396df8fb34f18fdb82aa70a443971",
+      "outputSHA256": "ce1a08eea15c5981e914fddc8ff4aa3f6dfe6de88a2d126f0ed96f96c72d2ea3",
+      "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "domObservationUTC": "2026-10-03T08:48:19.158Z",
+      "captureStartUTC": "2026-10-03T08:48:19.159Z",
+      "captureEndUTC": "2026-10-03T08:48:19.190Z",
+      "actualCSSViewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "53-individual-detail-mobile-top-settled.png",
+      "outputBasename": "individual-title-mobile.png",
+      "sourceDimensions": [
+        405,
+        606
+      ],
+      "cropBoundsLTRB": [
+        16,
+        212,
+        389,
+        283
+      ],
+      "outputDimensions": [
+        373,
+        71
+      ],
+      "sourceSHA256": "8e3e216d2db7641b7c1a922077c77eb177f8bf9f67cf326ed6ffcc6dab340eb2",
+      "outputSHA256": "d574f60f340c824f75464aed836acd68d5b864e16b662937629d5bd051dd191d",
+      "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "domObservationUTC": "2026-10-03T08:46:31.596Z",
+      "captureStartUTC": "2026-10-03T08:46:31.597Z",
+      "captureEndUTC": "2026-10-03T08:46:31.611Z",
+      "actualCSSViewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "sourceCollectorReportedPixelEquality": true
+    },
+    {
+      "sourceBasename": "57-individual-detail-desktop-top.png",
+      "outputBasename": "individual-title-desktop-duplicate.png",
+      "sourceDimensions": [
+        1183,
+        758
+      ],
+      "cropBoundsLTRB": [
+        55,
+        80,
+        1128,
+        475
+      ],
+      "outputDimensions": [
+        1073,
+        395
+      ],
+      "sourceSHA256": "1a6452fd71b7a41c66dfe30e5f9899394c63b78d77e4594eb4b96b63c6a69f4e",
+      "outputSHA256": "5c279e7ec6e6132152f75c5f1529ed0ff8f7a1a4c9ad881079ae42605b401160",
+      "url": "https://alpha.teameet.co.kr/matches/abc11044-1e5e-4657-a390-589d2daa4eb3",
+      "domObservationUTC": "2026-10-03T08:47:50.972Z",
+      "captureStartUTC": "2026-10-03T08:47:50.974Z",
+      "captureEndUTC": "2026-10-03T08:47:50.993Z",
+      "actualCSSViewport": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "sourceCollectorReportedPixelEquality": true
+    }
+  ],
+  "publicationLimit": "Only eight selected output PNGs inspected by publisher; raw source metadata and pixel equality not independently re-read. No resizing or pixel edits during publication."
+}

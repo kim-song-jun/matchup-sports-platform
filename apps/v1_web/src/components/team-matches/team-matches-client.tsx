@@ -4,6 +4,7 @@ import { TeamMatchRecordEntry } from './team-match-shared-record';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   useV1ApplyTeamMatch,
   useV1ApproveTeamMatchApplication,
@@ -25,6 +26,7 @@ import {
   useV1WithdrawTeamMatchApplication,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
+import { v1Keys } from '@/lib/query-keys';
 import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
@@ -70,8 +72,25 @@ import {
   toTeamMatch,
 } from './team-matches.card-model';
 
+type TeamMatchPagination = { cursor?: string; accumulated: V1TeamMatch[] };
+
+function readTeamMatchPagination(
+  client: QueryClient,
+  key: readonly unknown[],
+  filters: Record<string, unknown> | undefined,
+): TeamMatchPagination {
+  const saved = client.getQueryData<TeamMatchPagination>(key);
+  if (saved) {
+    const page = client.getQueryState(v1Keys.teamMatches(saved.cursor ? { ...filters, cursor: saved.cursor } : filters));
+    // 페이지 캐시가 만료되거나 상세 액션이 무효화했다면 오래된 누적 목록을 복원하지 않는다.
+    if (page?.status === 'success' && !page.isInvalidated) return saved;
+  }
+  return { accumulated: [] };
+}
+
 export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V1TeamMatch> } = {}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamMatchSort(searchParams.get('sort'));
@@ -104,16 +123,18 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
   // 같은 수정과 동일 패턴, tournaments/tournaments-list-client.tsx 의 "더 보기" 누적 방식을 따른다).
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [accumulated, setAccumulated] = useState<V1TeamMatch[]>([]);
+  const teamMatchFiltersKey = teamMatchFilters ? JSON.stringify(teamMatchFilters) : '';
+  // API의 flat 페이지 캐시와 별개로, 상세 왕복에 필요한 마지막 성공 cursor/이전 페이지만
+  // 메모리에 보관한다. v1 identity clear와 기본 GC를 따르며 localStorage에는 저장하지 않는다.
+  const paginationKey = useMemo(() => [...v1Keys.teamMatchesAll(), 'pagination', teamMatchFiltersKey], [teamMatchFiltersKey]);
+  const [pagination, setPagination] = useState<TeamMatchPagination>(() => readTeamMatchPagination(queryClient, paginationKey, teamMatchFilters));
+  const { cursor, accumulated } = pagination;
   // matches-client.tsx와 동일한 이유로 useEffect가 아니라 렌더 중에 되감는다 — 안 그러면
   // "새 필터 + 이전 cursor"가 합쳐진 무효 요청이 한 번 나가는 중간 렌더가 생긴다.
-  const teamMatchFiltersKey = teamMatchFilters ? JSON.stringify(teamMatchFilters) : '';
   const [pagedFiltersKey, setPagedFiltersKey] = useState(teamMatchFiltersKey);
   if (pagedFiltersKey !== teamMatchFiltersKey) {
     setPagedFiltersKey(teamMatchFiltersKey);
-    setCursor(undefined);
-    setAccumulated([]);
+    setPagination({ accumulated: [] });
   }
   const allQueryFilters = useMemo(() => (!teamMatchFilters && cursor ? { cursor } : undefined), [teamMatchFilters, cursor]);
   const filteredQueryFilters = useMemo(
@@ -142,6 +163,13 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const recordSearch = useV1RecordSearch();
   const query = teamMatchFilters ? filteredQuery : allQuery;
 
+  useEffect(() => {
+    // 더보기 중 previous-page placeholder 또는 실패 응답을 성공 snapshot으로 남기지 않는다.
+    if (query.isSuccess && !query.isPlaceholderData && !query.isFetching) {
+      queryClient.setQueryData<TeamMatchPagination>(paginationKey, pagination);
+    }
+  }, [queryClient, paginationKey, pagination, query.isSuccess, query.isPlaceholderData, query.isFetching, query.dataUpdatedAt]);
+
   if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getTeamMatchListViewModel();
@@ -163,8 +191,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const hasNext = query.data?.pageInfo?.hasNext ?? false;
   const handleLoadMore = () => {
     if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
-    setAccumulated(orderedItems ?? []);
-    setCursor(query.data.pageInfo.nextCursor);
+    setPagination({ accumulated: orderedItems ?? [], cursor: query.data.pageInfo.nextCursor });
   };
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
     value: searchValue,

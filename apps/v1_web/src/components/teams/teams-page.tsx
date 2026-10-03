@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -978,6 +978,31 @@ export function TeamFormPageView({
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
   // 저장 버튼은 화면 맨 아래, 오류 안내는 맨 위라 저장이 거절돼도 아무 일 없어 보인다 — 안내가 생기면 끌어온다.
   const errorRef = useRef<HTMLDivElement>(null);
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  const focusFrameRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+  }, []);
+
+  function revealFocusedField(event: FocusEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    // native focus 스크롤 뒤의 실제 가림만 회복한다. 빠른 다음 포커스는 이전 예약을 버린다.
+    focusFrameRef.current = requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      if (document.activeElement !== target || !target.isConnected) return;
+      const cta = fixedCtaRef.current;
+      const scroller = target.closest<HTMLElement>('.tm-scroll-area');
+      // desktop 숨김 및 소프트 키보드의 absolute CTA는 기존 흐름을 사용한다.
+      if (!cta || !scroller || getComputedStyle(cta).position !== 'fixed') return;
+      const bar = cta.getBoundingClientRect();
+      const field = target.getBoundingClientRect();
+      if (bar.height > 0 && field.bottom > bar.top && field.top < bar.bottom) {
+        scroller.scrollBy({ top: field.bottom - bar.top + 4, behavior: 'instant' });
+      }
+    });
+  }
   const formError = form?.error;
   useEffect(() => {
     if (formError) revealAndFocus(errorRef.current);
@@ -1010,7 +1035,7 @@ export function TeamFormPageView({
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
       <div className="tm-team-form-grid tm-content-enter">
-        <div className="tm-create-shell tm-team-form-main">
+        <div className="tm-create-shell tm-team-form-main" onFocusCapture={revealFocusedField}>
           {edit ? (
             <Card pad={16}>
               <div className="tm-my-toggle-row">
@@ -1132,7 +1157,7 @@ export function TeamFormPageView({
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
       </div>
-      <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import {
@@ -20,6 +20,7 @@ import {
   useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
 import { RegistrationsTab } from './registrations-tab';
+import { REGISTRATION_STATUS_FILTERS } from './tournament-detail-shared';
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: vi.fn(),
@@ -108,6 +109,119 @@ function baseRegistration(
 function noopMutationHook<T>(): T {
   return { mutate: vi.fn(), isPending: false } as unknown as T;
 }
+
+describe('RegistrationsTab — 상태 필터의 빈 결과 (#1565)', () => {
+  const mutate = vi.fn();
+  const refetch = vi.fn();
+  const items = [
+    baseRegistration({ id: 'reg-alpha', teamName: '합성 A팀' }),
+    baseRegistration({ id: 'reg-beta', teamId: 'team-beta', teamName: '합성 B팀' }),
+  ];
+
+  function arrange(query: Record<string, unknown> = {}) {
+    for (const hook of [useV1ConfirmPaymentMock, useV1ConfirmRegistrationMock, useV1CancelRegistrationAdminMock,
+      useV1RejectCancelRequestMock, useV1RosterLockMock, useV1RosterUnlockMock, useV1ExportRosterCsvMock,
+      useV1ExportTournamentRosterCsvMock, useV1RosterDeadlineOverrideGrantMock, useV1RosterDeadlineOverrideRevokeMock,
+      useV1UpdatePlayerEligibilityMock, useV1AdminAddPlayerMock, useV1AdminRemovePlayerMock] as const) {
+      (hook as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({ mutate, isPending: false });
+    }
+    useV1AdminTournamentPlayersMock.mockReturnValue({ data: { players: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
+    useV1AdminTournamentRegistrationsMock.mockReturnValue({ data: { items, truncated: false }, isPending: false, isError: false, error: null, refetch, ...query } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
+  }
+
+  beforeEach(() => { vi.clearAllMocks(); arrange(); });
+  afterEach(() => vi.clearAllMocks());
+
+  it.each([
+    { tournamentId: 'tournament-qa', canWrite: true, requireCancelReason: false },
+    { tournamentId: 'league-qa', canWrite: true, requireCancelReason: true },
+    { tournamentId: 'tournament-qa', canWrite: false, requireCancelReason: false },
+  ])('전체2→대기0→전체2를 구분하고 실제 공용 props $tournamentId/$canWrite를 유지해요', (props) => {
+    render(<RegistrationsTab {...props} showToast={vi.fn()} />);
+    const filters = within(screen.getByRole('group', { name: '신청 상태 필터' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(filters.getByRole('button', { name: '확정 2' })).toBeInTheDocument();
+    fireEvent.click(filters.getByRole('button', { name: '대기' }));
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
+    expect(screen.getByText('다른 상태를 선택하거나 전체 신청을 확인해 보세요.')).toBeInTheDocument();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+    expect(filters.getByRole('button', { name: '대기' })).toHaveAttribute('aria-pressed', 'true');
+    expect(filters.getByRole('button', { name: '확정 2' })).toBeInTheDocument();
+    fireEvent.click(filters.getByRole('button', { name: '전체' }));
+    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText('합성 A팀')).toBeInTheDocument();
+    expect(screen.getByText('합성 B팀')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '명단 검토' })).toHaveLength(2);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it.each(REGISTRATION_STATUS_FILTERS.filter(({ value }) => value !== 'all'))('$label 빈 결과는 전체 없음 안내를 사용하지 않아요', ({ label }) => {
+    arrange({ data: { items: [], truncated: false } });
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    fireEvent.click(within(screen.getByRole('group', { name: '신청 상태 필터' })).getByRole('button', { name: label }));
+    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it('실제 전체0은 전체 빈 안내를 유지하고 상태 필터로 이동할 수 있어요', () => {
+    arrange({ data: { items: [], truncated: false } });
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    expect(screen.getByText('신청이 없어요')).toBeInTheDocument();
+    expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();
+    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('빠른 연속 상태 변경 후 전체는 원본2건을 유지해요', () => {
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    const filters = within(screen.getByRole('group', { name: '신청 상태 필터' }));
+    for (const name of ['대기', '입금 확인 중', '취소', '대기', '전체']) {
+      fireEvent.click(filters.getByRole('button', { name }));
+    }
+    expect(filters.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it('부분 조회의 선택 상태0은 기존1000건 경고와 함께 보여요', () => {
+    arrange({ data: { items, truncated: true } });
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '대기' }));
+    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
+    expect(screen.getByText(/신청이 1,000건을 넘어 일부만 불러왔어요/)).toBeInTheDocument();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+  });
+
+  it('로딩은 필터 빈 결과로 표시하지 않아요', () => {
+    arrange({ data: undefined, isPending: true });
+    render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '대기' }));
+    expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+  });
+
+  it('API 오류→재조회→정상 빈 결과를 구분하고 선택 상태를 유지해요', () => {
+    arrange({ data: undefined, isError: true, error: new Error('신청 조회 실패') });
+    const view = render(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '대기' }));
+    expect(screen.getByText('신청 조회 실패')).toBeInTheDocument();
+    expect(screen.queryByText('선택한 상태의 신청이 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByText('아직 신청한 팀이 없어요.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    arrange();
+    view.rerender(<RegistrationsTab tournamentId="tournament-qa" canWrite showToast={vi.fn()} />);
+    expect(screen.queryByText('신청 조회 실패')).not.toBeInTheDocument();
+    expect(screen.getByText('선택한 상태의 신청이 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '대기' })).toHaveAttribute('aria-pressed', 'true');
+    expect(mutate).not.toHaveBeenCalled();
+  });
+});
 
 describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
   const showToast = vi.fn();
@@ -435,7 +549,7 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     // 결과 문구도 모달 제목("신청 거부")과 같은 말을 쓴다 — "취소" 로 알리면 팀이 스스로
     // 취소한 것과 운영자가 거부한 것이 같은 말이 된다.
     const onSuccess = (cancelMutate.mock.calls[0][1] as { onSuccess: () => void }).onSuccess;
-    onSuccess();
+    act(() => onSuccess());
     expect(showToast).toHaveBeenCalledWith('거부했어요.', 'success');
   });
 

@@ -197,7 +197,7 @@ export class TeamMatchesService {
     // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기를 그 뒤에 최근
     // 것부터, 일정 미정(startAt null — 리그 대진 등)은 맨 뒤. startAt asc 한 줄로 두면 기간 제한
     // 없이 실리는 matched·최근 완료 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는
-    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>",
+    // "시작 전/후"를 가를 수 없어 구간별로 읽어 잇는다(커서는 "<구간>:<id>@<기준 시각>",
     // matches.service.ts list() 와 같은 규칙). '최신순'을 고른 경우만 등록 최신순이다.
     const groups: Record<string, Pick<Prisma.V1TeamMatchFindManyArgs, 'where' | 'orderBy'>> = {
       latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },

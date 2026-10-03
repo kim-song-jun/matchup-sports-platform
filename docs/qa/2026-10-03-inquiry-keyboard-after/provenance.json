@@ -1,0 +1,23 @@
+{
+  "sourceFiles": [
+    {
+      "name": "inquiry-keyboard-after-proof.json",
+      "sha256": "68ce200d39699bee0fbabb0f43f5a39f1f4e97590c2d5a28e2f23e0bfc79acd4"
+    },
+    {
+      "name": "inquiry-keyboard-final-state.json",
+      "sha256": "c20688c59146541666465a80ec2120861cab2f5398ce04d3a490f337ad7fd735"
+    },
+    {
+      "name": "inquiry-keyboard-exit-observation.json",
+      "sha256": "b44ae256563ccd9c9f8ece8b794383741a0b51fd95410f1d6fc333df39964d13"
+    },
+    {
+      "name": "inquiry-exact-ax-after-proof.json",
+      "sha256": "89b10f02263ec4f2628de54866a1dc4ba509c88ab95c9564b7d00409d229cc40"
+    }
+  ],
+  "projection": "Raw inquiry and exit URLs replaced with generic route classes; exact same-source URL equality checked before omission. Generic control labels, values, geometry, booleans and UTC preserved.",
+  "sourceFinalDuplicatesProofIndex": 21,
+  "noPNG": true
+}

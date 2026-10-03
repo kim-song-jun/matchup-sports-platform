@@ -1,0 +1,139 @@
+{
+  "issueScope": "1464 inquiry keyboard comparison and later desktop exact AX names",
+  "evidenceMode": "DOM-only",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read successful Deploy Alpha workflow",
+    "runtimeServingSHA": "unknown"
+  },
+  "observationWindowUTC": [
+    "2026-10-03T12:25:55.828Z",
+    "2026-10-03T12:27:18.107Z"
+  ],
+  "exitUTC": "2026-10-03T12:27:18.969Z",
+  "laterExactAXUTC": "2026-10-03T12:38:15.217Z",
+  "recordCount": 22,
+  "keyboardEndpoints": 21,
+  "fullyWithinViewportEndpoints": 19,
+  "threeWidths": [
+    {
+      "width": 405,
+      "proofIndexes": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "TabEndpoints": [
+        "TEXTAREA",
+        "BUTTON",
+        "SELECT"
+      ],
+      "localStatusSequence": [
+        "received",
+        "reviewing",
+        "received"
+      ],
+      "selectFocusRetainedAfterArrows": true,
+      "spaceEscapeEndpointReceived": true,
+      "reverseEndpointTextarea": true,
+      "replyEmptyAllEndpoints": true,
+      "focusVisibleDOMAllEndpoints": true
+    },
+    {
+      "width": 789,
+      "proofIndexes": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "TabEndpoints": [
+        "TEXTAREA",
+        "BUTTON",
+        "SELECT"
+      ],
+      "localStatusSequence": [
+        "received",
+        "reviewing",
+        "received"
+      ],
+      "selectFocusRetainedAfterArrows": true,
+      "spaceEscapeEndpointReceived": true,
+      "reverseEndpointTextarea": true,
+      "replyEmptyAllEndpoints": true,
+      "focusVisibleDOMAllEndpoints": true
+    },
+    {
+      "width": 1183,
+      "proofIndexes": [
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "TabEndpoints": [
+        "TEXTAREA",
+        "BUTTON",
+        "SELECT"
+      ],
+      "localStatusSequence": [
+        "received",
+        "reviewing",
+        "received"
+      ],
+      "selectFocusRetainedAfterArrows": true,
+      "spaceEscapeEndpointReceived": true,
+      "reverseEndpointTextarea": true,
+      "replyEmptyAllEndpoints": true,
+      "focusVisibleDOMAllEndpoints": true
+    }
+  ],
+  "partialTextareaEndpoints": [
+    {
+      "proofIndex": 14,
+      "tag": "TEXTAREA",
+      "width": 789,
+      "fullyWithinViewport": false,
+      "topOverflowCSS": 14.25,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 15,
+      "tag": "TEXTAREA",
+      "width": 1183,
+      "fullyWithinViewport": false,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 40.75
+    }
+  ],
+  "collectorReportedActions": {
+    "replySubmit": 0,
+    "statusApply": 0,
+    "Enter": 0,
+    "serverWrites": 0
+  },
+  "screenshots": 0,
+  "limits": [
+    "DOM-only evidence with no inquiry content or screenshots; focusVisible is a pseudo-state, not a pixel focus/occlusion audit.",
+    "22 records contain one mobile pre-sequence link observation plus21 keyboard endpoints,7 per width. Final-state file duplicates row21.",
+    "19/21 active rectangles fit fully. Tablet reverse textarea top=-14.25; desktop initial textarea bottom798.75 exceeds viewport758 by40.75. Not an all-control visibility pass or new defect conclusion.",
+    "Status ArrowDown/Up changes/restores local selection and retains SELECT focus. Apply/Submit/Enter/serverWrites0 are collector-reported; no delivery/persistence audit.",
+    "Space/Escape records only the final received/select-focused endpoint; no native popup rendering or opening-state proof.",
+    "Two reverse ShiftTab presses are collector-reported. Final textarea endpoint is recorded; intermediate reverse submit focus is not a separate row.",
+    "replyEmpty=true comes from a collector expression requiring an existing textarea with value length0; no reply contents are retained. Empty labels/type on the initial link are not missing form values.",
+    "Earlier concatenated status label includes option text; exact AX labels are supported only by the later separate desktop12:38:15.217 record.",
+    "No full keyboard cycle, all-fields accessibility, backend behavior or root-cause claim. Runtime servingSHA unknown."
+  ]
+}

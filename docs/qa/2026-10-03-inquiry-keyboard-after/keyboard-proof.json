@@ -1,0 +1,779 @@
+[
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [],
+      "rect": {
+        "bottom": 116,
+        "height": 44,
+        "width": 81.80000305175781,
+        "x": 307,
+        "y": 72
+      },
+      "tag": "A",
+      "type": "",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:55.828Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-before-reply-link",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 0
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "답변 내용"
+      ],
+      "rect": {
+        "bottom": 496,
+        "height": 217.6000061035156,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 278.3999938964844
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:55.939Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-tab-reply",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 1
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [],
+      "name": "답변 등록",
+      "rect": {
+        "bottom": 552,
+        "height": 44,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 508
+      },
+      "tag": "BUTTON",
+      "type": "submit",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:56.105Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-tab-reply-submit-unactivated",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 2
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 513.3999938964844,
+        "height": 44,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 469.3999938964844
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:56.276Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-tab-status",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 3
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 513.3999938964844,
+        "height": 44,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 469.3999938964844
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "reviewing",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "reviewing",
+    "utc": "2026-10-03T12:25:56.441Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-status-arrow-down",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 4
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 513.3999938964844,
+        "height": 44,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 469.3999938964844
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:56.606Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-status-arrow-up-restored",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 5
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 513.3999938964844,
+        "height": 44,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 469.3999938964844
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:56.943Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-status-space-escape",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 6
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "답변 내용"
+      ],
+      "rect": {
+        "bottom": 300.80001068115234,
+        "height": 217.6000061035156,
+        "width": 339.20001220703125,
+        "x": 32.79999923706055,
+        "y": 83.20000457763672
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:25:57.415Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile-shifttab-reply",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 7
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "답변 내용"
+      ],
+      "rect": {
+        "bottom": 445.75001525878906,
+        "height": 217.33334350585935,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": 228.4166717529297
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:26:53.208Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-tab-reply",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 8
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [],
+      "name": "답변 등록",
+      "rect": {
+        "bottom": 501.75,
+        "height": 44,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": 457.75
+      },
+      "tag": "BUTTON",
+      "type": "submit",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:26:53.324Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-tab-reply-submit-unactivated",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 9
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 408.75,
+        "height": 44,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": 364.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:26:53.489Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-tab-status",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 10
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 408.75,
+        "height": 44,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": 364.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "reviewing",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "reviewing",
+    "utc": "2026-10-03T12:26:53.663Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-status-arrow-down",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 11
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 408.75,
+        "height": 44,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": 364.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:26:53.830Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-status-arrow-up-restored",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 12
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 408.75,
+        "height": 44,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": 364.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:26:54.176Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-status-space-escape",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 13
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "답변 내용"
+      ],
+      "rect": {
+        "bottom": 203.08334350585935,
+        "height": 217.33334350585935,
+        "width": 707.3333740234375,
+        "x": 40.66666793823242,
+        "y": -14.25
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": false
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:26:54.646Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet-shifttab-reply",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 14
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "답변 내용"
+      ],
+      "rect": {
+        "bottom": 798.75,
+        "height": 218,
+        "width": 845,
+        "x": 289,
+        "y": 580.75
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": false
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:27:16.641Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-tab-reply",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 15
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [],
+      "name": "답변 등록",
+      "rect": {
+        "bottom": 495.75,
+        "height": 44,
+        "width": 845,
+        "x": 289,
+        "y": 451.75
+      },
+      "tag": "BUTTON",
+      "type": "submit",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:27:16.811Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-tab-reply-submit-unactivated",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 16
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 652.75,
+        "height": 44,
+        "width": 845,
+        "x": 289,
+        "y": 608.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:27:16.963Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-tab-status",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 17
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 652.75,
+        "height": 44,
+        "width": 845,
+        "x": 289,
+        "y": 608.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "reviewing",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "reviewing",
+    "utc": "2026-10-03T12:27:17.128Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-status-arrow-down",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 18
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 652.75,
+        "height": 44,
+        "width": 845,
+        "x": 289,
+        "y": 608.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:27:17.294Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-status-arrow-up-restored",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 19
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "문의 처리 상태접수검토중답변완료종결"
+      ],
+      "rect": {
+        "bottom": 652.75,
+        "height": 44,
+        "width": 845,
+        "x": 289,
+        "y": 608.75
+      },
+      "tag": "SELECT",
+      "type": "select-one",
+      "value": "received",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:27:17.639Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-status-space-escape",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 20
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "답변 내용"
+      ],
+      "rect": {
+        "bottom": 439.75,
+        "height": 218,
+        "width": 845,
+        "x": 289,
+        "y": 221.75
+      },
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "withinViewport": true
+    },
+    "replyEmpty": true,
+    "statusLabel": [
+      "문의 처리 상태접수검토중답변완료종결"
+    ],
+    "statusValue": "received",
+    "utc": "2026-10-03T12:27:18.107Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop-shifttab-reply",
+    "runtimeServingSHA": "unknown",
+    "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+    "routeClass": "same admin inquiry detail",
+    "sourceProofIndex": 21
+  }
+]

@@ -1,0 +1,283 @@
+{
+  "scope": "Independent record/geometry/chronology recalculation and sanitized publication projection",
+  "threeWidths": [
+    {
+      "width": 405,
+      "proofIndexes": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "TabEndpoints": [
+        "TEXTAREA",
+        "BUTTON",
+        "SELECT"
+      ],
+      "localStatusSequence": [
+        "received",
+        "reviewing",
+        "received"
+      ],
+      "selectFocusRetainedAfterArrows": true,
+      "spaceEscapeEndpointReceived": true,
+      "reverseEndpointTextarea": true,
+      "replyEmptyAllEndpoints": true,
+      "focusVisibleDOMAllEndpoints": true
+    },
+    {
+      "width": 789,
+      "proofIndexes": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "TabEndpoints": [
+        "TEXTAREA",
+        "BUTTON",
+        "SELECT"
+      ],
+      "localStatusSequence": [
+        "received",
+        "reviewing",
+        "received"
+      ],
+      "selectFocusRetainedAfterArrows": true,
+      "spaceEscapeEndpointReceived": true,
+      "reverseEndpointTextarea": true,
+      "replyEmptyAllEndpoints": true,
+      "focusVisibleDOMAllEndpoints": true
+    },
+    {
+      "width": 1183,
+      "proofIndexes": [
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "TabEndpoints": [
+        "TEXTAREA",
+        "BUTTON",
+        "SELECT"
+      ],
+      "localStatusSequence": [
+        "received",
+        "reviewing",
+        "received"
+      ],
+      "selectFocusRetainedAfterArrows": true,
+      "spaceEscapeEndpointReceived": true,
+      "reverseEndpointTextarea": true,
+      "replyEmptyAllEndpoints": true,
+      "focusVisibleDOMAllEndpoints": true
+    }
+  ],
+  "endpointGeometry": [
+    {
+      "proofIndex": 1,
+      "tag": "TEXTAREA",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 2,
+      "tag": "BUTTON",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 3,
+      "tag": "SELECT",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 4,
+      "tag": "SELECT",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 5,
+      "tag": "SELECT",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 6,
+      "tag": "SELECT",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 7,
+      "tag": "TEXTAREA",
+      "width": 405,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 8,
+      "tag": "TEXTAREA",
+      "width": 789,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 9,
+      "tag": "BUTTON",
+      "width": 789,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 10,
+      "tag": "SELECT",
+      "width": 789,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 11,
+      "tag": "SELECT",
+      "width": 789,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 12,
+      "tag": "SELECT",
+      "width": 789,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 13,
+      "tag": "SELECT",
+      "width": 789,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 14,
+      "tag": "TEXTAREA",
+      "width": 789,
+      "fullyWithinViewport": false,
+      "topOverflowCSS": 14.25,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 15,
+      "tag": "TEXTAREA",
+      "width": 1183,
+      "fullyWithinViewport": false,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 40.75
+    },
+    {
+      "proofIndex": 16,
+      "tag": "BUTTON",
+      "width": 1183,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 17,
+      "tag": "SELECT",
+      "width": 1183,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 18,
+      "tag": "SELECT",
+      "width": 1183,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 19,
+      "tag": "SELECT",
+      "width": 1183,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 20,
+      "tag": "SELECT",
+      "width": 1183,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    },
+    {
+      "proofIndex": 21,
+      "tag": "TEXTAREA",
+      "width": 1183,
+      "fullyWithinViewport": true,
+      "topOverflowCSS": 0,
+      "bottomOverflowCSS": 0
+    }
+  ],
+  "laterExactAX": [
+    {
+      "role": "textbox",
+      "name": "답변 내용",
+      "count": 1
+    },
+    {
+      "role": "combobox",
+      "name": "문의 처리 상태",
+      "count": 1
+    }
+  ],
+  "sameSourceEndpointForKeyboardAndLaterAX": true,
+  "sameURLAllKeyboardRows": true,
+  "sourceFinalStateExactlyEqualsLastRow": true,
+  "privacy": "Raw inquiry URL/identifier and all inquiry/person/reply content are excluded",
+  "limits": [
+    "DOM-only evidence with no inquiry content or screenshots; focusVisible is a pseudo-state, not a pixel focus/occlusion audit.",
+    "22 records contain one mobile pre-sequence link observation plus21 keyboard endpoints,7 per width. Final-state file duplicates row21.",
+    "19/21 active rectangles fit fully. Tablet reverse textarea top=-14.25; desktop initial textarea bottom798.75 exceeds viewport758 by40.75. Not an all-control visibility pass or new defect conclusion.",
+    "Status ArrowDown/Up changes/restores local selection and retains SELECT focus. Apply/Submit/Enter/serverWrites0 are collector-reported; no delivery/persistence audit.",
+    "Space/Escape records only the final received/select-focused endpoint; no native popup rendering or opening-state proof.",
+    "Two reverse ShiftTab presses are collector-reported. Final textarea endpoint is recorded; intermediate reverse submit focus is not a separate row.",
+    "replyEmpty=true comes from a collector expression requiring an existing textarea with value length0; no reply contents are retained. Empty labels/type on the initial link are not missing form values.",
+    "Earlier concatenated status label includes option text; exact AX labels are supported only by the later separate desktop12:38:15.217 record.",
+    "No full keyboard cycle, all-fields accessibility, backend behavior or root-cause claim. Runtime servingSHA unknown."
+  ]
+}

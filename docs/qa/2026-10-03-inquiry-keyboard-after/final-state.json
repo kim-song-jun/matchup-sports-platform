@@ -1,0 +1,35 @@
+{
+  "active": {
+    "focusVisible": true,
+    "labels": [
+      "답변 내용"
+    ],
+    "rect": {
+      "bottom": 439.75,
+      "height": 218,
+      "width": 845,
+      "x": 289,
+      "y": 221.75
+    },
+    "tag": "TEXTAREA",
+    "type": "textarea",
+    "withinViewport": true
+  },
+  "replyEmpty": true,
+  "statusLabel": [
+    "문의 처리 상태접수검토중답변완료종결"
+  ],
+  "statusValue": "received",
+  "utc": "2026-10-03T12:27:18.107Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 758,
+    "scrollWidth": 1183,
+    "width": 1183
+  },
+  "step": "desktop-shifttab-reply",
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; runtime identity unknown.",
+  "routeClass": "same admin inquiry detail",
+  "sourceProofIndex": 21
+}

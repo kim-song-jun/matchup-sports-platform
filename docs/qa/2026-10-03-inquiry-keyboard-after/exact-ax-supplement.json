@@ -1,0 +1,28 @@
+{
+  "utc": "2026-10-03T12:38:15.217Z",
+  "viewport": {
+    "dpr": 1,
+    "height": 758,
+    "width": 1183
+  },
+  "checks": [
+    {
+      "role": "textbox",
+      "name": "답변 내용",
+      "count": 1
+    },
+    {
+      "role": "combobox",
+      "name": "문의 처리 상태",
+      "count": 1
+    }
+  ],
+  "axRelevantLines": [
+    "    - textbox \"답변 내용\"",
+    "    - combobox \"문의 처리 상태\":"
+  ],
+  "runtimeServingSHA": "unknown",
+  "deploymentContext": "Successful Deploy Alpha8167aaa at11:22:16UTC; later desktop-only read; runtime identity unknown.",
+  "scope": "Original exact AX verification desktop-only; no input or selection",
+  "routeClass": "same admin inquiry detail"
+}

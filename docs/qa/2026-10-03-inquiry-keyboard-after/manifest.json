@@ -1,0 +1,45 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2715,
+      "sha256": "b6aa6f7a076dc8f70aac50ee2736d23eb402fe5a67470d585e5a996646d6170c"
+    },
+    {
+      "file": "exact-ax-supplement.json",
+      "bytes": 707,
+      "sha256": "e0a54046883a891e2df2804c77f3009fa38ad9f35bf77e9799646e79c7dae156"
+    },
+    {
+      "file": "exit-observation.json",
+      "bytes": 310,
+      "sha256": "1c67550ee6df861a0fecf0c5320e621d42248fce9b5f60b9e7a57edc8ede5a42"
+    },
+    {
+      "file": "final-state.json",
+      "bytes": 795,
+      "sha256": "370f123f6e72c0e25470139436de956e10537d702f8f8dc67d37aa56dc0ba188"
+    },
+    {
+      "file": "keyboard-proof.json",
+      "bytes": 20460,
+      "sha256": "f5bfe8377e5614513a1ab0376bca1201fb2c06394a8a3121271ed287c9bf456f"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 885,
+      "sha256": "3f2e207d1b36d54fbad785f33d68717e77720d52e936a374fb1b5545fce1b5fb"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4347,
+      "sha256": "c2bb782b37c0667ac6ce5c2ea2b70f815aa44131ec3aa16f3a958bc67291d484"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 7256,
+      "sha256": "161ec1b119de8ec95a8725404fdc5edbca2449cfbd83ded5f0506b3aea726ab0"
+    }
+  ],
+  "scope": "All files except manifest itself"
+}

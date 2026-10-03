@@ -1,0 +1,245 @@
+{
+  "observations": [
+    {
+      "sourceProofIndex": 0,
+      "utc": "2026-10-03T12:39:56.322Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 405,
+        "width": 405
+      },
+      "routeClass": "member detail",
+      "sameSourceAsNavigation": true,
+      "recordedTeamLinkCount": 13,
+      "recordedUniqueTeamLinkCount": 13,
+      "rolesRecounted": {
+        "leader": 12,
+        "member": 1
+      },
+      "activeStatusLabelsRecounted": 13,
+      "affiliationStatistics": [
+        {
+          "count": 12,
+          "term": "소유 팀(보관 포함)"
+        },
+        {
+          "count": 12,
+          "term": "팀장 팀"
+        },
+        {
+          "count": 0,
+          "term": "매니저 팀"
+        },
+        {
+          "count": 13,
+          "term": "소속팀 전체"
+        },
+        {
+          "count": 1,
+          "term": "일반 멤버 팀"
+        }
+      ],
+      "definitionLists": [
+        {
+          "allDTFollowedByDD": true,
+          "ddCount": 15,
+          "dtCount": 15,
+          "terms": [
+            "회원 ID",
+            "이름",
+            "닉네임",
+            "이메일 인증",
+            "전화번호",
+            "전화번호 인증",
+            "성별",
+            "생년월일",
+            "활동 지역",
+            "로그인 방식",
+            "온보딩",
+            "가입일",
+            "최근 로그인",
+            "삭제일",
+            "관리자 권한"
+          ]
+        },
+        {
+          "allDTFollowedByDD": true,
+          "ddCount": 7,
+          "dtCount": 7,
+          "terms": [
+            "개설 매치",
+            "소유 팀(보관 포함)",
+            "팀장 팀",
+            "매니저 팀",
+            "소속팀 전체",
+            "일반 멤버 팀",
+            "리뷰 수"
+          ]
+        }
+      ],
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceProofIndex": 1,
+      "utc": "2026-10-03T12:40:17.617Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 789,
+        "width": 789
+      },
+      "routeClass": "member detail",
+      "sameSourceAsNavigation": true,
+      "recordedTeamLinkCount": 13,
+      "recordedUniqueTeamLinkCount": 13,
+      "rolesRecounted": {
+        "leader": 12,
+        "member": 1
+      },
+      "activeStatusLabelsRecounted": 13,
+      "affiliationStatistics": [
+        {
+          "count": 12,
+          "term": "소유 팀(보관 포함)"
+        },
+        {
+          "count": 12,
+          "term": "팀장 팀"
+        },
+        {
+          "count": 0,
+          "term": "매니저 팀"
+        },
+        {
+          "count": 13,
+          "term": "소속팀 전체"
+        },
+        {
+          "count": 1,
+          "term": "일반 멤버 팀"
+        }
+      ],
+      "definitionLists": [
+        {
+          "allDTFollowedByDD": true,
+          "ddCount": 15,
+          "dtCount": 15,
+          "terms": [
+            "회원 ID",
+            "이름",
+            "닉네임",
+            "이메일 인증",
+            "전화번호",
+            "전화번호 인증",
+            "성별",
+            "생년월일",
+            "활동 지역",
+            "로그인 방식",
+            "온보딩",
+            "가입일",
+            "최근 로그인",
+            "삭제일",
+            "관리자 권한"
+          ]
+        },
+        {
+          "allDTFollowedByDD": true,
+          "ddCount": 7,
+          "dtCount": 7,
+          "terms": [
+            "개설 매치",
+            "소유 팀(보관 포함)",
+            "팀장 팀",
+            "매니저 팀",
+            "소속팀 전체",
+            "일반 멤버 팀",
+            "리뷰 수"
+          ]
+        }
+      ],
+      "runtimeServingSHA": "unknown"
+    },
+    {
+      "sourceProofIndex": 2,
+      "utc": "2026-10-03T12:40:17.953Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "scrollWidth": 1183,
+        "width": 1183
+      },
+      "routeClass": "member detail",
+      "sameSourceAsNavigation": true,
+      "recordedTeamLinkCount": 13,
+      "recordedUniqueTeamLinkCount": 13,
+      "rolesRecounted": {
+        "leader": 12,
+        "member": 1
+      },
+      "activeStatusLabelsRecounted": 13,
+      "affiliationStatistics": [
+        {
+          "count": 12,
+          "term": "소유 팀(보관 포함)"
+        },
+        {
+          "count": 12,
+          "term": "팀장 팀"
+        },
+        {
+          "count": 0,
+          "term": "매니저 팀"
+        },
+        {
+          "count": 13,
+          "term": "소속팀 전체"
+        },
+        {
+          "count": 1,
+          "term": "일반 멤버 팀"
+        }
+      ],
+      "definitionLists": [
+        {
+          "allDTFollowedByDD": true,
+          "ddCount": 15,
+          "dtCount": 15,
+          "terms": [
+            "회원 ID",
+            "이름",
+            "닉네임",
+            "이메일 인증",
+            "전화번호",
+            "전화번호 인증",
+            "성별",
+            "생년월일",
+            "활동 지역",
+            "로그인 방식",
+            "온보딩",
+            "가입일",
+            "최근 로그인",
+            "삭제일",
+            "관리자 권한"
+          ]
+        },
+        {
+          "allDTFollowedByDD": true,
+          "ddCount": 7,
+          "dtCount": 7,
+          "terms": [
+            "개설 매치",
+            "소유 팀(보관 포함)",
+            "팀장 팀",
+            "매니저 팀",
+            "소속팀 전체",
+            "일반 멤버 팀",
+            "리뷰 수"
+          ]
+        }
+      ],
+      "runtimeServingSHA": "unknown"
+    }
+  ],
+  "scope": "Later read-only structural/aggregate observations; no extra destination clicks."
+}

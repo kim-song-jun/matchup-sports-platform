@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 2332,
+      "sha256": "9c7f4d455c818ea86c1008868da91b0beb519f067ce72e7c9aa2d60bebe554de"
+    },
+    {
+      "file": "final-state.json",
+      "bytes": 192,
+      "sha256": "220671fedd356b3ea5f7de254b519a2dea82f4e78c8381dfccdc81eab4efef0c"
+    },
+    {
+      "file": "membership-semantics-proof.json",
+      "bytes": 5834,
+      "sha256": "c344e1e9f8656b37b898b70013c199b8a8084a18249af98f82761277e508d81d"
+    },
+    {
+      "file": "navigation-proof.json",
+      "bytes": 15759,
+      "sha256": "b8d7bd56bd99d6258c8cf8fbc1ecae83dc82bfff978293d48b3c83c356856485"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 699,
+      "sha256": "2c84f9d3855990da5df733f38adc81892bf7f0329a8e0110ff384037f0447b1e"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4170,
+      "sha256": "188ebe7a765aac5b776ee008e9f02b6aa74e7906ebbdc4d6e19f8bfe1cb517b2"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 3683,
+      "sha256": "293db7882cfe6b269974e3cb1d5e74d5fc334ec992e20ac1f276179a4b428b88"
+    }
+  ],
+  "scope": "All files except manifest itself"
+}

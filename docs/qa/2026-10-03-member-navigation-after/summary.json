@@ -1,0 +1,105 @@
+{
+  "issueScope": "1461 selected team/match navigation and member detail semantics",
+  "evidenceMode": "DOM only",
+  "deploymentContext": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37118485935",
+    "headSHA": "8167aaa86ed3cc787bd82568515ad1f9d21d0ef2",
+    "successUpdatedUTC": "2026-10-03T11:22:16Z",
+    "source": "Independently read successful Deploy Alpha workflow",
+    "runtimeServingSHA": "unknown"
+  },
+  "navigationWindowUTC": [
+    "2026-10-03T12:06:23.112Z",
+    "2026-10-03T12:09:01.279Z"
+  ],
+  "supplementWindowUTC": [
+    "2026-10-03T12:39:56.322Z",
+    "2026-10-03T12:40:17.953Z"
+  ],
+  "finalExitUTC": "2026-10-03T12:40:19.335Z",
+  "navigationObservations": 15,
+  "laterSemanticsObservations": 3,
+  "selectedDestinationComparisons": [
+    {
+      "cssWidth": 405,
+      "proofIndexes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "selectedTeamIndex": 0,
+      "selectedRecentMatchIndex": 1,
+      "selectedEndpointsMatchObservedLinks": true,
+      "bothBrowserBackRestoreSameSource": true,
+      "bothBackPreserveOrderedLinkSequences": true,
+      "teamLinks": 13,
+      "uniqueTeamPaths": 13,
+      "recentMatchLinks": 5,
+      "teamPathSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchPathSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "cssWidth": 789,
+      "proofIndexes": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "selectedTeamIndex": 0,
+      "selectedRecentMatchIndex": 1,
+      "selectedEndpointsMatchObservedLinks": true,
+      "bothBrowserBackRestoreSameSource": true,
+      "bothBackPreserveOrderedLinkSequences": true,
+      "teamLinks": 13,
+      "uniqueTeamPaths": 13,
+      "recentMatchLinks": 5,
+      "teamPathSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchPathSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "cssWidth": 1183,
+      "proofIndexes": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "selectedTeamIndex": 0,
+      "selectedRecentMatchIndex": 1,
+      "selectedEndpointsMatchObservedLinks": true,
+      "bothBrowserBackRestoreSameSource": true,
+      "bothBackPreserveOrderedLinkSequences": true,
+      "teamLinks": 13,
+      "uniqueTeamPaths": 13,
+      "recentMatchLinks": 5,
+      "teamPathSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchPathSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    }
+  ],
+  "definitionListPairs": [
+    15,
+    7
+  ],
+  "roleCounts": {
+    "leader": 12,
+    "member": 1
+  },
+  "screenshots": 0,
+  "limits": [
+    "15 navigation observations cover one source member, one selected team and one selected recent match at three widths; not all13 team or all5 match destinations.",
+    "Actual activation/Back procedure is collector-reported and supported by exact endpoints/order. No new browser replay during publication.",
+    "Profile-specific link-collector zeros on destination pages do not mean those pages have no links/data.",
+    "13 unique team paths are independently recomputed from original navigation arrays. Supplementary13 unique links is a recorded aggregate without a new href array.",
+    "Later membership/definition-list evidence is a separate12:39–12:40 window, not part of12:06–12:09 navigation.",
+    "Two definition lists have15 and7 dt/dd pairs, not13 pairs. Only generic term labels are included; actual member values are excluded.",
+    "Whole-card anchor coverage, complete recent-match block structure and all-link navigation were not recorded.",
+    "Mounted sidebar is outside mobile/tablet viewport and intersects desktop viewport; no menu-open/focus/layout screenshot assertion.",
+    "No profile images, names, contact details, raw profile/team/match IDs or URL arrays are published.",
+    "No editing, saving, permissions, backend persistence, physical-device or whole-app validation. RuntimeSHA unknown."
+  ]
+}

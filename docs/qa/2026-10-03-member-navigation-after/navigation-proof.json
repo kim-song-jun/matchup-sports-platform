@@ -1,0 +1,442 @@
+{
+  "observations": [
+    {
+      "sourceProofIndex": 0,
+      "step": "mobile-source-profile",
+      "utc": "2026-10-03T12:06:23.112Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 1,
+      "step": "mobile-team-destination",
+      "utc": "2026-10-03T12:06:24.438Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "routeClass": "team detail",
+      "endpointSHA256": "2ea962038306e0f35e6b5158e253f589bddfd9bc5b5a46aea6c2cab22bcd2885",
+      "genericHeading": "팀 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 0,
+        "uniqueTeamPaths": 0,
+        "recentMatchLinks": 0
+      },
+      "teamSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "recentMatchSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "sourceProofIndex": 2,
+      "step": "mobile-team-browserBack",
+      "utc": "2026-10-03T12:06:24.515Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 3,
+      "step": "mobile-recent-match-destination",
+      "utc": "2026-10-03T12:06:25.638Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "routeClass": "match detail",
+      "endpointSHA256": "93615425e596a175cf159e1758b60fc3d45c4b8451083b0b0e8b2c02f5ebadc5",
+      "genericHeading": "매치 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 0,
+        "uniqueTeamPaths": 0,
+        "recentMatchLinks": 0
+      },
+      "teamSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "recentMatchSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "sourceProofIndex": 4,
+      "step": "mobile-match-browserBack",
+      "utc": "2026-10-03T12:06:25.712Z",
+      "viewportCSS": {
+        "dpr": 1.25,
+        "height": 606,
+        "width": 405
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 5,
+      "step": "tablet-source-profile",
+      "utc": "2026-10-03T12:08:14.918Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 6,
+      "step": "tablet-team-destination",
+      "utc": "2026-10-03T12:08:15.980Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "routeClass": "team detail",
+      "endpointSHA256": "2ea962038306e0f35e6b5158e253f589bddfd9bc5b5a46aea6c2cab22bcd2885",
+      "genericHeading": "팀 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 0,
+        "uniqueTeamPaths": 0,
+        "recentMatchLinks": 0
+      },
+      "teamSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "recentMatchSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "sourceProofIndex": 7,
+      "step": "tablet-team-browserBack",
+      "utc": "2026-10-03T12:08:16.049Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 8,
+      "step": "tablet-recent-match-destination",
+      "utc": "2026-10-03T12:08:16.706Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "routeClass": "match detail",
+      "endpointSHA256": "93615425e596a175cf159e1758b60fc3d45c4b8451083b0b0e8b2c02f5ebadc5",
+      "genericHeading": "매치 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 0,
+        "uniqueTeamPaths": 0,
+        "recentMatchLinks": 0
+      },
+      "teamSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "recentMatchSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "sourceProofIndex": 9,
+      "step": "tablet-match-browserBack",
+      "utc": "2026-10-03T12:08:16.782Z",
+      "viewportCSS": {
+        "dpr": 1.5,
+        "height": 505,
+        "width": 789
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": false,
+      "mobileMenuButtonVisible": true,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 10,
+      "step": "desktop-source-profile",
+      "utc": "2026-10-03T12:08:18.313Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": true,
+      "mobileMenuButtonVisible": false,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 11,
+      "step": "desktop-team-destination",
+      "utc": "2026-10-03T12:09:00.636Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "routeClass": "team detail",
+      "endpointSHA256": "2ea962038306e0f35e6b5158e253f589bddfd9bc5b5a46aea6c2cab22bcd2885",
+      "genericHeading": "팀 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": true,
+      "mobileMenuButtonVisible": false,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 0,
+        "uniqueTeamPaths": 0,
+        "recentMatchLinks": 0
+      },
+      "teamSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "recentMatchSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "sourceProofIndex": 12,
+      "step": "desktop-team-browserBack",
+      "utc": "2026-10-03T12:09:00.710Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": true,
+      "mobileMenuButtonVisible": false,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "sourceProofIndex": 13,
+      "step": "desktop-recent-match-destination",
+      "utc": "2026-10-03T12:09:01.215Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "routeClass": "match detail",
+      "endpointSHA256": "93615425e596a175cf159e1758b60fc3d45c4b8451083b0b0e8b2c02f5ebadc5",
+      "genericHeading": "매치 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": true,
+      "mobileMenuButtonVisible": false,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 0,
+        "uniqueTeamPaths": 0,
+        "recentMatchLinks": 0
+      },
+      "teamSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "recentMatchSequenceSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "sourceProofIndex": 14,
+      "step": "desktop-match-browserBack",
+      "utc": "2026-10-03T12:09:01.279Z",
+      "viewportCSS": {
+        "dpr": 1,
+        "height": 758,
+        "width": 1183
+      },
+      "routeClass": "member detail",
+      "endpointSHA256": "18fa4d5ffc2b928ff3274cdc98df4eb0344bdd84ddbaf3ea3f5f34ab66cb3f73",
+      "genericHeading": "회원 상세",
+      "adminSidebarMounted": true,
+      "sidebarIntersectsViewport": true,
+      "mobileMenuButtonVisible": false,
+      "runtimeServingSHA": "unknown",
+      "profileValuesExcluded": true,
+      "profileCollectorScopeCounts": {
+        "teamLinks": 13,
+        "uniqueTeamPaths": 13,
+        "recentMatchLinks": 5
+      },
+      "teamSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    }
+  ],
+  "comparisons": [
+    {
+      "cssWidth": 405,
+      "proofIndexes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "selectedTeamIndex": 0,
+      "selectedRecentMatchIndex": 1,
+      "selectedEndpointsMatchObservedLinks": true,
+      "bothBrowserBackRestoreSameSource": true,
+      "bothBackPreserveOrderedLinkSequences": true,
+      "teamLinks": 13,
+      "uniqueTeamPaths": 13,
+      "recentMatchLinks": 5,
+      "teamPathSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchPathSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "cssWidth": 789,
+      "proofIndexes": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "selectedTeamIndex": 0,
+      "selectedRecentMatchIndex": 1,
+      "selectedEndpointsMatchObservedLinks": true,
+      "bothBrowserBackRestoreSameSource": true,
+      "bothBackPreserveOrderedLinkSequences": true,
+      "teamLinks": 13,
+      "uniqueTeamPaths": 13,
+      "recentMatchLinks": 5,
+      "teamPathSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchPathSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    },
+    {
+      "cssWidth": 1183,
+      "proofIndexes": [
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "selectedTeamIndex": 0,
+      "selectedRecentMatchIndex": 1,
+      "selectedEndpointsMatchObservedLinks": true,
+      "bothBrowserBackRestoreSameSource": true,
+      "bothBackPreserveOrderedLinkSequences": true,
+      "teamLinks": 13,
+      "uniqueTeamPaths": 13,
+      "recentMatchLinks": 5,
+      "teamPathSequenceSHA256": "612f827a059a6944431f0f30ec3c53b981bbfe615fbaaf0eda8d1a2cf19be88d",
+      "recentMatchPathSequenceSHA256": "d1e1187f71b267b67416ba3e3521d13bd864dffe9b09fc9c5f8385157f0c3684"
+    }
+  ],
+  "hashMethod": "SHA256 of UTF8 full endpoint strings or compact JSON path arrays in observed order; raw paths excluded."
+}

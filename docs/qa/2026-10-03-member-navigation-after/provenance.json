@@ -1,0 +1,18 @@
+{
+  "sourceFiles": [
+    {
+      "name": "member-navigation-after-proof.json",
+      "sha256": "146e91efb82e5d348120e40056a5ebeba4e832fe2ee76726c20a6799ad0f6a24"
+    },
+    {
+      "name": "membership-semantics-after-proof.json",
+      "sha256": "1627f9458b5ad41c4561bc2a64bf76d52a16b7ac27596785ff5db285c80c7652"
+    },
+    {
+      "name": "membership-semantics-exit.json",
+      "sha256": "848bcac7d3d02dcb7d482dadb170cd0cea12edc68987561579ca9cf21c110792"
+    }
+  ],
+  "transformation": "Allowlisted DOM projection. Endpoint/path-sequence equality recomputed before replacing endpoints with hashes and generic route classes. No screenshot or original profile values accessed.",
+  "DOMOnly": true
+}

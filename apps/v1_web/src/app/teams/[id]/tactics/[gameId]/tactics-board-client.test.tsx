@@ -1,7 +1,11 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { createHistoryRouter, currentPath, settleHistory } from '@/test/history-router';
 import { V1ApiError } from '@/lib/api-client';
 import { TacticsBoardClient } from './tactics-board-client';
 
@@ -21,9 +25,10 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...apiMocks,
 }));
 
+const router = createHistoryRouter();
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  useRouter: () => router,
   usePathname: () => '/teams/team-1/tactics/game-1',
 }));
 
@@ -31,7 +36,9 @@ function render(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return rtlRender(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  });
 }
 
 const TEAM_ID = 'team-1';
@@ -274,5 +281,170 @@ describe('전술 조회 실패', () => {
     fireEvent.click(screen.getByRole('button', { name: /다시 시도/ }));
     expect(refetch).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
+  });
+});
+
+describe('#1540 전술보드 실제 편집기와 Back 이탈', () => {
+  const TEAM_RETURN = '/teams/team-1?from=%2Fmy%2Fteams';
+  const BOARD_URL = `/teams/team-1/tactics/game-1?from=${encodeURIComponent(TEAM_RETURN)}`;
+  const TITLE = '작성 중인 내용이 사라져요. 나갈까요?';
+  const step = async (action: () => void, ticks = 10) => {
+    await act(async () => { action(); await settleHistory(ticks); });
+  };
+  const boardWithBack = () => <>
+    <AppBackLink fallbackHref="/teams/team-1">뒤로</AppBackLink>
+    <TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />
+  </>;
+  const renderWithBack = () => render(boardWithBack());
+  const place = () => fireEvent.click(screen.getByRole('button', { name: '선수01(1번) 코트에 놓기' }));
+  const back = () => fireEvent.click(screen.getByRole('link', { name: '뒤로가기' }));
+  const placed = () => {
+    expect(screen.getByRole('button', { name: '선수01 (골키퍼), 등번호 1' })).toBeInTheDocument();
+    expect(screen.getByText('코트 1명 · 대기 0명. 저장하지 않은 변경이 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '전술 저장' })).toBeEnabled();
+  };
+
+  beforeEach(() => {
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/home');
+    installNavigationHistory();
+    window.history.pushState({}, '', TEAM_RETURN);
+    window.history.pushState({}, '', BOARD_URL);
+    vi.clearAllMocks();
+    mockMembers([member('u1', '선수01', 1)], 'owner');
+    mockBoard(boardData({ version: 0 }));
+  });
+  afterEach(async () => {
+    cleanup();
+    await settleHistory(10);
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+    vi.clearAllMocks();
+  });
+
+  it.each(['계속 작성', 'Escape'])('dirty page Back 후 %s는 배치를 유지하고 반복 Back에도 한 번씩 확인한다', async (cancel) => {
+    renderWithBack();
+    place();
+    await step(back);
+    expect(screen.getByRole('dialog', { name: TITLE })).toBeInTheDocument();
+    expect(currentPath()).toBe(BOARD_URL);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    await step(() => cancel === 'Escape'
+      ? fireEvent.keyDown(document, { key: 'Escape' })
+      : fireEvent.click(screen.getByRole('button', { name: '계속 작성' })));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(currentPath()).toBe(BOARD_URL);
+    placed();
+    await step(back);
+    expect(screen.getAllByRole('dialog', { name: TITLE })).toHaveLength(1);
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '계속 작성' })));
+    placed();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('나가기를 선택한 뒤에만 실제 Back 목적지로 이동하고 재진입은 서버 baseline이다', async () => {
+    const mounted = renderWithBack();
+    place();
+    await step(back);
+    expect(currentPath()).toBe(BOARD_URL);
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
+    expect(currentPath()).toBe(TEAM_RETURN);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    mounted.unmount();
+    await step(() => window.history.pushState({}, '', BOARD_URL));
+    renderWithBack();
+    expect(screen.getByRole('list', { name: '대기 1명' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수01 (골키퍼), 등번호 1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장됨' })).toBeDisabled();
+  });
+
+  it('browser Back 경계도 제자리에 확인하고 계속 작성 또는 나가기를 따른다', async () => {
+    renderWithBack();
+    place();
+    await step(() => window.history.back());
+    expect(screen.getByRole('dialog', { name: TITLE })).toBeInTheDocument();
+    expect(currentPath()).toBe(BOARD_URL);
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '계속 작성' })));
+    placed();
+    await step(() => window.history.back());
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
+    expect(currentPath()).toBe(TEAM_RETURN);
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each(['owner', 'member'])('clean %s는 page Back에서 불필요한 확인 없이 기존 목적지로 간다', async (role) => {
+    mockMembers([member('u1', '선수01', 1)], role);
+    renderWithBack();
+    await step(back);
+    expect(currentPath()).toBe(TEAM_RETURN);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('실제 편집 결과 저장 성공 뒤에는 clean으로 Back한다', async () => {
+    renderWithBack();
+    place();
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '전술 저장' })));
+    expect(savedInput()).toMatchObject({ formation: '1-2-1', entries: [expect.objectContaining({ userId: 'u1', started: true, goalkeeper: true })] });
+    expect(await screen.findByText('전술을 저장했어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장됨' })).toBeDisabled();
+    await step(back);
+    expect(currentPath()).toBe(TEAM_RETURN);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mutateAsync).toHaveBeenCalledOnce();
+  });
+
+  it.each([new Error('연결 실패'), new V1ApiError({ status: 'error', timestamp: '2026-10-02T00:00:00Z', statusCode: 409, code: 'TACTICS_CONFLICT', message: '충돌' })])('저장 실패 %s는 배치와 실제 오류를 유지하고 Back을 계속 보호한다', async (caught) => {
+    mutateAsync.mockRejectedValueOnce(caught);
+    renderWithBack();
+    place();
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '전술 저장' })));
+    expect(screen.getByText(caught instanceof V1ApiError
+      ? '다른 팀장·매니저가 먼저 저장했어요. 새로고침해서 최신 배치를 불러온 뒤 다시 저장해 주세요.'
+      : '연결 실패')).toBeInTheDocument();
+    placed();
+    await step(back);
+    expect(screen.getByRole('dialog', { name: TITLE })).toBeInTheDocument();
+    expect(currentPath()).toBe(BOARD_URL);
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '계속 작성' })));
+    placed();
+    expect(mutateAsync).toHaveBeenCalledOnce();
+  });
+
+  it('dirty beforeunload는 취소 가능하며 저장 성공 후에는 남은 경고가 없다', async () => {
+    renderWithBack();
+    place();
+    const dirtyUnload = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(dirtyUnload)).toBe(false);
+    expect(dirtyUnload.defaultPrevented).toBe(true);
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '전술 저장' })));
+    const cleanUnload = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(cleanUnload)).toBe(true);
+    expect(cleanUnload.defaultPrevented).toBe(false);
+  });
+
+  it.each(['board', 'members', 'loading'])('편집 중 %s 조회 상태로 바뀌어도 이탈 확인을 렌더하고 복구 뒤 작성분을 유지한다', async (state) => {
+    const mounted = renderWithBack();
+    place();
+    if (state === 'board') {
+      apiMocks.useV1TacticsBoard.mockReturnValue({ isError: true, isLoading: false, error: new Error('보드 연결 실패'), data: undefined });
+    } else if (state === 'members') {
+      apiMocks.useV1TeamMembers.mockReturnValue({ isError: true, isLoading: false, error: new Error('명단 연결 실패'), data: undefined });
+    } else {
+      apiMocks.useV1TacticsBoard.mockReturnValue({ isError: false, isLoading: true, data: undefined });
+    }
+    mounted.rerender(boardWithBack());
+    expect(screen.queryByRole('application', { name: '코트 배치 보드' })).not.toBeInTheDocument();
+    await step(back);
+    expect(screen.getByRole('dialog', { name: TITLE })).toBeInTheDocument();
+    expect(currentPath()).toBe(BOARD_URL);
+    await step(() => fireEvent.click(screen.getByRole('button', { name: '계속 작성' })));
+    mockBoard(boardData({ version: 0 }));
+    mockMembers([member('u1', '선수01', 1)], 'owner');
+    mounted.rerender(boardWithBack());
+    placed();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 });

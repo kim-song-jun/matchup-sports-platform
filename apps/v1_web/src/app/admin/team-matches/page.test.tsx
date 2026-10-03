@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import AdminTeamMatchesPage from './page';
 
-const { hooks } = vi.hoisted(() => ({ hooks: { rows: [] as V1AdminTeamMatchRow[] } }));
+const { hooks } = vi.hoisted(() => ({ hooks: { rows: [] as V1AdminTeamMatchRow[], filters: {} as Record<string, unknown> } }));
 
 const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
 
@@ -18,7 +18,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AdminTeamMatches: () => ({
+  useV1AdminTeamMatches: (filters: Record<string, unknown>) => {
+    hooks.filters = filters;
+    return ({
     data: {
       items: hooks.rows,
       pageInfo: { page: 1, limit: 20, total: hooks.rows.length, totalPages: 1 },
@@ -29,7 +31,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
     error: null,
     isFetching: false,
     refetch: vi.fn(),
-  }),
+  });
+  },
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1ChangeTeamMatchStatus: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -106,4 +109,50 @@ describe('AdminTeamMatchesPage 리그 표시', () => {
 
     expect(screen.getAllByText('첫 승인 팀').length).toBeGreaterThan(0);
   });
+});
+
+
+describe('competition moderation boundary', () => {
+  it('대회 소속과 관리 경로를 보여주고 일반 상태 변경은 숨긴다', () => {
+    hooks.rows = [{ ...BASE, league: null, tournament: { tournamentId: 'cup-1', title: '가을 컵' } }];
+    render(<AdminTeamMatchesPage />);
+    expect(screen.getAllByRole('link', { name: '대회 가을 컵 상세 보기' })[0]).toHaveAttribute('href', '/admin/tournaments/cup-1');
+    expect(screen.getAllByRole('link', { name: '대회 관리' })[0]).toHaveAttribute('href', '/admin/tournaments/cup-1');
+    expect(screen.getAllByText(/가을 컵 ·/)[0]).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /상태 변경/ })).toHaveLength(0);
+  });
+  it('리그에 대회 관계도 있을 때 리그로 분류한다', () => {
+    hooks.rows = [{ ...BASE, league: { leagueId: 'league-1', title: '가을 리그' }, tournament: { tournamentId: 'league-1', title: '가을 리그' } }];
+    render(<AdminTeamMatchesPage />);
+    expect(screen.getAllByRole('link', { name: '리그 관리' })[0]).toHaveAttribute('href', '/admin/league-matches/league-1');
+    expect(screen.queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /상태 변경/ })).toHaveLength(0);
+  });
+  it('친선 경기에서는 일반 상태 변경을 유지한다', () => {
+    hooks.rows = [{ ...BASE, league: null, tournament: null }];
+    render(<AdminTeamMatchesPage />);
+    expect(screen.getAllByRole('button', { name: /상태 변경/ }).length).toBeGreaterThan(0);
+  });
+});
+
+it('경기 유형을 바꾸면 API 필터와 첫 페이지에 반영한다', async () => {
+  hooks.rows = [];
+  const user = userEvent.setup();
+  render(<AdminTeamMatchesPage />);
+  await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), 'tournament');
+  expect(hooks.filters).toMatchObject({ kind: 'tournament', page: 1 });
+  await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), 'league');
+  expect(hooks.filters).toMatchObject({ kind: 'league', page: 1 });
+  await user.selectOptions(screen.getByRole('combobox', { name: '경기 유형' }), '');
+  expect(hooks.filters).not.toHaveProperty('kind');
+});
+
+it('완료 경기의 일반 상태 모달도 실제로 선택 가능한 상태로 시작한다', async () => {
+  hooks.rows = [{ ...BASE, league: null, tournament: null, status: 'completed' }];
+  const user = userEvent.setup();
+  render(<AdminTeamMatchesPage />);
+  await user.click(screen.getAllByRole('button', { name: /상태 변경/ })[0]);
+  const select = await screen.findByRole('combobox', { name: '변경할 상태' });
+  expect(select).toHaveValue('recruiting');
+  expect(screen.queryByRole('option', { name: '완료' })).not.toBeInTheDocument();
 });

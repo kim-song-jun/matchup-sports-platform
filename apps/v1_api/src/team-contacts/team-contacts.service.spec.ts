@@ -842,6 +842,26 @@ describe('발신 가드 — 차단·수신정책', () => {
     expect(where).toMatchObject({ hostTeamId: 'B', status: 'recruiting' });
   });
 
+  it.each([
+    { leagueId: null, tournamentId: 'cup-1', deletedAt: null, accepts: false },
+    { leagueId: 'league-1', tournamentId: 'league-1', deletedAt: null, accepts: false },
+    { leagueId: null, tournamentId: null, deletedAt: new Date(), accepts: false },
+    { leagueId: null, tournamentId: null, deletedAt: null, accepts: true },
+  ])('recruiting_only 발신은 실제 친선 모집으로만 열린다: %j', async ({ accepts, ...ownership }) => {
+    const prisma = acceptingPrisma();
+    prisma.v1Team.findFirst.mockResolvedValue({ contactPolicy: 'recruiting_only' });
+    const row = { id: 'tm-1', hostTeamId: 'B', status: 'recruiting', ...ownership };
+    prisma.v1TeamMatch.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+      Object.entries(where).every(([key, value]) => row[key as keyof typeof row] === value) ? row : null,
+    );
+    const pending = makeService(prisma).create(actor, 'B', dto);
+    if (accepts) await expect(pending).resolves.toMatchObject({ id: 'new' });
+    else {
+      await expect(pending).rejects.toMatchObject({ status: 403, response: { code: 'TEAM_CONTACT_NOT_ACCEPTING' } });
+      expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
+    }
+  });
+
   it('세 거부 사유가 서로 구분되지 않는다 — 차단 여부를 역추론할 수 없어야 한다', async () => {
     const bodies: unknown[] = [];
     for (const setup of [

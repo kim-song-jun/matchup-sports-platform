@@ -18,6 +18,9 @@ API 99/99, Web 200/200, 두 패키지 타입 검사 PASS. Headed 컴포넌트 fi
 목록·상세의 전체 사진 암막 제거, 상세 텍스트/버튼에만 대비 배경 적용.
 실제 컴포넌트 회귀 124/124, headed fixture 전후 캡처 12/12 (390/768/1440), 오류·overflow 0.
 [시나리오/이미지 비교](./05-team-match-flows.md). 실제 업로드·API 생성 흐름 및 Alpha 배포는 미실행.
+## 2026-10-03 — 대회·리그 팀매치 관리 경계 수정
+
+[감사 및 후속 작업](../../.github/tasks/20261003-competition-team-match-surface-audit.md): 기존 감사 20/20에서 발견한 관리자 분류·상태 변경, 사용자 공동 기록 이동, 조건부 컨택 판정·해체 리그 링크를 최신 dev에서 수정한다. [관리자 시나리오](./10-profile-settings-admin.md), [팀매치 시나리오](./05-team-match-flows.md). 회귀·타입 검사, dev PR 리뷰·CI, Alpha 배포·3폭 실제 화면 확인 진행 중.
 
 ## 2026-10-02 — 승격 보류 후 Alpha QA
 

@@ -25,7 +25,7 @@
   "src/app/admin/page.tsx": 5,
   "src/app/admin/settings/integrations-view.tsx": 3,
   "src/app/admin/settings/reviews-view.tsx": 3,
-  "src/app/admin/team-matches/[id]/page.tsx": 15,
+  "src/app/admin/team-matches/[id]/page.tsx": 13,
   "src/app/admin/teams/[id]/page.tsx": 14,
   "src/app/admin/tournaments/[id]/announcements-tab.tsx": 5,
   "src/app/admin/tournaments/[id]/awards-tab.tsx": 5,

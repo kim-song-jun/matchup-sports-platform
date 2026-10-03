@@ -234,6 +234,9 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
       - ./aasa:/etc/nginx/teameet-aasa:ro
+      - ./maintenance:/etc/nginx/teameet-maintenance:ro
+      # 점검 플래그 디렉터리는 릴리스 디렉터리(배포마다 교체) 밖에 둬야 배포가 플래그를 지우지 않는다.
+      - /home/ec2-user/.teameet-maintenance:/etc/nginx/maintenance:ro
       - ./release-metadata.prod.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot

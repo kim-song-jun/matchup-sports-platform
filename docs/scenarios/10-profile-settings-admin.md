@@ -86,3 +86,12 @@
 - 2026-04-11: live browser smoke는 stale API process의 `dev-login` `500`과 이후 web restart의 `@swc/helpers` 누락이 연속으로 겹치며 차단됐다. `SET-001` 최종 검증은 dev runtime 안정화 후 재실행이 필요하다.
 - 2026-04-11: Task 37로 `admin/payments`, `admin/reviews`, `admin/mercenary`, `admin/statistics`, `admin/teams/[id]`, `admin/venues/[id]`의 mock/sample fallback을 제거했다. browser smoke는 `/admin/dashboard`, `/admin/users/:id`, `/admin/reviews`, `/admin/payments`까지 확인했고, Docker dev API restart smoke에서 `warn -> suspend -> api restart -> detail refetch -> reactivate`도 통과했다. payments/reviews/user moderation을 포함한 별도 Playwright spec은 follow-up이다.
 - 2026-09-09: Task 169에서 온보딩 알림 opt-in은 유지하고 홈 중복 CTA를 제거했다. 설정 화면은 단말 제어 1개와 category 4개로 정리했고, headed QA 4상태에서 가로 넘침·화면/API 오류 0을 확인했다. 증거는 `output/playwright/visual-audit/task169-notification-settings/`에 있다.
+
+## Competition team-match management regression — 2026-10-03
+
+- [ ] Admin integrated list: friendly/league/tournament classification and competition title visible at 390/768/1440.
+- [ ] League rows with both ownership relations link to admin league; tournament rows link to admin tournament.
+- [ ] Competition rows have no generic status button; direct generic status request returns 409 without changing match/Game/schedule or creating success audit logs.
+- [ ] Tournament detail shows tournament ownership (never 단발 경기); recruitment editing is unavailable.
+- [ ] Friendly moderation retains audit records and usable controls. Read-only admins can inspect competition ownership.
+- [ ] Alpha deployment SHA includes merged change; screenshots and console/network findings posted on the PR.

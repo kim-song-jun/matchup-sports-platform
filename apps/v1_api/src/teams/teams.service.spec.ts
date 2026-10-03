@@ -935,6 +935,20 @@ describe('TeamsService', () => {
       expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(true);
     });
 
+    it.each([
+      { leagueId: null, tournamentId: 'cup-1', deletedAt: null, accepts: false },
+      { leagueId: 'league-1', tournamentId: 'league-1', deletedAt: null, accepts: false },
+      { leagueId: null, tournamentId: null, deletedAt: new Date(), accepts: false },
+      { leagueId: null, tournamentId: null, deletedAt: null, accepts: true },
+    ])('컨택 CTA도 유효한 친선 모집만 본다: %j', async ({ accepts, ...ownership }) => {
+      setup({ policy: 'recruiting_only' });
+      const row = { id: 'tm-1', hostTeamId: 'team-1', status: 'recruiting', ...ownership };
+      prisma.v1TeamMatch.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+        Object.entries(where).every(([key, value]) => row[key as keyof typeof row] === value) ? row : null,
+      );
+      expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(accepts);
+    });
+
     it('내 팀이 여럿이면 하나라도 보낼 수 있을 때 true, 전부 막혔을 때만 false', async () => {
       setup({ policy: 'open', senders: ['a', 'b'], blocks: [{ teamId: 'team-1', blockedTeamId: 'a' }] });
       expect((await service.detail(outsider, 'team-1')).canSendContact).toBe(true);

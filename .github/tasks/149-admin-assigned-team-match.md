@@ -232,3 +232,10 @@ Approval scope is these four local release-binding updates and their focused ver
 - Evidence: `docs/screenshots/team-match-closed-cards/{before,after}/{mobile,tablet,desktop}-list.png`; reproduce with `QA_MODE=closed`, `QA_PHASE=before|after`, `QA_BASE_REF=16cf66b63` and the same capture runner.
 - [ ] DEV-only release: attempted the four proposed schema-binding edits after the DEV-only request. Automatic review rejected them again, stating that deployment authorization did not constitute explicit separate approval for these production/alpha integrity controls. The rejected action made no partial deploy/release edits; no branch push, PR merge, DB migration or deployment occurred.
 - Needed next authorization: explicitly approve the four-file schema-binding proposal above for this DEV/alpha release. No main promotion or production deployment is requested or permitted.
+
+### 2026-10-03 DEV upload continuation
+
+- Feature commits `16cf66b63` and `55171ad3c` were pushed to `origin/fix/team-match-image-brightness`. No DEV merge/deployment has occurred.
+- Latest `origin/dev` advanced to `a105f40a1490ccf228568084a43610822d7a18da`. Integrated it into the isolated review branch; resolved admin detail and scenario-index conflicts while preserving the new tournament link and both image previews. Admin detail 18/18 and both package typechecks pass after integration.
+- The GitHub CLI official device-login request expired without completing authentication. CLI is installed under ignored `output/tools/github-cli/`; no Git credential was extracted, stored or reused for API calls (automatic review rejected that proposed credential reuse).
+- The deployment integrity files remain unchanged. Explicit four-file approval was requested again using a selectable approval question; the user can approve the concrete proposal above. GitHub CLI login and this approval remain prerequisites for the DEV PR/release flow.

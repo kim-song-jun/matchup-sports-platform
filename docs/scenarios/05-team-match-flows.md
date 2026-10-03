@@ -275,3 +275,11 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - [ ] matched/completed/cancelled 상태는 보류로 역전되지 않음.
 - [ ] 새로고침/내 팀매치/목록/상세 보류 표시 동일.
 - [ ] 390/768/1440 전체 route 및 console/network 확인.
+
+## Competition record entry regression — 2026-10-03
+
+- [ ] Tournament `/team-matches/:fixtureId/record` hands off to its tournament fixture detail, with source navigation preserved.
+- [ ] League fixture carrying both IDs hands off to league fixture detail.
+- [ ] Legacy friendly record keeps `view=detail`; administrator record never exits the admin shell.
+- [ ] `recruiting_only` contact CTA and server send gate both ignore competition/deleted rows; real friendly recruitment enables both.
+- [ ] Live league dissolution blocker opens actual league fixture detail; tournament/friendly links remain correct.

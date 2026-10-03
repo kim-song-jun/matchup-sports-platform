@@ -1,0 +1,85 @@
+{
+  "comparisonPairs": [
+    {
+      "baselineIndex": 0,
+      "selectedIndex": 1,
+      "baselineUTC": "2026-10-03T13:37:57.992Z",
+      "selectedUTC": "2026-10-03T13:38:08.948Z",
+      "M": 4,
+      "Nr": 2,
+      "allReasonsBefore": 4,
+      "allReasonsAfter": 4,
+      "allReasonsPreservesM": true
+    },
+    {
+      "baselineIndex": 2,
+      "selectedIndex": 3,
+      "baselineUTC": "2026-10-03T13:38:42.868Z",
+      "selectedUTC": "2026-10-03T13:38:53.245Z",
+      "M": 0,
+      "Nr": 0,
+      "allReasonsBefore": 0,
+      "allReasonsAfter": 0,
+      "allReasonsPreservesM": true
+    },
+    {
+      "baselineIndex": 4,
+      "selectedIndex": 5,
+      "baselineUTC": "2026-10-03T13:39:32.884Z",
+      "selectedUTC": "2026-10-03T13:39:45.972Z",
+      "M": 3,
+      "Nr": 2,
+      "allReasonsBefore": 3,
+      "allReasonsAfter": 3,
+      "allReasonsPreservesM": true
+    }
+  ],
+  "sameOtherURLParametersWithinEachPair": true,
+  "reasonOptionsIdenticalWithinEachPair": true,
+  "spamOptionCountMatchesSelectedRenderedCards": true,
+  "reportCategoryCountMatchesRenderedCards": true,
+  "allStatusButtonCountMatchesRenderedCards": true,
+  "renderedCardCounts": [
+    4,
+    2,
+    0,
+    0,
+    3,
+    2,
+    4
+  ],
+  "renderedTableRows": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "categoryRowCounts": [
+    4,
+    2,
+    0,
+    0,
+    3,
+    2,
+    4
+  ],
+  "allCategoryRowsRendered": true,
+  "allGeneralCategoryOptionSumsMatchTheirAllCategoryOption": true,
+  "namedReasonSumInFourCardCase": 3,
+  "allReasonsInFourCardCase": 4,
+  "underlyingNullReasonValuesVerified": false,
+  "finalReasonEmpty": true,
+  "finalSearchEmpty": true,
+  "finalReportRenderedCards": 4,
+  "DOMTimesStrictlyIncrease": true,
+  "actionBoundsOrderedAndNonoverlapping": true,
+  "positiveSearchSourceUTC": "2026-10-03T13:39:23.159Z",
+  "positiveSearchSourceMatchingVisibleTitleCount": 3,
+  "rawTitlesStored": false,
+  "privacyReviewPassed": true,
+  "imageCount": 0,
+  "publisherBrowserActions": 0
+}

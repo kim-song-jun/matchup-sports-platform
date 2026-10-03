@@ -1,0 +1,894 @@
+[
+  {
+    "categoryRows": [
+      {
+        "categoryText": "신고",
+        "index": 0,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고괴롭힘·욕설",
+        "index": 1,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 2,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 3,
+        "rendered": true
+      }
+    ],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 11",
+            "value": ""
+          },
+          {
+            "label": "계정 1",
+            "value": "account"
+          },
+          {
+            "label": "매치 1",
+            "value": "match"
+          },
+          {
+            "label": "팀 1",
+            "value": "team"
+          },
+          {
+            "label": "대회 1",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 1",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 4",
+            "value": "report"
+          },
+          {
+            "label": "기타 1",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 1",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 4",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 2",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 1",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": ""
+      }
+    ],
+    "query": "",
+    "statusButtons": [
+      {
+        "pressed": "false",
+        "text": "전체4"
+      },
+      {
+        "pressed": "true",
+        "text": "접수4"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?status=received&category=report",
+    "utc": "2026-10-03T13:37:57.992Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 4,
+    "visibleTableRowCount": 0,
+    "step": "mobile-received-reason-unselected-M",
+    "runtimeServingSHA": "unknown"
+  },
+  {
+    "categoryRows": [
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 0,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 1,
+        "rendered": true
+      }
+    ],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 2",
+            "value": ""
+          },
+          {
+            "label": "계정 0",
+            "value": "account"
+          },
+          {
+            "label": "매치 0",
+            "value": "match"
+          },
+          {
+            "label": "팀 0",
+            "value": "team"
+          },
+          {
+            "label": "대회 0",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 0",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 2",
+            "value": "report"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 0",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 4",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 2",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 1",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": "spam"
+      }
+    ],
+    "query": "",
+    "statusButtons": [
+      {
+        "pressed": "false",
+        "text": "전체2"
+      },
+      {
+        "pressed": "true",
+        "text": "접수2"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?status=received&category=report&reportReason=spam",
+    "utc": "2026-10-03T13:38:08.948Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 2,
+    "visibleTableRowCount": 0,
+    "step": "mobile-received-spam-Nr",
+    "runtimeServingSHA": "unknown"
+  },
+  {
+    "categoryRows": [],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 1",
+            "value": ""
+          },
+          {
+            "label": "계정 0",
+            "value": "account"
+          },
+          {
+            "label": "매치 0",
+            "value": "match"
+          },
+          {
+            "label": "팀 0",
+            "value": "team"
+          },
+          {
+            "label": "대회 0",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 0",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 0",
+            "value": "report"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 1",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 0",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 0",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 0",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": ""
+      }
+    ],
+    "query": "QA",
+    "statusButtons": [
+      {
+        "pressed": "true",
+        "text": "전체0"
+      },
+      {
+        "pressed": "false",
+        "text": "접수0"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?q=QA&category=report",
+    "utc": "2026-10-03T13:38:42.868Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 0,
+    "visibleTableRowCount": 0,
+    "step": "mobile-QA-search-reason-unselected-M",
+    "runtimeServingSHA": "unknown"
+  },
+  {
+    "categoryRows": [],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 0",
+            "value": ""
+          },
+          {
+            "label": "계정 0",
+            "value": "account"
+          },
+          {
+            "label": "매치 0",
+            "value": "match"
+          },
+          {
+            "label": "팀 0",
+            "value": "team"
+          },
+          {
+            "label": "대회 0",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 0",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 0",
+            "value": "report"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 0",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 0",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 0",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 0",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": "spam"
+      }
+    ],
+    "query": "QA",
+    "statusButtons": [
+      {
+        "pressed": "true",
+        "text": "전체0"
+      },
+      {
+        "pressed": "false",
+        "text": "접수0"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?q=QA&category=report&reportReason=spam",
+    "utc": "2026-10-03T13:38:53.245Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 0,
+    "visibleTableRowCount": 0,
+    "step": "mobile-QA-search-spam-Nr",
+    "runtimeServingSHA": "unknown"
+  },
+  {
+    "categoryRows": [
+      {
+        "categoryText": "신고괴롭힘·욕설",
+        "index": 0,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 1,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 2,
+        "rendered": true
+      }
+    ],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 3",
+            "value": ""
+          },
+          {
+            "label": "계정 0",
+            "value": "account"
+          },
+          {
+            "label": "매치 0",
+            "value": "match"
+          },
+          {
+            "label": "팀 0",
+            "value": "team"
+          },
+          {
+            "label": "대회 0",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 0",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 3",
+            "value": "report"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 0",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 3",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 2",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 1",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": ""
+      }
+    ],
+    "query": "팀 컨택 신고",
+    "statusButtons": [
+      {
+        "pressed": "true",
+        "text": "전체3"
+      },
+      {
+        "pressed": "false",
+        "text": "접수3"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?q=%ED%8C%80+%EC%BB%A8%ED%83%9D+%EC%8B%A0%EA%B3%A0&category=report",
+    "utc": "2026-10-03T13:39:32.884Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 3,
+    "visibleTableRowCount": 0,
+    "step": "mobile-positive-search-reason-unselected-M",
+    "runtimeServingSHA": "unknown"
+  },
+  {
+    "categoryRows": [
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 0,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 1,
+        "rendered": true
+      }
+    ],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 2",
+            "value": ""
+          },
+          {
+            "label": "계정 0",
+            "value": "account"
+          },
+          {
+            "label": "매치 0",
+            "value": "match"
+          },
+          {
+            "label": "팀 0",
+            "value": "team"
+          },
+          {
+            "label": "대회 0",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 0",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 2",
+            "value": "report"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 0",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 3",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 2",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 1",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": "spam"
+      }
+    ],
+    "query": "팀 컨택 신고",
+    "statusButtons": [
+      {
+        "pressed": "true",
+        "text": "전체2"
+      },
+      {
+        "pressed": "false",
+        "text": "접수2"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?q=%ED%8C%80+%EC%BB%A8%ED%83%9D+%EC%8B%A0%EA%B3%A0&category=report&reportReason=spam",
+    "utc": "2026-10-03T13:39:45.972Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 2,
+    "visibleTableRowCount": 0,
+    "step": "mobile-positive-search-spam-Nr",
+    "runtimeServingSHA": "unknown"
+  },
+  {
+    "categoryRows": [
+      {
+        "categoryText": "신고",
+        "index": 0,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고괴롭힘·욕설",
+        "index": 1,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 2,
+        "rendered": true
+      },
+      {
+        "categoryText": "신고스팸·광고",
+        "index": 3,
+        "rendered": true
+      }
+    ],
+    "filters": [
+      {
+        "name": "문의 분류 필터",
+        "options": [
+          {
+            "label": "전체 분류 13",
+            "value": ""
+          },
+          {
+            "label": "계정 1",
+            "value": "account"
+          },
+          {
+            "label": "매치 1",
+            "value": "match"
+          },
+          {
+            "label": "팀 1",
+            "value": "team"
+          },
+          {
+            "label": "대회 2",
+            "value": "tournament"
+          },
+          {
+            "label": "결제/환불 1",
+            "value": "payment_refund"
+          },
+          {
+            "label": "신고 4",
+            "value": "report"
+          },
+          {
+            "label": "기타 1",
+            "value": "other"
+          },
+          {
+            "label": "대회 개설 2",
+            "value": "tournament_hosting"
+          },
+          {
+            "label": "제휴 0",
+            "value": "partnership"
+          }
+        ],
+        "value": "report"
+      },
+      {
+        "name": "신고 사유 필터",
+        "options": [
+          {
+            "label": "전체 사유 4",
+            "value": ""
+          },
+          {
+            "label": "스팸·광고 2",
+            "value": "spam"
+          },
+          {
+            "label": "괴롭힘·욕설 1",
+            "value": "harassment"
+          },
+          {
+            "label": "사칭·허위 팀 0",
+            "value": "impersonation"
+          },
+          {
+            "label": "부적절한 내용 0",
+            "value": "inappropriate"
+          },
+          {
+            "label": "기타 0",
+            "value": "other"
+          }
+        ],
+        "value": ""
+      }
+    ],
+    "query": "",
+    "statusButtons": [
+      {
+        "pressed": "true",
+        "text": "전체4"
+      },
+      {
+        "pressed": "false",
+        "text": "접수4"
+      },
+      {
+        "pressed": "false",
+        "text": "검토0"
+      },
+      {
+        "pressed": "false",
+        "text": "답변0"
+      },
+      {
+        "pressed": "false",
+        "text": "종결0"
+      }
+    ],
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?category=report",
+    "utc": "2026-10-03T13:40:46.346Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 404,
+      "width": 404
+    },
+    "visibleCardCount": 4,
+    "visibleTableRowCount": 0,
+    "step": "mobile-final-report-only-restored",
+    "runtimeServingSHA": "unknown"
+  }
+]

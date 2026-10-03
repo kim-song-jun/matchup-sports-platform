@@ -1,0 +1,52 @@
+[
+  {
+    "name": "Click received status filter 접수4; not inquiry status submission",
+    "startedUTC": "2026-10-03T13:37:29.136Z",
+    "completedUTC": "2026-10-03T13:37:35.153Z"
+  },
+  {
+    "name": "Select reason filter spam with status received unchanged",
+    "startedUTC": "2026-10-03T13:37:57.996Z",
+    "completedUTC": "2026-10-03T13:37:58.012Z"
+  },
+  {
+    "name": "Restore reason filter to all reasons",
+    "startedUTC": "2026-10-03T13:38:08.951Z",
+    "completedUTC": "2026-10-03T13:38:08.966Z"
+  },
+  {
+    "name": "Choose all status filter",
+    "startedUTC": "2026-10-03T13:38:31.655Z",
+    "completedUTC": "2026-10-03T13:38:31.722Z"
+  },
+  {
+    "name": "Type QA into searchbox 문의 검색; no Enter",
+    "startedUTC": "2026-10-03T13:38:31.881Z",
+    "completedUTC": "2026-10-03T13:38:31.905Z"
+  },
+  {
+    "name": "Select spam reason with QA search unchanged",
+    "startedUTC": "2026-10-03T13:38:42.871Z",
+    "completedUTC": "2026-10-03T13:38:42.885Z"
+  },
+  {
+    "name": "Clear reason and search filters",
+    "startedUTC": "2026-10-03T13:38:53.247Z",
+    "completedUTC": "2026-10-03T13:38:53.283Z"
+  },
+  {
+    "name": "Type observed common mock-title phrase 팀 컨택 신고; no Enter",
+    "startedUTC": "2026-10-03T13:39:23.162Z",
+    "completedUTC": "2026-10-03T13:39:23.177Z"
+  },
+  {
+    "name": "Select spam reason with positive search phrase unchanged",
+    "startedUTC": "2026-10-03T13:39:32.887Z",
+    "completedUTC": "2026-10-03T13:39:32.901Z"
+  },
+  {
+    "name": "Restore all reasons and blank search after comparisons",
+    "startedUTC": "2026-10-03T13:39:45.975Z",
+    "completedUTC": "2026-10-03T13:39:46.021Z"
+  }
+]

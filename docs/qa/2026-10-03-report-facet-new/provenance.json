@@ -1,0 +1,33 @@
+{
+  "inputFiles": [
+    {
+      "file": "report-facet-proof.json",
+      "bytes": 19736,
+      "sha256": "a62e02a868caf85b9dc8bd1e67ea1fc401c17994d49c2cb686b3364cce36178f"
+    },
+    {
+      "file": "report-facet-actions.json",
+      "bytes": 1661,
+      "sha256": "1913812612dec42541a21b1729fab399176a8455eb85df14ee9df77d26fecd99"
+    },
+    {
+      "file": "report-facet-search-source.json",
+      "bytes": 216,
+      "sha256": "965b21d3c91d2296bf075b937b5a6ac2008b64cdf85fef0050524f1c932a1fc0"
+    },
+    {
+      "file": "report-facet-exit.json",
+      "bytes": 161,
+      "sha256": "aa2e320e80f1df7c204b4d63d7015e3ca0f4a32138e21e6c0df00e78eed307a2"
+    },
+    {
+      "file": "report-facet-summary.json",
+      "bytes": 2499,
+      "sha256": "cf8be496a9c51bbab23c6812623a5ca55e0250114cb65e3894feb17f1d111d4d"
+    }
+  ],
+  "publicationProjection": "DOM and action content retain their original observations. Summary removes unverified deployment and HTTP-method language, adds separate action/DOM windows and evidence limits. Original local files are unchanged.",
+  "cohort": "post-reset-20261003-1322",
+  "screenshots": 0,
+  "privacy": "Only generic UI labels, generic synthetic search phrase, aggregate/category counts, filter URL parameters and timestamps are included. Raw inquiry titles, text and people were not read by the publisher."
+}

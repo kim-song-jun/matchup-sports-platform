@@ -1,0 +1,90 @@
+{
+  "scope": "New single-mobile report filter combinations: received+spam, QA search+spam, observed positive mock-title search+spam",
+  "cohort": "post-reset-20261003-1322",
+  "reason": "New observations after original unpublished files were lost. No prior tablet or three-width general-total observations are reconstructed.",
+  "observedUTC": [
+    "2026-10-03T13:37:57.992Z",
+    "2026-10-03T13:40:46.346Z"
+  ],
+  "exit": {
+    "utc": "2026-10-03T13:40:47.118Z",
+    "url": "https://alpha.teameet.co.kr/tournaments",
+    "purpose": "Leave inquiry list after read-only filter comparisons"
+  },
+  "viewport": {
+    "dpr": 1.25,
+    "height": 606,
+    "scrollWidth": 404,
+    "width": 404
+  },
+  "runtimeServingSHA": "unknown",
+  "comparisons": [
+    {
+      "baselineIndex": 0,
+      "selectedIndex": 1,
+      "baselineUTC": "2026-10-03T13:37:57.992Z",
+      "selectedUTC": "2026-10-03T13:38:08.948Z",
+      "M": 4,
+      "Nr": 2,
+      "allReasonsBefore": 4,
+      "allReasonsAfter": 4,
+      "allReasonsPreservesM": true
+    },
+    {
+      "baselineIndex": 2,
+      "selectedIndex": 3,
+      "baselineUTC": "2026-10-03T13:38:42.868Z",
+      "selectedUTC": "2026-10-03T13:38:53.245Z",
+      "M": 0,
+      "Nr": 0,
+      "allReasonsBefore": 0,
+      "allReasonsAfter": 0,
+      "allReasonsPreservesM": true
+    },
+    {
+      "baselineIndex": 4,
+      "selectedIndex": 5,
+      "baselineUTC": "2026-10-03T13:39:32.884Z",
+      "selectedUTC": "2026-10-03T13:39:45.972Z",
+      "M": 3,
+      "Nr": 2,
+      "allReasonsBefore": 3,
+      "allReasonsAfter": 3,
+      "allReasonsPreservesM": true
+    }
+  ],
+  "final": {
+    "url": "https://alpha.teameet.co.kr/admin/inquiries?category=report",
+    "query": "",
+    "reason": "",
+    "rows": 4
+  },
+  "limits": [
+    "Single mobile404×606 new cohort; earlier unpublished tablet and three-width general totals are not reconstructed.",
+    "No screenshots, raw inquiry titles/bodies, names, contact details, account data or credentials are included.",
+    "QA search has0 results and is not positive-result coverage; the separate generic synthetic-title phrase has3 baseline rendered cards.",
+    "Actions are collector-reported filter/search UI operations. No reply or processing-status submission was performed according to the collector; HTTP methods, network writes and persistence were not independently audited.",
+    "CUA action-call bounds are not browser-event timestamps.",
+    "Rendered-card count is a DOM measurement; actual whole-card viewport visibility and pixels are unmeasured.",
+    "The all-reasons count includes more than the named-reason option sum in the four-record case. Neither underlying null values nor database contents were inspected.",
+    "No team-ranking period copy, three-width regression, server tests, screen-reader behavior or whole-issue PASS is established."
+  ],
+  "files": [
+    "report-facet-proof.json",
+    "report-facet-actions.json",
+    "report-facet-search-source.json",
+    "report-facet-exit.json",
+    "report-facet-summary.json"
+  ],
+  "DOMRecords": 7,
+  "collectorActionCalls": 10,
+  "screenshots": 0,
+  "DOMObservationWindow": {
+    "startUTC": "2026-10-03T13:37:57.992Z",
+    "endUTC": "2026-10-03T13:40:46.346Z"
+  },
+  "actionCallWindow": {
+    "startUTC": "2026-10-03T13:37:29.136Z",
+    "endUTC": "2026-10-03T13:39:46.021Z"
+  }
+}

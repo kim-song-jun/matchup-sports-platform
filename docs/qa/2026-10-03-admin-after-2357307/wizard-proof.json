@@ -1,0 +1,208 @@
+[
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "scheduled-at",
+      "tag": "INPUT",
+      "text": null
+    },
+    "fields": [
+      {
+        "id": "scheduled-at",
+        "value": ""
+      },
+      {
+        "id": "registration-deadline-at",
+        "value": ""
+      },
+      {
+        "id": "venue",
+        "value": "QA LOCAL 저장하지않음"
+      }
+    ],
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 606.4000396728516,
+        "height": 68.80000305175781,
+        "left": 0,
+        "right": 404.8000183105469,
+        "top": 537.6000366210938,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 537.6000366210938
+      }
+    },
+    "heading": null,
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T07:47:41.965Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile step2 Next to step3 initial heading",
+    "excludedReason": "Dates did not persist from tool fill; remained on step2, so no step3 regression claim."
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "id": "scheduled-at",
+      "tag": "INPUT",
+      "text": null
+    },
+    "fields": [
+      {
+        "id": "scheduled-at",
+        "value": ""
+      },
+      {
+        "id": "registration-deadline-at",
+        "value": ""
+      },
+      {
+        "id": "venue",
+        "value": "QA LOCAL 저장하지않음"
+      }
+    ],
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 606.4000396728516,
+        "height": 68.80000305175781,
+        "left": 0,
+        "right": 404.8000183105469,
+        "top": 537.6000366210938,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 537.6000366210938
+      }
+    },
+    "heading": null,
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T07:47:42.256Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile first Tab reaches team count above footer",
+    "excludedReason": "Dates did not persist from tool fill; remained on step2, so no step3 regression claim."
+  },
+  {
+    "active": {
+      "focusVisible": false,
+      "id": "scheduled-at",
+      "tag": "INPUT",
+      "text": null
+    },
+    "fields": [
+      {
+        "id": "scheduled-at",
+        "value": ""
+      },
+      {
+        "id": "registration-deadline-at",
+        "value": ""
+      },
+      {
+        "id": "venue",
+        "value": "QA LOCAL 저장하지않음"
+      }
+    ],
+    "footer": {
+      "position": "fixed",
+      "rect": {
+        "bottom": 606.4000396728516,
+        "height": 68.80000305175781,
+        "left": 0,
+        "right": 404.8000183105469,
+        "top": 537.6000366210938,
+        "width": 404.8000183105469,
+        "x": 0,
+        "y": 537.6000366210938
+      }
+    },
+    "heading": null,
+    "stageButtons": [
+      {
+        "disabled": false,
+        "label": "1단계 기본 정보 — 완료"
+      },
+      {
+        "disabled": false,
+        "label": "2단계 일정·장소 — 진행 중"
+      },
+      {
+        "disabled": false,
+        "label": "3단계 참가 조건"
+      },
+      {
+        "disabled": false,
+        "label": "4단계 상금·홍보"
+      },
+      {
+        "disabled": true,
+        "label": "5단계 공개 확인 — 잠김"
+      }
+    ],
+    "teamCount": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T07:54:20.924Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "blocked on step2: native date values not retained; stage3 unverified"
+  }
+]

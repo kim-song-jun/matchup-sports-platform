@@ -1,0 +1,1277 @@
+{
+  "scope": "25 actual safe crops from19 capture originals, covering four bounded admin regression checks. Original full screenshots are not published or re-read for this publication.",
+  "processingReportedBySource": "Integer-pixel crop only; source collector reports pixel equality with original regions. Publisher independently checked safe output hashes, decoding, dimensions, stated bounds and actual pixels.",
+  "deploymentAttribution": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761",
+    "headSHA": "235730755db0e7393bec9e01014a6906effde6af",
+    "workflowStatus": "completed",
+    "workflowConclusion": "success",
+    "workflowUpdatedAtUTC": "2026-10-03T07:30:13Z",
+    "workflowReadbackIndependentlyVerified": true,
+    "browserBuildIdentityIndependentlyVerified": false
+  },
+  "excluded": [
+    {
+      "originalBasename": "mobile-league-video-times.png",
+      "reason": "Captured before fixture rows settled; excluded by capture metadata and capture exclusion."
+    },
+    {
+      "originalBasename": "mobile-wizard-stage3-before-tab.png",
+      "reason": "Outside assigned four-fix review; observation showed actual wizard step 2 due to blank date."
+    },
+    {
+      "originalBasename": "mobile-wizard-stage3-after-tab.png",
+      "reason": "Outside assigned four-fix review; observation showed actual wizard step 2 due to blank date."
+    }
+  ],
+  "limitations": [
+    "The first mobile roster screenshot shows a loading state and is retained only for traceability. Prefer mobile-modal-close-settled.png, whose original was captured after roster content appeared. Chrome-only crops do not themselves display roster content.",
+    "The initial tournament modal-close crops and both added mobile modal-close crops show X without a distinct visible focus ring; their focus is supported by contemporaneous DOM observations. The added league tablet and desktop crops visibly show a blue X focus outline.",
+    "Mouse cursors partly obscure selected 대기 pill labels in filtered-zero screenshots. Contemporaneous DOM observations identify the selected state.",
+    "The rendered 확정 2 badge is visible in all filtered-zero screenshots. No generic DOM element count was converted to a rendered registration or roster count.",
+    "Tablet filtered-zero card and award-row bottom are cut by the original viewport; empty wording and award delete focus are fully visible.",
+    "Mobile award team placeholder is visually truncated. This is an existing general-placeholder observation limitation, separate from #1573 delete-button overflow; the delete button is visibly fully inside the row. Blank input values and delete focus are supported separately by DOM observations.",
+    "Award screenshots show local empty rows. Reported capture procedure and later settled zero-row observations support the unsaved state; these PNGs alone cannot prove no save occurred.",
+    "Date crops establish rendered strings only. Navigation roundtrips are supported by the supplied DOM log, not these static date crops.",
+    "Only the supplied after captures were inspected. No independent before-image or deployment-identity verification was performed."
+  ],
+  "items": [
+    {
+      "file": "images/mobile-modal-close.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:35:37.827Z",
+      "captureEndUTC": "2026-10-03T07:35:37.855Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 318,
+        "y": 103,
+        "width": 71,
+        "height": 78,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 71,
+        "height": 78,
+        "mode": "RGB"
+      },
+      "originalSHA256": "ddcc4f4369ae9ebdf0a7b5e841dd805ba37f01cb9f5589f461f9f430dce69e16",
+      "outputSHA256": "f395d7411af640cf25e04fd1345dcd7806c4fd92cc84d9c8171390dd765a51ac",
+      "observation": "Modal top-right chrome and X are visible. No distinct visible focus ring.",
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "zeroBasedRecordIndex": 1,
+        "utc": "2026-10-03T07:35:37.825Z",
+        "step": "mobile roster review initial focus",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true
+      },
+      "rasterViewportCaveat": null,
+      "recommendation": "Historical loading-state capture retained for traceability. Prefer mobile-modal-close-settled.png for settled-state evidence.",
+      "recommendedReplacement": "mobile-modal-close-settled.png",
+      "originalBasename": "mobile-roster-focus.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-modal-close.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:36:45.691Z",
+      "captureEndUTC": "2026-10-03T07:36:45.745Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 559,
+        "y": 16,
+        "width": 75,
+        "height": 77,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 75,
+        "height": 77,
+        "mode": "RGB"
+      },
+      "originalSHA256": "276c868907c8e84ce8a1411d06cea7304164eb988ae64952c829c9010ac47fbd",
+      "outputSHA256": "fc53b429bd256045f3ffbe1cd2b6910a4f14b1e5be0c511e0758f3f1351e5d8b",
+      "observation": "Modal top-right chrome and X are visible. No distinct visible focus ring.",
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "zeroBasedRecordIndex": 7,
+        "utc": "2026-10-03T07:36:45.688Z",
+        "step": "tablet roster review initial focus",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-roster-focus.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-modal-close.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:37:31.400Z",
+      "captureEndUTC": "2026-10-03T07:37:31.466Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 757,
+        "y": 16,
+        "width": 75,
+        "height": 77,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 75,
+        "height": 77,
+        "mode": "RGB"
+      },
+      "originalSHA256": "ea0ca053a34f1c489b3efbb9c2e69d8930f42ef24e9c1806a3358eca312e703a",
+      "outputSHA256": "934d4d42149ea8149672d63390c0bdb686aaadeac0b643c75a7d004ec15d2b42",
+      "observation": "Modal top-right chrome and X are visible. No distinct visible focus ring.",
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "zeroBasedRecordIndex": 13,
+        "utc": "2026-10-03T07:37:31.396Z",
+        "step": "desktop roster review initial focus",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-roster-focus.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-filtered-zero.png",
+      "category": "filtered-zero",
+      "captureStartUTC": "2026-10-03T07:36:19.208Z",
+      "captureEndUTC": "2026-10-03T07:36:19.239Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 16,
+        "y": 227,
+        "width": 373,
+        "height": 376,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 373,
+        "height": 376,
+        "mode": "RGB"
+      },
+      "originalSHA256": "3f2a599751b837146c30914d629dcf746cf2bf43f23722b79d3ab95f67b5e94a",
+      "outputSHA256": "ce0d28471f1fa6e0770010be419fb535a591741a6da1eec43a7a972a226eb285",
+      "observation": "Blue selected status pill, rendered 확정 2 badge, and 선택한 상태의 신청이 없어요 wording are visible. Cursor partly obscures selected 대기 text.",
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "zeroBasedRecordIndex": 5,
+        "utc": "2026-10-03T07:36:19.203Z",
+        "step": "mobile waiting filter zero",
+        "filterState": [
+          "대기"
+        ],
+        "emptyText": [
+          "선택한 상태의 신청이 없어요"
+        ]
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-filtered-zero.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-filtered-zero.png",
+      "category": "filtered-zero",
+      "captureStartUTC": "2026-10-03T07:36:46.778Z",
+      "captureEndUTC": "2026-10-03T07:36:46.811Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 24,
+        "y": 224,
+        "width": 740,
+        "height": 281,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 740,
+        "height": 281,
+        "mode": "RGB"
+      },
+      "originalSHA256": "7c65190927ec24ab8e5fa6fe8e17bffc4c38c136f20d2a8c3c99cf0699e4933e",
+      "outputSHA256": "6bbb83c7be4b2e4bf5156e8dbbdeaa336a2758f473427ccb9f3175b1e6841bfd",
+      "observation": "Blue selected status pill, rendered 확정 2 badge, and 선택한 상태의 신청이 없어요 wording are visible. Cursor partly obscures selected 대기 text.",
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "zeroBasedRecordIndex": 11,
+        "utc": "2026-10-03T07:36:46.775Z",
+        "step": "tablet waiting filter zero",
+        "filterState": [
+          "대기"
+        ],
+        "emptyText": [
+          "선택한 상태의 신청이 없어요"
+        ]
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-filtered-zero.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-filtered-zero.png",
+      "category": "filtered-zero",
+      "captureStartUTC": "2026-10-03T07:37:32.540Z",
+      "captureEndUTC": "2026-10-03T07:37:32.576Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 480,
+        "y": 257,
+        "width": 672,
+        "height": 328,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 672,
+        "height": 328,
+        "mode": "RGB"
+      },
+      "originalSHA256": "15375ab99be1355658ec827fdf5fc24755f868cba7eb4d913be890eba43a480a",
+      "outputSHA256": "fb8c3ebca806885fa1375263e5e94c496a8e0421af0c236f96f0aaa428e7e1b2",
+      "observation": "Blue selected status pill, rendered 확정 2 badge, and 선택한 상태의 신청이 없어요 wording are visible. Cursor partly obscures selected 대기 text.",
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "zeroBasedRecordIndex": 17,
+        "utc": "2026-10-03T07:37:32.535Z",
+        "step": "desktop waiting filter zero",
+        "filterState": [
+          "대기"
+        ],
+        "emptyText": [
+          "선택한 상태의 신청이 없어요"
+        ]
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-filtered-zero.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-award-row.png",
+      "category": "award-row",
+      "captureStartUTC": "2026-10-03T07:39:21.095Z",
+      "captureEndUTC": "2026-10-03T07:39:21.120Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 32,
+        "y": 267,
+        "width": 342,
+        "height": 309,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 342,
+        "height": 309,
+        "mode": "RGB"
+      },
+      "originalSHA256": "383d4e42fdeeb67ddff03163133d8b4cfe6e46f9bb85376f64b95274b887ad79",
+      "outputSHA256": "3376b5ecd4d198a79ad1fd8ff260d4258cb16c3c725e9e03764f5e5945ba5de3",
+      "observation": "Four blank text inputs, default trophy icon, and fully fitting outlined delete control are visible. Screenshot alone does not establish whether the row was saved.",
+      "supportingDOMObservation": {
+        "source": "awards-proof.json",
+        "zeroBasedRecordIndex": 2,
+        "utc": "2026-10-03T07:39:21.075Z",
+        "step": "mobile title Tab focuses fully fitting delete",
+        "activeAriaLabel": "항목 삭제",
+        "deleteRectCSS": {
+          "height": 44,
+          "right": 360,
+          "width": 44,
+          "x": 316,
+          "y": 281.1000061035156
+        },
+        "blankInputLengths": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-award-row.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-award-row.png",
+      "category": "award-row",
+      "captureStartUTC": "2026-10-03T07:41:16.089Z",
+      "captureEndUTC": "2026-10-03T07:41:16.112Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 39,
+        "y": 217,
+        "width": 710,
+        "height": 288,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 710,
+        "height": 288,
+        "mode": "RGB"
+      },
+      "originalSHA256": "09bf0c6b1d3476cbfc430779dca43bfa9e7fe8a6a0c40520a00f413aaf2805dc",
+      "outputSHA256": "6c05c84b26f7fc3f2eef64a4c1cf40820474c31df2e95e75df7d9820b51a5a5d",
+      "observation": "Four blank text inputs, default trophy icon, and fully fitting outlined delete control are visible. Screenshot alone does not establish whether the row was saved.",
+      "supportingDOMObservation": {
+        "source": "awards-proof.json",
+        "zeroBasedRecordIndex": 6,
+        "utc": "2026-10-03T07:41:16.074Z",
+        "step": "tablet local row and delete focus",
+        "activeAriaLabel": "항목 삭제",
+        "deleteRectCSS": {
+          "height": 44,
+          "right": 736,
+          "width": 44,
+          "x": 692,
+          "y": 230.83334350585935
+        },
+        "blankInputLengths": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-award-row.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-award-row.png",
+      "category": "award-row",
+      "captureStartUTC": "2026-10-03T07:41:17.982Z",
+      "captureEndUTC": "2026-10-03T07:41:18.012Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 495,
+        "y": 344,
+        "width": 641,
+        "height": 291,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 641,
+        "height": 291,
+        "mode": "RGB"
+      },
+      "originalSHA256": "74c687542c92368756b33df627ac7e125fb13e0c3a9bfb5ecd60d90e5b2fd9a1",
+      "outputSHA256": "f402fba170f8bd48adaacac7347c04adc85d50223e44cc27223cd79ee58f8f7a",
+      "observation": "Four blank text inputs, default trophy icon, and fully fitting outlined delete control are visible. Screenshot alone does not establish whether the row was saved.",
+      "supportingDOMObservation": {
+        "source": "awards-proof.json",
+        "zeroBasedRecordIndex": 9,
+        "utc": "2026-10-03T07:41:17.972Z",
+        "step": "desktop local row and delete focus",
+        "activeAriaLabel": "항목 삭제",
+        "deleteRectCSS": {
+          "height": 44,
+          "right": 1122,
+          "width": 44,
+          "x": 1078,
+          "y": 356.5
+        },
+        "blankInputLengths": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-award-row.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-detail-date-1.png",
+      "category": "detail-date-1",
+      "captureStartUTC": "2026-10-03T07:42:25.182Z",
+      "captureEndUTC": "2026-10-03T07:42:25.200Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 128,
+        "y": 271,
+        "width": 116,
+        "height": 25,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 116,
+        "height": 25,
+        "mode": "RGB"
+      },
+      "originalSHA256": "88b6375b3d393c4c209e40c0e17692ec397affca2188176736f05c60042d1220",
+      "outputSHA256": "d535884a4fb76b957a8e8e5a6fd998b220950b20518670968a1e746280d9911a",
+      "observation": "Visible rendered date: 9. 17. (목) 18:00. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 0,
+        "utc": "2026-10-03T07:42:24.975Z",
+        "step": "mobile league detail after fresh navigation"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-league-detail-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-detail-date-2.png",
+      "category": "detail-date-2",
+      "captureStartUTC": "2026-10-03T07:42:25.182Z",
+      "captureEndUTC": "2026-10-03T07:42:25.200Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 128,
+        "y": 492,
+        "width": 116,
+        "height": 25,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 116,
+        "height": 25,
+        "mode": "RGB"
+      },
+      "originalSHA256": "88b6375b3d393c4c209e40c0e17692ec397affca2188176736f05c60042d1220",
+      "outputSHA256": "3693a9baee7feffcb33a7429b5f60d3016d4ec1ff5b9a20fb0d26aa0ee340847",
+      "observation": "Visible rendered date: 9. 24. (목) 18:30. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 0,
+        "utc": "2026-10-03T07:42:24.975Z",
+        "step": "mobile league detail after fresh navigation"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-league-detail-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-detail-date-1.png",
+      "category": "detail-date-1",
+      "captureStartUTC": "2026-10-03T07:43:47.161Z",
+      "captureEndUTC": "2026-10-03T07:43:47.188Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 135,
+        "y": 266,
+        "width": 117,
+        "height": 25,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 117,
+        "height": 25,
+        "mode": "RGB"
+      },
+      "originalSHA256": "3ac474a7e525f2d74b55ff6fe31276a8224cbfc2c6a083563ebecf52601f5c15",
+      "outputSHA256": "83bd0e5e2ae2da87e3a93ddcdb2a7f18550a35ac47e6a5461c51e3b737ea51ed",
+      "observation": "Visible rendered date: 9. 17. (목) 18:00. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 5,
+        "utc": "2026-10-03T07:43:46.951Z",
+        "step": "tablet league detail baseline"
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-league-detail-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-detail-date-2.png",
+      "category": "detail-date-2",
+      "captureStartUTC": "2026-10-03T07:43:47.161Z",
+      "captureEndUTC": "2026-10-03T07:43:47.188Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 135,
+        "y": 467,
+        "width": 117,
+        "height": 26,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 117,
+        "height": 26,
+        "mode": "RGB"
+      },
+      "originalSHA256": "3ac474a7e525f2d74b55ff6fe31276a8224cbfc2c6a083563ebecf52601f5c15",
+      "outputSHA256": "edff9d171525d6c39c93f5d5ad1624fe451833f223308cd466681894149b370a",
+      "observation": "Visible rendered date: 9. 24. (목) 18:30. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 5,
+        "utc": "2026-10-03T07:43:46.951Z",
+        "step": "tablet league detail baseline"
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-league-detail-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-detail-date-1.png",
+      "category": "detail-date-1",
+      "captureStartUTC": "2026-10-03T07:43:48.819Z",
+      "captureEndUTC": "2026-10-03T07:43:48.848Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 792,
+        "y": 381,
+        "width": 117,
+        "height": 27,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 117,
+        "height": 27,
+        "mode": "RGB"
+      },
+      "originalSHA256": "785845e1ad7637aacc55cfbad1efcec26fee07ea658279f25712458277085e73",
+      "outputSHA256": "441d081be95e7750e0325d1ab85dd494233067741f37c1a403140ca5a90a60c3",
+      "observation": "Visible rendered date: 9. 17. (목) 18:00. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 8,
+        "utc": "2026-10-03T07:43:48.809Z",
+        "step": "desktop league detail baseline"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-league-detail-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-detail-date-2.png",
+      "category": "detail-date-2",
+      "captureStartUTC": "2026-10-03T07:43:48.819Z",
+      "captureEndUTC": "2026-10-03T07:43:48.848Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 792,
+        "y": 450,
+        "width": 117,
+        "height": 27,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 117,
+        "height": 27,
+        "mode": "RGB"
+      },
+      "originalSHA256": "785845e1ad7637aacc55cfbad1efcec26fee07ea658279f25712458277085e73",
+      "outputSHA256": "b5bdc2a15bd15031eaf363a17ea8df7cda65790ea95f58162c2f041f2bccd39b",
+      "observation": "Visible rendered date: 9. 24. (목) 18:30. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 8,
+        "utc": "2026-10-03T07:43:48.809Z",
+        "step": "desktop league detail baseline"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-league-detail-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-video-date-1.png",
+      "category": "video-date-1",
+      "captureStartUTC": "2026-10-03T07:42:51.603Z",
+      "captureEndUTC": "2026-10-03T07:42:51.624Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 30,
+        "y": 345,
+        "width": 163,
+        "height": 23,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 163,
+        "height": 23,
+        "mode": "RGB"
+      },
+      "originalSHA256": "cde0ae428ee2c397e8beab8e7de6aaa51e106f9570650dcdf8b608deec55937f",
+      "outputSHA256": "33428a54cf8b55bc7cd032da18362af0bfa70ecaae2a5cb91f5611a1376a80f3",
+      "observation": "Visible rendered date: 2026.9.17 18:00. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 3,
+        "utc": "2026-10-03T07:42:51.593Z",
+        "step": "mobile videos settled two fixture rows"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-league-video-times-settled.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-video-date-2.png",
+      "category": "video-date-2",
+      "captureStartUTC": "2026-10-03T07:42:51.603Z",
+      "captureEndUTC": "2026-10-03T07:42:51.624Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 30,
+        "y": 473,
+        "width": 163,
+        "height": 24,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 163,
+        "height": 24,
+        "mode": "RGB"
+      },
+      "originalSHA256": "cde0ae428ee2c397e8beab8e7de6aaa51e106f9570650dcdf8b608deec55937f",
+      "outputSHA256": "00d0a13042bb95a77d08c7cb8fb41fc95c1d261b4deeb1d075475dfd0e94c302",
+      "observation": "Visible rendered date: 2026.9.24 18:30. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 3,
+        "utc": "2026-10-03T07:42:51.593Z",
+        "step": "mobile videos settled two fixture rows"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-league-video-times-settled.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-video-date-1.png",
+      "category": "video-date-1",
+      "captureStartUTC": "2026-10-03T07:43:47.824Z",
+      "captureEndUTC": "2026-10-03T07:43:47.862Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 38,
+        "y": 271,
+        "width": 162,
+        "height": 23,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 162,
+        "height": 23,
+        "mode": "RGB"
+      },
+      "originalSHA256": "dc5b6b67f62fd123fad10a937dfa23e4efb715d37125bfcea97108a07a8dd3f9",
+      "outputSHA256": "2799f84f882d05a1fe4f0cd45f4b9ca8b5e014382cd9c3cb1d43aeb648c69be7",
+      "observation": "Visible rendered date: 2026.9.17 18:00. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 6,
+        "utc": "2026-10-03T07:43:47.815Z",
+        "step": "tablet videos settled actual link"
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-league-video-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-video-date-2.png",
+      "category": "video-date-2",
+      "captureStartUTC": "2026-10-03T07:43:47.824Z",
+      "captureEndUTC": "2026-10-03T07:43:47.862Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 38,
+        "y": 376,
+        "width": 162,
+        "height": 23,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 162,
+        "height": 23,
+        "mode": "RGB"
+      },
+      "originalSHA256": "dc5b6b67f62fd123fad10a937dfa23e4efb715d37125bfcea97108a07a8dd3f9",
+      "outputSHA256": "59e0e32cffc25762fb919e72e944b601ca11ef5cf077bb0e18e0182116df3d6a",
+      "observation": "Visible rendered date: 2026.9.24 18:30. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 6,
+        "utc": "2026-10-03T07:43:47.815Z",
+        "step": "tablet videos settled actual link"
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-league-video-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-video-date-1.png",
+      "category": "video-date-1",
+      "captureStartUTC": "2026-10-03T07:43:49.491Z",
+      "captureEndUTC": "2026-10-03T07:43:49.511Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 286,
+        "y": 227,
+        "width": 164,
+        "height": 24,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 164,
+        "height": 24,
+        "mode": "RGB"
+      },
+      "originalSHA256": "f520566f740612bd3b29bea8c1c316ccd8c7f1af88521a6ab477fc2b94dfb345",
+      "outputSHA256": "414c80819b89d5f1655c93163055071dcd2b8c3c1a7ab81080c078e100c682a1",
+      "observation": "Visible rendered date: 2026.9.17 18:00. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 9,
+        "utc": "2026-10-03T07:43:49.482Z",
+        "step": "desktop videos settled actual link"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-league-video-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-video-date-2.png",
+      "category": "video-date-2",
+      "captureStartUTC": "2026-10-03T07:43:49.491Z",
+      "captureEndUTC": "2026-10-03T07:43:49.511Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 286,
+        "y": 332,
+        "width": 164,
+        "height": 24,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 164,
+        "height": 24,
+        "mode": "RGB"
+      },
+      "originalSHA256": "f520566f740612bd3b29bea8c1c316ccd8c7f1af88521a6ab477fc2b94dfb345",
+      "outputSHA256": "eb1bcd87d759af14f35001aa7844e4cc2329785e8a405e1d362d73b2463c5882",
+      "observation": "Visible rendered date: 2026.9.24 18:30. Other page content excluded for data minimization.",
+      "supportingDOMObservation": {
+        "source": "video-time-proof.json",
+        "zeroBasedRecordIndex": 9,
+        "utc": "2026-10-03T07:43:49.482Z",
+        "step": "desktop videos settled actual link"
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-league-video-times.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-modal-close-settled.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:56:20.310Z",
+      "captureEndUTC": "2026-10-03T07:56:20.340Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 318,
+        "y": 16,
+        "width": 71,
+        "height": 77,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 71,
+        "height": 77,
+        "mode": "RGB"
+      },
+      "originalSHA256": "14e0260da2e43a76331e5250f94fe022a886db3ba336d881aa1d174d1504d226",
+      "outputSHA256": "79d5bfb7ce8562c4d2df52f30b40e1d6f0ea4407506e98785f3ad714d440c606",
+      "observation": "Settled original shows roster content; crop retains only modal top-right chrome and X. No distinct visible focus ring; focus is corroborated by contemporaneous DOM evidence.",
+      "visibleFocusOutline": false,
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "sourceSnapshotSHA256": "815e0c034d8fac3636f8a06f0fba4a4f94b3ecb206aff9fae4e066cba0e32ba4",
+        "zeroBasedRecordIndex": 19,
+        "utc": "2026-10-03T07:56:20.296Z",
+        "step": "mobile tournament focus still X after dialog select index5 settled",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true,
+        "originalStepLabel": "mobile tournament focus still X after six qualification selects settled",
+        "labelCorrection": "Updated to the narrowed source label; original label retained. No observation data or time changed."
+      },
+      "rasterViewportCaveat": null,
+      "recommendedReplacementFor": "mobile-modal-close.png",
+      "originalBasename": "mobile-roster-focus-settled.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/mobile-league-modal-close.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:56:23.040Z",
+      "captureEndUTC": "2026-10-03T07:56:23.070Z",
+      "actualCSSViewport": {
+        "width": 405,
+        "height": 606,
+        "scrollWidth": 405
+      },
+      "reportedDevicePixelRatio": 1.25,
+      "originalRaster": {
+        "width": 405,
+        "height": 606,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 318,
+        "y": 16,
+        "width": 71,
+        "height": 77,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 71,
+        "height": 77,
+        "mode": "RGB"
+      },
+      "originalSHA256": "7fc2477dfc67a4f3aa4eecf1931fd8cba44fa59949f9829814ce007676803550",
+      "outputSHA256": "79d5bfb7ce8562c4d2df52f30b40e1d6f0ea4407506e98785f3ad714d440c606",
+      "observation": "Settled original shows roster content; crop retains only modal top-right chrome and X. No distinct visible focus ring; focus is corroborated by contemporaneous DOM evidence.",
+      "visibleFocusOutline": false,
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "sourceSnapshotSHA256": "815e0c034d8fac3636f8a06f0fba4a4f94b3ecb206aff9fae4e066cba0e32ba4",
+        "zeroBasedRecordIndex": 22,
+        "utc": "2026-10-03T07:56:23.027Z",
+        "step": "mobile completed league initial focus after dialog select index5 settle",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true,
+        "originalStepLabel": "mobile completed league initial focus after six selects settle",
+        "labelCorrection": "Updated to the narrowed source label; original label retained. No observation data or time changed."
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "mobile-league-roster-focus.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/tablet-league-modal-close.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:56:53.560Z",
+      "captureEndUTC": "2026-10-03T07:56:53.611Z",
+      "actualCSSViewport": {
+        "width": 789,
+        "height": 505,
+        "scrollWidth": 789
+      },
+      "reportedDevicePixelRatio": 1.5,
+      "originalRaster": {
+        "width": 788,
+        "height": 505,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 559,
+        "y": 16,
+        "width": 75,
+        "height": 77,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 75,
+        "height": 77,
+        "mode": "RGB"
+      },
+      "originalSHA256": "39d48a578a624fb8587ffac7b71f058806caee613a3a61b5ad749ad34a8296c5",
+      "outputSHA256": "231ab47c0d4122c04cc027c26ff2b2071ae1b5e5147c7c754ffe4d993278df60",
+      "observation": "Settled original shows roster content; crop retains only modal top-right chrome and X. A blue focus outline is clearly visible around X.",
+      "visibleFocusOutline": true,
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "sourceSnapshotSHA256": "815e0c034d8fac3636f8a06f0fba4a4f94b3ecb206aff9fae4e066cba0e32ba4",
+        "zeroBasedRecordIndex": 25,
+        "utc": "2026-10-03T07:56:53.545Z",
+        "step": "tablet completed league initial focus after data settle",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true
+      },
+      "rasterViewportCaveat": "Tablet original raster is 788 pixels wide although capture metadata reports 789 CSS pixels. No rescaling was performed.",
+      "originalBasename": "tablet-league-roster-focus.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    },
+    {
+      "file": "images/desktop-league-modal-close.png",
+      "category": "modal-close",
+      "captureStartUTC": "2026-10-03T07:56:54.508Z",
+      "captureEndUTC": "2026-10-03T07:56:54.559Z",
+      "actualCSSViewport": {
+        "width": 1183,
+        "height": 758,
+        "scrollWidth": 1183
+      },
+      "reportedDevicePixelRatio": 1,
+      "originalRaster": {
+        "width": 1183,
+        "height": 758,
+        "mode": "RGB"
+      },
+      "cropRasterCoordinates": {
+        "x": 757,
+        "y": 16,
+        "width": 75,
+        "height": 77,
+        "origin": "top-left",
+        "rightBottomExclusive": true
+      },
+      "outputRaster": {
+        "width": 75,
+        "height": 77,
+        "mode": "RGB"
+      },
+      "originalSHA256": "a270f9460cc559d5b09a73b6409e87879612b5da87c71f73c112be5408d8fa72",
+      "outputSHA256": "6934a2de1236ab6377fce54a97a0ddd9abcb30495ff5481b486614a9c771f9aa",
+      "observation": "Settled original shows roster content; crop retains only modal top-right chrome and X. A blue focus outline is clearly visible around X.",
+      "visibleFocusOutline": true,
+      "supportingDOMObservation": {
+        "source": "proof.json",
+        "sourceSnapshotSHA256": "815e0c034d8fac3636f8a06f0fba4a4f94b3ecb206aff9fae4e066cba0e32ba4",
+        "zeroBasedRecordIndex": 28,
+        "utc": "2026-10-03T07:56:54.495Z",
+        "step": "desktop completed league initial focus after data settle",
+        "activeAriaLabel": "모달 닫기",
+        "activeWithinDialog": true
+      },
+      "rasterViewportCaveat": null,
+      "originalBasename": "desktop-league-roster-focus.png",
+      "sourceCollectorReportedOriginalInspected": true,
+      "sourceCollectorReportedPixelEquality": true,
+      "publisherInspectedSafeCrop": true
+    }
+  ],
+  "sourceEvidenceSnapshots": [
+    {
+      "snapshotUTC": "2026-10-03T07:49:42.047Z",
+      "files": {
+        "proof.json": {
+          "sha256": "72d6d97eaf54b2c577dcd8a7dd739d945a0db5ac706c201869826891daddfd8d",
+          "recordCount": 19
+        },
+        "awards-proof.json": {
+          "sha256": "17213449c04b0d856f369e32354c327fe34159b5a1de070c6008d44baed2b95d",
+          "recordCount": 11
+        },
+        "video-time-proof.json": {
+          "sha256": "49a8b6da88ca27e830a021f018680b5282c074bc2fa52112dfdb690483d945d7",
+          "recordCount": 11
+        }
+      },
+      "meaning": "Historical source snapshot; later snapshots may supersede earlier hashes. Publication manifest identifies exact public bytes."
+    },
+    {
+      "snapshotUTC": "2026-10-03T07:59:11.711Z",
+      "files": {
+        "proof.json": {
+          "sha256": "815e0c034d8fac3636f8a06f0fba4a4f94b3ecb206aff9fae4e066cba0e32ba4",
+          "recordCount": 31
+        }
+      },
+      "meaning": "Historical source snapshot; later snapshots may supersede earlier hashes. Publication manifest identifies exact public bytes."
+    },
+    {
+      "snapshotUTC": "2026-10-03T08:04:00.053Z",
+      "files": {
+        "proof.json": {
+          "sha256": "7f773feaf87eaa79346867c1d1802689358e409b0a8d32dbf0ab479ab055a2ef",
+          "recordCount": 31
+        },
+        "awards-proof.json": {
+          "sha256": "ccd41e1b5ff6a93dbfc6a1472c350d35da493a15d0839af5b3e3b106b66fb846",
+          "recordCount": 11
+        },
+        "video-time-proof.json": {
+          "sha256": "49a8b6da88ca27e830a021f018680b5282c074bc2fa52112dfdb690483d945d7",
+          "recordCount": 11
+        }
+      },
+      "meaning": "Historical source snapshot; later snapshots may supersede earlier hashes. Publication manifest identifies exact public bytes."
+    }
+  ]
+}

@@ -1,0 +1,337 @@
+[
+  {
+    "active": {
+      "ariaLabel": "메뉴 열기",
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "blankInputs": [],
+    "deleteButtons": 0,
+    "deleteRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:38:37.488Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile awards zero baseline"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "blankInputs": [
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "어워드명 (예: MVP)"
+      },
+      {
+        "id": "award-recipient-0",
+        "length": 0,
+        "placeholder": "명단에서 선택"
+      },
+      {
+        "id": "award-team-0",
+        "length": 0,
+        "placeholder": "참가 팀에서 선택"
+      },
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)"
+      }
+    ],
+    "deleteButtons": 1,
+    "deleteRect": {
+      "height": 44,
+      "right": 360,
+      "width": 44,
+      "x": 316,
+      "y": 423.5
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:38:37.835Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile blank local award row"
+  },
+  {
+    "active": {
+      "ariaLabel": "항목 삭제",
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "blankInputs": [
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "어워드명 (예: MVP)"
+      },
+      {
+        "id": "award-recipient-0",
+        "length": 0,
+        "placeholder": "명단에서 선택"
+      },
+      {
+        "id": "award-team-0",
+        "length": 0,
+        "placeholder": "참가 팀에서 선택"
+      },
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)"
+      }
+    ],
+    "deleteButtons": 1,
+    "deleteRect": {
+      "height": 44,
+      "right": 360,
+      "width": 44,
+      "x": 316,
+      "y": 281.1000061035156
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:39:21.075Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile title Tab focuses fully fitting delete"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "A"
+    },
+    "blankInputs": [
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "어워드명 (예: MVP)"
+      },
+      {
+        "id": "award-recipient-0",
+        "length": 0,
+        "placeholder": "명단에서 선택"
+      },
+      {
+        "id": "award-team-0",
+        "length": 0,
+        "placeholder": "참가 팀에서 선택"
+      },
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)"
+      }
+    ],
+    "deleteButtons": 1,
+    "deleteRect": {
+      "height": 44,
+      "right": 360,
+      "width": 44,
+      "x": 316,
+      "y": 450.7000122070313
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:39:40.379Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile state after section roundtrip wait did not settle empty",
+    "excludedFromCancelClaims": true,
+    "reason": "Rapid section clicks did not establish mounted statistics page; observation is a local row still present, not evidence of failed discard. Later settled statistics-to-awards roundtrip verified0."
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "A"
+    },
+    "blankInputs": [],
+    "deleteButtons": 0,
+    "deleteRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:40:43.642Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile settled statistics-to-awards restores zero"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "A"
+    },
+    "blankInputs": [],
+    "deleteButtons": 0,
+    "deleteRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:41:15.702Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet awards zero baseline"
+  },
+  {
+    "active": {
+      "ariaLabel": "항목 삭제",
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "blankInputs": [
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "어워드명 (예: MVP)"
+      },
+      {
+        "id": "award-recipient-0",
+        "length": 0,
+        "placeholder": "명단에서 선택"
+      },
+      {
+        "id": "award-team-0",
+        "length": 0,
+        "placeholder": "참가 팀에서 선택"
+      },
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)"
+      }
+    ],
+    "deleteButtons": 1,
+    "deleteRect": {
+      "height": 44,
+      "right": 736,
+      "width": 44,
+      "x": 692,
+      "y": 230.83334350585935
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:41:16.074Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet local row and delete focus"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "A"
+    },
+    "blankInputs": [],
+    "deleteButtons": 0,
+    "deleteRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:41:17.395Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet settled section roundtrip restores zero"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "A"
+    },
+    "blankInputs": [],
+    "deleteButtons": 0,
+    "deleteRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:41:17.581Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop awards zero baseline"
+  },
+  {
+    "active": {
+      "ariaLabel": "항목 삭제",
+      "id": "",
+      "tag": "BUTTON"
+    },
+    "blankInputs": [
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "어워드명 (예: MVP)"
+      },
+      {
+        "id": "award-recipient-0",
+        "length": 0,
+        "placeholder": "명단에서 선택"
+      },
+      {
+        "id": "award-team-0",
+        "length": 0,
+        "placeholder": "참가 팀에서 선택"
+      },
+      {
+        "id": "",
+        "length": 0,
+        "placeholder": "비고 (선택, 예: 3골 1어시스트)"
+      }
+    ],
+    "deleteButtons": 1,
+    "deleteRect": {
+      "height": 44,
+      "right": 1122,
+      "width": 44,
+      "x": 1078,
+      "y": 356.5
+    },
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:41:17.972Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop local row and delete focus"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "tag": "A"
+    },
+    "blankInputs": [],
+    "deleteButtons": 0,
+    "deleteRect": null,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/aa100000-0000-4000-8000-000000000004/awards",
+    "utc": "2026-10-03T07:41:19.100Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop settled section roundtrip restores zero"
+  }
+]

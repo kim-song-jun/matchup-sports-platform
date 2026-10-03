@@ -1,0 +1,633 @@
+{
+  "method": "Independent read of sanitized JSON and actual safe PNG pixels only. Full originals were intentionally not accessed.",
+  "sourceFileChecks": [
+    {
+      "file": "awards-proof.json",
+      "sha256": "ccd41e1b5ff6a93dbfc6a1472c350d35da493a15d0839af5b3e3b106b66fb846"
+    },
+    {
+      "file": "final-state.json",
+      "sha256": "6ef1f05424179c92f669c9a32342ae3535d205736f970d8da61988ece2748b98"
+    },
+    {
+      "file": "proof.json",
+      "sha256": "7f773feaf87eaa79346867c1d1802689358e409b0a8d32dbf0ab479ab055a2ef"
+    },
+    {
+      "file": "summary.json",
+      "sha256": "2f870f0a86fa7dbfc93fd1cba3c51564111efea9ae44ece745aa3505cc51d7f5"
+    },
+    {
+      "file": "video-time-proof.json",
+      "sha256": "49a8b6da88ca27e830a021f018680b5282c074bc2fa52112dfdb690483d945d7"
+    },
+    {
+      "file": "wizard-discard-reentry.json",
+      "sha256": "fe5f90fc9dd65834b1375969135d86226e249e3634596aa7f033423c796e0172"
+    },
+    {
+      "file": "wizard-entry-blocker.json",
+      "sha256": "cb36fd346901272b8bf8b2970d01e07fcd2ea5ddb1b3c1fc9e0ff480335742a5"
+    },
+    {
+      "file": "wizard-proof.json",
+      "sha256": "d337a59a68e9e91a8e25072077b4c2f5778231f966d19964a056303577c36179"
+    }
+  ],
+  "imageChecks": [
+    {
+      "file": "images/mobile-modal-close.png",
+      "sha256": "f395d7411af640cf25e04fd1345dcd7806c4fd92cc84d9c8171390dd765a51ac",
+      "size": [
+        71,
+        78
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:35:37.827Z",
+      "captureEndUTC": "2026-10-03T07:35:37.855Z"
+    },
+    {
+      "file": "images/tablet-modal-close.png",
+      "sha256": "fc53b429bd256045f3ffbe1cd2b6910a4f14b1e5be0c511e0758f3f1351e5d8b",
+      "size": [
+        75,
+        77
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:36:45.691Z",
+      "captureEndUTC": "2026-10-03T07:36:45.745Z"
+    },
+    {
+      "file": "images/desktop-modal-close.png",
+      "sha256": "934d4d42149ea8149672d63390c0bdb686aaadeac0b643c75a7d004ec15d2b42",
+      "size": [
+        75,
+        77
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:37:31.400Z",
+      "captureEndUTC": "2026-10-03T07:37:31.466Z"
+    },
+    {
+      "file": "images/mobile-filtered-zero.png",
+      "sha256": "ce0d28471f1fa6e0770010be419fb535a591741a6da1eec43a7a972a226eb285",
+      "size": [
+        373,
+        376
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:36:19.208Z",
+      "captureEndUTC": "2026-10-03T07:36:19.239Z"
+    },
+    {
+      "file": "images/tablet-filtered-zero.png",
+      "sha256": "6bbb83c7be4b2e4bf5156e8dbbdeaa336a2758f473427ccb9f3175b1e6841bfd",
+      "size": [
+        740,
+        281
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:36:46.778Z",
+      "captureEndUTC": "2026-10-03T07:36:46.811Z"
+    },
+    {
+      "file": "images/desktop-filtered-zero.png",
+      "sha256": "fb8c3ebca806885fa1375263e5e94c496a8e0421af0c236f96f0aaa428e7e1b2",
+      "size": [
+        672,
+        328
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:37:32.540Z",
+      "captureEndUTC": "2026-10-03T07:37:32.576Z"
+    },
+    {
+      "file": "images/mobile-award-row.png",
+      "sha256": "3376b5ecd4d198a79ad1fd8ff260d4258cb16c3c725e9e03764f5e5945ba5de3",
+      "size": [
+        342,
+        309
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:39:21.095Z",
+      "captureEndUTC": "2026-10-03T07:39:21.120Z"
+    },
+    {
+      "file": "images/tablet-award-row.png",
+      "sha256": "6c05c84b26f7fc3f2eef64a4c1cf40820474c31df2e95e75df7d9820b51a5a5d",
+      "size": [
+        710,
+        288
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:41:16.089Z",
+      "captureEndUTC": "2026-10-03T07:41:16.112Z"
+    },
+    {
+      "file": "images/desktop-award-row.png",
+      "sha256": "f402fba170f8bd48adaacac7347c04adc85d50223e44cc27223cd79ee58f8f7a",
+      "size": [
+        641,
+        291
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:41:17.982Z",
+      "captureEndUTC": "2026-10-03T07:41:18.012Z"
+    },
+    {
+      "file": "images/mobile-detail-date-1.png",
+      "sha256": "d535884a4fb76b957a8e8e5a6fd998b220950b20518670968a1e746280d9911a",
+      "size": [
+        116,
+        25
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:42:25.182Z",
+      "captureEndUTC": "2026-10-03T07:42:25.200Z"
+    },
+    {
+      "file": "images/mobile-detail-date-2.png",
+      "sha256": "3693a9baee7feffcb33a7429b5f60d3016d4ec1ff5b9a20fb0d26aa0ee340847",
+      "size": [
+        116,
+        25
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:42:25.182Z",
+      "captureEndUTC": "2026-10-03T07:42:25.200Z"
+    },
+    {
+      "file": "images/tablet-detail-date-1.png",
+      "sha256": "83bd0e5e2ae2da87e3a93ddcdb2a7f18550a35ac47e6a5461c51e3b737ea51ed",
+      "size": [
+        117,
+        25
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:47.161Z",
+      "captureEndUTC": "2026-10-03T07:43:47.188Z"
+    },
+    {
+      "file": "images/tablet-detail-date-2.png",
+      "sha256": "edff9d171525d6c39c93f5d5ad1624fe451833f223308cd466681894149b370a",
+      "size": [
+        117,
+        26
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:47.161Z",
+      "captureEndUTC": "2026-10-03T07:43:47.188Z"
+    },
+    {
+      "file": "images/desktop-detail-date-1.png",
+      "sha256": "441d081be95e7750e0325d1ab85dd494233067741f37c1a403140ca5a90a60c3",
+      "size": [
+        117,
+        27
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:48.819Z",
+      "captureEndUTC": "2026-10-03T07:43:48.848Z"
+    },
+    {
+      "file": "images/desktop-detail-date-2.png",
+      "sha256": "b5bdc2a15bd15031eaf363a17ea8df7cda65790ea95f58162c2f041f2bccd39b",
+      "size": [
+        117,
+        27
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:48.819Z",
+      "captureEndUTC": "2026-10-03T07:43:48.848Z"
+    },
+    {
+      "file": "images/mobile-video-date-1.png",
+      "sha256": "33428a54cf8b55bc7cd032da18362af0bfa70ecaae2a5cb91f5611a1376a80f3",
+      "size": [
+        163,
+        23
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:42:51.603Z",
+      "captureEndUTC": "2026-10-03T07:42:51.624Z"
+    },
+    {
+      "file": "images/mobile-video-date-2.png",
+      "sha256": "00d0a13042bb95a77d08c7cb8fb41fc95c1d261b4deeb1d075475dfd0e94c302",
+      "size": [
+        163,
+        24
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:42:51.603Z",
+      "captureEndUTC": "2026-10-03T07:42:51.624Z"
+    },
+    {
+      "file": "images/tablet-video-date-1.png",
+      "sha256": "2799f84f882d05a1fe4f0cd45f4b9ca8b5e014382cd9c3cb1d43aeb648c69be7",
+      "size": [
+        162,
+        23
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:47.824Z",
+      "captureEndUTC": "2026-10-03T07:43:47.862Z"
+    },
+    {
+      "file": "images/tablet-video-date-2.png",
+      "sha256": "59e0e32cffc25762fb919e72e944b601ca11ef5cf077bb0e18e0182116df3d6a",
+      "size": [
+        162,
+        23
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:47.824Z",
+      "captureEndUTC": "2026-10-03T07:43:47.862Z"
+    },
+    {
+      "file": "images/desktop-video-date-1.png",
+      "sha256": "414c80819b89d5f1655c93163055071dcd2b8c3c1a7ab81080c078e100c682a1",
+      "size": [
+        164,
+        24
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:49.491Z",
+      "captureEndUTC": "2026-10-03T07:43:49.511Z"
+    },
+    {
+      "file": "images/desktop-video-date-2.png",
+      "sha256": "eb1bcd87d759af14f35001aa7844e4cc2329785e8a405e1d362d73b2463c5882",
+      "size": [
+        164,
+        24
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:43:49.491Z",
+      "captureEndUTC": "2026-10-03T07:43:49.511Z"
+    },
+    {
+      "file": "images/mobile-modal-close-settled.png",
+      "sha256": "79d5bfb7ce8562c4d2df52f30b40e1d6f0ea4407506e98785f3ad714d440c606",
+      "size": [
+        71,
+        77
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:56:20.310Z",
+      "captureEndUTC": "2026-10-03T07:56:20.340Z"
+    },
+    {
+      "file": "images/mobile-league-modal-close.png",
+      "sha256": "79d5bfb7ce8562c4d2df52f30b40e1d6f0ea4407506e98785f3ad714d440c606",
+      "size": [
+        71,
+        77
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:56:23.040Z",
+      "captureEndUTC": "2026-10-03T07:56:23.070Z"
+    },
+    {
+      "file": "images/tablet-league-modal-close.png",
+      "sha256": "231ab47c0d4122c04cc027c26ff2b2071ae1b5e5147c7c754ffe4d993278df60",
+      "size": [
+        75,
+        77
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:56:53.560Z",
+      "captureEndUTC": "2026-10-03T07:56:53.611Z"
+    },
+    {
+      "file": "images/desktop-league-modal-close.png",
+      "sha256": "6934a2de1236ab6377fce54a97a0ddd9abcb30495ff5481b486614a9c771f9aa",
+      "size": [
+        75,
+        77
+      ],
+      "cropBoundsValid": true,
+      "DOMIndexUTCAndCurrentStepMatch": true,
+      "safePixelsInspected": true,
+      "captureStartUTC": "2026-10-03T07:56:54.508Z",
+      "captureEndUTC": "2026-10-03T07:56:54.559Z"
+    }
+  ],
+  "focus": [
+    {
+      "surface": "tournament",
+      "cssWidth": 405,
+      "proofIndices": [
+        19,
+        20,
+        21
+      ],
+      "UTC": [
+        "2026-10-03T07:56:20.296Z",
+        "2026-10-03T07:56:20.574Z",
+        "2026-10-03T07:56:20.782Z"
+      ],
+      "XFocusInsideTabEscapeReturn": true
+    },
+    {
+      "surface": "tournament",
+      "cssWidth": 789,
+      "proofIndices": [
+        7,
+        8,
+        10
+      ],
+      "UTC": [
+        "2026-10-03T07:36:45.688Z",
+        "2026-10-03T07:36:45.980Z",
+        "2026-10-03T07:36:46.433Z"
+      ],
+      "XFocusInsideTabEscapeReturn": true
+    },
+    {
+      "surface": "tournament",
+      "cssWidth": 1183,
+      "proofIndices": [
+        13,
+        14,
+        16
+      ],
+      "UTC": [
+        "2026-10-03T07:37:31.396Z",
+        "2026-10-03T07:37:31.717Z",
+        "2026-10-03T07:37:32.201Z"
+      ],
+      "XFocusInsideTabEscapeReturn": true
+    },
+    {
+      "surface": "league",
+      "cssWidth": 405,
+      "proofIndices": [
+        22,
+        23,
+        24
+      ],
+      "UTC": [
+        "2026-10-03T07:56:23.027Z",
+        "2026-10-03T07:56:23.302Z",
+        "2026-10-03T07:56:23.519Z"
+      ],
+      "XFocusInsideTabEscapeReturn": true
+    },
+    {
+      "surface": "league",
+      "cssWidth": 789,
+      "proofIndices": [
+        25,
+        26,
+        27
+      ],
+      "UTC": [
+        "2026-10-03T07:56:53.545Z",
+        "2026-10-03T07:56:53.855Z",
+        "2026-10-03T07:56:54.038Z"
+      ],
+      "XFocusInsideTabEscapeReturn": true
+    },
+    {
+      "surface": "league",
+      "cssWidth": 1183,
+      "proofIndices": [
+        28,
+        29,
+        30
+      ],
+      "UTC": [
+        "2026-10-03T07:56:54.495Z",
+        "2026-10-03T07:56:54.809Z",
+        "2026-10-03T07:56:55.015Z"
+      ],
+      "XFocusInsideTabEscapeReturn": true
+    }
+  ],
+  "focusLimits": {
+    "fullBoundaryWrapSampleCount": 1,
+    "boundaryWrapProofIndices": [
+      1,
+      2,
+      3
+    ],
+    "explicitSettledAggregate7Combinations": 4,
+    "qualificationCountSeparatelyMeasured": false
+  },
+  "filteredEmpty": [
+    {
+      "cssWidth": 405,
+      "proofIndices": [
+        5,
+        6
+      ],
+      "UTC": [
+        "2026-10-03T07:36:19.203Z",
+        "2026-10-03T07:36:19.566Z"
+      ],
+      "filteredZeroThenAllTwo": true
+    },
+    {
+      "cssWidth": 789,
+      "proofIndices": [
+        11,
+        12
+      ],
+      "UTC": [
+        "2026-10-03T07:36:46.775Z",
+        "2026-10-03T07:36:47.147Z"
+      ],
+      "filteredZeroThenAllTwo": true
+    },
+    {
+      "cssWidth": 1183,
+      "proofIndices": [
+        17,
+        18
+      ],
+      "UTC": [
+        "2026-10-03T07:37:32.535Z",
+        "2026-10-03T07:37:32.920Z"
+      ],
+      "filteredZeroThenAllTwo": true
+    }
+  ],
+  "awards": [
+    {
+      "cssWidth": 405,
+      "proofIndices": [
+        0,
+        2,
+        4
+      ],
+      "UTC": [
+        "2026-10-03T07:38:37.488Z",
+        "2026-10-03T07:39:21.075Z",
+        "2026-10-03T07:40:43.642Z"
+      ],
+      "deleteVisibleCSSWidth": 44,
+      "deleteXRange": [
+        316,
+        360
+      ],
+      "zeroLocalOneSettledZero": true
+    },
+    {
+      "cssWidth": 789,
+      "proofIndices": [
+        5,
+        6,
+        7
+      ],
+      "UTC": [
+        "2026-10-03T07:41:15.702Z",
+        "2026-10-03T07:41:16.074Z",
+        "2026-10-03T07:41:17.395Z"
+      ],
+      "deleteVisibleCSSWidth": 44,
+      "deleteXRange": [
+        692,
+        736
+      ],
+      "zeroLocalOneSettledZero": true
+    },
+    {
+      "cssWidth": 1183,
+      "proofIndices": [
+        8,
+        9,
+        10
+      ],
+      "UTC": [
+        "2026-10-03T07:41:17.581Z",
+        "2026-10-03T07:41:17.972Z",
+        "2026-10-03T07:41:19.100Z"
+      ],
+      "deleteVisibleCSSWidth": 44,
+      "deleteXRange": [
+        1078,
+        1122
+      ],
+      "zeroLocalOneSettledZero": true
+    }
+  ],
+  "video": [
+    {
+      "cssWidth": 405,
+      "proofIndices": [
+        2,
+        3,
+        4
+      ],
+      "UTC": [
+        "2026-10-03T07:42:26.581Z",
+        "2026-10-03T07:42:51.593Z",
+        "2026-10-03T07:42:52.161Z"
+      ],
+      "twoDateTimePairsEqual": true,
+      "detailReturnPreserved": true,
+      "fixtureIdentityLimit": "Video rows expose same week/team labels but not UUIDs; no database timestamp claim."
+    },
+    {
+      "cssWidth": 789,
+      "proofIndices": [
+        5,
+        6,
+        7
+      ],
+      "UTC": [
+        "2026-10-03T07:43:46.951Z",
+        "2026-10-03T07:43:47.815Z",
+        "2026-10-03T07:43:48.619Z"
+      ],
+      "twoDateTimePairsEqual": true,
+      "detailReturnPreserved": true,
+      "fixtureIdentityLimit": "Video rows expose same week/team labels but not UUIDs; no database timestamp claim."
+    },
+    {
+      "cssWidth": 1183,
+      "proofIndices": [
+        8,
+        9,
+        10
+      ],
+      "UTC": [
+        "2026-10-03T07:43:48.809Z",
+        "2026-10-03T07:43:49.482Z",
+        "2026-10-03T07:43:50.038Z"
+      ],
+      "twoDateTimePairsEqual": true,
+      "detailReturnPreserved": true,
+      "fixtureIdentityLimit": "Video rows expose same week/team labels but not UUIDs; no database timestamp claim."
+    }
+  ],
+  "wizard": {
+    "validStep3Observations": 0,
+    "mislabelledExcludedRecords": [
+      0,
+      1
+    ],
+    "discardReentryUTC": "2026-10-03T07:55:00.777Z",
+    "causeUnresolved": true
+  },
+  "timing": {
+    "allObservationArraysChronological": true,
+    "allObservationsAnd25CapturesAfterWorkflowCompletion": true,
+    "browserServingSHAEstablished": false
+  },
+  "limits": [
+    "Remote file checks are reported separately after publication.",
+    "Historical source metadata hashes are retained; the latest snapshot matches the current proof, awards and video files.",
+    "Two provenance step labels are narrowed to match corrected source labels; originalStepLabel is retained. No original timestamp or pixel changed.",
+    "Source original pixel equality and source-original hashes were not independently rechecked."
+  ]
+}

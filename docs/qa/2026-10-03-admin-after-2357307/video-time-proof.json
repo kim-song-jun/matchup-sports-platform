@@ -1,0 +1,321 @@
+[
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "다음 경기 콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n결과\n확정\n1 : 0\n일시\n9. 17. (목) 18:00\n콘솔 열기\n경기\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n결과\n결과 미입력\n일시\n9. 24. (목) 18:30\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:42:24.975Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile league detail after fresh navigation"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+        "text": "리그 상세로"
+      }
+    ],
+    "mainText": "플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부 경기 영상\n\n경기마다 하이라이트·중계 영상을 등록해요. 외부 링크를 붙이거나 mp4, webm, mov 파일을 200MB까지 직접 올릴 수 있어요. 등록한 영상은 리그 경기 상세에서 바로 재생돼요.\n\n리그 상세로",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+    "utc": "2026-10-03T07:42:25.919Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile videos actual link",
+    "excludedReason": "Header mounted before fixture/video data settled; no date claim from this observation."
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "다음 경기 콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n결과\n확정\n1 : 0\n일시\n9. 17. (목) 18:00\n콘솔 열기\n경기\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n결과\n결과 미입력\n일시\n9. 24. (목) 18:30\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:42:26.581Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile detail after actual return link"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+        "text": "리그 상세로"
+      }
+    ],
+    "mainText": "플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부 경기 영상\n\n경기마다 하이라이트·중계 영상을 등록해요. 외부 링크를 붙이거나 mp4, webm, mov 파일을 200MB까지 직접 올릴 수 있어요. 등록한 영상은 리그 경기 상세에서 바로 재생돼요.\n\n리그 상세로\n\n경기 2개 · 등록된 영상 0개\n\n1주차 · 송파 유나이티드 vs 한강 로버스\n\n2026.9.17 18:00 · 영상 0개\n\n영상 추가\n\n아직 등록된 영상이 없어요.\n\n2주차 · 한강 로버스 vs 송파 유나이티드\n\n2026.9.24 18:30 · 영상 0개\n\n영상 추가\n\n아직 등록된 영상이 없어요.",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+    "utc": "2026-10-03T07:42:51.593Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile videos settled two fixture rows"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "다음 경기 콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n결과\n확정\n1 : 0\n일시\n9. 17. (목) 18:00\n콘솔 열기\n경기\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n결과\n결과 미입력\n일시\n9. 24. (목) 18:30\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:42:52.161Z",
+    "viewport": {
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile actual return after settled video"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n결과\n확정\n1 : 0\n일시\n9. 17. (목) 18:00\n콘솔 열기\n경기\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n결과\n결과 미입력\n일시\n9. 24. (목) 18:30\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:43:46.951Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet league detail baseline"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+        "text": "리그 상세로"
+      }
+    ],
+    "mainText": "플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부 경기 영상\n\n경기마다 하이라이트·중계 영상을 등록해요. 외부 링크를 붙이거나 mp4, webm, mov 파일을 200MB까지 직접 올릴 수 있어요. 등록한 영상은 리그 경기 상세에서 바로 재생돼요.\n\n리그 상세로\n\n경기 2개 · 등록된 영상 0개\n\n1주차 · 송파 유나이티드 vs 한강 로버스\n\n2026.9.17 18:00 · 영상 0개\n\n영상 추가\n\n아직 등록된 영상이 없어요.\n\n2주차 · 한강 로버스 vs 송파 유나이티드\n\n2026.9.24 18:30 · 영상 0개\n\n영상 추가\n\n아직 등록된 영상이 없어요.",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+    "utc": "2026-10-03T07:43:47.815Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet videos settled actual link"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n결과\n확정\n1 : 0\n일시\n9. 17. (목) 18:00\n콘솔 열기\n경기\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n결과\n결과 미입력\n일시\n9. 24. (목) 18:30\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:43:48.619Z",
+    "viewport": {
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet detail actual return"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\t결과\t일시\t운영\n\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n\t\n확정\n1 : 0\n\t9. 17. (목) 18:00\t\n콘솔 열기\n\n\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n\t\n결과 미입력\n\t9. 24. (목) 18:30\t\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:43:48.809Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop league detail baseline"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+        "text": "리그 상세로"
+      }
+    ],
+    "mainText": "플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부 경기 영상\n\n경기마다 하이라이트·중계 영상을 등록해요. 외부 링크를 붙이거나 mp4, webm, mov 파일을 200MB까지 직접 올릴 수 있어요. 등록한 영상은 리그 경기 상세에서 바로 재생돼요.\n\n리그 상세로\n\n경기 2개 · 등록된 영상 0개\n\n1주차 · 송파 유나이티드 vs 한강 로버스\n\n2026.9.17 18:00 · 영상 0개\n\n영상 추가\n\n아직 등록된 영상이 없어요.\n\n2주차 · 한강 로버스 vs 송파 유나이티드\n\n2026.9.24 18:30 · 영상 0개\n\n영상 추가\n\n아직 등록된 영상이 없어요.",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+    "utc": "2026-10-03T07:43:49.482Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop videos settled actual link"
+  },
+  {
+    "fields": 0,
+    "links": [
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches",
+        "text": "리그 목록으로"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced/videos",
+        "text": "경기 영상 관리"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/e9235b90-c119-4e6b-8227-6aff827099e4/operate",
+        "text": "콘솔 열기"
+      },
+      {
+        "href": "https://alpha.teameet.co.kr/admin/live/525bd67a-e54b-41ad-a9bb-31415b882ced/fixtures/69017adb-98a1-4740-b9f9-9b8c83f36b1e/operate",
+        "text": "콘솔 열기"
+      }
+    ],
+    "mainText": "리그 목록으로\n\n플랫폼 · 리그\n\n(테스트) A-L 시즌티어검증 1시즌 1부\n\n2팀 참가 · 대진 2경기\n\n진행 중\n경기 영상 관리\n\n지금 할 일\n\n다음 경기는 한강 로버스 vs 송파 유나이티드예요\n\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 9. 24. (목) 18:30 — 킥오프 전에 콘솔에서 도착 확인을 해 주세요.\n\n다음 경기 콘솔 열기\n경기\t결과\t일시\t운영\n\n송파 유나이티드 vs 한강 로버스\n(테스트) A-L 시즌티어검증 1시즌 1부 1주차 · 장소 미정\n\t\n확정\n1 : 0\n\t9. 17. (목) 18:00\t\n콘솔 열기\n\n\n한강 로버스 vs 송파 유나이티드\n(테스트) A-L 시즌티어검증 1시즌 1부 2주차 · 장소 미정\n\t\n결과 미입력\n\t9. 24. (목) 18:30\t\n콘솔 열기\n참가 신청 · 참가팀 · 대진 관리\n리그를 만들 때와 팀 구성이 바뀔 때만 열어요. 일정 수정·몰수패·취소는 각 행의 ⋯ 에 있어요.\n열기",
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/525bd67a-e54b-41ad-a9bb-31415b882ced",
+    "utc": "2026-10-03T07:43:50.038Z",
+    "viewport": {
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop detail actual return"
+  }
+]

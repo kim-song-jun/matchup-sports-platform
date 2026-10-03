@@ -1,0 +1,770 @@
+[
+  {
+    "active": {
+      "ariaLabel": "메뉴 열기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:35:37.555Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile fresh completed tournament registration baseline"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:35:37.825Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile roster review initial focus"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "닫기",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:35:38.086Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile ShiftTab stays in roster dialog"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:35:38.318Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile Tab wraps in roster dialog"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:35:38.523Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile Escape returns review trigger"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "대기",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [
+      "선택한 상태의 신청이 없어요"
+    ],
+    "filterState": [
+      "대기"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 0,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:19.203Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile waiting filter zero"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "전체",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:19.566Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile all filter recovers two registrations"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:45.688Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet roster review initial focus"
+  },
+  {
+    "active": {
+      "ariaLabel": "[player qualification label redacted]",
+      "id": "",
+      "role": null,
+      "tag": "SELECT",
+      "text": null,
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:45.980Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet initial Tab remains inside roster dialog"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:46.217Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet ShiftTab returns modal X"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:46.433Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet Escape returns review trigger"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "대기",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [
+      "선택한 상태의 신청이 없어요"
+    ],
+    "filterState": [
+      "대기"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 0,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:46.775Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet waiting filter zero"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "전체",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:36:47.147Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet all filter recovers two registrations"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:37:31.396Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop roster review initial focus"
+  },
+  {
+    "active": {
+      "ariaLabel": "[player qualification label redacted]",
+      "id": "",
+      "role": null,
+      "tag": "SELECT",
+      "text": null,
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:37:31.717Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop initial Tab remains inside roster dialog"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:37:31.972Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop ShiftTab returns modal X"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:37:32.201Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop Escape returns review trigger"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "대기",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [
+      "선택한 상태의 신청이 없어요"
+    ],
+    "filterState": [
+      "대기"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 0,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:37:32.535Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop waiting filter zero"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "전체",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "emptyText": [],
+    "filterState": [
+      "전체"
+    ],
+    "publishedBuildMeta": [],
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:37:32.920Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop all filter recovers two registrations"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:56:20.296Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile tournament focus still X after dialog select index5 settled",
+    "originalStepLabel": "mobile tournament focus still X after six qualification selects settled",
+    "countLimit": "Waitconditiongenericdialogselectindex5visible; recordedaggregate7selects. Qualification/membercontrolcountsnotseparatelyrecorded."
+  },
+  {
+    "active": {
+      "ariaLabel": "[player qualification label redacted]",
+      "id": "",
+      "role": null,
+      "tag": "SELECT",
+      "text": null,
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:56:20.574Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile tournament first Tab inside settled roster"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "dialogSelectCount": 0,
+    "reviewButtons": 2,
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/932beb19-bc91-4446-86d8-9f69f5e4eae1/registrations",
+    "utc": "2026-10-03T07:56:20.782Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile tournament settled Escape returns review"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:23.027Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile completed league initial focus after dialog select index5 settle",
+    "originalStepLabel": "mobile completed league initial focus after six selects settle",
+    "countLimit": "Waitconditiongenericdialogselectindex5visible; recordedaggregate7selects. Qualification/membercontrolcountsnotseparatelyrecorded."
+  },
+  {
+    "active": {
+      "ariaLabel": "[player qualification label redacted]",
+      "id": "",
+      "role": null,
+      "tag": "SELECT",
+      "text": null,
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:23.302Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile league first Tab remains in modal"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "dialogSelectCount": 0,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:23.519Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 405,
+      "width": 405
+    },
+    "step": "mobile league Escape returns review"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:53.545Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet completed league initial focus after data settle"
+  },
+  {
+    "active": {
+      "ariaLabel": "[player qualification label redacted]",
+      "id": "",
+      "role": null,
+      "tag": "SELECT",
+      "text": null,
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:53.855Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet league first Tab remains in modal"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "dialogSelectCount": 0,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:54.038Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 789,
+      "width": 789
+    },
+    "step": "tablet league Escape returns review"
+  },
+  {
+    "active": {
+      "ariaLabel": "모달 닫기",
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "",
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:54.495Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop completed league initial focus after data settle"
+  },
+  {
+    "active": {
+      "ariaLabel": "[player qualification label redacted]",
+      "id": "",
+      "role": null,
+      "tag": "SELECT",
+      "text": null,
+      "withinDialog": true
+    },
+    "dialogCount": 1,
+    "dialogSelectCount": 7,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:54.809Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop league first Tab remains in modal"
+  },
+  {
+    "active": {
+      "ariaLabel": null,
+      "id": "",
+      "role": null,
+      "tag": "BUTTON",
+      "text": "명단 검토",
+      "withinDialog": false
+    },
+    "dialogCount": 0,
+    "dialogSelectCount": 0,
+    "reviewButtons": 3,
+    "url": "https://alpha.teameet.co.kr/admin/league-matches/c1f2ff15-9363-4915-9c11-8179e57369cb/registrations",
+    "utc": "2026-10-03T07:56:55.015Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 758,
+      "scrollWidth": 1183,
+      "width": 1183
+    },
+    "step": "desktop league Escape returns review"
+  }
+]

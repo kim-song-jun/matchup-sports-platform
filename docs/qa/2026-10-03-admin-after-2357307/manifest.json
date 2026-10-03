@@ -1,0 +1,185 @@
+{
+  "scope": "All files except this manifest itself.",
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 8015,
+      "sha256": "96825c956b04c641adbeb8fa00d6b782d5dc7ba24fb42e58c03c39a7422c4f0a"
+    },
+    {
+      "file": "awards-proof.json",
+      "bytes": 8106,
+      "sha256": "ccd41e1b5ff6a93dbfc6a1472c350d35da493a15d0839af5b3e3b106b66fb846"
+    },
+    {
+      "file": "final-state.json",
+      "bytes": 297,
+      "sha256": "6ef1f05424179c92f669c9a32342ae3535d205736f970d8da61988ece2748b98"
+    },
+    {
+      "file": "images/desktop-award-row.png",
+      "bytes": 53083,
+      "sha256": "f402fba170f8bd48adaacac7347c04adc85d50223e44cc27223cd79ee58f8f7a"
+    },
+    {
+      "file": "images/desktop-detail-date-1.png",
+      "bytes": 4125,
+      "sha256": "441d081be95e7750e0325d1ab85dd494233067741f37c1a403140ca5a90a60c3"
+    },
+    {
+      "file": "images/desktop-detail-date-2.png",
+      "bytes": 3885,
+      "sha256": "b5bdc2a15bd15031eaf363a17ea8df7cda65790ea95f58162c2f041f2bccd39b"
+    },
+    {
+      "file": "images/desktop-filtered-zero.png",
+      "bytes": 58494,
+      "sha256": "fb8c3ebca806885fa1375263e5e94c496a8e0421af0c236f96f0aaa428e7e1b2"
+    },
+    {
+      "file": "images/desktop-league-modal-close.png",
+      "bytes": 4663,
+      "sha256": "6934a2de1236ab6377fce54a97a0ddd9abcb30495ff5481b486614a9c771f9aa"
+    },
+    {
+      "file": "images/desktop-modal-close.png",
+      "bytes": 1333,
+      "sha256": "934d4d42149ea8149672d63390c0bdb686aaadeac0b643c75a7d004ec15d2b42"
+    },
+    {
+      "file": "images/desktop-video-date-1.png",
+      "bytes": 5052,
+      "sha256": "414c80819b89d5f1655c93163055071dcd2b8c3c1a7ab81080c078e100c682a1"
+    },
+    {
+      "file": "images/desktop-video-date-2.png",
+      "bytes": 5415,
+      "sha256": "eb1bcd87d759af14f35001aa7844e4cc2329785e8a405e1d362d73b2463c5882"
+    },
+    {
+      "file": "images/mobile-award-row.png",
+      "bytes": 50571,
+      "sha256": "3376b5ecd4d198a79ad1fd8ff260d4258cb16c3c725e9e03764f5e5945ba5de3"
+    },
+    {
+      "file": "images/mobile-detail-date-1.png",
+      "bytes": 4690,
+      "sha256": "d535884a4fb76b957a8e8e5a6fd998b220950b20518670968a1e746280d9911a"
+    },
+    {
+      "file": "images/mobile-detail-date-2.png",
+      "bytes": 4276,
+      "sha256": "3693a9baee7feffcb33a7429b5f60d3016d4ec1ff5b9a20fb0d26aa0ee340847"
+    },
+    {
+      "file": "images/mobile-filtered-zero.png",
+      "bytes": 57602,
+      "sha256": "ce0d28471f1fa6e0770010be419fb535a591741a6da1eec43a7a972a226eb285"
+    },
+    {
+      "file": "images/mobile-league-modal-close.png",
+      "bytes": 1398,
+      "sha256": "79d5bfb7ce8562c4d2df52f30b40e1d6f0ea4407506e98785f3ad714d440c606"
+    },
+    {
+      "file": "images/mobile-modal-close-settled.png",
+      "bytes": 1398,
+      "sha256": "79d5bfb7ce8562c4d2df52f30b40e1d6f0ea4407506e98785f3ad714d440c606"
+    },
+    {
+      "file": "images/mobile-modal-close.png",
+      "bytes": 1393,
+      "sha256": "f395d7411af640cf25e04fd1345dcd7806c4fd92cc84d9c8171390dd765a51ac"
+    },
+    {
+      "file": "images/mobile-video-date-1.png",
+      "bytes": 5770,
+      "sha256": "33428a54cf8b55bc7cd032da18362af0bfa70ecaae2a5cb91f5611a1376a80f3"
+    },
+    {
+      "file": "images/mobile-video-date-2.png",
+      "bytes": 5864,
+      "sha256": "00d0a13042bb95a77d08c7cb8fb41fc95c1d261b4deeb1d075475dfd0e94c302"
+    },
+    {
+      "file": "images/tablet-award-row.png",
+      "bytes": 51686,
+      "sha256": "6c05c84b26f7fc3f2eef64a4c1cf40820474c31df2e95e75df7d9820b51a5a5d"
+    },
+    {
+      "file": "images/tablet-detail-date-1.png",
+      "bytes": 4072,
+      "sha256": "83bd0e5e2ae2da87e3a93ddcdb2a7f18550a35ac47e6a5461c51e3b737ea51ed"
+    },
+    {
+      "file": "images/tablet-detail-date-2.png",
+      "bytes": 3915,
+      "sha256": "edff9d171525d6c39c93f5d5ad1624fe451833f223308cd466681894149b370a"
+    },
+    {
+      "file": "images/tablet-filtered-zero.png",
+      "bytes": 57568,
+      "sha256": "6bbb83c7be4b2e4bf5156e8dbbdeaa336a2758f473427ccb9f3175b1e6841bfd"
+    },
+    {
+      "file": "images/tablet-league-modal-close.png",
+      "bytes": 4410,
+      "sha256": "231ab47c0d4122c04cc027c26ff2b2071ae1b5e5147c7c754ffe4d993278df60"
+    },
+    {
+      "file": "images/tablet-modal-close.png",
+      "bytes": 1276,
+      "sha256": "fc53b429bd256045f3ffbe1cd2b6910a4f14b1e5be0c511e0758f3f1351e5d8b"
+    },
+    {
+      "file": "images/tablet-video-date-1.png",
+      "bytes": 5758,
+      "sha256": "2799f84f882d05a1fe4f0cd45f4b9ca8b5e014382cd9c3cb1d43aeb648c69be7"
+    },
+    {
+      "file": "images/tablet-video-date-2.png",
+      "bytes": 5571,
+      "sha256": "59e0e32cffc25762fb919e72e944b601ca11ef5cf077bb0e18e0182116df3d6a"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 19496,
+      "sha256": "7f773feaf87eaa79346867c1d1802689358e409b0a8d32dbf0ab479ab055a2ef"
+    },
+    {
+      "file": "screenshot-provenance.json",
+      "bytes": 47237,
+      "sha256": "789edb1bc1830d4cc29d7e0917efef624da08e68efcdbcb18bf42671204730cd"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 4645,
+      "sha256": "4491af254174c419d787d4e77430f3da4406e13c8f72031e9134b2bf21c4d369"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 17498,
+      "sha256": "31b2dfd3ac316db6291df50c8e4615c086487a7436d71e84ce3e1737bf5985bb"
+    },
+    {
+      "file": "video-time-proof.json",
+      "bytes": 20539,
+      "sha256": "49a8b6da88ca27e830a021f018680b5282c074bc2fa52112dfdb690483d945d7"
+    },
+    {
+      "file": "wizard-discard-reentry.json",
+      "bytes": 238,
+      "sha256": "fe5f90fc9dd65834b1375969135d86226e249e3634596aa7f033423c796e0172"
+    },
+    {
+      "file": "wizard-entry-blocker.json",
+      "bytes": 1208,
+      "sha256": "cb36fd346901272b8bf8b2970d01e07fcd2ea5ddb1b3c1fc9e0ff480335742a5"
+    },
+    {
+      "file": "wizard-proof.json",
+      "bytes": 4786,
+      "sha256": "d337a59a68e9e91a8e25072077b4c2f5778231f966d19964a056303577c36179"
+    }
+  ]
+}

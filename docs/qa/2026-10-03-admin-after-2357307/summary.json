@@ -1,0 +1,75 @@
+{
+  "scope": "Bounded admin observations begun after successful Deploy Alpha workflow2357307; not a browser-serving-SHA attestation or all19-PR acceptance result.",
+  "deployment": {
+    "workflowURL": "https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/37105569761",
+    "headSHA": "235730755db0e7393bec9e01014a6906effde6af",
+    "workflowStatus": "completed",
+    "workflowConclusion": "success",
+    "workflowUpdatedAtUTC": "2026-10-03T07:30:13Z",
+    "workflowReadbackIndependentlyVerified": true,
+    "browserBuildIdentityIndependentlyVerified": false
+  },
+  "testWindowUTC": [
+    "2026-10-03T07:35:37.555Z",
+    "2026-10-03T07:56:55.015Z"
+  ],
+  "finalStateUTC": "2026-10-03T08:00:01.396Z",
+  "CSSViewports": [
+    {
+      "width": 405,
+      "height": 606,
+      "dpr": 1.25
+    },
+    {
+      "width": 789,
+      "height": 505,
+      "dpr": 1.5
+    },
+    {
+      "width": 1183,
+      "height": 758,
+      "dpr": 1
+    }
+  ],
+  "results": [
+    {
+      "pr": 1566,
+      "status": "Supported within6 sampled route×viewport combinations",
+      "observed": "Close-X focus, first Tab inside and Escape back to review trigger:6/6, one tournament and one league at3 widths. Explicit settled aggregate SELECT count7 is recorded for4/6 combinations: mobile tournament and3 league widths. Mobile tournament shows true boundary Shift+Tab/Tab wrap; tablet/desktop tournament show interior Tab and reverse return; league shows first Tab/Escape only.",
+      "limits": "No full trap-cycle coverage for6 combinations. Generic dialog select index5 was used as a readiness condition; qualification/member SELECT counts were not separately classified. Most X crops have no visible focus outline, so DOM proves focus. Historical mobile loading crop is superseded for settled-state claims."
+    },
+    {
+      "pr": 1567,
+      "status": "Supported at3/3 widths on one completed tournament",
+      "observed": "Selected 대기:0 review buttons and 선택한 상태의 신청이 없어요 with alternate-state/all guidance. Returning 전체 restores2 review buttons at3/3 widths. 확정2 remains visible in all3 empty-state crops.",
+      "limits": "UI counts only, not backend application totals. Cursor obscures part of selected pill; DOM identifies 대기."
+    },
+    {
+      "pr": 1573,
+      "status": "Supported at3/3 widths on one local blank award row",
+      "observed": "Focused delete44×44 CSSpx fully fits:316–360/405,692–736/789,1078–1122/1183. Document scrollWidth equals each CSSwidth. Four text inputs remain empty. Zero→one local row→zero after settled section navigation at3/3 widths.",
+      "limits": "No award save/member selection/deletion/server persistence test. Section navigation is not a tested Cancel button. Rapid mobile navigation record3 is excluded from discard claims. Mobile placeholder truncation is separate from delete overflow."
+    },
+    {
+      "pr": 1575,
+      "status": "Six fixture×viewport date/time comparisons agree;3 actual detail/video/detail sequences",
+      "observed": "Same synthetic league: September17 18:00 and September24 18:30 on detail and settled video views at3 widths; actual return link retains those strings.",
+      "limits": "Header-only mobile video record1 excluded. No DB timestamp/timezone/canonical-source claim. Video rows identify fixtures by same week/team labels, not exposed fixtureUUIDs. No video save/playback."
+    },
+    {
+      "pr": 1562,
+      "status": "UNVERIFIED",
+      "observed": "Zero valid step3 observations. Date inputs temporarily showed values then were empty at Next; all3 wizard proof records remain step2. Two early misleading step3 labels are explicitly excluded. Re-entry at07:55:00.777UTC shows title/sport blank, no stage2 fields or creation confirmation.",
+      "limits": "Input-tool/app-state cause unresolved. Do not infer failed footer fix or new product defect. Draft was left and reopened; no submission/creation reported."
+    }
+  ],
+  "safety": "No server save, create, result change, delete, notification, permission or logout action reported. Only inspected safe product crops and sanitized DOM are published; no roster bodies, member identities, financial account fields, conversations or secrets.",
+  "recordCounts": {
+    "focusFilter": 31,
+    "awards": 11,
+    "video": 11,
+    "wizard": 3,
+    "PNG": 25
+  },
+  "limits": "All observations occurred after workflow completion, but no UI build/version identity was exposed. Fresh top-level entry was reported; actual browser serving SHA is not independently established. Static images cannot alone establish interaction sequence or absence of writes."
+}

@@ -1,0 +1,43 @@
+{
+  "scope": "Prerequisiteblock for1562,notconfirmedproductbug",
+  "temporaryDOMRead": {
+    "utc": "2026-10-03T07:49:24.587Z",
+    "scheduled": "2026-10-10T12:00",
+    "registration": "2026-10-07T23:59",
+    "venue": "QA LOCAL 저장하지않음",
+    "source": "TranscribedfromsupportedCUA DOMreadtoolresult"
+  },
+  "followingAction": "ClickedNext(typebutton),neverEnter/submit. Nextobservationshowedbothdatetimefieldsemptyandremainedstep2.",
+  "finalBlockedObservationUTC": "2026-10-03T07:54:20.924Z",
+  "finalValues": [
+    {
+      "id": "scheduled-at",
+      "value": ""
+    },
+    {
+      "id": "registration-deadline-at",
+      "value": ""
+    },
+    {
+      "id": "venue",
+      "value": "QA LOCAL 저장하지않음"
+    }
+  ],
+  "discard": {
+    "createdConfirmation": [],
+    "sport": "",
+    "stage2Fields": 0,
+    "title": "",
+    "url": "https://alpha.teameet.co.kr/admin/tournaments/new",
+    "utc": "2026-10-03T07:55:00.777Z",
+    "viewport": {
+      "height": 606,
+      "width": 405
+    }
+  },
+  "limits": [
+    "Nativepicker/automationevent/appstatecausenotisolated",
+    "No assertionofnewregression orfailedfooterfix",
+    "Falseearlystage3filenamesexplicitlyexcludedinproof/shots"
+  ]
+}

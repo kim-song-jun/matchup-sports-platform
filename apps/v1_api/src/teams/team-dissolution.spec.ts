@@ -190,3 +190,18 @@ describe('findDissolutionBlockers', () => {
     expect(blockers[0].items[0].route).toBe('/tournaments/t-league/my');
   });
 });
+
+
+it.each([
+  { leagueId: 'league-1', tournamentId: 'league-1', route: '/league-matches/league-1/fixtures/tm-1' },
+  { leagueId: null, tournamentId: 'cup-1', route: '/tournaments/cup-1/matches/tm-1' },
+  { leagueId: null, tournamentId: null, route: '/team-matches/tm-1' },
+])('진행 중 경기 해체 안내는 소속에 맞는 실제 상세 경로를 준다: %j', async ({ route, ...ownership }) => {
+  const fake = {
+    v1Game: { findMany: jest.fn().mockResolvedValue([{ id: 'game-1', sides: [], teamMatch: { id: 'tm-1', title: '진행 중 경기', startAt: NOW, placeName: null, ...ownership } }]) },
+    v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+  const blockers = await findDissolutionBlockers(fake as never, TEAM, NOW);
+  expect(blockers[0].items[0].route).toBe(route);
+});

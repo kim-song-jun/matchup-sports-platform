@@ -253,7 +253,8 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       activityTimeSlots: query.data.profile.activityTimeSlots ?? [],
       activityTypes: query.data.profile.activityTypes ?? [],
       activityMemo: normalizeHydratedActivityMemo(query.data.profile),
-      capacity: Math.max(2, query.data.profile.memberGoalCount ?? 0, query.data.memberCount),
+      // 미정 정원을 숫자 하한으로 바꾸면 소개만 저장해도 모집 조건이 달라진다.
+      capacity: query.data.profile.memberGoalCount == null ? 0 : Math.max(2, query.data.profile.memberGoalCount, query.data.memberCount),
     });
     setDraft((current) => ({
       ...current,

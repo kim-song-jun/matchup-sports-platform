@@ -258,7 +258,7 @@ export default function AdminTeamMatchDetailPage() {
         description={teamMatch.title}
         action={
           <div className="flex items-center gap-2">
-            {teamMatch.platformManaged && teamMatch.status === 'recruiting' && adminMe?.capabilities.includes('status:write') && (
+            {teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament && teamMatch.status === 'recruiting' && adminMe?.capabilities.includes('status:write') && (
               <Link
                 href={`/admin/team-matches/${encodeURIComponent(teamMatch.teamMatchId)}/edit`}
                 className="inline-flex h-[44px] items-center rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
@@ -290,10 +290,20 @@ export default function AdminTeamMatchDetailPage() {
             {teamMatch.league && (
               <Link
                 href={`/admin/league-matches/${encodeURIComponent(teamMatch.league.leagueId)}`}
-                className="mt-4 inline-flex h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="mt-4 inline-flex h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <ListOrdered size={16} aria-hidden="true" />
                 정규 리그 · {teamMatch.league.title}
+              </Link>
+            )}
+
+            {!teamMatch.league && teamMatch.tournament && (
+              <Link
+                href={`/admin/tournaments/${encodeURIComponent(teamMatch.tournament.tournamentId)}`}
+                className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--blue50)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--tint-blue)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <Trophy size={16} aria-hidden="true" />
+                대회 · {teamMatch.tournament.title}
               </Link>
             )}
 
@@ -373,7 +383,7 @@ export default function AdminTeamMatchDetailPage() {
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="상대팀 신청" value={`${teamMatch.applicationCount}건`} />
               <AdminSummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
-              <AdminSummaryItem icon={<ListOrdered size={16} />} label="정규 리그" value={teamMatch.league?.title ?? '단발 경기'} />
+              <AdminSummaryItem icon={<ListOrdered size={16} />} label={teamMatch.league ? '정규 리그' : teamMatch.tournament ? '대회' : '경기 유형'} value={teamMatch.league?.title ?? teamMatch.tournament?.title ?? '단발 경기'} />
               <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatAdminDateTime(teamMatch.startAt)} />
               <AdminSummaryItem icon={<CalendarClock size={16} />} label="경기 기록" value={teamMatch.hasGame ? '연결됨' : '없음'} />
@@ -388,7 +398,7 @@ export default function AdminTeamMatchDetailPage() {
             {teamMatch.hostTeamId && (
               <Link
                 href={`/admin/teams/${encodeURIComponent(teamMatch.hostTeamId)}`}
-                className="mt-3 inline-flex h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="mt-3 inline-flex h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 주최 팀 상세 보기
               </Link>

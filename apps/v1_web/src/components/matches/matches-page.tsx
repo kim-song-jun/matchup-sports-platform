@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { MatchParticipationActions } from './match-participation-actions';
 import Link from 'next/link';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FocusEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
@@ -885,6 +885,23 @@ function MatchRowItem({ match, fromHref }: { match: MatchCardModel; fromHref?: s
   );
 }
 
+function revealFocusedRailCard(event: FocusEvent<HTMLDivElement>) {
+  const rail = event.currentTarget;
+  const card = event.target;
+  if (!(card instanceof HTMLElement) || card.parentElement !== rail
+    || !card.classList.contains('tm-match-list-card') || !card.matches(':focus-visible')) return;
+
+  // 공용 outline 2px + offset 2px을 포함해 rail 안에서만 수평 보정한다.
+  const gutter = 4;
+  const bounds = rail.getBoundingClientRect();
+  const target = card.getBoundingClientRect();
+  if (target.width + gutter * 2 > bounds.width) return;
+  const left = bounds.left + gutter;
+  const right = bounds.right - gutter;
+  const delta = target.left < left ? target.left - left : target.right > right ? target.right - right : 0;
+  if (delta !== 0) rail.scrollTo({ left: Math.max(0, rail.scrollLeft + delta), behavior: 'instant' });
+}
+
 /**
  * 상단 이벤트 레일 — 호스트가 사진을 올린 매치만 가로 스크롤 배너로 띄운다.
  * 배너 카드를 없애지 않고 "몇 개만 눈에 띄는 자리"로 옮긴 것이라, 목록 본문은
@@ -897,7 +914,7 @@ function MatchFeatureRail({ matches, fromHref }: { matches: MatchCardModel[]; fr
       {/* 2026-09-07: tm-text-label(13px) → tm-text-body-lg(17px). 섹션 제목인데 그 아래
           카드 제목과 같은 크기라 위계가 서지 않았다 — DESIGN.md §2.1 의 섹션 제목 값. */}
       <h2 className="tm-text-body-lg tm-match-rail-heading" id="match-rail-heading">눈에 띄는 매치</h2>
-      <div className="tm-match-rail-h">
+      <div className="tm-match-rail-h" onFocus={revealFocusedRailCard}>
         {matches.map((match) => <MatchCardItem key={`rail-${match.id}`} match={match} fromHref={fromHref} />)}
       </div>
     </section>
@@ -920,7 +937,7 @@ function MatchNearbyRail({ matches, fromHref }: { matches: MatchCardModel[]; fro
     <section className="tm-match-nearby-section" aria-labelledby="match-nearby-heading">
       <h2 className="tm-text-body-lg tm-match-rail-heading" id="match-nearby-heading">이런 매치는 어때요?</h2>
       <p className="tm-text-caption tm-match-nearby-sub">검색 조건 밖이지만 지금 모집 중인 매치예요</p>
-      <div className="tm-match-rail-h">
+      <div className="tm-match-rail-h" onFocus={revealFocusedRailCard}>
         {matches.map((match) => <MatchCardItem key={`nearby-${match.id}`} match={match} fromHref={fromHref} />)}
       </div>
     </section>

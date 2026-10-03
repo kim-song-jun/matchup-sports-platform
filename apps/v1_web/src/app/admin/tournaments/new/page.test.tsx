@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -1009,12 +1010,12 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     const scrollTo = vi.fn();
     let scroller: HTMLDivElement;
 
-    function renderInScroller() {
+    function renderInScroller(container: HTMLElement = scroller) {
       return render(
         <Providers>
           <AdminTournamentsNewPage />
         </Providers>,
-        { container: scroller },
+        { container },
       );
     }
 
@@ -1110,6 +1111,189 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       fireEvent.click(screen.getByRole('button', { name: /다음/ }));
 
       expect(screen.getByLabelText(/대회명/)).toHaveFocus();
+    });
+
+    describe('작은 viewport의 단계 시작 가림 — 실제 page/geometry 경계', () => {
+      const viewports = [
+        { name: '모바일', width: 403, height: 606, headingTop: 431.375, controlTop: 556.175, footerTop: 538 },
+        { name: '태블릿', width: 788, height: 505, headingTop: 448, controlTop: 572.667, footerTop: 437 },
+        { name: '데스크톱', width: 1182, height: 758, headingTop: 384, controlTop: 509, footerTop: 690 },
+      ];
+      const restores: (() => void)[] = [];
+      function patch(target: object, key: string, value: unknown) {
+        const descriptor = Object.getOwnPropertyDescriptor(target, key);
+        Object.defineProperty(target, key, { configurable: true, writable: true, value });
+        restores.push(() => descriptor ? Object.defineProperty(target, key, descriptor) : Reflect.deleteProperty(target, key));
+      }
+      afterEach(() => {
+        vi.restoreAllMocks();
+        while (restores.length) restores.pop()?.();
+      });
+
+      function layout(spec = viewports[0], options: { document?: boolean; clipTop?: number; maxScroll?: number; visual?: { offsetTop: number; height: number }; reduced?: boolean; distinctControls?: boolean } = {}) {
+        const clipTop = options.clipTop ?? 0;
+        const headerHeight = spec.width < 1024 ? 52 : 0;
+        const header = document.createElement('header');
+        header.style.position = 'sticky';
+        const main = document.createElement('main');
+        scroller.append(header, main);
+        const target = options.document ? document.documentElement : scroller;
+        scroller.style.overflowY = options.document ? 'visible' : 'auto';
+        if (options.document) patch(document, 'scrollingElement', target);
+        patch(target, 'clientHeight', spec.height - clipTop);
+        patch(target, 'scrollHeight', spec.height - clipTop + (options.maxScroll ?? 2000));
+        patch(target, 'scrollTop', 0);
+        patch(target, 'scrollTo', scrollTo);
+        scrollTo.mockImplementation(({ top }: ScrollToOptions) => { target.scrollTop = top ?? 0; });
+        patch(window, 'innerHeight', spec.height);
+        patch(window, 'visualViewport', options.visual ? {
+          ...options.visual, offsetLeft: 0, width: spec.width, scale: 1, pageTop: options.visual.offsetTop, pageLeft: 0,
+          addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        } : undefined);
+        vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+          matches: Boolean(options.reduced && query.includes('prefers-reduced-motion')),
+          media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+          addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: () => true,
+        }));
+        vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+          if (this === header) return new DOMRect(0, clipTop, spec.width, headerHeight);
+          if (this === scroller) return new DOMRect(0, clipTop, spec.width, spec.height - clipTop);
+          if (this.matches('form > .fixed')) return new DOMRect(0, spec.footerTop, spec.width, spec.height - spec.footerTop);
+          if (this.tagName === 'H2') return new DOMRect(0, spec.headingTop + clipTop - target.scrollTop, spec.width, 28);
+          if (this.matches('input, select, textarea, button')) {
+            const controlTop = options.distinctControls && this.id !== 'team-count' ? spec.footerTop + 100 : spec.controlTop;
+            return new DOMRect(0, controlTop + clipTop - target.scrollTop, 200, 44);
+          }
+          return new DOMRect();
+        });
+        // 제목/입력 좌표는 공개 원본과 같은 경계, footer는 합성 fixture다. 실제 CSS 검증이 아니다.
+        renderInScroller(main);
+        return { target, headerHeight };
+      }
+
+      it.each(viewports)('$name: 다음 단계의 제목과 첫 입력이 header/footer 안에 보이고 생성하지 않는다', (spec) => {
+        const { target, headerHeight } = layout(spec);
+        goToScheduleStep();
+        fillScheduleStep();
+        target.scrollTop = 900;
+        scrollTo.mockClear();
+        fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+        const heading = screen.getByRole('heading', { level: 2, name: /참가 조건/ });
+        const control = screen.getByLabelText(/참가 팀 수/);
+        expect(heading).toHaveFocus();
+        expect(heading.getBoundingClientRect().top).toBeGreaterThanOrEqual(headerHeight + 8);
+        expect(control.getBoundingClientRect().bottom).toBeLessThanOrEqual(spec.footerTop - 8);
+        expect(target.scrollTop).toBe(spec.width < 1024 ? spec.headingTop - headerHeight - 8 : 0);
+        expect(createMutate).not.toHaveBeenCalled();
+        expect(updateMutate).not.toHaveBeenCalled();
+        expect(uploadMutateAsync).not.toHaveBeenCalled();
+        expect(changeStatusMutate).not.toHaveBeenCalled();
+      });
+
+      it('모바일 문서 scroller도 scroll0의 가림을 보정한다', () => {
+        const { target } = layout(viewports[0], { document: true });
+        goToParticipationStep();
+        expect(target.scrollTop).toBe(371.375);
+        expect(screen.getByRole('heading', { level: 2, name: /참가 조건/ })).toHaveFocus();
+      });
+
+      it('데스크톱에서 뒤쪽 입력이 가려져도 이미 보이는 실제 첫 입력의 위치를 유지한다', () => {
+        const spec = viewports[2];
+        const { target } = layout(spec, { distinctControls: true });
+        goToParticipationStep();
+        expect(screen.getByRole('heading', { level: 2, name: /참가 조건/ })).toHaveFocus();
+        expect(screen.getByLabelText(/참가 팀 수/).getBoundingClientRect().bottom).toBeLessThan(spec.footerTop);
+        expect(screen.getByLabelText(/최대 선수 수/).getBoundingClientRect().top).toBeGreaterThan(spec.footerTop);
+        expect(target.scrollTop).toBe(0);
+      });
+
+      it('내부 scroller가 viewport 아래에서 시작해도 header 뒤로 제목을 숨기지 않는다', () => {
+        const { target } = layout(viewports[0], { clipTop: 100 });
+        goToParticipationStep();
+        expect(target.scrollTop).toBe(371.375);
+        expect(screen.getByRole('heading', { level: 2, name: /참가 조건/ }).getBoundingClientRect().top).toBe(160);
+      });
+
+      it('visual viewport가 줄어도 제목만 focus하고 가능한 첫 입력을 함께 보인다', () => {
+        layout(viewports[0], { visual: { offsetTop: 20, height: 280 } });
+        goToParticipationStep();
+        expect(screen.getByRole('heading', { level: 2, name: /참가 조건/ })).toHaveFocus();
+        expect(screen.getByLabelText(/참가 팀 수/).getBoundingClientRect().bottom).toBeLessThanOrEqual(292);
+      });
+
+      it('제목과 첫 입력을 함께 담지 못할 만큼 짧으면 제목을 우선한다', () => {
+        layout(viewports[0], { visual: { offsetTop: 20, height: 140 } });
+        goToParticipationStep();
+        const heading = screen.getByRole('heading', { level: 2, name: /참가 조건/ });
+        expect(heading).toHaveFocus();
+        expect(heading.getBoundingClientRect().top).toBe(60);
+        expect(heading.getBoundingClientRect().bottom).toBeLessThanOrEqual(152);
+      });
+
+      it('스크롤 가능한 범위를 넘는 위치를 요청하지 않는다', () => {
+        const { target } = layout(viewports[0], { maxScroll: 100 });
+        goToParticipationStep();
+        expect(target.scrollTop).toBe(100);
+      });
+
+      it('reduced motion은 auto로 보정한다', () => {
+        layout(viewports[0], { reduced: true });
+        goToParticipationStep();
+        expect(scrollTo).toHaveBeenLastCalledWith({ top: 371.375, behavior: 'auto' });
+      });
+
+      it('첫 렌더와 같은 단계의 입력 변경은 scroll/focus를 옮기지 않는다', () => {
+        layout();
+        expect(scrollTo).not.toHaveBeenCalled();
+        const control = screen.getByLabelText(/대회명/);
+        control.focus();
+        fireEvent.change(control, { target: { value: '입력 중인 대회' } });
+        expect(control).toHaveFocus();
+        expect(scrollTo).not.toHaveBeenCalled();
+      });
+
+      it('이전/스테퍼 반복 이동도 입력을 유지하고 새 제목만 focus한다', () => {
+        const { target } = layout();
+        goToParticipationStep();
+        fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '12' } });
+        target.scrollTop = 900;
+        fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+        expect(screen.getByRole('heading', { level: 2, name: /일정/ })).toHaveFocus();
+        fireEvent.click(screen.getByRole('button', { name: /3단계 참가 조건/ }));
+        expect(screen.getByLabelText(/참가 팀 수/)).toHaveValue(12);
+        expect(screen.getByRole('heading', { level: 2, name: /참가 조건/ })).toHaveFocus();
+        expect(target.scrollTop).toBe(371.375);
+        expect(createMutate).not.toHaveBeenCalled();
+      });
+
+      it('검증으로 다른 단계에 돌아가면 제목을 거치지 않고 첫 오류 필드가 우선한다', () => {
+        layout();
+        goToParticipationStep();
+        fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+        fireEvent.change(screen.getByLabelText(/대회 시작/), { target: { value: '' } });
+        fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+        const focusedHeadings: string[] = [];
+        const record = (event: FocusEvent) => { if ((event.target as HTMLElement).tagName === 'H2') focusedHeadings.push((event.target as HTMLElement).textContent ?? ''); };
+        document.addEventListener('focusin', record);
+        try {
+          const stepper = screen.getByRole('button', { name: /4단계 상금/ });
+          stepper.focus();
+          fireEvent.click(stepper);
+          expect(screen.getByLabelText(/대회 시작/)).toHaveFocus();
+          expect(focusedHeadings).toEqual([]);
+          expect(createMutate).not.toHaveBeenCalled();
+        } finally { document.removeEventListener('focusin', record); }
+      });
+
+      it('제목 다음 Tab은 첫 입력으로 가고 Enter로 자동 생성하지 않는다', async () => {
+        layout();
+        goToParticipationStep();
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        await user.keyboard('{Enter}');
+        expect(createMutate).not.toHaveBeenCalled();
+        await user.tab();
+        expect(screen.getByLabelText(/참가 팀 수/)).toHaveFocus();
+      });
     });
   });
 });

@@ -120,8 +120,7 @@ aws elbv2 modify-load-balancer-attributes --region ap-northeast-2 \
 ```
 
 필요한 권한: `elasticloadbalancing:ModifyLoadBalancerAttributes` (로드밸런서 ARN 1개로 스코프).
-`docs/ops/rds-cutover-runbook.md` 의 "필요한 IAM" 절이 인라인 정책을 좁게 쓰는 선례다 —
-같은 방식으로 넓히지 말고 ARN 1개로 제한할 것.
+권한을 넓히지 말고 ARN 1개로 제한할 것.
 
 ### 4-2. 영향 범위 — 반드시 먼저 읽을 것
 
@@ -199,4 +198,3 @@ ALB 작업은 사람 손이 필요하므로 그때까지 아래로 버틴다. **
 - `README.md` "인프라 구조" — alpha·prod 가 ALB 하나를 나눠 쓰는 구조
 - `docs/ops/maintenance-mode.md` — 같은 ALB 를 만지는 다른 절차(리스너 기본 규칙). 확인 명령·
   `--no-keepalive` 주의사항의 출처
-- `docs/ops/rds-cutover-runbook.md` — ELBv2 인라인 IAM 정책을 좁게 쓰는 선례

@@ -5,6 +5,7 @@ import { Eye } from 'lucide-react';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { courtKindForSport } from '@/components/lineup/pitch-lines';
 import type { FormationSlot } from '@/components/lineup/formation-slots';
@@ -38,6 +39,8 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
   const [formation, setFormation] = useState<string | null>(null);
   const [baseVersion, setBaseVersion] = useState(0);
   const [dirty, setDirty] = useState(false);
+  // 서버에 저장하기 전 배치는 로컬에만 있다. 셸 Back도 기존 이탈 확인을 거치게 한다.
+  const { UnsavedChangesModal } = useUnsavedChangesGuard(dirty);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,32 +115,38 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
   if (board.isError) {
     const status = board.error instanceof V1ApiError ? board.error.statusCode : null;
     return (
-      <ErrorState
-        title={status === 403 ? '이 팀의 전술은 볼 수 없어요' : '전술을 불러오지 못했어요'}
-        message={
-          status === 403
-            ? '전술보드는 그 팀의 팀원만 볼 수 있어요.'
-            : status === 404
-              ? '이 경기에서 팀을 찾을 수 없어요. 대진이 바뀌었을 수 있어요.'
-              : '잠시 후 다시 시도해 주세요.'
-        }
-        onRetry={status === 403 || status === 404 ? undefined : () => void board.refetch()}
-      />
+      <>
+        {UnsavedChangesModal}
+        <ErrorState
+          title={status === 403 ? '이 팀의 전술은 볼 수 없어요' : '전술을 불러오지 못했어요'}
+          message={
+            status === 403
+              ? '전술보드는 그 팀의 팀원만 볼 수 있어요.'
+              : status === 404
+                ? '이 경기에서 팀을 찾을 수 없어요. 대진이 바뀌었을 수 있어요.'
+                : '잠시 후 다시 시도해 주세요.'
+          }
+          onRetry={status === 403 || status === 404 ? undefined : () => void board.refetch()}
+        />
+      </>
     );
   }
 
   if (members.isError) {
     return (
-      <ErrorState
-        title="팀원을 불러오지 못했어요"
-        message={extractErrorMessage(members.error, '잠시 후 다시 시도해 주세요.')}
-        onRetry={() => void members.refetch()}
-      />
+      <>
+        {UnsavedChangesModal}
+        <ErrorState
+          title="팀원을 불러오지 못했어요"
+          message={extractErrorMessage(members.error, '잠시 후 다시 시도해 주세요.')}
+          onRetry={() => void members.refetch()}
+        />
+      </>
     );
   }
 
   if (board.isLoading || members.isLoading || entries === null || board.data === undefined) {
-    return <PageSkeleton />;
+    return <>{UnsavedChangesModal}<PageSkeleton /></>;
   }
 
   const summary = `코트 ${people.onCourt.length}명 · 대기 ${people.waiting.length}명.${
@@ -205,6 +214,7 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
           </Button>
         </div>
       ) : null}
+      {UnsavedChangesModal}
     </div>
   );
 }

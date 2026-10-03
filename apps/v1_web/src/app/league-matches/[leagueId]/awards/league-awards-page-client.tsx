@@ -232,8 +232,11 @@ function AwardsPageSkeleton() {
 
 export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  // 순위표로 돌아가는 버튼은 받은 출처를 잇는다(받은 출처가 그 순위표면 그대로 접힌다).
-  const parentHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
+  const detailHref = `/league-matches/${leagueId}`;
+  // 같은 리그에서 받은 출처의 필터/query/hash는 페이지 복귀에서도 그대로 유지한다.
+  const parentHref = fromPath?.split(/[?#]/, 1)[0] === detailHref
+    ? fromPath
+    : withFromPath(detailHref, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);

@@ -51,6 +51,37 @@ describe('team match images', () => {
 
     expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
     expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(media?.style.backgroundImage).not.toContain('linear-gradient');
+    expect(media?.textContent).toBe('');
+    expect(screen.getByText(model.matches[0].title).closest('a')?.getAttribute('href')).toContain(`/team-matches/${model.matches[0].id}`);
+  });
+
+  it.each(['/uploads/team-match-cover.webp', '/mock/generated/team-huddle.webp'])(
+    'keeps text-free photos undimmed for %s while preserving closed-card state',
+    (imageUrl) => {
+      const model = getTeamMatchListViewModel();
+      model.matches = [{ ...model.matches[0], imageUrl, closed: true, live: false, completionPending: false, league: null }];
+      const { container } = renderPage(<TeamMatchListPageView model={model} />);
+      const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
+
+      expect(media?.style.backgroundImage).toContain(imageUrl);
+      expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+      expect(media?.style.backgroundImage).not.toContain('linear-gradient');
+      expect(media?.closest('a')).toHaveClass('tm-card-closed');
+      expect(media?.textContent).toBe('');
+    },
+  );
+
+  it('keeps the sport graphic when the list photo is absent', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], imageUrl: null, sport: '풋살' }];
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
+
+    expect(media).toHaveClass('tm-match-media-sport');
+    expect(media?.style.backgroundImage).toBe('');
+    expect(media?.querySelector('img')?.getAttribute('src')).toContain('sport-futsal');
+    expect(screen.getByText(model.matches[0].title)).toBeInTheDocument();
   });
 
   it('renders the API image with a local fallback on the detail hero', () => {
@@ -62,6 +93,7 @@ describe('team match images', () => {
 
     expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
     expect(hero?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(hero?.style.backgroundImage).toContain('linear-gradient');
     expect(hero?.style.backgroundPosition).toBe('center');
     expect(hero?.style.backgroundRepeat).toBe('no-repeat');
     expect(hero?.style.backgroundSize).toBe('cover');

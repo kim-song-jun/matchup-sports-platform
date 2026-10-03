@@ -234,12 +234,21 @@ cat v1_backup.sql | docker exec -i teameet_v1_postgres \
 
 ## 9. TLS
 
-DNS A record를 EC2 public IP에 연결한 뒤 Let's Encrypt 인증서를 발급하고 `deploy/nginx.conf`의 인증서 경로와 실제 도메인을 일치시킨다.
+nginx 가 쓰는 origin 인증서(`teameet.co.kr`, `www.teameet.co.kr`)는 Let's Encrypt 이고, Route53 DNS-01 로
+갱신한다(instance profile `teameet-certbot-route53` 의 Route53 권한, 상태 디렉터리는
+`/home/ec2-user/.teameet-prod-runtime/certbot`). `deploy/teameet-prod-certbot.timer` 가 매일 갱신 여부를 확인하고,
+성공하면 nginx 를 reload 한다. 배포 스크립트는 이 유닛을 설치하지 않으므로 처음 한 번은 직접 설치한다.
 
 ```bash
-sudo certbot certonly --standalone -d teameet.co.kr -d www.teameet.co.kr
-sudo docker compose -f docker-compose.prod.yml --env-file .env up -d nginx
+sudo install -m 0644 /home/ec2-user/teameet/deploy/teameet-prod-certbot.service /home/ec2-user/teameet/deploy/teameet-prod-certbot.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now teameet-prod-certbot.timer
+sudo systemctl start teameet-prod-certbot.service   # 즉시 한 번 확인
+sudo journalctl -u teameet-prod-certbot.service --since today
 ```
+
+이전 `teameet-cert-renew.timer` 는 존재하지 않는 `deploy/renew-certs.sh` 를 가리켜 한 번도 갱신하지 못했다 — 설치 시
+`sudo systemctl disable --now teameet-cert-renew.timer` 로 끈다.
 
 TLS 적용 후에도 `/`, `/api/v1/*`, `/uploads/*`의 공개 경로 계약은 동일하다.
 

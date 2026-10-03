@@ -115,11 +115,21 @@ curl() {
 }
 
 FAKE_GH_PR_LIST_OUTPUT=''
-FAKE_GH_WORKFLOW_RUN_CALLS=0
+# `gh workflow run <워크플로> ... --ref <ref>` 호출을 "<워크플로>@<ref>" 로 순서대로 기록한다.
+FAKE_GH_WORKFLOW_RUNS=()
+FAKE_GH_FAIL_WORKFLOW=''
 gh() {
   case "$1 $2" in
     'pr list') printf '%s' "${FAKE_GH_PR_LIST_OUTPUT}" ;;
-    'workflow run') FAKE_GH_WORKFLOW_RUN_CALLS=$((FAKE_GH_WORKFLOW_RUN_CALLS + 1)) ;;
+    'workflow run')
+      local workflow="$3" ref='' prev=''
+      for arg in "${@:4}"; do
+        [[ "${prev}" == --ref ]] && ref="${arg}"
+        prev="${arg}"
+      done
+      FAKE_GH_WORKFLOW_RUNS+=("${workflow}@${ref}")
+      [[ "${workflow}" != "${FAKE_GH_FAIL_WORKFLOW}" ]] || return 1
+      ;;
     *) : ;;
   esac
 }
@@ -148,7 +158,8 @@ reset_fakes() {
   FAKE_ALPHA_RELEASE=''
   FAKE_ALPHA_SHA=''
   FAKE_GH_PR_LIST_OUTPUT=''
-  FAKE_GH_WORKFLOW_RUN_CALLS=0
+  FAKE_GH_WORKFLOW_RUNS=()
+  FAKE_GH_FAIL_WORKFLOW=''
   FAKE_PNPM_CALLS=0
   FAKE_PNPM_VERSION_OVERRIDE=''
   FAKE_PNPM_KEEP_CHANGESETS=0
@@ -235,7 +246,7 @@ test_no_changeset_skips_version() {
   capture_main
   [[ "${rc}" -eq 0 ]] || fail "(c) changeset 0 케이스가 실패했다: ${out}"
   [[ "${FAKE_PNPM_CALLS}" -eq 0 ]] || fail "(c) changeset 0 인데 버전 단계가 실행됐다"
-  [[ "${FAKE_GH_WORKFLOW_RUN_CALLS}" -eq 0 ]] || fail "(c) changeset 0 인데 alpha dispatch 가 호출됐다"
+  [[ "${#FAKE_GH_WORKFLOW_RUNS[@]}" -eq 0 ]] || fail "(c) changeset 0 인데 dispatch 가 호출됐다 (${FAKE_GH_WORKFLOW_RUNS[*]})"
   grep -q 'compare/main...dev' "${GITHUB_STEP_SUMMARY}" || fail "(c) PR 링크가 summary 에 없다"
   grep -q '이번 실행에서 버전 커밋 생성: false' "${GITHUB_STEP_SUMMARY}" || fail "(c) versioned=false 표시가 없다"
 
@@ -262,7 +273,9 @@ test_changeset_present_runs_version_flow() {
   capture_main
   [[ "${rc}" -eq 0 ]] || fail "(d) changeset 있는 케이스가 실패했다: ${out}"
   [[ "${FAKE_PNPM_CALLS}" -eq 1 ]] || fail "(d) changesets version 이 정확히 한 번 호출되지 않았다 (실측 ${FAKE_PNPM_CALLS})"
-  [[ "${FAKE_GH_WORKFLOW_RUN_CALLS}" -eq 1 ]] || fail "(d) alpha 배포 dispatch 가 호출되지 않았다"
+  # push CI 가 없는 버전 커밋을 위해 CI(deploy.yml) 를 ref=dev 로 먼저, 그다음 alpha 배포를 dispatch 한다.
+  [[ "${FAKE_GH_WORKFLOW_RUNS[*]}" == 'deploy.yml@dev deploy-alpha.yml@dev' ]] \
+    || fail "(d) dispatch 순서/대상이 deploy.yml@dev -> deploy-alpha.yml@dev 가 아니다 (실측: ${FAKE_GH_WORKFLOW_RUNS[*]:-<none>})"
 
   after_head="$(git -C "${work}" rev-parse HEAD)"
   [[ "${after_head}" != "${before_head}" ]] || fail "(d) 버전 커밋이 만들어지지 않았다"
@@ -275,6 +288,35 @@ test_changeset_present_runs_version_flow() {
 
   rm -rf "${origin}" "${work}"
   echo "[test-promote-main] (d) changeset present -> version/commit/push/dispatch: OK"
+}
+
+# ── (d2) CI dispatch 실패 → 비 0 종료 + 수동 조치 안내, alpha 배포 dispatch 는 건너뛴다 ──
+# 의도: CI run 이 없으면 deploy-alpha.yml 은 35분을 기다리다 실패할 뿐이라, 그 전에 큰 소리로 멈춘다.
+test_ci_dispatch_failure_stops_before_alpha() {
+  reset_fakes
+  local pair origin work
+  pair="$(make_repo_pair 0.4.0)"
+  origin="$(sed -n 1p <<< "${pair}")"
+  work="$(sed -n 2p <<< "${pair}")"
+  add_pending_changeset "${work}" pending-one v1_api patch
+
+  export REPO_ROOT="${work}" CONFIRMATION=PROMOTE GITHUB_STEP_SUMMARY="${TEST_ROOT}/summary-d2.md"
+  : > "${GITHUB_STEP_SUMMARY}"
+  FAKE_ALPHA_SHA="$(git -C "${work}" rev-parse HEAD)"
+  FAKE_ALPHA_RELEASE="$(resolve_expected_release "${work}")"
+  FAKE_GH_FAIL_WORKFLOW='deploy.yml'
+
+  local out rc=0
+  capture_main
+  [[ "${rc}" -ne 0 ]] || fail "(d2) CI dispatch 가 실패했는데 main 이 성공했다"
+  [[ "${out}" == *"deploy.yml(CI) dispatch 에 실패했다"* ]] || fail "(d2) 수동 조치 안내 메시지가 없다: ${out}"
+  [[ "${out}" == *"CI 로 인정하지 않으니"* ]] || fail "(d2) 사람 dispatch 가 인정되지 않는다는 안내가 없다: ${out}"
+  [[ "${FAKE_GH_WORKFLOW_RUNS[*]}" == 'deploy.yml@dev' ]] \
+    || fail "(d2) CI dispatch 실패 뒤 alpha 배포를 dispatch 했다 (실측: ${FAKE_GH_WORKFLOW_RUNS[*]:-<none>})"
+  [[ ! -s "${GITHUB_STEP_SUMMARY}" ]] || fail "(d2) dispatch 실패인데 summary 에 PR 링크가 남았다"
+
+  rm -rf "${origin}" "${work}"
+  echo "[test-promote-main] (d2) CI dispatch failure -> nonzero, no alpha dispatch: OK"
 }
 
 # ── (e) 승격 게이트 실패 → 링크 없이 실패 ───────────────────────────────────
@@ -369,6 +411,7 @@ test_alpha_mismatch
 test_prerelease_mismatch
 test_no_changeset_skips_version
 test_changeset_present_runs_version_flow
+test_ci_dispatch_failure_stops_before_alpha
 test_gate_failure_blocks_link
 test_existing_pr_reused
 test_push_conflict_guides_retry
@@ -401,7 +444,7 @@ test_prepare_only() {
   [[ -e "${work}/.changeset/pending-prepare.md" ]] || fail 'dirty-tree refusal deleted changeset'
   rm "${work}/unrelated-wip.txt"
   main --prepare-only > "${TEST_ROOT}/prepare.log" 2>&1 || fail "prepare-only failed: $(cat "${TEST_ROOT}/prepare.log")"
-  [[ "${FAKE_PNPM_CALLS}" -eq 1 && "${FAKE_GH_WORKFLOW_RUN_CALLS}" -eq 0 ]] || fail 'prepare-only dispatched'
+  [[ "${FAKE_PNPM_CALLS}" -eq 1 && "${#FAKE_GH_WORKFLOW_RUNS[@]}" -eq 0 ]] || fail "prepare-only dispatched (${FAKE_GH_WORKFLOW_RUNS[*]:-})"
   [[ "$(git -C "${work}" rev-parse HEAD)" == "${before_head}" ]] || fail 'prepare-only committed'
   [[ "$(git -C "${origin}" rev-parse dev)" == "${before_dev}" ]] || fail 'prepare-only pushed dev'
   [[ "$(git -C "${origin}" rev-parse main)" == "${before_main}" ]] || fail 'prepare-only changed main'
@@ -443,7 +486,7 @@ test_prepare_failure() {
     grep -q 'must not contain unreleased Changesets' "${TEST_ROOT}/prepare-failure-${failure_kind}.log" || fail 'real promotion gate refusal missing'
   fi
   grep -q 'retry in a fresh isolated worktree' "${TEST_ROOT}/prepare-failure-${failure_kind}.log" || fail 'failure recovery guidance missing'
-  [[ "${FAKE_PNPM_CALLS}" -eq 1 && "${FAKE_GH_WORKFLOW_RUN_CALLS}" -eq 0 ]] || fail 'failure dispatched'
+  [[ "${FAKE_PNPM_CALLS}" -eq 1 && "${#FAKE_GH_WORKFLOW_RUNS[@]}" -eq 0 ]] || fail "failure dispatched (${FAKE_GH_WORKFLOW_RUNS[*]:-})"
   [[ "$(git -C "${work}" rev-parse HEAD)" == "${before_head}" ]] || fail 'failure committed'
   [[ "$(git -C "${work}" write-tree)" == "${before_index}" ]] || fail 'failure staged'
   [[ "$(git -C "${origin}" rev-parse dev)" == "${before_dev}" ]] || fail 'failure pushed dev'

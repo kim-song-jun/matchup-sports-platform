@@ -1,10 +1,21 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as renderTestingLibrary, screen, waitFor, type RenderOptions } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import { TeamMatchDetailPageClient, TeamMatchListPageClient } from './team-matches-client';
 import { toTeamMatch } from './team-matches.card-model';
+
+// 목록 client의 navigation snapshot은 앱과 동일한 QueryClient Provider가 필요하다.
+function render(ui: ReactElement, options?: RenderOptions) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderTestingLibrary(ui, {
+    ...options,
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 

@@ -30,7 +30,7 @@ import {
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { findScrollContainer } from '@/components/reviews/review-scroll-anchor';
+import { revealWizardStage } from './wizard-stage-viewport';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
 import {
   CONFIRM_STEP_INDEX,
@@ -129,14 +129,18 @@ export default function AdminTournamentsNewPage() {
   };
 
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const stepFieldsRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const renderedStepRef = useRef(state.step);
   useEffect(() => {
     if (renderedStepRef.current === state.step) return;
     renderedStepRef.current = state.step;
+    // Invalid forward navigation belongs to the error field, without an intermediate heading jump.
+    if (focusFirstErrorRef.current) return;
     const heading = stepHeadingRef.current;
     if (!heading) return;
-    findScrollContainer(heading)?.scrollTo({ top: 0, behavior: scrollBehavior() });
+    revealWizardStage(heading, stepFieldsRef.current, footerRef.current, scrollBehavior());
     heading.focus({ preventScroll: true });
   }, [state.step]);
 
@@ -341,7 +345,7 @@ export default function AdminTournamentsNewPage() {
             </p>
           </div>
 
-          <div className="px-5 py-6 sm:px-7">
+          <div ref={stepFieldsRef} className="px-5 py-6 sm:px-7">
             {state.step === 0 ? (
               <BasicStep
                 state={state}
@@ -398,7 +402,7 @@ export default function AdminTournamentsNewPage() {
           </div>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[var(--card-surface)]/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
+        <div ref={footerRef} className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[var(--card-surface)]/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
             {state.step === 0 ? (
               <Link

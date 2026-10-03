@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -842,6 +842,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}팀` : null}
             />
           ) : null}
+          {mode === 'mine' ? (
+            <TeamRecordLinkCard
+              href={`/teams/${team.id}/schedules`}
+              title="팀 일정"
+              description="훈련·경기·이벤트 일정을 보고 참석을 체크해요."
+            />
+          ) : null}
         </div>
         {mode === 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         <TeamOperationsSection operations={model.operations} />
@@ -978,6 +985,31 @@ export function TeamFormPageView({
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
   // 저장 버튼은 화면 맨 아래, 오류 안내는 맨 위라 저장이 거절돼도 아무 일 없어 보인다 — 안내가 생기면 끌어온다.
   const errorRef = useRef<HTMLDivElement>(null);
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  const focusFrameRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+  }, []);
+
+  function revealFocusedField(event: FocusEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (focusFrameRef.current !== null) cancelAnimationFrame(focusFrameRef.current);
+    // native focus 스크롤 뒤의 실제 가림만 회복한다. 빠른 다음 포커스는 이전 예약을 버린다.
+    focusFrameRef.current = requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      if (document.activeElement !== target || !target.isConnected) return;
+      const cta = fixedCtaRef.current;
+      const scroller = target.closest<HTMLElement>('.tm-scroll-area');
+      // desktop 숨김 및 소프트 키보드의 absolute CTA는 기존 흐름을 사용한다.
+      if (!cta || !scroller || getComputedStyle(cta).position !== 'fixed') return;
+      const bar = cta.getBoundingClientRect();
+      const field = target.getBoundingClientRect();
+      if (bar.height > 0 && field.bottom > bar.top && field.top < bar.bottom) {
+        scroller.scrollBy({ top: field.bottom - bar.top + 4, behavior: 'instant' });
+      }
+    });
+  }
   const formError = form?.error;
   useEffect(() => {
     if (formError) revealAndFocus(errorRef.current);
@@ -989,7 +1021,7 @@ export function TeamFormPageView({
   const descriptionField = <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline rows={4} inputClassName="tm-team-description-input" onChange={(value) => form?.onFieldChange('description', value)} />;
   const detailFields = (
     <>
-      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+      <div className="tm-create-two-col"><TeamLevelSelect value={team.level} editing={edit} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} editing={edit} min={form?.minCapacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
       <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
       <TeamActivityFields team={team} form={form} />
     </>
@@ -1010,7 +1042,7 @@ export function TeamFormPageView({
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
       <div className="tm-team-form-grid tm-content-enter">
-        <div className="tm-create-shell tm-team-form-main">
+        <div className="tm-create-shell tm-team-form-main" onFocusCapture={revealFocusedField}>
           {edit ? (
             <Card pad={16}>
               <div className="tm-my-toggle-row">
@@ -1132,7 +1164,7 @@ export function TeamFormPageView({
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
       </div>
-      <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </>
   );
 }
@@ -2126,25 +2158,27 @@ function TeamLevelSelect({ value, editing, onChange }: { value: string; editing:
   );
 }
 
-function TeamCapacityField({ value, min, onChange }: { value: number; min?: number; onChange?: (value: number) => void }) {
-  // 이미 있는 팀원보다 적은 정원은 서버가 거절한다 — 저장 전에 입력 칸에서 막는다.
-  const floor = Math.min(50, Math.max(2, min ?? 2));
-  const options = Array.from({ length: 50 - floor + 1 }, (_, index) => index + floor);
-  const normalized = Math.min(50, Math.max(floor, Number(value) || floor));
+function TeamCapacityField({ value, editing, min, onChange }: { value: number; editing: boolean; min?: number; onChange?: (value: number) => void }) {
+  // null은 기존 폼의 0으로 표현한다. 숫자일 때만 서버의 최소/현재 인원/최대 제약을 적용한다.
+  const floor = Math.max(2, min ?? 2);
+  const options = Array.from({ length: Math.max(0, 50 - floor + 1) }, (_, index) => index + floor);
+  const normalized = editing && (value === 0 || floor > 50) ? value : Math.min(50, Math.max(floor, Number(value) || floor));
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">정원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" disabled={normalized <= floor} onClick={() => onChange?.(Math.max(floor, normalized - 1))}>−</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" disabled={normalized <= floor || floor > 50} onClick={() => onChange?.(Math.max(floor, normalized - 1))}>−</button>
         <select className="tm-create-input tm-create-select-control" aria-label="정원" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
+          {editing ? <option value={0}>정원 미정</option> : null}
+          {editing && floor > 50 && value > 0 ? <option value={value} disabled>{value}명 (변경 필요)</option> : null}
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
-        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" disabled={normalized >= 50 || floor > 50} onClick={() => onChange?.(normalized === 0 ? floor : Math.min(50, normalized + 1))}>+</button>
       </div>
       {min !== undefined ? (
         <div className="tm-text-caption" style={{ marginTop: 8 }}>
-          {floor > 2 ? `지금 팀원이 ${floor}명이라 그보다 적게 정할 수 없어요.` : `지금 팀원이 ${min}명이에요.`} 정원이 다 차면 자동으로 “정원 마감”으로 보여요.
+          {floor > 50 ? `지금 팀원이 ${min}명이라 50명 이하로 정할 수 없어요. 정원은 미정으로 둘 수 있어요.` : <>{floor > 2 ? `지금 팀원이 ${floor}명이라 숫자 정원은 그보다 적게 정할 수 없어요.` : `지금 팀원이 ${min}명이에요.`} 정원이 다 차면 자동으로 “정원 마감”으로 보여요.</>}
         </div>
       ) : null}
     </div>

@@ -74,6 +74,8 @@ export function createV1GameRosterMswHandlers() {
     requests: [] as GameRosterMswRequest[],
     seq: 0,
     viewerRole: 'TEAM_MANAGER' as V1GameRosterViewerRole,
+    /** 리그 전체 상태와 개별 경기 state를 독립적으로 검증하기 위한 대회 종류. */
+    competitionKind: 'TOURNAMENT' as V1GameRosterView['competitionKind'],
     /** 등번호의 원본은 참가 명단이다 — 저장(PATCH)이 여기를 바꾸고, 명단 응답은 여기서 읽는다. */
     jerseys: new Map<string, number | null>(GAME_ROSTER_MSW.players.map((p) => [p.userId, p.jerseyNumber])),
     /** TEAM_MEMBERS = 참가 명단이 없는 리그 팀(팀원 전체가 기준 — 번호 원본·선수 id 가 없다). */
@@ -164,7 +166,7 @@ export function createV1GameRosterMswHandlers() {
       teamId: GAME_ROSTER_MSW.teamId,
       teamMatchId: `team-match-${game.gameId}`,
       competitionId: GAME_ROSTER_MSW.tournamentId,
-      competitionKind: 'TOURNAMENT',
+      competitionKind: state.competitionKind,
       gameState,
       deadline: game.startAt,
       editable: gameState === 'SCHEDULED' && canWrite(),
@@ -413,6 +415,9 @@ export function createV1GameRosterMswHandlers() {
     },
     setViewerRole(role: V1GameRosterViewerRole) {
       state.viewerRole = role;
+    },
+    setCompetitionKind(kind: V1GameRosterView['competitionKind']) {
+      state.competitionKind = kind;
     },
     /** 참가 명단이 없는 리그 팀으로 — 번호 원본·선수 id 가 없고 계정 없이 기록된다. */
     useTeamMembersFallback() {

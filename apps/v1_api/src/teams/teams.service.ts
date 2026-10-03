@@ -18,6 +18,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService, type ChatSystemLine } from '../chat/chat.service';
 import { NotificationsService, notificationPersonName } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { contactRecruitingWhere } from '../team-matches/contact-recruiting';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
@@ -2480,7 +2481,7 @@ export class TeamsService {
         select: { teamId: true, blockedTeamId: true },
       }),
       this.prisma.v1TeamMatch.findFirst({
-        where: { hostTeamId: team.id, status: 'recruiting' },
+        where: contactRecruitingWhere(team.id),
         select: { id: true },
       }),
     ]);

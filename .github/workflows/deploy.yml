@@ -54,8 +54,10 @@ jobs:
       - name: Verify release changeset
         if: >-
           github.event_name == 'pull_request' ||
-          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
         env:
+          EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           BASE_REF: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
@@ -89,6 +91,12 @@ jobs:
           #    "이전 상태가 없다" 는 뜻이므로 비교 기준은 main 뿐이다. 여기서 main 을 쓰는 건
           #    옳다 — 아래 보강에서 main 을 안 쓰는 이유(PR 의 base 는 dev 일 수 있다)와
           #    상황이 다르다.
+          # ⚠️ workflow_dispatch(Promote to main 이 버전 커밋을 push 한 뒤 거는 CI)에는
+          #    `event.before` 가 없다. 그 커밋 하나가 push 였다면 잡혔을 범위, 즉 첫 부모를 base 로
+          #    쓴다. 비워 두면 아래 보강이 dev 를 받아 base==head 가 되어 게이트가 죽는다.
+          if [[ "${EVENT_NAME:-}" == "workflow_dispatch" ]]; then
+            BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+          fi
           if [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
             git fetch --no-tags origin main
             BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
@@ -131,7 +139,8 @@ jobs:
       - name: Verify changeset gate base resolution
         if: >-
           github.event_name == 'pull_request' ||
-          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
         run: |
           set -Eeuo pipefail
           # 위 스텝의 셸을 픽스처 저장소에서 그대로 돌려, base 가 전진했을 때 **남의
@@ -143,7 +152,8 @@ jobs:
       - name: Validate planned SemVer
         if: >-
           github.event_name == 'pull_request' ||
-          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
         env:
           RELEASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
@@ -219,6 +229,11 @@ jobs:
       # 본체 — alpha 검증·버전 bump·승격 게이트·PR 링크 생성이 실제로 순서대로 도는지 확인한다.
       - name: Promote-to-main contract tests
         run: bash scripts/qa/test-promote-main.sh
+
+      # Promote 워크플로가 GITHUB_TOKEN 으로 push 한 버전 커밋엔 push CI 가 생기지 않는다.
+      # deploy-alpha.yml 이 어떤 CI run 을 기다림 없이 믿고 어떤 것을 거절하는지 고정한다.
+      - name: Alpha matching-CI selector tests
+        run: bash scripts/qa/test-select-matching-ci-run.sh
 
       # 배포 실패를 되돌리는 restore_active_release() 는 ERR trap 안에서 돈다. bash 는 trap 안의
       # 인자 없는 `return` 에 trap 을 일으킨 종료코드를 돌려주므로, 정상 흐름에서 멀쩡한 함수가

@@ -107,6 +107,13 @@ jobs:
           echo "timeoutSeconds=${TIMEOUT_INPUT:-}" >> "${GITHUB_OUTPUT}"
           echo "stepTimeoutMinutes=${step_timeout_minutes}" >> "${GITHUB_OUTPUT}"
 
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+          fetch-depth: 0
+
+      # 판정 규칙(push run 또는 Promote 가 건 dispatch run)은 select-matching-ci-run.sh 에 있어서
+      # 체크아웃이 이 스텝보다 앞서야 한다.
       - name: Wait for matching CI success
         timeout-minutes: 35
         env:
@@ -116,26 +123,25 @@ jobs:
         run: |
           set -Eeuo pipefail
           for attempt in $(seq 1 210); do
-            ci_result="$(gh api \
-              "repos/${REPOSITORY}/actions/workflows/deploy.yml/runs?branch=dev&event=push&per_page=100" \
-              --jq "[.workflow_runs[] | select(.head_sha == \"${RELEASE_SHA}\")][0] | if . == null then empty else [.status, (.conclusion // \"pending\")] | @tsv end")"
-            if [[ -n "${ci_result}" ]]; then
-              read -r ci_status ci_conclusion <<< "${ci_result}"
-              if [[ "${ci_status}" == completed ]]; then
-                [[ "${ci_conclusion}" == success ]] && exit 0
-                echo "Matching CI finished with ${ci_conclusion}" >&2
+            verdict="$(gh api \
+              "repos/${REPOSITORY}/actions/workflows/deploy.yml/runs?branch=dev&head_sha=${RELEASE_SHA}&per_page=100" |
+              bash scripts/release/select-matching-ci-run.sh "${RELEASE_SHA}")"
+            case "${verdict}" in
+              pass) exit 0 ;;
+              wait) ;;
+              fail*)
+                echo "Matching CI finished with ${verdict#fail }" >&2
                 exit 1
-              fi
-            fi
+                ;;
+              *)
+                echo "Unexpected CI verdict: ${verdict}" >&2
+                exit 1
+                ;;
+            esac
             sleep 10
           done
           echo "Matching CI did not finish within 35 minutes" >&2
           exit 1
-
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: ${{ steps.release.outputs.sha }}
-          fetch-depth: 0
 
       - name: Resolve Changesets alpha version
         id: version

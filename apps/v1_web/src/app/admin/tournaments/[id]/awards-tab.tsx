@@ -273,7 +273,7 @@ function AwardRow({
           value={row.awardLabel}
           onChange={(e) => update(idx, 'awardLabel', e.target.value)}
           placeholder="어워드명 (예: MVP)"
-          className="flex-1 text-[length:var(--font-size-label)] font-semibold border-0 bg-[var(--surface-soft)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="min-w-0 flex-1 text-[length:var(--font-size-label)] font-semibold border-0 bg-[var(--surface-soft)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         {/* 파괴적 동작이므로 손가락으로 정확히 누를 수 있어야 한다 — 히트 영역 44px. */}
         <button type="button" onClick={() => removeRow(idx)} className="text-[var(--text-muted)] hover:text-red-500 inline-flex items-center justify-center min-h-11 min-w-11 shrink-0" aria-label="항목 삭제"><X size={16} /></button>

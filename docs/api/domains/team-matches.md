@@ -211,7 +211,7 @@ Query:
 | `regionId` | uuid | No | — |
 | `status` | recruiting/closed/matched/cancelled/completed/expired | No | 기본 recruiting |
 | `teamId` | uuid | No | host 또는 applicant team 기준 |
-| `sort` | recommended/latest/starts_at/deadline | No | 기본 latest |
+| `sort` | recommended/latest/starts_at/deadline | No | 생략 시 경기일 순 |
 | `view` | card/compact | No | — |
 | `cursor` | string | No | cursor pagination |
 | `limit` | int(1~50) | No | default 20 |
@@ -219,7 +219,8 @@ Query:
 Rules:
 
 - `status`를 생략한 일반 탐색은 경기 시작 전인 `recruiting`, `closed`, `matched`를 포함한다.
-- 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. 명시적인 `recommended`/`deadline`/`starts_at`은 경기 시작 임박순으로 처리한다.
+- 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에, 일정 미정(`startAt` null)을 `createdAt DESC` 로 맨 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
+- `pageInfo.nextCursor` 는 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`/`unscheduled:`, 최신순은 시각 없는 `latest:<id>`) 형태다 — 기준 시각 규칙(구간 분할에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값은 첫 페이지부터, 시각 없는 구형 커서는 요청 시각 기준)은 개인매치 목록과 같다. 커서 행이 그사이 목록 조건을 벗어나도 다음 경기를 건너뛰지 않는 것도 같다.
 - 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
@@ -399,3 +400,9 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 
 - 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.
 - 취소·삭제 시 연결된 SCHEDULED Game도 CANCELLED로 전환하여 팀 일정/경기 상태가 어긋나지 않게 한다.
+
+## Managed record handoff ownership (2026-10-03)
+
+`GET/POST /team-matches/:id/record` responses add `leagueId: string | null` and `tournamentId: string | null`. The response remains under the existing envelope and GET optional-auth / POST authorization and version gates are unchanged.
+
+On the public `/team-matches/:id/record` screen, `phase=managed` hands off to `/league-matches/:leagueId/fixtures/:id` when `leagueId` exists, otherwise `/tournaments/:tournamentId/matches/:id`. League ownership wins when both IDs exist. The sanitized `from` parameter is preserved. `phase=legacy` keeps `/team-matches/:id?view=detail`; the admin record screen stays in its admin shell. A managed response does not grant record mutation permissions.

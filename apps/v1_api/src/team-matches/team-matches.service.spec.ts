@@ -139,7 +139,7 @@ describe('TeamMatchesService', () => {
     prisma = {
       v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '매니저 실명', gender: 'male' } }) },
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
-      v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn() },
       v1TeamSchedule: {
         create: jest.fn().mockResolvedValue({}),
         findMany: jest.fn().mockResolvedValue([]),
@@ -632,13 +632,19 @@ describe('TeamMatchesService', () => {
     }
   });
 
-  it('list: 기본 조회는 최신 생성순이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
+  it('list: 기본 조회는 경기일 순(시작 전 → 지난 경기 → 일정 미정)이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
     prisma.v1TeamMatch.findMany.mockResolvedValue([]);
 
     await service.list(null, {});
 
-    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
-    expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    const [upcoming, past, unscheduled] = prisma.v1TeamMatch.findMany.mock.calls.map(([args]: [any]) => args);
+    expect(upcoming.where.AND[1]).toEqual({ startAt: { gte: expect.any(Date) } });
+    expect(upcoming.orderBy).toEqual([{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }]);
+    expect(past.where.AND[1]).toEqual({ startAt: { lt: upcoming.where.AND[1].startAt.gte } });
+    expect(past.orderBy).toEqual([{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]);
+    expect(unscheduled.where.AND[1]).toEqual({ startAt: null });
+    expect(unscheduled.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    const args = { where: upcoming.where.AND[0] };
     expect(args.where.status).toBeUndefined();
     expect(args.where.startAt).toBeUndefined();
     expect(args.where.AND).toEqual([
@@ -669,9 +675,9 @@ describe('TeamMatchesService', () => {
 
     await service.list(null, { sort: 'recommended' });
 
-    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
-    expect(args.where.status).toEqual({ in: ['recruiting', 'matched'] });
-    expect(args.where.AND).toEqual(expect.arrayContaining([
+    const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where.AND[0];
+    expect(where.status).toEqual({ in: ['recruiting', 'matched'] });
+    expect(where.AND).toEqual(expect.arrayContaining([
       { OR: [{ status: 'matched' }, { deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
     ]));
   });
@@ -1403,7 +1409,7 @@ describe('TeamMatchesService', () => {
         { sourceId: 'tm-c', rating: 5, reviewerTeamId: 'rival-3' },
       ],
     });
-    prisma.v1TeamMatch.findMany.mockResolvedValue([
+    prisma.v1TeamMatch.findMany.mockResolvedValueOnce([
       {
         ...teamMatchRow({ hostTeamId: 'team-host' }),
         sport: { id: 'sport-1', name: '풋살' },
@@ -1435,7 +1441,7 @@ describe('TeamMatchesService', () => {
   });
 
   it('list: 플랫폼 모집은 호스트팀 없이 공개 목록에 노출된다', async () => {
-    prisma.v1TeamMatch.findMany.mockResolvedValue([
+    prisma.v1TeamMatch.findMany.mockResolvedValueOnce([
       {
         ...teamMatchRow({
           hostTeamId: null,
@@ -2025,9 +2031,9 @@ describe('TeamMatchesService', () => {
     await service.list(null, {});
     const after = Date.now();
 
-    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
-    const visibility = args.where.AND[0];
-    expect(args.where.status).toBeUndefined();
+    const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where.AND[0];
+    const visibility = where.AND[0];
+    expect(where.status).toBeUndefined();
     expect(visibility).toEqual({
       OR: [
         { status: { in: ['recruiting', 'closed'] }, startAt: { gte: expect.any(Date) } },
@@ -2051,7 +2057,7 @@ describe('TeamMatchesService', () => {
 
     await service.list(null, { status: 'completed' });
 
-    const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where;
+    const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where.AND[0];
     expect(where.status).toBe('completed');
     expect(where.completedAt).toBeUndefined();
   });

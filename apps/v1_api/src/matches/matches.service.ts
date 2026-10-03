@@ -8,6 +8,7 @@ import {
 import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ChatService } from '../chat/chat.service';
+import { paginateByStatePriority } from '../league-matches/league-lifecycle-rules';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -126,23 +127,34 @@ export class MatchesService {
       ...(constraints.length ? { AND: constraints } : {}),
     };
 
-    const matches = await this.prisma.v1Match.findMany({
-      where,
-      orderBy: getOrderBy(query.sort),
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: this.matchInclude(user),
+    // 기본 정렬은 경기일 순이다 — 시작 전 경기를 가까운 날부터, 이미 시작한 경기(진행 중·종료
+    // 확인 중·최근 완료)를 그 뒤에 최근 것부터. startAt asc 한 줄로 두면 기본 목록에 함께 실리는
+    // 지난 경기가 가장 오래된 것부터 첫 페이지를 채운다. orderBy 로는 "시작 전/후"를 가를 수 없어
+    // 구간별로 읽어 잇는다(커서는 "<구간>:<id>"). '최신순'을 고른 경우만 등록 최신순이다.
+    const groups: Record<string, Pick<Prisma.V1MatchFindManyArgs, 'where' | 'orderBy'>> = {
+      latest: { where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+      upcoming: { where: { AND: [where, { startAt: { gte: now } }] }, orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+      past: { where: { AND: [where, { startAt: { lt: now } }] }, orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] },
+    };
+    const include = this.matchInclude(user);
+    const { items: pageItems, hasNext, nextCursor } = await paginateByStatePriority({
+      stateGroups: query.sort === 'latest' ? ['latest'] : ['upcoming', 'past'],
+      limit,
+      cursor: query.cursor,
+      fetchGroup: (group, page) =>
+        this.prisma.v1Match
+          .findMany({
+            ...groups[group],
+            take: page.take,
+            ...(page.cursorId ? { cursor: { id: page.cursorId }, skip: 1 } : {}),
+            include,
+          })
+          .then((rows) => rows.map((row) => ({ ...row, state: group }))),
     });
-
-    const pageItems = matches.slice(0, limit);
-    const hasNext = matches.length > limit;
 
     return {
       items: pageItems.map((match) => this.toListItem(match, user)),
-      pageInfo: {
-        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
-        hasNext,
-      },
+      pageInfo: { nextCursor, hasNext },
     };
   }
 
@@ -1750,12 +1762,6 @@ export class MatchesService {
       where: { matchId, userId, role: 'host', status: 'active' },
     });
   }
-}
-
-function getOrderBy(sort: MatchesQueryDto['sort']): Prisma.V1MatchOrderByWithRelationInput[] {
-  if (!sort || sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
-  if (sort === 'deadline' || sort === 'starts_at') return [{ startAt: 'asc' }, { createdAt: 'desc' }];
-  return [{ startAt: 'asc' }, { createdAt: 'desc' }];
 }
 
 function getGenderRuleWhere(genderRule: NonNullable<MatchesQueryDto['genderRule']>) {

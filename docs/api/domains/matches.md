@@ -38,12 +38,13 @@
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
 | `status` | recruiting/closed/completed/cancelled/expired | No | 기본 recruiting |
-| `sort` | recommended/latest/starts_at/deadline | No | 기본 latest |
+| `sort` | recommended/latest/starts_at/deadline | No | 생략 시 경기일 순 |
 | `cursor` | string | No | cursor pagination |
 | `limit` | 1~50 | No | 기본 20 |
 
 - Response: `{ items, pageInfo }`
-- 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. `deadline`/`starts_at`은 경기 시작 임박순이며 `recommended`는 현재 시작 임박순으로 처리한다.
+- 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기(`startAt >= now`)를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
+- 경기일 순은 구간별로 따로 읽어 잇기 때문에 `pageInfo.nextCursor` 가 `"<구간>:<id>"`(`upcoming:`/`past:`, 최신순은 `latest:`) 형태다. 클라이언트는 받은 값을 그대로 돌려주면 된다 — 접두사 없는 예전 커서는 첫 페이지부터 다시 읽는다.
 - `status`를 생략한 일반 목록은 시작 전 raw `recruiting`/`closed`와 최근 7일 안에 시작·완료된 매치를 포함한다. raw 상태는 mutation guard를 위해 그대로 두고, 화면 상태는 `displayState`로 구분한다: 시작 전 `recruiting|closed|full`, 진행 조건 충족 시 `startAt <= now < endAt`은 `in_progress`, `endAt <= now`(종료 시각이 없으면 시작 시각부터)는 `completion_pending`, 완료 확정 뒤에는 `completed`다.
 - `completion_pending` 매치는 호스트가 확정 명단에서 참가자별 `completed|no_show`를 지정하고 완료할 수 있다. 완료·미완료 모두 공개 목록에는 최대 7일만 유지되며, `/me/matches` 이력은 이 공개 보존 기간의 영향을 받지 않는다.
 - `sort=recommended` 목록과 `GET /home/recommendations`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.

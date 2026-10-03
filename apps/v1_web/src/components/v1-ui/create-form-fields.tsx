@@ -28,6 +28,7 @@ export function CreateField({
   onChange,
   id,
   error,
+  description,
   onFocus,
   onBlur,
   children,
@@ -43,6 +44,8 @@ export function CreateField({
   id?: string;
   /** 설정되면 입력창을 orange로 강조하고 아래에 아이콘+문구를 병행 표시한다(색상 단독 전달 금지). */
   error?: string;
+  /** 일반 children과 달리 입력의 접근 가능한 설명으로도 연결할 안내 문구. */
+  description?: string;
   /** #3: 포커스 시 최근 사용 장소 칩(RecentVenueChips) 등 보조 UI를 열고 싶을 때. */
   onFocus?: () => void;
   onBlur?: () => void;
@@ -61,6 +64,8 @@ export function CreateField({
   const autoId = useId();
   const fieldId = id ?? autoId;
   const errorId = error ? `${fieldId}-error` : undefined;
+  const descriptionId = description ? `${fieldId}-description` : undefined;
+  const describedBy = [descriptionId, errorId].filter(Boolean).join(' ') || undefined;
   return (
     // div(label 아님): children(RecentVenueChips 등)에 버튼이 섞여 들어올 수 있는데,
     // <label>이 연결 대상 컨트롤 외의 labelable 요소(button)까지 감싸면 유효하지 않은
@@ -77,7 +82,7 @@ export function CreateField({
               value={value ?? ''}
               placeholder={placeholder}
               aria-invalid={error ? true : undefined}
-              aria-describedby={errorId}
+              aria-describedby={describedBy}
               onChange={(event) => onChange(event.target.value)}
               onFocus={onFocus}
               onBlur={onBlur}
@@ -92,7 +97,7 @@ export function CreateField({
               value={value ?? ''}
               placeholder={placeholder}
               aria-invalid={error ? true : undefined}
-              aria-describedby={errorId}
+              aria-describedby={describedBy}
               onChange={(event) => onChange(event.target.value)}
               onFocus={onFocus}
               onBlur={onBlur}
@@ -103,6 +108,7 @@ export function CreateField({
         )}
         {suffix ? <span className="tm-text-caption">{suffix}</span> : null}
       </div>
+      {description ? <div id={descriptionId} className="tm-text-caption" style={{ marginTop: 8 }}>{description}</div> : null}
       {children}
       {error ? (
         <div id={errorId} className="tm-create-field-error" role="alert">

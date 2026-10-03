@@ -3318,7 +3318,16 @@ label.tm-btn:focus-within {
 /* 사진 히어로(오버레이)의 기본 색 — 마크업에서 인라인 style 을 뺐으므로 여기서 준다.
    .tm-text-caption 과 같은 단일 클래스면 선언 순서에 지므로 오버레이로 한정해 올린다. */
 .tm-match-detail-overlay .tm-match-detail-meta {
+  margin-top: 8px;
   color: var(--overlay-white-76);
+}
+
+/* Desktop는 entity H1을 유지하고 hero H2를 숨긴다. 배지 아래 8px 간격은
+   배지 행이 담당하므로 host에 제목 뒤 여백을 한 번 더 주지 않는다. */
+@media (min-width: 1024px) {
+  .tm-match-detail-overlay .tm-match-detail-meta {
+    margin-top: 0;
+  }
 }
 
 .tm-match-detail-overlay .tm-match-detail-heromsg {
@@ -3528,10 +3537,8 @@ label.tm-btn:focus-within {
   margin: 4px 0 0;
   /* 히어로 지면(사진·그라디언트) 위라 흰 글씨는 그대로 둔다. */
   color: var(--static-white);
-  /* 이 h2 는 데스크톱 페이지 헤드의 h1(.tm-text-heading)과 **같은 match.title 문자열**을
-     보여준다(matches-page.tsx:309 vs :352). 그런데 크기는 같고 굵기만 700 vs 800 으로
-     갈려 있었다 — 한 화면에서 같은 제목이 두 무게로 보인다(alpha 실측 2026-09-08).
-     DESIGN.md 의 페이지 제목 값(24px/700)에 맞춘다. */
+  /* Mobile/tablet의 entity 제목. Desktop는 페이지 헤드 H1을 쓰고 이 H2는 숨긴다.
+     기존 DESIGN.md 페이지 제목 값(24px/700)을 유지한다. */
   font-size: var(--font-size-heading);
   line-height: 32px;
   font-weight: 700;

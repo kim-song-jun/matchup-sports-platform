@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1TeamMatch } from '@/types/api';
+import { CreateField } from '@/components/v1-ui/create-form-fields';
 import { toTeamMatch } from './team-matches.card-model';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
@@ -102,7 +104,8 @@ describe('selected C: keep the payer label and explain the applicant perspective
     expect(payload).not.toHaveProperty('shareMode');
   });
 
-  it.each(['condition', 'edit'] as const)('explains the existing input label in %s and keeps sequential edits/Back', (step) => {
+  it.each(['condition', 'edit'] as const)('explains the focused input in %s and keeps sequential edits/Back', async (step) => {
+    const user = userEvent.setup();
     const onBack = vi.fn();
     function FormHarness() {
       const base = getTeamMatchCreateViewModel(step);
@@ -118,6 +121,10 @@ describe('selected C: keep the payer label and explain the applicant perspective
     renderPage(<FormHarness />);
     const input = screen.getByLabelText('상대팀 부담금');
     expect(input.closest('.tm-create-field')).toHaveTextContent(explanation);
+    await user.click(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveAccessibleName('상대팀 부담금');
+    expect(input).toHaveAccessibleDescription(explanation);
     fireEvent.change(input, { target: { value: '10000' } });
     expect(input).toHaveValue(10000);
     fireEvent.change(input, { target: { value: '0' } });
@@ -125,5 +132,77 @@ describe('selected C: keep the payer label and explain the applicant perspective
     expect(screen.getByLabelText('총비용')).toHaveValue(50000);
     fireEvent.click(screen.getByRole('button', { name: step === 'edit' ? '변경 취소' : '이전' }));
     expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+describe('CreateField optional description contract used by applicant cost', () => {
+  it.each([false, true])('merges the description and error for a focused field (multiline=%s)', async (multiline) => {
+    const user = userEvent.setup();
+    const error = '금액을 확인해 주세요';
+    render(
+      <CreateField id={multiline ? undefined : 'field-cost'} label="비용 입력" value="25000" multiline={multiline} description={explanation} error={error} onChange={vi.fn()} />,
+    );
+    const input = screen.getByLabelText('비용 입력');
+
+    await user.tab();
+    expect(input).toHaveFocus();
+    expect(input).toHaveAccessibleName('비용 입력');
+    expect(input).toHaveAccessibleDescription(`${explanation} ${error}`);
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    const references = input.getAttribute('aria-describedby')!.split(' ');
+    expect(references).toHaveLength(2);
+    expect(references.map((id) => document.getElementById(id)?.textContent)).toEqual([explanation, error]);
+    expect(document.getElementById(references[1])).toHaveAttribute('role', 'alert');
+  });
+
+  it('keeps generated descriptions separate and removes obsolete references on rerender', async () => {
+    const user = userEvent.setup();
+    const renderFields = (showFirstDescription: boolean) => (
+      <>
+        <CreateField label="첫 비용" value="25000" description={showFirstDescription ? explanation : undefined} onChange={vi.fn()} />
+        <CreateField label="둘째 비용" value="10000" description="다른 신청 조건이에요" onChange={vi.fn()} />
+      </>
+    );
+    const { rerender } = render(renderFields(true));
+    const first = screen.getByLabelText('첫 비용');
+    const second = screen.getByLabelText('둘째 비용');
+    const firstDescriptionId = first.getAttribute('aria-describedby');
+    const secondDescriptionId = second.getAttribute('aria-describedby');
+
+    expect(firstDescriptionId).toBeTruthy();
+    expect(secondDescriptionId).toBeTruthy();
+    expect(firstDescriptionId).not.toBe(secondDescriptionId);
+    await user.tab();
+    expect(first).toHaveFocus();
+    expect(first).toHaveAccessibleDescription(explanation);
+    await user.tab();
+    expect(second).toHaveFocus();
+    expect(second).toHaveAccessibleDescription('다른 신청 조건이에요');
+
+    rerender(renderFields(false));
+    expect(first).not.toHaveAttribute('aria-describedby');
+    expect(first).toHaveAccessibleDescription('');
+    expect(document.getElementById(firstDescriptionId!)).toBeNull();
+    expect(second).toHaveAttribute('aria-describedby', secondDescriptionId);
+    expect(second).toHaveAccessibleDescription('다른 신청 조건이에요');
+  });
+
+  it('keeps error-only fields and interactive children outside the description', async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateField label="기존 비용" value="25000" error="기존 오류" onChange={vi.fn()}>
+        <button type="button">비용 조건 선택</button>
+      </CreateField>,
+    );
+    const input = screen.getByLabelText('기존 비용');
+    const childButton = screen.getByRole('button', { name: '비용 조건 선택' });
+
+    await user.tab();
+    expect(input).toHaveFocus();
+    expect(input).toHaveAccessibleName('기존 비용');
+    expect(input).toHaveAccessibleDescription('기존 오류');
+    expect(childButton.closest('label')).toBeNull();
+    await user.tab();
+    expect(childButton).toHaveFocus();
   });
 });

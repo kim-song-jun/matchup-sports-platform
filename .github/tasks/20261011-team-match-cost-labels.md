@@ -1,6 +1,6 @@
 # Task 20261011: Team-match cost perspective labels
 
-Status: Implementation verified locally — PR and exact-head CI pending
+Status: PR #1583 P2 remediation verified locally — follow-up commit and exact-head CI pending
 **Owner**: delegated bug-fix session
 **Created**: 2026-10-03
 **Issue**: https://github.com/kim-song-jun/matchup-sports-platform/issues/1578
@@ -32,12 +32,13 @@ Make the payer perspective clear while preserving known amounts, free invitation
 ## Parallel Work Breakdown
 - Frontend: A/B/C comparison → explicit choice → minimal implementation → focused regression.
 - Read-only helper agent investigated both issues; product file is shared, so implementation is serial.
-- Owned: `apps/v1_web/src/components/team-matches/team-matches-page.tsx`, issue-specific tests, this task, issue-specific Changeset.
+- Owned: `apps/v1_web/src/components/team-matches/team-matches-page.tsx`, `apps/v1_web/src/components/team-matches/team-match-cost-explanation.test.tsx`, `apps/v1_web/src/components/v1-ui/create-form-fields.tsx`, this task, issue-specific Changeset. The shared field is included only for the optional input-description contract requested by PR #1583 review.
 - Forbidden: API/DB/contracts, shared global CSS, other session files, other unmerged PR code and protected QA data.
 
 ## Acceptance Criteria
 - [x] A/B/C standalone HTML delivered; user explicitly selected C before product implementation.
 - [x] Issue-specific focused rendered-view regression passes.
+- [x] Conditions/edit input focus exposes the applicant explanation as its accessible description; shared input/textarea descriptions merge with existing errors and use each field's ID.
 - [x] Lint/typecheck, six aggregate gates, scoped diff and Changeset policy pass.
 - [ ] Ready for review PR has base dev, Refs #1578, actual before images and exact-head CI.
 - [ ] Actual alpha after at the same fixture/width/conditions is recorded after approved deployment; issue remains open until original conditions pass.
@@ -72,3 +73,13 @@ No original private conversation/attachments, credentials, account identities or
 - Initial lint caught two new test assignments dropping detail-only fields from their TypeScript return shape. Tests now preserve the detail fields while applying the actual mapper. The changed 15-test file passed again, and corrected lint/typecheck/v1 pattern checks passed. Six QA gates and patch Changeset policy passed.
 - Mapper→detail/list cases cover 50,000/25,000, differential 50,000/10,000, 50,000/0 invitation, null and total-only. Actual condition/edit controls retain sequential edits and Back/cancel callback; preview and actual payload retain the original costNote and no shareMode. Existing 0/0 serialization caveat remains out of scope.
 - Actual alpha after, three-width wrapping, keyboard/scroll/fixed CTA, console/network, mode confirmation and full save/payment verification wait for separately approved deployment. No actual data write or local Next server.
+
+## PR #1583 P2 remediation — 2026-10-03
+- Read-only remote check found PR #1583 OPEN/Ready/base dev at `4b67ad8019d27247fafadc98917daaa308238d78`, with submitted review [5400040335](https://github.com/kim-song-jun/matchup-sports-platform/pull/1583#pullrequestreview-5400040335) on that head. General and inline comments were empty; Copilot review 5399992344 was a service error, not a code verdict.
+- The P2 was valid: the new cost explanation appeared as general `children`, while the actual input/textarea `aria-describedby` referenced only the error. The previous parent-text assertion did not prove the programmatic input-description relation.
+- `CreateField` now accepts optional `description`, renders it with `${fieldId}-description`, and references that ID together with `${fieldId}-error`. Ordinary children remain independent, labels/onChange/payloads stay unchanged, and only the existing cost input caller opts in. The explanation keeps the existing caption style and 8px margin.
+- RED: before product changes, `pnpm exec vitest run src/components/team-matches/team-match-cost-explanation.test.tsx --maxWorkers=1 --minWorkers=1 --reporter=dot` from `apps/v1_web` produced 5FAIL/14PASS (19 cases): actual condition/edit focused descriptions, input/textarea description+error merging, and generated description IDs failed.
+- GREEN: `pnpm --filter v1_web exec vitest run src/components/team-matches/team-match-cost-explanation.test.tsx src/components/v1-ui/create-form-fields.test.tsx --maxWorkers=1 --minWorkers=1 --reporter=dot` produced 2 files/28PASS (cost 19 + existing shared field 9). New contracts cover focus/Tab, accessible name/description, error ID merging, distinct generated IDs, description removal on rerender, and interactive children exclusion; sequential edits and Back/cancel callbacks remain covered.
+- Execution was serial with one worker after the parent's lint finished. No full suite, lint, browser, actual screen reader, API/data write or remote mutation was run by this delegated fix. Host preflight was recorded; the two owned dependency symlinks were removed after verification. Parent owns follow-up lint, the explicit five-path commit and current-head CI.
+- These are DOM/accessibility-name algorithm and local callback/payload regressions. Actual alpha after, real screen-reader speech, browser navigation, 0/0 null round-trip and fixture allocation mode remain unverified/out of scope.
+- Root independently read the actual submitted P2 and reviewed the five-path patch. The implementation helper ran the 28-test GREEN; root then ran corrected-tree lint/typecheck/v1 pattern, six required QA gates and Changeset policy, all PASS. The previous 176-test execution and CI on 4b67ad80 are historical checks; the new committed head requires fresh CI.

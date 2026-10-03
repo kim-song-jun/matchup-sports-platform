@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Fresh tablet reentry via actual team-create link",
+    "startedUTC": "2026-10-03T14:49:32.245Z",
+    "completedUTC": "2026-10-03T14:49:32.328Z"
+  },
+  {
+    "name": "Open optional 더 꾸미기 after reentry",
+    "startedUTC": "2026-10-03T14:49:32.995Z",
+    "completedUTC": "2026-10-03T14:49:33.273Z"
+  },
+  {
+    "name": "Focus blank 팀 소개 after reentry; no value input",
+    "startedUTC": "2026-10-03T14:49:33.322Z",
+    "completedUTC": "2026-10-03T14:49:33.588Z"
+  },
+  {
+    "name": "One native Tab from intro to level after reentry",
+    "startedUTC": "2026-10-03T14:49:33.666Z",
+    "completedUTC": "2026-10-03T14:49:33.736Z"
+  },
+  {
+    "name": "Exit untouched blank form with visible 이전 link",
+    "startedUTC": "2026-10-03T14:55:50.148Z",
+    "completedUTC": "2026-10-03T14:55:50.423Z"
+  }
+]

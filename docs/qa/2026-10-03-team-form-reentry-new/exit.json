@@ -1,0 +1,20 @@
+{
+  "createLinks": [
+    {
+      "href": "/teams/new",
+      "visible": false
+    },
+    {
+      "href": "/teams/new",
+      "visible": true
+    }
+  ],
+  "teamNameInputPresent": false,
+  "url": "https://alpha.teameet.co.kr/teams",
+  "utc": "2026-10-03T14:55:51.143Z",
+  "viewport": {
+    "dpr": 1.5,
+    "height": 505,
+    "width": 787
+  }
+}

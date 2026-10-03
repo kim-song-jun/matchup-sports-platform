@@ -1,0 +1,45 @@
+{
+  "scope": "Only the named tablet reentry supplement artifacts",
+  "files": [
+    {
+      "file": "1534-tablet-reentry-level.png",
+      "bytes": 47434,
+      "sha256": "9876c1c535106d321a255dc6c06a7a08fa3f731ebbebe6d0758e1a951802aaf4"
+    },
+    {
+      "file": "README.md",
+      "bytes": 3401,
+      "sha256": "6d191bf8507c2c8327c38b5484ad4ea1585429641ca52c54b4272d9048fdd112"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 831,
+      "sha256": "0809102ed1597a0ac5a35241b1b52057a83a41230731cc6a328ef4a0b90ac34c"
+    },
+    {
+      "file": "exit.json",
+      "bytes": 341,
+      "sha256": "8cb6c50ea1849275d9c12575e81bc6a1db1ab010c03597f3f326e197fd274eff"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 4152,
+      "sha256": "099db6878cfa0cd02e600740b8666b65fd96b74cdde1e2abe1b0c6262c5ee8bb"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 3722,
+      "sha256": "d9feecabe0ee8aa7e66550bf54ba23505b25342f2687dce99ba1d3ba59342454"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 2655,
+      "sha256": "fbd6fdae4136e21775b3532c190db47ebc77df69596ce2c901f64a04ef2a9738"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 2119,
+      "sha256": "590cf2d552a7a32e069979c816fc273b134c28bebd3a35ac07c4e438c10d6b66"
+    }
+  ]
+}

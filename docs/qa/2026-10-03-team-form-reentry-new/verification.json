@@ -1,0 +1,65 @@
+{
+  "verifiedUTC": "2026-10-03T14:59:57.700010+00:00",
+  "method": "Independent arithmetic and chronology from safe source artifacts; no new UI execution",
+  "counts": {
+    "focusDOM": 3,
+    "applicableFieldEndpoints": 2,
+    "BODYNotApplicable": 1,
+    "nativeTabMovesRecorded": 1,
+    "actionCallRecords": 5,
+    "exitSnapshots": 1,
+    "safePNGs": 1,
+    "testedViewports": 1
+  },
+  "geometry": [
+    {
+      "proofIndex": 1,
+      "tag": "TEXTAREA",
+      "withinViewportRecalculated": true,
+      "CTAAncestorIntersectionCSSSquared": 0.0,
+      "CTAButtonIntersectionCSSSquared": 0.0,
+      "gapAboveCTAAncestorCSS": 88,
+      "gapAboveCTAButtonCSS": 104.6666870117187
+    },
+    {
+      "proofIndex": 2,
+      "tag": "SELECT",
+      "withinViewportRecalculated": true,
+      "CTAAncestorIntersectionCSSSquared": 0.0,
+      "CTAButtonIntersectionCSSSquared": 0.0,
+      "gapAboveCTAAncestorCSS": 4,
+      "gapAboveCTAButtonCSS": 20.666687011718693
+    }
+  ],
+  "sourceHashesMatchProvenance": true,
+  "captureChronologyConsistent": true,
+  "sourceCropSizeConsistent": true,
+  "priorLocalSourceHashesUnchanged": true,
+  "safePNGIdenticalToEarlierTablet": true,
+  "reentryDOMUTC": "2026-10-03T14:49:32.972Z",
+  "nativeTabCall": {
+    "name": "One native Tab from intro to level after reentry",
+    "startedUTC": "2026-10-03T14:49:33.666Z",
+    "completedUTC": "2026-10-03T14:49:33.736Z"
+  },
+  "levelFocusDOMUTC": "2026-10-03T14:49:33.820Z",
+  "captureCall": {
+    "file": "1534-tablet-reentry-level.png",
+    "startedUTC": "2026-10-03T14:49:33.839Z",
+    "completedUTC": "2026-10-03T14:49:33.858Z",
+    "domUTC": "2026-10-03T14:49:33.820Z",
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    }
+  },
+  "exitUTC": "2026-10-03T14:55:51.143Z",
+  "limitations": [
+    "Action/capture timestamps describe collector call bounds, not browser event timestamps.",
+    "Elapsed time before exit is not navigation latency.",
+    "No original image bytes, deployment identity, network or database trace verified."
+  ]
+}

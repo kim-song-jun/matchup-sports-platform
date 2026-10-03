@@ -1,0 +1,90 @@
+{
+  "scope": "Safe tablet reentry supplement for issue1534 only",
+  "sourceCapture": [
+    {
+      "file": "1534-tablet-reentry-level.png",
+      "startedUTC": "2026-10-03T14:49:33.839Z",
+      "completedUTC": "2026-10-03T14:49:33.858Z",
+      "domUTC": "2026-10-03T14:49:33.820Z",
+      "url": "https://alpha.teameet.co.kr/teams/new",
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "width": 787
+      }
+    }
+  ],
+  "crop": {
+    "sourceBasename": "1534-tablet-reentry-level.png",
+    "sourceDimensions": [
+      787,
+      505
+    ],
+    "sourceSHA256": "ad5865368f24c8ccb2d810b0a525b5b9e4f4892190ac89dc08e3b5f23987d8db",
+    "cropBoundsPixels": [
+      104,
+      157,
+      684,
+      492
+    ],
+    "outputBasename": "1534-tablet-reentry-level.png",
+    "outputDimensions": [
+      580,
+      335
+    ],
+    "outputSHA256": "9876c1c535106d321a255dc6c06a7a08fa3f731ebbebe6d0758e1a951802aaf4",
+    "sourceCropPixelEquality": true
+  },
+  "safeFileSHA256": {
+    "1534-tablet-reentry-proof.json": "099db6878cfa0cd02e600740b8666b65fd96b74cdde1e2abe1b0c6262c5ee8bb",
+    "1534-tablet-reentry-actions.json": "0809102ed1597a0ac5a35241b1b52057a83a41230731cc6a328ef4a0b90ac34c",
+    "1534-tablet-reentry-exit.json": "8cb6c50ea1849275d9c12575e81bc6a1db1ab010c03597f3f326e197fd274eff",
+    "1534-tablet-reentry-summary.json": "4c8967edf7ff8bf978056c15c877aba31c6f4d5b4ef37c4579eb31a267043818",
+    "1534-tablet-reentry-level.png": "9876c1c535106d321a255dc6c06a7a08fa3f731ebbebe6d0758e1a951802aaf4"
+  },
+  "privacy": "Crop contains only blank team introduction, level/capacity default controls, and CTA. No member names, list, uploaded image, private fixture, or credential.",
+  "sourceInputFiles": [
+    {
+      "file": "1534-tablet-reentry-proof.json",
+      "bytes": 4152,
+      "sha256": "099db6878cfa0cd02e600740b8666b65fd96b74cdde1e2abe1b0c6262c5ee8bb"
+    },
+    {
+      "file": "1534-tablet-reentry-actions.json",
+      "bytes": 831,
+      "sha256": "0809102ed1597a0ac5a35241b1b52057a83a41230731cc6a328ef4a0b90ac34c"
+    },
+    {
+      "file": "1534-tablet-reentry-exit.json",
+      "bytes": 341,
+      "sha256": "8cb6c50ea1849275d9c12575e81bc6a1db1ab010c03597f3f326e197fd274eff"
+    },
+    {
+      "file": "1534-tablet-reentry-summary.json",
+      "bytes": 1682,
+      "sha256": "4c8967edf7ff8bf978056c15c877aba31c6f4d5b4ef37c4579eb31a267043818"
+    },
+    {
+      "file": "1534-tablet-reentry-provenance.json",
+      "bytes": 1722,
+      "sha256": "b0f7b7fb26321bf9555d1cd44bba0cfa598650ca13480ba8c3b6e9184d46519c"
+    },
+    {
+      "file": "1534-tablet-reentry-level.png",
+      "bytes": 47434,
+      "sha256": "9876c1c535106d321a255dc6c06a7a08fa3f731ebbebe6d0758e1a951802aaf4"
+    }
+  ],
+  "identicalEarlierImage": {
+    "priorCommit": "40bc047d7059b9658884144330559047f396691f",
+    "file": "docs/qa/2026-10-03-team-form-focus-new/1534-team-form-tablet-level.png",
+    "sameSafeBytes": true,
+    "sameRecordedFullSourceSHA256": true,
+    "priorCaptureStartedUTC": "2026-10-03T14:26:15.169Z",
+    "newCaptureStartedUTC": "2026-10-03T14:49:33.839Z",
+    "scope": "Collector attests a new screenshot call of an identical blank UI; publisher can verify safe bytes and recorded metadata, not independently date identical pixels."
+  },
+  "publisherReview": "Actual safe image pixels, JSON, hashes, crop dimensions, chronology and focus geometry reviewed. Original screenshot bytes were not read; original-to-crop pixel equality is collector-attested.",
+  "publicationProjection": "Proof, actions, exit and safe PNG bytes preserved. Summary removes unverified deployment attribution and adds narrow limits; provenance preserves source hashes. Source inputs unchanged."
+}

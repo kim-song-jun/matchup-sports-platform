@@ -1,0 +1,169 @@
+[
+  {
+    "active": {
+      "focusVisible": false,
+      "labels": [],
+      "rect": {
+        "bottom": 504.6666870117187,
+        "height": 504.6666870117187,
+        "right": 786.6666870117188,
+        "width": 786.6666870117188,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "BODY"
+    },
+    "activeOverlapsFixedCTA": null,
+    "activeWithinViewport": null,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "false",
+    "focusComparisonApplicable": false,
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:49:32.972Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-fresh-reentry-blank",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": []
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "팀 소개"
+      ],
+      "rect": {
+        "bottom": 328,
+        "height": 96,
+        "right": 656.6666870117188,
+        "width": 526.6666870117188,
+        "x": 130,
+        "y": 232
+      },
+      "tag": "TEXTAREA"
+    },
+    "activeOverlapsFixedCTA": false,
+    "activeWithinViewport": true,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "focusComparisonApplicable": true,
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:49:33.647Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-reentry-intro-focus",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - textbox \"팀 소개\" [active]:"
+    ]
+  },
+  {
+    "active": {
+      "focusVisible": true,
+      "labels": [
+        "레벨전체 레벨입문초보초보-중수중수중수-고수고수"
+      ],
+      "rect": {
+        "bottom": 412,
+        "height": 48,
+        "right": 387.3333358764648,
+        "width": 274,
+        "x": 113.33333587646484,
+        "y": 364
+      },
+      "tag": "SELECT"
+    },
+    "activeOverlapsFixedCTA": false,
+    "activeWithinViewport": true,
+    "ctas": [
+      {
+        "ancestorPosition": "fixed",
+        "ancestorRect": {
+          "bottom": 504.6666717529297,
+          "height": 88.66667175292969,
+          "right": 693.3333358764648,
+          "width": 600,
+          "x": 93.33333587646484,
+          "y": 416
+        },
+        "buttonRect": {
+          "bottom": 482.6666870117187,
+          "height": 50,
+          "right": 673.3333435058594,
+          "width": 368,
+          "x": 305.3333435058594,
+          "y": 432.6666870117187
+        }
+      }
+    ],
+    "decoratorExpanded": "true",
+    "focusComparisonApplicable": true,
+    "introEmpty": true,
+    "teamNameEmpty": true,
+    "url": "https://alpha.teameet.co.kr/teams/new",
+    "utc": "2026-10-03T14:49:33.820Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "width": 787
+    },
+    "step": "tablet-reentry-Tab-level",
+    "runtimeServingSHA": "unknown",
+    "axFocusLines": [
+      "  - combobox \"레벨\" [active]:"
+    ]
+  }
+]

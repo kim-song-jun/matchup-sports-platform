@@ -1,0 +1,50 @@
+{
+  "issue": 1534,
+  "relatedPR": 1539,
+  "scope": "New tablet reentry-only supplement. Original three-width evidence remains unchanged.",
+  "startedUTC": "2026-10-03T14:49:32.245Z",
+  "endedUTC": "2026-10-03T14:55:51.143Z",
+  "viewport": {
+    "width": 787,
+    "height": 505,
+    "dpr": 1.5
+  },
+  "url": "https://alpha.teameet.co.kr/teams/new",
+  "observations": {
+    "DOMRecords": 3,
+    "actionRecords": 5,
+    "initialBlankAttachedTextFields": true,
+    "initialOptionalExpanded": "false",
+    "afterExpandIntroActive": true,
+    "actualNativeTabToLevel": true,
+    "levelAXEndpoint": [
+      "  - combobox \"레벨\" [active]:"
+    ],
+    "levelFocusVisible": true,
+    "levelWithinViewport": true,
+    "levelOverlapsFixedCTA": false,
+    "levelBottomCSS": 412,
+    "fixedCTATopCSS": 416,
+    "gapCSS": 4,
+    "levelHeightCSS": 48,
+    "safeExitURL": "https://alpha.teameet.co.kr/teams"
+  },
+  "limits": [
+    "Only tablet reentry repetition was requested and executed; no new mobile or desktop pass is asserted.",
+    "No values were entered or changed. No save, create, upload, or Enter occurred.",
+    "Native Tab execution is captured in action timestamps; DOM and AX record its focus endpoint.",
+    "Label textContent includes option strings. Exact accessible endpoint is the captured combobox \"레벨\" AX line.",
+    "Original three-width observations and this supplement have different timestamps.",
+    "No network/DB trace was collected; server-write0 describes actions deliberately not performed, not a transport audit.",
+    "Runtime serving SHA is unknown.",
+    "The new capture has the same PNG bytes and reported full-source hash as the earlier tablet image; only the separately recorded DOM/action/capture metadata establishes the new observation sequence. Image pixels alone cannot identify a capture time.",
+    "Only two post-reentry field focus endpoints and one native Tab move are present. BODY is not an applicable field-focus endpoint.",
+    "DPR is 1.5; recorded source raster dimensions are 787×505, not a derived DPR-scaled size. The safe crop is 580×335 pixels.",
+    "No new initial keyboard traversal from the image chooser, Shift+Tab reversal, mobile reentry traversal, desktop reentry traversal, populated-form reset or screen-reader speech was performed."
+  ],
+  "previousEvidence": {
+    "commit": "40bc047d7059b9658884144330559047f396691f",
+    "readme": "https://github.com/kim-song-jun/matchup-sports-platform/blob/40bc047d7059b9658884144330559047f396691f/docs/qa/2026-10-03-team-form-focus-new/README.md",
+    "relationship": "Separate later tablet-only observation; prior files remain unchanged."
+  }
+}

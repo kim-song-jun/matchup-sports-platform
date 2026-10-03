@@ -1,0 +1,134 @@
+{
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 9360,
+      "sha256": "c111f9c5e466ea0df87016bd89bcbd83787dda56a6b62b48a4ecc997ac506657"
+    },
+    {
+      "file": "actions.json",
+      "bytes": 10518,
+      "sha256": "8c9dc3d27a48eb84afe9304b160550e7ffe8f3f8b41abfd151b2f47982d3ffcb"
+    },
+    {
+      "file": "deployment-context.json",
+      "bytes": 1905,
+      "sha256": "dc6abd31826cda87b44b02715619580328d71950ae83d3675026dacafc72854f"
+    },
+    {
+      "file": "desktop-consent-popup.png",
+      "bytes": 12917,
+      "sha256": "973cb68a91f64757aff6ad10a065bff09e76c649bda10b3e991b8aea201a38c0"
+    },
+    {
+      "file": "desktop-footer-reset.png",
+      "bytes": 22466,
+      "sha256": "6dcb1861786f167e3e91291e7aa69b6e644ee68a6932a360fa7aa8e04d411915"
+    },
+    {
+      "file": "desktop-order-focus.png",
+      "bytes": 22108,
+      "sha256": "9d87e0ef43b84f2bfe0a22e39c75dbafacd168580244f97c822d0dd203fecfed"
+    },
+    {
+      "file": "desktop-placement-changed.png",
+      "bytes": 21271,
+      "sha256": "67b975457836b9fab0794fd039e8bd36598b342ce87f5e033854a09f86302836"
+    },
+    {
+      "file": "desktop-placement-popup.png",
+      "bytes": 22019,
+      "sha256": "db4341dfb3572018f06ae12e5e9984525268b3a9f02d1cf91181ab3b63576c6c"
+    },
+    {
+      "file": "entry.json",
+      "bytes": 417,
+      "sha256": "cf82bbb47c42907be39c05271f34a11cde03344b9516b2a437c19a18a254d96c"
+    },
+    {
+      "file": "exit-and-reentry.json",
+      "bytes": 335,
+      "sha256": "044fd9039e453771343231b700fb19aecb109248d5c0739d444b64640c8b4da6"
+    },
+    {
+      "file": "final-local-state.json",
+      "bytes": 1025,
+      "sha256": "01267b316b9798e4612dc56deac6a30f81fa76121e34d39e741f0ac8f5105956"
+    },
+    {
+      "file": "mobile-consent-popup.png",
+      "bytes": 16290,
+      "sha256": "3a2a754e45dfc67a8abfee618429a3703bfaf15326dfed0d2daa1c4d30bba4e5"
+    },
+    {
+      "file": "mobile-footer-reset.png",
+      "bytes": 21697,
+      "sha256": "09ee8ac6613493a8a8a3136dbb86c4740d93ee6369d282f696afb9c149eb9992"
+    },
+    {
+      "file": "mobile-order-focus.png",
+      "bytes": 21335,
+      "sha256": "1586a98437316150db578613ae914f1564b725a3df6d1b6327436ec33cd0d112"
+    },
+    {
+      "file": "mobile-placement-changed.png",
+      "bytes": 20116,
+      "sha256": "3e7cad2f0f3fcbad5a3f13366aae60686bce9e7ee86365e9abae9f2afa4fd2e3"
+    },
+    {
+      "file": "mobile-placement-popup.png",
+      "bytes": 26147,
+      "sha256": "75be4d01817b65b8dc6d6d8a2b695d188fce8983a9f0cd681fd472f633789d39"
+    },
+    {
+      "file": "names.json",
+      "bytes": 775,
+      "sha256": "e42b1ea802c629b6d3d46d0d8ace46666431736efd3d1508a99270f3c5c094bc"
+    },
+    {
+      "file": "proof.json",
+      "bytes": 249129,
+      "sha256": "381ded66181e9176e58944b20539850f4640f26849586d1b7b2c6866bad917ba"
+    },
+    {
+      "file": "provenance.json",
+      "bytes": 18809,
+      "sha256": "613e2c9fbdccc6d1b286d231c497303563562c3e97d6ccaa41133d216b91b799"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 13213,
+      "sha256": "57c42d22fcc02f02a1915d94d2b871cb0a5e990dfd7a0449c37bc99f434efd13"
+    },
+    {
+      "file": "tablet-consent-popup.png",
+      "bytes": 21200,
+      "sha256": "0d1698dbcaa5274b6d8f5795111acb283c172ff21f805a36ea796f7058cbff08"
+    },
+    {
+      "file": "tablet-footer-reset.png",
+      "bytes": 19012,
+      "sha256": "85e69fedd8a6681c7e70cff21c034d8470ab628ee36d4e8bce125bae3520a711"
+    },
+    {
+      "file": "tablet-order-focus.png",
+      "bytes": 19712,
+      "sha256": "02d3fedb49c325ed4c26ae01f2114c93d6acf1a2c32541b9d04a426e5028dbac"
+    },
+    {
+      "file": "tablet-placement-changed.png",
+      "bytes": 17858,
+      "sha256": "bc4cae10029a7435a914ac7c683569e52fe1c2e25b0b627b93232db574f800b0"
+    },
+    {
+      "file": "tablet-placement-popup.png",
+      "bytes": 35023,
+      "sha256": "60adcc1b8a75a82615d0477006e6c6b4fce29ff07a712b242225c593ba6fe416"
+    },
+    {
+      "file": "verification.json",
+      "bytes": 31017,
+      "sha256": "5353e65b37ba723d980afd79e5351146082be3bed39c4df4df04b518a605dd7b"
+    }
+  ]
+}

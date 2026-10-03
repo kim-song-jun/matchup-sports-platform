@@ -1,0 +1,13 @@
+{
+  "firstExit": {
+    "utc": "2026-10-03T16:53:45.766Z",
+    "url": "https://alpha.teameet.co.kr/admin/content?tab=terms",
+    "newPolicyHeadingCount": 0
+  },
+  "reentryProofIndex": 60,
+  "finalExit": {
+    "utc": "2026-10-03T16:53:47.523Z",
+    "url": "https://alpha.teameet.co.kr/admin/content",
+    "newPolicyHeadingCount": 0
+  }
+}

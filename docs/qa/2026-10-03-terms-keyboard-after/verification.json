@@ -1,0 +1,1240 @@
+{
+  "verifiedUTC": "2026-10-03T17:06:13.246370+00:00",
+  "method": "Independent safe-artifact recalculation and actual safe-pixel review; no additional browser execution",
+  "counts": {
+    "keyboardDOMRows": 60,
+    "freshReentryDOMRows": 1,
+    "selectedActionRecords": 67,
+    "namedControlQuerySnapshots": 3,
+    "safePNGs": 15,
+    "nativePopupPNGs": 6,
+    "responsiveWidths": 3
+  },
+  "sequences": [
+    {
+      "layout": "mobile",
+      "firstUTC": "2026-10-03T16:49:45.783Z",
+      "lastUTC": "2026-10-03T16:51:00.822Z",
+      "placementValues": [
+        "signup",
+        "tournament_application",
+        "signup"
+      ],
+      "placementArrowScrollY": [
+        1922.4000244140625,
+        1922.4000244140625,
+        1922.4000244140625
+      ],
+      "scrollYDeltaAtOrderTab": 3.199951171875,
+      "orderProofIndex": 17,
+      "orderBorderBottomCSS": 605.625,
+      "orderBottomClearanceCSS": 0.375,
+      "keyboardDOMRows": 20
+    },
+    {
+      "layout": "tablet",
+      "firstUTC": "2026-10-03T16:51:41.179Z",
+      "lastUTC": "2026-10-03T16:52:06.237Z",
+      "placementValues": [
+        "signup",
+        "tournament_application",
+        "signup"
+      ],
+      "placementArrowScrollY": [
+        1837.3333740234375,
+        1837.3333740234375,
+        1837.3333740234375
+      ],
+      "scrollYDeltaAtOrderTab": 0.0,
+      "orderProofIndex": 37,
+      "orderBorderBottomCSS": 406.3333435058594,
+      "orderBottomClearanceCSS": 98.66665649414062,
+      "keyboardDOMRows": 20
+    },
+    {
+      "layout": "desktop",
+      "firstUTC": "2026-10-03T16:52:38.571Z",
+      "lastUTC": "2026-10-03T16:53:03.831Z",
+      "placementValues": [
+        "signup",
+        "tournament_application",
+        "signup"
+      ],
+      "placementArrowScrollY": [
+        1677,
+        1677,
+        1677
+      ],
+      "scrollYDeltaAtOrderTab": 0,
+      "orderProofIndex": 57,
+      "orderBorderBottomCSS": 532,
+      "orderBottomClearanceCSS": 225,
+      "keyboardDOMRows": 20
+    }
+  ],
+  "keyboardEndpoints": [
+    {
+      "proofIndex": 0,
+      "actionIndex": 1,
+      "utc": "2026-10-03T16:49:45.783Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 1,
+      "actionIndex": 2,
+      "utc": "2026-10-03T16:49:46.049Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 2,
+      "actionIndex": 3,
+      "utc": "2026-10-03T16:49:46.324Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 3,
+      "actionIndex": 4,
+      "utc": "2026-10-03T16:50:26.729Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 4,
+      "actionIndex": 5,
+      "utc": "2026-10-03T16:50:26.984Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 5,
+      "actionIndex": 6,
+      "utc": "2026-10-03T16:50:27.237Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 6,
+      "actionIndex": 7,
+      "utc": "2026-10-03T16:50:27.482Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 7,
+      "actionIndex": 8,
+      "utc": "2026-10-03T16:50:27.803Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 8,
+      "actionIndex": 9,
+      "utc": "2026-10-03T16:50:28.067Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 9,
+      "actionIndex": 10,
+      "utc": "2026-10-03T16:50:28.313Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "footer",
+        "display_only",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 10,
+      "actionIndex": 11,
+      "utc": "2026-10-03T16:50:28.579Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 11,
+      "actionIndex": 12,
+      "utc": "2026-10-03T16:50:28.832Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 12,
+      "actionIndex": 13,
+      "utc": "2026-10-03T16:50:43.628Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 13,
+      "actionIndex": 14,
+      "utc": "2026-10-03T16:50:59.054Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 14,
+      "actionIndex": 15,
+      "utc": "2026-10-03T16:50:59.300Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 15,
+      "actionIndex": 16,
+      "utc": "2026-10-03T16:50:59.569Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 16,
+      "actionIndex": 17,
+      "utc": "2026-10-03T16:50:59.877Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1922.4000244140625
+    },
+    {
+      "proofIndex": 17,
+      "actionIndex": 18,
+      "utc": "2026-10-03T16:51:00.144Z",
+      "focusedControl": "노출 순서",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1925.5999755859375
+    },
+    {
+      "proofIndex": 18,
+      "actionIndex": 19,
+      "utc": "2026-10-03T16:51:00.491Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1925.5999755859375
+    },
+    {
+      "proofIndex": 19,
+      "actionIndex": 20,
+      "utc": "2026-10-03T16:51:00.822Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1925.5999755859375
+    },
+    {
+      "proofIndex": 20,
+      "actionIndex": 22,
+      "utc": "2026-10-03T16:51:41.179Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 21,
+      "actionIndex": 23,
+      "utc": "2026-10-03T16:51:41.453Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 22,
+      "actionIndex": 24,
+      "utc": "2026-10-03T16:51:41.744Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 23,
+      "actionIndex": 25,
+      "utc": "2026-10-03T16:51:42.010Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 24,
+      "actionIndex": 26,
+      "utc": "2026-10-03T16:51:42.294Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 25,
+      "actionIndex": 27,
+      "utc": "2026-10-03T16:51:42.566Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 26,
+      "actionIndex": 28,
+      "utc": "2026-10-03T16:51:42.826Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 27,
+      "actionIndex": 29,
+      "utc": "2026-10-03T16:51:43.156Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 28,
+      "actionIndex": 30,
+      "utc": "2026-10-03T16:51:43.419Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 29,
+      "actionIndex": 31,
+      "utc": "2026-10-03T16:51:43.697Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "footer",
+        "display_only",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 30,
+      "actionIndex": 32,
+      "utc": "2026-10-03T16:51:43.989Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 31,
+      "actionIndex": 33,
+      "utc": "2026-10-03T16:51:44.275Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 32,
+      "actionIndex": 34,
+      "utc": "2026-10-03T16:52:04.145Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 33,
+      "actionIndex": 35,
+      "utc": "2026-10-03T16:52:04.466Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 34,
+      "actionIndex": 36,
+      "utc": "2026-10-03T16:52:04.740Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 35,
+      "actionIndex": 37,
+      "utc": "2026-10-03T16:52:04.991Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 36,
+      "actionIndex": 38,
+      "utc": "2026-10-03T16:52:05.283Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 37,
+      "actionIndex": 39,
+      "utc": "2026-10-03T16:52:05.564Z",
+      "focusedControl": "노출 순서",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 38,
+      "actionIndex": 40,
+      "utc": "2026-10-03T16:52:05.916Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 39,
+      "actionIndex": 41,
+      "utc": "2026-10-03T16:52:06.237Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1837.3333740234375
+    },
+    {
+      "proofIndex": 40,
+      "actionIndex": 43,
+      "utc": "2026-10-03T16:52:38.571Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 41,
+      "actionIndex": 44,
+      "utc": "2026-10-03T16:52:38.880Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 42,
+      "actionIndex": 45,
+      "utc": "2026-10-03T16:52:39.196Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 43,
+      "actionIndex": 46,
+      "utc": "2026-10-03T16:52:39.486Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 44,
+      "actionIndex": 47,
+      "utc": "2026-10-03T16:52:39.782Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 45,
+      "actionIndex": 48,
+      "utc": "2026-10-03T16:52:40.064Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 46,
+      "actionIndex": 49,
+      "utc": "2026-10-03T16:52:40.343Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 47,
+      "actionIndex": 50,
+      "utc": "2026-10-03T16:52:40.693Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "optional",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 48,
+      "actionIndex": 51,
+      "utc": "2026-10-03T16:52:40.979Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 49,
+      "actionIndex": 52,
+      "utc": "2026-10-03T16:52:41.254Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "footer",
+        "display_only",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 50,
+      "actionIndex": 53,
+      "utc": "2026-10-03T16:52:41.552Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "tournament_application",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 51,
+      "actionIndex": 54,
+      "utc": "2026-10-03T16:52:41.813Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 52,
+      "actionIndex": 55,
+      "utc": "2026-10-03T16:53:01.637Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 53,
+      "actionIndex": 56,
+      "utc": "2026-10-03T16:53:01.957Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 54,
+      "actionIndex": 57,
+      "utc": "2026-10-03T16:53:02.252Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 55,
+      "actionIndex": 58,
+      "utc": "2026-10-03T16:53:02.518Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 56,
+      "actionIndex": 59,
+      "utc": "2026-10-03T16:53:02.847Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 57,
+      "actionIndex": 60,
+      "utc": "2026-10-03T16:53:03.122Z",
+      "focusedControl": "노출 순서",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 58,
+      "actionIndex": 61,
+      "utc": "2026-10-03T16:53:03.483Z",
+      "focusedControl": "동의 유형",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    },
+    {
+      "proofIndex": 59,
+      "actionIndex": 62,
+      "utc": "2026-10-03T16:53:03.831Z",
+      "focusedControl": "노출 위치",
+      "values": [
+        "signup",
+        "required",
+        "0"
+      ],
+      "focusVisible": true,
+      "withinEditor": true,
+      "focusedBorderWithinViewport": true,
+      "scrollY": 1677
+    }
+  ],
+  "images": [
+    {
+      "file": "mobile-placement-changed.png",
+      "proofIndex": 1,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:49:46.049Z",
+      "captureStartedUTC": "2026-10-03T16:49:46.137Z",
+      "captureCompletedUTC": "2026-10-03T16:49:46.155Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        332,
+        218
+      ],
+      "safeSHA256": "3e7cad2f0f3fcbad5a3f13366aae60686bce9e7ee86365e9abae9f2afa4fd2e3"
+    },
+    {
+      "file": "mobile-footer-reset.png",
+      "proofIndex": 9,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:50:28.313Z",
+      "captureStartedUTC": "2026-10-03T16:50:28.391Z",
+      "captureCompletedUTC": "2026-10-03T16:50:28.406Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        332,
+        218
+      ],
+      "safeSHA256": "09ee8ac6613493a8a8a3136dbb86c4740d93ee6369d282f696afb9c149eb9992"
+    },
+    {
+      "file": "mobile-order-focus.png",
+      "proofIndex": 17,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:51:00.144Z",
+      "captureStartedUTC": "2026-10-03T16:51:00.225Z",
+      "captureCompletedUTC": "2026-10-03T16:51:00.245Z",
+      "sourceRasterPixels": [
+        402,
+        605
+      ],
+      "safeRasterPixels": [
+        332,
+        218
+      ],
+      "safeSHA256": "1586a98437316150db578613ae914f1564b725a3df6d1b6327436ec33cd0d112"
+    },
+    {
+      "file": "mobile-placement-popup.png",
+      "proofIndex": 12,
+      "captureSource": "native desktop screenshot",
+      "domUTC": "2026-10-03T16:50:43.628Z",
+      "captureStartedUTC": "2026-10-03T16:50:43.712Z",
+      "captureCompletedUTC": "2026-10-03T16:50:43.760Z",
+      "sourceRasterPixels": [
+        1364,
+        1024
+      ],
+      "safeRasterPixels": [
+        409,
+        182
+      ],
+      "safeSHA256": "75be4d01817b65b8dc6d6d8a2b695d188fce8983a9f0cd681fd472f633789d39"
+    },
+    {
+      "file": "mobile-consent-popup.png",
+      "proofIndex": 15,
+      "captureSource": "native desktop screenshot",
+      "domUTC": "2026-10-03T16:50:59.569Z",
+      "captureStartedUTC": "2026-10-03T16:50:59.660Z",
+      "captureCompletedUTC": "2026-10-03T16:50:59.707Z",
+      "sourceRasterPixels": [
+        1364,
+        1024
+      ],
+      "safeRasterPixels": [
+        409,
+        148
+      ],
+      "safeSHA256": "3a2a754e45dfc67a8abfee618429a3703bfaf15326dfed0d2daa1c4d30bba4e5"
+    },
+    {
+      "file": "tablet-placement-changed.png",
+      "proofIndex": 21,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:51:41.453Z",
+      "captureStartedUTC": "2026-10-03T16:51:41.539Z",
+      "captureCompletedUTC": "2026-10-03T16:51:41.563Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        633,
+        78
+      ],
+      "safeSHA256": "bc4cae10029a7435a914ac7c683569e52fe1c2e25b0b627b93232db574f800b0"
+    },
+    {
+      "file": "tablet-footer-reset.png",
+      "proofIndex": 29,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:51:43.697Z",
+      "captureStartedUTC": "2026-10-03T16:51:43.783Z",
+      "captureCompletedUTC": "2026-10-03T16:51:43.806Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        633,
+        78
+      ],
+      "safeSHA256": "85e69fedd8a6681c7e70cff21c034d8470ab628ee36d4e8bce125bae3520a711"
+    },
+    {
+      "file": "tablet-order-focus.png",
+      "proofIndex": 37,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:52:05.564Z",
+      "captureStartedUTC": "2026-10-03T16:52:05.651Z",
+      "captureCompletedUTC": "2026-10-03T16:52:05.681Z",
+      "sourceRasterPixels": [
+        787,
+        504
+      ],
+      "safeRasterPixels": [
+        633,
+        78
+      ],
+      "safeSHA256": "02d3fedb49c325ed4c26ae01f2114c93d6acf1a2c32541b9d04a426e5028dbac"
+    },
+    {
+      "file": "tablet-placement-popup.png",
+      "proofIndex": 32,
+      "captureSource": "native desktop screenshot",
+      "domUTC": "2026-10-03T16:52:04.145Z",
+      "captureStartedUTC": "2026-10-03T16:52:04.241Z",
+      "captureCompletedUTC": "2026-10-03T16:52:04.289Z",
+      "sourceRasterPixels": [
+        1364,
+        1024
+      ],
+      "safeRasterPixels": [
+        401,
+        220
+      ],
+      "safeSHA256": "60adcc1b8a75a82615d0477006e6c6b4fce29ff07a712b242225c593ba6fe416"
+    },
+    {
+      "file": "tablet-consent-popup.png",
+      "proofIndex": 35,
+      "captureSource": "native desktop screenshot",
+      "domUTC": "2026-10-03T16:52:04.991Z",
+      "captureStartedUTC": "2026-10-03T16:52:05.070Z",
+      "captureCompletedUTC": "2026-10-03T16:52:05.111Z",
+      "sourceRasterPixels": [
+        1364,
+        1024
+      ],
+      "safeRasterPixels": [
+        400,
+        183
+      ],
+      "safeSHA256": "0d1698dbcaa5274b6d8f5795111acb283c172ff21f805a36ea796f7058cbff08"
+    },
+    {
+      "file": "desktop-placement-changed.png",
+      "proofIndex": 41,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:52:38.880Z",
+      "captureStartedUTC": "2026-10-03T16:52:38.982Z",
+      "captureCompletedUTC": "2026-10-03T16:52:39.013Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        771,
+        74
+      ],
+      "safeSHA256": "67b975457836b9fab0794fd039e8bd36598b342ce87f5e033854a09f86302836"
+    },
+    {
+      "file": "desktop-footer-reset.png",
+      "proofIndex": 49,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:52:41.254Z",
+      "captureStartedUTC": "2026-10-03T16:52:41.345Z",
+      "captureCompletedUTC": "2026-10-03T16:52:41.371Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        771,
+        74
+      ],
+      "safeSHA256": "6dcb1861786f167e3e91291e7aa69b6e644ee68a6932a360fa7aa8e04d411915"
+    },
+    {
+      "file": "desktop-order-focus.png",
+      "proofIndex": 57,
+      "captureSource": "browser tab screenshot",
+      "domUTC": "2026-10-03T16:53:03.122Z",
+      "captureStartedUTC": "2026-10-03T16:53:03.218Z",
+      "captureCompletedUTC": "2026-10-03T16:53:03.239Z",
+      "sourceRasterPixels": [
+        1181,
+        757
+      ],
+      "safeRasterPixels": [
+        771,
+        74
+      ],
+      "safeSHA256": "9d87e0ef43b84f2bfe0a22e39c75dbafacd168580244f97c822d0dd203fecfed"
+    },
+    {
+      "file": "desktop-placement-popup.png",
+      "proofIndex": 52,
+      "captureSource": "native desktop screenshot",
+      "domUTC": "2026-10-03T16:53:01.637Z",
+      "captureStartedUTC": "2026-10-03T16:53:01.731Z",
+      "captureCompletedUTC": "2026-10-03T16:53:01.779Z",
+      "sourceRasterPixels": [
+        1364,
+        1024
+      ],
+      "safeRasterPixels": [
+        342,
+        156
+      ],
+      "safeSHA256": "db4341dfb3572018f06ae12e5e9984525268b3a9f02d1cf91181ab3b63576c6c"
+    },
+    {
+      "file": "desktop-consent-popup.png",
+      "proofIndex": 55,
+      "captureSource": "native desktop screenshot",
+      "domUTC": "2026-10-03T16:53:02.518Z",
+      "captureStartedUTC": "2026-10-03T16:53:02.615Z",
+      "captureCompletedUTC": "2026-10-03T16:53:02.659Z",
+      "sourceRasterPixels": [
+        1364,
+        1024
+      ],
+      "safeRasterPixels": [
+        339,
+        130
+      ],
+      "safeSHA256": "973cb68a91f64757aff6ad10a065bff09e76c649bda10b3e991b8aea201a38c0"
+    }
+  ],
+  "deploymentBoundary": "2026-10-03T16:52:38Z",
+  "DOMRowsBeforeBoundary": 40,
+  "DOMRowsAtOrAfterBoundary": 21,
+  "runtimeServingSHA": "unknown",
+  "blankFieldCoverage": "Only observed body textarea; not all free-text inputs",
+  "firstExitURLIsStillTerms": true
+}

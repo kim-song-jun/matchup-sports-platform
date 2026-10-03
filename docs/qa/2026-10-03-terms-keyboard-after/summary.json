@@ -1,0 +1,386 @@
+{
+  "issue": 1464,
+  "fixedByPR": 1589,
+  "url": "https://alpha.teameet.co.kr/admin/content?tab=terms",
+  "scope": "Fresh live after of original terms-creation select focus regression, plus consent reset and native popup/Tab checks; local draft only.",
+  "before": "https://github.com/kim-song-jun/matchup-sports-platform/blob/67e0c72e1a18241a4383f274159b778b324d3613/docs/qa/2026-10-03-terms-keyboard-residual/README.md",
+  "entry": {
+    "entryStartedUTC": "2026-10-03T16:47:40.916Z",
+    "entryCompletedUTC": "2026-10-03T16:47:41.237Z",
+    "url": "https://alpha.teameet.co.kr/admin/content?tab=terms",
+    "runtimeServingSHA": "unknown",
+    "navigationScope": "Only initial full-navigation call bounds recorded. Collector reports no later reload/goto; subsequent hub-tab operations are SPA actions.",
+    "deploymentContextFile": "deployment-context.json"
+  },
+  "firstKeyboardUTC": "2026-10-03T16:49:45.783Z",
+  "lastKeyboardUTC": "2026-10-03T16:53:03.831Z",
+  "endedUTC": "2026-10-03T16:53:47.523Z",
+  "runtimeServingSHA": "unknown",
+  "counts": {
+    "keyboardDOMRows": 60,
+    "freshReentryDOMRows": 1,
+    "totalDOMRows": 61,
+    "selectedActionRecords": 67,
+    "safePNGs": 15,
+    "nativePopupPNGs": 6
+  },
+  "sequences": [
+    {
+      "layout": "mobile",
+      "indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 606,
+        "scrollWidth": 402,
+        "scrollY": 1922.4000244140625,
+        "width": 402
+      },
+      "placementSequence": [
+        {
+          "index": 0,
+          "utc": "2026-10-03T16:49:45.783Z",
+          "value": "signup",
+          "activeTag": "SELECT",
+          "activeValue": "signup",
+          "scrollY": 1922.4000244140625
+        },
+        {
+          "index": 1,
+          "utc": "2026-10-03T16:49:46.049Z",
+          "value": "tournament_application",
+          "activeTag": "SELECT",
+          "activeValue": "tournament_application",
+          "scrollY": 1922.4000244140625
+        },
+        {
+          "index": 2,
+          "utc": "2026-10-03T16:49:46.324Z",
+          "value": "signup",
+          "activeTag": "SELECT",
+          "activeValue": "signup",
+          "scrollY": 1922.4000244140625
+        }
+      ],
+      "consentResetIndices": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "SpaceEscapeIndices": [
+        12,
+        13,
+        15,
+        16
+      ],
+      "TabShiftTabIndices": [
+        3,
+        7,
+        14,
+        17,
+        18,
+        19
+      ],
+      "orderRect": {
+        "bottom": 605.625,
+        "height": 44,
+        "right": 357.6000175476074,
+        "width": 312.8000183105469,
+        "x": 44.79999923706055,
+        "y": 561.625
+      },
+      "orderLabelRect": {
+        "bottom": 605.625,
+        "height": 68,
+        "right": 357.6000175476074,
+        "width": 312.8000183105469,
+        "x": 44.79999923706055,
+        "y": 537.625
+      },
+      "orderWithinViewport": true,
+      "orderBottomClearanceCSS": 0.375,
+      "all20ActiveControlsRemainWithinEditor": true,
+      "all20FocusVisible": true
+    },
+    {
+      "layout": "tablet",
+      "indices": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "viewport": {
+        "dpr": 1.5,
+        "height": 505,
+        "scrollWidth": 787,
+        "scrollY": 1837.3333740234375,
+        "width": 787
+      },
+      "placementSequence": [
+        {
+          "index": 20,
+          "utc": "2026-10-03T16:51:41.179Z",
+          "value": "signup",
+          "activeTag": "SELECT",
+          "activeValue": "signup",
+          "scrollY": 1837.3333740234375
+        },
+        {
+          "index": 21,
+          "utc": "2026-10-03T16:51:41.453Z",
+          "value": "tournament_application",
+          "activeTag": "SELECT",
+          "activeValue": "tournament_application",
+          "scrollY": 1837.3333740234375
+        },
+        {
+          "index": 22,
+          "utc": "2026-10-03T16:51:41.744Z",
+          "value": "signup",
+          "activeTag": "SELECT",
+          "activeValue": "signup",
+          "scrollY": 1837.3333740234375
+        }
+      ],
+      "consentResetIndices": [
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "SpaceEscapeIndices": [
+        32,
+        33,
+        35,
+        36
+      ],
+      "TabShiftTabIndices": [
+        23,
+        27,
+        34,
+        37,
+        38,
+        39
+      ],
+      "orderRect": {
+        "bottom": 406.3333435058594,
+        "height": 44,
+        "right": 672.9166870117188,
+        "width": 90,
+        "x": 582.9166870117188,
+        "y": 362.3333435058594
+      },
+      "orderLabelRect": {
+        "bottom": 406.3333435058594,
+        "height": 68,
+        "right": 672.9166870117188,
+        "width": 90,
+        "x": 582.9166870117188,
+        "y": 338.3333435058594
+      },
+      "orderWithinViewport": true,
+      "orderBottomClearanceCSS": 98.66665649414062,
+      "all20ActiveControlsRemainWithinEditor": true,
+      "all20FocusVisible": true
+    },
+    {
+      "layout": "desktop",
+      "indices": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
+      ],
+      "viewport": {
+        "dpr": 1,
+        "height": 757,
+        "scrollWidth": 1181,
+        "scrollY": 1677,
+        "width": 1181
+      },
+      "placementSequence": [
+        {
+          "index": 40,
+          "utc": "2026-10-03T16:52:38.571Z",
+          "value": "signup",
+          "activeTag": "SELECT",
+          "activeValue": "signup",
+          "scrollY": 1677
+        },
+        {
+          "index": 41,
+          "utc": "2026-10-03T16:52:38.880Z",
+          "value": "tournament_application",
+          "activeTag": "SELECT",
+          "activeValue": "tournament_application",
+          "scrollY": 1677
+        },
+        {
+          "index": 42,
+          "utc": "2026-10-03T16:52:39.196Z",
+          "value": "signup",
+          "activeTag": "SELECT",
+          "activeValue": "signup",
+          "scrollY": 1677
+        }
+      ],
+      "consentResetIndices": [
+        46,
+        47,
+        48,
+        49,
+        50,
+        51
+      ],
+      "SpaceEscapeIndices": [
+        52,
+        53,
+        55,
+        56
+      ],
+      "TabShiftTabIndices": [
+        43,
+        47,
+        54,
+        57,
+        58,
+        59
+      ],
+      "orderRect": {
+        "bottom": 532,
+        "height": 44,
+        "right": 1058.25,
+        "width": 90,
+        "x": 968.25,
+        "y": 488
+      },
+      "orderLabelRect": {
+        "bottom": 532,
+        "height": 68,
+        "right": 1058.25,
+        "width": 90,
+        "x": 968.25,
+        "y": 464
+      },
+      "orderWithinViewport": true,
+      "orderBottomClearanceCSS": 225,
+      "all20ActiveControlsRemainWithinEditor": true,
+      "all20FocusVisible": true
+    }
+  ],
+  "confirmed": [
+    "At every width, signup→tournament_application→signup uses consecutive native Down/Up without refocusing. Active SELECT and focus-visible remain on placement; no BODY endpoint occurred.",
+    "Consent required→optional→required retains SELECT focus. With optional set, changing placement resets consent to required; footer resets to display_only; returning to ordinary placements resets required.",
+    "Both native select popups were opened with Space, directly photographed on the desktop, then dismissed with Escape while preserving selected values and select focus.",
+    "Tab moves placement→consent→order; ShiftTab returns order→consent→placement. This is the named control subsequence, not a full-panel keyboard cycle.",
+    "Exact-role queries find one combobox named 노출 위치, one combobox named 동의 유형 and one spinbutton named 노출 순서 at each width. Visible labels are shown in safe crops.",
+    "All three inputs are44CSSpx high. Mobile stacks them; tablet/desktop align them in a row.",
+    "Final local placement/consent/order values are signup/required/0. The first notices-tab action is followed by a no-creation-heading snapshot with the old terms URL still present. A subsequent fresh local editor records defaults and an empty observed body textarea. Final route is /admin/content with no creation heading."
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "description": "Fresh navigation and empty terms creation panel",
+      "health": "Reached after deployment without authentication or permission changes."
+    },
+    {
+      "step": 2,
+      "description": "Mobile402×606 native keyboard sequence",
+      "health": "Original focus loss no longer reproduced; consent reset and popup closure confirmed."
+    },
+    {
+      "step": 3,
+      "description": "Tablet787×505 same sequence",
+      "health": "Focus and values preserved through required sequence."
+    },
+    {
+      "step": 4,
+      "description": "Desktop1181×757 same sequence",
+      "health": "Focus and values preserved through required sequence; UTC crosses later deployment boundary without reload attribution."
+    },
+    {
+      "step": 5,
+      "description": "Hub-tab exit, fresh local reentry and final exit",
+      "health": "Local default controls restored; no save or policy creation."
+    }
+  ],
+  "limitations": [
+    "Source tab raster is402×605 mobile and787×504 tablet while DOM innerHeight is606 and505. Keep raster dimensions distinct from CSS viewport; do not pad the captured image.",
+    "Browser window resizing/zoom measures CSS widths; no mobile device virtual keyboard or screen-reader speech test. Before widths405/789/1183 differ slightly from current402/787/1181; these are the same responsive regimes, not exact pixel-identical conditions.",
+    "DOM and active AX endpoints establish focus retention, not React identity or remount cause.",
+    "Wrapping labels have blank input id/for and labels.textContent includes option strings; exact-role names and AX lines establish accessible names. Do not claim label-for/id pairs were added.",
+    "blankDraftFields collector matches input[type=text] plus textarea. These inputs omit the type attribute, so the recorded empty-field arrays contain only the body textarea. allObservedFreeTextBlank does not prove all editor fields are empty. No typing was performed, but broad hidden-field/storage reset is not asserted.",
+    "The version defaults to v1.1; it was not edited. Consent changes are local placement configuration, not legal consent by a user.",
+    "Mobile order border box ends605.625 in606px viewport (0.375px clearance). The bottom focus outline may touch/clip at the viewport edge; do not claim generous focus-ring clearance.",
+    "Save/create/publish/archive/agree actions, Enter, exposure-checkbox changes, server writes and inquiries were not performed. This is a collection attestation, not an HTTP/database audit.",
+    "Only original fresh page navigation bounds are recorded in entry.json. URL-based hub tab navigation occurred within the same SPA; no runtime serving SHA is exposed.",
+    "No PR1590 or1591/1592 behavior is certified by this bundle.",
+    "Action timestamps record supported input calls rather than authenticated browser-event telemetry; native popup pixels are captured separately from DOM values.",
+    "Initial mobile order control before it received focus extends to608.825012px in a606px viewport. Tab to order scrolls the page about3.2px, yielding border bottom605.625px. Only the focused endpoint fits; all controls were not wholly visible at every mobile snapshot.",
+    "No node identity equality reference was captured. Stable DOM/AX focus endpoints do not prove React component identity or the implementation cause.",
+    "First exit URL remains the terms URL in its early snapshot; do not report that snapshot as a settled notices route. Only the final exit establishes /admin/content.",
+    "Native popup crops are from1364×1024 desktop rasters. Their pixel dimensions are not CSS control widths; browser-tab crops have separate raster dimensions.",
+    "final-local-state timestamp16:53:45.486Z accompanies values derived from proof59 at16:53:03.831Z; it is not another fresh DOM sample.",
+    "Exact-name query expressions are collector-reported, while names.json stores only count fields. AX endpoints separately support the control names."
+  ],
+  "deploymentContextFile": "deployment-context.json",
+  "deploymentInterpretation": "Initial page navigation follows the successful6d2e45a workflow and precedes the8ec820c workflow update16:52:38Z. Mobile/tablet observations occur before that later boundary; desktop begins16:52:38.571Z in the existing page without a reported reload. Neither cohort establishes runtime serving SHA or loaded bundle identity."
+}

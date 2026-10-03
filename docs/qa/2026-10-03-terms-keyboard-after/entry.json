@@ -1,0 +1,8 @@
+{
+  "entryStartedUTC": "2026-10-03T16:47:40.916Z",
+  "entryCompletedUTC": "2026-10-03T16:47:41.237Z",
+  "url": "https://alpha.teameet.co.kr/admin/content?tab=terms",
+  "runtimeServingSHA": "unknown",
+  "navigationScope": "Only initial full-navigation call bounds recorded. Collector reports no later reload/goto; subsequent hub-tab operations are SPA actions.",
+  "deploymentContextFile": "deployment-context.json"
+}

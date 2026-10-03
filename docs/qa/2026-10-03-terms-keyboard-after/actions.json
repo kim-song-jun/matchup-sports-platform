@@ -1,0 +1,337 @@
+[
+  {
+    "name": "mobile focus empty management-name field",
+    "startedUTC": "2026-10-03T16:49:45.246Z",
+    "completedUTC": "2026-10-03T16:49:45.522Z"
+  },
+  {
+    "name": "mobile placement initial Tab",
+    "startedUTC": "2026-10-03T16:49:45.604Z",
+    "completedUTC": "2026-10-03T16:49:45.673Z"
+  },
+  {
+    "name": "mobile placement ArrowDown to tournament",
+    "startedUTC": "2026-10-03T16:49:45.866Z",
+    "completedUTC": "2026-10-03T16:49:45.936Z"
+  },
+  {
+    "name": "mobile placement ArrowUp back to signup",
+    "startedUTC": "2026-10-03T16:49:46.156Z",
+    "completedUTC": "2026-10-03T16:49:46.226Z"
+  },
+  {
+    "name": "mobile Tab placement to consent",
+    "startedUTC": "2026-10-03T16:50:26.562Z",
+    "completedUTC": "2026-10-03T16:50:26.633Z"
+  },
+  {
+    "name": "mobile consent ArrowDown optional",
+    "startedUTC": "2026-10-03T16:50:26.814Z",
+    "completedUTC": "2026-10-03T16:50:26.883Z"
+  },
+  {
+    "name": "mobile consent ArrowUp required",
+    "startedUTC": "2026-10-03T16:50:27.069Z",
+    "completedUTC": "2026-10-03T16:50:27.141Z"
+  },
+  {
+    "name": "mobile consent set optional before placement reset",
+    "startedUTC": "2026-10-03T16:50:27.318Z",
+    "completedUTC": "2026-10-03T16:50:27.387Z"
+  },
+  {
+    "name": "mobile ShiftTab consent to placement",
+    "startedUTC": "2026-10-03T16:50:27.566Z",
+    "completedUTC": "2026-10-03T16:50:27.702Z"
+  },
+  {
+    "name": "mobile placement tournament resets optional to required",
+    "startedUTC": "2026-10-03T16:50:27.898Z",
+    "completedUTC": "2026-10-03T16:50:27.967Z"
+  },
+  {
+    "name": "mobile placement footer resets to display_only",
+    "startedUTC": "2026-10-03T16:50:28.151Z",
+    "completedUTC": "2026-10-03T16:50:28.221Z"
+  },
+  {
+    "name": "mobile placement tournament restores required options",
+    "startedUTC": "2026-10-03T16:50:28.407Z",
+    "completedUTC": "2026-10-03T16:50:28.476Z"
+  },
+  {
+    "name": "mobile placement signup restored",
+    "startedUTC": "2026-10-03T16:50:28.668Z",
+    "completedUTC": "2026-10-03T16:50:28.737Z"
+  },
+  {
+    "name": "mobile Space placement popup",
+    "startedUTC": "2026-10-03T16:50:43.437Z",
+    "completedUTC": "2026-10-03T16:50:43.507Z"
+  },
+  {
+    "name": "mobile Escape placement retains value and focus",
+    "startedUTC": "2026-10-03T16:50:58.884Z",
+    "completedUTC": "2026-10-03T16:50:58.953Z"
+  },
+  {
+    "name": "mobile Tab placement to consent for popup",
+    "startedUTC": "2026-10-03T16:50:59.140Z",
+    "completedUTC": "2026-10-03T16:50:59.208Z"
+  },
+  {
+    "name": "mobile Space consent popup",
+    "startedUTC": "2026-10-03T16:50:59.389Z",
+    "completedUTC": "2026-10-03T16:50:59.457Z"
+  },
+  {
+    "name": "mobile Escape consent retains value and focus",
+    "startedUTC": "2026-10-03T16:50:59.709Z",
+    "completedUTC": "2026-10-03T16:50:59.778Z"
+  },
+  {
+    "name": "mobile Tab consent to order",
+    "startedUTC": "2026-10-03T16:50:59.970Z",
+    "completedUTC": "2026-10-03T16:51:00.042Z"
+  },
+  {
+    "name": "mobile ShiftTab order to consent",
+    "startedUTC": "2026-10-03T16:51:00.247Z",
+    "completedUTC": "2026-10-03T16:51:00.383Z"
+  },
+  {
+    "name": "mobile ShiftTab consent to placement end",
+    "startedUTC": "2026-10-03T16:51:00.573Z",
+    "completedUTC": "2026-10-03T16:51:00.715Z"
+  },
+  {
+    "name": "tablet focus empty management-name field",
+    "startedUTC": "2026-10-03T16:51:40.630Z",
+    "completedUTC": "2026-10-03T16:51:40.912Z"
+  },
+  {
+    "name": "tablet placement initial Tab",
+    "startedUTC": "2026-10-03T16:51:41.001Z",
+    "completedUTC": "2026-10-03T16:51:41.070Z"
+  },
+  {
+    "name": "tablet placement ArrowDown to tournament",
+    "startedUTC": "2026-10-03T16:51:41.260Z",
+    "completedUTC": "2026-10-03T16:51:41.334Z"
+  },
+  {
+    "name": "tablet placement ArrowUp back to signup",
+    "startedUTC": "2026-10-03T16:51:41.567Z",
+    "completedUTC": "2026-10-03T16:51:41.638Z"
+  },
+  {
+    "name": "tablet Tab placement to consent",
+    "startedUTC": "2026-10-03T16:51:41.824Z",
+    "completedUTC": "2026-10-03T16:51:41.893Z"
+  },
+  {
+    "name": "tablet consent ArrowDown optional",
+    "startedUTC": "2026-10-03T16:51:42.103Z",
+    "completedUTC": "2026-10-03T16:51:42.176Z"
+  },
+  {
+    "name": "tablet consent ArrowUp required",
+    "startedUTC": "2026-10-03T16:51:42.376Z",
+    "completedUTC": "2026-10-03T16:51:42.451Z"
+  },
+  {
+    "name": "tablet consent set optional before placement reset",
+    "startedUTC": "2026-10-03T16:51:42.651Z",
+    "completedUTC": "2026-10-03T16:51:42.719Z"
+  },
+  {
+    "name": "tablet ShiftTab consent to placement",
+    "startedUTC": "2026-10-03T16:51:42.905Z",
+    "completedUTC": "2026-10-03T16:51:43.041Z"
+  },
+  {
+    "name": "tablet placement tournament resets optional to required",
+    "startedUTC": "2026-10-03T16:51:43.248Z",
+    "completedUTC": "2026-10-03T16:51:43.317Z"
+  },
+  {
+    "name": "tablet placement footer resets to display_only",
+    "startedUTC": "2026-10-03T16:51:43.517Z",
+    "completedUTC": "2026-10-03T16:51:43.589Z"
+  },
+  {
+    "name": "tablet placement tournament restores required options",
+    "startedUTC": "2026-10-03T16:51:43.808Z",
+    "completedUTC": "2026-10-03T16:51:43.877Z"
+  },
+  {
+    "name": "tablet placement signup restored",
+    "startedUTC": "2026-10-03T16:51:44.079Z",
+    "completedUTC": "2026-10-03T16:51:44.151Z"
+  },
+  {
+    "name": "tablet Space placement popup",
+    "startedUTC": "2026-10-03T16:52:03.969Z",
+    "completedUTC": "2026-10-03T16:52:04.038Z"
+  },
+  {
+    "name": "tablet Escape placement retains value and focus",
+    "startedUTC": "2026-10-03T16:52:04.291Z",
+    "completedUTC": "2026-10-03T16:52:04.360Z"
+  },
+  {
+    "name": "tablet Tab placement to consent for popup",
+    "startedUTC": "2026-10-03T16:52:04.555Z",
+    "completedUTC": "2026-10-03T16:52:04.626Z"
+  },
+  {
+    "name": "tablet Space consent popup",
+    "startedUTC": "2026-10-03T16:52:04.821Z",
+    "completedUTC": "2026-10-03T16:52:04.891Z"
+  },
+  {
+    "name": "tablet Escape consent retains value and focus",
+    "startedUTC": "2026-10-03T16:52:05.113Z",
+    "completedUTC": "2026-10-03T16:52:05.183Z"
+  },
+  {
+    "name": "tablet Tab consent to order",
+    "startedUTC": "2026-10-03T16:52:05.384Z",
+    "completedUTC": "2026-10-03T16:52:05.455Z"
+  },
+  {
+    "name": "tablet ShiftTab order to consent",
+    "startedUTC": "2026-10-03T16:52:05.682Z",
+    "completedUTC": "2026-10-03T16:52:05.818Z"
+  },
+  {
+    "name": "tablet ShiftTab consent to placement end",
+    "startedUTC": "2026-10-03T16:52:06.004Z",
+    "completedUTC": "2026-10-03T16:52:06.141Z"
+  },
+  {
+    "name": "desktop focus empty management-name field",
+    "startedUTC": "2026-10-03T16:52:37.999Z",
+    "completedUTC": "2026-10-03T16:52:38.283Z"
+  },
+  {
+    "name": "desktop placement initial Tab",
+    "startedUTC": "2026-10-03T16:52:38.371Z",
+    "completedUTC": "2026-10-03T16:52:38.440Z"
+  },
+  {
+    "name": "desktop placement ArrowDown to tournament",
+    "startedUTC": "2026-10-03T16:52:38.690Z",
+    "completedUTC": "2026-10-03T16:52:38.760Z"
+  },
+  {
+    "name": "desktop placement ArrowUp back to signup",
+    "startedUTC": "2026-10-03T16:52:39.014Z",
+    "completedUTC": "2026-10-03T16:52:39.084Z"
+  },
+  {
+    "name": "desktop Tab placement to consent",
+    "startedUTC": "2026-10-03T16:52:39.291Z",
+    "completedUTC": "2026-10-03T16:52:39.360Z"
+  },
+  {
+    "name": "desktop consent ArrowDown optional",
+    "startedUTC": "2026-10-03T16:52:39.595Z",
+    "completedUTC": "2026-10-03T16:52:39.666Z"
+  },
+  {
+    "name": "desktop consent ArrowUp required",
+    "startedUTC": "2026-10-03T16:52:39.875Z",
+    "completedUTC": "2026-10-03T16:52:39.944Z"
+  },
+  {
+    "name": "desktop consent set optional before placement reset",
+    "startedUTC": "2026-10-03T16:52:40.160Z",
+    "completedUTC": "2026-10-03T16:52:40.229Z"
+  },
+  {
+    "name": "desktop ShiftTab consent to placement",
+    "startedUTC": "2026-10-03T16:52:40.448Z",
+    "completedUTC": "2026-10-03T16:52:40.585Z"
+  },
+  {
+    "name": "desktop placement tournament resets optional to required",
+    "startedUTC": "2026-10-03T16:52:40.803Z",
+    "completedUTC": "2026-10-03T16:52:40.872Z"
+  },
+  {
+    "name": "desktop placement footer resets to display_only",
+    "startedUTC": "2026-10-03T16:52:41.075Z",
+    "completedUTC": "2026-10-03T16:52:41.144Z"
+  },
+  {
+    "name": "desktop placement tournament restores required options",
+    "startedUTC": "2026-10-03T16:52:41.372Z",
+    "completedUTC": "2026-10-03T16:52:41.441Z"
+  },
+  {
+    "name": "desktop placement signup restored",
+    "startedUTC": "2026-10-03T16:52:41.638Z",
+    "completedUTC": "2026-10-03T16:52:41.707Z"
+  },
+  {
+    "name": "desktop Space placement popup",
+    "startedUTC": "2026-10-03T16:53:01.458Z",
+    "completedUTC": "2026-10-03T16:53:01.527Z"
+  },
+  {
+    "name": "desktop Escape placement retains value and focus",
+    "startedUTC": "2026-10-03T16:53:01.782Z",
+    "completedUTC": "2026-10-03T16:53:01.851Z"
+  },
+  {
+    "name": "desktop Tab placement to consent for popup",
+    "startedUTC": "2026-10-03T16:53:02.071Z",
+    "completedUTC": "2026-10-03T16:53:02.140Z"
+  },
+  {
+    "name": "desktop Space consent popup",
+    "startedUTC": "2026-10-03T16:53:02.346Z",
+    "completedUTC": "2026-10-03T16:53:02.414Z"
+  },
+  {
+    "name": "desktop Escape consent retains value and focus",
+    "startedUTC": "2026-10-03T16:53:02.661Z",
+    "completedUTC": "2026-10-03T16:53:02.729Z"
+  },
+  {
+    "name": "desktop Tab consent to order",
+    "startedUTC": "2026-10-03T16:53:02.941Z",
+    "completedUTC": "2026-10-03T16:53:03.009Z"
+  },
+  {
+    "name": "desktop ShiftTab order to consent",
+    "startedUTC": "2026-10-03T16:53:03.240Z",
+    "completedUTC": "2026-10-03T16:53:03.375Z"
+  },
+  {
+    "name": "desktop ShiftTab consent to placement end",
+    "startedUTC": "2026-10-03T16:53:03.584Z",
+    "completedUTC": "2026-10-03T16:53:03.719Z"
+  },
+  {
+    "name": "Leave empty local draft through notices hub tab",
+    "startedUTC": "2026-10-03T16:53:45.486Z",
+    "completedUTC": "2026-10-03T16:53:45.641Z"
+  },
+  {
+    "name": "Return to terms hub for fresh local reentry check",
+    "startedUTC": "2026-10-03T16:53:45.782Z",
+    "completedUTC": "2026-10-03T16:53:46.025Z"
+  },
+  {
+    "name": "Open fresh empty terms policy without save",
+    "startedUTC": "2026-10-03T16:53:46.274Z",
+    "completedUTC": "2026-10-03T16:53:46.550Z"
+  },
+  {
+    "name": "Final exit from blank draft through notices hub tab",
+    "startedUTC": "2026-10-03T16:53:46.759Z",
+    "completedUTC": "2026-10-03T16:53:47.315Z"
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "utc": "2026-10-03T16:51:32.502Z",
+    "viewport": {
+      "dpr": 1.25,
+      "height": 606,
+      "scrollWidth": 402,
+      "scrollY": 1925.5999755859375,
+      "width": 402
+    },
+    "placementCount": 1,
+    "consentCount": 1,
+    "orderCount": 1
+  },
+  {
+    "utc": "2026-10-03T16:52:06.322Z",
+    "viewport": {
+      "dpr": 1.5,
+      "height": 505,
+      "scrollWidth": 787,
+      "scrollY": 1837.3333740234375,
+      "width": 787
+    },
+    "placementCount": 1,
+    "consentCount": 1,
+    "orderCount": 1
+  },
+  {
+    "utc": "2026-10-03T16:53:03.925Z",
+    "viewport": {
+      "dpr": 1,
+      "height": 757,
+      "scrollWidth": 1181,
+      "scrollY": 1677,
+      "width": 1181
+    },
+    "placementCount": 1,
+    "consentCount": 1,
+    "orderCount": 1
+  }
+]

@@ -140,7 +140,7 @@ push_dev() {
 # 그 CI run 을 직접 dispatch 해 만든다 — 반드시 dispatch_alpha_deploy 보다 먼저 부른다.
 dispatch_ci() {
   if ! gh workflow run deploy.yml --repo "${GITHUB_REPOSITORY}" --ref dev; then
-    log "deploy.yml(CI) dispatch 에 실패했다 — 버전 커밋은 이미 dev 에 push 됐으니 수동으로 deploy.yml 을 ref=dev 로 dispatch 한 뒤 deploy-alpha.yml 을 dispatch 하라."
+    log "deploy.yml(CI) dispatch 에 실패했다 — 버전 커밋은 이미 dev 에 push 됐다. 사람이 수동 dispatch 한 deploy.yml 은 alpha 배포가 CI 로 인정하지 않으니(github-actions[bot] dispatch 만 인정), 사람이 dev 에 push/머지하는 다음 커밋의 push CI 와 alpha 배포로 이어 가라."
     return 1
   fi
 }

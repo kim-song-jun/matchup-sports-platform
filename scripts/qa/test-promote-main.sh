@@ -310,6 +310,7 @@ test_ci_dispatch_failure_stops_before_alpha() {
   capture_main
   [[ "${rc}" -ne 0 ]] || fail "(d2) CI dispatch 가 실패했는데 main 이 성공했다"
   [[ "${out}" == *"deploy.yml(CI) dispatch 에 실패했다"* ]] || fail "(d2) 수동 조치 안내 메시지가 없다: ${out}"
+  [[ "${out}" == *"CI 로 인정하지 않으니"* ]] || fail "(d2) 사람 dispatch 가 인정되지 않는다는 안내가 없다: ${out}"
   [[ "${FAKE_GH_WORKFLOW_RUNS[*]}" == 'deploy.yml@dev' ]] \
     || fail "(d2) CI dispatch 실패 뒤 alpha 배포를 dispatch 했다 (실측: ${FAKE_GH_WORKFLOW_RUNS[*]:-<none>})"
   [[ ! -s "${GITHUB_STEP_SUMMARY}" ]] || fail "(d2) dispatch 실패인데 summary 에 PR 링크가 남았다"

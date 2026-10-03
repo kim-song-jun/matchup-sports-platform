@@ -15,16 +15,17 @@ fail() {
   exit 1
 }
 
-# run <id> <event> <status> <conclusion|null> <sha> <login> <created_at> [head_branch]
+# run <id> <event> <status> <conclusion|null> <sha> <login> <created_at> [head_branch] [triggering_login]
+# triggering_login 을 생략하면 actor 와 같다(재실행이면 사람으로 갈라진다).
 run_json() {
-  local id="$1" event="$2" status="$3" conclusion="$4" sha="$5" login="$6" created="$7" branch="${8:-dev}"
+  local id="$1" event="$2" status="$3" conclusion="$4" sha="$5" login="$6" created="$7" branch="${8:-dev}" trig="${9:-$6}"
   jq -nc --argjson id "${id}" --arg event "${event}" --arg status "${status}" \
     --arg conclusion "${conclusion}" --arg sha "${sha}" --arg login "${login}" \
-    --arg created "${created}" --arg branch "${branch}" '{
+    --arg created "${created}" --arg branch "${branch}" --arg trig "${trig}" '{
       id: $id, event: $event, status: $status,
       conclusion: (if $conclusion == "null" then null else $conclusion end),
       head_sha: $sha, head_branch: $branch, created_at: $created,
-      actor: {login: $login}, triggering_actor: {login: $login}
+      actor: {login: $login}, triggering_actor: {login: $trig}
     }'
 }
 
@@ -59,11 +60,14 @@ expect 'bot workflow_dispatch success' pass \
 expect 'human workflow_dispatch is not accepted' wait \
   "$(run_json 3 workflow_dispatch completed success "${SHA}" kim-song-jun "${T1}")"
 
-# triggering_actor 가 없으면 actor 로 판정한다.
-fallback_run="$(run_json 4 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}" | jq -c 'del(.triggering_actor)')"
-expect 'dispatch falls back to actor.login' pass "${fallback_run}"
-human_fallback="$(run_json 5 workflow_dispatch completed success "${SHA}" human "${T1}" | jq -c 'del(.triggering_actor)')"
-expect 'dispatch fallback actor human is not accepted' wait "${human_fallback}"
+# 회귀 대상: bot 이 건 dispatch run 을 사람이 `gh run rerun` 하면 actor 는 bot 그대로,
+# triggering_actor 만 사람이다(실측: deploy.yml run 37114520414). 재실행도 인정해야 한다.
+rerun_run="$(run_json 4 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
+expect 'human re-run of bot dispatch is accepted' pass "${rerun_run}"
+expect 'human dispatch re-run by human is not accepted' wait \
+  "$(run_json 5 workflow_dispatch completed success "${SHA}" kim-song-jun "${T1}" dev kim-song-jun)"
+expect 'failed human re-run of bot dispatch fails' 'fail failure' \
+  "$(run_json 19 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
 
 expect 'other SHA is ignored' wait \
   "$(run_json 6 push completed success "${OTHER_SHA}" human "${T1}")"

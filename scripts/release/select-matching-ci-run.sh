@@ -10,6 +10,8 @@
 #   - Promote to main 이 버전 커밋을 push 한 뒤 직접 건 workflow_dispatch run
 #     (GITHUB_TOKEN push 는 push CI 를 만들지 못한다). 사람이 건 dispatch 는 HEAD^ 기준
 #     게이트라 여러 커밋 push 의 범위보다 좁게 검사할 수 있어 인정하지 않는다.
+#     dispatch 주체는 actor 로만 본다: 사람이 `gh run rerun` 하면 triggering_actor 만 사람으로
+#     바뀌고 actor 는 원래 dispatch 주체(bot)로 남으므로, triggering_actor 를 보면 flaky 재실행이 막힌다.
 # pull_request run 도 head_branch 가 dev 로 찍히므로 event 로 걸러야 한다.
 # 여러 run 이 맞으면 가장 최근 것으로 판정한다.
 
@@ -23,7 +25,7 @@ jq -er --arg sha "${release_sha}" '
     | select(
         .event == "push"
         or (.event == "workflow_dispatch"
-            and ((.triggering_actor.login // .actor.login) == "github-actions[bot]"))
+            and .actor.login == "github-actions[bot]")
       )
   ]
   | sort_by([.created_at, .id])
